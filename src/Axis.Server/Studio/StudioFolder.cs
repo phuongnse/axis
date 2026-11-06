@@ -150,10 +150,20 @@ internal static class StudioFolder
     /// that is not a valid resource is kept, so the publisher reports it. The same files as <see cref="List"/> are
     /// reachable: no link, no hidden file and nothing that leaves the folder.
     /// </summary>
-    public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder)
+    public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder) =>
+        [.. Files(folder).Select(file => new StudioSnapshotFile(
+            file.File,
+            Convert.ToHexStringLower(SHA256.HashData(file.Bytes)),
+            Encoding.UTF8.GetString(file.Bytes)))];
+
+    /// <summary>
+    /// The path relative to <paramref name="folder"/> and the bytes of every file <see cref="Snapshot"/> lists, sorted
+    /// by path ordinally. One mechanism decides which files a snapshot and a revision hold.
+    /// </summary>
+    public static IReadOnlyList<(string File, byte[] Bytes)> Files(string folder)
     {
         var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
-        var files = new List<StudioSnapshotFile>();
+        var files = new List<(string File, byte[] Bytes)>();
         foreach (var path in Directory.EnumerateFiles(folder, "*.json", _enumeration))
         {
             if (!Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal))
@@ -163,11 +173,7 @@ internal static class StudioFolder
 
             try
             {
-                var bytes = File.ReadAllBytes(path);
-                files.Add(new StudioSnapshotFile(
-                    Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'),
-                    Convert.ToHexStringLower(SHA256.HashData(bytes)),
-                    Encoding.UTF8.GetString(bytes)));
+                files.Add((Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'), File.ReadAllBytes(path)));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {

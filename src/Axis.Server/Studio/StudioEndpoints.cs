@@ -402,6 +402,7 @@ internal static class StudioEndpoints
 
             var outcome = await StudioWrites.WriteLayerAsync(
                 writeLock,
+                await RevisionsAsync(httpContext, options, folder),
                 folder,
                 module,
                 found.Name,
@@ -545,7 +546,15 @@ internal static class StudioEndpoints
         }
 
         var outcome = await StudioWrites.WriteLayerAsync(
-            writeLock, folder, module, found.Name, difference.Changes, ifMatch, ifNoneMatch: false, httpContext.RequestAborted);
+            writeLock,
+            await RevisionsAsync(httpContext, options, folder),
+            folder,
+            module,
+            found.Name,
+            difference.Changes,
+            ifMatch,
+            ifNoneMatch: false,
+            httpContext.RequestAborted);
         return LayerAnswer(httpContext, folder, packages, modules, outcome);
     }
 
@@ -705,7 +714,13 @@ internal static class StudioEndpoints
         }
 
         var outcome = await StudioWrites.PatchAsync(
-            writeLock, folder, found.Id, patch, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+            writeLock,
+            await RevisionsAsync(httpContext, options, folder),
+            folder,
+            found.Id,
+            patch,
+            request.Headers.IfMatch.ToString(),
+            httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Unavailable:
@@ -761,7 +776,8 @@ internal static class StudioEndpoints
             return Problem(StatusCodes.Status400BadRequest, problem!);
         }
 
-        var outcome = await StudioWrites.CreateAsync(writeLock, folder, id, file, content, httpContext.RequestAborted);
+        var outcome = await StudioWrites.CreateAsync(
+            writeLock, await RevisionsAsync(httpContext, options, folder), folder, id, file, content, httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Exists:
@@ -877,7 +893,8 @@ internal static class StudioEndpoints
             return Problem(StatusCodes.Status400BadRequest, "Each change must name a different resource and file.");
         }
 
-        var outcome = await StudioWrites.ChangesAsync(writeLock, folder, changes, httpContext.RequestAborted);
+        var outcome = await StudioWrites.ChangesAsync(
+            writeLock, await RevisionsAsync(httpContext, options, folder), folder, changes, httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Unavailable:
@@ -949,7 +966,12 @@ internal static class StudioEndpoints
         }
 
         var outcome = await StudioWrites.DeleteAsync(
-            writeLock, folder, found.Id, request.Headers.IfMatch.ToString(), httpContext.RequestAborted);
+            writeLock,
+            await RevisionsAsync(httpContext, options, folder),
+            folder,
+            found.Id,
+            request.Headers.IfMatch.ToString(),
+            httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Unavailable:
@@ -1015,7 +1037,8 @@ internal static class StudioEndpoints
             return Problem(StatusCodes.Status400BadRequest, InvalidTextWrite);
         }
 
-        var outcome = await StudioWrites.WriteTextAsync(writeLock, folder, key, texts, httpContext.RequestAborted);
+        var outcome = await StudioWrites.WriteTextAsync(
+            writeLock, await RevisionsAsync(httpContext, options, folder), folder, key, texts, httpContext.RequestAborted);
         switch (outcome.Refusal)
         {
             case StudioWriteRefusal.Unavailable:
@@ -1080,6 +1103,19 @@ internal static class StudioEndpoints
         return StudioFolder.Find(ForRequest(httpContext, options), application) is { } folder
             ? (folder, null)
             : (null, NotFound("No Studio folder holds an application with this name."));
+    }
+
+    // The revisions of a write to the folder, by the signed-in user, or null when the server keeps no revisions. The
+    // routes call it after FindFolderAsync, which has checked the session.
+    internal static async Task<StudioRevisions?> RevisionsAsync(HttpContext httpContext, StudioOptions options, string folder)
+    {
+        var user = await CurrentUsers.FindAsync(httpContext);
+        return StudioRevisions.For(
+            ForRequest(httpContext, options).RevisionsPath,
+            folder,
+            user!.Id,
+            user.DisplayName,
+            httpContext.RequestServices.GetRequiredService<ILogger<StudioRevisions>>());
     }
 
     // The options of this request: in a cell, the applications folder of the request's tenant alone.
