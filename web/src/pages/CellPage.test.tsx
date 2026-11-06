@@ -51,7 +51,7 @@ describe('CellPage', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('shows the id, the region and the tenants against the cap', async () => {
-    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: 50 })
+    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: 50, restoreCheck: null })
     renderPage()
 
     const overview = await screen.findByTestId('cell-overview')
@@ -61,12 +61,48 @@ describe('CellPage', () => {
   })
 
   it('shows the count alone when the cell has no cap', async () => {
-    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: null })
+    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: null, restoreCheck: null })
     renderPage()
 
     const overview = await screen.findByTestId('cell-overview')
     expect(overview).toHaveTextContent('12')
     expect(overview).not.toHaveTextContent('of')
+  })
+
+  it('shows the result, the tenant and the time of the newest restore check', async () => {
+    stubCell(200, {
+      id: 'vn-1',
+      region: 'vn',
+      tenants: 12,
+      cap: 50,
+      restoreCheck: { ranAt: '2026-11-01T02:00:00Z', tenantId: 'acme', passed: true },
+    })
+    renderPage()
+
+    const check = await screen.findByTestId('cell-restore-check')
+    expect(check).toHaveTextContent('Passed')
+    expect(check).toHaveTextContent('acme')
+    expect(check).toHaveTextContent(new Date('2026-11-01T02:00:00Z').toLocaleString('en'))
+  })
+
+  it('shows a failed restore check as failed', async () => {
+    stubCell(200, {
+      id: 'vn-1',
+      region: 'vn',
+      tenants: 12,
+      cap: 50,
+      restoreCheck: { ranAt: '2026-11-01T02:00:00Z', tenantId: 'acme', passed: false },
+    })
+    renderPage()
+
+    expect(await screen.findByTestId('cell-restore-check')).toHaveTextContent('Failed, tenant acme')
+  })
+
+  it('shows a dash when no restore check has run', async () => {
+    stubCell(200, { id: 'vn-1', region: 'vn', tenants: 12, cap: 50, restoreCheck: null })
+    renderPage()
+
+    expect(await screen.findByTestId('cell-restore-check')).toHaveTextContent('—')
   })
 
   it('reports a refusal to the console', async () => {

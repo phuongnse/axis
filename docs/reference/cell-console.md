@@ -84,11 +84,10 @@ operator's display name from the session read in place of the app switcher and t
 notification bell. The built views are read only, except for the actions of the Tenant view.
 
 - **Cell.** The cell id, its region, and the number of tenants against [the cap](cells.md#cell-size). With no
-  cap it shows the count alone.
+  cap it shows the count alone. It also shows the newest [restore check](tenant-backup-and-restore.md#weekly-restore-check):
+  its result, its source tenant and its time, or a dash when no check has run.
 - **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
   step with its state, and the error of a failed job or step.
-- **Cell restore check** _(planned for M31)_. The Cell view also shows the cell's newest restore check with its
-  result, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
 - **Tenants.** One row per tenant, with a search by id and host and a filter by status. The search and the
   filter run in the browser. A row shows:
   - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`), the application and

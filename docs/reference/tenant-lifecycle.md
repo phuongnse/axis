@@ -87,7 +87,7 @@ over the schema role.
 
 | Route | What it does |
 | --- | --- |
-| `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. |
+| `GET /api/cell` | Answers the cell as `{ "id", "region", "tenants", "cap", "restoreCheck" }`. `tenants` counts the cell's tenants whatever their status and leaves out preview tenants. `cap` is `Cell:TenantCap`, see [cell size](cells.md#cell-size), or `null` when it is not set. `restoreCheck` is `{ "ranAt", "tenantId", "passed" }` of the newest [weekly restore check](tenant-backup-and-restore.md#weekly-restore-check), or `null` when no check has run. |
 | `GET /api/cell/auth/sign-in` | Sends the operator to the operator realm's login page, see [sign-in](cell-console.md#sign-in). It needs no session and answers `404` on any host but the console host, and when the console offers no sign-in. |
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
 | `GET /api/cell/session` | Answers the signed-in operator as `{ "displayName" }`, see [sign-in](cell-console.md#sign-in). Needs the operator role. |
