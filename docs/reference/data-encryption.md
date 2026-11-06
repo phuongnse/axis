@@ -59,10 +59,10 @@ collection, and none writes a sensitive value in clear.
   stored. Its record steps, task completions, seeds and process steps use the cipher. A read under a grant whose
   `filter` tests an exact lookup field matches through the lookup hashes, and so do a data source `filter` and a
   measure's `filter` in the rows, the export and the id read of the trigger fan-out.
-- **Triggers and start conditions** _(planned for M26)_. The data change trigger, the event trigger start, the task
+- **Triggers and start conditions** _(planned for M30)_. The data change trigger, the event trigger start, the task
   escalation and the inbound endpoint start condition read a record that holds a stored sensitive value with the
   cipher.
-- **Recomputing computed fields** _(planned for M26)_. Activation's inline recompute of computed fields and the worker's
+- **Recomputing computed fields** _(planned for M30)_. Activation's inline recompute of computed fields and the worker's
   `computed.backfill` read and write an entity that holds stored sensitive values with the cipher.
 
 ### Tests
@@ -115,9 +115,9 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   `filter`, so `==` matches the records whose field is empty and `!=` matches the records whose field has a value. The
   rows, their export and the trigger fan-out of a schedule trigger apply the `filter` this way, and a read that reaches
   it without the tenant's keys throws.
-- **A search after a rotation** _(planned for M26)_. A search reads the tenant's lookup keys again before it hashes, so
+- **A search after a rotation** _(planned for M30)_. A search reads the tenant's lookup keys again before it hashes, so
   it matches under every lookup key the tenant holds, also on a server that read the keys before a rotation.
-- **A caller's filter** _(planned for M26)_. A caller's filter may test an exact lookup field the same way.
+- **A caller's filter** _(planned for M30)_. A caller's filter may test an exact lookup field the same way.
 - **What the hash shows.** Two records with the same value have the same hash, so whoever reads the table can see that
   they match. That is the cost of the lookup.
 
@@ -234,7 +234,7 @@ counts the values it re-encrypted and the hashes it recomputed, so `0` means tha
   with its older key until it reads a value under the new one, or restarts. Those values name an older key, and a
   second `rotate` updates them. A server that read the keys before the rotation still reads a rewritten value, because
   the new number is one it does not hold, so it reads the keys again.
-- **A search meanwhile** _(planned for M26)_. An exact lookup search reads the keys again, as
+- **A search meanwhile** _(planned for M30)_. An exact lookup search reads the keys again, as
   [exact lookup](#exact-lookup) says, so it finds a record that rotate re-hashed.
 - **A failure.** A value that does not decrypt stops rotate at its table, with the line
   `<id> data-key rotate failed: <message>` and exit code `1`. The message holds no value and no key. The tables before
@@ -288,5 +288,5 @@ carries the tenant's keys, so a restored tenant reads its sensitive values.
   The `check` step decrypts only as far as the manifest and the start of `tenant.dump`. The `restore` step decrypts to
   the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
   is restored, and a rerun with a good archive finishes the restore.
-- **A restore under a new tenant id** _(planned for M26)_. A value's associated data names the tenant id, so a restore
+- **A restore under a new tenant id** _(planned for M30)_. A value's associated data names the tenant id, so a restore
   under a new tenant id encrypts each stored value again under the new id.
