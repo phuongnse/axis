@@ -2,79 +2,53 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. It replaces two points of
-[D40](d40-reusable-modules.md): that processes, pages, roles and policies stay
-out of a module, and that a module does not depend on other modules. Roles stay
-out. Everything else in D40 holds. See
-[modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
+## Context
 
-Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies that name a slot are built too, with `AXC0304` and `AXC0305`. Task assignees that name a slot are built too, with `AXC0307`.
+A [module](d40-reusable-modules.md) that holds only data and rules cannot ship a working feature,
+such as an approval with its screens and permissions. A module cannot know the roles of the
+applications that use it, and a feature often builds on another, such as approvals on an
+organization's departments.
 
-Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Connector slots and running module processes are built too. A module's `packages` are built: its process steps call their operations, and the release pins them with the application's.
+## Decision
 
-The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is built too, see [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies). A module policy's grants on the processes of its own module are built too.
+- **A module holds processes, pages and policies,** besides the kinds of D40, and triggers and
+  scenarios as [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) adds. It holds no
+  `role`, `site`, `identityProvider`, `connector`, `endpoint` or `webhook`, because those need application bindings, an
+  inbound surface or a site.
+- **Role slots stand for roles.** `module.json` declares role slots, and module policies and task
+  assignees name a slot. The application's `modules` entry maps each slot to one of its own roles,
+  and a user who holds that role holds the slot. A module policy grants only on resources of its own
+  module.
+- **Module processes and pages work inside their module.** Their steps and widgets name resources of
+  their own module, and a process calls operations of the module's packages and, as D103 adds,
+  connectors through connector slots. The application starts a module process and lists a module
+  page in its site navigation by the name `<module id>/<name>`.
+- **A module may depend on other modules.** `module.json` declares `modules` as `application.json`
+  does, and a module names resources and calls rules only of the modules it declares. A depending
+  module maps the slots of a module it depends on to its own slots.
+- **The application resolves the graph flat.** Each module gets one version per application, the
+  highest installed version that meets every range that asks for it, and one copy with ids derived
+  from the application. A cycle is a diagnostic, and the application names resources only of the
+  modules it declares itself.
+- **Studio never edits a module's own files.** An author's change to a module resource is saved as
+  the application's customization layer, as
+  [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) agrees, which also gives
+  modules migrations for their upgrades.
 
-- **New kinds in a module:** a module may also hold `process`, `page` and
-  `policy` resources. It still holds no `role`, `site`, `connector`,
-  `endpoint`, `trigger` or `webhook`. Those need application bindings, an
-  inbound surface or a site, which a module cannot know.
-  - [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) replaces
-    this point: a module also holds triggers and scenarios, and names the
-    connectors it calls through connector slots.
-- **Role slots instead of roles:**
-  - `module.json` declares `roles`, a list of role slots, each with a `name`
-    and a `label`.
-  - Module policies and module task assignees name a slot. Naming anything
-    else is a diagnostic.
-  - The application's `modules` entry maps each slot to one of its own roles,
-    as `"roles": { "approver": "Manager" }`. A slot left unmapped, or mapped to
-    a role the application does not declare, is a diagnostic.
-  - After the mapping, a slot is that application role. A user who holds the
-    role holds the slot.
-  - A module policy grants only on resources of its own module.
-- **Pages:**
-  - A module page is named `<module id>/<name>`, as other module resources
-    are. Its widgets name resources of its own module.
-  - A module holds no site. The application's site navigation lists a module
-    page by that name.
-- **Processes:**
-  - A module process works on an entity of its own module. Its steps name
-    resources of its own module, and call operations of the module's
-    `packages`. It calls no connector, because a module holds none.
-  - An application starts it like its own processes: from a trigger, from a
-    `startProcess` action, or from a sub-process step, by the name
-    `<module id>/<name>`.
-  - It is pinned with the rest of the release, as every module file is.
-- **Dependencies:**
-  - `module.json` gets `modules`, with the same shape as in
-    `application.json`. A module names resources and calls rules only of the
-    modules it declares, with the same `<module id>/<name>` and
-    `<module id>:<rule>(…)` forms an application uses.
-  - The application resolves the whole graph flat. Each module id gets one
-    version per application: the highest installed version that meets every
-    range that asks for it. No such version is a diagnostic that names every
-    module that asks.
-  - A cycle between modules is a diagnostic.
-  - A depending module maps the role slots of the module it depends on to its
-    own slots, in its `modules` entry.
-  - Each module gets one copy per application, with ids derived from the
-    application, as D40 says. A module that two others depend on is copied
-    once.
-  - An application names resources only of the modules it declares itself.
-- **Studio:** shows module resources read-only, as it shows module entities
-  today. Studio does not edit modules.
-  - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-    adds in M25 that Studio writes an application's customization layer over
-    a module. Modules themselves stay read-only.
-- **Upgrades:** a module upgrade must still be additive for its entities.
-  Adding a process, page or policy is additive.
-  - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-    replaces this point in M29, as [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves it: a module ships migrations.
+The detail is in
+[processes, pages, policies and dependencies](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
 
-_Why:_ a module that holds only data and rules cannot ship a working feature,
-such as an approval with its screens and permissions. Role slots let a module
-name who may act without knowing an application's roles, and the mapping
-stays in the application, where its roles are declared. One version per module
-in each application keeps the derived ids and tables of D40 unique.
-Connectors, endpoints and triggers stay out, so a module never needs bindings
-or an inbound surface of its own.
+## Consequences
+
+- A module can ship an approval with its process, screens and permissions.
+- The mapping of slots to roles stays in the application, where its roles are declared.
+- Two modules that ask for versions of a third that no single version meets cannot be used together
+  in one application.
+- A module never needs bindings or an inbound surface of its own.
+
+## Alternatives
+
+- **Roles inside a module.** A module would have to know the roles of every application that uses
+  it.
+- **Several versions of one module in an application.** The ids and tables that D40 derives from
+  the application would no longer be unique.

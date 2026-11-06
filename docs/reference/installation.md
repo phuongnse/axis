@@ -1,88 +1,67 @@
 # Installation
 
-How to install and upgrade Axis on premises and in the cloud. It follows
-[D44](../decisions/d44-packaging-for-on-premises-and-cloud-installation.md).
-The three production images, the Compose example and the Helm chart are built.
-The default target of the `Dockerfile` and `compose.yaml` at the repository
-root build the development images instead. Those hold the samples and
-development credentials, and they are not for production. See
-[development](../development.md#docker-compose) for them.
+This page says how a platform operator installs and upgrades Axis, on one machine with Docker Compose
+and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
+and the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-The conventions of [architecture.md](../architecture.md) apply, and Dn refers
-to [decisions.md](../decisions.md). In this page, "database role" always means
-the PostgreSQL role.
+An installation runs three hosts, from three production images:
 
-An installation has three hosts:
+| Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
+| ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The server               | `axis-server` | Serves the API, the sites and the SPA.                                                                                                                                                                                                                                     |
+| The worker               | `axis-worker` | Runs background work.                                                                                                                                                                                                                                                      |
+| The admin host           | `axis-admin`  | `Axis.Admin`, a command-line tool that a platform operator runs to create tenants, migrate tenant databases and activate releases, see [administration](administration.md).                                                                                                 |
+| The publisher            | `axis-admin`  | `axis-admin publisher`, a long-running command of the admin host that runs the publish requests that Studio stores, see [publisher](administration.md#publisher). It holds the schema role of every active tenant, so it runs apart from the server. It has no HTTP endpoint. |
 
-- The server serves the API, the sites and the SPA.
-- The worker runs background work.
-- The admin host, `Axis.Admin`, is a command-line tool. A platform operator
-  runs it to create tenants, migrate tenant databases and activate releases.
-  See [administration](administration.md).
-- The publisher, `axis-admin publisher`, is a
-  long-running command of the same host. It runs the publish requests that
-  Studio stores, see [publisher](administration.md#publisher). It holds the
-  schema role of every active tenant, so run it apart from the server. It has
-  no HTTP endpoint.
+An installation also needs a PostgreSQL 18 server, which Axis does not ship for production. The
+Compose example and the Helm chart both run [Axis's identity provider](identity-provider.md#installation),
+so an installation needs no OIDC provider of its own.
 
-An installation also needs a PostgreSQL 18 server. Axis does not ship one for
-production. The Compose example runs Axis's own identity provider, see
-[Axis's identity provider](identity-provider.md#installation), so it needs no
-OIDC provider of its own. The Helm chart runs it too.
-
-Every tenant database needs the `pg_trgm` extension, for
-[search](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
-`tenant create` and `migrate` create it in the `public` schema as the tenant's
-schema role. It is a trusted extension, so they need no superuser. The server
-must ship the contrib modules, as the official `postgres` images do. A managed
-service may need `pg_trgm` on its list of allowed extensions.
+Every tenant database needs the `pg_trgm` extension, for [search](record-api.md#paging-and-sorting).
+`tenant create` and `migrate` create it in the `public` schema as the tenant's schema role. It is a
+trusted extension, so they need no superuser. The PostgreSQL server must ship the contrib modules, as
+the official `postgres` images do, and a managed service may need `pg_trgm` on its list of allowed
+extensions.
 
 ## Images
 
-There are three production images: `axis-server`, `axis-worker` and
-`axis-admin`. They hold no sample, no sample extension package, no sample
-module, no development realm, no credential and no source control metadata
-such as `.git`. _(planned for M21)_ A fourth
-image, `axis-package-host`, runs the
-[package runners](extension-packages.md#package-runners) in the
-`package-host` container beside the worker. Compose and the Helm chart give
-that container no tenant settings, a read-only root file system, CPU and
-memory limits, and a network that reaches only the worker.
-`axis-controlplane` is the Axis SaaS control plane image, not part of an installation, see [control-plane.md](control-plane.md#image-and-chart).
+Axis ships three production images, `axis-server`, `axis-worker` and `axis-admin`. They hold no
+sample, no sample extension package, no sample module, no development realm, no credential and no
+source control metadata such as `.git`. The default target of the `Dockerfile` and the `compose.yaml`
+at the repository root build the development images instead, which hold the samples and development
+credentials and are not for production, see [development](../development.md#docker-compose).
+`axis-controlplane` is the image of the Axis SaaS control plane and not part of an installation, see
+[control plane](control-plane.md#image-and-chart).
 
-Build one from the repository root with
-`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
-Use `axis-worker` or `axis-admin` as the target for the other two. `AXIS_VERSION`
-defaults to `0.0.0-dev`.
+Build an image from the repository root with
+`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use `axis-worker` or
+`axis-admin` as the target for the other two. `AXIS_VERSION` defaults to `0.0.0-dev`.
 
-- **Environment.** They run the `Production` environment.
-- **User.** They run as a non-root user and work with a read-only root file
-  system.
-- **Settings.** They read settings only from environment variables and from
-  files in `/run/secrets`. Each file is named after a setting in its
-  environment variable form, such as `Platform__SecretKey`. Its content is the
-  value. Compose `secrets:` and Kubernetes secret volumes put files there.
-- **Packages and modules.** Mount extension packages at `/extensions` and
-  modules at `/modules`.
-- **Application folders.** Mount the folder into the admin container, then run
-  `activate` on it.
-- **No curl.** The images hold no `curl`, so they have no container health
-  check. Use the probes of the orchestrator, see
-  [health checks](../architecture.md#health-checks).
-- **PostgreSQL tools.** `axis-admin` holds the PostgreSQL 18 client tools, such
-  as `pg_dump`, for backup and restore.
+- **Environment.** The images run the `Production` environment.
+- **User.** They run as a non-root user, UID 1654, and work with a read-only root file system.
+- **Settings.** They read settings only from environment variables and from files in `/run/secrets`.
+  Each file is named after a setting in its environment variable form, such as `Platform__SecretKey`,
+  and its content is the value. Compose `secrets:` and Kubernetes secret volumes put files there.
+- **Packages and modules.** Mount extension packages at `/extensions` and modules at `/modules`.
+- **Application folders.** Mount the folder into the admin container, then run `activate` on it.
+- **No curl.** The images hold no `curl`, so they have no container health check. Use the probes of
+  the orchestrator, see [health checks](health-checks.md).
+- **PostgreSQL tools.** `axis-admin` holds the PostgreSQL 18 client tools, such as `pg_dump`, for
+  backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
-  `org.opencontainers.image.version`. `axis-admin version` prints it.
-- **Signed images** _(planned for M32)_. A release workflow publishes the images
-  to the GitHub container registry, each signed with cosign and with a CycloneDX
-  SBOM. Check the signature before an install or an upgrade, see
-  [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md).
+  `org.opencontainers.image.version`, and `axis-admin version` prints it.
+- **The package host image** _(planned for M21)_. A fourth image, `axis-package-host`, runs the
+  [package runners](extension-packages.md#package-runners) in the `package-host` container beside the
+  worker. Compose and the Helm chart give that container no tenant settings, a read-only root file
+  system, CPU and memory limits, and a network that reaches only the worker.
+- **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
+  container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
+  an install or an upgrade.
 
 ## Settings and secrets
 
-Every installation sets these. A value marked secret comes from a file in
-`/run/secrets` or from a secret store of the platform, never from a committed
-file.
+Every installation sets these settings. A value marked secret comes from a file in `/run/secrets` or
+from a secret store of the platform, never from a committed file.
 
 | Setting | Environment variable | Hosts | Secret | Source |
 | --- | --- | --- | --- | --- |
@@ -91,65 +70,64 @@ file.
 | `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it at start for the platform migrations, and for the unpooled connection that `PUT /api/cell/tenants/{id}/quotas` opens for each write. Revoking or blocking this role stops that route. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
-| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | no | Secret. Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value. Add the variable or a secret file yourself. |
+| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | yes | Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value, so add the variable or a secret file yourself. |
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](several-server-replicas.md). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin, publisher (in a cell) | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | admin, publisher (in a cell) | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | admin, publisher (in a cell) | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https` outside `Development` and `Testing`. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin, publisher (in a cell) | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin, publisher (in a cell) | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
 | `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | admin | yes | Optional. A read-only role of the identity provider's database, with `SELECT` on Keycloak's `credential` table only. With it, `tenant backup` writes the realm's users and credentials into the archive as `realm.json`, which a `tenant restore` into a new realm imports. Without it, no archive holds `realm.json`. Outside `Development` and `Testing` it must set `SSL Mode=VerifyFull`. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
-| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [On premises](#on-premises). |
+| `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [the scenario role](#the-scenario-role). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
-| `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which then fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
+| `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
 | `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080, plain HTTP. The Compose example and the Helm chart replace it with the Kestrel endpoint below, so nothing listens on 8080. |
 | `Kestrel:Endpoints:Https:Url` | `Kestrel__Endpoints__Https__Url` | server | no | The Compose example and the Helm chart set `https://+:8443`. A Kestrel endpoint replaces `ASPNETCORE_HTTP_PORTS`, so the server serves HTTPS only. |
 | `Kestrel:Endpoints:Https:Certificate:Path`, `Kestrel:Endpoints:Https:Certificate:KeyPath` | `Kestrel__Endpoints__Https__Certificate__Path`, `Kestrel__Endpoints__Https__Certificate__KeyPath` | server | no | The Compose example and the Helm chart set `/server-tls/tls.crt` and `/server-tls/tls.key`. The key is a private key, so the folder is a mounted volume and never a setting. See [TLS](#tls). |
+| `Kestrel:Endpoints:Internal:Url` | `Kestrel__Endpoints__Internal__Url` | server | no | A cell's internal listener, with its own certificate under `Kestrel:Endpoints:Internal:Certificate:Path` and `:KeyPath`. See [the internal listener](tenant-lifecycle.md#provisioning-api). |
 | `OTEL_*` | `OTEL_*` | server, worker | maybe | Optional. See [telemetry export](host-settings.md#telemetry-export). A collector token in the headers is secret. |
 
-Read the rules of each setting in
-[tenancy settings](host-settings.md#tenancy-settings) and
-[admin settings](host-settings.md#admin-settings). They are not repeated here.
+The rules of each setting are in [tenancy settings](host-settings.md#tenancy-settings) and
+[admin settings](host-settings.md#admin-settings). Three of them matter most for an installation:
 
-- **`ActivateOnStartup` must be empty** under `directory`, or the server stops
-  at start. The admin host activates releases, see
-  [administration](administration.md#activate).
-- **Tenant settings are not host settings.** A tenant's OIDC settings, database
-  passwords and bindings live in the tenant directory, and the secrets are
-  encrypted there. See [platform database](storage.md#platform-database). No
-  host setting holds them.
-- **The worker needs no schema connection** of any kind and gets no
+- **`ActivateOnStartup` must be empty** under `directory`, or the server stops at start. The admin
+  host activates releases, see [administration](administration.md#activate).
+- **Tenant settings are not host settings.** A tenant's OIDC settings, database passwords and
+  bindings live in the tenant directory, where the secrets are encrypted, see
+  [platform database](storage.md#platform-database). No host setting holds them.
+- **The worker needs no schema connection** of any kind, and it gets no
   `ConnectionStrings:PlatformSchema`.
 
 ## On premises
 
-This installs Axis on one machine with Docker Compose. PostgreSQL runs
-elsewhere. Compose runs [Axis's identity provider](identity-provider.md#installation)
-beside the server, with its own database on that PostgreSQL server. The example lives in `deploy/compose/`. Its
-`compose.yaml` has the server, the worker, the publisher, the identity provider, the TLS proxy and the admin host. One
-more service, a second server replica, sits under a profile, see
-"TLS proxy and a second replica" below. The server and
-the worker run the production images with a read-only root file system. The identity provider cannot, because
-Keycloak rebuilds itself at start and writes into its image. The
-admin host runs only when asked, through `docker compose run --rm admin`, so
-`docker compose up` does not start it. The file holds no password, client
-secret or key. The `publisher` service runs the `axis-admin` image with the
-command `publisher`, and `docker compose up` starts it. It gets the
-`ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
-`Admin__ConnectionString`. It publishes no port. Its `stop_grace_period` is six
-minutes, longer than the five-minute lease, so a stop lets the running request
-finish.
+This section installs Axis on one machine with Docker Compose, from the example in `deploy/compose/`.
+PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server with its own database
+on that PostgreSQL server.
 
-Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
-registry prefix. The comment at the top of `compose.yaml` lists every variable.
+The example's `compose.yaml` has the server, the worker, the publisher, the identity provider, the TLS
+proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second
+server replica sits under the `replicas` profile, see
+[TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password, client
+secret or key.
 
-**Before the first start.** Create these database roles on the PostgreSQL
-server, and the platform database. See [database roles](storage.md#database-roles)
-for what each may do.
+- **The server and the worker** run the production images with a read-only root file system. The
+  identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
+- **The admin host** runs only when asked, through `docker compose run --rm admin`.
+- **The publisher** runs the `axis-admin` image with the command `publisher`. It gets the
+  `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
+  `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
+  than the five-minute lease, so a stop lets the running request finish.
+- **The images.** Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
+  registry prefix. The comment at the top of `compose.yaml` lists every variable.
+
+### Database roles
+
+Before the first start, create these database roles and the platform database on the PostgreSQL
+server. [Database roles](storage.md#database-roles) says what each may do.
 
 ```sql
 CREATE ROLE axis_platform_schema LOGIN PASSWORD '<password>';
@@ -167,41 +145,43 @@ CREATE DATABASE axis_identity OWNER axis_identity;
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
 
-**The scenario role.** To let Studio run test scenarios, create one more role.
-It has `CREATEDB`, is not a superuser and owns no tenant database. Put its
-connection string in the secret file `Scenarios__ServerConnectionString`, and
-add `deploy/compose/compose.scenarios.yaml` to the Compose files, as
-`docker compose -f compose.yaml -f compose.scenarios.yaml ...` or with
-`COMPOSE_FILE=compose.yaml:compose.scenarios.yaml`. That file mounts the secret
-in the publisher only and sets `Studio__Tests=true` on both servers, so one
-cannot be on without the other. Without it, nothing changes: the publisher gets
-no scenario secret and Studio shows no test controls. `compose.yaml` does not
-declare the secret itself, because Compose fails to start a service whose secret
-file is missing, and that would force every operator to create it. The role owns
-no database, so its connection string names the `postgres` database. See
-[D55](../decisions/d55-running-test-scenarios-from-studio.md).
+The names are examples. Create the tenant database roles through `tenant create`, not by hand.
+`tenant create` also creates each tenant's realm in
+[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step). The identity provider
+starts with the admin client `axis-admin` in its `master` realm, whose secret is the
+`IdentityProvider__AdminClientSecret` file that the admin host reads too, so you write that secret
+once.
+
+### The scenario role
+
+To let Studio run test scenarios, create one more role. It has `CREATEDB`, is not a superuser and owns
+no tenant database. It owns no database at all, so its connection string names the `postgres`
+database.
 
 ```sql
 CREATE ROLE axis_scenario LOGIN PASSWORD '<password>' CREATEDB;
 ```
 
-Point it at a PostgreSQL server that holds no tenant data. If it shares the
-server with tenant databases, run
-`REVOKE CONNECT ON DATABASE <tenant database> FROM PUBLIC` for each one, because
-PostgreSQL lets every role connect by default. The scenario role can then
-connect to a tenant database but read nothing in it. The publisher drops each
-scenario database after use. After a crash, drop the `axis_scenario_*`
-databases that the role owns, see [publisher](administration.md#publisher).
+1. Put its connection string in the secret file `Scenarios__ServerConnectionString`.
+2. Add `deploy/compose/compose.scenarios.yaml` to the Compose files, as
+   `docker compose -f compose.yaml -f compose.scenarios.yaml ...` or with
+   `COMPOSE_FILE=compose.yaml:compose.scenarios.yaml`.
 
-The names are examples. Create the tenant database roles through
-`tenant create`, not by hand. `tenant create` also creates each tenant's realm in
-[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step). The identity provider starts with the admin
-client `axis-admin` in its `master` realm, and its secret is the `IdentityProvider__AdminClientSecret` file, which the
-admin host reads too. You write that secret once.
+That file mounts the secret in the publisher only and sets `Studio__Tests=true` on both servers, so
+one cannot be on without the other. Without it, the publisher gets no scenario secret and Studio shows
+no test controls. `compose.yaml` does not declare the secret itself, because Compose fails to start a
+service whose secret file is missing, and that would force every operator to create it.
 
-**The secret files.** Compose reads one file per secret from
-`AXIS_SECRETS_DIR`, which defaults to `./secrets` next to `compose.yaml`. Each
-file is named after its setting, and its content is the value.
+Point the role at a PostgreSQL server that holds no tenant data. If it shares the server with tenant
+databases, run `REVOKE CONNECT ON DATABASE <tenant database> FROM PUBLIC` for each one, because
+PostgreSQL lets every role connect by default. The scenario role can then connect to a tenant
+database but read nothing in it. The publisher drops each scenario database after use. After a crash,
+drop the `axis_scenario_*` databases that the role owns, see [publisher](administration.md#publisher).
+
+### The secret files
+
+Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./secrets` next to
+`compose.yaml`. Each file is named after its setting, and its content is the value.
 
 | File | Mounted in |
 | --- | --- |
@@ -215,299 +195,255 @@ file is named after its setting, and its content is the value.
 | `KC_DB_PASSWORD` | identity |
 | `Scenarios__ServerConnectionString` *(optional, only with `compose.scenarios.yaml`)* | publisher |
 
-Write each file with `printf '%s'`, so it has no trailing newline. Make the
-folder and the files readable by UID 1654, the user the images run as, and the
-files the identity provider reads readable by UID 1000, the user of the Keycloak image. The
-worker never gets `ConnectionStrings__PlatformSchema`. The three `KC_DB_*` files hold Keycloak's
-database settings: a JDBC URL such as
-`jdbc:postgresql://db.example.com:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt`, the user name
-and the password. Without `sslrootcert`, the PostgreSQL JDBC driver reads `~/.postgresql/root.crt`, which does not
-exist, and Keycloak does not start. For a PostgreSQL certificate from a public authority, use
-`sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory` instead of `sslrootcert`.
-A small entrypoint script turns each file into the variable of the same name, because Keycloak has no `_FILE`
-variables. Generate the key once
-with `openssl rand -base64 32`. Each connection string sets `SSL Mode=VerifyFull`,
-and `Root Certificate` when your PostgreSQL certificate comes from a private
-authority, because the hosts refuse anything weaker, see [TLS](#tls). The
-connection strings name the database server as the hosts reach it, which is a
-name in the PostgreSQL certificate. The admin tool records the host and port of
-`Admin__ConnectionString` as the tenant database server, so the server and the
-worker must reach it there too.
+- **Writing them.** Write each file with `printf '%s'`, so it has no trailing newline. Make the folder
+  and the files readable by UID 1654, the user the images run as, and the files that the identity
+  provider reads readable by UID 1000, the user of the Keycloak image.
+- **The installation key.** Generate it once with `openssl rand -base64 32`.
+- **The connection strings.** Each sets `SSL Mode=VerifyFull`, and `Root Certificate` when your
+  PostgreSQL certificate comes from a private authority, because the hosts refuse anything weaker, see
+  [TLS](#tls). They name the database server as the hosts reach it, which is a name in the PostgreSQL
+  certificate. The admin host records the host and port of `Admin__ConnectionString` as the tenant
+  database server, so the server and the worker must reach it there too.
+- **Keycloak's database settings.** The three `KC_DB_*` files hold a JDBC URL such as
+  `jdbc:postgresql://db.example.com:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt`,
+  the user name and the password. Without `sslrootcert`, the PostgreSQL JDBC driver reads
+  `~/.postgresql/root.crt`, which does not exist, and Keycloak does not start. For a PostgreSQL
+  certificate from a public authority, use `sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory`
+  instead of `sslrootcert`. Keycloak has no `_FILE` variables, so a small entrypoint script turns each
+  file into the variable of the same name.
 
-**The identity provider.** It needs these before the first start.
+### The identity provider
 
-- **`AXIS_IDENTITY_HOST`.** The one public host name of the identity provider, such as `id.example.com`. It is
-  required. The proxy sends requests for this host to the identity provider and every other host to the servers.
-  The containers reach the same name through a network alias of the proxy, so a browser and the server use one
-  address. Each realm's authority is `https://<AXIS_IDENTITY_HOST>/realms/<tenant>`.
-- **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_IDENTITY_TLS_DIR`, which defaults to `./identity-tls`.
-  The certificate is issued for the name `identity` by the authority of `server-ca.crt`, the authority that the
-  proxy trusts. Compose mounts the folder read-only at `/identity-tls` on the identity provider and on no other
-  service. Both files must be readable by UID 1000. Keycloak listens on HTTPS only, on port 8443, and publishes no
-  port. The proxy certificate must also cover `AXIS_IDENTITY_HOST`.
+The identity provider needs these before the first start. It runs the Keycloak image that development
+and the tests pin, and the operator upgrades it with Axis.
+
+- **`AXIS_IDENTITY_HOST`.** The one public host name of the identity provider, such as
+  `id.example.com`, which is required. The proxy sends requests for this host to the identity provider
+  and every other host to the servers. The containers reach the same name through a network alias of
+  the proxy, so a browser and the server use one address. Each realm's authority is
+  `https://<AXIS_IDENTITY_HOST>/realms/<tenant>`.
+- **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_IDENTITY_TLS_DIR`, which defaults to
+  `./identity-tls`. The certificate is issued for the name `identity` by the authority of
+  `server-ca.crt`, which the proxy trusts. Compose mounts the folder read-only at `/identity-tls` on
+  the identity provider and on no other service. Both files must be readable by UID 1000. Keycloak
+  listens on HTTPS only, on port 8443, and publishes no port. The proxy certificate must also cover
+  `AXIS_IDENTITY_HOST`.
 - **The database authority.** Put `root.crt`, the authority certificate of your PostgreSQL server, in
-  `AXIS_IDENTITY_DB_CA_DIR`, which defaults to `./db-ca`. Compose mounts the folder read-only at `/db-ca` on the
-  identity provider and on no other service, and `sslrootcert=/db-ca/root.crt` in `KC_DB_URL` names the file. It
-  must be readable by UID 1000. It is a public certificate, not a secret.
+  `AXIS_IDENTITY_DB_CA_DIR`, which defaults to `./db-ca`. Compose mounts the folder read-only at
+  `/db-ca` on the identity provider and on no other service, and `sslrootcert=/db-ca/root.crt` in
+  `KC_DB_URL` names the file. It must be readable by UID 1000. It is a public certificate, not a
+  secret.
 - **The theme.** Build the Axis theme from the release's source with
-  `npm run build:keycloak-theme --prefix web`. Set `AXIS_IDENTITY_THEME_DIR` to the output folder,
-  `artifacts/keycloak-theme`. Compose mounts it read-only at `/opt/keycloak/themes`, so sign-in pages show the Axis
-  theme. No release carries the built theme yet.
+  `npm run build:keycloak-theme --prefix web`, and set `AXIS_IDENTITY_THEME_DIR` to the output folder,
+  `artifacts/keycloak-theme`. Compose mounts it read-only at `/opt/keycloak/themes`, so sign-in pages
+  show the Axis theme. A release does not carry the built theme.
 - **The breached-password list.** Compose mounts `deploy/keycloak/password-blacklists` read-only at
-  `/opt/keycloak/data/password-blacklists`. Realms made by `tenant create` check new passwords against it. Set
-  `AXIS_PASSWORD_BLACKLISTS_DIR` to use another folder.
-- **The admin console.** Keycloak's admin console and admin API answer on the public identity host, and Keycloak
-  authentication protects them. Limit them by network in front of the proxy if you need to.
+  `/opt/keycloak/data/password-blacklists`, and realms made by `tenant create` check new passwords
+  against it. Set `AXIS_PASSWORD_BLACKLISTS_DIR` to use another folder.
+- **The admin console.** Keycloak's admin console and admin API answer on the public identity host,
+  and Keycloak authentication protects them. Limit them by network in front of the proxy if you need
+  to.
 
-Put extension packages in `AXIS_EXTENSIONS_DIR` and modules in
-`AXIS_MODULES_DIR`, mounted read-only at `/extensions` and `/modules`. Put the
-application folders for `activate` in `AXIS_APPS_DIR`, mounted at `/apps` in
-the admin container only.
+### Folders
 
-**The order.**
+Put extension packages in `AXIS_EXTENSIONS_DIR` and modules in `AXIS_MODULES_DIR`, which Compose
+mounts read-only at `/extensions` and `/modules`. Put the application folders for `activate` in
+`AXIS_APPS_DIR`, which Compose mounts at `/apps` in the admin container only.
+
+### The order
+
+Install in this order:
 
 1. Put the secret files in place.
-2. Run `docker compose run --rm admin migrate`. On a first install it has
-   nothing to migrate and exits with code 0.
-3. Start the identity provider and the proxy with `docker compose up -d identity proxy`. Wait until
+2. Run `docker compose run --rm admin migrate`. On a first install it has nothing to migrate and exits
+   with code 0.
+3. Start the identity provider and the proxy with `docker compose up -d identity proxy`, and wait until
    `https://<AXIS_IDENTITY_HOST>/realms/master/.well-known/openid-configuration` answers `200`. Then
-   start the server and the worker with `docker compose up -d server worker`.
-   Wait until `/health/ready` answers `200` on both. The server creates the
-   `platform` tables at start, and `tenant create` needs them. Then start the
-   publisher with `docker compose up -d publisher`. It exits with code 1 until
-   the server has created those tables, so start it only after `/health/ready`.
-4. Create a tenant with
-   `docker compose run --rm admin tenant create <id> --host <host>`.
-   The command creates the tenant's realm in the identity provider. The compose file points the admin host at
-   `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell variable. The
-   admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
-   command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
-   missing. The command sets the redirect addresses of the `axis` client from the hosts you give it. The activation
-   copies the redirect addresses and mappers of the `axis` client to the client of each site, and it does not
-   copy later changes until the next activation.
-5. Activate an application with
-   `docker compose run --rm admin activate /apps/<folder>`.
+   start the server and the worker with `docker compose up -d server worker`, and wait until
+   `/health/ready` answers `200` on both, because the server creates the `platform` tables at start
+   and `tenant create` needs them. Then start the publisher with `docker compose up -d publisher`. It
+   exits with code 1 until the server has created those tables, so start it only after
+   `/health/ready`.
+4. Create a tenant with `docker compose run --rm admin tenant create <id> --host <host>`. The command
+   creates the tenant's realm in the identity provider and sets the redirect addresses of the `axis`
+   client from the hosts you give it. The compose file points the admin host at
+   `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell
+   variable, and the admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is
+   in no command line. Every `admin` run needs that file, because Compose refuses to start a service
+   whose secret file is missing.
+5. Activate an application with `docker compose run --rm admin activate /apps/<folder>`. The
+   activation copies the redirect addresses and mappers of the `axis` client to the client of each
+   site, and it does not copy later changes until the next activation.
 
-The hosts serve a tenant after their next refresh. `Tenancy__RefreshInterval`
-sets it, 30 seconds by default.
+The hosts serve a tenant after their next refresh, which `Tenancy__RefreshInterval` sets, 30 seconds
+by default.
 
-- **The OIDC authority must be `https`.** The server runs in `Production`,
-  which refuses an identity provider over plain `http`. So `tenant create` refuses a plain `http`
-  `IdentityProvider__Url` there too.
-- **A private certificate authority.** When the proxy's certificate
-  comes from your own authority, add its certificate to the trust store of the server, of the admin host and of the publisher,
-  because they reach the identity host through the proxy. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
-  the server trust only that file.
-- **Ports.** The server listens on `127.0.0.1:8080` of the host, the second
-  replica on `127.0.0.1:8081`, and the worker's health endpoints on
-  `127.0.0.1:5208`. Both servers serve HTTPS only, on container port 8443, and
-  the worker's health endpoint stays plain HTTP because it carries no application
-  traffic. The proxy is the only service published beyond the machine,
-  on port 443. To use a reverse proxy of your own instead, put it on the same
-  machine in front of the server, and make it connect over HTTPS and check the
-  server certificate. It must also reach the identity provider. See
-  [forwarded headers](several-server-replicas.md). The images hold no `curl`, so the
-  example has no container health check. Probe `/health/ready` from the host, for
-  example `curl --cacert <ca> --resolve servers:8080:127.0.0.1 https://servers:8080/health/ready`.
-- **The server certificate.** Put `tls.crt` and `tls.key` in
-  `AXIS_SERVER_TLS_DIR`, which defaults to `./server-tls`. The certificate is
-  issued for the name `servers`, the network alias of both replicas. Compose
-  mounts the folder read-only at `/server-tls` on both servers and on no other
-  service, so only the servers hold the private key. Both files must be readable
-  by UID 1654, the user of the image. A server does not start without them.
-- **The purchase request sample** needs a purchasing system binding, which
-  `tenant binding set` sets, see
-  [deployment bindings](tenant-setting-commands.md#deployment-bindings). This
-  guide activates the leave request sample.
+- **The OIDC authority must be `https`.** The server runs in `Production`, which refuses an identity
+  provider over plain `http`, so `tenant create` refuses a plain `http` `IdentityProvider__Url` there
+  too.
+- **A private certificate authority.** When the proxy's certificate comes from your own authority, add
+  its certificate to the trust store of the server, of the admin host and of the publisher, because
+  they reach the identity host through the proxy. Do not replace the store: pointing `SSL_CERT_FILE` at
+  one file makes the server trust only that file.
+- **Ports.** The server listens on `127.0.0.1:8080` of the host, the second replica on
+  `127.0.0.1:8081`, and the worker's health endpoints on `127.0.0.1:5208`. Both servers serve HTTPS
+  only, on container port 8443. The worker's health endpoint stays plain HTTP, because it carries no
+  application traffic. The proxy is the only service published beyond the machine, on port 443. To
+  use a reverse proxy of your own instead, put it on the same machine in front of the server, make it
+  connect over HTTPS and check the server certificate, and let it reach the identity provider too. See
+  [forwarded headers](several-server-replicas.md).
+- **Probes.** The images hold no `curl`, so the example has no container health check. Probe
+  `/health/ready` from the host, for example
+  `curl --cacert <ca> --resolve servers:8080:127.0.0.1 https://servers:8080/health/ready`.
+- **The server certificate.** Put `tls.crt` and `tls.key` in `AXIS_SERVER_TLS_DIR`, which defaults to
+  `./server-tls`. The certificate is issued for the name `servers`, the network alias of both
+  replicas. Compose mounts the folder read-only at `/server-tls` on both servers and on no other
+  service, so only the servers hold the private key. Both files must be readable by UID 1654, the user
+  of the image. A server does not start without them.
+- **The purchase request sample** needs a purchasing system binding, which `tenant binding set` sets,
+  see [deployment bindings](tenant-setting-commands.md#deployment-bindings). This guide activates the
+  leave request sample.
 
-**TLS proxy and a second replica.** The `proxy` service, which `docker compose up`
-starts, is a pinned Caddy proxy that ends TLS. It accepts only the versions and ciphers that [TLS](#tls)
-states. It is the only way to reach the identity provider. It routes by host: requests for `AXIS_IDENTITY_HOST` go to
-`identity` on port 8443 over TLS, and every other host goes to the servers. The `replicas` profile starts `server-2`, configured like
-`server`.
+### TLS proxy and a second replica
 
-- **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_TLS_DIR`, which
-  defaults to `./tls`. Compose mounts the folder read-only at `/certs`, so no
-  compose file holds a certificate or a key. The files must be readable by the
-  proxy. The certificate must cover every tenant host and `AXIS_IDENTITY_HOST`, see [TLS](#tls). Put
-  `server-ca.crt` in the same folder: the certificate of the authority that
-  issued the server and identity certificates. The proxy trusts that one certificate for the
-  servers and the identity provider and no other.
-- **The ports.** The proxy publishes `AXIS_HTTPS_PORT`, 443 by default.
-  `server-2` publishes `127.0.0.1:${AXIS_SERVER_2_PORT}`, 8081 by default, for
-  health probes.
-- **The replicas.** Both servers answer to the network alias `servers`. The
-  proxy looks that name up again every five seconds, so a restarted replica
-  rejoins on its own. A request to a replica that is down is retried on the
-  other one. The proxy connects to port 8443 over TLS and checks that the
-  certificate is for the name `servers` and comes from the authority in
-  `server-ca.crt`.
-- **The forwarded headers.** The Compose network has a fixed subnet,
-  `AXIS_NETWORK_SUBNET`, 172.31.250.0/24 by default. The proxy has a fixed
-  address in it, `AXIS_PROXY_ADDRESS`, 172.31.250.10 by default. Both servers
-  get it as `ForwardedHeaders__KnownProxies__0`, so they trust forwarded
-  headers from that address only. The proxy replaces any `X-Forwarded-For`,
-  `X-Forwarded-Proto` and `X-Forwarded-Host` a client sends. Behind it, sign-in
-  returns to `https://<tenant host>/api/auth/callback` and the session cookie
-  is `Secure`.
-- **The address range.** Docker hands out addresses without a fixed one only
-  from `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default. A short-lived
-  `admin` container then cannot take the proxy's address.
-- **The start order.** Start `server` first and wait for `/health/ready`. Then
-  run `docker compose --profile replicas up -d server-2` and wait for its
-  `/health/ready`. The proxy is already running.
-- **Upgrading an existing install.** `docker compose up` now starts the proxy and the identity provider, because the
-  `proxy` profile is gone. An install that started the proxy with `--profile proxy` keeps working. Before the
-  upgrade, set `AXIS_IDENTITY_HOST`, create the `axis_identity` role and database, write the three `KC_DB_*` files,
-  and put the identity certificate in place. Then point each tenant's sign-in at its realm there. The admin host no longer reads `IdentityProvider__Url` and
-  `IdentityProvider__AdminClientId` from the shell.
-- **An existing install.** The network gains fixed address settings, and
-  Compose does not change an existing network in place. Run
-  `docker compose down` once before the first start with this file. If the
-  default subnet overlaps a network of the machine, `docker compose up` fails.
-  Set `AXIS_NETWORK_SUBNET`, `AXIS_NETWORK_IP_RANGE` and `AXIS_PROXY_ADDRESS`.
-- **Studio.** Studio is off until you turn it on. Both servers mount
-  `AXIS_STUDIO_DIR`, `./studio` by default, read-write at `/studio`. No other
-  service mounts it. To turn Studio on, set `Studio__Folders__0=/studio/<folder>`
-  in the shell, where `<folder>` is an application folder inside
-  `AXIS_STUDIO_DIR`. Set `Studio__AuthorRole` and `Studio__PublisherRole` too.
-  Without them nobody may author or publish. All three pass through from the
-  shell to both servers. More folders need an override file that adds
-  `Studio__Folders__1` and so on. Create the folder before the first start,
-  because Docker creates a missing one owned by root. It must be writable by
-  UID 1654, the user of the image, and it must be the same folder for every
-  replica. See [Studio](host-settings.md#studio-settings).
+The `proxy` service, which `docker compose up` starts, is a pinned Caddy proxy that ends TLS. It
+accepts only the versions and ciphers that [TLS](#tls) states, and it is the only way to reach the
+identity provider. It routes by host: requests for `AXIS_IDENTITY_HOST` go to `identity` on port 8443
+over TLS, and every other host goes to the servers. The `replicas` profile starts `server-2`,
+configured like `server`.
 
-**The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
-steps say, and `scripts/smoke.sh` runs it. It builds the three production images
-and starts a test PostgreSQL over TLS and the example's own identity provider, with a certificate
-authority it makes for the run, and imports a copy of the development realm that
-adds the tenants' `https://` redirect addresses. The identity provider runs from `compose.yaml` with the built Axis theme and
-`deploy/keycloak/password-blacklists`, in its own database, and the proxy serves it on the host `id.axis.test`. The admin host, the server and the publisher trust the authority too. PostgreSQL serves a certificate
-of the same authority for the name `postgres`, and every connection string sets
-`SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
-`compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
-`compose.scenarios.yaml` gives the secret to the publisher only and `Studio__Tests` to both servers only. The
-smoke test runs no `test` request against the installed images. It does add `compose.scenarios.yaml` and the
-scenario role, because the leave request sample needs the `organization` module and that module has contract
-scenarios, which the publisher runs when it publishes. An override file in a temporary folder holds
-everything else the test adds, so `deploy/compose/compose.yaml` stays as an
-operator uses it. The test then:
+- **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_TLS_DIR`, which defaults to `./tls`.
+  Compose mounts the folder read-only at `/certs`, so no compose file holds a certificate or a key. The
+  files must be readable by the proxy. The certificate must cover every tenant host and
+  `AXIS_IDENTITY_HOST`, see [TLS](#tls). Put `server-ca.crt` in the same folder: the certificate of the
+  authority that issued the server and identity certificates. The proxy trusts that one certificate
+  for the servers and the identity provider, and no other.
+- **The ports.** The proxy publishes `AXIS_HTTPS_PORT`, 443 by default. `server-2` publishes
+  `127.0.0.1:${AXIS_SERVER_2_PORT}`, 8081 by default, for health probes.
+- **The replicas.** Both servers answer to the network alias `servers`. The proxy looks that name up
+  again every five seconds, so a restarted replica rejoins on its own. A request to a replica that is
+  down is retried on the other one. The proxy connects to port 8443 over TLS and checks that the
+  certificate is for the name `servers` and comes from the authority in `server-ca.crt`.
+- **The forwarded headers.** The Compose network has a fixed subnet, `AXIS_NETWORK_SUBNET`,
+  172.31.250.0/24 by default. The proxy has a fixed address in it, `AXIS_PROXY_ADDRESS`, 172.31.250.10
+  by default. Both servers get it as `ForwardedHeaders__KnownProxies__0`, so they trust forwarded
+  headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
+  `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
+  `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
+- **The address range.** Docker hands out addresses without a fixed one only from
+  `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
+  the proxy's address. If the default subnet overlaps a network of the machine, `docker compose up`
+  fails: set `AXIS_NETWORK_SUBNET`, `AXIS_NETWORK_IP_RANGE` and `AXIS_PROXY_ADDRESS`. Compose does not
+  change an existing network in place, so run `docker compose down` before a start that changes them.
+- **The start order.** Start `server` first and wait for `/health/ready`. Then run
+  `docker compose --profile replicas up -d server-2` and wait for its `/health/ready`. The proxy is
+  already running.
+- **Studio.** Studio is off until you turn it on. Both servers mount `AXIS_STUDIO_DIR`, `./studio` by
+  default, read-write at `/studio`, and no other service mounts it. To turn Studio on, set
+  `Studio__Folders__0=/studio/<folder>` in the shell, where `<folder>` is an application folder inside
+  `AXIS_STUDIO_DIR`. Set `Studio__AuthorRole` and `Studio__PublisherRole` too, because without them
+  nobody may author or publish. All three pass through from the shell to both servers. More folders
+  need an override file that adds `Studio__Folders__1` and so on. Create the folder before the first
+  start, because Docker creates a missing one owned by root. It must be writable by UID 1654, the user
+  of the image, and it must be the same folder for every replica. See
+  [Studio settings](host-settings.md#studio-settings).
 
-1. Creates the database roles with the SQL above, the scenario role included, and writes the secret files,
-   each connection string with `SSL Mode=VerifyFull`.
-2. Starts the identity provider and the proxy, and waits until the development realm answers through the proxy on the
-   identity host. Checks that its sign-in page contains the Axis theme's `axis-sign-in-context`. Runs `migrate`, starts
-   the server and the worker, waits for `/health/ready`, and then starts the publisher.
-3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts and no `--oidc-*` option. Each
-   command creates the tenant's realm in the identity provider. Then adds a redirect address, a `roles` mapper, the four
-   client roles and the accounts `requester` and `author` to the realm of tenant `one` through the identity provider's
-   admin API, because a new realm has none and the activation copies them to the site client.
-4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
-   The sample needs the built-in `organization` module, so the test mounts the modules from
-   `artifacts/modules` at `/modules`. The production images
-   still hold no sample module.
-5. Checks that both hosts are ready, that each tenant's host serves `/leave`
-   and holds the active site in its database, and that each tenant's sign-in
-   redirects to the authorization endpoint of that tenant's realm on the identity host and returns to that tenant's host. Checks in
-   `pg_stat_ssl` that at least one Axis connection uses TLS and that none
-   does not.
-6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
-   checks that it answers `503` while `one` still serves, then resumes it and
-   checks that it serves again.
-7. Queues one publish request of the leave request sample in each tenant, over
-   `psql`, and checks that the installed publisher runs both to `succeeded`.
-   The publisher runs the contract scenarios of the `organization` module
-   on the scenario role's server, so the request needs that role.
-   The publisher's log shows `one claim ok` and `two claim ok`, and the
-   `publisher` service is still running.
-8. Starts the second replica, with a proxy certificate and a
-   server certificate from the test's authority, and that authority's certificate
-   as `server-ca.crt`. Checks that a plain HTTP request to a server port gets no
-   HTTP response, and that the servers answer on their own ports over HTTPS for the
-   name `servers`. Signs an employee in through the proxy over HTTPS with plain
-   HTTP requests, in the realm of tenant `one`, posting the Axis theme's login form to its `loginAction`. Checks that the
-   redirect goes to `/realms/one/protocol/openid-connect/auth` and carries `redirect_uri=https://one.axis.test/api/auth/callback` even
-   when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
-   that every `__Host-Axis.Session` cookie is `Secure` with `Path=/` and no domain, and that `GET /api/me`
-   answers `200`. Then restarts `server` and checks that `GET /api/me` with the
-   same cookie answers `200` through the proxy and on the HTTPS ports of `server` and
-   `server-2`. Also checks that a default handshake with the proxy negotiates
-   TLS 1.3, that a TLS 1.2 handshake with an ECDHE GCM cipher succeeds and that
-   a TLS 1.2 handshake offering only CBC ciphers is refused.
-9. Turns Studio on for the author over a copy of the leave request sample in a
-   temporary folder that every user may write. Signs the author in through the proxy
-   and saves a text through `server`. Checks that the read of the same
-   resource through `server-2` answers `200` with the new text and the same
-   `ETag`. Then checks that a second save through `server-2` with the old
-   version answers `409`.
+### Tests of the example
 
-Other tests check that nothing under `deploy/compose/` holds a secret, that the
-rendered configuration takes every connection string, the installation key, the identity provider's database settings
-and its admin client secret only from `secrets:` files and holds no password or secret in any
-environment, that neither the proxy nor the identity provider has a profile, that the identity provider runs the
-Keycloak image that `KeycloakFixture.Image` pins, that only it mounts the identity certificate folder, read-only, that every published port of both servers is on
-`127.0.0.1`, that the proxy mounts its certificate folder read-only, that
-both servers trust the proxy's fixed address only, and that both servers mount
-the same Studio folder read-write at `/studio` while the worker, the
-publisher, the admin host and the proxy do not. They also check that the
-Caddyfile sets `protocols tls1.2 tls1.3`, lists only ECDHE AEAD ciphers and has
-`:443` as its only site address, and that the proxy publishes only container
-port 443. They check that both servers set the three Kestrel HTTPS settings and
-publish only container port 8443, that both mount the server certificate folder
-read-only and that no other service does, and that the Caddyfile forwards to
-port 8443 over TLS with the server name `servers` and sends the identity host to `identity:8443` with the server
-name `identity`, trusts only `/certs/server-ca.crt` in both places and never skips the verification.
+Two kinds of test keep the example as this section describes it.
+
+- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the three
+  production images and installs the example in the order above, against a test PostgreSQL over TLS
+  and the example's own identity provider, with a certificate authority that it makes for the run. Its
+  additions, such as the scenario role and the modules from `artifacts/modules`, sit in an override
+  file in a temporary folder, so `deploy/compose/compose.yaml` stays as an operator uses it. It creates
+  two tenants, activates the leave request sample for both and checks that each serves on its own host
+  and signs in through its own realm, that every Axis connection uses TLS, that a suspended tenant
+  answers `503` while the other serves, that the installed publisher runs a publish request of each
+  tenant to `succeeded`, that a session works on both replicas and survives a restart, that the
+  proxy's TLS versions and ciphers are the ones of [TLS](#tls), and that a Studio save on one replica
+  is read on the other and a stale save there answers `409`. It runs no `test` request against the
+  installed images.
+- **The static checks.** Other tests read the rendered configuration and check the rules of this
+  section: that nothing under `deploy/compose/` holds a secret, that every secret comes only from
+  `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
+  that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
+  published port of both servers is on `127.0.0.1`, and that the Caddyfile and the Kestrel settings
+  match [what the Compose example sets](#tls).
 
 ## In the cloud
 
-This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
-PostgreSQL and the source of secrets are external. The chart runs
-[Axis's identity provider](identity-provider.md#installation), so it needs no
-OIDC provider of its own. Axis SaaS runs the chart in [cells](cells.md) _(planned for M31)_.
+This section installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`. PostgreSQL and the
+source of secrets are external, and the chart runs
+[Axis's identity provider](identity-provider.md#installation). The same chart installs a
+[cell](cells.md) of Axis SaaS through its `cell.*` values.
 
-The chart has one Deployment for the server and one for the worker, and a
-Service for the server. It also has a Deployment for the publisher, with one
-replica, that runs the `axis-admin` image with the command `publisher`. The
-Deployment uses the `Recreate` strategy, so a rollout never runs two
-publishers. It has no Service, no container port and no probe, because the
-publisher has no HTTP endpoint. Its termination grace period is 360 seconds,
-longer than the five-minute lease. Outside a cell it mounts the same secrets as the migrate Job, and in a
-cell it also gets what the `create` job reads, see below. It has no Ingress. The server and worker
-Deployments each have a startup, liveness and readiness probe, see
-[health checks](../architecture.md#health-checks). The server's probes use HTTPS, and the worker's use
-plain HTTP. The chart sets `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
-reach it. The server mounts the Studio volume and gets the Studio settings, and so does the publisher in a
-cell. The server and the identity provider get the forwarded headers settings. The pods run as a non-root
-user with a read-only root file system, except the identity provider, see below.
+The chart has these objects:
 
-**The publisher in a cell.** With `cell.id` set, the publisher gets what the `create` job reads: the `adminConnection` and `identityAdminClientSecret` Secrets as files in `/run/secrets`, `IdentityProvider:Url` as `https://<identity.hostname>/`, `IdentityProvider:AdminClientId` as `axis-admin`, and the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, which `Cell:BackupKeyFile` names whatever `cell.backupKeyFile` says. It mounts `studio.persistence` read-write at `/studio` and `templates.volume` read-only at `/templates`, and sets `Studio:ApplicationsPath` and `Templates:Path` to them. The server also mounts `studio.persistence` at `/studio` and sets `Studio:ApplicationsPath`, so the applications that the job writes are the ones that Studio shows, and a cell needs a `ReadWriteMany` volume source even with one server replica. The server gets no `Templates:Path`, so Studio lists no templates there. Rendering fails with a message that names the value when `secrets.adminConnection`, `secrets.cellBackupKey`, `studio.persistence` or `templates.volume` is missing. Outside a cell the publisher gets none of these.
+- **The server and the worker.** One Deployment each, and a Service for the server. Each has a
+  startup, liveness and readiness probe, see [health checks](health-checks.md). The server's probes use
+  HTTPS and the worker's use plain HTTP, and the chart sets `Health__Urls` to `http://0.0.0.0:5208` for
+  the worker so that the kubelet can reach it. The server mounts the Studio volume and gets the Studio
+  settings. The server and the identity provider get the forwarded headers settings.
+- **The publisher.** A Deployment with one replica that runs the `axis-admin` image with the command
+  `publisher`. It uses the `Recreate` strategy, so a rollout never runs two publishers. It has no
+  Service, no container port, no probe and no Ingress, because the publisher has no HTTP endpoint. Its
+  termination grace period is 360 seconds, longer than the five-minute lease. Outside a cell it mounts
+  the same secrets as the migrate Job.
+- **The identity provider**, see [below](#the-identity-provider-in-the-chart).
+- **PgBouncer**, in a cell that turns it on, see [PgBouncer](#pgbouncer).
+- **The migrate Job and the CronJobs** of a cell, see [jobs](#jobs).
 
-**The identity provider.** The chart also has a Deployment and a Service named
-`<release>-identity`. There is no switch to turn them off, as `docker compose up`
-always starts the identity provider too. The Deployment runs one replica of
-Keycloak at `identity.image`, which defaults to the version that development, the
-tests and the Compose example pin. Axis does not cluster Keycloak. It runs
-`start` on HTTPS only, with the certificate of `secrets.identityCertificate`,
-and `identity.hostname` as its public host name. Its database settings and the
-`axis-admin` client secret are secret files, which a small script in the
-container command turns into Keycloak's variables, because Keycloak has no
-`_FILE` variables. The Axis theme and the breached-password list come from
-volumes that you name, see the table. The pod has a startup, liveness and
-readiness probe over HTTPS on Keycloak's management port, 9000. Keycloak
-rebuilds itself at start and writes into its image, so this one container has
-no read-only root file system. The Service has port 443, named `https`, and
-forwards to port 8443. It does not expose the management port. The chart renders no Ingress, so your own
-Ingress sends the identity host to this Service, as it sends the server's host
-to the server Service. Keycloak reads the forwarded headers only from
-`forwardedHeaders.knownProxies` and `knownNetworks`. It sets no proxy headers
-when both are empty. A cluster that runs `tenant create` still needs its own
-Job with the `IdentityProvider__*` settings, which the chart does not render.
+The pods run as a non-root user with a read-only root file system, except the identity provider.
 
-**Before the first install.** Create the database roles of
-[On premises](#on-premises). Then create the Kubernetes Secrets. The chart
-creates none and never takes a secret value. Each reference in the values names
-a Secret and a key. Several references may name the same Secret.
+### The publisher in a cell
+
+With `cell.id` set, the publisher also gets what the `create` job reads:
+
+- the `adminConnection` and `identityAdminClientSecret` Secrets as files in `/run/secrets`;
+- `IdentityProvider:Url` as `https://<identity.hostname>/` and `IdentityProvider:AdminClientId` as
+  `axis-admin`;
+- the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, which `Cell:BackupKeyFile` names
+  whatever `cell.backupKeyFile` says;
+- `studio.persistence` read-write at `/studio` and `templates.volume` read-only at `/templates`, with
+  `Studio:ApplicationsPath` and `Templates:Path` set to them.
+
+The server also mounts `studio.persistence` at `/studio` and sets `Studio:ApplicationsPath`, so the
+applications that the job writes are the ones that Studio shows, and a cell needs a `ReadWriteMany`
+volume source even with one server replica. The server gets no `Templates:Path`, so Studio lists no
+templates there. Rendering fails with a message that names the value when `secrets.adminConnection`,
+`secrets.cellBackupKey`, `studio.persistence` or `templates.volume` is missing. Outside a cell the
+publisher gets none of these.
+
+### The identity provider in the chart
+
+The chart has a Deployment and a Service named `<release>-identity`, and no switch to turn them off,
+as `docker compose up` always starts the identity provider too.
+
+- **The pod.** One replica of Keycloak at `identity.image`, which defaults to the image that
+  development, the tests and the Compose example pin. Axis does not cluster Keycloak. It runs `start`
+  on HTTPS only, with the certificate of `secrets.identityCertificate`, and `identity.hostname` as its
+  public host name. Keycloak rebuilds itself at start and writes into its image, so this one container
+  has no read-only root file system.
+- **Its settings.** Its database settings and the `axis-admin` client secret are secret files, which a
+  small script in the container command turns into Keycloak's variables, because Keycloak has no
+  `_FILE` variables. The Axis theme and the breached-password list come from volumes that you name,
+  see the values table.
+- **Probes and Service.** The pod has a startup, liveness and readiness probe over HTTPS on Keycloak's
+  management port, 9000. The Service has port 443, named `https`, which forwards to port 8443, and it
+  does not expose the management port. The chart renders no Ingress, so your own Ingress sends the
+  identity host to this Service, as it sends the server's host to the server Service.
+- **Forwarded headers.** Keycloak reads them only from `forwardedHeaders.knownProxies` and
+  `knownNetworks`, and sets no proxy headers when both are empty.
+- **Creating tenants.** A cluster that runs `tenant create` still needs its own Job with the
+  `IdentityProvider__*` settings, which the chart does not render.
+
+### Before the first install
+
+Create the database roles of [On premises](#database-roles). Then create the Kubernetes Secrets. The
+chart creates none and never takes a secret value: each reference in the values names a Secret and a
+key, and several references may name the same Secret. A secret store works too, if it syncs into a
+Kubernetes Secret.
 
 ```sh
 kubectl create secret generic axis-platform \
@@ -521,50 +457,44 @@ kubectl create secret generic axis-identity \
   --from-literal=IdentityProvider__AdminClientSecret='<client secret of axis-admin>'
 ```
 
-The `axis-identity` Secret holds the four settings of the identity provider, as
-in [Axis's identity provider](identity-provider.md#installation). The JDBC URL
-may name the PostgreSQL authority certificate with `sslrootcert=/db-ca/root.crt`
-when you set `identity.databaseAuthority.volume`.
+The `axis-identity` Secret holds the four settings of the identity provider, as in
+[Axis's identity provider](identity-provider.md#installation). The JDBC URL may name the PostgreSQL
+authority certificate with `sslrootcert=/db-ca/root.crt` when you set
+`identity.databaseAuthority.volume`.
 
 To let Studio run test scenarios, add
-`--from-literal=Scenarios__ServerConnectionString='<connection string>'` to the
-same Secret, or to another one. Then set `secrets.scenarioServerConnection` and
-`studio.tests`, see the table below.
+`--from-literal=Scenarios__ServerConnectionString='<connection string>'` to the same Secret, or to
+another one. Then set `secrets.scenarioServerConnection` and `studio.tests`, see the values table.
 
-A secret store works too, if it syncs into a Kubernetes Secret.
-
-The server serves HTTPS only, so it needs a certificate for the DNS name of its
-Service, such as `axis-server.<namespace>.svc`. Create it as a Kubernetes TLS
-Secret, from a certificate that your Ingress trusts:
+The server serves HTTPS only, so it needs a certificate for the DNS name of its Service, such as
+`axis-server.<namespace>.svc`. Create it as a Kubernetes TLS Secret, from a certificate that your
+Ingress trusts. The identity provider also serves HTTPS only, so create a second TLS Secret for the DNS
+name of the identity Service, such as `axis-identity.<namespace>.svc`:
 
 ```sh
 kubectl create secret tls axis-server-tls --cert=tls.crt --key=tls.key
-```
-
-The identity provider also serves HTTPS only. Create a second TLS Secret for the
-DNS name of the identity Service, such as `axis-identity.<namespace>.svc`:
-
-```sh
 kubectl create secret tls axis-identity-tls --cert=tls.crt --key=tls.key
 ```
 
-**PgBouncer.** A cell sets `cell.pgbouncer.enabled` to `true` to run PgBouncer in
-transaction mode in front of PostgreSQL, see [connections](cells.md#connections).
-The chart then renders a ConfigMap, a Deployment and a Service named
-`<release>-pgbouncer`, and none of them when it is off. The Service has port 6432. The
-server and the worker send their runtime connections to it, with `Cell__RuntimeDatabaseHost`
-and `Cell__RuntimeDatabasePort`. The publisher and the migrate Job connect to PostgreSQL
-directly. PgBouncer runs as one replica, because each replica adds its own
-`max_db_connections` to PostgreSQL. TLS holds on both legs. PgBouncer asks the hosts for TLS
-and verifies PostgreSQL's certificate in full. The hosts verify PgBouncer's certificate with
-the `SSL Mode` and `Root Certificate` of `ConnectionStrings:Platform`, so the certificate
-must name `<release>-pgbouncer` and chain to that authority.
+### PgBouncer
 
-PgBouncer looks passwords up with one auth user. As a superuser, create the user, then a
-lookup function in `cell.pgbouncer.authDatabase`. The function returns a password only
-for the tenant runtime roles, `axis_<id>_runtime`, so the schema role cannot connect
-through PgBouncer. It reads `pg_authid`, so a managed service may need another way to
-grant that right.
+A cell sets `cell.pgbouncer.enabled` to `true` to run PgBouncer in transaction mode in front of
+PostgreSQL, see [connections](cells.md#connections). The chart then renders a ConfigMap, a Deployment
+and a Service named `<release>-pgbouncer`, and none of them when it is off.
+
+- **Who connects through it.** The Service has port 6432. The server and the worker send their
+  runtime connections to it, with `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort`. The
+  publisher and the migrate Job connect to PostgreSQL directly.
+- **One replica**, because each replica adds its own `max_db_connections` to PostgreSQL.
+- **TLS on both legs.** PgBouncer asks the hosts for TLS and verifies PostgreSQL's certificate in
+  full. The hosts verify PgBouncer's certificate with the `SSL Mode` and `Root Certificate` of
+  `ConnectionStrings:Platform`, so the certificate must name `<release>-pgbouncer` and chain to that
+  authority.
+
+PgBouncer looks passwords up with one auth user. As a superuser, create the user, then a lookup
+function in `cell.pgbouncer.authDatabase`. The function returns a password only for the tenant runtime
+roles, `axis_<id>_runtime`, so the schema role cannot connect through PgBouncer. It reads `pg_authid`,
+so a managed service may need another way to grant that right.
 
 ```sql
 CREATE ROLE axis_pgbouncer LOGIN PASSWORD '<password>';
@@ -587,7 +517,9 @@ kubectl create secret generic axis-pgbouncer-auth --from-file=userlist.txt
 kubectl create secret tls axis-pgbouncer-tls --cert=tls.crt --key=tls.key
 ```
 
-**Install.** Write a values file that names the Secrets, then run:
+### Install
+
+Write a values file that names the Secrets, then run:
 
 ```sh
 helm upgrade --install axis deploy/helm/axis -f my-values.yaml
@@ -625,22 +557,30 @@ identity:
         claimName: axis-password-blacklists
 ```
 
-Each pod mounts only the secrets it needs as files in `/run/secrets`. The
-server gets the first three, the worker gets the first and the third, and the migrate
-Job and the publisher get the second and the third. The publisher also gets
-`Scenarios__ServerConnectionString` when `secrets.scenarioServerConnection` is
-set. Neither has an `Admin:ConnectionString` outside a cell. The identity provider gets the four `axis-identity` files and no other secret.
-Only the cell restore-check CronJob and, in a cell, the publisher also get `IdentityProvider__AdminClientSecret`, and no other pod gets the four.
-The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
-other pod does. The identity provider mounts the `identityCertificate` Secret
-read-only at `/identity-tls` in the same way. Only the PgBouncer pod mounts the
-`pgbouncerAuth` and `pgbouncerCertificate` Secrets. The cell backup CronJob and the cell restore-check
-CronJob alone get `backupStorageAccessKeyId` and `backupStorageSecretAccessKey` as files in `/run/secrets`.
-They and, in a cell, the publisher mount the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, outside `/run/secrets`.
-The cell restore-check CronJob and, in a cell, the publisher alone get `Admin__ConnectionString` from
-`secrets.adminConnection`, so they are the only pods of the chart with the admin role.
-Rendering fails with a message that names the value when a `name` is missing.
-The values schema rejects any field in a reference other than `name` and `key`.
+### Which pod gets which secret
+
+Each pod mounts only the secrets it needs, as files in `/run/secrets` unless this table says
+otherwise. Rendering fails with a message that names the value when a `name` is missing, and the
+values schema rejects any field in a reference other than `name` and `key`.
+
+| Pod | Secrets |
+| --- | --- |
+| Server | `platformConnection`, `platformSchemaConnection` and `platformSecretKey`, and `serverCertificate` read-only at `/server-tls`, which no other pod mounts |
+| Worker | `platformConnection` and `platformSecretKey` |
+| Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
+| Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set. In a cell also `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
+| Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |
+| PgBouncer | `pgbouncerAuth` and `pgbouncerCertificate`, which no other pod mounts |
+| Cell backup CronJob | `platformSchemaConnection`, `platformSecretKey`, `backupStorageAccessKeyId` and `backupStorageSecretAccessKey`, and `cellBackupKey` read-only at `/cell-backup-key/key`, outside `/run/secrets` |
+| Cell restore-check CronJob | The backup CronJob's secrets, `adminConnection`, `identityAdminClientSecret`, and `scenarioServerConnection` when it is set |
+
+So outside a cell no pod has an `Admin:ConnectionString`, and in a cell only the publisher and the
+restore-check CronJob have the admin role. Only those two, besides the identity provider, get
+`IdentityProvider__AdminClientSecret`, and only the two CronJobs get the storage credentials.
+
+### Values
+
+The values of the chart, with their defaults:
 
 | Value | Default | Meaning |
 | --- | --- | --- |
@@ -658,24 +598,24 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
 | `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
-| `identity.image` | `quay.io/keycloak/keycloak:26.8` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
+| `identity.image` | the Keycloak image that `KeycloakFixture.Image` pins | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
 | `identity.hostname` | none, required | The public host name of the identity provider, without a scheme. It becomes `KC_HOSTNAME=https://<hostname>`. Rendering fails with a message that names it when it is missing. |
 | `identity.resources` | none | Kubernetes resource requests and limits of the identity provider. |
 | `identity.service.type`, `identity.service.port` | `ClusterIP`, 443 | The Service of the identity provider. Its port is named `https` and forwards to Keycloak's HTTPS port, 8443. Put your own Ingress in front of it. |
-| `identity.theme.volume` | none, required | A Kubernetes volume source with the built Axis theme, the output of `npm run build:keycloak-theme --prefix web`, mounted read-only at `/opt/keycloak/themes`. No release ships the built theme. Rendering fails with a message that names the value when it is missing. |
+| `identity.theme.volume` | none, required | A Kubernetes volume source with the built Axis theme, the output of `npm run build:keycloak-theme --prefix web`, mounted read-only at `/opt/keycloak/themes`. A release does not ship the built theme. Rendering fails with a message that names the value when it is missing. |
 | `identity.passwordBlacklists.volume` | none, required | A Kubernetes volume source with the breached-password list of `deploy/keycloak/password-blacklists`, mounted read-only at `/opt/keycloak/data/password-blacklists`. Without it `tenant create` fails at its realm step. Rendering fails with a message that names the value when it is missing. |
 | `identity.databaseAuthority.volume` | empty | Optional. A volume source with `root.crt`, the authority certificate of the PostgreSQL server, mounted read-only at `/db-ca`. A database with a public certificate can use `sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory` in the JDBC URL instead. |
 | `secrets.identityDatabaseUrl`, `secrets.identityDatabaseUsername`, `secrets.identityDatabasePassword` | keys `KC_DB_URL`, `KC_DB_USERNAME`, `KC_DB_PASSWORD` | Identity provider only. Secret `name` and `key` of Keycloak's database settings. All three names are required. |
 | `secrets.identityAdminClientSecret` | key `IdentityProvider__AdminClientSecret` | Identity provider, the cell restore-check CronJob and, in a cell, the publisher. Secret `name` and `key` of the `axis-admin` client secret. Required. |
 | `secrets.identityCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the identity Service. It has no `key`. Rendering fails with a message that names `secrets.identityCertificate.name` when it is missing. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
-| `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [On premises](#on-premises). |
+| `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [the scenario role](#the-scenario-role). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |
 | `cell.*` | empty | `Cell__*` on the server, the worker and the publisher, one variable for each value that is set: `id`, `region`, `tenantDomain`, `internalDomain` (required with `backup.bucket`, because the scratch tenant of the restore check lives under it), `tenantCap`, `consoleHost`, `consoleAllowedNetworks` (a list), `internalUrl`, `operatorRealm`, `operatorRole` and `backupKeyFile`. Empty is a self-hosted installation. With `cell.id` set the hosts need `cell.region` and `cell.tenantDomain`, see [cell settings](host-settings.md#cell-settings). The migrate Job gets none. The `Cell__RuntimeDatabaseHost` and `Cell__RuntimeDatabasePort` pair comes from `cell.pgbouncer` and goes to the server and the worker only. |
-| `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob and the cell restore-check CronJob, see the two CronJobs below. It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders neither. |
+| `backup.bucket` | empty | In a cell, setting it renders the cell backup CronJob and the cell restore-check CronJob, see [jobs](#jobs). It is `Cell__BackupStorage__Bucket`. Empty, or outside a cell, renders neither. |
 | `backup.serviceUrl` | empty | `Cell__BackupStorage__ServiceUrl`, the endpoint of the object storage. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
 | `backup.region` | empty | `Cell__BackupStorage__Region`, the region of the object storage. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
 | `backup.timeZone` | empty | The IANA time zone of the region, such as `Asia/Ho_Chi_Minh`, in which the backup CronJob runs at 01:00 and the restore-check CronJob runs on Sundays at 03:00. Required with `backup.bucket`: rendering fails with a message that names it when it is empty. |
@@ -684,8 +624,8 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `secrets.backupStorageSecretAccessKey` | key `Cell__BackupStorage__SecretAccessKey` | Secret `name` and `key` of the secret access key of the backup storage. The cell backup and cell restore-check CronJobs alone mount it. Required with `backup.bucket`. |
 | `secrets.cellBackupKey` | key `cell-backup-key` | Secret `name` and `key` of the cell's backup key. The cell backup and cell restore-check CronJobs and, in a cell, the publisher alone mount it, at `/cell-backup-key/key`, and set `Cell__BackupKeyFile` to that path. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
 | `secrets.adminConnection` | key `Admin__ConnectionString` | Secret `name` and `key` of `Admin:ConnectionString`, the connection of the admin role. The publisher in a cell and the cell restore-check CronJob alone mount it. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
-| `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#in-the-cloud). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
-| `cell.pgbouncer.image` | `edoburu/pgbouncer:v1.24.1-p1` | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
+| `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#pgbouncer). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
+| `cell.pgbouncer.image` | the PgBouncer image that `PgBouncerServer.Image` pins | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
 | `cell.pgbouncer.databaseHost`, `cell.pgbouncer.databasePort` | none, required, and 5432 | The address of PostgreSQL, the target of the wildcard `* = host=... port=...` database line. |
 | `cell.pgbouncer.authUser`, `cell.pgbouncer.authDatabase` | none, required, and `postgres` | The role that PgBouncer looks passwords up with, and the database that holds its `pgbouncer.user_lookup` function. The `auth_query` is fixed: `SELECT uname, phash FROM pgbouncer.user_lookup($1)`. |
 | `cell.pgbouncer.defaultPoolSize`, `cell.pgbouncer.maxDbConnections`, `cell.pgbouncer.maxClientConn` | 3, 10 and 10000 | `default_pool_size`, `max_db_connections` and `max_client_conn`, the starting values of [connections](cells.md#connections). |
@@ -703,198 +643,165 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `secrets.platformSchemaConnection` | key `ConnectionStrings__PlatformSchema` | Secret `name` and `key` of `ConnectionStrings:PlatformSchema`. |
 | `secrets.platformSecretKey` | key `Platform__SecretKey` | Secret `name` and `key` of the installation key. |
 
-**The migrate Job.** A `pre-upgrade` hook Job runs `axis-admin migrate` with the
-new admin image before the Deployments roll out. A failed migration fails the
-upgrade and the Deployments stay as they are. The Job never retries. Helm keeps
-a failed Job for its logs and deletes a successful one. The Job does not run on
-the first install, because a first install has no tenants, see
-[the first install](#open-points). Helm waits 5 minutes for a hook. An
-installation with many tenants needs a longer wait, such as
-`helm upgrade --install --timeout 30m`.
+### Jobs
 
-**The cell backup CronJob.** In a cell with `backup.bucket` set, the chart renders a CronJob
-named `<release>-cell-backup` that runs `axis-admin cell backup` with the admin image every day at
-01:00 in `backup.timeZone`, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
-It never runs two backups at once and never retries, and Kubernetes stops the Job after 6 hours
-15 minutes. It gets the platform schema connection, the installation key, the storage credentials
-and the cell backup key from Secret references, and the storage settings from `backup.*`. The
-operator sets the bucket's object lock in compliance mode for 30 days and its lifecycle rule that
-deletes an archive after 30 days. The chart does not create or change the bucket. The job needs all
-five `Cell__BackupStorage__*` settings, so the chart requires the service URL and the region too.
-The job has no
-Studio volume, so its archives hold no Studio files.
+The chart runs the migration before every upgrade, and in a cell it runs the backups and the weekly
+restore check. It has no Job for tenants and releases.
 
-**The cell restore-check CronJob.** In a cell with `backup.bucket` set, the chart also renders a CronJob
-named `<release>-cell-restore-check` that runs `axis-admin cell restore-check` every Sunday at 03:00 in
-`backup.timeZone`, see [the cell restore check](administration.md#cell-restore-check). It never runs two
-checks at once and never retries, and Kubernetes stops it after 6 hours, so a hung run does not block the
-next week. It gets the storage settings, credentials, cell backup key and `backup.resources` of the backup job.
-It also gets `secrets.adminConnection`, `secrets.identityAdminClientSecret`, `IdentityProvider:Url` as
-`https://<identity.hostname>/`, `IdentityProvider:AdminClientId` as `axis-admin`, `Cell:InternalDomain`, and
-`secrets.scenarioServerConnection` when set. A cell whose tenants have Studio applications needs that Secret set for
-the weekly check to pass, because the scenario step fails with `AXC0217` without a scenario server.
-`Studio:ApplicationsPath` is `/studio` on an `emptyDir`, so the scratch tenant's Studio files never touch the server's Studio volume. The admin
-connection and the client secret are the widest credentials of the chart. The chart passes no OTLP settings, so
-the metric `axis.backup.restore_check` goes only to the job's output until you set an OTLP endpoint.
+- **The migrate Job.** A `pre-upgrade` hook Job runs `axis-admin migrate` with the new admin image
+  before the Deployments roll out. A failed migration fails the upgrade, and the Deployments stay as
+  they are. The Job never retries. Helm keeps a failed Job for its logs and deletes a successful one.
+  The Job does not run on the first install, because a first install has no tenants, see
+  [the first install](#open-points). Helm waits 5 minutes for a hook, so an installation with many
+  tenants needs a longer wait, such as `helm upgrade --install --timeout 30m`.
+- **The cell backup CronJob.** In a cell with `backup.bucket` set, the chart renders a CronJob named
+  `<release>-cell-backup` that runs `axis-admin cell backup` with the admin image every day at 01:00
+  in `backup.timeZone`, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). It
+  never runs two backups at once and never retries, and Kubernetes stops the Job after 6 hours 15
+  minutes. It gets the platform schema connection, the installation key, the storage credentials and
+  the cell backup key from Secret references, and the storage settings from `backup.*`. The job needs
+  all five `Cell__BackupStorage__*` settings, so the chart requires the service URL and the region
+  too. The job has no Studio volume, so its archives hold no Studio files. The operator sets the
+  bucket's object lock in compliance mode for 30 days and its lifecycle rule that deletes an archive
+  after 30 days, and the chart does not create or change the bucket.
+- **The cell restore-check CronJob.** In a cell with `backup.bucket` set, the chart also renders a
+  CronJob named `<release>-cell-restore-check` that runs `axis-admin cell restore-check` every Sunday
+  at 03:00 in `backup.timeZone`, see [the cell restore check](administration.md#cell-restore-check).
+  It never runs two checks at once and never retries, and Kubernetes stops it after 6 hours, so a hung
+  run does not block the next week. It gets the storage settings, credentials, cell backup key and
+  `backup.resources` of the backup job. It also gets `secrets.adminConnection`,
+  `secrets.identityAdminClientSecret`, `IdentityProvider:Url` as `https://<identity.hostname>/`,
+  `IdentityProvider:AdminClientId` as `axis-admin`, `Cell:InternalDomain`, and
+  `secrets.scenarioServerConnection` when set. A cell whose tenants have Studio applications needs that
+  Secret set for the weekly check to pass, because the scenario step fails with `AXC0217` without a
+  scenario server. `Studio:ApplicationsPath` is `/studio` on an `emptyDir`, so the scratch tenant's
+  Studio files never touch the server's Studio volume. The admin connection and the client secret are
+  the widest credentials of the chart. The chart passes no OTLP settings, so the metric
+  `axis.backup.restore_check` goes only to the job's output until you set an OTLP endpoint.
+- **Tenants and releases.** Run `tenant create` and `activate` from a Job or a pod that uses the admin
+  image, with the settings of the [settings table](#settings-and-secrets) and the application folder
+  mounted.
 
-**Tenants and releases.** Run `tenant create` and `activate` from a Job or a pod
-that uses the admin image, with the settings of the
-[settings table](#settings-and-secrets) and the application folder mounted.
-The chart has no Job for them.
+### Checks of the chart
 
-**Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
-rendered manifests against the Kubernetes schemas and the pinned cert-manager schemas with kubeconform.
-`scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks the cell restore-check CronJob: the Sunday 03:00 schedule in the time zone, one run at a time with no retry, its settings, and that its secrets are files and never env entries. It checks that no CronJob renders outside a cell or without a bucket, and that, outside a cell, the publisher gets none of the create job's settings, that in a cell the publisher gets the admin connection, the client secret, the cell backup key, the Studio volume and the templates, and that no other Deployment or Job gets the admin connection. It checks that the identity secret files and certificate are mounted in the identity pod and in no env entry, and that only the publisher in a cell and the restore-check CronJob also get the client secret, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume, the password-list volume, the admin connection Secret, the cell backup key Secret, `studio.persistence`, `templates.volume` or the internal domain. It checks the cert-manager `Certificate` and `Issuer` of the tenant subdomains: the wildcard name, the Secret name, the DNS-01 solver with a Secret reference for its token, that an inline token is rejected and never rendered, that nothing renders with the certificate off, and that rendering fails, naming the value, without the tenant domain, the Secret name, the ACME server or the token Secret name. It checks the PgBouncer objects: that only the server and the worker get the runtime database settings, the transaction pool mode, the pool sizes, the wildcard database line and the TLS modes in the ConfigMap, the non-root pod with a read-only root file system, the Service port 6432, that nothing renders with PgBouncer off, that rendering fails, naming the value, without `cell.id`, the database host, the auth user or either Secret name, and that a `value` in either Secret reference is rejected. No test runs PgBouncer from the chart on a live cluster. It checks the cell backup CronJob: the schedule, the time zone, `Forbid`, no retry, the deadline, the storage values, that both storage credentials and the cell backup key come from Secret references and only the CronJob gets them, that a `value` in either storage reference or an unknown field under `backup` is rejected and never rendered, that nothing renders outside a cell or without a bucket, and that rendering fails, naming the value, without `backup.timeZone`, `backup.serviceUrl`, `backup.region` or any of the three Secret names. `scripts/setup.sh` installs the pinned Helm,
-kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and downloads any schema file that a cached folder lacks. Axis has no test
-against a live cluster.
+`scripts/lint.sh` runs `helm lint --strict` and validates the rendered manifests against the
+Kubernetes schemas and the pinned cert-manager schemas with kubeconform. `scripts/helm.test.mjs`
+renders the chart and checks the rules of this section: the probes and HTTPS endpoints, the objects
+that render and that do not render inside and outside a cell, which pod gets which secret and setting,
+that secrets are files and never env entries, that a secret value in a reference is rejected, and
+that rendering fails, naming the value, without each required value. `scripts/setup.sh` installs the
+pinned Helm, kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and
+downloads any schema file that a cached folder lacks. Axis has no test against a live cluster, so no
+test runs PgBouncer or the identity provider from the chart.
 
 ## TLS
 
-The rule for traffic that comes in, and for every connection Axis makes.
+This section states the TLS rule for traffic that comes in, and for every connection that Axis makes.
+[Outbound connections](outbound-connections.md) lists those connections with the settings that name
+their addresses.
 
-**Incoming traffic.**
+### Incoming traffic
 
-- **Versions.** Only TLS 1.2 and TLS 1.3. TLS 1.3 is preferred, and a normal
-  client gets it.
-- **Ciphers.** On TLS 1.2 only ECDHE ciphers with AES-GCM or
-  ChaCha20-Poly1305, so every session has forward secrecy. All TLS 1.3 suites
-  are AEAD and forward-secret.
-- **The certificate.** Use a publicly trusted certificate that covers every
-  tenant host.
-- **No plain HTTP.** The hosts publish only on `127.0.0.1`, and only the TLS
-  endpoint faces clients. The server sends HSTS on https, see
-  [security headers](headers-and-rate-limits.md#security-headers).
-- **No client certificate.** Mutual TLS is not offered.
+- **Versions.** Only TLS 1.2 and TLS 1.3. TLS 1.3 is preferred, and a normal client gets it.
+- **Ciphers.** On TLS 1.2 only ECDHE ciphers with AES-GCM or ChaCha20-Poly1305, so every session has
+  forward secrecy. All TLS 1.3 suites are AEAD and forward-secret.
+- **The certificate.** Use a publicly trusted certificate that covers every tenant host.
+- **No plain HTTP.** The hosts publish only on `127.0.0.1`, and only the TLS endpoint faces clients.
+  The server sends HSTS on https, see [security headers](headers-and-rate-limits.md#security-headers).
+- **No client certificate.** Mutual TLS is not offered on the public listeners. The one exception is
+  the cell's [internal listener](tenant-lifecycle.md#provisioning-api), which the control plane calls.
 
-**Connections Axis makes.**
+### Connections Axis makes
 
-- **The identity provider.** Outside Development and Testing the server
-  accepts an identity provider over `https` only (`RequireHttpsMetadata`). It
-  validates the certificate against the system trust store. The admin host and the publisher
-  update each tenant's realm, so they trust it the same way. Add a private
-  authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
-  makes the server trust only that file, see [on premises](#on-premises).
-- **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection
-  string, plus `Root Certificate` for a private authority. Outside Development
-  and Testing, the server, the worker, the publisher and the admin tool stop at
-  start when one of their own connection strings sets a lower mode or none, and
-  the error names the setting and never shows its value. The server checks
-  `ConnectionStrings:Platform` and `ConnectionStrings:PlatformSchema`. The
-  worker checks `ConnectionStrings:Platform` under
-  `Tenancy:Source=directory`. Every admin command, `publisher` included, checks
-  `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` and
-  `Scenarios:ServerConnectionString` when set, and exits with code 2. Every tenant
-  connection copies `SSL Mode`, `Root Certificate` and
-  `Check Certificate Revocation` from `ConnectionStrings:Platform` (the server
-  and the worker), `Admin:ConnectionString` (`tenant create` and
-  `tenant restore`) or `ConnectionStrings:PlatformSchema` (the other admin
-  commands and the publisher). `pg_dump` and `pg_restore` get `PGSSLMODE` and
-  `PGSSLROOTCERT`, with `system` under `verify-full` when no root certificate
-  is named. A connection string with no `SSL Mode` counts as `Prefer`, which
-  falls back to plain text, so it is refused. Tenants under
-  `Tenancy:Source=configuration` carry their own settings in their connection
-  strings, and the hosts do not check them.
-- **URL bindings.** A `url` binding must be `https` outside Development.
-  Activation refuses an `http` binding, and the worker never sends a call to
-  one, see [deployment bindings](integration-resources.md#deployment-bindings).
-- **Mail.** Outside Development the worker sends no email while `Email:Smtp:UseTls`
-  is off, and `tenant email set` refuses `--tls false`. Both name the setting. See
+- **The identity provider.** Outside Development and Testing the server accepts an identity provider
+  over `https` only (`RequireHttpsMetadata`), and validates its certificate against the system trust
+  store. The admin host and the publisher update each tenant's realm, so they trust it the same way.
+  Add a private authority to that store. Do not replace the store with `SSL_CERT_FILE`, which makes
+  the server trust only that file, see [the order](#the-order).
+- **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection string, plus
+  `Root Certificate` for a private authority. Outside Development and Testing, the server, the worker,
+  the publisher and the admin tool stop at start when one of their own connection strings sets a lower
+  mode or none, and the error names the setting and never shows its value. A connection string with
+  no `SSL Mode` counts as `Prefer`, which falls back to plain text, so it is refused.
+  - The server checks `ConnectionStrings:Platform` and `ConnectionStrings:PlatformSchema`.
+  - The worker checks `ConnectionStrings:Platform` under `Tenancy:Source=directory`.
+  - Every admin command, `publisher` included, checks `Admin:ConnectionString`,
+    `ConnectionStrings:PlatformSchema` and `Scenarios:ServerConnectionString` when set, and exits with
+    code 2.
+  - Every tenant connection copies `SSL Mode`, `Root Certificate` and `Check Certificate Revocation`
+    from `ConnectionStrings:Platform` (the server and the worker), `Admin:ConnectionString`
+    (`tenant create` and `tenant restore`) or `ConnectionStrings:PlatformSchema` (the other admin
+    commands and the publisher).
+  - `pg_dump` and `pg_restore` get `PGSSLMODE` and `PGSSLROOTCERT`, with `system` under `verify-full`
+    when no root certificate is named.
+  - Tenants under `Tenancy:Source=configuration` carry their own settings in their connection strings,
+    and the hosts do not check them.
+- **URL bindings.** A `url` binding must be `https` outside Development. Activation refuses an `http`
+  binding, and the worker never sends a call to one, see
+  [deployment bindings](integration-resources.md#deployment-bindings).
+- **Mail.** Outside Development the worker sends no email while `Email:Smtp:UseTls` is off, and
+  `tenant email set` refuses `--tls false`. Both name the setting. See
   [mail settings](notifications.md#mail-settings).
-- **Telemetry export.** Outside Development every OTLP endpoint that is set must be an
-  `https` URL, or the server and the worker stop at start. See
-  [telemetry export](host-settings.md#telemetry-export).
-- **Proxy to server.** The server serves HTTPS only and has no plain HTTP
-  listener, so traffic between the proxy and the server never falls back to
-  unencrypted. The certificate comes from you. The Compose proxy connects over
-  TLS, checks that the certificate is for the name `servers` and trusts only
-  `server-ca.crt`, the authority you name. With Helm, your own Ingress must
-  connect to the Service over HTTPS and verify the server certificate. The
-  worker's health endpoint stays plain HTTP. Only the host or the kubelet
-  probes it, and it carries no application traffic.
+- **Telemetry export.** Outside Development every OTLP endpoint that is set must be an `https` URL, or
+  the server and the worker stop at start. See [telemetry export](host-settings.md#telemetry-export).
+- **Proxy to server.** The server serves HTTPS only and has no plain HTTP listener, so traffic between
+  the proxy and the server never falls back to unencrypted. The certificate comes from you. The
+  Compose proxy connects over TLS, checks that the certificate is for the name `servers` and trusts
+  only `server-ca.crt`, the authority you name. With Helm, your own Ingress must connect to the Service
+  over HTTPS and verify the server certificate. The worker's health endpoint stays plain HTTP: only the
+  host or the kubelet probes it, and it carries no application traffic.
 
-**What the Compose example sets.** The Caddyfile sets `protocols tls1.2 tls1.3`
-and the `ciphers` list above. The proxy publishes container port 443 only. Both
-servers set a Kestrel HTTPS endpoint on port 8443 with the certificate in
-`AXIS_SERVER_TLS_DIR`, and the proxy forwards to port 8443 over TLS with the
-server name `servers` and `/certs/server-ca.crt` as its only trusted authority.
+### What the Compose example sets
 
-**What the Helm chart leaves to you.** The chart has no Ingress, and the
-server Service is `ClusterIP`. Your own Ingress or load balancer ends TLS, so
-it must meet the rules for incoming traffic above. The chart cannot enforce
-versions or ciphers there. It also cannot make the Ingress connect over HTTPS
-and verify the server certificate. The chart sets a Kestrel HTTPS endpoint from
-the Secret in `secrets.serverCertificate`, probes it over HTTPS and names the
-Service port `https`.
+The Caddyfile sets `protocols tls1.2 tls1.3` and the `ciphers` list above, and `:443` is its only site
+address, so Caddy turns on no automatic HTTPS and no HTTP listener. The proxy publishes container port
+443 only. Both servers set a Kestrel HTTPS endpoint on port 8443 with the certificate in
+`AXIS_SERVER_TLS_DIR` and publish only that container port. The proxy forwards to port 8443 over TLS
+with the server name `servers`, and sends the identity host to `identity:8443` with the server name
+`identity`. It trusts only `/certs/server-ca.crt` in both places and never skips the verification.
 
-The proxy follows
-[D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
+### What the Helm chart leaves to you
+
+The chart has no Ingress, and the server Service is `ClusterIP`. Your own Ingress or load balancer
+ends TLS, so it must meet the rules for incoming traffic above, because the chart cannot enforce
+versions or ciphers there. The chart also cannot make the Ingress connect over HTTPS and verify the
+server certificate. The chart sets a Kestrel HTTPS endpoint from the Secret in
+`secrets.serverCertificate`, probes it over HTTPS and names the Service port `https`.
 
 ## Hardening checklist
 
-_(planned for M32)_ A list of every control that the [ASVS](asvs.md) tracking or the threat model
-delegates to the operator, such as disk encryption, malware scanning of uploads and access to the
-logs, with how to meet each one and how to check it. Outside Development, the server and the
-worker warn at start about each item they can see is missing, see
-[D110](../decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md).
+_(planned for M32)_
+
+The checklist lists every control that the [ASVS](asvs.md) tracking or the
+[threat model](threat-model.md) delegates to the operator, such as disk encryption, malware scanning
+of uploads and access to the logs, with how to meet each one and how to check it. Outside
+Development, the server and the worker warn at start about each item they can see is missing.
 
 ## Upgrade
 
-Only the latest version of Axis gets security fixes, so an operator upgrades to get one, see
-[D108](../decisions/d108-reporting-a-vulnerability-and-security-fixes.md).
+An upgrade has a fixed order, because a host serves only the tenants on its own schema version. So
+migrate first and roll out the hosts second. Only the latest version of Axis gets security fixes, so
+an operator upgrades to get one, see [D108](../decisions/d108-reporting-a-vulnerability-and-security-fixes.md).
 
-An upgrade has a fixed order. A host serves only tenants on its own schema
-version, as [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
-says. So migrate first and roll out the hosts second.
-
-1. Back up the platform database and every tenant database. For example, run
-   `pg_dump` from the admin image. Back up each tenant with
-   [`tenant backup`](tenant-backup-and-restore.md#tenant-backup).
+1. Back up the platform database and every tenant database. For example, run `pg_dump` from the admin
+   image. Back up each tenant with [`tenant backup`](tenant-backup-and-restore.md#tenant-backup).
 2. Run `migrate` with the new admin image.
 3. Roll out the new server, the new worker and the new publisher.
 
-Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration
-failed keeps its old version. See [migrate](administration.md#migrate) for the
-window and for failed tenants.
+Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration failed keeps its old
+version. See [migrate](administration.md#migrate) for the window and for failed tenants.
 
-**PostgreSQL over TLS.** A host outside Development and Testing stops at start
-when a connection string of its own sets `SSL Mode` below `VerifyFull`, or sets
-none, see [TLS](#tls). An existing install whose strings use the default
-`Prefer` stops at the next start. Before you roll out the hosts, make
-PostgreSQL serve TLS and set `SSL Mode=VerifyFull` in `ConnectionStrings__Platform`,
-`ConnectionStrings__PlatformSchema` and `Admin__ConnectionString`. Add
-`Root Certificate` when the certificate comes from a private authority. The admin
-image checks the same strings, so `migrate` in step 2 needs them too.
+The admin image checks the same connection strings as the hosts, see [TLS](#tls), so `migrate` in
+step 2 needs them in their final form too.
 
-**The server certificate.** The server serves HTTPS only, so it does not start
-without a certificate. An existing install must create it before the rollout.
-With Compose, put `tls.crt` and `tls.key` for the name `servers` in
-`AXIS_SERVER_TLS_DIR`, and `server-ca.crt` in `AXIS_TLS_DIR`. The server does
-not start without the first two, and the proxy cannot reach the server without
-the third. The server's host port now serves HTTPS.
-With Helm, create the TLS Secret and set `secrets.serverCertificate.name`.
-Rendering fails without it. The Service port is now 443 and named `https`, so
-point your Ingress at it over HTTPS.
-
-**The Helm identity provider.** The chart now also runs the identity provider, so
-an existing install fails to render until you set the new required values:
-`identity.hostname`, `identity.theme.volume`, `identity.passwordBlacklists.volume`,
-`secrets.identityCertificate.name`, and the names of `secrets.identityDatabaseUrl`,
-`secrets.identityDatabaseUsername`, `secrets.identityDatabasePassword` and
-`secrets.identityAdminClientSecret`. Create the `axis-identity` and
-`axis-identity-tls` Secrets first, see [in the cloud](#in-the-cloud).
-
-**No downgrade.** Migrations are not reversed. To roll back, restore the backup
-from step 1 and run the old images.
+**No downgrade.** Migrations are not reversed. To roll back, restore the backup from step 1 and run
+the old images.
 
 ## Open points
 
-These are not decided yet.
-
-- **The first install.** The server applies the platform migrations at start,
-  see [platform database](storage.md#platform-database). `tenant create` does
-  not create the `platform` tables and exits with code 2 without them, so start
-  the server once first. `migrate` before the `platform` schema exists does
-  nothing, because there is no tenant to migrate. It writes a note to standard
-  error and exits with code 0, so running it first, as the order above does, is
-  safe on a first install.
+The first install differs from an upgrade in one way: the `platform` tables do not exist yet. The
+server applies the platform migrations at start, see [platform database](storage.md#platform-database).
+`tenant create` does not create the `platform` tables and exits with code 2 without them, so start the
+server once first. `migrate` before the `platform` schema exists does nothing, because there is no
+tenant to migrate. It writes a note to standard error and exits with code 0, so running it first, as
+[the order](#the-order) does, is safe on a first install.

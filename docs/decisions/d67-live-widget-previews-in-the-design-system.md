@@ -2,60 +2,38 @@
 
 Status: **Agreed**
 
-The Design System artifact draws each widget live from one bundle that the
-repository builds, in place of the static HTML files it shows today. The owner
-agreed this on 2026-10-24. The
-artifact then works the way its type expects: a person can click a widget's
-inputs, open its pickers and dialogs, switch light and dark, and see a token
-edited on the page in the widgets. This changes how
-[D57](d57-a-design-system-published-from-the-repository.md) publishes the
-widget previews. Everything else in D57 stays: the repository is the source of
-truth, only the owner and Claude edit in Claude Design, a design change is a
-NexKit issue, and NexKit's agents neither read nor write Claude Design.
+## Context
 
-- **One bundle:** the repository builds a design-system bundle, one classic
-  script that sets `window.Axis`. It holds the shared widget components of
-  `web/src/platform/`, their fixtures, React 19 and Ant Design. It needs no
-  server, database or sign-in, like the preview page today. The Design System
-  type caps a bundle at 6 MB; today's preview build, with the same contents,
-  is 1.3 MB.
-- **Its own React:** React 19 ships no UMD build, so the bundle carries React
-  and mounts its widgets itself. It never uses a React that the page provides.
-- **One mount per widget:** `window.Axis` has one entry per widget and field
-  input in the preview list: `table`, `form`, `taskInbox`, `processInspector`,
-  `columns`, `tabs`, `section`, and the input of each field type. Each preview
-  in the artifact mounts one of them into its own element.
-- **Fixtures stay inside the bundle:** the fixtures answer only the API paths
-  of the fixture application. Every other request goes to the page's own
-  `fetch`, unchanged, so a page that loads the bundle keeps working. Today the
-  preview page replaces `window.fetch` for every request.
-- **Theme follows the page:** a mounted widget draws in the mode the page sets
-  with `data-theme`, and redraws when it changes.
-- **Tokens follow the page:** at mount, and when the page's token values
-  change, the bundle reads the Axis colour, type, spacing and radius tokens
-  from the page's CSS custom properties and passes them to the theme. A token
-  the page does not declare keeps its value from
-  `web/src/platform/designTokens.ts`, which stays the only source in the
-  repository.
-- **The preview page becomes the bundle's harness:** `/design-system.html`
-  loads the same bundle the artifact loads, and mounts each preview the same
-  way, in light and dark. The Playwright spec checks it there: every preview
-  draws without a console error in both modes, and no fixture reaches the
-  server's web root.
-- **No static files:** `scripts/design-system.sh` builds the bundle and no
-  longer saves HTML files. The artifact's saved renditions, its
-  `project/previews/` files, are removed when the local session first
-  publishes the bundle.
-- **Not the widget SDK:** the bundle is a preview of the standard widgets with
-  fixtures. It is not the published SDK for custom widgets that
-  [D8](d8-custom-ui-widgets-are-packaged-react-components.md) and M22 plan,
-  and it gives configuration no new way to run code.
+The Design System artifact of [D57](d57-a-design-system-published-from-the-repository.md) shows a
+preview of each widget. A static rendition shows how a widget looks, but not its pickers, dialogs,
+validation messages or hover states, and a token edited on the page changes nothing in it.
 
-_Why:_ static files show how a widget looks, but not its pickers, dialogs,
-validation messages or hover states, and a token edited on the page changes
-nothing in them. Live widgets let the owner try a design change on the page
-before it becomes an issue, and let a Design artifact use the real widgets
-instead of drawing copies. Reading tokens from the page keeps
-`designTokens.ts` the source while the page can try new values. The cost is a
-bundle that holds React and Ant Design, a fixture layer that must not leak
-into other pages, and a build the local session runs before every publish.
+## Decision
+
+- **One bundle.** The repository builds one classic script that sets `window.Axis`, with one mount per
+  preview. It holds the shared widgets, their fixtures, React and Ant Design, and needs no server or
+  sign-in. It carries its own React, because React 19 ships no UMD build for a page to provide.
+- **Fixtures stay inside it.** They answer only the fixture application's API paths, and every other
+  request goes to the page's own `fetch`.
+- **Theme and tokens follow the page.** A mounted widget follows the page's `data-theme` and the Axis
+  tokens in its CSS custom properties. A token the page leaves out keeps its value from the token
+  file, which stays the only source.
+- **One harness.** The repository's preview page mounts the same bundle the same way, and the
+  end-to-end tests check every preview there.
+- **Not the widget SDK.** The bundle previews the standard widgets. It is not the SDK of
+  [D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md), and gives configuration
+  no new way to run code.
+
+The detail is in [widget previews](../development.md#widget-previews) and
+[frontend](../reference/frontend.md).
+
+## Consequences
+
+- The owner tries a design change on the page before it becomes an issue, and a Design artifact can
+  use the real widgets instead of drawing copies.
+- The bundle carries React and Ant Design, its fixtures must not leak into other pages, and the local
+  session builds it before every publish.
+
+## Alternatives
+
+- **Static HTML renditions.** They show neither the interactive states nor an edited token.

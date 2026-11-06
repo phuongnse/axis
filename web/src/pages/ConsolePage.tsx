@@ -14,6 +14,7 @@ import { ConsolePublishing } from '../platform/ConsolePublishing'
 import { ConsoleWebhookDeliveries } from '../platform/ConsoleWebhookDeliveries'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { ConsoleDeadLetters } from './ConsoleDeadLetters'
 import { ConsoleSchedules } from './ConsoleSchedules'
 import { usePlatform } from './context'
@@ -32,6 +33,7 @@ const pageSize = 20
 export function ConsolePage() {
   const t = useText()
   const platform = usePlatform()
+  const { colour } = useDesignTokens()
   const { locale } = platform.current
   const [tenant, setTenant] = useState<ConsoleTenant>()
   const [forbidden, setForbidden] = useState(false)
@@ -98,7 +100,12 @@ export function ConsolePage() {
           <Flex vertical gap="middle">
             <Flex gap="small" align="center">
               <span>{t('shell.console.tenant.status')}</span>
-              <Tag color={tenant.status === 'readOnly' ? 'warning' : 'success'}>
+              <Tag
+                style={{
+                  color: tenant.status === 'readOnly' ? colour.warningText : colour.successText,
+                  borderColor: tenant.status === 'readOnly' ? colour.warning : colour.success,
+                }}
+              >
                 {t(`shell.console.tenant.status.${tenant.status}`)}
               </Tag>
             </Flex>

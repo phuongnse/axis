@@ -1,14 +1,15 @@
 # Payments
 
-Detailed reference for how a tenant of Axis SaaS pays: invoices, bank transfers through VietQR,
-payments abroad through a merchant of record, provider webhooks, the daily reconciliation and the
-billing ledger. It follows
-[D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
-[D127](../decisions/d127-plans-payments-and-invoices.md). Everything in this file is _(planned for
-M34)_. No payment is taken before the company, the providers' contracts and the accountant are in
-place, as D118 says. The conventions of [architecture.md](../architecture.md) apply.
+_(planned for M34)_
+
+A tenant of Axis SaaS pays for its subscription by bank transfer in Vietnam and through a merchant of
+record abroad. This page covers the billing invoices, the two ways to pay, the providers' webhooks,
+the daily reconciliation and the ledger that holds every amount. No payment is taken before the
+company, the providers' contracts and the accountant are in place.
 
 ## Invoices
+
+A billing invoice is Axis's own record of what a subscription owes for a period or a change.
 
 - **A billing invoice for each period.** The [control plane](control-plane.md) creates the invoice
   of a period 7 days before it starts, with its lines: the plan, each add-on, and any prorated charge
@@ -21,7 +22,9 @@ place, as D118 says. The conventions of [architecture.md](../architecture.md) ap
 
 ## Paying in Vietnam
 
-- **Provider.** PayOS, with VietQR bank transfers, as D118 agrees. Card payments come later.
+In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
+
+- **Provider.** PayOS, with VietQR bank transfers.
 - **A payment link for each invoice.** The control plane creates a PayOS payment request with the
   invoice's amount in `VND` and a unique integer `orderCode`, and shows its VietQR code and transfer
   details in the [billing portal](billing-portal.md) and in the reminder emails' link.
@@ -37,8 +40,10 @@ place, as D118 says. The conventions of [architecture.md](../architecture.md) ap
 
 ## Paying abroad
 
+Abroad a merchant of record sells the subscription and takes the payment.
+
 - **Merchant of record.** Paddle Billing sells the subscription, takes the payment, handles tax and
-  issues the invoice, as D118 agrees. Axis is the seller to Paddle, not to the customer.
+  issues the invoice. Axis is the seller to Paddle, not to the customer.
 - **Subscriptions in Paddle.** The control plane creates a Paddle subscription for the plan's price
   in `USD`, and Paddle charges the card each period and retries a failed charge.
 - **Mapped to Axis's states.** Paddle's `past_due` makes the Axis subscription `pastDue`, and Axis's
@@ -71,6 +76,8 @@ and compares them with its ledger.
 - Each run writes its counts as a metric and an audit record.
 
 ## The ledger
+
+The ledger is the only source of money: every amount is an entry in it, and nothing else holds one.
 
 - **Append-only.** `billing.ledger_entries` holds every charge, credit, payment, refund and
   proration: the subscription, the invoice, the kind, the signed amount in minor units, the currency,

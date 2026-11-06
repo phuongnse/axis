@@ -509,7 +509,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         ["serviceAccountsEnabled"] = false,
     };
 
-    private static Dictionary<string, object?> ServiceClient(string clientId, string secret) => new()
+    internal static Dictionary<string, object?> ServiceClient(string clientId, string secret) => new()
     {
         ["clientId"] = clientId,
         ["enabled"] = true,
@@ -542,7 +542,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return uuid;
     }
 
-    private async Task<string?> ClientUuidAsync(string token, string realmPath, string clientId, CancellationToken cancellationToken)
+    internal async Task<string?> ClientUuidAsync(string token, string realmPath, string clientId, CancellationToken cancellationToken)
     {
         using var response = await SendAsync(token, HttpMethod.Get, $"{realmPath}/clients?clientId={Uri.EscapeDataString(clientId)}", null, cancellationToken);
         EnsureSuccess(response, $"find the client '{clientId}'");

@@ -52,7 +52,8 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   with an id from `crypto.randomUUID()`. A reference the author must still choose is an empty string,
   so it shows as a diagnostic. A new `site` gets the kebab-case name as its `path`, by the rule of file
   names, because a path is a value and not a reference. A new `identityProvider` starts with type
-  `accounts`, in `identity-providers/<name>.json`.
+  `accounts`, in `identity-providers/<name>.json`. A new trigger starts with an empty `event`, and
+  Studio removes the key only when the author picks an event and then clears it.
 - **Tested starters.** The starters live in `web/src/platform/studioStarters.json`, each with the
   pointers of its empty references. A Vitest test checks each against its bundled schema, so a schema
   with no starter fails, the manifest, the contract and the layer aside, and every error must be at a
@@ -88,7 +89,8 @@ what changed.
 - **The generic form** is built from the JSON Schema of the resource's kind. The SPA bundles the
   schemas of `src/Axis.Configuration/Schemas`, the files the server embeds, and loads the one it needs
   when a resource opens. The form shows text, number, boolean and enum values, nested objects, and
-  arrays with add and remove.
+  arrays with add and remove. An array that the author adds an entry to and then empties stays in the
+  file as an empty array, as a data source's `groupBy` of a total does.
 - **What the form leaves to the JSON view.** A part that holds `oneOf` or `anyOf`, an `allOf` with an
   item that holds more than `if`, `then` and `else`, an object with no `properties`, such as a map, and
   a part with no type point to the JSON view. A `oneOf` whose value is text, or empty, shows its text
@@ -180,6 +182,8 @@ its end.
   finds in `GET .../releases` by the request's `releaseId`. A failed publish shows the failure and no
   release number, even when the request names a release, so a failure never looks like a success. An
   activation shows its own texts, Rolled back and Rollback failed.
+- **Activated** _(planned for M31)_. An activation's texts are Activated and Activation failed, in the
+  words of [D130](../decisions/d130-activate-a-release-replaces-roll-back.md).
 - **Diagnostics.** When a request ends, the Problems panel shows its diagnostics in place of the loaded
   ones, for a failed request and for a succeeded one that holds warnings.
 - **Contract scenarios.** A publish, validate or preview request that stored contract scenarios lists
@@ -197,10 +201,11 @@ The Releases entry lists the release history from `GET .../releases`, as
 
 - **A row's facts.** A release's label, note, time and publisher are those of its first activation,
   which is the publish. The list has one page.
-- **Activate….** Confirming its dialog sends `POST .../releases/{id}/rollback`, and the status line
-  follows the request as it follows a publish. A failed activation puts its diagnostics in the Problems
-  panel, and the list still marks the previous release Live. Activate… is off while a request runs and
-  while the reconnect message shows.
+- **Activate….** Confirming its dialog sends `POST .../releases/{id}/rollback`, see
+  [publishing](authoring.md#publishing), and the status line follows the request as it follows a
+  publish. A failed activation puts its diagnostics in the Problems panel, and the list still marks
+  the previous release Live. Activate… is off while a request runs and while the reconnect message
+  shows.
 - **Loading.** The history loads when the application opens, and again after a request ends, a save, a
   text write, a delete or a reconnect, because the folder may then differ from the live release.
 
@@ -739,7 +744,8 @@ second view of the same draft. Scenarios themselves are in [test scenarios](test
   the aliases that earlier `createRecord` steps save, and a `step` and its `outcome` come from the
   processes that the record started.
 - **Values.** The fields of the step's entity show as typed cells, and a value the entity does not name
-  stays as a text row. A step whose entity is not in the folder edits its `values` as a JSON object,
+  stays as a text row. A money value is a number box that stores a number. A child collection's rows
+  cannot be added in the form, so the JSON view writes them. A step whose entity is not in the folder edits its `values` as a JSON object,
   and the text is saved only when it is one.
 - **Notifications.** An `expectNotification` step picks its recipient kind, a user, a role or an email
   address, and a channel, `inApp`, `email` or none, which reads both channels. Its expected values are

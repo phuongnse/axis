@@ -1,6 +1,7 @@
-import { Alert, Col, Input, Row, Table, Typography } from 'antd'
+import { Alert, Col, Flex, Input, Row, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from '../platform/about'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
   axisLicenceUrl,
   fetchLicences,
@@ -56,16 +57,15 @@ export function LicencesPage() {
       title={t('shell.licences.title')}
       breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.licences.title') }]}
     >
-      <Typography.Paragraph>
-        {t('shell.licences.axis')}{' '}
+      <Typography.Paragraph>{t('shell.licences.axis')}</Typography.Paragraph>
+      <Flex gap="middle" wrap>
         <a href={axisLicenceUrl} target="_blank" rel="noreferrer">
           {t('shell.licences.licenceText')}
         </a>
-        {' · '}
         <a href={sourceUrl(version)} target="_blank" rel="noreferrer">
           {t('shell.licences.source')}
         </a>
-      </Typography.Paragraph>
+      </Flex>
       {loadFailed && <Alert data-testid="licences-error" type="error" title={t('shell.licences.loadFailed')} />}
       {licences && (
         <>
@@ -101,32 +101,36 @@ export function LicencesPage() {
 function PackageList({ title, entries, testId }: { title: string; entries: LicencePackage[]; testId: string }) {
   const t = useText()
   const withVersions = entries.some((entry) => entry.version !== undefined)
+  const columns: AxisColumn<LicencePackage>[] = [
+    { key: 'name', kind: 'freeText', title: t('shell.licences.package'), dataIndex: 'name' },
+    ...(withVersions
+      ? [{ key: 'version', kind: 'fixed' as const, title: t('shell.licences.version'), dataIndex: 'version' }]
+      : []),
+    {
+      key: 'licence',
+      kind: 'freeText',
+      title: t('shell.licences.licence'),
+      render: (_value, entry) => {
+        const url = licenceUrl(entry.licence)
+        return url ? (
+          <a href={url} target="_blank" rel="noreferrer">
+            {entry.licence}
+          </a>
+        ) : (
+          entry.licence
+        )
+      },
+    },
+  ]
   return (
     <div data-testid={testId}>
       <Typography.Title level={5}>{title}</Typography.Title>
-      <Table<LicencePackage>
-        size="small"
+      <AxisTable<LicencePackage>
         rowKey={(entry) => `${entry.name}/${entry.version ?? ''}/${entry.licence}`}
         pagination={false}
         dataSource={entries}
-        columns={[
-          { title: t('shell.licences.package'), dataIndex: 'name' },
-          ...(withVersions ? [{ title: t('shell.licences.version'), dataIndex: 'version' }] : []),
-          {
-            title: t('shell.licences.licence'),
-            dataIndex: 'licence',
-            render: (licence: string) => {
-              const url = licenceUrl(licence)
-              return url ? (
-                <a href={url} target="_blank" rel="noreferrer">
-                  {licence}
-                </a>
-              ) : (
-                licence
-              )
-            },
-          },
-        ]}
+        emptyText={t('shell.licences.empty')}
+        columns={columns}
       />
     </div>
   )

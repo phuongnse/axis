@@ -2,94 +2,52 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. M22 builds the custom widgets that
-[D8](d8-custom-ui-widgets-are-packaged-react-components.md) agreed and
-deferred, and publishes the SDK that package authors build on. D8 gave the
-rules a custom widget follows but no design. This decision gives that design,
-and D8 keeps its status line. It builds on
-[D28](d28-extension-packages.md),
-[D58](d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md),
-[D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
-and [D67](d67-live-widget-previews-in-the-design-system.md). Everything here is
-_(planned for M22)_. See [custom widgets](../reference/custom-widgets.md).
+## Context
 
-- **A widget in a package:**
-  - An extension package may hold widgets as well as operations. Its manifest,
-    `axis-package.json`, gets a `widgets` list. Each widget has a `name`, an
-    `entry` ES module in the package folder, a `label` per locale, typed
-    `properties` and an `sdk` version range.
-  - Property types are `text`, `textKey`, `number`, `boolean`, `entity`,
-    `dataSource`, `field` and `page`. A property may be `required`.
-  - `assembly` becomes optional, so a package may hold only widgets. A package
-    with operations still names its assembly.
-  - Custom widgets are page widgets only. Custom inputs for form fields come
-    later.
-- **On a page:**
-  - A page names a custom widget as
-    `{ "type": "custom", "widget": "<package>/<name>", "properties": { … } }`.
-  - The application declares the package in `packages`, as for operations.
-    Compilation checks the widget and its properties against the manifest of
-    the pinned version, and the release pins it.
-  - An unknown widget, a property the manifest does not declare, a missing
-    required property, or a value of the wrong type is a new diagnostic.
-    `entity`, `dataSource`, `field` and `page` values are checked as
-    references, so the reference index lists them.
-- **Loading in the SPA:**
-  - The server serves each installed version's widget files read-only under
-    `/extensions/<package>/<version>/`, with long-lived caching, because a
-    version's files never change.
-  - Page metadata gives each custom widget its entry URL and the content hash
-    of the entry. The SPA loads the entry through an import map entry that
-    carries that hash as its integrity.
-  - The server writes the import map into the SPA's page when it starts,
-    because installed packages change only with a restart. The map is an
-    inline script, so the content security policy of
-    [D85](d85-rate-limits-and-security-headers.md) lists its `sha256` hash in
-    `script-src`. That is the only inline script it allows.
-  - The import map gives the widget `react`, `react-dom` and
-    `@axis/widgets-sdk` from the SPA, so there is one React. A widget bundle
-    keeps them external and never imports Ant Design.
-  - A widget runs no `eval` and no inline script, so it works under the
-    security headers that M16 adds.
-- **The SDK hooks:** `useDataSource`, `useRecord`, `useText`, `useTokens` and
-  `runAction`. Each calls the platform APIs that the SPA already uses, so the
-  server checks the user's grants as for any other widget.
-- **Not a sandbox:**
-  - A custom widget runs in the SPA's origin with the user's session. It can
-    call any API the user may call, and do anything the user may do.
-  - The server still enforces every grant, so a widget never reaches more
-    than the user's grants. It is not stopped from acting as the user.
-  - "Only through platform APIs" in D8 is a rule for package authors, not a
-    limit the platform enforces.
-  - The operator installs and reviews packages for the whole installation.
-    Authors never upload code.
-- **In the page designer:**
-  - The palette lists the widgets of the packages that the application
-    declares and that are installed, through a new authoring route.
-  - The property panel is built from the widget's `properties`, with the
-    reference pickers of
-    [D52](d52-reference-pickers-label-texts-and-the-expression-editor.md).
-  - The canvas draws the widget with `preview: true` and placeholder data made
-    from field types, as D65 draws the standard widgets.
-- **The published SDK:**
-  - `Axis.Extensions` is published as a NuGet package and
-    `@axis/widgets-sdk` as an npm package, to the public registries.
-  - Both are 0.x versions with their own SemVer, apart from the platform
-    version. They make no compatibility promise. The one-format rule of
-    [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
-    holds until the first production release.
-  - A package declares the `sdk` range it was built for. An installed version
-    whose range the host's SDK does not meet is a load diagnostic, and the host
-    leaves the version out, as for a broken manifest.
-  - A package template and a test harness come with the SDK: a fake operation
-    context for operations, and a render harness for widgets that uses the D67
-    fixtures.
+[D8](d8-custom-ui-widgets-are-packaged-react-components.md) agreed that a custom widget is a React
+component in an extension package ([D28](d28-extension-packages.md)), with no design. Package authors
+need a manifest, a way for the SPA to load their code under the content security policy, an SDK to
+build on, and a place in the page designer.
 
-_Why:_ D8 already agreed that a custom widget is a packaged React component.
-Installing widgets the way packages are installed keeps one way to version,
-pin and review custom code. A sandboxed frame would isolate the widget, but it
-would break theming, overlays, focus and screen readers, which the standard
-widgets get right. So the docs say plainly that a widget is trusted code, as
-[D28](d28-extension-packages.md) says for packages. A 0.x SDK lets the contract
-change while the platform has one format, instead of adding compatibility code
-before the first production release.
+## Decision
+
+- **Widgets in a package.** A package's manifest lists its widgets beside its operations, each with
+  an entry module, a label, typed properties and the SDK range it was built for. A package may hold
+  only widgets, and custom widgets are page widgets only.
+- **Checked like any reference.** The application declares the package, compilation checks a page's
+  custom widget against the manifest of the pinned version, and properties that name a resource join
+  the reference index.
+- **Loaded through an import map.** The server serves each installed version's files read-only and
+  cacheable, and writes one import map into the SPA's page at start. The map pins each entry to its
+  content hash and gives every widget the SPA's own React and SDK. The content security policy of
+  [D85](d85-rate-limits-and-security-headers.md) allows that map, and no other inline script, so a
+  widget runs no `eval` and no inline script.
+- **Not a sandbox.** A widget runs in the SPA's origin with the user's session, through SDK hooks
+  that call the platform APIs. It can do anything the user may do and never more, because the server
+  enforces every grant. "Only through platform APIs" in D8 binds package authors, and the platform
+  does not enforce it. The operator installs and reviews packages, and authors never upload code.
+- **In the page designer.** The palette lists the widgets of the declared, installed packages, the
+  property panel is built from their properties, and the canvas draws them in preview mode, as
+  [D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md) draws the standard
+  widgets.
+- **A published 0.x SDK.** `Axis.Extensions` on NuGet and `@axis/widgets-sdk` on npm are 0.x, with
+  their own SemVer and no compatibility promise until the first production release. A host leaves out
+  a package version whose SDK range it does not meet.
+
+The detail is in [custom widgets](../reference/custom-widgets.md) and
+[extension packages](../reference/extension-packages.md).
+
+## Consequences
+
+- Custom code is versioned, pinned and reviewed one way, as packages are.
+- A custom widget gets the theme, overlays, focus and screen readers of the standard widgets.
+- A custom widget is trusted code that can act as the user without asking.
+- The SDK's contract can change while the platform keeps one format
+  ([D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)).
+
+## Alternatives
+
+- **A sandboxed frame.** It would isolate the widget, but break theming, overlays, focus and screen
+  readers.
+- **A compatible SDK from the start.** It would add compatibility code before the first production
+  release.

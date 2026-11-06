@@ -36,7 +36,7 @@ internal static class CsrfHeader
             await next(context);
         });
 
-    private static bool IsUnsafe(string method) =>
+    internal static bool IsUnsafe(string method) =>
         HttpMethods.IsPost(method) || HttpMethods.IsPut(method) || HttpMethods.IsPatch(method) || HttpMethods.IsDelete(method);
 
     private static bool HasHeader(HttpRequest request) =>

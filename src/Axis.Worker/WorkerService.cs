@@ -35,7 +35,8 @@ namespace Axis.Worker;
 /// A tenant whose database the server has not migrated yet is skipped until it has. Under the directory source the poll
 /// reads the directory again every <c>Tenancy:RefreshInterval</c>. The refresh pauses the loops, waits for the work items
 /// already running, and drops the pools of the tenants that changed or left, so no pool is dropped while one of its items runs.
-/// A tenant that is no longer active gets no new work item claimed, and a new tenant is polled once its runtime role passes the
+/// A tenant that is no longer active gets no new work item claimed. When a read-only tenant is seen active again, the schedule
+/// occurrences that fell meanwhile are skipped before any of its work is claimed, not caught up. A new tenant is polled once its runtime role passes the
 /// check. The poll also reads the recorded schema version of every tenant, and claims no work of a tenant whose version is not
 /// the worker's, until the admin tool's <c>migrate</c> has brought it there. When a tenant's database counts as migrated,
 /// its runtime database role is checked, so that it can only read and write rows. Then the releases
@@ -74,6 +75,10 @@ internal sealed partial class WorkerService(
     private readonly HashSet<string> _ready = new(StringComparer.Ordinal);
     private readonly HashSet<string> _waitingLogged = new(StringComparer.Ordinal);
     private readonly HashSet<string> _schemaWaiting = new(StringComparer.Ordinal);
+
+    // The tenants that came back from read-only and whose schedule occurrences that fell meanwhile are not skipped yet.
+    // No work of such a tenant is claimed before they are, so no old occurrence runs as a catch-up.
+    private readonly HashSet<string> _schedulesToSkip = new(StringComparer.Ordinal);
 
     // The recorded schema versions of the last good read. Null under the configuration source, and before a read worked.
     private IReadOnlyDictionary<string, string>? _schemaVersions;
@@ -500,8 +505,10 @@ internal sealed partial class WorkerService(
                 _notificationsCleaned.Forget(tenantId);
                 _usageSampled.Forget(tenantId);
                 health.TenantDropped(tenantId);
+                _schedulesToSkip.Remove(tenantId);
             }
 
+            _schedulesToSkip.UnionWith(result.Resumed);
             LogRefreshed(result.TenantCount, result.CheckedCount, result.WithheldCount);
         }
         catch (InvalidOperationException exception)
@@ -581,6 +588,12 @@ internal sealed partial class WorkerService(
                 _ready.Add(tenantId);
                 health.TenantMigrated(tenantId);
                 LogReady(tenantId);
+            }
+
+            if (_schedulesToSkip.Contains(tenantId))
+            {
+                await SkipSchedulesAsync(tenantId, stoppingToken);
+                _schedulesToSkip.Remove(tenantId);
             }
 
             return true;
@@ -817,6 +830,31 @@ internal sealed partial class WorkerService(
         }
     }
 
+    /// <summary>
+    /// Moves the schedule triggers of a tenant that came back from read-only past the occurrences that fell meanwhile, and logs each.
+    /// A database without the table yet has nothing to skip. Any other failure reaches the caller, so the tenant stays not ready and the skip is retried.
+    /// </summary>
+    private async Task SkipSchedulesAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            foreach (var skipped in await TriggerSchedules.SkipMissedAsync(connection, cancellationToken))
+            {
+                LogSchedulesSkipped(skipped.TriggerId, tenantId, skipped.Count, skipped.NextOccurrenceAt);
+            }
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
+    }
+
     /// <exception cref="StartupCheckException">The runtime database role is a superuser, owns a schema or may create objects.</exception>
     private async Task CheckRuntimeRoleAsync(string tenantId, CancellationToken cancellationToken)
     {
@@ -903,6 +941,9 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Error, "Reading the schema versions from the tenant directory failed. The worker keeps the last good read.")]
     private partial void LogSchemaReadFailed(Exception exception);
+
+    [LoggerMessage(LogLevel.Information, "Trigger {TriggerId} of tenant {TenantId} skipped {Count} occurrence(s) that fell while the tenant was read-only. Its next occurrence is {NextOccurrenceAt:o}.")]
+    private partial void LogSchedulesSkipped(Guid triggerId, string tenantId, int count, DateTimeOffset nextOccurrenceAt);
 
     [LoggerMessage(LogLevel.Information, "Tenant {TenantId} is ready for work.")]
     private partial void LogReady(string tenantId);

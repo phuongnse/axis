@@ -1,21 +1,26 @@
 # Diagnostic codes
 
-Detailed reference for the diagnostics that the [configuration pipeline](configuration.md)
-reports, and the table of every code. A new code gets the next free number and a new row at the
-end of the table. A unit test compares the table with `DiagnosticCodes` and
-`ExpressionDiagnosticCodes`.
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+The [configuration pipeline](configuration.md) reports every problem it finds in an application
+folder as a diagnostic. This page describes what a diagnostic holds and lists every code with its
+meaning, so that an author can look up what a code means and where it is reported.
 
-Diagnostics always carry `file`, `resourceId` (when the file has a readable
-ID), `path`, `code` and a message. `file` is relative to the application
-folder and uses `/` separators, or is empty when the diagnostic concerns the
-whole application folder. `path` is a JSON Pointer (RFC 6901) into that file,
-such as `/fields/0/type`, or empty when the problem concerns the whole file or
-the whole folder. Messages never contain absolute paths or exception text,
-because they are shown to application authors. Codes have the form `AXCnnnn`
-and never change meaning. A retired code is never reported again and keeps its row. Compile reports all diagnostics, not just the first,
-sorted by file and then path.
+## Diagnostic shape
+
+A diagnostic carries `file`, `resourceId` when the file has a readable id, `path`, `code` and a
+message. Compile reports all diagnostics, not just the first, sorted by file and then path.
+
+- **`file`** is relative to the application folder and uses `/` separators, or is empty when the
+  diagnostic concerns the whole application folder.
+- **`path`** is a JSON Pointer (RFC 6901) into that file, such as `/fields/0/type`, or is empty when
+  the problem concerns the whole file or the whole folder.
+- **The message** never contains absolute paths or exception text, because it is shown to
+  application authors.
+
+## Codes
+
+Codes have the form `AXCnnnn` and never change meaning. A new code gets the next free number and a
+new row at the end of the table. A retired code is never reported again and keeps its row. A unit
+test compares the table with `DiagnosticCodes` and `ExpressionDiagnosticCodes`.
 
 | Code | Meaning |
 | --- | --- |
@@ -91,7 +96,7 @@ sorted by file and then path.
 | `AXC0070` | A process's `start`, a branch `next`, an `otherwise`, an operation's `next`, a task outcome's `next`, a task deadline's `next` or a `waitEvent` timeout's `next` names no step of the process, ignoring letter case. Reported at that property, such as `/start`, `/steps/{i}/branches/{j}/next`, `/steps/{i}/next`, `/steps/{i}/outcomes/{j}/next`, `/steps/{i}/deadline/next` or `/steps/{i}/timeout/next`. |
 | `AXC0071` | A process step cannot be reached from `start`. Reported at `/steps/{i}`. Not checked when `start` names no step. |
 | `AXC0072` | A process step has no path to an `end` step. Reported at `/steps/{i}`. Not reported for a step with a transition to an unknown step, which is already `AXC0070`. |
-| `AXC0073` | Process steps form a cycle with no waiting step, such as a → b → a of `decision` and `operation` steps, which would run for ever. A cycle through a `task`, a `timer` or a `waitEvent` step is allowed, because the transitions of such a step are not followed. Reported at the transition that closes the cycle, walking the steps in file order and each step's transitions in order: the branches, then `otherwise`, then `next`, then the outcomes, then the deadline's `next`, then the timeout's `next`. The message names the steps in the cycle. See [Limits in M3](processes.md#limits-in-m3) and [Loops](process-flow.md#loops). |
+| `AXC0073` | Process steps form a cycle with no waiting step, such as a → b → a of `decision` and `operation` steps, which would run for ever. A cycle through a `task`, a `timer` or a `waitEvent` step is allowed, because the transitions of such a step are not followed. Reported at the transition that closes the cycle, walking the steps in file order and each step's transitions in order: the branches, then `otherwise`, then `next`, then the outcomes, then the deadline's `next`, then the timeout's `next`. The message names the steps in the cycle. See [limits](processes.md#limits) and [Loops](process-flow.md#loops). |
 | `AXC0074` | A form's `entity` names no loaded entity. Reported at `/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. |
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
@@ -102,7 +107,7 @@ sorted by file and then path.
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`, or at `/steps/{i}/escalations/{j}/reassign` for an escalation's `reassign`. |
 | `AXC0082` | A process task step's `form` names no loaded form, ignoring letter case. Reported at `/steps/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
 | `AXC0083` | A process task step's `form` is over another entity than the process's subject entity. Reported at `/steps/{i}/form`, naming both entities. Not checked when either entity is unknown. |
-| `AXC0084` | A process task step's `dueIn`, its `deadline`'s `after`, an escalation's `after`, a timer step's `wait`, or a `waitEvent` step's `timeout.after`, is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months are `AXC0084` until calendar durations come with the [time zone rule](../decisions/d22-current-time-and-time-zones.md), because they have no fixed length. Reported at `/steps/{i}/dueIn`, at `/steps/{i}/deadline/after` for a deadline, at `/steps/{i}/escalations/{j}/after` for an escalation, at `/steps/{i}/wait` for a timer, or at `/steps/{i}/timeout/after` for a `waitEvent`. |
+| `AXC0084` | A process task step's `dueIn`, its `deadline`'s `after`, an escalation's `after`, a timer step's `wait`, or a `waitEvent` step's `timeout.after`, is not a positive ISO 8601 duration in the accepted form: whole-number weeks (`W`), or days (`D`) with an optional `T` part of hours (`H`), minutes (`M`) and seconds (`S`), such as `P2W`, `P3D`, `PT4H` or `P1DT12H`. Years and months have no fixed length, so they are `AXC0084`. Reported at `/steps/{i}/dueIn`, at `/steps/{i}/deadline/after` for a deadline, at `/steps/{i}/escalations/{j}/after` for an escalation, at `/steps/{i}/wait` for a timer, or at `/steps/{i}/timeout/after` for a `waitEvent`. |
 | `AXC0085` | An earlier outcome of the same task step already uses this `name`, ignoring letter case. Reported at `/steps/{i}/outcomes/{j}/name` of the later outcome, naming the first one. |
 | `AXC0086` | A computed field calls `now()`, `today()` or `toDate`, also inside an aggregate's item expression, such as `count(lines, dueAt < now())`. A stored value cannot depend on the current time or the application's time zone. Reported at `/fields/{i}/expression`, with the character position of the call in the message. See [expression diagnostics](expressions.md#diagnostics). |
 | `AXC0087` | A `form` widget action's, or a `table` row action's, `process` names no loaded process. Reported at `/widgets/{i}/actions/{j}/process` or `/widgets/{i}/rowActions/{j}/process`. Not reported when the name is a process file that was not loaded because of its own errors. |
@@ -164,7 +169,7 @@ sorted by file and then path.
 | `AXC0143` | A data change trigger's `entity` names no loaded entity. Reported in the trigger at `/entity`. |
 | `AXC0144` | A data change trigger's `entity` is not the process's subject entity. Reported in the trigger at `/entity`. |
 | `AXC0145` | A name in a data change trigger's `fields` names no field of the entity, or names a computed field. Reported in the trigger at `/fields/{i}`. |
-| `AXC0146` | A release that is active, or has a running or waiting process instance, pins an extension package version that is not installed. Reported at the start of the server and the worker, in that release's stored `application.json` at `/packages/{i}/version`. It names the tenant, application, release, package id and version, and stops the start. A [rollback](authoring.md#rollback) of a release that pins a version that is not installed gets the same code and is refused. |
+| `AXC0146` | A release that is active, or has a running or waiting process instance, pins an extension package version that is not installed. Reported at the start of the server and the worker, in that release's stored `application.json` at `/packages/{i}/version`. It names the tenant, application, release, package id and version, and stops the start. [Activating a stored release](authoring.md#activating-a-release) that pins a version that is not installed gets the same code and is refused. |
 | `AXC0150` | A process package operation step's `operation` names a package that the application does not list in `packages`, matched exactly. Not reported for a listed package that failed pinning (`AXC0139` to `AXC0142`), or when `application.json` was not loaded. Reported at `/steps/{i}/operation`. In a module process, the package must be one of the module's `packages` in `module.json`, and a package that only a module lists gives it in an application process. |
 | `AXC0151` | A process package operation step's `operation` names no operation in the manifest of the pinned version, matched ignoring letter case. Reported at `/steps/{i}/operation`. Its `input` and `output` are then not checked. |
 | `AXC0160` | A schedule trigger's `schedule` is not a valid 5-field cron. Reported at `/schedule`. |
@@ -179,7 +184,7 @@ sorted by file and then path.
 | `AXC0171` | A `renameField`'s `from`, or a `dropField`'s or `convert`'s `field`, names no field of the entity as it is at that change. Reported at `/changes/{i}/from` or `/changes/{i}/field`. |
 | `AXC0172` | A `renameField`'s `to` is already a field of the entity at that change. Reported at `/changes/{i}/to`. |
 | `AXC0173` | A `fill`'s or `convert`'s `field` is not a field of the entity in the release. A child-collection field does not count. Reported at `/changes/{i}/field`. |
-| `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. A [rollback](authoring.md#rollback) to a release that lacks a migration applied after it gets the same code and is refused. |
+| `AXC0174` | An applied migration's file has changed since it was applied, or it is missing from the release. A changed file is reported at that file, and a missing one at `application.json`. Both have an empty path and the migration `id` as `resourceId`. Nothing is applied. [Activating a stored release](authoring.md#activating-a-release) that lacks a migration applied after it gets the same code and is refused. |
 | `AXC0176` | A pending `fill` leaves a `null` in some row, because its value is `null` for that row. Reported at `/changes/{i}/value` of the migration file, with the number of rows in the message. Nothing is applied. |
 | `AXC0177` | A pending `convert` fails for a stored row, such as text that does not parse as the new type, a value that is too long, a required field left empty or a duplicate in a unique field. Also reported when an enum `convert` leaves a value that the field does not list. Reported at `/changes/{i}/value` of the migration file, with a fixed message and, for a database error, its PostgreSQL error code. Nothing is applied. |
 | `AXC0178` | A pending `renameField`, `dropField`, `dropEntity` or `convert` changes a column that another release of the application uses, and `running` or `waiting` process instances are pinned to that release. One per migration and release, with the release id and the number of open instances in the message. Reported at the migration file with an empty path and the migration `id` as `resourceId`. Nothing is applied. Activate the release again once those instances end. |
@@ -206,7 +211,7 @@ sorted by file and then path.
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, a site navigation entry's `page`, a trigger's, `startProcess` action's, process inspector's or sub-process step's `process`, an endpoint's `entity` or `process`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource`, `/navigation/{i}/page`, `/process`, `{actionPath}/process`, `/widgets/{i}/process`, `/steps/{i}/process` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, a module trigger's `process`, `event` or `entity`, or a module scenario step's `entity` or `process`, contains `/` and does not name a module that module declares. A `sequence`, a step `form`, a step `process`, a trigger `process` and a scenario step's `process` with `/` always give it. A scenario step's `entity` may name a declared module. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, a module trigger's `process`, `event` or `entity`, a module page's widget `entity`, `dataSource`, `form` or `process`, an action's `page` or `process` or a page parameter's `target`, or a module scenario step's `entity` or `process`, contains `/` and does not name a module that module declares. A `sequence`, a step `form`, a step `process`, a trigger `process`, a scenario step's `process` and every reference of a module page with `/` always give it, because a page names only its own module's resources. A scenario step's `entity` may name a declared module. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. A contract transition's message key is reported at `/lifecycle/transitions/{i}/message/textKey` of the contract file, and a contract core validation's at `/validations/{i}/message/textKey`. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |

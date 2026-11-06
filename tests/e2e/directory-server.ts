@@ -21,8 +21,13 @@ import {
  * Playwright runs specs in parallel, so two specs that start this server at once need two ports. Each spec passes its
  * own `portOffset`, which is added to `AXIS_E2E_TENANT_HTTPS_PORT`. The browser maps the host on port 443 to the
  * returned `httpsPort`, so the offset does not show in any address.
+ *
+ * `env` adds settings to the server's environment, such as the `Cell__*` settings that make it a cell.
  */
-export async function startDirectoryServer(portOffset = 0): Promise<{ httpsPort: number; stop(): Promise<void> }> {
+export async function startDirectoryServer(
+  portOffset = 0,
+  env: Record<string, string> = {},
+): Promise<{ httpsPort: number; stop(): Promise<void> }> {
   const httpsPort =
     Number(required('AXIS_E2E_TENANT_HTTPS_PORT', 'the https port of the server of a created tenant')) + portOffset
   const httpUrl = `http://127.0.0.1:${await sparePort()}`
@@ -42,6 +47,7 @@ export async function startDirectoryServer(portOffset = 0): Promise<{ httpsPort:
     Extensions__Path: extensionsPath,
     Modules__Path: modulesPath,
     Templates__Path: templatesPath,
+    ...env,
   })
   return { httpsPort, stop }
 }

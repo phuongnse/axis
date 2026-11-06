@@ -128,6 +128,8 @@ const signedInUser: CurrentUser = {
   studioTest: false,
   console: false,
   users: false,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 
 const e2eSite: ApplicationSite = {
@@ -697,7 +699,9 @@ describe('App', () => {
 
     await screen.findByRole('heading', { name: 'Tools' })
     const description = screen.getByText('Build and publish applications.')
-    expect(description.closest('.ant-typography')).toHaveClass('ant-typography-ellipsis-multiple-line')
+    await waitFor(() =>
+      expect(description.closest('.ant-typography')).toHaveClass('ant-typography-ellipsis-multiple-line'),
+    )
     expect(description.closest('.ant-typography')).toHaveStyle({ '-webkit-line-clamp': '2' })
   })
 

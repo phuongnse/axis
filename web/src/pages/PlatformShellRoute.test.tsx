@@ -32,6 +32,8 @@ const user: CurrentUser = {
   studioTest: false,
   console: false,
   users: true,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 
 const notices: NotificationPage = {

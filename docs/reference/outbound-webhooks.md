@@ -1,23 +1,17 @@
 # Outbound webhooks
 
-Detailed reference for the `webhook` resource and the delivery of an event to it, moved out of
-[integration-resources.md](integration-resources.md), which holds the connectors, events, triggers and
-inbound endpoints. How a process raises an event is in [process-events.md](process-events.md#raise-event-step).
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+This page describes the `webhook` resource and how Axis delivers an event to it. The connectors,
+events, triggers and inbound endpoints are in [integration resources](integration-resources.md), and
+how a process raises an event is in [raise event step](process-events.md#raise-event-step).
 
 ## Outbound webhooks
 
-A webhook tells another system that an event happened, as
-[D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
-in the application, so it is part of the release. There is no API through
-which another system subscribes itself. The webhook resource, its compile
-checks, the activation check of its bindings, the delivery, the rotation by two
-secrets and the dead letter of a delivery that keeps failing are built. The
-console lists recent deliveries and dead letters (built).
+A webhook tells another system that an event happened. The author configures it in the application,
+so it is part of the release, and there is no API through which another system subscribes itself.
 
 ### Webhook resource
 
+A `webhook` resource names the event it sends, the URL and the secret it sends with, and its timeout.
 A webhook that tells a chat system when a note is closed, in
 `webhooks/note-closed-chat.json`:
 
@@ -51,10 +45,8 @@ A webhook that tells a chat system when a note is closed, in
   `url` and `secret` optional, so a missing one has this code and not the
   schema error `AXC0004`.
 - An event that has a webhook may not carry a value read from a field marked
-  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
-  maps one into its payload, directly or through a reference path, is `AXC0316`
-  at `/steps/{i}/fields/{key}`. A step that maps it into an event that no
-  webhook names compiles. An
+  `sensitive`. A [raise event step](process-events.md#raise-event-step) checks
+  its payload for one, as that section says. An
   [endpoint's event](integration-resources.md#endpoint-resource) that reads an
   input that `values` maps to a sensitive field is `AXC0316` at
   `/event/fields/{key}`.
@@ -63,15 +55,12 @@ A webhook that tells a chat system when a note is closed, in
 
 ### Webhook delivery
 
-The delivery is built.
+Each raised event is delivered to every webhook of the event as a signed `POST`, at least once,
+retried until it succeeds or becomes a dead letter.
 
 - **Staged with the event.** Raising the event stages one delivery for each
-  webhook of the event, in the same transaction, as a row in
-  `axis.webhook_deliveries` and a `webhook.deliver`
-  [work item](process-events.md#webhook-delivery). The worker sends it later,
-  outside any transaction. The webhooks are those of the release the raising
-  instance is pinned to, which compiled the step. A step that rolls back stages
-  nothing.
+  webhook of the event, which the worker sends later, as
+  [webhook delivery](process-events.md#webhook-delivery) describes.
 - **Body.** A `POST` with a JSON body:
 
   ```json
@@ -89,8 +78,7 @@ The delivery is built.
 
   `id` is the event occurrence id. `timestamp` is the time the occurrence was
   raised, in UTC, and is the same on every attempt. `fields` holds the event's
-  payload fields. The delivery stores no body, so each attempt builds the same
-  body again from the stored occurrence.
+  payload fields. Every attempt sends the same body.
 
 - **Headers.** The Standard Webhooks headers:
   - `webhook-id`, `<occurrence id>_<webhook id>`, both as hyphenated UUIDs, the
@@ -111,9 +99,9 @@ The delivery is built.
   [dead letter](process-events.md#dead-letters) of the kind `webhook.deliver`
   that an operator redelivers or discards. A redeliver keeps the same
   `webhook-id`. The other webhooks of the occurrence still deliver.
-- **Rules of a connector call.** `https` only outside Development, and no
-  redirects: a `3xx` fails the attempt. The request is cancelled after the
-  webhook's `timeout`.
+- **Rules of a connector call.** The worker sends the request with the rules
+  of a connector call, as [webhook delivery](process-events.md#webhook-delivery)
+  says.
 - **At least once.** A delivery can arrive more than once, and deliveries
   arrive in no fixed order.
 - **Audit.** Each delivered request writes an audit record
@@ -122,8 +110,8 @@ The delivery is built.
   history, audit records or logs. The record names the application, the event's
   entity, the subject record and the raising instance, so it shows in the
   record's history.
-- **Test scenarios.** A [scenario](test-scenarios.md) tenant sends no webhook.
-  Its deliveries stay queued.
+- **Test scenarios.** A [scenario](test-scenarios.md) sends no webhook, see
+  [webhook delivery](process-events.md#webhook-delivery).
 - **Seen in the console.** The [operator console](operator-console.md#views)
   lists recent deliveries with their state, attempts and status code, and its
-  Dead letters view lists the dead letters (built).
+  Dead letters view lists the dead letters.

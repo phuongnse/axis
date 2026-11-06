@@ -1,31 +1,22 @@
 # Inbound endpoint calls
 
-Detailed reference for how another system calls an inbound endpoint: the call, the order of
-checks, the responses, idempotency and the status location. The `endpoint` resource is in
-[integration-resources.md](integration-resources.md#inbound-endpoints).
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+This page describes how another system calls an inbound endpoint: the call, the order of checks,
+the responses, idempotency and the status location. An
+[`endpoint` resource](integration-resources.md#endpoint-resource) lets another system create a record
+and start a process on it, or raise an event about it, in one call, and the resource itself is
+described with the [integration resources](integration-resources.md#inbound-endpoints).
 
-The design follows [D27](../decisions/d27-inbound-endpoints.md).
-The bearer token check, its `401`, the CSRF exemption and the call are built.
-The call creates the record and starts the process, with the order of checks,
-the responses, `output` with `wait`, the audit records,
-[idempotency](#idempotency) and the [status location](#status-location)
-below. An
-[`endpoint` resource](integration-resources.md#endpoint-resource) lets
-another system create a record and start a process on it in one call. The
-caller signs in with a bearer token, as
-[Machine callers](security.md#machine-callers) describes. Endpoints
-are an exception to the session and CSRF rules above, as are the
-[service accounts](security.md#service-accounts) of the record API, data source
-rows, process start and process inspection. Under a tenant's `fapi2` profile an endpoint accepts
-only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
+The caller signs in with a bearer token, as [machine callers](security.md#machine-callers)
+describes. So an endpoint call is an exception to the session and CSRF rules of
+[security](security.md), as are the calls of [service accounts](security.md#service-accounts) to the
+record API, data source rows, process start and process inspection. Under a tenant's `fapi2` profile
+an endpoint accepts only DPoP-bound tokens, sent as `Authorization: DPoP` with a proof, see
 [machine callers under `fapi2`](fapi2-profile.md).
 
 ## The call
 
-The purchasing system submits a purchase request through the sample's
-`SubmitPurchaseRequest` endpoint:
+A call is one `POST` to the endpoint's route with the input in its body. The purchasing system
+submits a purchase request through the sample's `SubmitPurchaseRequest` endpoint:
 
 ```http
 POST /api/apps/PurchaseRequests/endpoints/SubmitPurchaseRequest
@@ -68,7 +59,10 @@ Idempotency-Key: po-import-20261012-0042
 
 ## Order of checks
 
-A call is checked in this order, and the first failure is the response:
+The checks of a call come before any write, and one transaction then creates the record, starts the
+process and raises the event. A call in a [read-only tenant](subscriptions.md#the-read-only-tenant)
+is refused before all of these checks. Any other call is checked in this order, and the first failure
+is the response:
 
 1. The bearer token, `401` with `WWW-Authenticate: Bearer` (`DPoP` under
    `fapi2`, with its proof). It comes before
@@ -97,19 +91,19 @@ One transaction then does the rest:
 3. It starts the processes of the [data change triggers](process-events.md#starts-from-triggers)
    on `create` for the entity, as `system`, in the order of the release. A
    skipped trigger start does not fail the call.
-4. Steps 4 and 5 run only when the endpoint has a `process`. It evaluates the process's `startCondition` on the new record. A failure
-   is a `400` keyed `/input`, with the condition's message text key.
+4. With a `process`, it evaluates the process's `startCondition` on the new record. A failure
+   is a `400` keyed `/input`, with the condition's message text key. Steps 4 and 5 run only when
+   the endpoint has a `process`.
 5. It inserts the instance, pinned to the active release, with its first
    work item, as the [process start](processes.md#start-endpoint) does. An
    instance already running for the record is a `409`.
 6. With an `event`, it raises the event for the new record,
    as a [raise event step](process-events.md#raise-event-step) does: it stores
-   the occurrence, with the instance of step 5 as the one that raised it, or
-   no instance when the endpoint has no `process`, and the active release, runs the `sync` event triggers, queues the `event.deliver`
-   work item and stages the event's
-   [webhook deliveries](outbound-webhooks.md#webhook-delivery). A run-time
-   error in an expression is a `400` keyed `/event/fields/<key>`. See
-   [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md).
+   the occurrence with the active release and with the instance of step 5 as the one that raised
+   it, or no instance when the endpoint has no `process`. It runs the `sync` event triggers, queues
+   the `event.deliver` work item and stages the event's
+   [webhook deliveries](outbound-webhooks.md#webhook-delivery). A run-time error in an expression
+   is a `400` keyed `/event/fields/<key>`.
 7. It writes the audit records `record.created` and, with a `process`, `process.started`.
 
 When any part fails, nothing is written. After the commit, an endpoint with
@@ -121,6 +115,8 @@ When any part fails, nothing is written. After the commit, an endpoint with
 - **Failure ends the wait.** A failed instance never completes, so the call
   stops waiting as soon as it reads `failed`.
 
+The audit records of step 7 name the caller and the endpoint:
+
 - **Actor.** The actor of both audit records is the caller's id, from the
   token's user id claim (`sub`). They store no display name, see
   [Machine callers](security.md#machine-callers).
@@ -131,12 +127,12 @@ When any part fails, nothing is written. After the commit, an endpoint with
 
 ## Responses
 
-Errors are problem details (`application/problem+json`), and their titles are
-fixed, as in [Errors](record-api.md#errors).
+A call answers `201` when it is done, `202` when it started an instance that has not completed
+within `wait`, and an error otherwise. Errors are problem details (`application/problem+json`), and
+their titles are fixed, as in [Errors](record-api.md#errors).
 
-**`201` without output.** The record and the instance are stored. An
-endpoint without `output` answers at once, and the instance is still
-`running`:
+An endpoint without `output` answers `201` as soon as the record and the instance are stored, and
+the instance is still `running`:
 
 ```json
 {
@@ -146,9 +142,8 @@ endpoint without `output` answers at once, and the instance is still
 }
 ```
 
-**`201` without process.** An endpoint with no `process` starts no instance.
-It answers at once, when the record is stored and the event is raised, with
-the record only:
+An endpoint with no `process` starts no instance. It answers `201` at once, when the record is stored
+and the event is raised, with the record only:
 
 ```json
 {
@@ -156,9 +151,8 @@ the record only:
 }
 ```
 
-**`201` with output.** The endpoint declares `output` and `wait`, and the
-instance completed within `wait`. The fixture's `ImportClosedNote` returns
-the note's `code` and `status`:
+An endpoint that declares `output` and `wait` answers `201` with the output when the instance
+completed within `wait`. The fixture's `ImportClosedNote` returns the note's `code` and `status`:
 
 ```json
 {
@@ -169,8 +163,7 @@ the note's `code` and `status`:
 }
 ```
 
-**`202`.** The endpoint declares `output` and `wait`, and the instance did
-not complete within `wait`. The body has no `output`, and `Location` names
+It answers `202` when the instance did not complete within `wait`. The body has no `output`, and `Location` names
 the status location. `Location` uses the declared names of the application
 and the endpoint, not the letter case of the request. `state` is `running`
 or `waiting`, or `failed` when the instance failed:
@@ -187,8 +180,8 @@ Content-Type: application/json
 }
 ```
 
-**`400`.** The input does not fit the schema, the record create refuses the
-values, or the start condition fails. Nothing is written.
+A `400` means that the input does not fit the schema, the record create refuses the values, or the
+start condition fails. Nothing is written.
 
 - Input that does not fit the endpoint's input fields is keyed
   `/input/<name>`, or `/input/<collection>/<index>/<field>` for a row.
@@ -214,8 +207,8 @@ values, or the start condition fails. Nothing is written.
 }
 ```
 
-**`401`.** No `Authorization` header, a token that is not a bearer token,
-or a token whose signature, issuer, audience or expiry fails. A tenant
+A `401` answers a call with no `Authorization` header, a token that is not a bearer token, or a
+token whose signature, issuer, audience or expiry fails. A tenant
 without `Oidc:EndpointAudience` answers `401` to every call. The response
 carries `WWW-Authenticate: Bearer`, and it never says which check failed. Under
 the `fapi2` profile it carries `WWW-Authenticate: DPoP algs="ES256 PS256"`, and
@@ -233,9 +226,8 @@ Content-Type: application/problem+json
 }
 ```
 
-**`403`.** The caller has no `invoke` grant on the endpoint. Only roles
-claim values that name a declared role of the application count. The title
-is the record API's:
+A `403` means that the caller has no `invoke` grant on the endpoint. Only roles claim values that
+name a declared role of the application count. The title is the record API's:
 
 ```json
 {
@@ -244,6 +236,8 @@ is the record API's:
   "status": 403
 }
 ```
+
+The other errors are these:
 
 - **`404`.** An unknown application, an application with no active release,
   or an unknown endpoint.
@@ -265,7 +259,7 @@ is the record API's:
 
 ## Idempotency
 
-A key is unique per endpoint and caller. Two callers can use the same key
+An `Idempotency-Key` lets a caller send a call again safely after a lost answer. A key is unique per endpoint and caller. Two callers can use the same key
 without meeting.
 
 - **Repeat.** A repeat with the same key and the same input returns the same
@@ -311,7 +305,8 @@ A repeat of the same key with a different input:
 
 ## Status location
 
-`GET /api/apps/{app}/endpoints/{name}/instances/{instanceId}` reads the
+The status location lets a caller read the state and the output of an instance that its call
+started, after a `202`. `GET /api/apps/{app}/endpoints/{name}/instances/{instanceId}` reads the
 state of an instance that an endpoint call started.
 
 - **Checks.** It needs a bearer token and the `invoke` grant on the
@@ -332,7 +327,10 @@ state of an instance that an endpoint call started.
 
 ## Editing in Studio
 
-- **Endpoint `event`** _(built)_. The [Studio](studio.md) endpoint form shows the
+Studio edits an endpoint in the generic form, with [rows](studio.md#endpoint-rows) for its
+`values`, and with a picker and rows for its `event`.
+
+- **Endpoint `event`.** The [Studio](studio.md) endpoint form shows the
   `event` as a picker of the application's events. The event's `fields` show as
   rows of a payload field and an expression, and **Add mapping** lists the
   payload fields that have no row. Clearing the picker removes the whole

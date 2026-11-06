@@ -21,6 +21,8 @@ const requester: CurrentUser = {
   studioTest: false,
   console: false,
   users: false,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 const author: CurrentUser = { ...requester, id: 'author', displayName: 'Author User', roles: ['author'], studio: true }
 const olga: CurrentUser = { ...requester, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
@@ -32,6 +34,8 @@ const una: CurrentUser = {
   roles: ['tenant-administrator'],
   console: true,
   users: true,
+  tenantStatus: 'active',
+  billingUrl: null,
 }
 
 const sites: SiteListItem[] = [
@@ -163,6 +167,35 @@ describe('AppSwitcher', () => {
         .slice(-2)
         .map((item) => item.textContent),
     ).toEqual(['Operator console', 'Users'])
+  })
+
+  it('lists Billing after Users for an administrator with a billing address, linking to it', async () => {
+    stubServer({ ...una, billingUrl: 'https://account.vn.example.test/tenants/quiz' })
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(menu.getByRole('link', { name: 'Billing' })).toHaveAttribute(
+      'href',
+      'https://account.vn.example.test/tenants/quiz',
+    )
+    expect(
+      menu
+        .getAllByRole('menuitem')
+        .slice(-2)
+        .map((item) => item.textContent),
+    ).toEqual(['Users', 'Billing'])
+    expect(markedNames(menu)).toEqual([])
+  })
+
+  it('lists no Billing link without a billing address', async () => {
+    stubServer(una)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(menu.getByRole('link', { name: 'Users' })).toBeInTheDocument()
+    expect(menu.queryByRole('link', { name: 'Billing' })).not.toBeInTheDocument()
   })
 
   it('lists no Users link for a user who is not an administrator', async () => {

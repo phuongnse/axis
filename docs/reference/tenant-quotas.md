@@ -1,29 +1,18 @@
 # Tenant quotas and usage
 
-Detailed reference for the quotas of a tenant in a [cell](cells.md) and the usage that Axis measures.
-It follows [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) and
-[D123](../decisions/d123-how-an-axis-saas-cell-keeps-tenants-apart-measured-and-recoverable.md).
-Everything in this file is _(planned for M31)_, except what the next paragraph says is in place. A
-self-hosted installation has no quotas: they are on only when `Cell:Id` is set.
+A quota limits what one tenant of a [cell](cells.md) uses in total or at once, so that one tenant
+cannot take what the others need. This page covers the quotas, how a request past one is refused, how
+work past a concurrency quota waits, the daily email count, and the usage that Axis measures for each
+tenant. Quotas are on only when `Cell:Id` is set, so a self-hosted installation has none: its server
+and worker answer no limit for every quota.
 
-In place: the `platform.tenant_quotas` table, the cell's defaults and the reading of both with the
-directory. `PUT /api/cell/tenants/{id}/quotas` of the provisioning API writes the rows, and `GET /api/cell/tenants/{id}` answers the
-effective quotas. The server and the worker answer a tenant's effective quota from them, and answer no limit
-outside a cell. The worker in a cell also samples each tenant's storage and counts the work items it runs, as
-[usage](#usage) says. It counts each email it sends in `platform.tenant_daily_counters` and holds an email past
-`emailsPerDay` until 00:00 UTC, and stores one in-app notice a day for the tenant's administrators when it
-holds one, as [Emails a day](#emails-a-day) says. The refusal answer, the `quota.refused` log
-event, the `applications` refusal of Studio and the `users` refusal of the invite and enable routes are in place. So
-are the `storage` refusals of record creates and updates, imports, file uploads, inbound endpoint calls and Studio
-saves and publishes. So are `platform.tenant_leases`, the `concurrentQueries` lease of a record list read and a data
-source rows read, and the `concurrentConnectorCalls` lease of a connector or package call in the worker. The realm's first-login flow holds a deny step, and `RealmUsersQuota.RefreshAsync` switches it on at the `users` quota and off below it. In a cell the server calls it after a successful invite, enable or disable and after each brokered sign-in. The worker's hourly sampling in a cell also calls it for each tenant with realm details. So the `users` refusal of a brokered person's first sign-in is in place. A failed call is logged and never fails the command or the sign-in. The other leases are
-still planned, and so are the usage columns that the text marks. The conventions of
-[architecture.md](../architecture.md) apply.
-
-The [rate limits](headers-and-rate-limits.md) and the query timeouts stay as they are. A quota limits
-what one tenant uses in total or at once. A rate limit limits how fast one caller asks.
+A quota is not a [rate limit](headers-and-rate-limits.md), and the query timeouts are apart from both.
+A quota limits what one tenant uses in total or at once, and a rate limit limits how fast one caller
+asks.
 
 ## Quotas
+
+Each quota has a key, a cell-wide default and a kind, which says how it is counted.
 
 | Quota | What it counts | Default | Kind |
 | --- | --- | --- | --- |
@@ -35,23 +24,30 @@ what one tenant uses in total or at once. A rate limit limits how fast one calle
 | `concurrentConnectorCalls` | Connector and package calls in flight at once | 10 | Lease |
 | `concurrentQueries` | Data source queries and record list reads that run at once | 10 | Lease |
 | `workerWeight` | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md) | 1 | Weight |
-| `authoringRequests` | AI authoring requests a month, counted when the author sends one, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ | — | Exact |
+| `authoringRequests` | AI authoring requests a month, see [budgets](authoring-requests.md#budgets) | None | Exact |
 
-- **Where they live.** `platform.tenant_quotas` holds one row for each quota a tenant overrides:
+- **Where they live.** `platform.tenant_quotas` holds one row for each quota that a tenant overrides:
   `tenant_id`, `quota`, `value` and `updated_at`. A quota with no row takes the cell's default,
-  `Quotas:Defaults:<quota>`, see [cell settings](host-settings.md#cell-settings). A `value` of
-  `null` means no limit. _(planned for M34)_ The [control plane](control-plane.md) writes a SaaS
-tenant's rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
+  `Quotas:Defaults:<quota>`, see [cell settings](host-settings.md#cell-settings). A `value` of `null`
+  means no limit. The server and the worker read the rows with the directory, at each
+  `Tenancy:RefreshInterval`, and answer a tenant's effective quota from them.
 - **Who sets them.** The operator sets a tenant's quotas through the
-  [provisioning API](tenant-lifecycle.md#provisioning-api). Each change writes a platform audit
-  record that names the keys of the request. It carries no operator or machine caller yet: the
-  `actor` column of `platform.audit_records` exists, but the route does not pass one _(planned for M31)_. The hosts read the quotas with the directory, at each `Tenancy:RefreshInterval`.
+  [provisioning API](tenant-lifecycle.md#provisioning-api), and each change writes a platform audit
+  record that names the keys of the request. The [create route](tenant-lifecycle.md#creating-a-tenant)
+  can also set the first rows.
+- **The operator as actor** _(planned for M31)_. The audit record of a quota change names the operator
+  or the machine caller in its `actor` column.
+- **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's
+  rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
+- **Authoring requests** _(planned for M35)_. `authoringRequests` is counted when the author sends a
+  request, and its default is no limit.
 - **Lowering a quota below use.** It refuses new use and removes nothing. A tenant over its storage
   quota keeps its data and can still delete.
 
 ## Refusals
 
-A request past a quota answers `403` problem details whose `reason` is `quota-exceeded`:
+A request past a quota answers `403` problem details whose `reason` is `quota-exceeded`, and writes
+nothing:
 
 ```json
 {
@@ -65,147 +61,161 @@ A request past a quota answers `403` problem details whose `reason` is `quota-ex
 }
 ```
 
-- The title names the quota in words, and `quota` names its key. Neither names the tenant.
-  `reason` tells a quota refusal apart from a `403` of a policy, which has no `reason`.
-- `used` is the last sample for a sampled quota and the exact count otherwise.
-- The check is an endpoint filter that runs after the sign-in check (`401`) and before the path (`404`) and the
-  grant (`403`), so a signed-in caller without a grant also sees the tenant's limit and usage.
-- The check comes before body validation, validations, the
-  [module contract](module-contracts.md#where-the-contract-is-checked)
-  check and any write, so a refused request evaluates nothing and writes nothing, not even an audit
-  record. It writes a log event `quota.refused` with the tenant and the quota.
-- The SPA shows the title, and an administrator sees which quota on the usage page of M33.
+- **The answer.** The title names the quota in words, and `quota` names its key. Neither names the
+  tenant. `reason` tells a quota refusal apart from a `403` of a policy, which has no `reason`. `used`
+  is the last sample for a sampled quota and the exact count otherwise.
+- **Order.** The check is an endpoint filter that runs after the sign-in check (`401`) and before the
+  path (`404`) and the grant (`403`), so a signed-in caller without a grant also sees the tenant's
+  limit and usage.
+- **Nothing evaluated.** The check comes before body validation, validations, the
+  [module contract](module-contracts.md#where-the-contract-is-checked) check and any write, so a
+  refused request evaluates nothing and writes nothing, not even an audit record. It writes a log
+  event `quota.refused` with the tenant and the quota.
+- **What a person sees.** The SPA shows the title.
+- **The usage page** _(planned for M33)_. An administrator sees which quota was reached on the usage
+  page, see [readers](#usage).
 
 **What each quota refuses.**
 
-- **`storage`.** Once the last sample is at or over the quota, these are refused: a record create
-  or update through the record API, an import, an inbound endpoint call that writes, a file upload,
-  a save or reset in Studio and a publish. A delete is never refused. Process steps, task completions,
+- **`storage`.** Once the last sample is at or over the quota, these are refused: a record create or
+  update through the record API, an import, an inbound endpoint call that writes, a file upload, a
+  save or reset in Studio and a publish. A delete is never refused. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
-  tenant writes in one sampling interval. A tenant with no sample yet is not refused, and neither is a
-  write when the platform database cannot be read: the server logs a warning and the write goes on, because a quota
-  is a billing limit and not a security boundary. The server reads the last sample on each such write.
+  tenant writes in one sampling interval. The server reads the last sample on each such write. A
+  tenant with no sample yet is not refused, and neither is a write when the platform database cannot
+  be read: the server logs a warning and the write goes on, because a quota is a billing limit and not
+  a security boundary.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
-  refused when the count would pass the quota. A person who signs in through a brokered provider
-  for the first time, and would pass the quota, is refused at the identity provider with a page
-  that asks them to contact their administrator. The worker's hourly sample in a cell switches that
-  refusal, so a change of the quota, or of the users outside Axis, takes effect within about an hour of the
-  worker's next directory refresh.
+  refused when the count would pass the quota. A person who signs in through a brokered provider for
+  the first time, and would pass the quota, is refused at the identity provider with a page that asks
+  them to contact their administrator. The realm's first-login flow holds a deny step for this, which
+  `RealmUsersQuota.RefreshAsync` switches on at the quota and off below it. In a cell the server calls
+  it after a successful invite, enable or disable and after each brokered sign-in, and the worker's
+  hourly [sampling](#usage) calls it for each tenant with realm details, so a change of the quota, or
+  of the users outside Axis, takes effect within about an hour of the worker's next directory
+  refresh. A failed call is logged and never fails the command or the sign-in.
 - **`applications`.** Creating an application in Studio is refused when the count would pass the
   quota. Existing applications keep working.
-- **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never refused over
-  the `storage` quota. It writes platform rows and no tenant data, so the operator can raise a quota that a
-  tenant has reached.
+- **The provisioning API.** The platform operator's `PUT /api/cell/tenants/{id}/quotas` is never
+  refused over the `storage` quota. It writes platform rows and no tenant data, so the operator can
+  raise a quota that a tenant has reached.
 
 ## Work at once
 
-D118 agrees that work past a concurrency quota waits its turn instead of failing.
+Work past a concurrency quota waits its turn instead of failing. The count of work that runs is kept
+in the platform database, so it holds for the whole cell.
 
 - **Leases.** `platform.tenant_leases` holds one row for each piece of work that runs: `tenant_id`,
   `quota`, `lease_id`, `holder` (the host and process) and `expires_at`. To start, a host takes a
   transaction advisory lock on the tenant and quota, counts the unexpired rows and inserts one when
   the count is under the quota. A lease lasts 60 seconds and its holder renews it every 20 seconds.
-  It is deleted when the work ends. A host that dies leaves leases that expire within a minute.
+  It is deleted when the work ends, and a host that dies leaves leases that expire within a minute.
 - **Shared by every host.** The count is one for the whole cell, whatever the number of replicas and
-  workers. A limit kept in each host's memory would multiply with the hosts.
-- **What waits, and how.**
-  - In a cell, the dry run or the commit of an import takes a `concurrentImports` lease before it
-    runs. When none is free it does not run. Its work item is due again in 1 second and the import
-    keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. The
-    lease is held until the work has committed.
-  - In a cell, the `export` job of the publisher takes a `concurrentImports` lease before its step runs, and holds it until the
-    ZIP is stored. When none is free the job stays `running` and the publisher tries again about a second later. The wait does not
-    use one of the job's three claims, so a busy tenant never fails an export. The limit is the tenant's own row in
-    `platform.tenant_quotas`, read when the lease is taken, or the publisher's `Quotas:Defaults` when it has no row.
-  - A connector or package call is not claimed by the worker while the tenant has no lease free.
-    The work item stays due, and the worker runs other tenants' work. The worker retries the claim
-    at the tenant's next turn, after one of its items ends or at the next poll. The lease is held
-    until the run of the item ends.
-  - A data source query, a record list read, a record export or a data source export waits up to
-    5 seconds for a lease. It then answers `503` problem details titled "This tenant is busy. Try
-    again in a moment.", with `Retry-After: 1`. The query timeout counts from the start of the
-    query, not of the wait. A query or a list read takes a `concurrentQueries` lease and an export
-    takes a `concurrentImports` lease, so a busy slot of one never blocks the other. An export
-    releases its lease when its file is complete, before the file is sent.
-- **When the platform database is down.** A read, an export, an import or a connector or package call that cannot reach the
-  platform database runs without a lease, and the server or the worker logs a warning. Under `directory` the server keeps serving from the last good
-  directory then, and the limit would otherwise turn a platform outage into a cell-wide read outage. The `export` job of the publisher is
-  the exception: it needs the platform database to renew and finish the job anyway, so a lease that cannot be taken ends its claim, and the
-  export does not run without one.
+  workers, because a limit kept in each host's memory would multiply with the hosts.
 - **Cost.** A lease costs two short statements on the platform database. The
   [cell load test](performance.md#cell-load-test) shows whether the objectives still hold with them.
 
+What waits, and how:
+
+| Work | Lease | When none is free |
+| --- | --- | --- |
+| The dry run or the commit of an import, in the worker | `concurrentImports`, held until the work has committed | It does not run. Its work item is due again in 1 second and the import keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. |
+| The `export` job of the publisher, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) | `concurrentImports`, held until the ZIP is stored | The job stays `running` and the publisher tries again about a second later. The wait uses none of the job's three claims, so a busy tenant never fails an export. |
+| A connector or package call, in the worker | `concurrentConnectorCalls`, held until the run of the item ends | The worker does not claim it. The work item stays due, the worker runs other tenants' work, and it retries the claim at the tenant's next turn, after one of its items ends or at the next poll. |
+| A data source query or a record list read | `concurrentQueries` | It waits up to 5 seconds, then answers `503`, see below. |
+| A record export or a data source export | `concurrentImports`, released when the file is complete, before it is sent | It waits up to 5 seconds, then answers `503`, see below. |
+
+- **The busy answer.** A read or an export that waited 5 seconds answers `503` problem details titled
+  "This tenant is busy. Try again in a moment.", with `Retry-After: 1`. The query timeout counts from
+  the start of the query, not of the wait. A query takes a different lease from an export, so a busy
+  slot of one never blocks the other.
+- **The publisher's limit.** The `export` job reads the tenant's own row in `platform.tenant_quotas`
+  when it takes the lease, or the publisher's `Quotas:Defaults` when the tenant has no row.
+- **When the platform database is down.** A read, an export, an import or a connector or package call
+  that cannot reach the platform database runs without a lease, and the server or the worker logs a
+  warning. Under `directory` the server keeps serving from the last good directory then, and the limit
+  would otherwise turn a platform outage into a cell-wide read outage. The `export` job of the
+  publisher is the exception: it needs the platform database to renew and finish the job anyway, so a
+  lease that cannot be taken ends its claim, and the export does not run without one.
+
 ## Emails a day
 
-- **Counting.** In a cell the worker takes one slot of the tenant's count for the day just before it
-  sends an email. `platform.tenant_daily_counters` holds the count, keyed by tenant, day (UTC) and
-  counter, and emails use the counter `emails`. One statement on the platform database checks the
-  quota and adds one, so workers that send at the same time cannot pass it. It is a short
-  transaction of its own, since the platform and the tenant databases cannot commit together.
+In a cell the worker counts each email it sends for a tenant, and holds an email past the tenant's
+`emailsPerDay` until the next day. Outside a cell nothing is counted or held.
+
+- **Counting.** The worker takes one slot of the tenant's count for the day just before it sends an
+  email. `platform.tenant_daily_counters` holds the count, keyed by tenant, day (UTC) and counter, and
+  emails use the counter `emails`. One statement on the platform database checks the quota and adds
+  one, so workers that send at the same time cannot pass it. It is a short transaction of its own,
+  because the platform and the tenant databases cannot commit together.
 - **Failure.** A send that fails gives its slot back. A worker that crashes between the send and the
-  mark of the row sends the email again and counts it twice. A send cancelled at shutdown keeps its slot.
+  mark of the row sends the email again and counts it twice. A send cancelled at shutdown keeps its
+  slot.
 - **Held emails.** An email past the quota is held, not dropped. Its row stays `pending` and its work
   item is due at the next 00:00 UTC by the worker's clock. After midnight held emails are sent in the
-  order their items were queued, to the millisecond, and count against the new day's quota. A quota of
-  0 holds every email. A tenant with no limit is counted and never held.
+  order their items were queued, to the millisecond, and count against the new day's quota. A quota
+  of 0 holds every email. A tenant with no limit is counted and never held.
 - **In-app notifications** are never held. A `notify` step stores its in-app notification when the
   day's emails are used up.
-- **Platform database down.** When a slot cannot be taken, the email is not sent, its item is due again
-  after one lease, and the worker logs one warning for the tenant.
-- **Outside a cell** nothing is counted or held.
-- The platform reader role gets `INSERT` and `UPDATE` on the table, and no `DELETE`. Old rows are kept,
-  one small row for each tenant and day.
-- **The notice.** The tenant's administrators get one in-app notice the first time a day that an email
-  is held, see [D131](../decisions/d131-tenant-notices-live-in-axisnotifications.md). The worker takes the
-  counter `emailsHeldNotice` for the day with a limit of 1. When it gets it, it inserts the notice row
-  in the same tenant transaction that makes the item due at 00:00 UTC, and later holds that day store
-  nothing. A transaction that fails or loses its claim gives the counter back. A worker that crashes
-  between taking the counter and the commit loses that day's notice. When the platform database cannot
-  be reached for the counter, the email is still held, no notice is stored, and the worker logs one
-  warning for the tenant. The notice is a row with no application and no release, whose texts are the
+- **Platform database down.** When a slot cannot be taken, the email is not sent, its item is due
+  again after one lease, and the worker logs one warning for the tenant.
+- **Rows.** The platform reader role gets `INSERT` and `UPDATE` on the table, and no `DELETE`. Old
+  rows are kept, one small row for each tenant and day.
+- **The notice.** The tenant's administrators get one in-app notice the first time in a day that an
+  email is held. The worker takes the counter `emailsHeldNotice` for the day with a limit of 1. When
+  it gets it, it inserts the notice row in the same tenant transaction that makes the item due at
+  00:00 UTC, and later holds that day store nothing. A transaction that fails or loses its claim
+  gives the counter back. A worker that crashes between taking the counter and the commit loses that
+  day's notice. When the platform database cannot be reached for the counter, the email is still
+  held, no notice is stored, and the worker logs one warning for the tenant. A tenant with no limit
+  stores no notice.
+- **The notice's text.** The notice is a row with no application and no release, whose texts are the
   platform texts `notices.emailsHeld.subject` and `notices.emailsHeld.body` with the value `limit`,
-  the tenant's `emailsPerDay`. A tenant with no limit, and a worker outside a cell, store none. The
-  administrators read the notice on the [notification routes](notifications.md#in-app-notifications). The bell of the
-  [platform site](notifications.md#in-app-notifications) shows it.
+  the tenant's `emailsPerDay`. The administrators read it on the
+  [notification routes](notifications.md#in-app-notifications), and the bell of the platform site
+  shows it.
 
 ## Usage
 
-- **Sampling.** A worker job in a cell samples each tenant's storage every hour. It keeps the
-  newest sample in `platform.tenant_usage_latest`, which the storage check reads. The same pass counts
-  the tenant's failed instances, its calls with an unknown outcome and its open dead letters, the
-  failed work that its [operator console](operator-console.md) lists, and stores the three counts in that row.
-  The provisioning API answers them as `failedWork`. A worker with no
-  `Cell:Id` measures nothing and writes no usage row. The same hourly pass brings the deny step of
-  each tenant with realm details in step with its `users` quota. A tenant without realm details, such as
-  a preview tenant, is skipped. A failure for one tenant is logged as a warning that names it, and the pass
+The worker of a cell measures each tenant's usage: its storage every hour and its counts as it runs
+work. A worker with no `Cell:Id` measures nothing and writes no usage row. Usage holds counts and
+sizes only, never a record value, a file name or a user name.
+
+- **Sampling.** A worker job samples each tenant's storage every hour and keeps the newest sample in
+  `platform.tenant_usage_latest`, which the storage check reads. The same pass counts the tenant's
+  failed instances, its calls with an unknown outcome and its open dead letters, the failed work that
+  its [operator console](operator-console.md) lists, and stores the three counts in that row, which
+  the provisioning API answers as `failedWork`. The same pass brings the deny step of each tenant
+  with realm details in step with its `users` quota, and skips a tenant without realm details, such
+  as a preview tenant. A failure for one tenant is logged as a warning that names it, and the pass
   goes on with the other tenants.
-- **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents,
-  the table `axis.file_contents` with its indexes and TOAST data. Database bytes are
-  `pg_database_size` of the tenant database minus the file bytes. A stored file sits inside the tenant
-  database, so this split counts each byte once. A file kept outside the database would need its own
-  measurement. A size on disk does not shrink after a delete until PostgreSQL vacuums the
-  table.
-- **Daily rows.** `platform.tenant_usage` holds one row per tenant and day (UTC): the largest
-  storage sample of the day, split into database and file bytes, the users and applications at the
-  end of the day, the emails sent, the connector and package calls, and the work items run. A sample
-  replaces the day's pair of sizes only when its total is larger. Rows are
-  kept for 13 months. The sampling job deletes the tenant's rows older than that.
-  The users, applications and emails-sent columns exist, but nothing fills them yet.
-  _(planned for M31)_ Each is filled by its own quota, see [Quotas](#quotas) and
-  [Emails a day](#emails-a-day). _(planned for M35)_ Rows also hold the authoring requests sent
+- **Database bytes and file bytes.** File bytes are the on-disk size of the stored file contents, the
+  table `axis.file_contents` with its indexes and TOAST data. Database bytes are `pg_database_size`
+  of the tenant database minus the file bytes. A stored file sits inside the tenant database, so this
+  split counts each byte once. A size on disk does not shrink after a delete until PostgreSQL vacuums
+  the table.
+- **Daily rows.** `platform.tenant_usage` holds one row per tenant and day (UTC): the largest storage
+  sample of the day, split into database and file bytes, the users and applications at the end of
+  the day, the emails sent, the connector and package calls, and the work items run. A sample
+  replaces the day's pair of sizes only when its total is larger. Rows are kept for 13 months, and
+  the sampling job deletes the tenant's rows older than that.
+- **Users, applications and emails sent** _(planned for M31)_. The daily row's users, applications
+  and emails-sent columns are filled from the counts of their quotas, see [quotas](#quotas) and
+  [emails a day](#emails-a-day).
+- **Authoring requests** _(planned for M35)_. The daily row also holds the authoring requests sent
   and the tokens of each model, with a tenant's own key counted apart, see
   [authoring requests](authoring-requests.md#audit).
 - **Counts.** Each work item the worker runs adds one to the day's work-item count, and a connector
   call or a package call adds one to the day's call count too. A retry that the handler reschedules
-  counts, as every attempt is real work. The count is added in a short transaction on the platform database right
-  after the work item's transaction in the tenant database ended. The two databases cannot commit
-  together, so a worker that stops between them loses one count, and a failed write is logged and
-  never fails the work item. An item whose claim another worker took counts nowhere in this worker.
+  counts, because every attempt is real work. The count is added in a short transaction on the
+  platform database right after the work item's transaction in the tenant database ended. The two
+  databases cannot commit together, so a worker that stops between them loses one count, and a failed
+  write is logged and never fails the work item. An item whose claim another worker took counts
+  nowhere in this worker.
 - **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
   rows of both usage tables, see [storage](storage.md#database-roles).
-- **Readers.** The [cell console](cell-console.md#views) shows the usage. M34's plans and prices
-  read it, as D118 agrees. _(planned for M33)_ A tenant administrator sees the tenant's own quotas
-  and its usage of the last 30 days on the users page's "Usage" section, and the
+- **Readers.** The [cell console](cell-console.md#views) shows the usage.
+- **Plans** _(planned for M34)_. The [plans](plans.md) and their prices read the usage.
+- **The tenant's own usage** _(planned for M33)_. A tenant administrator sees the tenant's own quotas
+  and its usage of the last 30 days in the users page's "Usage" section, and the
   [billing portal](billing-portal.md#pages) shows them to its owner.
-- **No business data.** Usage holds counts and sizes only, never a record value, a file name or a
-  user name.

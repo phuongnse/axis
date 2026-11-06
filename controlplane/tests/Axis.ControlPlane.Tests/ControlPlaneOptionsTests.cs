@@ -85,6 +85,38 @@ public sealed class ControlPlaneOptionsTests
     }
 
     [Fact]
+    public void A_directory_connection_string_that_does_not_parse_stops_the_start_and_the_message_holds_no_value()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:DirectoryConnectionString"] = "Password=secret-password;NoSuchKey=1",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:DirectoryConnectionString", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-password", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Outside_Development_a_directory_connection_without_VerifyFull_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(
+            environment: "Production",
+            settings: new Dictionary<string, string?>
+            {
+                ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
+                ["ControlPlane:DirectoryConnectionString"] = ControlPlaneFactory.UnreachableConnectionString,
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:DirectoryConnectionString", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("VerifyFull", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-password", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_mail_sender_that_is_not_an_address_stops_the_start()
     {
         using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:MailFrom"] = "not an address" });

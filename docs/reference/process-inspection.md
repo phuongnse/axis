@@ -1,34 +1,30 @@
 # Process inspection and operator commands
 
-Detailed reference for process inspection, where authorized users see an instance's graph, path,
-tasks and calls, and for the operator commands retry, cancel and resolve.
-The conventions of [architecture.md](../architecture.md) apply: sections marked
-_(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
+This page covers process inspection, where an authorized user sees where an instance is, what it did
+and why it failed or waits, and the operator commands retry, cancel and resolve, which act on process
+work that the engine cannot finish alone. The
+[process inspector widget](process-inspector-widget.md) shows the same data and offers the same
+commands, and the [operator console](operator-console.md) offers them to the platform operator.
 
 ## Process inspection
 
-This section follows
-[D34](../decisions/d34-process-inspection.md). Authorized users see
-where an instance is, what it did and why it failed or waits. Two routes list
-the instances of a process and read one of them. The `inspect` grant and the
-[instance list](#instance-list) and the [instance detail](#instance-detail)
-are built, with the detail's `calls` and `timerDueAt`. The `sensitive` flag, which hides more
-values, is built too. The widget is built, and so is the record history link to an
-instance.
-The user is the user of the
+Two routes let an authorized user see where an instance is, what it did and why it failed or waits:
+the [instance list](#instance-list) lists the instances of a process and the
+[instance detail](#instance-detail) reads one of them. The user is the user of the
 [session](security.md#sign-in-and-the-session), or a
-[service account](security.md#service-accounts) with a bearer token. A bad
-token is a `401` with `WWW-Authenticate: Bearer`. The
-[process inspector widget](process-inspector-widget.md) shows the same data.
+[service account](security.md#service-accounts) with a bearer token. A bad token is a `401` with
+`WWW-Authenticate: Bearer`. Both routes only read, and they write no audit record.
 
-**Grant.** A `process` grant takes the action `inspect`, next to `start`.
-See [Roles and policies](roles-and-policies.md). The grant
-decides who may inspect, and the signed-in user needs nothing else. A user who
-holds only `start` cannot inspect, and a user who holds only `inspect` cannot
-start.
+### Who may inspect
 
-**Order of checks.** A request is checked in this order, and the first
-failure is the response:
+A `process` grant takes the action `inspect`, next to `start`, as
+[roles and policies](roles-and-policies.md) say. The grant decides who may inspect, and the
+signed-in user needs nothing else. A user who holds only `start` cannot inspect, and a user who holds
+only `inspect` cannot start.
+
+### Order of checks
+
+A request is checked in this order, and the first failure is the response:
 
 1. The session or the bearer token, `401`. The title is the record API's "Sign
    in to read or write this data.", or the bearer challenge's for a token.
@@ -48,11 +44,9 @@ failure is the response:
    give one answer, with the title "No instance of this process exists with
    this id.". So the user cannot tell them apart.
 
-A process without a subject has no subject record. Step 5 and the subject
-record part of step 6 do not apply to it, so the `inspect` grant alone is
-enough, see [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
-
-Both routes only read. They write no audit record.
+A [process without a subject](process-flow.md#processes-without-a-subject) has no subject record.
+Step 5 and the subject record part of step 6 do not apply to it, so the `inspect` grant alone is
+enough.
 
 ### Instance list
 
@@ -112,8 +106,7 @@ lists the instances of the process, whatever release they are pinned to.
   instance is pinned to in the application's
   [release history](storage.md#release-history), such as `3`, a JSON number, so
   the widget writes no API text of its own. It is `null` only for a release
-  with no row in the release history, such as an old release from before the
-  history existed. Both come from the one query that reads the page.
+  with no row in the release history. Both come from the one query that reads the page.
 
 ### Instance detail
 
@@ -127,8 +120,7 @@ in any state. The body has these parts:
   the instance is `waiting` on a timer step, as a UTC time like `createdAt`. It
   reads only the item of the instance's current revision, so a stale item from
   an earlier pass of a loop is not shown. It is `null` in every other case. It
-  is the same for every user who may inspect the instance, see
-  [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md).
+  is the same for every user who may inspect the instance.
 - `parent` is `{ "id", "process", "step" }` for an instance that a `subProcess`
   step started, and `null` for any other instance. `step` is the name of the
   `subProcess` step in the parent that started this instance. It is not the step
@@ -334,7 +326,7 @@ evaluated input that the call sent, so it holds field values.
 - **Pinned and active release.** The fields a mapping reads or writes come
   from the step in the release the instance is pinned to. Which of them the
   user may read comes from the policies of the active release, as for
-  [tasks](task-api.md) and [D29](../decisions/d29-release-pinning-and-text-resources.md).
+  [tasks](task-api.md).
   A field that the active release no longer has counts as unreadable.
 - **No subject.** A call's `input` of an instance of a process without a
   subject is always hidden. The mapping reads parameters, not fields, and they
@@ -356,8 +348,8 @@ evaluated input that the call sent, so it holds field values.
   settles, so inspection shows a settled package call with `input` `null` and
   `inputHidden` `false`.
 
-The [operator console](operator-console.md#route-and-access) shows the same detail with the same
-rules and the operator as the reader. The operator reads every field that the active release has, so only a
+The [operator console](operator-console.md#api) shows the same detail with the same rules, with the
+operator as the reader. The operator reads every field that the active release has, so only a
 sensitive field, or a field the active release no longer has, hides an `input`.
 
 ### Call input kept
@@ -365,9 +357,8 @@ sensitive field, or a field the active release no longer has, hides an `input`.
 A connector call keeps its input after it settles, whether it succeeded or
 failed. The kept input lets inspection show what was sent. It is never copied
 to history, audit records or logs, and inspection
-shows it only under the [masking rule](#values-and-masking). Package calls
-keep today's rule: their input is cleared when the call settles, see
-[Staging a package call](process-execution.md#staging-a-package-call).
+shows it only under the [masking rule](#values-and-masking). A package call's input is cleared when
+the call settles, see [Staging a package call](process-execution.md#staging-a-package-call).
 
 ### Attempts
 
@@ -375,6 +366,10 @@ keep today's rule: their input is cleared when the call settles, see
 connector or package call, see [Tables](process-tables.md#tables). The call row counts its
 attempts and keeps only the last status and error, so the attempt rows hold the
 earlier ones.
+
+- **Trace ids** _(planned for M31)_. Each `path` entry and each attempt carries the `traceId` of the
+  run that wrote it, from its stored `trace_id`, and the process inspector shows it, so an operator can
+  find the run's logs and spans, see [telemetry](telemetry.md).
 
 - **Attempt.** One send of a connector call, or one run of a package
   operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
@@ -424,10 +419,7 @@ message can hold a value:
   recorded, a fixed text that ends with the exception type. The same text is
   the call's `last_error`.
 
-None of them holds a value.
-
-History rows written before this change may still hold exception messages.
-Inspection shows them as stored.
+None of them holds a value, and inspection shows the error as it is stored.
 
 ### Inspection errors
 
@@ -453,16 +445,12 @@ titles are fixed and never contain text from the request.
 
 ## Operator commands
 
-This section follows
-[D35](../decisions/d35-operator-retry-cancel-and-resolve.md). Cancel,
-retry and resolve are built. Three
-commands let an authorized user act on process work that the engine cannot
-finish alone. **Retry** runs a `failed` instance again. **Cancel** stops a
-`running` or `waiting` instance. **Resolve** settles a connector or package
-call whose outcome is `unknown`. Each is an audited command with its own
-grant, a required reason and one transaction. The
-[instance detail](#instance-detail) lists the commands the user may take. The
-[process inspector widget](process-inspector-widget.md) shows Cancel, Retry and Resolve.
+Three commands let an authorized user act on process work that the engine cannot finish alone.
+Retry runs a `failed` instance again, cancel stops a `running` or `waiting` instance, and resolve
+settles a connector or package call whose outcome is `unknown`. Each is an audited command with its
+own grant, a required reason and one transaction. The [instance detail](#instance-detail) lists the
+commands the user may take, and the [process inspector widget](process-inspector-widget.md) shows
+Cancel, Retry and Resolve.
 
 Two more commands, **redeliver** and **discard**, act on a dead letter of the
 process with the same `retry` grant, a required reason and an audit record, see
@@ -498,7 +486,8 @@ the instance id and `{callId}` is the call's operation identity. A success is
 `200` with the instance, in the shape of a start's body:
 `{ "id", "process", "subjectId", "releaseId", "state" }`.
 
-- `reason` is required. It must not be blank and has at most 500 characters.
+- `reason` is required. It must not be blank and has at most 500 characters. It is stored only in the
+  details of the command's audit record, never in the step history.
 - `outcome` is required for a resolve, and is `succeeded` or `failed`.
 - `output` is for a resolve. It is allowed only with `succeeded`.
 
@@ -550,8 +539,8 @@ One transaction does this:
    model already reflects them. Activation stores the columns each migration
    changed in `axis.applied_migrations`, see
    [Applied migrations](migrations.md#applied-migrations), and the retry reads
-   them back. A row stored before the columns were recorded counts as having
-   changed every column. A pinned release whose stored content is missing
+   them back. A row with no recorded columns counts as having changed every
+   column. A pinned release whose stored content is missing
    counts as using every column, so any applied destructive migration of the
    application refuses the retry. A refused instance stays `failed`. The
    operator starts a new instance for the record.
@@ -578,20 +567,18 @@ call's stored input is cleared when it settles. The attempts count from zero,
 so the step's full retry policy applies again. The attempt rows carry on
 numbering after the earlier run, see [Attempts](#attempts).
 
-**Risks.** A retry of a connector call sends it again under the same
-idempotency key. Some systems replay their stored failure for a key they have
-seen, so the retry can fail the same way. The widget warns before a retry only
-when the failed call is a package call whose operation is not
-`idempotent: true`. Such an operation may have acted before it failed, and a
-retry runs it again. A connector call needs no warning, because every unknown
-outcome of one was sent again under the idempotency key or
+Retry has a risk for each kind of call. A retry of a connector call sends it again under the same
+idempotency key, and some systems replay their stored failure for a key they have seen, so the retry
+can fail the same way. The [process inspector widget](process-inspector-widget.md) warns before a
+retry only when the failed call is a package call whose operation is not `idempotent: true`, because
+such an operation may have acted before it failed, and a retry runs it again. A connector call needs
+no warning, because every unknown outcome of one was sent again under the idempotency key or
 [reconciled](process-execution.md#reconciliation), or was [resolved](#resolve) by an operator.
 
 ### Cancel
 
 Cancel takes an instance that is `running` or `waiting`. It does not undo
-steps that already ran, because there is no compensation yet
-([D25](../decisions/d25-connectors-deployment-bindings-and-secrets.md)).
+steps that already ran, because Axis does not compensate a step's effects.
 Before it locks anything, it answers the policy `409` when a `read` filter of
 the user reads a pending field, see
 [Operator command errors](#operator-command-errors).
@@ -625,9 +612,8 @@ One transaction does this:
     two lists name the tasks and calls it cancelled. The actor is the user and
     the reason is the same for every instance.
 
-**Failing a waiting parent.** When the cancelled instance is a child and its
-parent is `waiting` on the sub-process step for this child, the cancel also
-fails the parent's step. The parent becomes `failed` with `ended_at`, and its
+Cancelling a child can fail its parent. When the cancelled instance is a child and its parent is
+`waiting` on the sub-process step for this child, the cancel also fails the parent's step. The parent becomes `failed` with `ended_at`, and its
 history row has the error `The sub-process of the step '{step}' was cancelled.`
 and the output `{ "childInstanceId" }`. The audit record `process.failed` is
 written with the actor `system` and details `{ "step" }`. A parent that is
@@ -638,9 +624,8 @@ A `cancelled` instance does not block a new start for the same record. Its
 cancelled tasks leave every inbox, and a completion of one is `409`, see
 [Task API errors](task-api.md#task-api-errors).
 
-**Races.** A worker that runs a step when the cancel commits cannot commit
-after it, because the step changes the instance only at the revision it loaded,
-see [Running a step](process-execution.md#running-a-step). A worker that marks a call `sending`
+A cancel and a worker never both win. A worker that runs a step when the cancel commits cannot
+commit after it, because the step changes the instance only at the revision it loaded, see [Running a step](process-execution.md#running-a-step). A worker that marks a call `sending`
 either commits before the cancel, so the cancel finds the call `sending` and
 answers `409`, or finds its work item deleted and sends nothing.
 

@@ -10,7 +10,7 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Writes the state of schedule triggers in <c>axis.trigger_schedules</c> and their
 /// <c>trigger.schedule</c> work items over a connection to a tenant database. Activating a release
-/// calls it once the release is active.
+/// calls it once the release is active. The worker calls <see cref="SkipMissedAsync"/> when a read-only tenant is active again.
 /// </summary>
 public static class TriggerSchedules
 {
@@ -155,7 +155,91 @@ public static class TriggerSchedules
 
         await transaction.CommitAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// In one transaction, moves every schedule trigger whose next occurrence has passed to its next occurrence after the
+    /// transaction's time, and its <c>trigger.schedule</c> work item with it, so none of the passed occurrences runs.
+    /// The worker calls it for a tenant that was read-only. The latest run occurrence stays. A row whose
+    /// <c>schedule</c> or <c>timeZone</c> cannot be read is left alone.
+    /// </summary>
+    /// <returns>The triggers that were moved, with the number of occurrences that fell at or before the transaction's time.</returns>
+    public static async Task<IReadOnlyList<SkippedSchedule>> SkipMissedAsync(NpgsqlConnection connection, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        var due = new List<(Guid TriggerId, string Schedule, string TimeZone, DateTimeOffset Occurrence)>();
+        await using (var select = new NpgsqlCommand(
+            """
+            SELECT trigger_id, schedule, time_zone, next_occurrence_at
+            FROM axis.trigger_schedules
+            WHERE next_occurrence_at <= @now AND schedule IS NOT NULL AND time_zone IS NOT NULL
+            FOR UPDATE
+            """,
+            connection,
+            transaction))
+        {
+            select.Parameters.AddWithValue("now", now.ToUniversalTime());
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                due.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<DateTimeOffset>(3)));
+            }
+        }
+
+        var skipped = new List<SkippedSchedule>();
+        foreach (var (triggerId, expression, zoneId, occurrence) in due)
+        {
+            if (!CronSchedule.TryParse(expression, out var schedule, out _)
+                || !TimeZoneInfo.TryFindSystemTimeZoneById(zoneId, out var zone))
+            {
+                continue;
+            }
+
+            var latest = occurrence;
+            var count = 1;
+            for (var candidate = schedule.NextAfter(latest, zone); candidate <= now; candidate = schedule.NextAfter(latest, zone))
+            {
+                latest = candidate;
+                count++;
+            }
+
+            var next = schedule.NextAfter(now, zone);
+            await using (var state = new NpgsqlCommand(
+                "UPDATE axis.trigger_schedules SET next_occurrence_at = @next WHERE trigger_id = @trigger",
+                connection,
+                transaction))
+            {
+                state.Parameters.AddWithValue("next", next.ToUniversalTime());
+                state.Parameters.AddWithValue("trigger", triggerId);
+                await state.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using (var item = new NpgsqlCommand(
+                """
+                UPDATE axis.process_work_items SET due_at = @next, claim_token = NULL, lease_expires_at = NULL
+                WHERE kind = @kind AND trigger_id = @trigger
+                """,
+                connection,
+                transaction))
+            {
+                item.Parameters.AddWithValue("next", next.ToUniversalTime());
+                item.Parameters.AddWithValue("kind", ProcessStarts.TriggerScheduleWorkItemKind);
+                item.Parameters.AddWithValue("trigger", triggerId);
+                await item.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            skipped.Add(new SkippedSchedule(triggerId, count, next));
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return skipped;
+    }
 }
+
+/// <summary>A schedule trigger that <see cref="TriggerSchedules.SkipMissedAsync"/> moved: how many occurrences it skipped and its next one.</summary>
+public sealed record SkippedSchedule(Guid TriggerId, int Count, DateTimeOffset NextOccurrenceAt);
 
 /// <summary>
 /// The stored state of a schedule trigger: its <c>schedule</c> and <c>timeZone</c> as activation stored them, the next

@@ -1,15 +1,17 @@
 # Legal links and terms
 
-Detailed reference for the privacy policy and terms of service links, the legal line that shows them, the page that
-lists the licences of what Axis ships, and the step where a person accepts the terms. The conventions of
-[architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
-[decisions.md](../decisions.md).
+This page describes the links to an organization's privacy policy and terms of service, the legal line
+that shows them, the page that lists the licences of what Axis ships, and the step where a person
+accepts the terms.
 
 ## Legal settings
 
+An organization sets the addresses of its own policies, and Axis shows them wherever its people sign
+in or work.
+
 - **The organization owns its policies.** A privacy policy and terms of service are the organization's, because it
   decides what it collects about its people and on what terms. In Axis SaaS the organization is the controller and Axis
-  the processor, see [D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). Axis writes no
+  the processor. Axis writes no
   policy text and ships no default one: it only links what the organization publishes.
 - **Set per tenant, with a site override.** A tenant sets the `https` addresses of its privacy policy and its terms,
   and the version of its terms. A site may set its own two addresses, which replace the tenant's on that site's legal
@@ -28,6 +30,8 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 
 ## Legal line
 
+The legal line closes every page with the copyright and the legal links.
+
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
   and so does the shell's footer, see [layout](shell.md#layout).
 - **Copyright at the start, links at the end.** The line starts with the copyright in `textMuted`. At its end sit the
@@ -38,10 +42,11 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 
 ## Open source licences
 
+Axis lists the licence of everything it ships on a page that anyone can open.
+
 - **`/licences` lists what Axis ships.** The page opens without signing in. It first names Axis's licence, the AGPL,
-  with its text and a link to Axis's source, which
-  [D120](../decisions/d120-axis-is-agpl-licensed-with-a-commercial-licence.md) requires Axis to offer every person
-  who uses it over a network. Then it lists every npm package of the SPA and every NuGet package of the server, the
+  with its text and a link to Axis's source, which the AGPL requires Axis to offer every person who uses it over a
+  network. Then it lists every npm package of the SPA and every NuGet package of the server, the
   worker and `Axis.Admin`, each with its licence, in two lists side by side, one above the other at narrow width.
 - **Versions only for a signed-in person.** A signed-in person also sees each package's version, and the source link
   points at the commit when the version the server runs names one (build metadata of 7 to 40 hex characters after
@@ -60,17 +65,19 @@ lists the licences of what Axis ships, and the step where a person accepts the t
 
 ## Accepting the terms
 
-- **Once, then on each new version**. After a person's first sign-in, and again when the tenant's terms change
+A person accepts the tenant's terms in a step of the identity provider, once and again on each new version.
+
+- **Once, then on each new version.** After a person's first sign-in, and again when the tenant's terms change
   version, the identity provider asks them to accept the terms in a step of its own, never as a box on every sign-in.
   It is Keycloak's Terms and Conditions required action, drawn as an Axis page.
-- **The tenant's terms**. The step asks for the tenant's terms and privacy policy, whichever client signs the person
+- **The tenant's terms.** The step asks for the tenant's terms and privacy policy, whichever client signs the person
   in, because the identity provider asks it of the whole realm. A site's own addresses change only its legal line.
-- **One required tick**. The page shows one checkbox that names the Terms of service and the Privacy policy as links,
+- **One required tick.** The page shows one checkbox that names the Terms of service and the Privacy policy as links,
   Continue, and Decline and sign out. The links open in a new tab, so the person keeps the step. A tenant that sets
   terms but no privacy policy gets a label that names only the Terms of service. Continue with the box unticked marks
   the box with an error and sends nothing. Continue records when the person accepted. Declining ends the sign-in at
   `/?signIn=declined`, Axis's sign-in card, which says that signing in needs the terms accepted, see
-  [the shell's sign-in card](shell.md#platform-home-page).
+  [the shell's sign-in card](shell.md#the-sign-in-card).
 - **On only while there are terms.** The realm sync turns the step on, for new users too, while the tenant sets terms
   and off when it has none, so the page never shows without a link. When the tenant's terms version changes, the
   sync asks it again of every user of the realm, and then stores the version in the realm attribute

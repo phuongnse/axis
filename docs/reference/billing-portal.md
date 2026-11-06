@@ -1,16 +1,16 @@
 # Billing portal
 
-Detailed reference for the billing portal, where the owner of a tenant of Axis SaaS and their billing
-contacts choose a plan, pay, and get their invoices. It follows
-[D118](../decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md),
-[D126](../decisions/d126-sign-up-trials-and-the-control-plane.md) and
-[D127](../decisions/d127-plans-payments-and-invoices.md). Accounts, owners and the trial's page are
-_(planned for M33)_. Plans, payments and invoices are _(planned for M34)_. The conventions of
-[architecture.md](../architecture.md) apply.
+_(planned for M33)_
+
+The billing portal is where the owner of a tenant of Axis SaaS and their billing contacts choose a
+plan, pay and get their invoices. This page covers where it runs, its accounts, the people of a
+tenant, its pages and the rules every route follows.
 
 ## Where
 
-- **On the control plane.** `https://account.<region domain>`, served by the regional
+The portal runs on the regional control plane, not in a cell, and the application links to it.
+
+- **On the control plane.** `https://account.<region domain>`, where the region domain is the cell's `Cell:TenantDomain`, served by the regional
   [control plane](control-plane.md). It is not a page of the cell, so it works while the tenant is
   read-only or suspended, and no payment data enters a cell.
 - **From the application.** The shell shows "Billing" to a person who holds the
@@ -19,6 +19,8 @@ _(planned for M33)_. Plans, payments and invoices are _(planned for M34)_. The c
   see [the read-only tenant](subscriptions.md#the-read-only-tenant).
 
 ## Accounts
+
+The portal has accounts of its own, apart from every tenant realm.
 
 - **Its own accounts.** The portal signs people in through a realm of its own, `axis-billing`, in an
   identity provider that the control plane runs, with the Axis theme. A billing account is not an
@@ -34,6 +36,9 @@ _(planned for M33)_. Plans, payments and invoices are _(planned for M34)_. The c
 
 ## People
 
+Each tenant has owners and billing contacts in the portal, who need not be users of the
+application.
+
 | Role | What they do |
 | --- | --- |
 | `owner` | Everything: plan, add-ons, payment, billing details, contacts, cancelling, and handing ownership to another account |
@@ -47,24 +52,30 @@ _(planned for M33)_. Plans, payments and invoices are _(planned for M34)_. The c
 
 ## Pages
 
-- **Overview.** The subscription's state and its next date, the plan, the add-ons, the open invoice,
-  and the tenant's usage against its quotas, read through the provisioning API.
-- **Plans.** The plans of the region with their quotas and prices, for a change, see
-  [changing a plan](plans.md#changing-a-plan). A refused downgrade lists each quota that is over.
-- **Add-ons.** User packs to add or drop, see [add-ons](plans.md#add-ons).
-- **Pay.** The open invoice with its VietQR code and transfer details, or Paddle's checkout abroad,
-  see [payments](payments.md).
-- **Invoices.** Each billing invoice with its lines and status, and each e-invoice with its lookup
-  code and its PDF and XML.
-- **Billing details.** The legal name, the tax code, the address and the invoice email of the
-  [e-invoices](e-invoices.md#what-it-holds).
+The portal's pages show the subscription and let the owner and the billing contacts act on it.
+
+- **Overview.** The subscription's state and its next date, and the tenant's usage against its
+  quotas, read through the provisioning API.
+- **The plan in the overview** _(planned for M34)_. The overview also shows the plan, the add-ons and
+  the open invoice.
+- **Plans** _(planned for M34)_. The plans of the region with their quotas and prices, for a change,
+  see [changing a plan](plans.md#changing-a-plan). A refused downgrade lists each quota that is over.
+- **Add-ons** _(planned for M34)_. User packs to add or drop, see [add-ons](plans.md#add-ons).
+- **Pay** _(planned for M34)_. The open invoice with its VietQR code and transfer details, or Paddle's
+  checkout abroad, see [payments](payments.md).
+- **Invoices** _(planned for M34)_. Each billing invoice with its lines and status, and each e-invoice
+  with its lookup code and its PDF and XML.
+- **Billing details** _(planned for M34)_. The legal name, the tax code, the address and the invoice
+  email of the [e-invoices](e-invoices.md#what-it-holds).
 - **Contacts.** The owners and billing contacts, with invitations.
-- **Cancel.** Cancels at the period's end, see [states](subscriptions.md#states), after the owner types
-  the tenant's id.
+- **Cancel** _(planned for M34)_. Cancels at the period's end, see [states](subscriptions.md#states),
+  after the owner types the tenant's id.
 - **Terms.** The versions the owner accepted, and the current ones to accept, see
   [terms acceptance](sign-up.md#terms-acceptance).
 
 ## Rules
+
+Every route of the portal checks its caller on the server, as the platform's routes do.
 
 - **Grants are checked on the server.** Every route checks the account's role on that tenant. A
   person of another tenant gets `404`.
@@ -72,4 +83,5 @@ _(planned for M33)_. Plans, payments and invoices are _(planned for M34)_. The c
 - **Rate limits.** The portal's routes have limits by account and by client address, as the
   platform's [rate limits](headers-and-rate-limits.md#rate-limits) work.
 - **Security headers** as the platform's, see [security headers](headers-and-rate-limits.md#security-headers).
-  The pay page allows Paddle's checkout script and frame only, and only on that page.
+- **Paddle's checkout** _(planned for M34)_. The pay page allows Paddle's checkout script and frame
+  only, and only on that page.

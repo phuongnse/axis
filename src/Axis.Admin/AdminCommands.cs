@@ -101,6 +101,7 @@ internal static partial class AdminCommands
                tenant host move <host> --to <id>
                platform rekey
                cell operator invite <email>
+               cell operator client add <name>
                cell backup
                cell restore-check
                publisher
@@ -215,6 +216,7 @@ internal static partial class AdminCommands
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("cell operator invite", AuditMark.OnePerRun, CellOperatorInvite.InviteAsync),
+        new("cell operator client add", AuditMark.OnePerRun, CellOperatorClient.AddAsync),
         new("cell backup", AuditMark.OnePerTenant, CellBackup.BackupAsync),
         new("cell restore-check", AuditMark.OnePerTenant, CellRestoreCheck.RunAsync),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Cell, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.DnsResolver, run.CertificateWriter, run.CancellationToken)),
@@ -2253,6 +2255,7 @@ internal static partial class AdminCommands
 /// <c>tenant create</c>. A main tenant has no <paramref name="PreviewOf"/> and gets a realm. A preview tenant has
 /// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>. A main tenant may have an
 /// <paramref name="Administrator"/>, the normalised email of the person to invite as its first administrator.
+/// <paramref name="Quotas"/>, when not null, are the tenant's quota rows, where a null value is no limit.
 /// </summary>
 internal sealed record TenantCreateRequest(
     string Id,
@@ -2260,7 +2263,8 @@ internal sealed record TenantCreateRequest(
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings,
     string? Administrator = null,
-    bool StayProvisioning = false);
+    bool StayProvisioning = false,
+    IReadOnlyDictionary<string, long?>? Quotas = null);
 
 /// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
 internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);

@@ -233,6 +233,35 @@ public sealed class CellClientTests : IAsyncLifetime
         Assert.Empty(_server.Posts);
     }
 
+    [Fact]
+    public async Task A_409_titled_this_cell_is_full_sets_the_full_flag()
+    {
+        _server.ConflictTitle = CellClient.FullTitle;
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() =>
+            cell.PostAsync("/api/cell/tenants", new CellOperation("tenant-create", Guid.NewGuid()), new { id = "acme" }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(409, exception.Status);
+        Assert.True(exception.CellFull);
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(CellClient.FullTitle, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_409_with_another_title_does_not_set_the_full_flag()
+    {
+        _server.ConflictTitle = "The tenant id is taken.";
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() =>
+            cell.PostAsync("/api/cell/tenants", new CellOperation("tenant-create", Guid.NewGuid()), new { id = "acme" }, TestContext.Current.CancellationToken));
+
+        Assert.Equal(409, exception.Status);
+        Assert.False(exception.CellFull);
+        Assert.DoesNotContain("The tenant id is taken.", exception.Message, StringComparison.Ordinal);
+    }
+
     private CellClients Build(CellClientOptions? clientOptions = null, ControlPlaneOptions? options = null)
     {
         options ??= Options(_server.InternalUrl, _server.TokenUrl, _server.CertificatePath, _server.KeyPath, _server.CertificateAuthorityPath);

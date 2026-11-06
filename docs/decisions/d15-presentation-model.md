@@ -2,18 +2,28 @@
 
 Status: **Agreed**
 
-- **Pages:** a page is a route in a site.
-- **Widgets:** widgets are a page's content. A page has no entity or
-  template of its own.
-- **Layout:** layout comes later as container widgets, such as tabs,
-  sections and columns, that hold other widgets.
+## Context
 
-- **Data:** see [D18](d18-data-sources.md).
-- **Forms:** a `form` resource serves both a `form` widget and a process
-  task. See [D20](d20-human-tasks-task-inbox-and-forms.md).
-- **Navigation:** see
-  [D63](d63-navigate-actions-and-page-parameters.md).
+Data sources, task forms and authorization all attach to the presentation model, so its shape comes
+first, and it must let widgets and layouts be added without a change to the page format.
 
-_Why:_ the page and widget split shapes data sources (M2), process task forms
-(M3) and authorization (M4). Keeping the page free of an entity or template
-lets more widgets and a layout be added without a format change.
+## Decision
+
+- **A page is a route in a site,** and widgets are its content. A page has no entity or template of
+  its own.
+- **Layout is container widgets** that hold other widgets
+  ([D61](d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md)).
+- **A `form` resource serves both a `form` widget and a process task**
+  ([D20](d20-human-tasks-task-inbox-and-forms.md)).
+
+Widgets read data through data sources ([D18](d18-data-sources.md)), and pages open each other
+through navigate actions ([D63](d63-navigate-actions-and-page-parameters.md)). The detail is in
+[frontend](../reference/frontend.md).
+
+## Consequences
+
+- A new widget or layout needs no change to the page format.
+
+## Alternatives
+
+- **A page bound to an entity or a template.** Every new layout would change the page format.

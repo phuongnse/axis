@@ -51,7 +51,7 @@ export function UserMenu() {
       return null
     }
     return (
-      <Button type="text" onClick={startSignIn}>
+      <Button type="text" onClick={() => startSignIn()}>
         {t('shell.account.signIn')}
       </Button>
     )

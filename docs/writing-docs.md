@@ -69,7 +69,8 @@ it change. It never holds progress, dates, names or issue numbers.
   fixed, but a change to the choice is a new decision.
 - **A new decision that changes an agreed one replaces it whole.** It restates the parts that still
   hold, so the old file is never half valid. In the same change the old file is deleted, its row in
-  the index says `Superseded by Dn` with a link to its last text in git, and every reference page and
+  the index names the decision, or decisions, that superseded it, as `Superseded by Dn`, with a link to
+  its last text in git, and every reference page and
   link follows the new decision. A number is never used again.
 
 ## Reference pages
@@ -93,9 +94,9 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
 ### Planned work
 
 Work that is agreed but not built yet is marked `_(planned for Mx)_`, where Mx is the milestone that
-builds it, in one of two places: on a line of its own under the title of a page or the heading of a
-section that is planned as a whole, so that no anchor ever changes, or right after the bold lead-in of
-a single planned rule in a list. A marker never sits in the middle of a sentence, and nothing else on a page
+builds it, in one of three places: on a line of its own under the title of a page or the heading of a
+section that is planned as a whole, so that no anchor ever changes; right after the bold lead-in of a
+single planned rule in a list; or in the row of a table whose rows are items of their own. A marker never sits in the middle of a sentence, and nothing else on a page
 says what is built.
 
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
@@ -168,13 +169,13 @@ each of them.
    sweep reads the sections that the milestone's pull requests changed, merges what is said twice,
    deletes what a later rule replaced, and checks that the decisions they link still hold only live
    choices. Its checklist is in [the life of a milestone](delivery.md#the-life-of-a-milestone).
-7. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A check is added
-   only once the whole tree passes it: there are no baselines and no lists of exceptions.
+7. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
+   added only once the whole tree passes it: there are no baselines and no lists of exceptions.
    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
      the repository.
    - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
      doc, that the decisions index matches the decision files and that a superseded row names a live
-     decision, that no planned marker names a milestone the roadmap calls Done, the size limits, the
+     decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size limits, the
      [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
      realm.

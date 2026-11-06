@@ -1,6 +1,7 @@
-import { Alert, Button, Flex, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Flex, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
+import { AxisTable } from '../platform/AxisTable'
 import { assignLocation } from '../platform/navigation'
 import { fetchOwnAuthenticators, type OwnAuthenticator, type OwnAuthenticators } from '../platform/ownAuthenticators'
 import {
@@ -12,6 +13,7 @@ import {
 } from '../platform/ownSessions'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { usePlatform } from './context'
 
 /**
@@ -102,25 +104,29 @@ export function AccountPage() {
             <Button onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}>
               {t('shell.account.authenticators.add')}
             </Button>
-            <Table<OwnAuthenticator>
-              style={{ width: '100%' }}
-              rowKey="id"
+            <AxisTable<OwnAuthenticator>
+              rowKey={(authenticator) => authenticator.id}
               pagination={false}
               dataSource={authenticators.authenticators}
+              emptyText={t('shell.account.authenticators.empty')}
               columns={[
                 {
+                  key: 'label',
+                  kind: 'freeText',
                   title: t('shell.account.authenticators.name'),
-                  dataIndex: 'label',
-                  render: (label: string | null) => label ?? t('shell.account.authenticators.unnamed'),
+                  render: (_value, authenticator) => authenticator.label ?? t('shell.account.authenticators.unnamed'),
                 },
                 {
+                  key: 'createdAt',
+                  kind: 'fixed',
                   title: t('shell.account.authenticators.addedAt'),
-                  dataIndex: 'createdAt',
-                  render: (createdAt: string | null) => (createdAt ? time(createdAt) : ''),
+                  render: (_value, authenticator) => (authenticator.createdAt ? time(authenticator.createdAt) : null),
                 },
                 {
-                  key: 'actions',
-                  render: (_, authenticator) => (
+                  key: 'remove',
+                  kind: 'fixed',
+                  title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                  render: (_value, authenticator) => (
                     <Button
                       size="small"
                       disabled={authenticators.authenticators.length <= 1}
@@ -162,17 +168,29 @@ export function AccountPage() {
           >
             {t('shell.account.sessions.endOthers')}
           </Button>
-          <Table<OwnSession>
-            style={{ width: '100%' }}
-            rowKey="id"
+          <AxisTable<OwnSession>
+            rowKey={(session) => session.id}
             pagination={false}
             dataSource={sessions.sessions}
+            emptyText={t('shell.account.sessions.empty')}
             columns={[
-              { title: t('shell.account.sessions.signedInAt'), dataIndex: 'signedInAt', render: time },
-              { title: t('shell.account.sessions.lastRequestAt'), dataIndex: 'lastRequestAt', render: time },
               {
-                key: 'actions',
-                render: (_, session) =>
+                key: 'signedInAt',
+                kind: 'fixed',
+                title: t('shell.account.sessions.signedInAt'),
+                render: (_value, session) => time(session.signedInAt),
+              },
+              {
+                key: 'lastRequestAt',
+                kind: 'fixed',
+                title: t('shell.account.sessions.lastRequestAt'),
+                render: (_value, session) => time(session.lastRequestAt),
+              },
+              {
+                key: 'end',
+                kind: 'fixed',
+                title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                render: (_value, session) =>
                   session.current ? (
                     <Tag>{t('shell.account.sessions.current')}</Tag>
                   ) : (

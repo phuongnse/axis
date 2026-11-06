@@ -7,7 +7,7 @@ namespace Axis.Data.Storage;
 /// Gives and removes the roles that an administrator gives a person, as rows of <c>axis.given_roles</c>. A null application id
 /// is a platform role, whose row holds its kind. Both steps run in the caller's transaction and report whether they changed a
 /// row, so a repeat is not a change. A move gives every role of one person to another id. A read lists the roles of one person, and another lists the roles of every
-/// person in a transaction.
+/// person in a transaction. A third lists the people who hold one platform role.
 /// </summary>
 public static class GivenRoles
 {
@@ -44,6 +44,24 @@ public static class GivenRoles
         }
 
         return roles;
+    }
+
+    /// <summary>Lists the ids of the people who hold the platform role of this kind, ordered by id.</summary>
+    public static async Task<IReadOnlyList<string>> ListPlatformRoleHoldersAsync(
+        NpgsqlConnection connection, string kind, CancellationToken cancellationToken = default)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT user_id FROM axis.given_roles WHERE application_id IS NULL AND role = @kind ORDER BY user_id",
+            connection);
+        command.Parameters.AddWithValue("kind", kind);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var holders = new List<string>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            holders.Add(reader.GetString(0));
+        }
+
+        return holders;
     }
 
     /// <summary>Gives the person the role in the application, or the platform role with no application, and returns whether it was new.</summary>

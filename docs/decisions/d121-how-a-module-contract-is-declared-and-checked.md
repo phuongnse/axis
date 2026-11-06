@@ -2,69 +2,59 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-11-01. It sets the shapes that
-[D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) left open for module
-contracts, so that M24 can be broken into issues. It adds to D102 and changes none of its points.
-It is built, except the labels of named points _(planned for M31)_. [Module contracts](../reference/module-contracts.md) holds
-the detail.
+## Context
 
-- **A resource of its own:** a contract is a resource of the kind `contract`, one file for each
-  module entity it covers, holding the lifecycle, the core validations, the effects and the grant
-  ceiling. Only a module holds contracts, and a customization layer never names one.
-  - [D122](d122-how-a-customization-layer-is-written-and-applied.md) lets a layer add states and
-    transitions to a contract, never into a state the contract marks `protected`.
-- **Lifecycle:** an `enum` field that is required, not computed and not `sensitive` holds the
-  state. Every value of the field is a state.
-  - A record is created only in a state marked `initial`, and deleted only in a state marked
-    `deletable`. No state is deletable unless it says so.
-  - An update that changes the state needs a transition from the stored state to the new one whose
-    guard is `true`.
-- **The accountable user:** guards, core validations and effect values call `accountableUser()`,
-  the user who answers for the write, and `previous(field)`, the value before the write.
-  - For the record API, import and endpoints it is the caller. For a task completion it is the user
-    who decides.
-  - For a process step it is the user of the instance's last completed task, or the instance's
-    starter before any task.
-  - For a schedule, seed data and migrations it is `null`.
-  - The instance keeps it, so a retried step reads the same user.
-  - `decisionTask()` gives the task whose completion the write follows, kept the same way, so a
-    contract can require a new decision for each step.
-  - A step's `set` may write both, so a module records who decided.
-- **Effects only create records:** an effect creates a record in an entity of the same module, in
-  the transaction of the transition, as an entry in a ledger. It never updates or deletes, and
-  effects never chain.
-- **Grant ceiling:** each role slot gets a list of entries shaped like grants: actions and fields,
-  checked when the application compiles, and an optional record filter. For each action, the
-  engine adds the `or` of the filters of the entries that list it to every grant of the role, with
-  `and`.
-  - Roles mapped to no slot get the ceiling's `others` entry.
-  - Without `others`, such roles get no grant on the entity, as default deny asks.
-- **Named points:** each guard, `initial` and `deletable` rule, core validation, effect and slot
-  ceiling is a point named `<entity>/<part>/<name>`.
-  - A `relax` entry on the application's module entry names one point and gives a plain-text
-    reason. It marks the release off-standard.
-  - The list of states and transitions is no point and never relaxes. Adding states and transitions
-    is a change to the module, which the customization layers of M25 design.
-- **Contract scenarios:** a module scenario marks the points it covers. Every publish and validate
-  request runs the contract scenarios of every pinned module through the publisher, before
-  activation. A scenario that covers a relaxed point is skipped and listed.
-- **Every write:** `Axis.Data` checks the contract inside every record write. That covers the
-  record API, task completions, process steps, connector and package outputs, imports, endpoints,
-  scenarios and seed data. Migrations, recomputes, key rotation and restores are bulk changes of
-  stored values and check no contract.
-- **Studio:** the application's module entry shows each contract read-only, relaxes a point with
-  its reason and shows the off-standard mark.
+[D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) binds each module to a
+contract on its data and leaves its shapes open. Its own example, "approved only by someone other
+than the requester", cannot be written from record values alone, because a process step writes as
+the system and a field that records the decider is written by the steps a customization changes.
 
-_Why:_ a separate resource keeps the line between what a module promises and what an application
-may change as clear as a file boundary. That suits the layer of M25 and the version checks of M29.
-The guard in D102's own example, "approved only by someone other than the requester", cannot be
-written from record values alone. A process step writes as the system, and a field that records
-the decider is written by the same steps a customization changes. Carrying the decider through the
-instance, as workflow engines do for separation of duties, lets a guard refuse an approval that no
-other person made, whatever step makes it. Ledger entries instead of updates keep concurrent
-approvals from losing a change, and keep every change in the history. Comparing actions and fields
-at compile time, and adding filters at run time, is as far as a ceiling can be checked, because
-two filters cannot be compared. Capping roles that no slot covers keeps default deny. Lifecycle
-rules on create and delete close the way around a transition: deleting an approved record and
-creating it again. Relaxing only points, never the state graph, keeps each relax entry small and
-readable. Extending the graph is an addition to the module, not a check turned off.
+## Decision
+
+- **A resource of its own.** A contract is a `contract` resource, one file for each module entity it
+  covers, with the lifecycle, the core validations, the effects and the grant ceiling. Only a module
+  holds contracts, and a layer only adds states and transitions to one, as
+  [D122](d122-how-a-customization-layer-is-written-and-applied.md) agrees.
+- **The lifecycle covers create and delete.** A required, non-computed, non-sensitive `enum` field
+  holds the state. A record is created only in a state marked `initial` and deleted only in one
+  marked `deletable`, and an update that changes the state needs a transition whose guard is true.
+- **The accountable user is carried through the instance.** `accountableUser()` gives the user who
+  answers for the write: the caller, the user who decides a task, or for a process step the user of
+  the instance's last completed task, and `null` for a schedule, seed data and migrations.
+  `decisionTask()` gives the task the write follows, and `previous(field)` the value before the
+  write. The instance keeps them, so a retried step reads the same values.
+- **Effects only create records.** An effect creates a record of the same module in the
+  transaction of the transition, as a ledger entry. It never updates or deletes, and effects never
+  chain.
+- **A ceiling is checked in two steps.** Each role slot gets entries shaped like grants. Actions and
+  fields are checked when the application compiles, and the entries' filters are added to the role's
+  grants at run time, because two filters cannot be compared. Roles mapped to no slot get the
+  `others` entry, or no grant.
+- **Points relax, the state graph does not.** Each guard, `initial` and `deletable` rule, core
+  validation, effect and slot ceiling is a named point, and a `relax` entry with a reason turns one
+  off and marks the release off-standard. The list of states and transitions is no point.
+- **Contract scenarios run before activation.** A module scenario marks the points it covers, and
+  every publish and validate runs the contract scenarios of every pinned module through the
+  publisher. A scenario that covers a relaxed point is skipped and listed.
+- **Every write, inside `Axis.Data`.** The contract is checked inside every record write, whatever
+  makes it. Migrations, recomputes, key rotation and restores change stored values in bulk and check
+  no contract.
+
+The detail is in [module contracts](../reference/module-contracts.md).
+
+## Consequences
+
+- What a module promises and what an application may change are split by a file boundary, which
+  suits the layers and the version checks of upgrades.
+- A guard refuses an approval that no other person made, whatever step makes it, as workflow engines
+  enforce separation of duties.
+- Deleting an approved record and creating it again cannot go around a transition.
+- A running total is a sum of entries rather than a field.
+- Each relax entry stays small, and adding states is an addition to the module, never a check turned
+  off.
+
+## Alternatives
+
+- **A contract inside the entity file.** The promise would sit in a file that a layer changes.
+- **Effects that update records.** Two approvals at once could lose an update, and the history would
+  lose the steps.

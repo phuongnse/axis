@@ -47,7 +47,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [File fields](reference/file-fields.md)                                | The `file` field type: values, upload, download, storage and clean-up                |
 | [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
-| [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states                 |
+| [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, releases and running work |
 | [Process tables](reference/process-tables.md)                          | The tables that `Axis.Processes` owns                                                 |
 | [Process states](reference/process-states.md)                          | The states of a process instance and of a task                                        |
 | [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
@@ -81,6 +81,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Threat model: the product](reference/threat-model-product.md) | The server, worker, SPA, Studio, packages, connectors, identity provider and personal data threats |
 | [Threat model: the installation](reference/threat-model-installation.md) | The images, hosts, databases, backups, secrets and the cell console threats of an install |
 | [Threat model: the way Axis is built](reference/threat-model-build.md) | The NexKit, CI and AI agent threats of how Axis is built |
+| [Threat model: the control plane](reference/threat-model-control-plane.md) | The sign-up, cell call, DNS and billing portal sign-in threats of Axis SaaS |
 | [Threat model method](reference/threat-model-method.md)                | How the threat model is filled: the methods, the rows, the ratings and the statuses    |
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
