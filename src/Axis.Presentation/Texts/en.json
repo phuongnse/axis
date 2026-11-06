@@ -374,6 +374,7 @@
   "shell.inspector.kind": "Kind",
   "shell.inspector.number": "Number",
   "shell.inspector.httpStatus": "HTTP status",
+  "shell.inspector.traceId": "Trace ID",
   "shell.inspector.input": "Input",
   "shell.inspector.hidden": "Hidden",
   "shell.inspector.noHistory": "No history yet.",

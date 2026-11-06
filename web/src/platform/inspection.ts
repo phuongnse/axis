@@ -68,6 +68,8 @@ export interface PathEntry {
   decision: string | null
   output: unknown
   error: string | null
+  /** The trace id of the run that wrote the entry, or `null` when it stored none. */
+  traceId: string | null
 }
 
 /** A task of the instance. `outcome`, `completedBy` and `completedAt` are `null` while it is open. */
@@ -92,6 +94,8 @@ export interface CallAttempt {
   outcome: string
   httpStatus: number | null
   error: string | null
+  /** The trace id of the run that wrote the row, or `null` when it stored none. */
+  traceId: string | null
 }
 
 /** An output the operation of a resolvable call declares. `type` is the field type, such as `text` or `decimal`. */

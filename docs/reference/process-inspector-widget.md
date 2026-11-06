@@ -55,7 +55,9 @@ wrong form show the not-found page, and the instance is not requested.
   its type and its transitions, with no diagram. Steps the instance has run are marked as taken, and
   the step it is at is marked as current, whatever the instance state.
 - **History, tasks and calls.** Below the steps come the history rows with the step, the times, the
-  decision and the error, then the tasks, then the calls with their attempts. A call whose
+  decision, the error and the trace ID, then the tasks, then the calls with their attempts. The
+  trace ID of a history row and of an attempt is copyable text, empty when there is none, see
+  [Attempts](process-inspection.md#attempts). A call whose
   `inputHidden` is `true` shows "hidden" in place of its input. A shown input is a list of its
   top-level properties, where a number keeps its source digits.
 - **Subject, timer and parent.** An instance without a subject shows "No subject" in place of the

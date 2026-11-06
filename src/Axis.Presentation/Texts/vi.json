@@ -374,6 +374,7 @@
   "shell.inspector.kind": "Loại",
   "shell.inspector.number": "Lần",
   "shell.inspector.httpStatus": "Mã HTTP",
+  "shell.inspector.traceId": "ID truy vết",
   "shell.inspector.input": "Đầu vào",
   "shell.inspector.hidden": "Đã ẩn",
   "shell.inspector.noHistory": "Chưa có lịch sử.",
