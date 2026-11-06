@@ -89,17 +89,23 @@ notification bell. The built views are read only.
   step with its state, and the error of a failed job or step.
 - **Cell restore check** _(planned for M31)_. The Cell view also shows the cell's newest restore check with its
   result, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell).
-- **Tenants** _(planned for M31)_. One row per tenant, with a search by id and host and a filter by status. A row
-  shows:
-  - the id, the status (`active`, `suspended`, `provisioning` or `deleting`), the application and the
-    hosts;
-  - the newest storage sample against its quota, the users and applications against theirs, and the
-    emails sent today;
-  - the counts of failed instances, calls with an unknown outcome and open dead letters;
-  - the time of the newest daily archive, marked when it is more than 26 hours old.
-- **Tenant** _(planned for M31)_. One tenant's details: its quotas and the rows that override the defaults, the
-  usage of the last 13 months by day, its hosts with their verification state, its jobs, and a deletion's
-  dates. Each [action](#actions) is a button with a confirmation that names the tenant.
+- **Tenants.** One row per tenant, with a search by id and host and a filter by status. The search and the
+  filter run in the browser. A row shows:
+  - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`), the application and
+    the hosts;
+  - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a
+    tenant that the worker has not counted yet;
+  - **Usage and quotas** _(planned for M31)_: the newest storage sample against its quota, the users and
+    applications against theirs, and the emails sent today;
+  - **Daily archive** _(planned for M31)_: the time of the newest daily archive, marked when it is more than 26
+    hours old.
+- **Tenant.** One tenant's status, application and hosts, its quotas with the rows that override the cell's
+  defaults, and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
+  - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
+  - **Host verification** _(planned for M31)_: the verification state of each host.
+  - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
+  - **Actions** _(planned for M31)_: each [action](#actions) is a button with a confirmation that names the
+    tenant.
 
 ## Actions
 

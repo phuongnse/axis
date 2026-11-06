@@ -4,6 +4,8 @@ import { AccountPage } from './pages/AccountPage'
 import { CellConsoleRoute } from './pages/CellConsoleRoute'
 import { CellJobsPage } from './pages/CellJobsPage'
 import { CellPage } from './pages/CellPage'
+import { CellTenantPage } from './pages/CellTenantPage'
+import { CellTenantsPage } from './pages/CellTenantsPage'
 import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
 import { ConsolePage } from './pages/ConsolePage'
 import { HomePage } from './pages/HomePage'
@@ -89,7 +91,8 @@ function PlatformRoot({ development }: { development: boolean }) {
 /**
  * The routes of the platform. On the host of a site the SPA serves that site at `/` and its pages at `/{page}`, and
  * nothing else, as the server serves nothing else there. Elsewhere it serves the platform's own routes and every site
- * under `/{site}`. On the cell console's host it serves the console's two pages, Cell at `/` and Jobs at `/jobs`.
+ * under `/{site}`. On the cell console's host it serves the console's pages: Cell at `/`, Jobs at `/jobs`, Tenants at
+ * `/tenants` and one tenant at `/tenants/{id}`.
  */
 function PlatformRoutes() {
   const { hostSite, cellConsole } = usePlatform().site
@@ -99,6 +102,8 @@ function PlatformRoutes() {
         <Route element={<CellConsoleRoute />}>
           <Route index element={<CellPage />} />
           <Route path="jobs" element={<CellJobsPage />} />
+          <Route path="tenants" element={<CellTenantsPage />} />
+          <Route path="tenants/:id" element={<CellTenantPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
