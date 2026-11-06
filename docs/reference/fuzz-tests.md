@@ -2,7 +2,7 @@
 
 This page describes the fuzz tests of the parsers that read outside input: what each one fuzzes, how it mutates
 its input, what fails a run and how to replay a failure. The reasons for them are in
-[D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
+[D137](../decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md).
 
 A fuzz test feeds a parser random and mutated input. It runs with the unit or integration tests,
 with a fixed seed and a time limit, so a run is repeatable and fast. It does not use a
