@@ -103,8 +103,10 @@ configuration doc, then:
    [`axis-nexkit-routine`](../axis-nexkit-routine/SKILL.md) skill wherever the
    release changes a setting Axis chooses or a choice NexKit leaves to Axis.
 3. Say in the pull request what changes, what the release brings that needs
-   nothing here, and what the owner does: merge with the admin bypass, and any
-   secret or setting only the owner can add.
+   nothing here, and what the owner does: merge once `/nexkit review` has set
+   `nexkit/checks` and `nexkit/review` green, and any secret, permission or
+   setting only the owner can add. Comment `/nexkit review` after each push,
+   as NexKit's upgrade steps say.
 
 ## When something stops
 

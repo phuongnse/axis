@@ -23,7 +23,6 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                        | Docker          |
 | `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
 | `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
-| `scripts/dependabot-issues.mjs` | Prints the NexKit issues for the high and critical Dependabot alerts that no open issue names       | Network         |
 | `scripts/docs-audit.mjs`        | The docs audit of the `docs-audit.yml` workflow: picks a run's pages, reads them, opens the issues  | Network         |
 | `scripts/check-issue-links.mjs` | Prints the links of open issues to a file or heading of `main` that does not exist                  | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
@@ -233,10 +232,6 @@ check.
 that `KeycloakFixture.Image` pins, and scans them with Trivy, which it downloads at its pinned
 version.
 
-`scripts/dependabot-issues.mjs` prints the NexKit issues, as JSON with a title, a body and labels, for
-the high and critical Dependabot alerts whose advisory id no open issue names, and opens nothing. The
-hourly driver runs it and opens each issue it prints.
-
 ### Workflows outside NexKit's checks
 
 These workflows run on `main`, and none of them gates a NexKit merge.
@@ -298,8 +293,9 @@ that adds a source changes this section too.
   name, and one entry covers that package in every image.
 - **Alerts.** Dependabot alerts cover NuGet, npm, GitHub Actions and the Dockerfile's base images,
   and Dependabot opens no pull requests. A time frame starts on the alert's date when it comes
-  before the scan's. The hourly driver opens each NexKit issue that `scripts/dependabot-issues.mjs`
-  prints, in no milestone, one for each high or critical alert that no open issue covers, see
+  before the scan's. NexKit's autopilot opens a NexKit issue, in no milestone, for each advisory of
+  a high or critical alert that no open issue covers, because `.nexkit/config.json` sets its
+  `autopilot.dependabot` to `high`, see
   [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md).
 
 ## Test runs and reports
