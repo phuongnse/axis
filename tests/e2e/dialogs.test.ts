@@ -33,6 +33,9 @@ const pageHTML = `
 
 type Clicked = { running: boolean; opacity: string };
 
+// Node's test runner has no timeout by default, so a call that never returns would hold the whole check.
+const testTimeout = 120_000;
+
 let browser: Browser;
 
 before(async () => {
@@ -54,7 +57,7 @@ function chosen(page: Page): Promise<Clicked> {
   return page.evaluate(() => (window as unknown as { clicked: Clicked }).clicked);
 }
 
-test("a click through waitForDialog lands after the dialog has finished opening", async () => {
+test("a click through waitForDialog lands after the dialog has finished opening", { timeout: testTimeout }, async () => {
   const page = await openPage();
   try {
     const dialog = await waitForDialog(page, "Pick");
@@ -66,7 +69,7 @@ test("a click through waitForDialog lands after the dialog has finished opening"
   }
 });
 
-test("a click without waiting lands while the dialog is still opening", async () => {
+test("a click without waiting lands while the dialog is still opening", { timeout: testTimeout }, async () => {
   const page = await openPage();
   try {
     await page.getByRole("dialog").getByRole("button", { name: "Choose", exact: true }).click();
@@ -78,7 +81,7 @@ test("a click without waiting lands while the dialog is still opening", async ()
   }
 });
 
-test("confirmDialog closes the dialog once its button has been clicked", async () => {
+test("confirmDialog closes the dialog once its button has been clicked", { timeout: testTimeout }, async () => {
   const page = await openPage();
   try {
     await confirmDialog(page, "OK");
