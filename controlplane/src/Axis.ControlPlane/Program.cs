@@ -5,6 +5,7 @@ using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
+using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
@@ -57,6 +58,7 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
     // The jobs that write and remove a tenant's record. The options guarantee an IDnsRecords whenever the directory is set.
     builder.Services.AddSingleton<IJobHandler, WriteTenantRecordJobHandler>();
     builder.Services.AddSingleton<IJobHandler, RemoveTenantRecordJobHandler>();
+    builder.Services.AddSingleton(sp => new SubdomainCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), options));
 }
 
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
@@ -85,6 +87,7 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 app.UseExceptionHandler();
 
 app.MapHealthEndpoints();
+app.MapSignUpEndpoints();
 
 app.Run();
 
