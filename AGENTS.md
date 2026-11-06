@@ -23,10 +23,11 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 
 - Use English for code, comments, configuration, commit messages, issues and docs. The owner may
   write in Vietnamese.
-- Docs are the source of truth. An issue links to the doc section it implements and does not copy
-  it. A change that alters agreed behaviour, or makes any doc statement false, fixes the docs in the
-  same change. Follow [writing the docs](docs/writing-docs.md): one home for each rule, the current
-  rule and never the change, no progress or history, and leave nothing of a rule it replaces.
+- Docs are the source of truth. An issue links the doc section it implements and does not copy it.
+  A plan and a pull request have a `Docs:` line naming the sections they change, or why none. A change
+  fixes every doc statement it makes false, removes the planned marker of what it builds and greps the
+  docs for each name it renames or removes. Follow [how the docs stay correct](docs/writing-docs.md#how-the-docs-stay-correct);
+  a review checks the docs diff against the code diff.
 - Keep the decision status words exact: **Agreed** means agreed and **Proposed** means still open.
   Never present a proposal as agreed.
 - One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test
