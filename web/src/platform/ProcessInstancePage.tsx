@@ -1,6 +1,7 @@
 import { Alert, Button, Descriptions, Empty, Flex, Table, Tag, Typography, type TableColumnsType } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { AxisTable, type AxisColumn } from './AxisTable'
 import { formatValue } from './formatValue'
 import {
   fetchInstance,
@@ -184,49 +185,66 @@ export function InstanceDetailView({
     const labelKey = stepNames ? undefined : stepsByName.get(name)?.labelKey
     return labelKey ? t(labelKey) : name
   }
-  const time = (name: string, value: string | null) => formatValue(dateTime(name), value, {}, { locale, text: t })
+  const time = (name: string, value: string | null) =>
+    value === null ? null : formatValue(dateTime(name), value, {}, { locale, text: t })
 
   const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
-  const historyColumns: TableColumnsType<PathEntry> = [
-    { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
+  const historyColumns: AxisColumn<PathEntry>[] = [
+    {
+      key: 'step',
+      kind: 'freeText',
+      title: t('shell.inspector.step'),
+      render: (_v, row) => stepLabel(row.step),
+    },
     {
       key: 'startedAt',
+      kind: 'fixed',
       title: t('shell.inspector.startedAt'),
-      render: (_v: unknown, row) => time('startedAt', row.startedAt),
+      render: (_v, row) => time('startedAt', row.startedAt),
     },
     {
       key: 'finishedAt',
+      kind: 'fixed',
       title: t('shell.inspector.finishedAt'),
-      render: (_v: unknown, row) => time('finishedAt', row.finishedAt),
+      render: (_v, row) => time('finishedAt', row.finishedAt),
     },
-    { key: 'decision', title: t('shell.inspector.decision'), render: (_v: unknown, row) => row.decision ?? '' },
-    { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
+    {
+      key: 'decision',
+      kind: 'fixed',
+      title: t('shell.inspector.decision'),
+      render: (_v, row) => row.decision ?? null,
+    },
+    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
   ]
-  const taskColumns: TableColumnsType<InstanceTask> = [
-    { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
+  const taskColumns: AxisColumn<InstanceTask>[] = [
+    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
     {
       key: 'assignee',
+      kind: 'freeText',
       title: t('shell.inspector.assignee'),
-      render: (_v: unknown, row) => `${row.assigneeKind}: ${row.assignee}`,
+      render: (_v, row) => `${row.assigneeKind}: ${row.assignee}`,
     },
-    { key: 'state', title: t('shell.inspector.state'), render: (_v: unknown, row) => row.state },
-    { key: 'outcome', title: t('shell.inspector.outcome'), render: (_v: unknown, row) => row.outcome ?? '' },
+    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => row.state },
+    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome ?? null },
     {
       key: 'completedBy',
+      kind: 'freeText',
       title: t('shell.inspector.completedBy'),
-      render: (_v: unknown, row) => row.completedBy ?? '',
+      render: (_v, row) => row.completedBy ?? null,
     },
     {
       key: 'createdAt',
+      kind: 'fixed',
       title: t('shell.inspector.createdAt'),
-      render: (_v: unknown, row) => time('createdAt', row.createdAt),
+      render: (_v, row) => time('createdAt', row.createdAt),
     },
     {
       key: 'completedAt',
+      kind: 'fixed',
       title: t('shell.inspector.completedAt'),
-      render: (_v: unknown, row) => time('completedAt', row.completedAt),
+      render: (_v, row) => time('completedAt', row.completedAt),
     },
   ]
   const attemptColumns: TableColumnsType<CallAttempt> = [
@@ -247,23 +265,26 @@ export function InstanceDetailView({
     { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
   ]
 
-  const subProcessColumns: TableColumnsType<SubProcess> = [
-    { key: 'process', title: t('shell.inspector.process'), render: (_v: unknown, row) => row.process },
-    { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
-    { key: 'state', title: t('shell.inspector.state'), render: (_v: unknown, row) => stateText(t, row.state) },
+  const subProcessColumns: AxisColumn<SubProcess>[] = [
+    { key: 'process', kind: 'freeText', title: t('shell.inspector.process'), render: (_v, row) => row.process },
+    { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
+    { key: 'state', kind: 'fixed', title: t('shell.inspector.state'), render: (_v, row) => stateText(t, row.state) },
     {
       key: 'createdAt',
+      kind: 'fixed',
       title: t('shell.inspector.createdAt'),
-      render: (_v: unknown, row) => time('createdAt', row.createdAt),
+      render: (_v, row) => time('createdAt', row.createdAt),
     },
     {
       key: 'endedAt',
+      kind: 'fixed',
       title: t('shell.inspector.endedAt'),
-      render: (_v: unknown, row) => time('endedAt', row.endedAt),
+      render: (_v, row) => time('endedAt', row.endedAt),
     },
     {
       key: 'open',
-      render: (_v: unknown, row) => {
+      kind: 'fixed',
+      render: (_v, row) => {
         const page = inspectors?.get(row.process)
         return page === undefined ? null : (
           <Link to={inspectorPath(sitePath, page, row.id)} data-testid={`inspector-subprocess-${row.id}`}>
@@ -335,24 +356,20 @@ export function InstanceDetailView({
       </section>
       <section>
         <Typography.Title level={5}>{t('shell.inspector.history')}</Typography.Title>
-        <Table<PathEntry>
+        <AxisTable<PathEntry>
           rowKey={(row) => `${row.step}|${row.startedAt}|${row.finishedAt}`}
           columns={historyColumns}
-          scroll={{ x: 'max-content' }}
           dataSource={instance.path}
-          pagination={false}
-          locale={{ emptyText: t('shell.inspector.noHistory') }}
+          emptyText={t('shell.inspector.noHistory')}
         />
       </section>
       <section>
         <Typography.Title level={5}>{t('shell.inspector.tasks')}</Typography.Title>
-        <Table<InstanceTask>
-          rowKey="id"
+        <AxisTable<InstanceTask>
+          rowKey={(row) => row.id}
           columns={taskColumns}
-          scroll={{ x: 'max-content' }}
           dataSource={instance.tasks}
-          pagination={false}
-          locale={{ emptyText: t('shell.inspector.noTasks') }}
+          emptyText={t('shell.inspector.noTasks')}
         />
       </section>
       <section>
@@ -377,13 +394,11 @@ export function InstanceDetailView({
       </section>
       <section>
         <Typography.Title level={5}>{t('shell.inspector.subProcesses')}</Typography.Title>
-        <Table<SubProcess>
-          rowKey="id"
+        <AxisTable<SubProcess>
+          rowKey={(row) => row.id}
           columns={subProcessColumns}
-          scroll={{ x: 'max-content' }}
           dataSource={instance.subProcesses}
-          pagination={false}
-          locale={{ emptyText: t('shell.inspector.noSubProcesses') }}
+          emptyText={t('shell.inspector.noSubProcesses')}
         />
       </section>
     </Flex>

@@ -339,6 +339,18 @@ describe('ProcessInstancePage', () => {
     expect(within(taskRow).getByText('open')).toBeInTheDocument()
   })
 
+  it('shows the em dash in the completed cell of a task that is not completed', async () => {
+    stubApi()
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    const taskRow = screen.getByRole('row', { name: /role: manager/ })
+    const headers = within(taskRow.closest('table')!).getAllByRole('columnheader')
+    const completed = headers.findIndex((header) => header.textContent === 'Completed')
+    expect(within(taskRow).getAllByRole('cell')[completed].textContent).toBe('—')
+  })
+
   it('shows the history rows and the attempts of a call', async () => {
     stubApi()
 

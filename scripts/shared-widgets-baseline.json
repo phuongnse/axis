@@ -175,8 +175,8 @@
   },
   "web/src/platform/ProcessInstancePage.tsx": {
     "tag": 2,
-    "table": 4,
-    "button": 2
+    "button": 2,
+    "table": 1
   },
   "web/src/platform/ReferenceLookup.tsx": {
     "table": 1
