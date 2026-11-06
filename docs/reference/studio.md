@@ -23,7 +23,8 @@ opens the same view.
   `&resource=<id>`, without the kind. The id of a module resource opens it the same way when the id is
   not one of the folder's own resources.
 - **A path.** A Used by entry or a diagnostic that opens a resource at a path adds `&path=<path>`.
-- **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry and
+- **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
+  `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
   `&view=policies` the [policy matrix](#policy-matrix).
 
 ## New application

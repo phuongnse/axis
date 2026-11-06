@@ -464,7 +464,7 @@ release history see which promises of a module the business turned off, and why.
 - **Where it shows.** Studio's [releases](studio-workspace.md#releases) show the Off-standard tag beside
   the number of an off-standard release, and the operator console's publishing view shows the tag with
   the module, point and reason of each relaxed entry.
-- **Release page** _(planned for M31)_. A release's [page](studio-workspace.md#release-page) lists its
+- **Release page.** A release's [page](studio-workspace.md#release-page) lists its
   relaxed points in words, with their reasons.
 - **Upgrades** _(planned for M29)_. The module's upgrade promise does not cover a relaxed point.
 

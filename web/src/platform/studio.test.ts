@@ -7,6 +7,7 @@ import {
   changeRows,
   checkStudioExpression,
   fetchStudioPolicyMatrix,
+  fetchStudioRelease,
   fetchStudioResource,
   filterResources,
   folderDiffers,
@@ -70,6 +71,23 @@ describe('fetchStudioResource', () => {
 function json(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200 })
 }
+
+describe('fetchStudioRelease', () => {
+  it('loads the release at its number and answers null for a number the history lacks', async () => {
+    const release = { number: 3, previous: 2, previousIsLive: true, live: false }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(json(release))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    expect(await fetchStudioRelease('Purchase Requests', '3')).toEqual(release)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/api/studio/apps/Purchase%20Requests/releases/3')
+    expect(await fetchStudioRelease('Purchase Requests', '99')).toBeNull()
+    await expect(fetchStudioRelease('Purchase Requests', '3')).rejects.toBeInstanceOf(Error)
+  })
+})
 
 describe('fetchStudioPolicyMatrix', () => {
   it('loads the matrix of the application', async () => {
