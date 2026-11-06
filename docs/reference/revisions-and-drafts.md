@@ -36,7 +36,7 @@ LibGit2Sharp.
 A revision is one commit on the repository's `main` branch, and every change to the folder makes one.
 
 - **What makes one.** Each save in Studio, each `changes` call, each text write, each create, each
-  delete and each module layer save or reset through the [authoring API](authoring.md#writes). The
+  delete, each module layer save or reset and each undo through the [authoring API](authoring.md#writes). The
   commit is made under the same platform lock as the write, after the files are written, so the
   history follows the folder in the same order. A write that leaves every file byte for byte the same
   makes no revision, and a refused write makes none.
@@ -93,12 +93,15 @@ The publisher runs an accept as a publish request of the kind `accept`, see
 
 ## Undo
 
-_(planned for M35)_
-
-Undoing a revision commits a new revision that reverts it, so history never shrinks.
+Undoing a revision commits a new revision that reverts it, so history never shrinks. The revision
+is named "Undo <summary>", such as "Undo Change rule FinanceThreshold". The
+[authoring API](authoring-revisions.md) lists the revisions, shows one and undoes it.
 
 - **Only when clean.** A revision whose files a later revision changed again cannot be undone alone.
-  Studio lists the later revisions that touch the same files, and the author undoes those first.
+  The undo is refused and names the later revisions that touch the same files, newest first, and the
+  author undoes those first. Nothing is written when it is refused.
+- **Not the start.** The first revision, "Start of history", cannot be undone, because that would
+  delete every file in the folder.
 - **Checks.** An undo runs the compiler like any write, and its diagnostics show as for a save. It
   never publishes.
 - **Who.** A person with the author role. An agent has no undo tool.
