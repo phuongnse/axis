@@ -323,8 +323,8 @@ public sealed class AdminCellBackupTests(PostgreSqlFixture database, MinioFixtur
     /// <summary>Reads the whole archive with the key. A wrong key or a damaged chunk throws.</summary>
     private static async Task DecryptAsync(IAmazonS3 s3, string bucket, string key, byte[] backupKey)
     {
-        using var response = await s3.GetObjectAsync(bucket, key, CancellationToken);
-        await using var plain = BackupArchive.Decrypt(response.ResponseStream, backupKey);
+        var bytes = await MinioFixture.ReadObjectAsync(s3, bucket, key, CancellationToken);
+        await using var plain = BackupArchive.Decrypt(new MemoryStream(bytes), backupKey);
         await plain.CopyToAsync(Stream.Null, CancellationToken);
     }
 

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Amazon.Runtime;
 using Amazon.S3;
+using Amazon.S3.Model;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 
@@ -64,6 +65,27 @@ public sealed class MinioFixture : IAsyncLifetime
     }
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
+
+    /// <summary>The whole object. MinIO at times ends a response early, so a body cut short is read again from the start, up to three times.</summary>
+    public static Task<byte[]> ReadObjectAsync(IAmazonS3 s3, string bucket, string key, CancellationToken cancellationToken) =>
+        ReadWholeAsync(token => s3.GetObjectAsync(bucket, key, token), cancellationToken);
+
+    internal static async Task<byte[]> ReadWholeAsync(Func<CancellationToken, Task<GetObjectResponse>> get, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                using var response = await get(cancellationToken);
+                using var memory = new MemoryStream();
+                await response.ResponseStream.CopyToAsync(memory, cancellationToken);
+                return memory.ToArray();
+            }
+            catch (Exception exception) when (attempt < 3 && exception is IOException or HttpRequestException)
+            {
+            }
+        }
+    }
 
     /// <summary>A client of the service, with path-style addressing.</summary>
     public IAmazonS3 NewClient() =>

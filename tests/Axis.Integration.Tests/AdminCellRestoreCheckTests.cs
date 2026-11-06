@@ -410,8 +410,8 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
     // The usernames in the realm.json of an uploaded archive.
     private static async Task<string[]> ArchivedUsernamesAsync(IAmazonS3 s3, string bucket, string key, byte[] backupKey)
     {
-        using var response = await s3.GetObjectAsync(bucket, key, CancellationToken);
-        await using var plain = BackupArchive.Decrypt(response.ResponseStream, backupKey);
+        var bytes = await MinioFixture.ReadObjectAsync(s3, bucket, key, CancellationToken);
+        await using var plain = BackupArchive.Decrypt(new MemoryStream(bytes), backupKey);
         using var reader = new TarReader(plain);
         while (reader.GetNextEntry() is { } entry)
         {
