@@ -1,9 +1,10 @@
-import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd'
+import { Alert, Button, Card, Flex, Spin, Typography } from 'antd'
 import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { colourTokens } from '../platform/designTokens'
+import { EmptyState } from '../platform/EmptyState'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
@@ -243,7 +244,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
   if (sites === 'failed') {
     body = <Alert data-testid="applications-error" type="error" title={t('shell.home.applications.loadFailed')} />
   } else if (groups.length === 0) {
-    body = <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.applications.empty')} />
+    body = <EmptyState text={t('shell.home.applications.empty')} />
   } else {
     body = groups.map((group) => (
       <ApplicationCard

@@ -1,6 +1,6 @@
 import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { AxisActionRow, AxisButton } from './AxisButton'
@@ -11,6 +11,11 @@ import type { ThemeMode } from './themeMode'
 
 const texts = { 'test.add': 'Add a row' }
 const catalogs = [{ texts, fallbackTexts: texts }]
+
+/** Waits past Ant Design's hover delay, so a tooltip that should open has opened. */
+function pause(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 function renderIn(mode: ThemeMode, ui: React.ReactNode) {
   return render(
@@ -32,6 +37,54 @@ describe('the icon-only button', () => {
     await userEvent.tab()
 
     expect(screen.getByRole('button', { name: 'Add a row' })).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+  })
+
+  it('shows its tooltip on hover', async () => {
+    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+
+    await userEvent.hover(screen.getByRole('button', { name: 'Add a row' }))
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+  })
+
+  it('shows its tooltip on hover when disabled, which takes no focus', async () => {
+    renderIn('light', <AxisButton role="icon" disabled icon={<PlusOutlined />} nameKey="test.add" />)
+
+    await userEvent.hover(screen.getByRole('button', { name: 'Add a row' }))
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+  })
+
+  it('closes its tooltip on click and keeps it closed while the pointer stays on it', async () => {
+    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    const button = screen.getByRole('button', { name: 'Add a row' })
+    await userEvent.hover(button)
+    await screen.findByRole('tooltip')
+
+    await userEvent.click(button)
+    await pause(150)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('opens no tooltip on focus that a script gives', async () => {
+    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+
+    act(() => screen.getByRole('button', { name: 'Add a row' }).focus())
+    await pause(150)
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('shows its tooltip again when the pointer leaves after a click and comes back', async () => {
+    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+    const button = screen.getByRole('button', { name: 'Add a row' })
+    await userEvent.click(button)
+
+    await userEvent.unhover(button)
+    await userEvent.hover(button)
+
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
   })
 

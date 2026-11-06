@@ -1,8 +1,9 @@
 import { DownOutlined } from '@ant-design/icons'
 import { Button, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
-import { createContext, useContext, type CSSProperties, type ReactNode, type Ref } from 'react'
+import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { focusFollowsTab } from './tabFocus'
 
 /** The level of an action. Each level has one style, so the same kind of action always looks the same. */
 export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive' | 'plain'
@@ -32,6 +33,66 @@ export type AxisButtonProps =
     })
 
 const ActionRowContext = createContext(false)
+
+type IconButtonProps = Extract<AxisButtonProps, { role: 'icon' }>
+
+/** Opens on hover and Tab focus, and a click hides it until the pointer comes back. */
+function IconButton(props: IconButtonProps) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const {
+    role: _role,
+    nameKey,
+    destructive,
+    nameSuffix,
+    joined,
+    icon,
+    style,
+    disabled,
+    onClick,
+    onMouseEnter,
+    onMouseLeave,
+    ...rest
+  } = props
+  const [open, setOpen] = useState(false)
+  const pointerOver = useRef(false)
+  const hushed = useRef(false)
+  const name = t(nameKey)
+  const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
+  return (
+    <Tooltip
+      title={name}
+      trigger={['hover', 'focus']}
+      open={open}
+      onOpenChange={(next) =>
+        setOpen(next && !hushed.current && (pointerOver.current || !!disabled || focusFollowsTab()))
+      }
+    >
+      <Button
+        {...rest}
+        type={joined ? 'default' : 'text'}
+        disabled={disabled}
+        aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
+        icon={<span aria-hidden>{icon}</span>}
+        style={{ ...tint, ...style }}
+        onMouseEnter={(event) => {
+          pointerOver.current = true
+          onMouseEnter?.(event)
+        }}
+        onMouseLeave={(event) => {
+          pointerOver.current = false
+          hushed.current = false
+          onMouseLeave?.(event)
+        }}
+        onClick={(event) => {
+          hushed.current = true
+          setOpen(false)
+          onClick?.(event)
+        }}
+      />
+    </Tooltip>
+  )
+}
 
 /**
  * A row of actions that has a solid `finish` button (D128). Beside it, `main`, `secondary` and `destructive` buttons
@@ -66,27 +127,10 @@ export function AxisActionRow({
  * role. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
-  const t = useText()
   const { colour } = useDesignTokens()
   const inRow = useContext(ActionRowContext)
 
-  if (props.role === 'icon') {
-    const { role: _role, nameKey, destructive, nameSuffix, joined, icon, style, disabled, ...rest } = props
-    const name = t(nameKey)
-    const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
-    return (
-      <Tooltip title={name} trigger={['hover', 'focus']}>
-        <Button
-          {...rest}
-          type={joined ? 'default' : 'text'}
-          disabled={disabled}
-          aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
-          icon={<span aria-hidden>{icon}</span>}
-          style={{ ...tint, ...style }}
-        />
-      </Tooltip>
-    )
-  }
+  if (props.role === 'icon') return <IconButton {...props} />
 
   const { role, style, disabled, caret, children, ...rest } = props
   const body = {

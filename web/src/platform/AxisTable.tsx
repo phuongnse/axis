@@ -4,6 +4,7 @@ import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
+import { EmptyState } from './EmptyState'
 import { markCurrentPage } from './pagination'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -63,7 +64,7 @@ export interface AxisTableProps<T> {
   rowKey: (row: T) => string
   dataSource?: readonly T[]
   loading?: boolean
-  emptyText: string
+  emptyText?: string
   /**
    * The paging. Without it, or with `false`, every row shows and there is no pager. The page-size picker shows only
    * when `pageSizeOptions` offers sizes, and a pager with no picker hides on a single page.
@@ -209,8 +210,7 @@ export function AxisTable<T extends object>({
             scroll={{ x: 'max-content' }}
             dataSource={dataSource as T[] | undefined}
             loading={loading}
-            // Ant Design draws the empty text in its disabled colour, which is too faint to read.
-            locale={{ emptyText: <span style={{ color: tokens.colour.textMuted }}>{emptyText}</span> }}
+            locale={{ emptyText: <EmptyState text={emptyText} /> }}
             pagination={
               pagination
                 ? {

@@ -41,10 +41,22 @@ describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mo
 describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Design theme in %s mode', (mode) => {
   const config = antThemeFor(mode)
   const token = theme.getDesignToken(config)
-  const { colour, shadow } = designTokensFor(mode)
+  const { colour, shadow, spacing } = designTokensFor(mode)
 
   it('draws a placeholder in the muted text colour', () => {
     expect(token.colorTextPlaceholder).toBe(colour.textMuted)
+  })
+
+  it('gives a tab label no padding above it at any size and keeps the padding below', () => {
+    const tabs = config.components?.Tabs
+    expect(tabs).toMatchObject({
+      horizontalItemPadding: `0 0 ${spacing.sm}px`,
+      horizontalItemPaddingSM: `0 0 ${spacing.xs}px`,
+      horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
+    })
+    for (const name of ['horizontalItemPadding', 'horizontalItemPaddingSM', 'horizontalItemPaddingLG'] as const) {
+      expect(String(tabs?.[name])).toMatch(/^0 /)
+    }
   })
 
   it('draws links and state text in the text tokens', () => {

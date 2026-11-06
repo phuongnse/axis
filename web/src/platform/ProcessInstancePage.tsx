@@ -1,7 +1,8 @@
-import { Alert, Button, Descriptions, Empty, Flex, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
+import { EmptyState } from './EmptyState'
 import { formatValue } from './formatValue'
 import {
   fetchInstance,
@@ -395,7 +396,7 @@ export function InstanceDetailView({
       <section>
         <Typography.Title level={5}>{t('shell.inspector.calls')}</Typography.Title>
         {instance.calls.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.inspector.noCalls')} />
+          <EmptyState text={t('shell.inspector.noCalls')} />
         ) : (
           <Flex vertical>
             {instance.calls.map((call) => (
