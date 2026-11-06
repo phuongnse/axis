@@ -411,6 +411,12 @@
       "status": "proposed"
     },
     {
+      "concept": "Quota",
+      "en": "quota",
+      "vi": "hạn mức",
+      "status": "proposed"
+    },
+    {
       "concept": "Action: Save",
       "en": "Save",
       "vi": "Lưu",

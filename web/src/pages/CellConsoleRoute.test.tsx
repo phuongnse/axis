@@ -108,6 +108,7 @@ describe('CellConsoleRoute', () => {
     expect(await screen.findByTestId('cell-overview')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Cell console' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Jobs' })).toHaveAttribute('href', '/jobs')
+    expect(screen.getByRole('link', { name: 'Tenants' })).toHaveAttribute('href', '/tenants')
     expect(screen.queryByRole('button', { name: 'Switch to' })).not.toBeInTheDocument()
     expect(fetchMock).not.toHaveBeenCalledWith('/api/me', expect.anything())
     expect(fetchMock).toHaveBeenCalledWith('/api/cell/session', expect.anything())

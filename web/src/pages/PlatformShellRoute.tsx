@@ -16,12 +16,13 @@ const cellConsoleTitleKey = 'shell.cell.title'
 const cellConsoleNavigation: NavigationItem[] = [
   { key: 'cell', path: '/', labelKey: 'shell.cell.nav.cell', icon: 'dashboard' },
   { key: 'jobs', path: '/jobs', labelKey: 'shell.cell.nav.jobs', icon: 'list' },
+  { key: 'tenants', path: '/tenants', labelKey: 'shell.cell.nav.tenants', icon: 'people' },
 ]
 
 /**
  * Renders a page in the platform shell, with the platform texts, navigation and locales. The header has
  * the notification bell for an administrator, who sees the tenant notices. On the cell console's host the
- * shell has the console's title and two entries, no bell, and shows `account` in place of the app switcher
+ * shell has the console's title and its three entries, no bell, and shows `account` in place of the app switcher
  * and the account button.
  */
 export function PlatformShellRoute({ children, account }: { children: ReactNode; account?: ReactNode }) {
