@@ -80,6 +80,11 @@ says. Autopilot takes them all the same.
    The issue names the advisory id, so the next run prints nothing for it.
    When the script fails, open no issue in that run and
    [hand it to the owner](#hand-to-the-owner).
+3. For links of open issues that point nowhere, run
+   `node scripts/check-issue-links.mjs` on `main`. For each link it prints, find
+   where the file or heading went (`git log --follow`, the decisions index for
+   a superseded decision) and edit the issue to link the new place, with
+   `gh issue edit --body-file`. Change nothing else in the issue.
 
 ## Hand to the owner
 

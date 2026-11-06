@@ -1,4 +1,4 @@
-# D134. Docs stay true while work merges
+# D135. Docs stay true, and an audit reads them every hundred merges
 
 Status: **Agreed**
 
@@ -16,7 +16,7 @@ the existing rules did not stop:
   decision that promised what nothing builds.
 
 Sweeping every doc in every pull request would cost much and miss much. The checks have to sit where
-each kind of drift starts.
+each kind of drift starts, and the audit should run as the repository's other checks of `main` run.
 
 ## Decision
 
@@ -31,10 +31,13 @@ Three layers, each closing one kind of drift. The rules are in
   routes, commands, codes, kinds, environment variables, metrics or anything else the code defines has
   a test that compares the list with the code each time it runs. Without one, the doc names the file
   that holds the list instead.
-- **A weekly audit reads the docs against the code.** A routine reads a share of the pages each week,
-  in turn, so every page is read about once a month. It opens a NexKit issue for what it finds: a
-  docs fix for a statement the code contradicts, and a code fix for an agreed rule the code does not
-  follow. The audit itself changes nothing, so all work still goes through NexKit.
+- **An audit reads the docs against the code every hundred merges.** A workflow, which NexKit starts
+  on `main` once every 100 of its merges as it starts CodeQL and the performance tests, reads a quarter
+  of the pages in turn, so every page is read about once in four hundred merges. Its first job runs
+  Claude Code with read-only tools and no GitHub token and prints the findings. Its second job runs no
+  model and opens a NexKit issue for each group of findings that no open issue covers: a docs fix for
+  a statement the code contradicts, and a code fix for an agreed rule the code does not follow. NexKit
+  takes those issues because it trusts the issues that this workflow of the default branch opens.
 
 ## Consequences
 
@@ -42,9 +45,14 @@ Three layers, each closing one kind of drift. The rules are in
   before it merges.
 - A test reads both sides every run, so it never holds a copy of the values that could go stale.
 - A list that nobody tests is not written, so the docs link the code a little more often.
-- Drift that slips past both is found within about a month, and the milestone docs sweep is the last
-  check before a milestone closes.
-- The audit spends a routine's runs, and its issues add to NexKit's queue.
+- Drift that slips past both is found within about four hundred merges, which is about a week at the
+  current pace, and the milestone docs sweep is the last check before a milestone closes. The audit
+  runs more often when more merges, which is when the docs drift most.
+- A page that tries to steer the model reaches nothing that can write: the model reads, and a job
+  with no model writes.
+- The audit's runs show on the repository's Actions, and its issues add to NexKit's queue.
+- The audit needs NexKit to trust the issues of a listed workflow, as the trusted workflows setting
+  that NexKit's issue phuongnse/nexkit#205 asks for.
 
 ## Alternatives
 
@@ -52,5 +60,8 @@ Three layers, each closing one kind of drift. The rules are in
   reader of everything checks nothing closely.
 - **Generate the lists from the code.** It cannot drift either, but it needs a generator for each list,
   and generated text reads worse than text written for a person.
+- **A routine that relays the issues.** A Claude Code routine on a weekly clock, or the hourly
+  driver opening the audit's issues as it opens the Dependabot ones, would work today, but a relay is
+  one more moving part, and the runs would not show in the repository.
 - **Rely on the milestone docs sweep alone.** A milestone runs for weeks, and the drift found in the
   rewrite had outlived several sweeps.

@@ -272,6 +272,10 @@
       {
         "workflow": "performance.yml",
         "every": 62
+      },
+      {
+        "workflow": "docs-audit.yml",
+        "every": 100
       }
     ]
   },

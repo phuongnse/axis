@@ -145,4 +145,5 @@ the files agree, title and status included.
 | [D131](decisions/d131-tenant-notices-live-in-axisnotifications.md) | Tenant notices live in axis.notifications | **Agreed** |
 | D132 | Rules from the Studio settings review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d132-rules-from-the-studio-settings-review.md) |
 | [D133](decisions/d133-docs-state-each-current-rule-once.md) | Docs state each current rule once | **Agreed** |
-| [D134](decisions/d134-docs-stay-true-while-work-merges.md) | Docs stay true while work merges | **Agreed** |
+| D134 | Docs stay true while work merges | Superseded by [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md), [last text](https://github.com/phuongnse/axis/blob/ca77a8d1aefab251f800f77636d2d99f87e4e836/docs/decisions/d134-docs-stay-true-while-work-merges.md) |
+| [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) | Docs stay true, and an audit reads them every hundred merges | **Agreed** |
