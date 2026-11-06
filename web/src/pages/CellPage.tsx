@@ -1,14 +1,17 @@
 import { Alert, Card, Descriptions } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchCell, type Cell } from '../platform/cell'
+import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import { useCellConsole } from './cellConsoleContext'
+import { usePlatform } from './context'
 
-/** The Cell view of the cell console: the cell's id and region, and its number of tenants against the cap. It is read only. */
+/** The Cell view of the cell console: the cell's id and region, its number of tenants against the cap and its newest restore check. It is read only. */
 export function CellPage() {
   const t = useText()
   const { onRefused } = useCellConsole()
+  const { locale } = usePlatform().current
   const [cell, setCell] = useState<Cell>()
   const [failed, setFailed] = useState(false)
 
@@ -51,6 +54,25 @@ export function CellPage() {
                     : t('shell.cell.overview.tenantsOfCap')
                         .replace('{tenants}', String(cell.tenants))
                         .replace('{cap}', String(cell.cap)),
+              },
+              {
+                key: 'restoreCheck',
+                label: t('shell.cell.overview.restoreCheck'),
+                children: (
+                  <span data-testid="cell-restore-check">
+                    {cell.restoreCheck === null ? (
+                      <EmptyDash />
+                    ) : (
+                      t(
+                        cell.restoreCheck.passed
+                          ? 'shell.cell.overview.restoreCheck.passed'
+                          : 'shell.cell.overview.restoreCheck.failed',
+                      )
+                        .replace('{tenant}', cell.restoreCheck.tenantId)
+                        .replace('{time}', new Date(cell.restoreCheck.ranAt).toLocaleString(locale))
+                    )}
+                  </span>
+                ),
               },
             ]}
           />

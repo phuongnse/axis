@@ -39,9 +39,10 @@ namespace Axis.Server.CellApi;
 /// <c>403</c> without the role.
 /// </para>
 /// <para>
-/// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap }</c>: <c>tenants</c> counts the rows of the cell's tenant directory
-/// whatever their status and leaves out preview tenants, and <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
-/// <see langword="null"/>. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
+/// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap, restoreCheck }</c>: <c>tenants</c> counts the rows of the cell's tenant directory
+/// whatever their status and leaves out preview tenants, <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
+/// <see langword="null"/>, and <c>restoreCheck</c> is <c>{ ranAt, tenantId, passed }</c> of the newest row of <c>platform.restore_checks</c> or
+/// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
 /// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. <c>tenant</c> keeps one tenant's jobs and an
 /// unknown tenant answers an empty list. <c>limit</c> is a whole number from 1 to 200, 50 when missing, and any other value
 /// answers <c>400</c>.
@@ -228,7 +229,11 @@ internal static partial class CellEndpoints
     {
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking().CountAsync(tenant => tenant.PreviewOf == null, cancellationToken);
-        return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap));
+        var restoreCheck = await platform.RestoreChecks.AsNoTracking()
+            .OrderByDescending(check => check.RanAt).ThenByDescending(check => check.Id)
+            .Select(check => new CellRestoreCheckResponse(check.RanAt, check.TenantId, check.Passed))
+            .FirstOrDefaultAsync(cancellationToken);
+        return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap, restoreCheck));
     }
 
     private static async Task<IResult> ListTenantsAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
@@ -845,8 +850,13 @@ internal static partial class CellEndpoints
 /// <summary>The signed-in operator: the name the console shows.</summary>
 internal sealed record CellSessionResponse(string DisplayName);
 
-/// <summary>The cell: its id and region, the number of its tenants without preview tenants, and its tenant cap or null.</summary>
-internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap);
+/// <summary>The newest stored result of the weekly restore check: when the run started, its source tenant and whether it passed.</summary>
+internal sealed record CellRestoreCheckResponse(DateTimeOffset RanAt, string TenantId, bool Passed);
+
+/// <summary>
+/// The cell: its id and region, the number of its tenants without preview tenants, its tenant cap or null and its newest restore check or null.
+/// </summary>
+internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap, CellRestoreCheckResponse? RestoreCheck);
 
 /// <summary>The counts of a tenant's failed work: numbers only, with no ids, inputs or errors.</summary>
 internal sealed record CellFailedWorkResponse(long Instances, long UnknownCalls, long DeadLetters);

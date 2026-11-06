@@ -23,7 +23,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <c>cell restore-check</c> on real PostgreSQL, MinIO and Keycloak. A good archive restores into the scratch tenant, which has the
-/// counts and the users of the archive, is removed with its database, roles and realm, and records 1. An archive whose counts do not match its
+/// counts and the users of the archive, is removed with its database, roles and realm, and records 1. Each run that picked a tenant also stores its result in <c>platform.restore_checks</c>, and a run with no pick stores none. An archive whose counts do not match its
 /// data, or of a tenant with its own realm that holds no <c>realm.json</c>, records 0, exits 1 and still removes the scratch tenant. The command writes one platform audit record for the source tenant, before its
 /// first change. A missing <c>Cell:InternalDomain</c> makes it exit 2 and write no audit record. The test scenarios of an application in the
 /// source tenant's Studio folder run against the scratch tenant's copy of it: a passing scenario records 1, and a failing one records 0, exits 1
@@ -100,6 +100,10 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         Assert.Contains($"{scratch} remove ok", result.Output);
         Assert.Equal($"{source} restore-check passed", result.Output[^1]);
         Assert.Equal(1, gauge.Points[source]);
+        var stored = Assert.Single(await RestoreChecksAsync(scenario));
+        Assert.Equal(source, stored.TenantId);
+        Assert.True(stored.Passed);
+        Assert.InRange(DateTimeOffset.UtcNow - stored.RanAt, TimeSpan.Zero, TimeSpan.FromMinutes(30));
         var audited = (await scenario.AuditRecordsAsync()).Where(record => record.Command == Command).ToList();
         var record = Assert.Single(audited);
         Assert.Equal(source, record.TenantId);
@@ -133,6 +137,9 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
 
         Assert.Equal(1, result.Exit);
         Assert.Equal(0, gauge.Points[source]);
+        var stored = Assert.Single(await RestoreChecksAsync(scenario));
+        Assert.Equal(source, stored.TenantId);
+        Assert.False(stored.Passed);
         Assert.Contains($"{scratch} counts failed: {table} has {archived - 1} rows and the archive {archived}", result.Output);
         Assert.DoesNotContain(result.Output, line => line.Contains("counts ok", StringComparison.Ordinal));
         Assert.Contains($"{scratch} remove ok", result.Output);
@@ -188,6 +195,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         Assert.Equal(["The setting Cell:InternalDomain is required."], result.Error);
         Assert.Empty(result.Output);
         Assert.Empty(await scenario.AuditRecordsAsync());
+        Assert.Empty(await RestoreChecksAsync(scenario));
         Assert.Equal(0, await scenario.CountEntriesAsync());
         Assert.False(await scenario.DatabaseExistsAsync(ScratchId()));
     }
@@ -474,6 +482,12 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
 
     private static PlatformDbContext NewContext(AdminScenario scenario) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
+
+    private static async Task<List<RestoreCheckRow>> RestoreChecksAsync(AdminScenario scenario)
+    {
+        await using var context = NewContext(scenario);
+        return await context.RestoreChecks.AsNoTracking().ToListAsync(CancellationToken);
+    }
 
     private static async Task<int> CountTenantsAsync(AdminScenario scenario, string id)
     {

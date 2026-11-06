@@ -1028,6 +1028,18 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             Assert.Equal("vn", cell.GetProperty("region").GetString());
             Assert.Equal(3, cell.GetProperty("tenants").GetInt32());
             Assert.Equal(JsonValueKind.Null, cell.GetProperty("cap").ValueKind);
+            Assert.Equal(JsonValueKind.Null, cell.GetProperty("restoreCheck").ValueKind);
+
+            await ExecuteAsync(
+                "INSERT INTO platform.restore_checks (id, ran_at, tenant_id, passed) VALUES " +
+                "(gen_random_uuid(), now() - interval '8 days', 'a', true), (gen_random_uuid(), now() - interval '1 day', 'b', false)");
+            using var afterCheck = await GetAsync(client, "/api/cell", token);
+
+            Assert.Equal(HttpStatusCode.OK, afterCheck.StatusCode);
+            var restoreCheck = (await afterCheck.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("restoreCheck");
+            Assert.Equal("b", restoreCheck.GetProperty("tenantId").GetString());
+            Assert.False(restoreCheck.GetProperty("passed").GetBoolean());
+            Assert.InRange(DateTimeOffset.UtcNow - restoreCheck.GetProperty("ranAt").GetDateTimeOffset(), TimeSpan.FromHours(23), TimeSpan.FromHours(25));
         }
 
         await using (var capped = await StartAsync(tenantCap: 10))

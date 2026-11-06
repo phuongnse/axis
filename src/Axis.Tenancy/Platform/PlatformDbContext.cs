@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts, the requests for hosts of their own,
-/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the tombstones of purged tenants, the data protection keys
+/// their deployment bindings, their platform sign-in providers, their data keys and lookup keys, the backup keys and last successful backup times of a cell's tenants and their quota overrides, their legal links and those of their sites, their usage and daily counts, the sessions of the cell console's operators, the provisioning jobs, the tombstones of purged tenants, the results of the weekly restore check, the data protection keys
 /// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
@@ -49,6 +49,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<JobRow> Jobs => Set<JobRow>();
 
     public DbSet<DeletedTenantRow> DeletedTenants => Set<DeletedTenantRow>();
+
+    public DbSet<RestoreCheckRow> RestoreChecks => Set<RestoreCheckRow>();
 
     public DbSet<PlatformAuditRecordRow> AuditRecords => Set<PlatformAuditRecordRow>();
 
@@ -395,6 +397,17 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             deleted.Property(d => d.DeletedAt).HasColumnName("deleted_at").HasColumnType("timestamp with time zone");
             deleted.Property(d => d.Actor).HasColumnName("actor");
             deleted.Property(d => d.Hosts).HasColumnName("hosts").HasColumnType("text[]");
+        });
+
+        modelBuilder.Entity<RestoreCheckRow>(check =>
+        {
+            check.ToTable("restore_checks");
+            check.HasKey(c => c.Id).HasName("pk_restore_checks");
+            check.Property(c => c.Id).HasColumnName("id").ValueGeneratedNever();
+            check.Property(c => c.RanAt).HasColumnName("ran_at").HasColumnType("timestamp with time zone");
+            check.Property(c => c.TenantId).HasColumnName("tenant_id");
+            check.Property(c => c.Passed).HasColumnName("passed");
+            check.HasIndex(c => c.RanAt).HasDatabaseName("ix_restore_checks_ran_at");
         });
 
         modelBuilder.Entity<PlatformAuditRecordRow>(record =>

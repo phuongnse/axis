@@ -5,12 +5,20 @@ export interface CellSession {
   displayName: string
 }
 
-/** The cell, as served by `GET /api/cell`. `cap` is `null` when the cell has no cap on its tenants. */
+/** The newest stored result of the weekly restore check: when the run started, as an ISO 8601 time, its source tenant and whether it passed. */
+export interface CellRestoreCheck {
+  ranAt: string
+  tenantId: string
+  passed: boolean
+}
+
+/** The cell, as served by `GET /api/cell`. `cap` is `null` when the cell has no cap on its tenants and `restoreCheck` when no check has run. */
 export interface Cell {
   id: string
   region: string
   tenants: number
   cap: number | null
+  restoreCheck: CellRestoreCheck | null
 }
 
 /** One step of a job. `error` is `null` unless the step failed. */
