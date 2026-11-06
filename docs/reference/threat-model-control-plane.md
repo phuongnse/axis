@@ -55,7 +55,7 @@ flowchart LR
 ### Sign-up page and API
 
 The sign-up page and its API take requests from anyone on the internet, before anyone signs in.
-The page is planned for M33, see [sign-up](sign-up.md).
+The control plane serves the page, see [sign-up](sign-up.md). Sending the form is planned for M33.
 
 ```mermaid
 flowchart LR

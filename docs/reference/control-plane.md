@@ -180,9 +180,10 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   relay are required, except `ControlPlane:Mail:UserName`. The directory connection string is
   optional, and once it is set a DNS provider is required. The cell settings are optional, and once a cell is listed, all of its settings, its secret
   and the client certificate are required. The DNS settings are optional, and once a provider is
-  named, the ones it needs are required.
+  named, the ones it needs are required. The sign-up applications are optional, and each listed one
+  needs an id and both titles.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
-  index of a cell, and never its value.
+  index of a cell or an application, and never its value.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets and the DNS key
   may also come from the key-per-file secrets `/run/secrets/ControlPlane__ConnectionString`,
   `/run/secrets/ControlPlane__DirectoryConnectionString`,
@@ -208,13 +209,17 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Cells:<n>:TokenUrl` | The token endpoint of the cell's operator realm | An absolute `https` URL |
 | `ControlPlane:Cells:<n>:ClientId` | The id of the realm's client for the control plane | Not empty |
 | `ControlPlane:CellSecrets:<cell id>` | The client secret of that cell's client, a key-per-file secret | Not empty for every listed cell |
-| `ControlPlane:CellClientCertificate:Path` and `:KeyPath` | The PEM certificate and private key that the control plane presents to every cell | Both set and both files exist, when a cell is listed |
+| `ControlPlane:CellClientCertificate:Path` | The PEM certificate that the control plane presents to every cell | Set and the file exists, when a cell is listed |
+| `ControlPlane:CellClientCertificate:KeyPath` | The PEM private key of that certificate | Set and the file exists, when a cell is listed |
 | `ControlPlane:Dns:Provider` | The DNS adapter that sets and removes a tenant's `CNAME` record: `InMemory` or `Rfc2136`. Required when `ControlPlane:DirectoryConnectionString` is set. With none the service registers no adapter | `InMemory` is refused outside Development and Testing. Any other value is refused |
 | `ControlPlane:Dns:Server` | The host of the DNS server that takes the dynamic updates | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Port` | The TCP port of that server. Default 53 | 1 to 65535, with `Rfc2136` |
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
+| `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
+| `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
+| `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
@@ -232,8 +237,9 @@ The control plane ships as its own image and Helm chart, beside the platform's.
 - **Image.** Build it with
   `docker build --target axis-controlplane --build-arg AXIS_VERSION=<version> .`. It runs as the
   non-root user of the base image in the Production environment, works on a read-only root file
-  system, carries the version as the OCI label `org.opencontainers.image.version`, and holds no
-  sample, extension package or module.
+  system, carries the version as the OCI label `org.opencontainers.image.version`, holds the built
+  [sign-up page](sign-up.md#the-page) in its web root, and holds no sample, extension package or
+  module.
 - **Chart.** `deploy/helm/axis-controlplane` installs one Deployment and one ClusterIP Service. The
   Deployment has startup, liveness and readiness probes on `/health/live` and `/health/ready`.
 - **HTTPS only.** The control plane listens on port 8443 with the certificate of a Kubernetes TLS

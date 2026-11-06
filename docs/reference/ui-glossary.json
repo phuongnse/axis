@@ -381,6 +381,12 @@
       "note": "Kept in English: operators say it."
     },
     {
+      "concept": "Tenant subdomain",
+      "en": "subdomain",
+      "vi": "tên miền phụ",
+      "status": "proposed"
+    },
+    {
       "concept": "Operator console",
       "en": "operator console",
       "vi": "bảng điều khiển vận hành",
