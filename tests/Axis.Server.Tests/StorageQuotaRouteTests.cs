@@ -117,9 +117,9 @@ public sealed class StorageQuotaRouteTests
         // Studio deletes are never refused.
         "DELETE /api/studio/apps/{application}/resources/{id}",
 
-        // Validate, preview, test and rollback store a request and go on over the quota.
+        // Validate, preview, test and activate store a request and go on over the quota.
         "POST /api/studio/apps/{application}/preview",
-        "POST /api/studio/apps/{application}/releases/{id}/rollback",
+        "POST /api/studio/apps/{application}/releases/{id}/activate",
         "POST /api/studio/apps/{application}/test",
         "POST /api/studio/apps/{application}/validate",
 

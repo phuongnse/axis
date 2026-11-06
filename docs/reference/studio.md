@@ -181,9 +181,8 @@ its end.
 - **The release number.** A succeeded publish or activation shows its release number, which Studio
   finds in `GET .../releases` by the request's `releaseId`. A failed publish shows the failure and no
   release number, even when the request names a release, so a failure never looks like a success. An
-  activation shows its own texts, Rolled back and Rollback failed.
-- **Activated** _(planned for M31)_. An activation's texts are Activated and Activation failed, in the
-  words of [D130](../decisions/d130-activate-a-release-replaces-roll-back.md).
+  activation shows its own texts, Activated and Activation failed, in the words of
+  [D130](../decisions/d130-activate-a-release-replaces-roll-back.md).
 - **Diagnostics.** When a request ends, the Problems panel shows its diagnostics in place of the loaded
   ones, for a failed request and for a succeeded one that holds warnings.
 - **Contract scenarios.** A publish, validate or preview request that stored contract scenarios lists
@@ -201,7 +200,7 @@ The Releases entry lists the release history from `GET .../releases`, as
 
 - **A row's facts.** A release's label, note, time and publisher are those of its first activation,
   which is the publish. The list has one page.
-- **Activate….** Confirming its dialog sends `POST .../releases/{id}/rollback`, see
+- **Activate….** Confirming its dialog sends `POST .../releases/{id}/activate`, see
   [publishing](authoring.md#publishing), and the status line follows the request as it follows a
   publish. A failed activation puts its diagnostics in the Problems panel, and the list still marks
   the previous release Live. Activate… is off while a request runs and while the reconnect message

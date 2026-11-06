@@ -9,7 +9,7 @@ import {
   previewSiteUrl,
   previewStudioApp,
   publishStudioApp,
-  rollbackStudioRelease,
+  activateStudioRelease,
   ServerUnreachableError,
   type StudioDiagnostic,
   type StudioReleaseListRow,
@@ -46,13 +46,13 @@ export interface StudioPublishingHandle {
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
  * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
- * An Activate… button in the history sends a rollback request.
+ * An Activate… button in the history sends an activate request.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
  * stored under the status line, when it stored any.
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
- * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or rollback
+ * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or activate
  * shows its release number, found in the release history by the request's `releaseId`. Publish and Activate… show
  * only when `canPublish`. They and Validate are off while a request runs and while the reconnect message shows. The
  * history loads when the application is picked, and again after a request ends, after the reconnect, and when
@@ -181,7 +181,7 @@ export function StudioPublishing({
     async function findReleaseNumber(ended: StudioRequest, signal: AbortSignal): Promise<number | null> {
       if (
         ended.target === 'preview' ||
-        (ended.kind !== 'publish' && ended.kind !== 'rollback') ||
+        (ended.kind !== 'publish' && ended.kind !== 'activate') ||
         ended.status !== 'succeeded' ||
         ended.releaseId === null
       ) {
@@ -318,10 +318,10 @@ export function StudioPublishing({
           {history && history !== 'failed' && (
             <StudioReleasesList
               history={history}
-              canRollBack={canPublish}
+              canActivate={canPublish}
               busy={busy}
               titled={!releasesView}
-              onRollBack={(row: StudioReleaseListRow) => send(() => rollbackStudioRelease(application, row.releaseId))}
+              onActivate={(row: StudioReleaseListRow) => send(() => activateStudioRelease(application, row.releaseId))}
             />
           )}
         </Flex>

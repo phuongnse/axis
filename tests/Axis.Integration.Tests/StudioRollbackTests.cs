@@ -8,8 +8,8 @@ using static Axis.Integration.Tests.StudioPublishTests;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The rollback route of the authoring API stores a <c>rollback</c> request for a release of the history, and the publisher
-/// activates that release again. The server and the publisher run together here.
+/// The activate route of the authoring API stores an <c>activate</c> request for a release of the history, and the publisher
+/// activates that release again. The old rollback route is gone and answers 405. The server and the publisher run together here.
 /// </summary>
 [Collection("Test scenario runs")]
 public sealed class StudioRollbackTests : IAsyncLifetime
@@ -48,13 +48,13 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var published = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var folderHash = published.RootElement.GetProperty("folderContentHash").GetString();
 
-        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/activate", HostA);
 
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         using var request = await ReadAsync(accepted);
         var requestId = request.RootElement.GetProperty("id").GetGuid();
         Assert.Equal($"{ApplicationUrl}/requests/{requestId:D}", accepted.Headers.Location?.OriginalString);
-        Assert.Equal(("rollback", "queued", "tenant", "author"), (
+        Assert.Equal(("activate", "queued", "tenant", "author"), (
             request.RootElement.GetProperty("kind").GetString(),
             request.RootElement.GetProperty("status").GetString(),
             request.RootElement.GetProperty("target").GetString(),
@@ -113,7 +113,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         await AddFieldAsync(folder.Path);
         var second = await PublishAsync(author);
 
-        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/activate", HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         using var finished = await WaitForFinalAsync(author, accepted.Headers.Location!.OriginalString, HostA);
 
@@ -138,7 +138,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var nobody = factory.CreateClient();
         using var startup = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var release = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
-        var url = $"{ApplicationUrl}/releases/{release:D}/rollback";
+        var url = $"{ApplicationUrl}/releases/{release:D}/activate";
 
         using var withoutPublisher = await SendAsync(employee, HttpMethod.Post, url, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, withoutPublisher.StatusCode);
@@ -153,14 +153,19 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, noHeader.StatusCode);
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
-        foreach (var missing in new[] { $"{ApplicationUrl}/releases/{Guid.NewGuid():D}/rollback", $"{ApplicationUrl}/releases/not-a-uuid/rollback" })
+        foreach (var missing in new[] { $"{ApplicationUrl}/releases/{Guid.NewGuid():D}/activate", $"{ApplicationUrl}/releases/not-a-uuid/activate" })
         {
             using var unknown = await SendAsync(author, HttpMethod.Post, missing, HostA);
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
 
-        using var unknownApplication = await SendAsync(author, HttpMethod.Post, $"/api/studio/apps/NoSuchApplication/releases/{release:D}/rollback", HostA);
+        using var unknownApplication = await SendAsync(author, HttpMethod.Post, $"/api/studio/apps/NoSuchApplication/releases/{release:D}/activate", HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
+        Assert.Equal(0L, await CountRequestsAsync(connectionString));
+
+        // The rollback route of before D130 is no longer a route. The API fallback answers GET only, so the answer is 405.
+        using var rolledBack = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{release:D}/rollback", HostA);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, rolledBack.StatusCode);
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
         // The body is ignored.

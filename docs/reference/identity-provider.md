@@ -451,8 +451,8 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
   tenant and its platform sign-in. The stored platform providers are always part of the plan, so a
   provider that only the platform sign-in names stays in the realm. A provider that nothing names any
   more is removed: its users stay, but cannot sign in through it.
-  - `Axis.Admin` `activate`, and the publisher's `publish`, `publish` with target `preview` and
-    `rollback` update the realm, with its mail server and legal settings, inside their `activate` step,
+  - The `Axis.Admin` `activate` command, and the publisher's `publish`, `publish` with target
+    `preview` and `activate` requests, update the realm, with its mail server and legal settings, inside their `activate` step,
     after the activation has committed. A tenant without an activation secret, such as a preview tenant
     or one that signs in through an outside identity provider, skips the update.
   - A failure of the identity provider fails the step with a line that names the identity provider step
@@ -471,7 +471,7 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     [mail settings](notifications.md#mail-settings).
   - `tenant create`, and `tenant restore` when it makes a new realm, write it in their `realm` step.
     `tenant email set` and `tenant email clear` write it right after they store the change, and
-    `Axis.Admin` `activate`, `publish` and `rollback` write it again inside their `activate` step. These
+    the `Axis.Admin` `activate` command and the publisher's `publish` and `activate` requests write it again inside their `activate` step. These
     commands read the host's settings from the `Email` settings of `Axis.Admin`, the same keys that the
     worker reads, so the operator gives both hosts the same block. The server's startup activation
     leaves the mail server as it is, because the server has no `Email` settings.

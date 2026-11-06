@@ -195,7 +195,7 @@ export interface ConsoleReleaseItem {
 /** One publish request of an application. It never holds the file snapshot, the diagnostics or the test results. */
 export interface ConsolePublishRequest {
   id: string
-  kind: 'publish' | 'rollback' | 'test'
+  kind: 'publish' | 'activate' | 'test'
   target: string
   status: 'queued' | 'running' | 'succeeded' | 'failed'
   label: string | null

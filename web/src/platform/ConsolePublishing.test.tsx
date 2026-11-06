@@ -63,13 +63,13 @@ function request(id: string, overrides: Partial<Publishing['requests'][number]> 
 const leave: Publishing = {
   active: { releaseId: 'r2', number: 2, contentHash: 'hash-r2' },
   releases: [
-    // The active release is in the history twice, after a rollback, and only the newest row is marked.
+    // The active release is in the history twice, after an activation, and only the newest row is marked.
     release('r2', 2, { actorName: 'Rita Reader', label: 'Spring', note: 'Back again' }),
     release('r1', 1, { actor: 'startup', activatedAt: '2026-10-27T10:00:00Z' }),
     release('r2', 2, { actor: 'operator', activatedAt: '2026-10-27T09:00:00Z' }),
   ],
   requests: [
-    request('q2', { kind: 'rollback', status: 'failed', label: 'Undo', requestedByName: 'Alan Author' }),
+    request('q2', { kind: 'activate', status: 'failed', label: 'Undo', requestedByName: 'Alan Author' }),
     request('q1', { requestedBy: 'u9' }),
   ],
   page: 1,
@@ -141,7 +141,7 @@ describe('ConsolePublishing', () => {
     const requests = screen.getByTestId('console-publishing-requests')
     const requestRows = within(requests).getAllByRole('row').slice(1)
     expect(requestRows).toHaveLength(2)
-    expect(within(requestRows[0]!).getByText('rollback')).toBeVisible()
+    expect(within(requestRows[0]!).getByText('activate')).toBeVisible()
     expect(within(requestRows[0]!).getByText('Failed')).toBeVisible()
     expect(within(requestRows[0]!).getByText('Undo')).toBeVisible()
     expect(within(requestRows[0]!).getByText('Alan Author')).toBeVisible()
