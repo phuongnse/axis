@@ -311,7 +311,7 @@ server against the application's policies. The detail is in [security](reference
   - The server sets security headers on every response and rate limits the routes a caller can
     repeat, see [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-  - Every route needs a signed-in user or a valid caller token unless it is listed as open (D111),
+  - Every route needs a signed-in user or a valid caller token unless it is listed as open (D137),
     see [authorization](reference/security.md#authorization).
   - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md), with
     `.github/CODEOWNERS` and a threat model (D106) among its
