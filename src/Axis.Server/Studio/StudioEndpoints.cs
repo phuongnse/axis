@@ -79,7 +79,8 @@ namespace Axis.Server.Studio;
 /// object and 503 when the write lock cannot be taken. It takes no <c>If-Match</c>.
 /// <c>POST /api/studio/apps/{application}/changes</c> applies 1 to 20 creates and patches in one call under one write
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
-/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, and the expression check is in
+/// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, the revision list, diff and undo are in
+/// <see cref="StudioRevisionEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
 /// In a cell, the create, patch, <c>changes</c>, module resource save, module resource reset and text write routes check the tenant's storage
 /// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
@@ -115,6 +116,7 @@ internal static class StudioEndpoints
         endpoints.MapPut("/api/studio/apps/{application}/texts/{key}", TextWriteAsync).WithStorageQuota();
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioAuthoringRequestEndpoints();
+        endpoints.MapStudioRevisionEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioPageMetadataEndpoints();
         endpoints.MapStudioTemplateEndpoints();

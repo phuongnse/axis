@@ -40,6 +40,7 @@ public sealed class StorageQuotaRouteTests
         "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset",
         "POST /api/studio/apps/{application}/publish",
         "POST /api/studio/apps/{application}/resources",
+        "POST /api/studio/apps/{application}/revisions/{revision}/undo",
         "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",
         "PUT /api/studio/apps/{application}/texts/{key}",
     ];

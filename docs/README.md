@@ -99,6 +99,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
+| [Revisions in the authoring API](reference/authoring-revisions.md)     | The routes that list a folder's revisions, show one and undo it                       |
 | [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form, of a module page and of a draft module form |
 | [Module resource saves](reference/module-resource-saves.md)           | The routes that save an edited module resource as a customization layer with only the difference, and reset one element of it |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |

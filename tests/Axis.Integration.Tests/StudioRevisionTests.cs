@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using LibGit2Sharp;
@@ -144,6 +145,195 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
         Assert.Equal(before, CommitShas(path));
+    }
+
+    [Fact]
+    public async Task The_list_and_the_diff_of_a_revision_match_the_writes_that_made_them()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var rule = Path.Combine(folder.Path, "rules", "finance-threshold.json");
+        var original = File.ReadAllText(rule);
+        var created = Guid.NewGuid();
+
+        using var patch = await PatchAsync(client, RuleId, Version(rule), "/expression", "20000");
+        using var create = await SendAsync(
+            client, HttpMethod.Post, $"{Url}/resources", "application/json", $$"""{"id":"{{created}}","kind":"policy","name":"Fresh"}""");
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var createdFile = (await ReadAsync(create)).GetProperty("file").GetString()!;
+
+        using var list = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions", null);
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        var items = (await ReadAsync(list)).GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(["Create policy Fresh", "Change rule FinanceThreshold", "Start of history"], items.Select(item => item.GetProperty("summary").GetString()));
+        Assert.Equal(["Author User", "Author User", "Axis"], items.Select(item => item.GetProperty("author").GetString()));
+        Assert.Equal(["author", "author", null], items.Select(item => item.GetProperty("userId").GetString()));
+        Assert.Equal(["studio", "studio", null], items.Select(item => item.GetProperty("client").GetString()));
+        Assert.All(items, item => Assert.Equal(JsonValueKind.Null, item.GetProperty("request").ValueKind));
+        Assert.All(items, item => Assert.True(item.GetProperty("time").GetDateTimeOffset() > DateTimeOffset.UtcNow.AddMinutes(-5)));
+        Assert.Equal(CommitShas(RepositoryPath(revisions.Path, folder.Path)).AsEnumerable().Reverse(), items.Select(item => item.GetProperty("id").GetString()));
+
+        using var changeDiff = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions/{items[1].GetProperty("id").GetString()}", null);
+        Assert.Equal(HttpStatusCode.OK, changeDiff.StatusCode);
+        var change = await ReadAsync(changeDiff);
+        Assert.Equal("Change rule FinanceThreshold", change.GetProperty("revision").GetProperty("summary").GetString());
+        var changed = Assert.Single(change.GetProperty("resources").EnumerateArray());
+        Assert.Equal("rules/finance-threshold.json", changed.GetProperty("file").GetString());
+        Assert.Equal("changed", changed.GetProperty("change").GetString());
+        Assert.Equal(RuleId, changed.GetProperty("id").GetString());
+        Assert.Equal("rule", changed.GetProperty("kind").GetString());
+        Assert.Equal("FinanceThreshold", changed.GetProperty("name").GetString());
+        Assert.Equal(original, changed.GetProperty("before").GetString());
+        Assert.Equal(File.ReadAllText(rule), changed.GetProperty("after").GetString());
+
+        using var createDiff = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions/{items[0].GetProperty("id").GetString()}", null);
+        var added = Assert.Single((await ReadAsync(createDiff)).GetProperty("resources").EnumerateArray());
+        Assert.Equal(createdFile, added.GetProperty("file").GetString());
+        Assert.Equal("added", added.GetProperty("change").GetString());
+        Assert.Equal(created.ToString(), added.GetProperty("id").GetString());
+        Assert.Equal("policy", added.GetProperty("kind").GetString());
+        Assert.Equal("Fresh", added.GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, added.GetProperty("before").ValueKind);
+        Assert.Equal(File.ReadAllText(Path.Combine(folder.Path, createdFile)), added.GetProperty("after").GetString());
+    }
+
+    [Fact]
+    public async Task Undoing_the_last_revision_puts_the_files_back_and_adds_an_undo_revision()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var rule = Path.Combine(folder.Path, "rules", "finance-threshold.json");
+        var original = File.ReadAllBytes(rule);
+        using var patch = await PatchAsync(client, RuleId, Version(rule), "/expression", "20000");
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        Assert.NotEqual(original, File.ReadAllBytes(rule));
+        var path = RepositoryPath(revisions.Path, folder.Path);
+        var patched = CommitShas(path)[^1];
+
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{patched}/undo", null);
+
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        var answer = await ReadAsync(undo);
+        Assert.Equal(original, File.ReadAllBytes(rule));
+        using var repository = new Repository(path);
+        var commits = Commits(repository);
+        Assert.Equal(["Start of history", "Change rule FinanceThreshold", "Undo Change rule FinanceThreshold"], commits.Select(commit => commit.MessageShort));
+        Assert.Equal(commits[^1].Sha, answer.GetProperty("id").GetString());
+        Assert.Equal(JsonValueKind.Array, answer.GetProperty("diagnostics").ValueKind);
+        Assert.Contains("\nAxis-User-Id: author\nAxis-Client: studio\n", commits[^1].Message, StringComparison.Ordinal);
+        Assert.Equal(commits[0].Tree.Sha, commits[^1].Tree.Sha);
+    }
+
+    [Fact]
+    public async Task Undoing_a_created_resource_removes_its_file()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        using var create = await SendAsync(
+            client, HttpMethod.Post, $"{Url}/resources", "application/json", $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"Fresh"}""");
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var file = Path.Combine(folder.Path, (await ReadAsync(create)).GetProperty("file").GetString()!);
+        Assert.True(File.Exists(file));
+
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{CommitShas(RepositoryPath(revisions.Path, folder.Path))[^1]}/undo", null);
+
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        Assert.False(File.Exists(file));
+    }
+
+    [Fact]
+    public async Task An_undo_is_refused_with_the_later_revisions_when_one_of_them_changed_the_same_file()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var rule = Path.Combine(folder.Path, "rules", "finance-threshold.json");
+        using var first = await PatchAsync(client, RuleId, Version(rule), "/expression", "20000");
+        using var second = await PatchAsync(client, RuleId, Version(rule), "/expression", "30000");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var path = RepositoryPath(revisions.Path, folder.Path);
+        var shas = CommitShas(path);
+        var files = File.ReadAllBytes(rule);
+
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{shas[1]}/undo", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, undo.StatusCode);
+        var problem = await ReadAsync(undo);
+        Assert.Equal("A later revision changed the same files. Undo it first.", problem.GetProperty("title").GetString());
+        Assert.Equal([shas[2]], problem.GetProperty("revisions").EnumerateArray().Select(item => item.GetProperty("id").GetString()));
+        Assert.Equal(files, File.ReadAllBytes(rule));
+        Assert.Equal(shas, CommitShas(path));
+    }
+
+    [Fact]
+    public async Task The_start_of_history_cannot_be_undone_and_an_unknown_revision_is_not_found()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+        var rule = Path.Combine(folder.Path, "rules", "finance-threshold.json");
+        using var empty = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions", null);
+        Assert.Equal(HttpStatusCode.OK, empty.StatusCode);
+        Assert.Empty((await ReadAsync(empty)).GetProperty("items").EnumerateArray());
+        using var noHistory = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{new string('a', 40)}/undo", null);
+        Assert.Equal(HttpStatusCode.NotFound, noHistory.StatusCode);
+        using var patch = await PatchAsync(client, RuleId, Version(rule), "/expression", "20000");
+        Assert.Equal(HttpStatusCode.OK, patch.StatusCode);
+        var path = RepositoryPath(revisions.Path, folder.Path);
+        var shas = CommitShas(path);
+
+        using var start = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{shas[0]}/undo", null);
+        using var unknown = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{new string('a', 40)}/undo", null);
+        using var malformed = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions/main", null);
+        using var unknownDiff = await SendAsync(client, HttpMethod.Get, $"{Url}/revisions/{new string('a', 40)}", null);
+
+        Assert.Equal(HttpStatusCode.Conflict, start.StatusCode);
+        Assert.Equal("The start of history cannot be undone.", (await ReadAsync(start)).GetProperty("title").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, malformed.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownDiff.StatusCode);
+        Assert.Equal(shas, CommitShas(path));
+    }
+
+    [Fact]
+    public async Task A_person_without_the_author_role_gets_403_on_the_list_the_diff_and_the_undo_and_no_revision_is_added()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var saved = await PatchAsync(author, RuleId, Version(folder.Path, "rules/finance-threshold.json"), "/expression", "20000");
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+        var path = RepositoryPath(revisions.Path, folder.Path);
+        var before = CommitShas(path);
+        var bytes = File.ReadAllBytes(Path.Combine(folder.Path, "rules", "finance-threshold.json"));
+
+        using var list = await SendAsync(requester, HttpMethod.Get, $"{Url}/revisions", null);
+        using var diff = await SendAsync(requester, HttpMethod.Get, $"{Url}/revisions/{before[^1]}", null);
+        using var undo = await SendAsync(requester, HttpMethod.Post, $"{Url}/revisions/{before[^1]}/undo", null);
+
+        Assert.Equal(HttpStatusCode.Forbidden, list.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, diff.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, undo.StatusCode);
+        Assert.Equal(before, CommitShas(path));
+        Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(folder.Path, "rules", "finance-threshold.json")));
+    }
+
+    private static async Task<JsonElement> ReadAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return document.RootElement.Clone();
     }
 
     private static string RepositoryPath(string revisions, string folder) =>

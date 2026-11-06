@@ -51,6 +51,17 @@ internal enum StudioWriteRefusal
     Unavailable,
     LocalesChanged,
     TextsNotObject,
+    Blocked,
+}
+
+/// <summary>
+/// What an undo did: the id of the revision it recorded, null when git failed to record it, or the reason it was refused.
+/// <c>Blockers</c> are the later revisions that changed the same files, set with <see cref="StudioWriteRefusal.Blocked"/>.
+/// <c>IsStart</c> is set with <see cref="StudioWriteRefusal.Blocked"/> when the revision is the start of history.
+/// </summary>
+internal sealed record StudioUndoOutcome(StudioWriteRefusal? Refusal, IReadOnlyList<StudioRevision> Blockers, bool IsStart, string? Id)
+{
+    public static StudioUndoOutcome Refused(StudioWriteRefusal refusal) => new(refusal, [], false, null);
 }
 
 /// <summary>What a text write did: each text resource's new version, or the reason it was refused.</summary>
@@ -349,6 +360,60 @@ internal static class StudioWrites
         File.Delete(target);
         revisions?.Record($"Delete {current.Kind} {current.Name ?? current.File}");
         return new StudioWriteOutcome(null, null);
+    }
+
+    /// <summary>
+    /// Undoes revision <paramref name="id"/> by putting back the files it changed and recording the revision
+    /// "Undo &lt;summary&gt;". It refuses as <see cref="StudioWriteRefusal.Blocked"/> and writes nothing when a later
+    /// revision changed any of the same files, or when the revision is the start of history.
+    /// </summary>
+    public static async Task<StudioUndoOutcome> UndoAsync(
+        IStudioWriteLock writeLock, StudioRevisions revisions, string folder, string id, CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioUndoOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+        revisions.RecordOutside();
+
+        if (revisions.Revert(id) is not { } revert)
+        {
+            return StudioUndoOutcome.Refused(StudioWriteRefusal.NotFound);
+        }
+
+        if (revert.IsStart || revert.Blockers.Count > 0)
+        {
+            return new StudioUndoOutcome(StudioWriteRefusal.Blocked, revert.Blockers, revert.IsStart, null);
+        }
+
+        var targets = new List<(string Target, byte[]? Bytes)>();
+        foreach (var (file, bytes) in revert.Files)
+        {
+            if (Target(folder, file) is not { } target)
+            {
+                return StudioUndoOutcome.Refused(StudioWriteRefusal.UnsafePath);
+            }
+
+            targets.Add((target, bytes));
+        }
+
+        foreach (var (target, bytes) in targets)
+        {
+            if (bytes is null)
+            {
+                File.Delete(target);
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            await ReplaceAsync(target, bytes, cancellationToken);
+        }
+
+        revisions.Record($"Undo {revert.Summary}");
+        var tip = revisions.List() is [{ } latest, ..] ? latest.Id : null;
+        return new StudioUndoOutcome(null, [], false, tip != revert.Tip ? tip : null);
     }
 
     /// <summary>
