@@ -54,8 +54,9 @@ because its change needs those paths:
    `node scripts/check-docs.mjs`.
 3. Commit, push, and open a pull request that closes the issue, with the
    plan's points for the owner in their own short section.
-4. When its CI fails, fix and push. When CI and every check are green, hand it
-   to the owner for the admin-bypass merge.
+4. Comment `/nexkit review` on it after each push. When CI, `nexkit/checks`
+   or `nexkit/review` fails, fix, push and comment again. When all are green,
+   hand it to the owner to merge.
 
 ## Issues the driver opens
 
@@ -65,21 +66,7 @@ opens, as
 says. Autopilot takes them all the same.
 
 1. For one CI failure, open one issue.
-2. For Dependabot alerts, run `node scripts/dependabot-issues.mjs`, as
-   [D107](../../../docs/decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md)
-   and [dependency updates](../../../docs/development.md#dependency-updates)
-   say. It prints a JSON list of issues, one for each high or critical alert
-   that no open issue names, and opens nothing. For each printed issue:
-   - keep the printed labels that `gh label list` shows, and add every other
-     label whose description fits, as
-     [delivery](../../../docs/delivery.md#the-life-of-an-issue) says;
-   - write the body to a temporary file and run `gh issue create --title ...
-     --label ... --body-file ...` with no `--milestone`.
-
-   The issue names the advisory id, so the next run prints nothing for it.
-   When the script fails, open no issue in that run and
-   [hand it to the owner](#hand-to-the-owner).
-3. For links of open issues that point nowhere, run
+2. For links of open issues that point nowhere, run
    `node scripts/check-issue-links.mjs` on `main`. For each link it prints, find
    where the file or heading went (`git log --follow`, the decisions index for
    a superseded decision) and edit the issue to link the new place, with
@@ -94,9 +81,7 @@ skill lists, only for:
   with no basis in the plan, the issue or `docs/`;
 - a NexKit pull request that NexKit did not merge because its issue was
   closed (`merge_issue_closed`), for the owner to merge or close;
-- a hand-made pull request that is ready for the admin-bypass merge;
-- `scripts/dependabot-issues.mjs` failing, for example with no access to the
-  Dependabot alerts, because alerts then go unhandled.
+- a hand-made pull request that is ready for the owner's merge.
 
 ## Timing
 

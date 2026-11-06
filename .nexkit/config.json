@@ -293,7 +293,8 @@
     "trusted_workflows": [
       "docs-audit.yml"
     ],
-    "last_in_milestone_label": "last-in-milestone"
+    "last_in_milestone_label": "last-in-milestone",
+    "dependabot": "high"
   },
   "evidence": {
     "artifacts": [

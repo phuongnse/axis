@@ -1,5 +1,6 @@
-# Installed by `nexkit init`. Commands: /nexkit plan, /nexkit go (issues);
-# /nexkit fix, /nexkit review (NexKit pull requests). Settings: .nexkit/config.json
+# Installed by `nexkit init`. Commands: /nexkit plan, /nexkit go, /nexkit trust (issues);
+# /nexkit fix (NexKit pull requests); /nexkit review (any pull request of this repository's
+# branches). Settings: .nexkit/config.json
 name: NexKit
 
 on:
@@ -60,10 +61,10 @@ jobs:
     # events and sweeps share one group, so they never replace a command that waits.
     concurrency:
       group: nexkit-${{ (github.event_name == 'milestone' || (github.event_name == 'issues' && github.event.action != 'closed')) && 'autopilot' || github.event.issue.number || github.event.pull_request.number || inputs.number || github.event_name }}
-    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v6.0.0
+    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v6.1.0
     with:
       nexkit_repository: phuongnse/nexkit
-      nexkit_ref: v6.0.0
+      nexkit_ref: v6.1.0
     # The pipeline passes each job only the secrets .nexkit/config.json names for it (its
     # stages' agents, or the App's), so it can read them by those names.
     secrets: inherit
