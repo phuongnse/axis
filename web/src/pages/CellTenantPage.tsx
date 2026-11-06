@@ -23,6 +23,8 @@ import { useText } from '../platform/texts'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
+import { CellTenantHostDialog } from './CellTenantHostDialog'
+import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
 import { NotFoundPage } from './NotFoundPage'
 
 interface QuotaRow extends CellQuota {
@@ -69,10 +71,12 @@ const actionTexts = {
  * table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. Any tenant but a `provisioning` one offers Export. An `active`,
  * `readOnly` or `suspended` tenant offers Delete, which stays off until the operator types the tenant id exactly, and a
- * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An action queues a job with an
- * `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
- * follows the job every 2 seconds until it ends and reloads the tenant and its jobs. With a succeeded `export` job among
- * the jobs, Download opens a warning that the ZIP is restricted data, and only accepting it fetches the ZIP.
+ * `deleting` one offers Cancel deletion in place of Suspend, Resume and Delete. Each action is behind a confirmation. An
+ * action queues a job with an `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a
+ * final answer. The page then follows the job every 2 seconds until it ends and reloads the tenant and its jobs. With a
+ * succeeded `export` job among the jobs, Download opens a warning that the ZIP is restricted data, and only accepting it
+ * fetches the ZIP. Set quotas and Add a host open their own dialogs, show for every status and queue no job: the quota
+ * table shows the quotas that the cell answered.
  */
 export function CellTenantPage() {
   const t = useText()
@@ -83,6 +87,7 @@ export function CellTenantPage() {
   const [tenantFailed, setTenantFailed] = useState(false)
   const [jobs, setJobs] = useState<CellJob[]>()
   const [jobsFailed, setJobsFailed] = useState(false)
+  const [openDialog, setOpenDialog] = useState<'quotas' | 'host' | null>(null)
   const [confirming, setConfirming] = useState<CellTenantAction | null>(null)
   // The text typed to confirm a deletion. It starts empty whenever a confirmation opens.
   const [typed, setTyped] = useState('')
@@ -268,73 +273,77 @@ export function CellTenantPage() {
                 },
               ]}
             />
-            {(canSuspend || canResume || canExport || canDelete || canCancelDeletion) && (
-              <Flex gap="small">
-                {canSuspend && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-suspend"
-                    disabled={following !== null}
-                    onClick={() => openConfirmation('suspend')}
-                  >
-                    {t(actionTexts.suspend.button)}
-                  </AxisButton>
-                )}
-                {canResume && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-resume"
-                    disabled={following !== null}
-                    onClick={() => openConfirmation('resume')}
-                  >
-                    {t(actionTexts.resume.button)}
-                  </AxisButton>
-                )}
-                {canExport && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-export"
-                    disabled={following !== null}
-                    onClick={() => openConfirmation('export')}
-                  >
-                    {t(actionTexts.export.button)}
-                  </AxisButton>
-                )}
-                {canDelete && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-delete"
-                    disabled={following !== null}
-                    onClick={() => openConfirmation('delete')}
-                  >
-                    {t(actionTexts.delete.button)}
-                  </AxisButton>
-                )}
-                {canCancelDeletion && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-cancel-deletion"
-                    disabled={following !== null}
-                    onClick={() => openConfirmation('cancel-deletion')}
-                  >
-                    {t(actionTexts['cancel-deletion'].button)}
-                  </AxisButton>
-                )}
-                {ready && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-download"
-                    disabled={following !== null}
-                    onClick={() => {
-                      setDownloadError(null)
-                      setDownloading(true)
-                    }}
-                  >
-                    {t('shell.cell.tenant.download')}
-                  </AxisButton>
-                )}
-              </Flex>
-            )}
+            <Flex gap="small">
+              {canSuspend && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-suspend"
+                  disabled={following !== null}
+                  onClick={() => openConfirmation('suspend')}
+                >
+                  {t(actionTexts.suspend.button)}
+                </AxisButton>
+              )}
+              {canResume && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-resume"
+                  disabled={following !== null}
+                  onClick={() => openConfirmation('resume')}
+                >
+                  {t(actionTexts.resume.button)}
+                </AxisButton>
+              )}
+              {canExport && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-export"
+                  disabled={following !== null}
+                  onClick={() => openConfirmation('export')}
+                >
+                  {t(actionTexts.export.button)}
+                </AxisButton>
+              )}
+              {canDelete && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-delete"
+                  disabled={following !== null}
+                  onClick={() => openConfirmation('delete')}
+                >
+                  {t(actionTexts.delete.button)}
+                </AxisButton>
+              )}
+              {canCancelDeletion && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-cancel-deletion"
+                  disabled={following !== null}
+                  onClick={() => openConfirmation('cancel-deletion')}
+                >
+                  {t(actionTexts['cancel-deletion'].button)}
+                </AxisButton>
+              )}
+              {ready && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-download"
+                  disabled={following !== null}
+                  onClick={() => {
+                    setDownloadError(null)
+                    setDownloading(true)
+                  }}
+                >
+                  {t('shell.cell.tenant.download')}
+                </AxisButton>
+              )}
+              <AxisButton role="secondary" data-testid="cell-tenant-set-quotas" onClick={() => setOpenDialog('quotas')}>
+                {t('shell.cell.tenant.setQuotas')}
+              </AxisButton>
+              <AxisButton role="secondary" data-testid="cell-tenant-add-host" onClick={() => setOpenDialog('host')}>
+                {t('shell.cell.tenant.addHost')}
+              </AxisButton>
+            </Flex>
           </Card>
           <Card title={t('shell.cell.tenant.quotas')}>
             <AxisTable<QuotaRow>
@@ -349,6 +358,18 @@ export function CellTenantPage() {
             <TenantUsageDayTable days={tenant.days} locale={locale} testId="cell-tenant-usage" />
           </Card>
         </>
+      )}
+      {tenant && openDialog === 'quotas' && (
+        <CellTenantQuotasDialog
+          tenant={id}
+          quotas={tenant.quotas}
+          onSaved={(quotas) => setTenant((current) => current && { ...current, quotas })}
+          onRefused={onRefused}
+          onClose={() => setOpenDialog(null)}
+        />
+      )}
+      {openDialog === 'host' && (
+        <CellTenantHostDialog tenant={id} onRefused={onRefused} onClose={() => setOpenDialog(null)} />
       )}
       {confirming && (
         <Modal

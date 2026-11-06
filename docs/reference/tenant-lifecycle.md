@@ -168,8 +168,8 @@ served before it is verified are in [hosts and certificates](cells.md#hosts-and-
   trailing dot, and no IP address. A blank or malformed host answers `400`. An unknown tenant or a
   preview tenant answers `404`.
 - **The answer.** `201` with `{ host, token, state, expiresAt, txt, cname }`. The `token` is 32
-  random bytes as base64url, `txt` is the record `_axis-verify.<host>` that holds the token, `cname`
-  points the host to `<id>.<Cell:TenantDomain>`, and `expiresAt` is 7 days after the request.
+  random bytes as base64url, `txt` is the record `{ name, value }` with the name `_axis-verify.<host>` and the token as its value, `cname`
+  is the record `{ name, target }` that points the host to `<id>.<Cell:TenantDomain>`, and `expiresAt` is 7 days after the request.
 - **A repeat.** The same tenant asking again for the same pending host answers `200` with the same
   token, so a retry does not invalidate DNS records the customer already added. Once `expiresAt` has
   passed the request is not pending any more, and a new request stores a new row with a new token. A
