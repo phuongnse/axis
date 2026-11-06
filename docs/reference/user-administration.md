@@ -58,8 +58,8 @@ In a tenant of a cell, the users page also shows two sections, see
 
 ### Read routes
 
-Three routes read users and their roles. When the identity provider fails, each answers `502` with a fixed title, and
-the server's log names the step and the status code, never a body or a secret.
+Four routes read users, their roles and the tenant's usage. When the identity provider fails, each users route answers
+`502` with a fixed title, and the server's log names the step and the status code, never a body or a secret.
 
 - **The list route.** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm
   to an administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50, and a value
@@ -96,6 +96,11 @@ the server's log names the step and the status code, never a body or a secret.
     account, a preview tenant and a tenant without a users client.
   - The route takes a session only, so a signed-out caller and a service account's bearer token get `401`. It needs no
     administrator role and no recent login at the identity provider, because it only reads.
+- **The usage route.** `GET /api/tenant/usage` answers the tenant's quotas with their use and its usage of the last 30
+  days to an administrator, see [usage](tenant-quotas.md#usage). The route checks in the order of the list route (`401`,
+  `403`, `404`), and also answers `404` on a host outside a cell. It only reads, so it accepts any signed-in caller who
+  holds `Users:AdministratorRole`, not only a browser session. It answers `503`, not `502`, when the platform database
+  cannot be read.
 
 ### Command routes
 

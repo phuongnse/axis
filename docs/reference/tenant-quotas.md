@@ -214,7 +214,19 @@ sizes only, never a record value, a file name or a user name.
   nowhere in this worker.
 - **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
   rows of both usage tables, see [storage](storage.md#database-roles).
-- **Readers.** The [cell console](cell-console.md#views) shows the usage.
+- **Readers.** The [cell console](cell-console.md#views) shows the usage, and a tenant's administrator reads
+  it through [the usage route](#usage).
+- **The usage route.** `GET /api/tenant/usage` on a tenant's own host answers
+  `{ quotas, days }` to an administrator. `quotas` holds every quota by its key as `{ limit, used }`,
+  with a `null` limit for no limit. `used` is the latest storage sample, the realm's enabled users,
+  Studio's application count and the emails sent today. `storage.used` is `null` until the worker has
+  taken the tenant's first sample, and `emailsPerDay.used` is 0 when no email was sent today. A
+  concurrency quota, `workerWeight` and `authoringRequests` answer `used: null`, and so does `users`
+  when the identity provider cannot count the users, with a warning in the server's log. `days` holds
+  the tenant's own rows of today and the 29 days before it, newest first, with the columns of
+  `platform.tenant_usage` and nothing else. The route checks in the order of the
+  [read routes](user-administration.md#read-routes) and answers `503` when the platform database
+  cannot be read.
 - **Plans** _(planned for M34)_. The [plans](plans.md) and their prices read the usage.
 - **The tenant's own usage** _(planned for M33)_. A tenant administrator sees the tenant's own quotas
   and its usage of the last 30 days in the users page's "Usage" section, and the
