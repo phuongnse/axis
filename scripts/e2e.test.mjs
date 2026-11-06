@@ -210,6 +210,21 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(run.calls.includes(`docker network rm ${network}`), run.calls.join('\n'))
   })
 
+  test('MinIO starts with a default bucket and a KMS key before the build and Playwright, and is removed at the end', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const minio = run.calls.findIndex((call) => call.startsWith('docker run ') && call.includes('bitnamilegacy/minio'))
+    const playwright = run.calls.findIndex((call) => call.startsWith('npm test '))
+    assert.ok(minio >= 0, run.calls.join('\n'))
+    assert.match(run.calls[minio], /MINIO_DEFAULT_BUCKETS=\S+/)
+    assert.match(run.calls[minio], /MINIO_KMS_SECRET_KEY=\S+:\S+/)
+    assert.ok(playwright > minio, run.calls.join('\n'))
+    const name = /--name (\S+)/.exec(run.calls[minio])?.[1]
+    assert.ok(name, run.calls[minio])
+    assert.ok(run.calls.includes(`docker rm -f ${name}`), run.calls.join('\n'))
+  })
+
   test('the axis first login flow is added through the Keycloak address before Playwright starts', () => {
     const run = runE2e()
 

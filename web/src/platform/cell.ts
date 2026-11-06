@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { fileNameOf } from './exports'
 import type { TenantQuotaUse } from './tenantUsage'
 
 /** The signed-in platform operator, as served by `GET /api/cell/session`. */
@@ -149,7 +150,7 @@ export function fetchCellJob(id: string, signal?: AbortSignal): Promise<CellResu
 }
 
 /** The actions of the Tenant view that queue a job, named by the kind of the job. */
-export type CellTenantAction = 'suspend' | 'resume' | 'delete' | 'cancel-deletion'
+export type CellTenantAction = 'suspend' | 'resume' | 'export' | 'delete' | 'cancel-deletion'
 
 /**
  * The answer of {@link queueCellTenantJob} and {@link createCellTenant}: the queued job, the refusal that the console shows, or the problem that the
@@ -205,6 +206,7 @@ export function queueCellTenantJob(
   const requests: Record<CellTenantAction, { method: 'POST' | 'DELETE'; url: string }> = {
     suspend: { method: 'POST', url: `${tenantUrl}/suspend` },
     resume: { method: 'POST', url: `${tenantUrl}/resume` },
+    export: { method: 'POST', url: `${tenantUrl}/exports` },
     delete: { method: 'DELETE', url: tenantUrl },
     'cancel-deletion': { method: 'POST', url: `${tenantUrl}/deletion/cancel` },
   }
@@ -224,4 +226,40 @@ export interface CellTenantRequest {
  */
 export function createCellTenant(body: string, idempotencyKey: string): Promise<CellActionResult> {
   return sendCellJob('POST', '/api/cell/tenants', idempotencyKey, body)
+}
+
+/**
+ * Downloads the ZIP of the export `exportId` of the tenant `tenantId`, with `Accept: application/zip`. A 200 answers the
+ * file with the name the server gave it. A 401 or 403 is a refusal. Any other 4xx, such as a 410 for an export past its
+ * retention, comes back as the problem with the server's title. A 5xx and a network error throw.
+ */
+export async function downloadCellTenantExport(
+  tenantId: string,
+  exportId: string,
+): Promise<CellResult<{ blob: Blob; fileName: string }> | { kind: 'problem'; status: number; title: string }> {
+  const response = await apiFetch(
+    `/api/cell/tenants/${encodeURIComponent(tenantId)}/exports/${encodeURIComponent(exportId)}`,
+    { headers: { Accept: 'application/zip' } },
+    { promptSignInOnUnauthorized: false },
+  )
+  if (response.status === 401) {
+    return { kind: 'unauthorized' }
+  }
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (response.status >= 400 && response.status < 500) {
+    const problem = (await response.json().catch(() => ({}))) as { title?: string }
+    return { kind: 'problem', status: response.status, title: problem.title ?? '' }
+  }
+  if (!response.ok) {
+    throw new Error(`Downloading the cell tenant export failed with status ${response.status}.`)
+  }
+  return {
+    kind: 'ok',
+    value: {
+      blob: await response.blob(),
+      fileName: fileNameOf(response.headers.get('Content-Disposition')) ?? `${tenantId}.zip`,
+    },
+  }
 }
