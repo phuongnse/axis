@@ -35,12 +35,12 @@ Each common job has one shared widget or helper:
 ## What the build checks
 
 `scripts/check-shared-widgets.mjs`, tested by `scripts/check-shared-widgets.test.mjs`, fails
-`scripts/lint.sh` when a file under `web/src` uses Ant Design's `Button` or `Table`, or a preset tag
-colour, more often than `scripts/shared-widgets-baseline.json` allows. A test file and the shared
-widget itself are not checked.
+`scripts/lint.sh` when a file under `web/src` imports Ant Design's `Table`, or uses its `Button` or a
+preset tag colour more often than `scripts/shared-widgets-baseline.json` allows. A test file and the
+shared widget itself are not checked.
 
-- **The baseline only goes down.** It counts, by file and rule, the code that broke a rule before the
-  check existed. A file that uses a rule less than its baseline must lower it. A change that moves a
+- **The baseline only goes down.** It counts, by file and rule, the `button` and `tag` code that broke
+  a rule before the check existed. A file that uses a rule less than its baseline must lower it. A change that moves a
   file off the baseline writes the new one with
   `node scripts/check-shared-widgets.mjs --write-baseline`.
 - **The `tag` rule** refuses a `Tag` whose `color` is an Ant Design colour name, with or without
@@ -48,5 +48,7 @@ widget itself are not checked.
   `processing` or `default`). It counts a preset written as a string or inside a `color={…}`
   expression, even when Prettier wrapped the props onto later lines. It cannot see a colour picked from
   a lookup table.
-- **The `button` and `table` rules** match within one line, so they miss a tag whose name ends its
-  line.
+- **The `table` rule** refuses a named `Table` import from `antd`, also when the import spans lines.
+  It has no baseline, so no file may import `Table`. It does not see an import from a deep path such
+  as `antd/es/table`.
+- **The `button` rule** matches within one line, so it misses a tag whose name ends its line.

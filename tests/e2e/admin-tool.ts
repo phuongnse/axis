@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { platformSecretKey, required } from './server-settings'
+import { extensionsPath, modulesPath, platformSecretKey, required, templatesPath } from './server-settings'
 
 /** The built admin tool. scripts/build.sh builds it in Release. */
 const adminDll = path.resolve(import.meta.dirname, '..', '..', 'src', 'Axis.Admin', 'bin', 'Release', 'net10.0', 'Axis.Admin.dll')
@@ -58,4 +58,50 @@ export function runAdmin(args: string[], timeoutMs = 120_000): Promise<AdminResu
       resolve({ status, stdout, stderr })
     })
   })
+}
+
+/**
+ * Starts `Axis.Admin publisher` against the tenant directory, with `env` as the settings of a cell, and returns once it
+ * has run for a moment. The run's shared publisher reads the `Tenants` section, so it runs no provisioning jobs. This one
+ * reads the tenant directory, so it runs the jobs of `platform.jobs` that a spec queues, such as the console's suspend and
+ * resume. It also claims the publish and host-check work of every tenant in the directory, so a spec stops it when it
+ * is done. It prints no ready line, so a start that exits within 2 seconds throws with its output. `stop` ends it with
+ * SIGTERM, and with SIGKILL after 15 seconds.
+ */
+export async function startPublisher(env: Record<string, string> = {}): Promise<{ stop(): Promise<void> }> {
+  const child = spawn('dotnet', [adminDll, 'publisher'], {
+    env: {
+      ...process.env,
+      ...adminEnv(),
+      Extensions__Path: extensionsPath,
+      Modules__Path: modulesPath,
+      Templates__Path: templatesPath,
+      ...env,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let output = ''
+  child.stdout.setEncoding('utf8').on('data', (chunk: string) => (output += chunk))
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => (output += chunk))
+  let exitCode: number | null | undefined
+  const exited = new Promise<void>((resolve) =>
+    child.once('close', (code) => {
+      exitCode = code ?? -1
+      resolve()
+    }),
+  )
+  const stop = async () => {
+    if (exitCode === undefined) {
+      child.kill('SIGTERM')
+      // A publisher that ignores SIGTERM must not hang the spec.
+      const killer = setTimeout(() => child.kill('SIGKILL'), 15_000)
+      await exited
+      clearTimeout(killer)
+    }
+  }
+  await new Promise((resolve) => setTimeout(resolve, 2_000))
+  if (exitCode !== undefined) {
+    throw new Error(`The publisher exited with code ${exitCode} at its start. Publisher output:\n${output}`)
+  }
+  return { stop }
 }

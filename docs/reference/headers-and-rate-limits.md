@@ -64,7 +64,7 @@ cannot use up a replica.
 | ---------- | ---------------------------------------------------------------------- | -------------------- | ----------------------- |
 | Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`                   | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                                 | Tenant and user      | `RateLimits:Session`    |
-| Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
+| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and `/mcp` | Tenant and caller id | `RateLimits:Bearer`     |
 | Publishing | Studio validate, publish, preview, activate and test requests          | Tenant and user      | `RateLimits:Publishing` |
 | MCP        | `/mcp`, the [MCP server](mcp-server.md) _(planned for M35)_            | Tenant and client    | `RateLimits:Mcp`        |
 
@@ -97,8 +97,8 @@ cannot use up a replica.
   anonymous `401` into a `429`.
 - **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the limiter counts the
   callback just before authentication. It shares the sign-in count of its client address.
-- **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `/health` and the SPA's static files and pages have no
-  limit.
+- **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `GET /.well-known/oauth-protected-resource/mcp`, `/health` and
+  the SPA's static files and pages have no limit.
 - **The control plane** _(planned for M33)_. The [control plane](control-plane.md) is another service with limits of
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
   [billing portal](billing-portal.md#rules)'s.

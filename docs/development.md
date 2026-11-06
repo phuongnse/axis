@@ -93,8 +93,9 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
   text exactly, see [Testing](architecture.md#testing);
 - that no file under `web/` writes raw HTML, and that the SPA has no code that a key such as
   `__proto__` can turn into prototype pollution;
-- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own,
-  within the baseline in `scripts/shared-widgets-baseline.json`, which only goes down, see
+- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own, with
+  no `Table` import from `antd` and the other uses within the baseline in
+  `scripts/shared-widgets-baseline.json`, which only goes down, see
   [shared widgets](reference/shared-widgets.md);
 - that no test outside a `*PerformanceTests` class measures elapsed time;
 - the Markdown link and anchor check and the docs structure check, see
@@ -561,6 +562,7 @@ The realm's clients:
 | `axis`           | `axis-development-secret`            | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                 |
 | `axis-activation` | `axis-activation-development-secret` | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
 | `axis-users`     | `axis-users-development-secret`      | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them |
+| `axis-mcp-test`  | `axis-mcp-test-development-secret`   | An integration test host only, for the [MCP server](reference/mcp-server.md). Its password grant gives the realm's users tokens with the audience `https://localhost/mcp`, so `McpServerTests` signs in as `author` and `requester` through it |
 | `axis-fapi`      | Development keys in `samples/keycloak` | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                |
 
 The confidential clients `purchasing-system`, a [machine caller](reference/security.md#machine-callers),
@@ -656,6 +658,10 @@ settings, so the server and the worker never inherit them. The tool's realm emai
 administrator's invitation, go to the run's Mailpit. `tests/e2e/tenant-realm.ts` lists a realm's
 clients and adds an account with a password and an authenticator to a tenant's realm, through the
 `axis-admin` client.
+
+The run's shared publisher reads the `Tenants` section, so it runs no provisioning jobs. A spec that queues
+jobs, such as the cell console spec, starts its own publisher with `startPublisher` of the same file, which
+reads the tenant directory with a cell's settings and runs the jobs.
 
 ## Hot reload with `scripts/dev.sh`
 

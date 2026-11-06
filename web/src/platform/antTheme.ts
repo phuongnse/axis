@@ -113,7 +113,16 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         colorError: colour.dangerText,
         colorInfo: colour.infoText,
       },
-      Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
+      // A default button hovered or pressed draws its text in the text colour that passes contrast, not in a shade of the seed.
+      Button: {
+        defaultShadow: 'none',
+        primaryShadow: 'none',
+        dangerShadow: 'none',
+        defaultHoverColor: colour.primaryText,
+        defaultHoverBorderColor: colour.primaryText,
+        defaultActiveColor: colour.primaryText,
+        defaultActiveBorderColor: colour.primaryText,
+      },
     },
   }
 }
@@ -163,8 +172,8 @@ export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginB
 
 /**
  * The cell padding of a table (D129). A row is `spacing-xs` above and below a line of the `smallControl` size, which a
- * line of text and a small icon button both fill, and `spacing-lg` on each side keeps columns apart. A table applies it
- * through a nested ConfigProvider, so tables that are not yet on `AxisTable` keep their look.
+ * line of text and a small icon button both fill, and `spacing-lg` on each side keeps columns apart. `AxisTable` applies it
+ * through a nested ConfigProvider.
  */
 export function tableTheme(tokens: DesignTokens): ThemeConfig {
   return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }

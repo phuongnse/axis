@@ -4,7 +4,8 @@ The docs say what Axis is, why it is built the way it is, and exactly how it beh
 written for people: the owner, a contributor who joins later, an operator who installs Axis. Agents
 read the same docs, and a page that a person reads easily is also the best input for an agent. This
 page says what goes where, how to write it, and how the docs stay correct while Axis grows. The
-reasons are in [D133](decisions/d133-docs-state-each-current-rule-once.md).
+reasons are in [D133](decisions/d133-docs-state-each-current-rule-once.md) and
+[D138](decisions/d138-the-docs-follow-arc42-c4-diagrams-in-mermaid-and-four-kinds-of-page.md).
 
 ## What goes where
 
@@ -19,6 +20,7 @@ Each kind of content has one home. Write a fact in its home and link to it from 
 | How Axis behaves: configuration, APIs, screens, commands       | A [reference page](#reference-pages)                                                                                  |
 | How the work is done                                           | [Delivery](delivery.md), [Development](development.md) and this page                                                  |
 | How an agent applies a rule, step by step                      | A skill under `.claude/skills/`, which links the rule and does not restate it                                         |
+| A picture of how parts fit or how a flow runs | A Mermaid diagram in the page that owns the topic, see [diagrams](#diagrams) |
 | Milestone status                                               | The [roadmap](roadmap.md)                                                                                             |
 | Who builds what, and its progress                              | GitHub issues and pull requests                                                                                       |
 | What changed, when and at whose request                        | Git and GitHub                                                                                                        |
@@ -129,8 +131,13 @@ while the page scrolls. Only the sidebar's entries scroll, under the row."
 The docs are split so that a reader, or an agent, reads only what a change needs, and so that two
 pull requests rarely edit the same lines.
 
-- **One file for each topic.** [docs/README.md](README.md) lists every file with what it holds, and a
-  new file gets its row in the same change. A new topic that needs more than a few sections starts in
+- **One kind of page.** A page is a reference page, which says how Axis behaves; an explanation,
+  which says why and how the parts fit, such as the architecture, the knowledge and the decisions; a
+  how-to guide, the steps of one task for one reader; or a tutorial, a guided first project. These
+  are the kinds of Diátaxis, and a page does not mix them.
+- **One file for each topic.** [docs/README.md](README.md) lists every file with what it holds and
+  when to read it, grouped by the area that a reader works in, and a new file gets its row in the
+  same change. The grouping is in the map: files do not move into folders by area. A new topic that needs more than a few sections starts in
   a file of its own, and a table that many changes add rows to lives in a file of its own.
 - **Small files.** A doc under `docs/` stays at or under 1,000 lines, and a change that grows a doc
   past 900 lines splits it, so that two changes that each add a few lines both still pass. The split
@@ -143,6 +150,38 @@ pull requests rarely edit the same lines.
   docs cover at the version the repository pins.
 - **Stable links.** Link to a file, or to a heading in it, never to text that changes with status.
   Renaming or moving a heading changes its anchor, so the same change fixes every link to it.
+- **The architecture page follows arc42.** [Architecture](architecture.md) holds, in this order,
+  context and scope, building blocks, runtime view, deployment view, and crosscutting concepts such as
+  tenancy, security and telemetry. It links the other parts of arc42 where they live: goals and
+  constraints in the [product brief](product-brief.md), decisions in [decisions](decisions.md),
+  quality goals in [knowledge](domain/knowledge.md), risks in the
+  [threat model](reference/threat-model.md), and the glossary in [concepts](domain/concepts.md).
+
+## Diagrams
+
+A diagram shows what text says slowly: how the parts fit, or how a flow runs. Diagrams follow the C4
+model and are written in Mermaid inside the Markdown, which GitHub draws. They are text, so a review
+reads their diff and an agent can read and change them.
+
+| View | Mermaid form | Where it lives |
+| --- | --- | --- |
+| Context: Axis, the people who use it and the systems around it | `flowchart` | [Architecture](architecture.md), context and scope |
+| Containers: the hosts, the SPA and the databases | `flowchart` | [Architecture](architecture.md), building blocks |
+| Components of one container, where its parts are not obvious | `flowchart` | The reference page of that container |
+| A runtime flow, such as publishing or signing in | `sequenceDiagram` | The reference page of that flow |
+| The data model of a store | `erDiagram` | The reference page of that store |
+| An installation | `flowchart` | The page of that installation |
+| A threat model's data flows | `flowchart` | Its threat model page, see the [method](reference/threat-model-method.md) |
+
+- **Next to its text.** A diagram sits in the section that it illustrates, and the text says the same
+  thing in words, so a reader who cannot see the diagram loses nothing.
+- **One view.** A diagram shows one view at one level. A diagram that needs a legend, or more than
+  about fifteen boxes, is split.
+- **Names from the docs.** Boxes and arrows use the names of [concepts](domain/concepts.md) and of
+  the code, so a reader can search for them.
+- **No image files.** A picture that Mermaid cannot draw, such as a screen, is a Design artifact that
+  an issue links, not a file under `docs/`.
+- **True like any statement.** A change that makes a diagram wrong fixes it, as it fixes the text.
 
 ## How the docs stay correct
 

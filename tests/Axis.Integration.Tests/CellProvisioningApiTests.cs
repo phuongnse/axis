@@ -149,6 +149,53 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_list_and_the_detail_answer_usage_against_the_limits_and_the_newest_archive_time()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_quotas (tenant_id, quota, value, updated_at) VALUES ('a', 'users', 100, now());
+            INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, sampled_at) VALUES ('a', 10, 5, now());
+            INSERT INTO platform.tenant_usage (tenant_id, day, users, applications)
+            VALUES ('a', (now() AT TIME ZONE 'UTC')::date - 1, 3, 2), ('a', (now() AT TIME ZONE 'UTC')::date, 4, 1);
+            INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value)
+            VALUES ('a', (now() AT TIME ZONE 'UTC')::date, 'emails', 7), ('a', (now() AT TIME ZONE 'UTC')::date - 1, 'emails', 9);
+            INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('a', '2026-11-03 01:00:00+00')
+            """);
+        var archive = new DateTimeOffset(2026, 11, 3, 1, 0, 0, TimeSpan.Zero);
+
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+        using var sampled = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var unsampled = await GetAsync(client, "/api/cell/tenants/b", token);
+
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        var backedUp = new[] { items[0], await sampled.Content.ReadFromJsonAsync<JsonElement>(CancellationToken) };
+        Assert.All(
+            backedUp,
+            tenant =>
+            {
+                Assert.Equal((10_737_418_240, 15), Use(tenant, "storage"));
+                Assert.Equal((100, 4), Use(tenant, "users"));
+                Assert.Equal((10, 1), Use(tenant, "applications"));
+                Assert.Equal((1000, 7), Use(tenant, "emailsPerDay"));
+                Assert.Equal(archive, tenant.GetProperty("newestArchiveAt").GetDateTimeOffset());
+            });
+        var bare = new[] { items[1], await unsampled.Content.ReadFromJsonAsync<JsonElement>(CancellationToken) };
+        Assert.All(
+            bare,
+            tenant =>
+            {
+                Assert.Equal((10_737_418_240, null), Use(tenant, "storage"));
+                Assert.Equal((50, null), Use(tenant, "users"));
+                Assert.Equal((10, null), Use(tenant, "applications"));
+                Assert.Equal((1000, 0), Use(tenant, "emailsPerDay"));
+                Assert.Equal(JsonValueKind.Null, tenant.GetProperty("newestArchiveAt").ValueKind);
+            });
+    }
+
+    [Fact]
     public async Task A_row_written_before_the_counts_existed_answers_null_failed_work()
     {
         await using var factory = await StartAsync();
@@ -174,6 +221,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             $"""
             INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, failed_instances, unknown_calls, open_dead_letters, sampled_at)
             VALUES ('a', 1, 1, 1, 1, 1, now());
+            INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('a', now());
             INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('a', 'ReportsUrl', 'url', '{bindingUrl}')
             """);
         var tenantDatabase = new NpgsqlConnectionStringBuilder(_platform)
@@ -210,7 +258,12 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         using var detail = await GetAsync(client, "/api/cell/tenants/a", token);
 
         string[] failedWork = ["failedWork.instances", "failedWork.unknownCalls", "failedWork.deadLetters", "failedWork"];
-        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork];
+        string[] usage =
+        [
+            "usage.storage.limit", "usage.storage.used", "usage.users.limit", "usage.users.used",
+            "usage.applications.limit", "usage.applications.used", "usage.emailsPerDay.limit", "usage.emailsPerDay.used",
+        ];
+        string[] tenantFields = ["id", "status", "application", "hosts[]", .. failedWork, .. usage, "newestArchiveAt"];
         AssertFields(
             await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
             [.. tenantFields.Select(field => $"items[].{field}")],
@@ -1761,6 +1814,14 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
                     break;
             }
         }
+    }
+
+    private static (long? Limit, long? Used) Use(JsonElement tenant, string quota)
+    {
+        var use = tenant.GetProperty("usage").GetProperty(quota);
+        return (Count(use.GetProperty("limit")), Count(use.GetProperty("used")));
+
+        static long? Count(JsonElement value) => value.ValueKind == JsonValueKind.Null ? null : value.GetInt64();
     }
 
     private static (long Instances, long UnknownCalls, long DeadLetters)? FailedWork(JsonElement tenant)

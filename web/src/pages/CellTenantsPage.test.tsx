@@ -22,12 +22,23 @@ const platform: Platform = {
   development: false,
 }
 
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+const noUse = { limit: null, used: null }
+const noUsage = { storage: noUse, users: noUse, applications: noUse, emailsPerDay: noUse }
+
 const acme: CellTenant = {
   id: 'acme',
   status: 'active',
   application: 'crm',
   hosts: ['acme.example.com', 'portal.acme.test'],
   failedWork: { instances: 2, unknownCalls: 0, deadLetters: 1 },
+  usage: {
+    storage: { limit: 1024 ** 3 * 10, used: 1024 ** 2 * 512 },
+    users: { limit: 50, used: null },
+    applications: { limit: null, used: 3 },
+    emailsPerDay: { limit: 1000, used: 1200 },
+  },
+  newestArchiveAt: hoursAgo(30),
 }
 const beta: CellTenant = {
   id: 'beta',
@@ -35,6 +46,8 @@ const beta: CellTenant = {
   application: null,
   hosts: ['beta.example.com'],
   failedWork: null,
+  usage: noUsage,
+  newestArchiveAt: null,
 }
 const gamma: CellTenant = {
   id: 'gamma',
@@ -42,6 +55,8 @@ const gamma: CellTenant = {
   application: 'hr',
   hosts: ['gamma.example.com'],
   failedWork: { instances: 0, unknownCalls: 0, deadLetters: 0 },
+  usage: noUsage,
+  newestArchiveAt: hoursAgo(2),
 }
 
 function stubTenants(status: number, items: CellTenant[] = []) {
@@ -94,16 +109,49 @@ describe('CellTenantsPage', () => {
     expect(
       within(rows[0])
         .getAllByRole('cell')
-        .slice(4)
+        .slice(4, 7)
         .map((cell) => cell.textContent),
     ).toEqual(['2', '0', '1'])
     expect(
       within(rows[1])
         .getAllByRole('cell')
-        .slice(4)
+        .slice(4, 7)
         .map((cell) => cell.textContent),
     ).toEqual(['—', '—', '—'])
     expect(within(rows[0]).getByRole('link', { name: 'acme' })).toHaveAttribute('href', '/tenants/acme')
+  })
+
+  it('shows the usage against the limits, with a dash for a count not yet filled', async () => {
+    stubTenants(200, [acme, beta])
+    renderPage()
+
+    await screen.findByTestId('cell-tenants')
+    const rows = dataRows()
+    expect(
+      within(rows[0])
+        .getAllByRole('cell')
+        .slice(7, 11)
+        .map((cell) => cell.textContent),
+    ).toEqual(['512 MB of 10 GB', '—', '3, no limit', '1,200 of 1,000'])
+    expect(
+      within(rows[1])
+        .getAllByRole('cell')
+        .slice(7, 11)
+        .map((cell) => cell.textContent),
+    ).toEqual(['—', '—', '—', '—'])
+  })
+
+  it('marks an archive more than 26 hours old and no other, and shows a dash for none', async () => {
+    stubTenants(200, [acme, beta, gamma])
+    renderPage()
+
+    await screen.findByTestId('cell-tenants')
+    const rows = dataRows()
+    expect(within(rows[0]).getByTestId('cell-tenants-archive-stale')).toHaveTextContent('Overdue')
+    expect(within(rows[1]).queryByTestId('cell-tenants-archive-stale')).toBeNull()
+    expect(within(rows[1]).getAllByRole('cell')[11]).toHaveTextContent('—')
+    expect(within(rows[2]).queryByTestId('cell-tenants-archive-stale')).toBeNull()
+    expect(within(rows[2]).getAllByRole('cell')[11]).not.toHaveTextContent('—')
   })
 
   it('narrows the rows by id, ignoring case', async () => {

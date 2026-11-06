@@ -98,6 +98,15 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
       dangerShadow: 'none',
     })
   })
+
+  it('draws a hovered or pressed default button in the text colour that passes contrast', () => {
+    expect(config.components?.Button).toMatchObject({
+      defaultHoverColor: colour.primaryText,
+      defaultHoverBorderColor: colour.primaryText,
+      defaultActiveColor: colour.primaryText,
+      defaultActiveBorderColor: colour.primaryText,
+    })
+  })
 })
 
 describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (mode) => {

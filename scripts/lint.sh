@@ -20,7 +20,8 @@ node scripts/check-locators.mjs
 node scripts/check-raw-html.mjs
 
 # The SPA draws a button, a table and a tag with the platform's shared widgets and tokens, not with the library's own
-# (AGENTS.md: one concern has one mechanism). The code that predates this check is counted in a baseline that only goes down.
+# (AGENTS.md: one concern has one mechanism). No file but AxisTable.tsx imports Ant Design's Table. The button and tag
+# code that predates this check is counted in a baseline that only goes down.
 node scripts/check-shared-widgets.mjs
 
 # The SPA has no code that a key such as __proto__ can turn into prototype pollution (ASVS V15.3.6).

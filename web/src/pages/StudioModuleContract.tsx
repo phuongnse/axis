@@ -1,6 +1,7 @@
-import { Alert, Button, Checkbox, Flex, Input, Modal, Select, Table, Tag, Typography } from 'antd'
+import { Alert, Button, Checkbox, Flex, Input, Modal, Select, Tag, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisTable } from '../platform/AxisTable'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
@@ -202,22 +203,25 @@ function ContractTable<T extends object>({
   rows: T[]
   columns: { key: string; title: string; render: (row: T, index: number) => React.ReactNode }[]
 }) {
+  const t = useText()
   if (rows.length === 0) {
     return null
   }
   return (
-    <Table<{ key: number; row: T }>
-      data-testid={testId}
-      size="small"
-      pagination={false}
-      title={() => <Typography.Text strong>{title}</Typography.Text>}
-      dataSource={rows.map((row, key) => ({ key, row }))}
-      columns={columns.map((column) => ({
-        key: column.key,
-        title: column.title,
-        render: (_: unknown, entry: { key: number; row: T }) => column.render(entry.row, entry.key),
-      }))}
-    />
+    <Flex vertical gap="small" data-testid={testId}>
+      <Typography.Text strong>{title}</Typography.Text>
+      <AxisTable<{ key: number; row: T }>
+        rowKey={(entry) => String(entry.key)}
+        emptyText={t('shell.table.empty')}
+        dataSource={rows.map((row, key) => ({ key, row }))}
+        columns={columns.map((column) => ({
+          key: column.key,
+          kind: 'freeText' as const,
+          title: column.title,
+          render: (_: unknown, entry: { key: number; row: T }) => column.render(entry.row, entry.key),
+        }))}
+      />
+    </Flex>
   )
 }
 
