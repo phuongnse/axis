@@ -166,8 +166,7 @@
   },
   "web/src/platform/ProcessInstancePage.tsx": {
     "tag": 2,
-    "button": 2,
-    "table": 1
+    "button": 2
   },
   "web/src/platform/ReleaseOffStandard.tsx": {
     "tag": 1

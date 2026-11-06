@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Empty, Flex, Table, Tag, Typography, type TableColumnsType } from 'antd'
+import { Alert, Button, Descriptions, Empty, Flex, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -259,22 +259,29 @@ export function InstanceDetailView({
       render: (_v, row) => time('completedAt', row.completedAt),
     },
   ]
-  const attemptColumns: TableColumnsType<CallAttempt> = [
-    { key: 'kind', title: t('shell.inspector.kind'), render: (_v: unknown, row) => row.kind },
-    { key: 'number', title: t('shell.inspector.number'), render: (_v: unknown, row) => row.number },
+  const attemptColumns: AxisColumn<CallAttempt>[] = [
+    { key: 'kind', kind: 'fixed', title: t('shell.inspector.kind'), render: (_v, row) => row.kind },
+    { key: 'number', kind: 'fixed', title: t('shell.inspector.number'), render: (_v, row) => row.number },
     {
       key: 'startedAt',
+      kind: 'fixed',
       title: t('shell.inspector.startedAt'),
-      render: (_v: unknown, row) => time('startedAt', row.startedAt),
+      render: (_v, row) => time('startedAt', row.startedAt),
     },
     {
       key: 'finishedAt',
+      kind: 'fixed',
       title: t('shell.inspector.finishedAt'),
-      render: (_v: unknown, row) => time('finishedAt', row.finishedAt),
+      render: (_v, row) => time('finishedAt', row.finishedAt),
     },
-    { key: 'outcome', title: t('shell.inspector.outcome'), render: (_v: unknown, row) => row.outcome },
-    { key: 'httpStatus', title: t('shell.inspector.httpStatus'), render: (_v: unknown, row) => row.httpStatus ?? '' },
-    { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
+    { key: 'outcome', kind: 'fixed', title: t('shell.inspector.outcome'), render: (_v, row) => row.outcome },
+    {
+      key: 'httpStatus',
+      kind: 'fixed',
+      title: t('shell.inspector.httpStatus'),
+      render: (_v, row) => row.httpStatus ?? null,
+    },
+    { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
     traceIdColumn,
   ]
 
@@ -466,7 +473,7 @@ interface CallItemProps {
   /** Called after a resolve was accepted, so the page reads the instance again. */
   onChanged: () => void
   stepLabel: (name: string) => string
-  attemptColumns: TableColumnsType<CallAttempt>
+  attemptColumns: AxisColumn<CallAttempt>[]
 }
 
 /**
@@ -489,7 +496,8 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
       <Flex gap="small" align="center" wrap>
         <Tag>{call.kind}</Tag>
         <Typography.Text strong>{stepLabel(call.step)}</Typography.Text>
-        <Typography.Text>{`${target} · ${call.operation}`}</Typography.Text>
+        <Typography.Text>{target}</Typography.Text>
+        <Typography.Text>{call.operation}</Typography.Text>
         <Tag>{call.state}</Tag>
         {call.resolvable && call.outputs && (
           <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
@@ -519,13 +527,11 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         />
       )}
       <Typography.Text type="secondary">{t('shell.inspector.attempts')}</Typography.Text>
-      <Table<CallAttempt>
-        size="small"
+      <AxisTable<CallAttempt>
         rowKey={(row) => `${row.kind}|${row.number}|${row.startedAt}`}
         columns={attemptColumns}
-        scroll={{ x: 'max-content' }}
         dataSource={call.attempts}
-        pagination={false}
+        emptyText={t('shell.inspector.noAttempts')}
       />
     </Flex>
   )

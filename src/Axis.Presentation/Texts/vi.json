@@ -431,6 +431,7 @@
   "shell.inspector.input": "Đầu vào",
   "shell.inspector.hidden": "Đã ẩn",
   "shell.inspector.noHistory": "Chưa có lịch sử.",
+  "shell.inspector.noAttempts": "Chưa có lần thử.",
   "shell.inspector.noTasks": "Không có công việc.",
   "shell.inspector.noCalls": "Không có lời gọi.",
   "shell.inspector.noSubject": "Không có bản ghi",
