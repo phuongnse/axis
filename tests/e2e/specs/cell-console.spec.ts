@@ -1,4 +1,8 @@
 import { spawnSync } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { chromium, type Browser, type Page } from '@playwright/test'
 import { expect, test } from '../test'
@@ -24,6 +28,8 @@ let browser: Browser
 let member: RealmAccount
 // The page that the first test signs the operator in on, which the last test reuses: Keycloak refuses a code twice in one period.
 let operator: Page
+// Holds the backup key and the applications folder that the create job needs.
+let publisherFolder: string
 
 const cellSettings = {
   Cell__Id: 'vn-1',
@@ -62,9 +68,18 @@ test.beforeAll(async () => {
     Cell__ConsoleClientSecret: 'axis-cell-console-development-secret',
     IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
   })
+  // The create job encrypts its first backup and creates the application's folder, so the publisher needs a backup key
+  // and an applications folder.
+  publisherFolder = mkdtempSync(path.join(os.tmpdir(), 'axis-cell-console-'))
+  const backupKeyFile = path.join(publisherFolder, 'backup.key')
+  writeFileSync(backupKeyFile, randomBytes(32).toString('base64'))
+  const applications = path.join(publisherFolder, 'applications')
+  mkdirSync(applications)
   // The run's shared publisher runs no provisioning jobs, so this one runs the jobs that the console queues.
   publisher = await startPublisher({
     ...cellSettings,
+    Cell__BackupKeyFile: backupKeyFile,
+    Studio__ApplicationsPath: applications,
     IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
   })
   browser = await chromium.launch({
@@ -76,6 +91,9 @@ test.afterAll(async () => {
   await browser?.close()
   await publisher?.stop()
   await server?.stop()
+  if (publisherFolder) {
+    rmSync(publisherFolder, { recursive: true, force: true })
+  }
 })
 
 async function expectNoViolations(page: Page) {
@@ -161,4 +179,43 @@ test('the platform operator suspends a tenant, follows the job and resumes it', 
   await confirmDialog(page, 'Resume')
   await expect(page.getByTestId('cell-jobs').getByRole('row').nth(1)).toContainText('resume', { timeout: 60_000 })
   await expect(page.getByTestId('cell-tenant')).toContainText('Active', { timeout: 60_000 })
+})
+
+test('the platform operator creates a tenant, follows the create job and opens the new tenant', async () => {
+  // The create job makes a database, a realm, an activation and an invitation email, one after another.
+  test.setTimeout(420_000)
+  const page = operator
+  const created = 'console-created'
+  await page.goto('https://console.localhost/tenants')
+  await page.getByTestId('cell-tenants-create').click()
+  const dialog = await waitForDialog(page)
+  await dialog.getByLabel('Tenant ID', { exact: true }).fill(created)
+  await dialog.getByLabel('Application', { exact: true }).fill('approvals')
+  await dialog.getByLabel("Administrator's email", { exact: true }).fill(`first-admin@${created}.test`)
+  await expectNoViolations(page)
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+
+  const jobs = dialog.getByTestId('cell-jobs')
+  await expect(jobs).toContainText('create', { timeout: 60_000 })
+  await expect(jobs).toContainText('Succeeded', { timeout: 180_000 })
+  await dialog.getByRole('button', { name: 'Close', exact: true }).last().click()
+  await expect(dialog).toBeHidden()
+
+  await page.getByRole('searchbox', { name: 'Search by ID or host', exact: true }).fill(created)
+  await page.getByTestId('cell-tenants').getByRole('link', { name: created, exact: true }).click()
+  await expect(page.getByTestId('cell-tenant')).toContainText(`${created}.localhost`)
+})
+
+test("the create dialog shows the title of the cell's refusal when a tenant already has the id", async () => {
+  const page = operator
+  await page.goto('https://console.localhost/tenants')
+  await page.getByTestId('cell-tenants-create').click()
+  const dialog = await waitForDialog(page)
+  await dialog.getByLabel('Tenant ID', { exact: true }).fill(tenant)
+  await dialog.getByLabel('Application', { exact: true }).fill('approvals')
+  await dialog.getByLabel("Administrator's email", { exact: true }).fill(`first-admin@${tenant}.test`)
+  await dialog.getByRole('button', { name: 'Create', exact: true }).click()
+
+  await expect(dialog.getByTestId('cell-create-error')).toContainText('A tenant of the cell already has this id.')
+  await expect(dialog).toBeVisible()
 })

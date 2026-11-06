@@ -1,6 +1,7 @@
 import { Alert, Flex, Input, Select, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
   fetchCellTenants,
@@ -16,6 +17,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { formatBytes } from '../platform/tenantUsage'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
+import { CreateCellTenantModal } from './CreateCellTenantModal'
 
 const statuses: CellTenantStatus[] = ['active', 'readOnly', 'suspended', 'provisioning', 'deleting']
 
@@ -25,7 +27,8 @@ const staleArchiveMs = 26 * 60 * 60 * 1000
 /**
  * The Tenants view of the cell console: one row per tenant of the cell, with its failed work, its usage against its
  * limits and the time of its newest archive, which carries a mark when it is more than 26 hours old. It has a search by
- * id or host and a filter by status. Both run in the browser on the loaded list. It is read only.
+ * id or host and a filter by status. Both run in the browser on the loaded list. Create tenant opens the dialog that
+ * creates a tenant, and the list loads again when the create job ends.
  */
 export function CellTenantsPage() {
   const t = useText()
@@ -36,6 +39,9 @@ export function CellTenantsPage() {
   const [failed, setFailed] = useState(false)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<CellTenantStatus>()
+  const [creating, setCreating] = useState(false)
+  // Counts the create jobs that ended, so the list loads again.
+  const [reload, setReload] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -55,7 +61,7 @@ export function CellTenantsPage() {
       },
     )
     return () => controller.abort()
-  }, [onRefused])
+  }, [onRefused, reload])
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -174,6 +180,11 @@ export function CellTenantsPage() {
           columns={columns}
           emptyText={t('shell.cell.tenants.empty')}
           toolbar={{
+            main: (
+              <AxisButton role="main" data-testid="cell-tenants-create" onClick={() => setCreating(true)}>
+                {t('shell.cell.create.button')}
+              </AxisButton>
+            ),
             view: (
               <Flex gap="small" wrap>
                 <Input.Search
@@ -198,6 +209,9 @@ export function CellTenantsPage() {
             ),
           }}
         />
+      )}
+      {creating && (
+        <CreateCellTenantModal onClose={() => setCreating(false)} onEnded={() => setReload((count) => count + 1)} />
       )}
     </PageLayout>
   )
