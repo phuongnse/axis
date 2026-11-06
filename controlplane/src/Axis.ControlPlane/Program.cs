@@ -1,5 +1,6 @@
 using Axis.ControlPlane;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
@@ -36,6 +37,17 @@ builder.Services.TryAddSingleton(TimeProvider.System);
 
 // The clients of the region's cells. With no cell listed they hold nothing and the service starts as before.
 builder.Services.AddCellClients(options);
+
+// The DNS adapter that sets and removes a tenant's CNAME record, by the provider named. Without one the service starts as before.
+if (string.Equals(options.Dns.Provider, DnsProviders.InMemory, StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<InMemoryDnsRecords>();
+    builder.Services.AddSingleton<IDnsRecords>(services => services.GetRequiredService<InMemoryDnsRecords>());
+}
+else if (string.Equals(options.Dns.Provider, DnsProviders.Rfc2136, StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<IDnsRecords>(services => new Rfc2136DnsRecords(options.Dns, services.GetRequiredService<TimeProvider>()));
+}
 
 // The region directory's own database, keyed so that it does not clash with the control plane's. Without it the service starts as before.
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))

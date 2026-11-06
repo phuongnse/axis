@@ -10,7 +10,8 @@ namespace Axis.ControlPlane;
 /// The <c>ControlPlane</c> settings of the service, see the settings table in
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional. The cell
-/// settings are optional, and once a cell is listed, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
+/// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
+/// provider is named, the ones it needs are required. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -54,6 +55,9 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The mail relay that sends the emails of the control plane. Never a cell's mail settings.</summary>
     public ControlPlaneMailOptions Mail { get; set; } = new();
+
+    /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
+    public ControlPlaneDnsOptions Dns { get; set; } = new();
 
     /// <summary>Reads and checks the settings, and returns them.</summary>
     /// <exception cref="InvalidOperationException">
@@ -136,6 +140,8 @@ public sealed partial class ControlPlaneOptions
             problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.Password)} is required when {mail}:{nameof(ControlPlaneMailOptions.UserName)} is set.");
         }
 
+        problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
+
         if (problems.Count > 0)
         {
             throw new InvalidOperationException($"The control plane configuration is invalid. {string.Join(" ", problems)}");
@@ -189,6 +195,67 @@ public sealed partial class ControlPlaneOptions
         if (!string.IsNullOrWhiteSpace(options.CellCertificateAuthorityPath) && !File.Exists(options.CellCertificateAuthorityPath))
         {
             problems.Add($"The file of the setting {SectionName}:{nameof(CellCertificateAuthorityPath)} does not exist.");
+        }
+
+        return problems;
+    }
+
+    private static List<string> DnsProblems(ControlPlaneDnsOptions dns, bool outsideDevelopment)
+    {
+        var problems = new List<string>();
+        var prefix = $"{SectionName}:{nameof(Dns)}";
+        if (string.IsNullOrWhiteSpace(dns.Provider))
+        {
+            return problems;
+        }
+
+        if (string.Equals(dns.Provider, DnsProviders.InMemory, StringComparison.OrdinalIgnoreCase))
+        {
+            if (outsideDevelopment)
+            {
+                problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Provider)} must not be {DnsProviders.InMemory} outside Development and Testing.");
+            }
+
+            return problems;
+        }
+
+        if (!string.Equals(dns.Provider, DnsProviders.Rfc2136, StringComparison.OrdinalIgnoreCase))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Provider)} must be {DnsProviders.InMemory} or {DnsProviders.Rfc2136}.");
+            return problems;
+        }
+
+        if (string.IsNullOrWhiteSpace(dns.Server))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Server)} is required.");
+        }
+
+        if (dns.Port is < 1 or > 65535)
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Port)} must be between 1 and 65535.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dns.Zone))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Zone)} is required.");
+        }
+        else if (Uri.CheckHostName(dns.Zone) != UriHostNameType.Dns)
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Zone)} must be a domain name.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dns.KeyName))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.KeyName)} is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(dns.Key))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Key)} is required.");
+        }
+        else if (!Convert.TryFromBase64String(dns.Key, new byte[dns.Key.Length], out _))
+        {
+            problems.Add($"The setting {prefix}:{nameof(ControlPlaneDnsOptions.Key)} must be base64.");
         }
 
         return problems;

@@ -1,4 +1,6 @@
+using Axis.ControlPlane.Dns;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -282,6 +284,117 @@ public sealed class ControlPlaneOptionsTests
         Assert.Equal("vn-1", cell.Id);
         Assert.Equal("https://cell.internal:8443", cell.InternalUrl);
         Assert.Equal("cell-secret", options.CellSecrets["vn-1"]);
+    }
+
+    private const string DnsKey = "c2VjcmV0LWtleS1ieXRlcy0xMjM0NTY3ODkwMTIzNDU2";
+
+    private static Dictionary<string, string?> DnsSettings(string provider = "Rfc2136") => new()
+    {
+        ["ControlPlane:Dns:Provider"] = provider,
+        ["ControlPlane:Dns:Server"] = "ns.example.com",
+        ["ControlPlane:Dns:Zone"] = "vn.example.com",
+        ["ControlPlane:Dns:KeyName"] = "axis-controlplane",
+        ["ControlPlane:Dns:Key"] = DnsKey,
+    };
+
+    [Theory]
+    [InlineData("ControlPlane:Dns:Server")]
+    [InlineData("ControlPlane:Dns:Zone")]
+    [InlineData("ControlPlane:Dns:KeyName")]
+    [InlineData("ControlPlane:Dns:Key")]
+    public void With_the_RFC_2136_provider_a_missing_DNS_setting_stops_the_start_and_the_message_names_it_and_holds_no_key(string setting)
+    {
+        var settings = DnsSettings();
+        settings[setting] = string.Empty;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(DnsKey, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_DNS_key_that_is_not_base64_stops_the_start_and_the_message_holds_no_value()
+    {
+        var settings = DnsSettings();
+        settings["ControlPlane:Dns:Key"] = "not base64 secret!";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Dns:Key", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("not base64", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("ControlPlane:Dns:Port", "0")]
+    [InlineData("ControlPlane:Dns:Port", "70000")]
+    [InlineData("ControlPlane:Dns:Zone", "not a zone")]
+    public void A_DNS_setting_out_of_range_stops_the_start(string setting, string value)
+    {
+        var settings = DnsSettings();
+        settings[setting] = value;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_unknown_DNS_provider_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: DnsSettings("Route53"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Dns:Provider", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Outside_Development_and_Testing_the_in_memory_DNS_provider_stops_the_start()
+    {
+        var settings = DnsSettings("InMemory");
+        settings["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull";
+        settings["ControlPlane:Mail:UseTls"] = "true";
+        using var factory = ControlPlaneFactory.Create(environment: "Production", settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Dns:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void In_Testing_the_in_memory_DNS_provider_loads_and_is_registered()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: DnsSettings("InMemory"));
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<InMemoryDnsRecords>(factory.Services.GetRequiredService<IDnsRecords>());
+        Assert.Same(factory.Services.GetRequiredService<InMemoryDnsRecords>(), factory.Services.GetRequiredService<IDnsRecords>());
+    }
+
+    [Fact]
+    public void The_RFC_2136_provider_with_all_its_settings_loads_and_is_registered()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: DnsSettings());
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<Rfc2136DnsRecords>(factory.Services.GetRequiredService<IDnsRecords>());
+    }
+
+    [Fact]
+    public void With_no_DNS_provider_the_service_starts_and_registers_no_DNS_adapter()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Null(factory.Services.GetService<IDnsRecords>());
     }
 
     /// <summary>Empty files that exist, so a test of the settings needs no certificate.</summary>

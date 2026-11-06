@@ -179,13 +179,15 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 - **Required.** The region, the tenant domain, the connection string, the mail sender and the mail
   relay are required, except `ControlPlane:Mail:UserName`. The directory connection string is
   optional. The cell settings are optional, and once a cell is listed, all of its settings, its secret
-  and the client certificate are required.
+  and the client certificate are required. The DNS settings are optional, and once a provider is
+  named, the ones it needs are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell, and never its value.
-- **Secrets as files.** The connection strings, the mail password and the cells' secrets may also come
-  from the key-per-file secrets `/run/secrets/ControlPlane__ConnectionString`,
+- **Secrets as files.** The connection strings, the mail password, the cells' secrets and the DNS key
+  may also come from the key-per-file secrets `/run/secrets/ControlPlane__ConnectionString`,
   `/run/secrets/ControlPlane__DirectoryConnectionString`,
-  `/run/secrets/ControlPlane__Mail__Password` and `/run/secrets/ControlPlane__CellSecrets__<cell id>`.
+  `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>` and
+  `/run/secrets/ControlPlane__Dns__Key`.
 - **Plans and providers** _(planned for M34)_. `ControlPlane:` settings also hold the
   [plans](plans.md) and the payment and e-invoice providers' non-secret values.
 
@@ -207,6 +209,12 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Cells:<n>:ClientId` | The id of the realm's client for the control plane | Not empty |
 | `ControlPlane:CellSecrets:<cell id>` | The client secret of that cell's client, a key-per-file secret | Not empty for every listed cell |
 | `ControlPlane:CellClientCertificate:Path` and `:KeyPath` | The PEM certificate and private key that the control plane presents to every cell | Both set and both files exist, when a cell is listed |
+| `ControlPlane:Dns:Provider` | The DNS adapter that sets and removes a tenant's `CNAME` record: `InMemory` or `Rfc2136`. Optional, and with none the service registers no adapter | `InMemory` is refused outside Development and Testing. Any other value is refused |
+| `ControlPlane:Dns:Server` | The host of the DNS server that takes the dynamic updates | Not empty, with `Rfc2136` |
+| `ControlPlane:Dns:Port` | The TCP port of that server. Default 53 | 1 to 65535, with `Rfc2136` |
+| `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
+| `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
+| `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
