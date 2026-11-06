@@ -4,6 +4,7 @@ using Axis.Data.Profiles;
 using Axis.Data.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
+using Axis.Server.CellApi;
 using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
@@ -20,7 +21,8 @@ namespace Axis.Server.Users;
 /// server serves one. It also says whether the user may use the operator console: the user holds the role that
 /// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
 /// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page. It also says the
-/// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal.
+/// tenant's status and, for an administrator in a cell, the address of the tenant's page in the billing portal. It also says
+/// whether the tenant has exports for the administrator, see <see cref="TenantExportEndpoints.ExportTenant"/>.
 /// <para>
 /// <c>GET /api/users?search=&amp;page=&amp;pageSize=</c> lists the users of the tenant's realm to an administrator. It reads
 /// them through the realm's users client and joins <c>axis.user_profiles</c> for the status and the last sign-in. The search
@@ -190,7 +192,8 @@ internal static partial class UserEndpoints
                 console.Allows(user.Roles),
                 users.Allows(user.Roles) && !IsPreview(catalog, tenants),
                 tenants.Current is { ReadOnly: true } ? "readOnly" : "active",
-                BillingUrl(users.Allows(user.Roles), cell, catalog, tenants)))
+                BillingUrl(users.Allows(user.Roles), cell, catalog, tenants),
+                users.Allows(user.Roles) && TenantExportEndpoints.ExportTenant(cell, catalog, tenants) is not null))
             : Grants.SignInRequired();
 
     private static string? BillingUrl(bool administrator, CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
@@ -264,8 +267,9 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
 /// <c>TenantStatus</c> is <c>readOnly</c> while the tenant is read-only, otherwise <c>active</c>. <c>BillingUrl</c> is the
 /// tenant's page in the billing portal, <c>https://account.{Cell:TenantDomain}/tenants/{tenant id}</c>, and is <c>null</c>
-/// outside a cell, for a user without the administrator role and in a preview tenant.
+/// outside a cell, for a user without the administrator role and in a preview tenant. <c>TenantExports</c> is true when the user
+/// holds the administrator role and the tenant is a cell tenant that is not a preview tenant, the tenants whose export routes answer.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
     string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console, bool Users,
-    string TenantStatus, string? BillingUrl);
+    string TenantStatus, string? BillingUrl, bool TenantExports);

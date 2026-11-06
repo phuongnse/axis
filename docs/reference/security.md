@@ -272,6 +272,7 @@ platform tools they may open.
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                                                             |
 | `tenantStatus`      | `readOnly` while the tenant is [read-only](subscriptions.md#the-read-only-tenant), otherwise `active`. A suspended tenant is never served                   |
 | `billingUrl`        | `https://account.<Cell:TenantDomain>/tenants/<tenant id>` for a user who holds the administrator role in a tenant of a cell, see [billing portal](billing-portal.md#where). Otherwise null, also in a preview tenant |
+| `tenantExports`     | True for a user who holds the administrator role in a tenant of a cell that is not a preview tenant, the tenants whose [export routes](tenant-lifecycle.md#exports-by-a-tenant-administrator) answer. Otherwise false |
 
 Record writes, process starts and the task API read the current user the same way, and their audit
 records store the user's id and no display name.

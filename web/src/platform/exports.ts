@@ -48,7 +48,7 @@ function decode(value: string): string | null {
 }
 
 /** The file name of a `Content-Disposition` header: `filename*` decoded if it has one, then `filename`. */
-function fileNameOf(disposition: string | null): string | null {
+export function fileNameOf(disposition: string | null): string | null {
   const encoded = /filename\*\s*=\s*UTF-8''([^;]+)/i.exec(disposition ?? '')
   const decoded = encoded ? decode(encoded[1].trim()) : null
   if (decoded) {

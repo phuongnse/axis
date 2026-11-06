@@ -34,6 +34,7 @@ const user: CurrentUser = {
   users: true,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 
 const notices: NotificationPage = {

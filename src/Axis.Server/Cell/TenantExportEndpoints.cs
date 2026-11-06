@@ -101,17 +101,24 @@ internal static class TenantExportEndpoints
             return (null, Grants.Forbidden());
         }
 
-        var catalog = services.GetRequiredService<ITenantCatalog>();
-        var tenants = services.GetRequiredService<ITenantContextAccessor>();
-        if (!services.GetRequiredService<CellOptions>().IsCell
-            || tenants.Current is not { } tenant
-            || catalog.Find(tenant.TenantId) is not { PreviewOf: null })
+        var tenantId = ExportTenant(
+            services.GetRequiredService<CellOptions>(), services.GetRequiredService<ITenantCatalog>(), services.GetRequiredService<ITenantContextAccessor>());
+        if (tenantId is null)
         {
             return (null, Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no exports."));
         }
 
-        return (new Opening(tenant.TenantId, caller.Id), null);
+        return (new Opening(tenantId, caller.Id), null);
     }
+
+    /// <summary>
+    /// The id of the current tenant when it has exports: a cell with a tenant in the catalog that is not a preview tenant.
+    /// Otherwise <c>null</c>. The routes answer <c>404</c> for <c>null</c> and <c>GET /api/me</c> answers <c>tenantExports</c> false.
+    /// </summary>
+    internal static string? ExportTenant(CellOptions cell, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        cell.IsCell && tenants.Current is { } tenant && catalog.Find(tenant.TenantId) is { PreviewOf: null }
+            ? tenant.TenantId
+            : null;
 
     private sealed record Opening(string TenantId, string CallerId);
 }
