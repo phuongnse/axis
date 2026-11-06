@@ -81,15 +81,16 @@ The console has four views, which read the provisioning API. Its shell has the t
 navigation entry for each built view. A person with no session goes to the operator realm's sign-in, and a
 person without the operator role sees a forbidden page in place of the views. The header shows the
 operator's display name from the session read in place of the app switcher and the account button, and has no
-notification bell. The built views are read only, except for the actions of the Tenant view.
+notification bell. The built views are read only, except for the Create tenant button of the Tenants view and the
+actions of the Tenant view.
 
 - **Cell.** The cell id, its region, and the number of tenants against [the cap](cells.md#cell-size). With no
   cap it shows the count alone. It also shows the newest [restore check](tenant-backup-and-restore.md#weekly-restore-check):
   its result, its source tenant and its time, or a dash when no check has run.
 - **Jobs.** The jobs of the cell, newest first. A row shows the time, the kind, the tenant and the state, each
   step with its state, and the error of a failed job or step.
-- **Tenants.** One row per tenant, with a search by id and host and a filter by status. The search and the
-  filter run in the browser. A row shows:
+- **Tenants.** One row per tenant, with a search by id and host, a filter by status and a Create tenant button
+  that opens the dialog of [creating a tenant](#actions). The search and the filter run in the browser. A row shows:
   - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`), the application and
     the hosts;
   - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a
@@ -118,16 +119,26 @@ operator's session and queues a job.
   and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
   shows neither. A button opens a confirmation that names the tenant and says what the action does, and
   confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
-- **Idempotency key.** Each action sends an `Idempotency-Key`. The console keeps the key in the page's memory,
-  for each tenant and action, while the request has no final answer. A retry after a network error or a `5xx`
-  sends the same key, so it cannot queue a second job. Any `2xx` or `4xx` answer is final and drops the key,
-  and the next action gets a new one.
-- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation open with an error. A `401` or `403` goes through
+- **Create a tenant.** The Tenants view's Create tenant button opens a dialog with the tenant id, the
+  application and the administrator's email. The application is the id of an installed
+  [application template](modules-and-templates.md#application-templates), typed as text, such as `approvals`.
+  Create calls `POST /api/cell/tenants`, see [creating a tenant](tenant-lifecycle.md#creating-a-tenant). A `400`,
+  `409` or `422` answer keeps the dialog open and shows the server's title. A `202` answer replaces the form
+  with the queued create job in the same table as the Jobs view. The dialog reads the job at once and then every
+  2 seconds, and shows its state and steps until it succeeds or fails. Close is there at any time and stops
+  following the job, which keeps running. When the job ends, or when the dialog closes after the job was
+  queued, the Tenants view loads the list again.
+- **Idempotency key.** Each action sends an `Idempotency-Key`. The console keeps the key in the page's memory
+  while the request has no final answer: for each tenant and action, and for a create, for each request body.
+  A retry after a network error or a `5xx` sends the same key, so it cannot queue a second job. Any `2xx` or
+  `4xx` answer is final and drops the key, and the next action gets a new one. A create whose field changed
+  gets a new key, because the server hashes the body into the request that a key names.
+- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation or the dialog open with an error. A `401` or `403` goes through
   the console's sign-in and forbidden handling.
 - **The job.** The queued job heads the tenant's jobs. The view reads it at once and then every 2 seconds, and
   shows its state and steps. When the job succeeds or fails, the view loads the tenant and its jobs again. The
   buttons are off while it follows a job.
-- **Other actions** _(planned for M31)_. Create a tenant, set quotas, add a host, export, download an export,
+- **Other actions** _(planned for M31)_. Set quotas, add a host, export, download an export,
   delete and cancel a deletion. Delete asks the operator to type the tenant id.
 
 ## What the console never shows

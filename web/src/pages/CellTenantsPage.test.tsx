@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { CellTenant } from '../platform/cell'
+import type { CellJob, CellTenant } from '../platform/cell'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { CellTenantsPage } from './CellTenantsPage'
@@ -84,6 +84,76 @@ function renderPage(onRefused = vi.fn()) {
   )
   return onRefused
 }
+
+interface Post {
+  key: string | null
+  contentType: string | null
+  body: unknown
+}
+
+const queued = { id: '7', kind: 'create', tenantId: 'delta', state: 'queued', createdAt: hoursAgo(0) }
+
+function createJob(state: CellJob['state']): CellJob {
+  return {
+    ...queued,
+    state,
+    steps: ['tenant', 'database', 'realm', 'application', 'invite'].map((name) => ({
+      name,
+      state: state === 'succeeded' ? 'succeeded' : 'pending',
+      error: null,
+    })),
+    error: null,
+  }
+}
+
+/**
+ * Answers the create dialog's page. Each POST takes the next of `posts`, and each job read the next of `reads`, the
+ * last one for good. `lists` counts the reads of the tenant list.
+ */
+function stubCreate(posts: { status: number; body: unknown }[], reads: CellJob[] = []) {
+  const sent: Post[] = []
+  const counts = { lists: 0 }
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        const headers = new Headers(init.headers)
+        sent.push({
+          key: headers.get('Idempotency-Key'),
+          contentType: headers.get('Content-Type'),
+          body: JSON.parse(init.body as string),
+        })
+        const answer = posts.shift()!
+        return new Response(JSON.stringify(answer.body), { status: answer.status })
+      }
+      if (input.startsWith('/api/cell/jobs/')) {
+        const job = reads.length > 1 ? reads.shift()! : reads[0]
+        return new Response(JSON.stringify(job), { status: 200 })
+      }
+      counts.lists += 1
+      return new Response(JSON.stringify({ items: [acme] }), { status: 200 })
+    }),
+  )
+  return { sent, counts }
+}
+
+async function openDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByTestId('cell-tenants-create'))
+  return screen.findByRole('dialog')
+}
+
+async function fillDialog(user: ReturnType<typeof userEvent.setup>, dialog: HTMLElement, id = 'delta') {
+  await user.clear(within(dialog).getByLabelText('Tenant ID'))
+  await user.type(within(dialog).getByLabelText('Tenant ID'), id)
+  await user.clear(within(dialog).getByLabelText('Application'))
+  await user.type(within(dialog).getByLabelText('Application'), ' approvals ')
+  await user.clear(within(dialog).getByLabelText("Administrator's email"))
+  await user.type(within(dialog).getByLabelText("Administrator's email"), 'admin@delta.test')
+}
+
+// The dialog's corner icon has the same name, so the footer button is the last.
+const closeButton = (dialog: HTMLElement) => within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!
+const createButton = (dialog: HTMLElement) => within(dialog).getByRole('button', { name: 'Create' })
 
 function dataRows() {
   return within(screen.getByTestId('cell-tenants')).getAllByRole('row').slice(1)
@@ -198,5 +268,138 @@ describe('CellTenantsPage', () => {
     renderPage()
 
     expect(await screen.findByTestId('cell-tenants-error')).toHaveTextContent('The tenants could not be loaded.')
+  })
+
+  it('sends the fields trimmed as JSON with an Idempotency-Key', async () => {
+    const { sent } = stubCreate([{ status: 202, body: queued }], [createJob('running')])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+
+    await within(dialog).findByTestId('cell-jobs')
+    expect(sent).toHaveLength(1)
+    expect(sent[0].key).toBeTruthy()
+    expect(sent[0].contentType).toBe('application/json')
+    expect(sent[0].body).toEqual({ id: 'delta', application: 'approvals', administrator: 'admin@delta.test' })
+  })
+
+  it('does not send a request until every field is valid', async () => {
+    const { sent } = stubCreate([])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await user.type(within(dialog).getByLabelText('Tenant ID'), 'Not Valid')
+    await user.click(createButton(dialog))
+
+    expect(await within(dialog).findAllByText(/required|not match|valid/i)).not.toHaveLength(0)
+    expect(sent).toHaveLength(0)
+  })
+
+  it('shows the title of a refusal in the open dialog', async () => {
+    stubCreate([{ status: 409, body: { title: 'A tenant of the cell already has this id.' } }])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+
+    expect(await within(dialog).findByTestId('cell-create-error')).toHaveTextContent(
+      'A tenant of the cell already has this id.',
+    )
+    expect(within(dialog).queryByTestId('cell-jobs')).not.toBeInTheDocument()
+  })
+
+  it('sends the same Idempotency-Key for a retry after a 5xx', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { sent } = stubCreate([
+      { status: 500, body: {} },
+      { status: 202, body: queued },
+    ])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+    expect(await within(dialog).findByTestId('cell-create-error')).toHaveTextContent('Try again.')
+    await user.click(createButton(dialog))
+
+    await within(dialog).findByTestId('cell-jobs')
+    expect(sent).toHaveLength(2)
+    expect(sent[0].key).toBeTruthy()
+    expect(sent[1].key).toBe(sent[0].key)
+  })
+
+  it('sends a new Idempotency-Key when a field changed after a 5xx', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { sent } = stubCreate([
+      { status: 500, body: {} },
+      { status: 202, body: queued },
+    ])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+    await within(dialog).findByTestId('cell-create-error')
+    await user.type(within(dialog).getByLabelText('Tenant ID'), '2')
+    await user.click(createButton(dialog))
+
+    await within(dialog).findByTestId('cell-jobs')
+    expect(sent).toHaveLength(2)
+    expect(sent[1].body).toEqual({ id: 'delta2', application: 'approvals', administrator: 'admin@delta.test' })
+    expect(sent[1].key).not.toBe(sent[0].key)
+  })
+
+  it('follows the job until it ends and then loads the list again', async () => {
+    const { counts } = stubCreate([{ status: 202, body: queued }], [createJob('running'), createJob('succeeded')])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+
+    const jobs = await within(dialog).findByTestId('cell-jobs')
+    expect(jobs).toHaveTextContent('create')
+    expect(counts.lists).toBe(1)
+    await waitFor(() => expect(jobs).toHaveTextContent('Succeeded'), { timeout: 5000 })
+    await waitFor(() => expect(counts.lists).toBe(2))
+    expect(within(dialog).queryByRole('button', { name: 'Create' })).not.toBeInTheDocument()
+    await user.click(closeButton(dialog))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(counts.lists).toBe(2)
+  })
+
+  it('loads the list again when the dialog closes before the job ends', async () => {
+    const { counts } = stubCreate([{ status: 202, body: queued }], [createJob('running')])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+    await within(dialog).findByTestId('cell-jobs')
+    await user.click(closeButton(dialog))
+
+    await waitFor(() => expect(counts.lists).toBe(2))
+  })
+
+  it('reports a refusal of the create to the console', async () => {
+    stubCreate([{ status: 403, body: {} }])
+    const user = userEvent.setup()
+    const onRefused = renderPage()
+
+    const dialog = await openDialog(user)
+    await fillDialog(user, dialog)
+    await user.click(createButton(dialog))
+
+    await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
   })
 })
