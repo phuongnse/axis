@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Result, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -45,7 +45,6 @@ import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioProblems } from './StudioProblems'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
-import { hasRelaxEntry } from './relaxEntries'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioReferences } from './StudioReferences'
 import { StudioSidebar } from './StudioSidebar'
@@ -192,8 +191,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * the layer, shows while it has one. A contract opens in its lifecycle view, and a scenario opens
  * read-only as JSON under a notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's. The folder's `application.json` loads with the
- * application and again after a write. An Off-standard tag shows in the band after the state while it has a relax
- * entry. A module contract, which the application declares directly, has Relax and Undo relax, which write it.
+ * application and again after a write. A module contract, which the application declares directly, has Relax and Undo relax, which write it.
  */
 export function StudioPage() {
   const t = useText()
@@ -558,13 +556,6 @@ function StudioWorkspace() {
             problemsOpen={problemsOpen}
             onToggleProblems={() => setProblemsOpen((open) => !open)}
             newResource={<StudioNewResource application={application!} resources={resources} onCreated={onCreated} />}
-            bandState={
-              manifest && hasRelaxEntry(manifest.content) ? (
-                <Tag data-testid="studio-off-standard" color="warning" style={{ margin: 0 }}>
-                  {t('shell.studio.offStandard')}
-                </Tag>
-              ) : undefined
-            }
             problems={
               problemsOpen && (
                 <StudioProblems

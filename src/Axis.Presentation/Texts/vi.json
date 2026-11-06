@@ -997,6 +997,7 @@
   "shell.studio.band.changesNotLive": "Thay đổi chưa chạy",
   "shell.studio.band.notPublished": "Chưa phát hành",
   "shell.studio.band.live": "Phiên bản {release} đang chạy",
+  "shell.studio.band.liveOffStandard": "Phiên bản {release} đang chạy, ngoài chuẩn",
   "shell.studio.band.releasesFailed": "Không tải được các phiên bản",
   "shell.studio.activate": "Kích hoạt phiên bản",
   "shell.studio.activate.title": "Kích hoạt phiên bản {release}?",

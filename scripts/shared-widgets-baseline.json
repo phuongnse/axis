@@ -113,9 +113,6 @@
   "web/src/pages/StudioNewApplication.tsx": {
     "button": 1
   },
-  "web/src/pages/StudioPage.tsx": {
-    "tag": 1
-  },
   "web/src/pages/StudioPageDesign.tsx": {
     "button": 1
   },

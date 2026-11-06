@@ -39,7 +39,7 @@ export interface StudioPublishingHandle {
  * The band of the open application, with the status of the request its buttons send and its release history. The
  * band holds the `newResource` button, Validate, Preview, Run tests and Publish. On its left it shows the application's
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
- * panel beside the page, then the release state, and `bandState` after it. The request status, test results and
+ * panel beside the page, then the release state. The request status, test results and
  * preview links show at the top of the content, under the band, then `children`, which is called with the release history
  * when it is a function, then the release list. The release
  * list keeps its own title unless `releasesView`, where the page's heading names it, and is hidden on `releasePage`,
@@ -76,7 +76,6 @@ export function StudioPublishing({
   problemsOpen,
   onToggleProblems,
   newResource,
-  bandState,
   problems,
   releasesView,
   releasePage,
@@ -96,7 +95,6 @@ export function StudioPublishing({
   problemsOpen: boolean
   onToggleProblems: () => void
   newResource: ReactNode
-  bandState?: ReactNode
   problems: ReactNode
   releasesView: boolean
   releasePage: boolean
@@ -274,7 +272,6 @@ export function StudioPublishing({
         history={history}
         problemsOpen={problemsOpen}
         onToggleProblems={onToggleProblems}
-        state={bandState}
       >
         <AxisActionRow align="center">
           {newResource}
