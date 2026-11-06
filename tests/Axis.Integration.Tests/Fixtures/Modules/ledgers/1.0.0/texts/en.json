@@ -6,6 +6,15 @@
   "locale": "en",
   "texts": {
     "ledgers.roles.clerk": "Clerk",
-    "ledgers.entry.amountNotNegative": "The amount cannot be negative."
+    "ledgers.entry.amountNotNegative": "The amount cannot be negative.",
+    "ledgers.claim.effect.entryRecorded": "Entry recorded",
+    "ledgers.claim.transition.submit": "Submit",
+    "ledgers.claim.transition.approve": "Approve",
+    "ledgers.claim.state.draft": "Draft",
+    "ledgers.claim.state.submitted": "Submitted",
+    "ledgers.claim.state.approved": "Approved",
+    "ledgers.entry.transition.close": "Close",
+    "ledgers.entry.state.open": "Open",
+    "ledgers.entry.state.closed": "Closed"
   }
 }

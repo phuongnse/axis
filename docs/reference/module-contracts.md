@@ -29,15 +29,25 @@ module's `Decision` entity:
   "lifecycle": {
     "field": "status",
     "states": [
-      { "name": "draft", "initial": true, "deletable": true },
-      { "name": "submitted" },
-      { "name": "returned", "deletable": true },
-      { "name": "approved" },
-      { "name": "rejected" }
+      {
+        "name": "draft",
+        "label": { "textKey": "approvals.request.status.draft" },
+        "initial": true,
+        "deletable": true
+      },
+      { "name": "submitted", "label": { "textKey": "approvals.request.status.submitted" } },
+      {
+        "name": "returned",
+        "label": { "textKey": "approvals.request.status.returned" },
+        "deletable": true
+      },
+      { "name": "approved", "label": { "textKey": "approvals.request.status.approved" } },
+      { "name": "rejected", "label": { "textKey": "approvals.request.status.rejected" } }
     ],
     "transitions": [
       {
         "name": "submit",
+        "label": { "textKey": "approvals.request.transition.submit" },
         "from": ["draft", "returned"],
         "to": "submitted",
         "guard": "accountableUser() == requester",
@@ -45,6 +55,7 @@ module's `Decision` entity:
       },
       {
         "name": "approve",
+        "label": { "textKey": "approvals.request.transition.approve" },
         "from": ["submitted"],
         "to": "approved",
         "guard": "accountableUser() != null and accountableUser() != requester",
@@ -52,17 +63,24 @@ module's `Decision` entity:
       },
       {
         "name": "reject",
+        "label": { "textKey": "approvals.request.transition.reject" },
         "from": ["submitted"],
         "to": "rejected",
         "guard": "accountableUser() != null and accountableUser() != requester",
         "message": { "textKey": "approvals.request.noSelfApproval" }
       },
-      { "name": "return", "from": ["submitted"], "to": "returned" }
+      {
+        "name": "return",
+        "label": { "textKey": "approvals.request.transition.return" },
+        "from": ["submitted"],
+        "to": "returned"
+      }
     ]
   },
   "validations": [
     {
       "name": "amountFrozenAfterSubmit",
+      "label": { "textKey": "approvals.request.validation.amountFrozenAfterSubmit" },
       "expression": "previous(status) in ('draft', 'returned') or amount == previous(amount)",
       "message": { "textKey": "approvals.request.amountFrozen" },
       "field": "amount"
@@ -71,6 +89,7 @@ module's `Decision` entity:
   "effects": [
     {
       "name": "approvalRecorded",
+      "label": { "textKey": "approvals.request.effect.approvalRecorded" },
       "on": "approve",
       "create": {
         "entity": "Decision",
@@ -143,8 +162,8 @@ be created and deleted, and which changes of state are allowed and by whom.
     refuses the write, as a validation does.
   - An update that keeps the state makes no transition. The core validations still run.
   - A delete is refused unless the stored state is deletable.
-- **Labels** _(planned for M31)_. A state and a transition each take a `label` text reference, see
-  [named points](#named-points).
+- **Labels.** A state and a transition each take a `label` text reference, see
+  [point labels](#point-labels).
 - **Extending the lifecycle.** A relax entry never adds states or transitions, see
   [relax entries](#relax-entries). A
   [customization layer](customization-layers.md#extending-a-lifecycle) adds them, except into a
@@ -163,8 +182,8 @@ by it.
 - The compile checks each one: its `name` is unique ignoring letter case (`AXC0328`), its `field` is
   a field of the entity (`AXC0052`), its message key starts with `<module id>.` (`AXC0209`), and its
   expression is boolean.
-- **Labels** _(planned for M31)_. A core validation takes a `label` text reference, see
-  [named points](#named-points).
+- **Labels.** A core validation takes a `label` text reference, see
+  [point labels](#point-labels).
 - They run on every create and update of the entity, after the entity's own validations, on the
   record as it will be stored. Validations that an application's
   [layer](customization-layers.md#module-entities) adds to the entity count as the entity's own.
@@ -193,8 +212,8 @@ transition and runs no effect.
   is not the plain name of a root entity of the module is `AXC0345`. A `values` key that names no
   writable field, or an expression that does not fit its field, is `AXC0346` or the expression's own
   code.
-- **Labels** _(planned for M31)_. An effect takes a `label` text reference, see
-  [named points](#named-points).
+- **Labels.** An effect takes a `label` text reference, see
+  [point labels](#point-labels).
 - **Values.** The expressions read the record after the write, so `id` is the record's id, and may
   call `previous`, `accountableUser` and `decisionTask`. They see the record's fields and child rows
   as an entity validation does, and the rules of the module. Each expression's type must fit its
@@ -387,15 +406,18 @@ a relax entry cannot name it.
 
 ### Point labels
 
-_(planned for M31)_
-
 A point reads as words, never as its technical name, so a person can judge it. A contract's states,
 transitions, core validations and effects each need a `label` text reference, a ceiling slot uses its
 module role's label, and the ceiling of roles mapped to no slot reads "Other roles". A point without a
-label, or a label whose key no text resource holds, is a compile error, so a publish never brings a
-point without words. Studio reads the words from the module files that the release stores, so a
-release keeps the words it was published with, and a part without a label in an older release shows
-its name as written.
+label is `AXC0376`, reported at the element's path. A label whose key no text resource holds is
+`AXC0028`, and a key without the `<module id>.` prefix is `AXC0209`. A publish never brings a point
+without words. Studio reads the words from the module files that the release stores, so a release
+keeps the words it was published with.
+
+A state or transition that a [layer](customization-layers.md#extending-a-lifecycle) adds is no
+point, so it needs no label and its key needs no prefix. A label it carries must still resolve.
+Rebuilding a stored release does not require labels, so a release stored with a contract that has
+none still rebuilds and activates. Its parts without a label show their name as written.
 
 ## Relax entries
 

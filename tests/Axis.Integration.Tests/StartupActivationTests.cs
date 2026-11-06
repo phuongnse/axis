@@ -1090,10 +1090,10 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
                 { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a62", "kind": "contract", "name": "TicketContract", "formatVersion": 1, "entity": "Ticket",
                   "lifecycle": {
                     "field": "status",
-                    "states": [{ "name": "open", "initial": true, "deletable": true }, { "name": "closed" }],
+                    "states": [{ "name": "open", "label": { "textKey": "tickets.point" }, "initial": true, "deletable": true }, { "name": "closed", "label": { "textKey": "tickets.point" } }],
                     "transitions": [
-                      { "name": "close", "from": ["open"], "to": "closed" },
-                      { "name": "reopen", "from": ["closed"], "to": "open"{{guard}} }
+                      { "name": "close", "label": { "textKey": "tickets.point" }, "from": ["open"], "to": "closed" },
+                      { "name": "reopen", "label": { "textKey": "tickets.point" }, "from": ["closed"], "to": "open"{{guard}} }
                     ]
                   } }
                 """)
@@ -1103,7 +1103,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
                 """)
             .With("tickets/1.0.0/TextsEn.json", """
                 { "id": "8d0e3b52-6f1a-4c47-b2d9-0a7c5e1f3a65", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "tickets.roles.agent": "Agent" } }
+                  "texts": { "tickets.roles.agent": "Agent", "tickets.point": "Point" } }
                 """);
     }
 

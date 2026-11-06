@@ -27,6 +27,13 @@
     "department-budgets.budgetApproval.approve": "Approve",
     "department-budgets.budgetApproval.reject": "Reject",
     "department-budgets.roles.approver": "Budget approver",
-    "department-budgets.roles.administrator": "Organization administrator"
+    "department-budgets.roles.administrator": "Organization administrator",
+    "department-budgets.budget.state.draft": "Draft",
+    "department-budgets.budget.state.approved": "Approved",
+    "department-budgets.budget.state.rejected": "Rejected",
+    "department-budgets.budget.transition.approve": "Approve",
+    "department-budgets.budget.transition.reject": "Reject",
+    "department-budgets.budget.validation.amountFrozenOnceDecided": "Amount frozen once decided",
+    "department-budgets.budget.effect.decisionRecorded": "Record the decision"
   }
 }

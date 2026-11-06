@@ -8,6 +8,11 @@
     "stages.roles.requester": "Requester",
     "stages.ticket.amountNotNegative": "The amount cannot be negative.",
     "stages.ticket.amountFrozen": "The amount cannot change after the ticket is submitted.",
-    "stages.ticket.stepNeedsDecision": "The step moves only with a new decision."
+    "stages.ticket.stepNeedsDecision": "The step moves only with a new decision.",
+    "stages.ticket.validation.amountFrozenAfterSubmit": "Amount frozen after submit",
+    "stages.ticket.validation.stepMovesWithNewDecision": "Step moves with new decision",
+    "stages.ticket.transition.submit": "Submit",
+    "stages.ticket.state.draft": "Draft",
+    "stages.ticket.state.submitted": "Submitted"
   }
 }

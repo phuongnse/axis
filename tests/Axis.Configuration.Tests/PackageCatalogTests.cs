@@ -22,6 +22,7 @@ public sealed class PackageCatalogTests
         Assert.Same(package, catalog.Find(TestPackages.Id, "1.0.0"));
         Assert.Null(catalog.Find(TestPackages.Id, "2.0.0"));
         Assert.Equal(("test-package", "1.0.0", "Axis.TestPackage.dll"), (package.Manifest.Id, package.Manifest.Version, package.Manifest.Assembly));
+        Assert.Equal("Test package", package.Manifest.Label);
         Assert.Equal(["describe", "sum", "fail", "flaky", "slow", "probe"], package.Manifest.Operations.Select(operation => operation.Name));
         Assert.Equal("test-package/1.0.0", package.LoadContext.Name);
     }
@@ -39,6 +40,35 @@ public sealed class PackageCatalogTests
         Assert.Equal((DiagnosticCodes.PackageManifestInvalid, ManifestFile, "/operations/0"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Contains("'test-package'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Contains("idempotent", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_manifest_without_a_label_is_a_diagnostic_and_the_package_is_not_listed()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0")
+            .EditManifest("1.0.0", manifest => manifest.Remove("label"));
+
+        var catalog = PackageCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, ManifestFile), (diagnostic.Code, diagnostic.File));
+        Assert.Contains("'test-package'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Contains("label", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_manifest_label_of_101_characters_is_a_diagnostic_and_the_package_is_not_listed()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0")
+            .EditManifest("1.0.0", manifest => manifest["label"] = new string('a', 101));
+
+        var catalog = PackageCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, ManifestFile, "/label"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("'test-package'", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]

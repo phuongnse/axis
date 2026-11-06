@@ -83,6 +83,14 @@
     "approvals.actions.view": "View",
     "approvals.actions.submit": "Submit",
     "approvals.roles.admin": "Administrator",
-    "approvals.roles.member": "Member"
+    "approvals.roles.member": "Member",
+    "approvals.request.transition.submit": "Submit",
+    "approvals.request.transition.approve": "Approve",
+    "approvals.request.transition.return": "Return",
+    "approvals.request.transition.reject": "Reject",
+    "approvals.request.transition.cancel": "Cancel",
+    "approvals.request.validation.oneDecisionPerStep": "One decision per step",
+    "approvals.request.validation.frozenAfterSubmit": "Locked after submission",
+    "approvals.requestType.validation.hasStepForEveryAmount": "A step for every amount"
   }
 }

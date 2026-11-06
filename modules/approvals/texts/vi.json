@@ -83,6 +83,14 @@
     "approvals.actions.view": "Xem",
     "approvals.actions.submit": "Gửi",
     "approvals.roles.admin": "Quản trị viên",
-    "approvals.roles.member": "Thành viên"
+    "approvals.roles.member": "Thành viên",
+    "approvals.request.transition.submit": "Gửi",
+    "approvals.request.transition.approve": "Duyệt",
+    "approvals.request.transition.return": "Trả lại",
+    "approvals.request.transition.reject": "Từ chối",
+    "approvals.request.transition.cancel": "Hủy",
+    "approvals.request.validation.oneDecisionPerStep": "Mỗi bước một quyết định",
+    "approvals.request.validation.frozenAfterSubmit": "Khóa sau khi gửi",
+    "approvals.requestType.validation.hasStepForEveryAmount": "Có bước duyệt cho mọi số tiền"
   }
 }
