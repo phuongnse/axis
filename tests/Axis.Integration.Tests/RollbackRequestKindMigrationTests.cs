@@ -39,6 +39,7 @@ public sealed class RollbackRequestKindMigrationTests
 
         await context.Database.MigrateAsync(CancellationToken);
 
+        // The rows come back ordered by kind, because two version 7 ids made in one millisecond have no fixed order.
         Assert.Equal(
             [(rollback, "activate", "queued"), (publish, "publish", "succeeded")],
             await RequestsAsync(connectionString));
@@ -48,7 +49,7 @@ public sealed class RollbackRequestKindMigrationTests
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
-        await using var command = new NpgsqlCommand("SELECT id, kind, status FROM axis.publish_requests ORDER BY id", connection);
+        await using var command = new NpgsqlCommand("SELECT id, kind, status FROM axis.publish_requests ORDER BY kind", connection);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         var rows = new List<(Guid, string, string)>();
         while (await reader.ReadAsync(CancellationToken))
