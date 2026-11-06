@@ -155,9 +155,6 @@
   "web/src/platform/ConsolePublishing.tsx": {
     "tag": 1
   },
-  "web/src/platform/DeadLetterList.tsx": {
-    "table": 1
-  },
   "web/src/platform/FilterBar.tsx": {
     "button": 2
   },
@@ -169,9 +166,6 @@
   },
   "web/src/platform/NotificationBell.tsx": {
     "button": 2
-  },
-  "web/src/platform/ProcessInspectorWidget.tsx": {
-    "table": 1
   },
   "web/src/platform/ProcessInstancePage.tsx": {
     "tag": 2,

@@ -1,6 +1,7 @@
-import { Alert, Flex, Select, Table, Typography, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Flex, Select } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { AxisTable, type AxisColumn, type AxisTableProps } from './AxisTable'
 import { DeadLetterList } from './DeadLetterList'
 import { formatValue } from './formatValue'
 import {
@@ -11,7 +12,6 @@ import {
   type InstanceListItem,
   type InstancePage,
 } from './inspection'
-import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { useText } from './texts'
@@ -40,15 +40,10 @@ const pageSizes = tablePageSizes()
 const parameterNames = ['state']
 const createdAtField = { name: 'createdAt', type: 'date-time' } as const
 const endedAtField = { name: 'endedAt', type: 'date-time' } as const
-const emptyDash = (
-  <Typography.Text type="secondary" italic>
-    —
-  </Typography.Text>
-)
 
 /**
  * Lists the instances of the widget's process, newest first, as the inspection API orders them. A
- * clearable select filters them by state. `state`, `page` and `pageSize` live in the URL, and a
+ * clearable select in the table's toolbar filters them by state. `state`, `page` and `pageSize` live in the URL, and a
  * state change goes back to page 1. The first column links each row to the instance's address
  * under the inspector page. A `403` shows that the user may not inspect the process. With nobody
  * signed in, the inspection API's 401 shows the sign-in prompt.
@@ -121,12 +116,13 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     return () => controller.abort()
   }, [instancesPath, requestQuery, requestUrl])
 
-  const columns = useMemo<TableColumnsType<InstanceListItem>>(
+  const columns = useMemo<AxisColumn<InstanceListItem>[]>(
     () => [
       {
         key: 'record',
+        kind: 'freeText',
         title: t('shell.inspector.subject'),
-        render: (_value: unknown, instance: InstanceListItem) => (
+        render: (_value, instance) => (
           <Link to={`${instancePath}/${instance.id}`}>
             {instance.subjectLabel ??
               (instance.subjectId === null ? t('shell.inspector.noSubject') : t('shell.inspector.open'))}
@@ -135,25 +131,29 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       },
       {
         key: 'state',
+        kind: 'fixed',
         title: t('shell.inspector.state'),
-        render: (_value: unknown, instance: InstanceListItem) => stateText(t, instance.state),
+        render: (_value, instance) => stateText(t, instance.state),
       },
-      { key: 'step', title: t('shell.inspector.step'), render: (_value: unknown, instance) => instance.step },
+      { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_value, instance) => instance.step },
       {
         key: 'release',
+        kind: 'fixed',
         title: t('shell.inspector.release'),
-        render: (_value: unknown, instance) => instance.releaseNumber ?? emptyDash,
+        render: (_value, instance) => instance.releaseNumber ?? null,
       },
       {
         key: 'createdAt',
+        kind: 'fixed',
         title: t('shell.inspector.createdAt'),
-        render: (_value: unknown, instance) => formatValue(createdAtField, instance.createdAt, {}, { locale, text: t }),
+        render: (_value, instance) => formatValue(createdAtField, instance.createdAt, {}, { locale, text: t }),
       },
       {
         key: 'endedAt',
+        kind: 'fixed',
         title: t('shell.inspector.endedAt'),
-        render: (_value: unknown, instance) =>
-          instance.endedAt === null ? emptyDash : formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
+        render: (_value, instance) =>
+          instance.endedAt === null ? null : formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
       },
     ],
     [locale, t, instancePath],
@@ -162,7 +162,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   const stateOptions = useMemo(() => instanceStates.map((value) => ({ value, label: stateText(t, value) })), [t])
 
   // A new state or page size starts again at page 1. Paging adds history entries.
-  const onChange: TableProps<InstanceListItem>['onChange'] = (pagination) => {
+  const onChange: AxisTableProps<InstanceListItem>['onChange'] = (pagination) => {
     const pageSize = pagination.pageSize ?? query.pageSize
     const page = pageSize !== query.pageSize ? 1 : (pagination.current ?? 1)
     setSearchParams(writeTableQuery(searchParams, { ...query, page, pageSize }, undefined, parameterNames))
@@ -186,30 +186,31 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   }
   return (
     <Flex vertical gap="middle">
-      <Select
-        allowClear
-        aria-label={t('shell.inspector.state')}
-        style={{ width: 240 }}
-        placeholder={t('shell.inspector.allStates')}
-        value={state}
-        options={stateOptions}
-        virtual={false}
-        onChange={onStateChange}
-      />
-      <Table<InstanceListItem>
-        rowKey="id"
+      <AxisTable<InstanceListItem>
+        toolbar={{
+          view: (
+            <Select
+              allowClear
+              aria-label={t('shell.inspector.state')}
+              style={{ width: 240 }}
+              placeholder={t('shell.inspector.allStates')}
+              value={state}
+              options={stateOptions}
+              virtual={false}
+              onChange={onStateChange}
+            />
+          ),
+        }}
+        rowKey={(instance) => instance.id}
         columns={columns}
-        scroll={{ x: 'max-content' }}
         dataSource={load.page?.items}
         loading={loading}
-        locale={{ emptyText: t('shell.inspector.empty') }}
+        emptyText={t('shell.inspector.empty')}
         pagination={{
           current: query.page,
           pageSize: query.pageSize,
           total: load.page?.totalCount ?? 0,
           pageSizeOptions: pageSizes,
-          showSizeChanger: true,
-          itemRender: markCurrentPage(query.page),
         }}
         onChange={onChange}
       />
