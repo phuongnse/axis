@@ -15,9 +15,10 @@ This skill says how to read a page. The audit changes no file.
 
 1. `pages <run number>` picks the run's pages: every `*.md` that git tracks under `docs/`, in order,
    whose index modulo 4 equals the run number modulo 4, so every page is read once in four runs.
-2. `read <run number>` asks Claude Code, with the tools `Read`, `Grep`, `Glob` and `Task` only and no
-   GitHub token, to follow [reading a page](#reading-a-page) for those pages and answer with the
-   findings in the script's JSON schema.
+2. `read <run number>` splits those pages into groups of about eight. It asks Claude Code once per group,
+   at most four at a time, with the tools `Read`, `Grep` and `Glob` only and no GitHub token. Each
+   answer follows [reading a page](#reading-a-page) for its group and gives the findings in the script's
+   JSON schema. When a group's answer fails, the step fails after every group has finished.
 3. `file <findings> <run id>`, in a job that runs no model, groups the findings, leaves out those an
    open issue covers, opens at most ten issues and marks each with the run that found it.
 
@@ -26,11 +27,9 @@ reports the findings to the owner instead.
 
 ## Reading a page
 
-Split the pages into groups of about eight and give each group to a subagent, with this section as its
-brief. Start each subagent in the foreground and wait until every subagent has returned before you
-answer. A subagent starts no subagents of its own. For each page, compare every statement that the
-repository can confirm with the code: the server under `src/`, the SPA under `web/src/`, `scripts/`,
-`deploy/`, `.github/`, `.nexkit/`, the schemas and the tests. The code, not another doc, is the evidence.
+For each page, compare every statement that the repository can confirm with the code: the server under
+`src/`, the SPA under `web/src/`, `scripts/`, `deploy/`, `.github/`, `.nexkit/`, the schemas and the tests.
+The code, not another doc, is the evidence.
 
 Report each finding with the page and line, the statement, the evidence (file and line), and one kind:
 

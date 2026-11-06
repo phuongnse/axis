@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { issuesFrom, maxIssues, pagesFor, parseAnswer, promptFor, shares } from './docs-audit.mjs'
+import {
+  claudeArgs,
+  groupsOf,
+  issuesFrom,
+  maxIssues,
+  pagesFor,
+  parseAnswer,
+  readers,
+  readGroups,
+  shares,
+} from './docs-audit.mjs'
 
 const finding = (page, line, kind, extra = {}) => ({
   page,
@@ -59,13 +69,64 @@ describe('parseAnswer', () => {
   })
 })
 
-describe('promptFor', () => {
-  test('asks for foreground subagents, a wait for all of them, and no subagents of subagents', () => {
-    const prompt = promptFor(['docs/a.md'])
-    assert.match(prompt, /foreground/)
-    assert.match(prompt, /wait/i)
-    assert.match(prompt, /starts no subagents/)
-    assert.match(prompt, /^- docs\/a\.md$/m)
+describe('claudeArgs', () => {
+  test('gives Claude Code the read-only tools and no subagent tool', () => {
+    const args = claudeArgs(['docs/a.md'])
+    assert.equal(args[args.indexOf('--tools') + 1], 'Read,Grep,Glob')
+    assert.doesNotMatch(args[args.indexOf('-p') + 1], /subagent/i)
+  })
+
+  test('lists the pages of the group in the prompt', () => {
+    assert.match(claudeArgs(['docs/a.md'])[1], /^- docs\/a\.md$/m)
+  })
+})
+
+describe('groupsOf and readGroups', () => {
+  const pages = Array.from({ length: 20 }, (_, i) => `docs/p${i}.md`)
+
+  test('splits 20 pages into asks of at most eight pages and merges their findings in order', async () => {
+    const sizes = []
+    const findings = await readGroups(groupsOf(pages), async (group) => {
+      sizes.push(group.length)
+      return JSON.stringify({ structured_output: { findings: [finding(group[0], 1, 'wrong')] } })
+    })
+    assert.deepEqual(sizes, [8, 8, 4])
+    assert.deepEqual(
+      findings.map((f) => f.page),
+      ['docs/p0.md', 'docs/p8.md', 'docs/p16.md'],
+    )
+  })
+
+  test('fails after every group has settled, naming the group whose answer is prose', async () => {
+    const calls = []
+    const prose = JSON.stringify({ subtype: 'success', result: 'The `modules/` pages were read, and no finding was found.' })
+    await assert.rejects(
+      readGroups(groupsOf(pages), async (group) => {
+        calls.push(group[0])
+        return group[0] === 'docs/p8.md' ? prose : JSON.stringify({ structured_output: { findings: [] } })
+      }),
+      (error) => {
+        assert.match(error.message, /^docs\/p8\.md…: .*no structured output.*The `modules\//)
+        assert.equal(error.message.split('\n').length, 1)
+        return true
+      },
+    )
+    assert.deepEqual(calls, ['docs/p0.md', 'docs/p8.md', 'docs/p16.md'])
+  })
+
+  test('never runs more asks at once than readers', async () => {
+    let active = 0
+    let peak = 0
+    const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    const forty = Array.from({ length: 40 }, (_, i) => `docs/p${i}.md`)
+    await readGroups(groupsOf(forty), async () => {
+      active++
+      peak = Math.max(peak, active)
+      await delay(10)
+      active--
+      return JSON.stringify({ structured_output: { findings: [] } })
+    })
+    assert.equal(peak, readers)
   })
 })
 

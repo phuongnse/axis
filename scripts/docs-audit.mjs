@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url'
 // The docs audit of D135, in three commands that the docs-audit workflow runs:
 //
 //   node scripts/docs-audit.mjs pages <run>        prints this run's pages, one per line
-//   node scripts/docs-audit.mjs read <run>         reads those pages against the code with Claude Code,
-//                                                  which has read-only tools, and prints the findings
+//   node scripts/docs-audit.mjs read <run>         asks Claude Code once per group of about eight pages, at most
+//                                                  four at a time, with read-only tools, and prints the findings
 //   node scripts/docs-audit.mjs file <findings> <run id>
 //                                                  opens a NexKit issue for each group of findings
 //                                                  that no open issue covers, at most ten
@@ -20,6 +20,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repository = 'https://github.com/phuongnse/axis'
 export const shares = 4
 export const maxIssues = 10
+export const groupSize = 8
+export const readers = 4
 export const kinds = ['wrong', 'built', 'missing', 'unbuilt', 'untested-list', 'standard']
 const docsKinds = new Set(['wrong', 'built', 'missing', 'standard'])
 const kindNames = {
@@ -174,44 +176,96 @@ export function issuesFrom(findings, openBodies, runId) {
   return issues.slice(0, maxIssues)
 }
 
+function failure(command, args, stdout, stderr) {
+  return `${command} ${args[0]} failed:\n${stdout}${stderr}`.trimEnd()
+}
+
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...options })
   if (result.error) throw new Error(`${command}: ${result.error.message}`)
-  if (result.status !== 0) throw new Error(`${command} ${args[0]} failed:\n${result.stdout}${result.stderr}`.trimEnd())
+  if (result.status !== 0) throw new Error(failure(command, args, result.stdout, result.stderr))
   return result.stdout
+}
+
+function runAsync(command, args, options) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, options)
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk
+    })
+    child.on('error', (error) => reject(new Error(`${command}: ${error.message}`)))
+    child.on('close', (status) => {
+      if (status === 0) resolve(stdout)
+      else reject(new Error(failure(command, args, stdout, stderr)))
+    })
+  })
 }
 
 function trackedDocs() {
   return run('git', ['ls-files', 'docs'], { cwd: root }).split('\n').filter(Boolean)
 }
 
-export function promptFor(pages) {
+function promptFor(pages) {
   return [
     'Read .claude/skills/axis-docs-audit/SKILL.md, then follow its section "Reading a page" for these pages:',
     ...pages.map((p) => `- ${p}`),
-    'Use subagents for groups of about eight pages. Start each one in the foreground, never in the background. Wait until every subagent has returned. A subagent starts no subagents of its own. Then answer once, with the findings only, in the given schema.',
+    'Then answer once, with the findings only, in the given schema.',
   ].join('\n')
 }
 
-function read(runNumber) {
-  const answer = run(
-    process.env.CLAUDE ?? 'claude',
-    [
-      '-p',
-      promptFor(pagesFor(trackedDocs(), runNumber)),
-      '--output-format',
-      'json',
-      '--no-session-persistence',
-      '--model',
-      process.env.DOCS_AUDIT_MODEL ?? 'claude-opus-5-5',
-      '--tools',
-      'Read,Grep,Glob,Task',
-      '--json-schema',
-      JSON.stringify(findingsSchema),
-    ],
-    { cwd: root },
+export function claudeArgs(pages) {
+  return [
+    '-p',
+    promptFor(pages),
+    '--output-format',
+    'json',
+    '--no-session-persistence',
+    '--model',
+    process.env.DOCS_AUDIT_MODEL ?? 'claude-opus-5-5',
+    '--tools',
+    'Read,Grep,Glob',
+    '--json-schema',
+    JSON.stringify(findingsSchema),
+  ]
+}
+
+export function groupsOf(pages) {
+  const groups = []
+  for (let i = 0; i < pages.length; i += groupSize) groups.push(pages.slice(i, i + groupSize))
+  return groups
+}
+
+/** Asks once per group, at most `readers` at a time, and returns the findings of all groups in order. */
+export async function readGroups(groups, ask) {
+  const results = new Array(groups.length)
+  let next = 0
+  const lanes = Array.from({ length: Math.min(readers, groups.length) }, async () => {
+    while (next < groups.length) {
+      const i = next++
+      try {
+        results[i] = { findings: parseAnswer(await ask(groups[i])) }
+      } catch (error) {
+        results[i] = { error: `${groups[i][0]}…: ${error.message}` }
+      }
+    }
+  })
+  await Promise.all(lanes)
+  const failed = results.filter((r) => r.error)
+  if (failed.length) throw new Error(failed.map((r) => r.error).join('\n'))
+  return results.flatMap((r) => r.findings)
+}
+
+async function read(runNumber) {
+  return readGroups(groupsOf(pagesFor(trackedDocs(), runNumber)), (pages) =>
+    runAsync(process.env.CLAUDE ?? 'claude', claudeArgs(pages), { cwd: root }),
   )
-  return parseAnswer(answer)
 }
 
 function file(findingsFile, runId) {
@@ -227,11 +281,11 @@ function file(findingsFile, runId) {
   return issues.length
 }
 
-function main([command, ...args]) {
+async function main([command, ...args]) {
   if (command === 'pages') {
     console.log(pagesFor(trackedDocs(), Number(args[0])).join('\n'))
   } else if (command === 'read') {
-    console.log(JSON.stringify(read(Number(args[0])), null, 2))
+    console.log(JSON.stringify(await read(Number(args[0])), null, 2))
   } else if (command === 'file') {
     console.log(`Opened ${file(args[0], args[1])} issues.`)
   } else {
@@ -242,10 +296,13 @@ function main([command, ...args]) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    process.exitCode = main(process.argv.slice(2))
-  } catch (error) {
-    console.error(error.message)
-    process.exitCode = 1
-  }
+  main(process.argv.slice(2)).then(
+    (code) => {
+      process.exitCode = code
+    },
+    (error) => {
+      console.error(error.message)
+      process.exitCode = 1
+    },
+  )
 }
