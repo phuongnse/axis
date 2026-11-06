@@ -169,8 +169,8 @@ function emptyTextOf(name: string): string | undefined {
     return "No open tasks.";
   }
   if (name === "detail") {
-    // Ant Design's placeholder for the empty Lines table.
-    return "No data";
+    // The shared table's empty text for the empty Lines table.
+    return "No records yet.";
   }
   if (name === "kpi") {
     // The dash is what the eye sees. The words are visually hidden for assistive technology.
