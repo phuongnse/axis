@@ -53,6 +53,10 @@ else if (string.Equals(options.Dns.Provider, DnsProviders.Rfc2136, StringCompari
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 {
     builder.Services.AddKeyedSingleton("directory", (_, _) => NpgsqlDataSource.Create(options.DirectoryConnectionString));
+
+    // The jobs that write and remove a tenant's record. The options guarantee an IDnsRecords whenever the directory is set.
+    builder.Services.AddSingleton<IJobHandler, WriteTenantRecordJobHandler>();
+    builder.Services.AddSingleton<IJobHandler, RemoveTenantRecordJobHandler>();
 }
 
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.

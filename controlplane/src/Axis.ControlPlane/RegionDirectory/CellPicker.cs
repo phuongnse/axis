@@ -9,9 +9,14 @@ namespace Axis.ControlPlane.RegionDirectory;
 /// The caller's create call asks that cell to create the tenant. When the cell answers that it is full, the picker marks it as not
 /// taking new tenants and tries the next one. When the cell accepts, one transaction writes the tenant row and raises the cell's
 /// count by one. The <see cref="DirectoryCorrection"/> may have added the row already, as the cell has the tenant once it
-/// accepts. Then the write keeps that row and leaves the count, which the correction has set. With no cell left it logs an error and returns <see cref="CellPlacement.Queued"/>.
+/// accepts. Then the write keeps that row and leaves the count, which the correction has set. The same transaction writes the tenant's
+/// subdomain host row, and after it commits the picker queues the <c>writeTenantRecord</c> job on the control plane database, see
+/// <see cref="TenantRecordJobs"/>. With no cell left it logs an error and returns <see cref="CellPlacement.Queued"/>.
 /// </summary>
-internal sealed partial class CellPicker(NpgsqlDataSource directory, ILogger<CellPicker> logger)
+internal sealed partial class CellPicker(
+    [FromKeyedServices("directory")] NpgsqlDataSource directory,
+    NpgsqlDataSource controlPlane,
+    ILogger<CellPicker> logger)
 {
     /// <summary>
     /// Places <paramref name="tenantId"/> in a cell of <paramref name="regionCode"/>. <paramref name="create"/> receives the id of
@@ -93,7 +98,24 @@ internal sealed partial class CellPicker(NpgsqlDataSource directory, ILogger<Cel
             await count.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        // The subdomain host, so the directory's host rows match the DNS records. The cell's own list adds the other hosts.
+        await using (var host = new NpgsqlCommand(
+            """
+            INSERT INTO directory.hosts (host, tenant_id, cell_id)
+            SELECT lower(@id || '.' || r.tenant_domain), @id, @cell FROM directory.regions r WHERE r.code = @region
+            ON CONFLICT (host) DO NOTHING
+            """, connection, transaction))
+        {
+            host.Parameters.AddWithValue("id", tenantId);
+            host.Parameters.AddWithValue("cell", cellId);
+            host.Parameters.AddWithValue("region", regionCode);
+            await host.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await transaction.CommitAsync(cancellationToken);
+
+        // After the commit: the queue is in another database, and a job that ran first would find no row.
+        await TenantRecordJobs.EnqueueWriteAsync(controlPlane, tenantId, cancellationToken);
     }
 
     [LoggerMessage(LogLevel.Error, "No cell of the region {Region} takes a new tenant. Open a cell.")]

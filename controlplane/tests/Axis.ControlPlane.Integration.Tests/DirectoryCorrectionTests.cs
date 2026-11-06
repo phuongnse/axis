@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
 using Microsoft.EntityFrameworkCore;
@@ -37,6 +38,8 @@ public sealed class DirectoryCorrectionTests : IAsyncLifetime
             await context.Database.MigrateAsync(token);
         }
 
+        // The two schemas have their own history tables, so the directory and the control plane share this database.
+        await ControlPlaneDatabase.MigrateAsync(_container.GetConnectionString(), token);
         _dataSource = NpgsqlDataSource.Create(_container.GetConnectionString());
         await Execute("INSERT INTO directory.regions (code, tenant_domain, api_url) VALUES ('vn', 'vn.example.com', 'https://api.vn.example.com')");
         await Execute("""
@@ -53,7 +56,7 @@ public sealed class DirectoryCorrectionTests : IAsyncLifetime
 
         _clients = new CellClients(controlPlane, new HandlerFactory(_handler), new CellClientOptions(), TimeProvider.System);
         _loggers = LoggerFactory.Create(builder => builder.AddProvider(_logs));
-        _correction = new DirectoryCorrection(_dataSource, _clients, _loggers.CreateLogger<DirectoryCorrection>());
+        _correction = new DirectoryCorrection(_dataSource, _dataSource, _clients, _loggers.CreateLogger<DirectoryCorrection>());
     }
 
     public async ValueTask DisposeAsync()
@@ -149,6 +152,71 @@ public sealed class DirectoryCorrectionTests : IAsyncLifetime
         Assert.Equal(0L, await ScalarAsync<long>("SELECT count(*) FROM directory.tenants"));
         var warning = Assert.Single(_logs.Entries, entry => entry.Level == LogLevel.Warning);
         Assert.Contains("vn-2", warning.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_tenant_the_cell_no_longer_lists_gets_a_removal_job_that_removes_its_record_and_a_second_run_changes_nothing()
+    {
+        await SeedTenantAsync("vn-1", "old", "old.vn.example.com");
+        var dns = new InMemoryDnsRecords();
+        await dns.SetCnameAsync("old.vn.example.com", "ingress.vn-1.vn.example.com", TestContext.Current.CancellationToken);
+        _handler.Lists["vn-1"] = [];
+        _handler.Lists["vn-2"] = [];
+
+        await Run();
+
+        var job = await ClaimAsync(TenantRecordJobs.RemoveKind);
+        Assert.Equal("old", job.Payload["tenantId"]!.GetValue<string>());
+        Assert.Equal("vn.example.com", job.Payload["tenantDomain"]!.GetValue<string>());
+        var handler = new RemoveTenantRecordJobHandler(_dataSource, dns);
+        await handler.RunAsync(job, TestContext.Current.CancellationToken);
+        await handler.RunAsync(job, TestContext.Current.CancellationToken);
+        Assert.Empty(dns.Records);
+    }
+
+    [Fact]
+    public async Task A_tenant_the_correction_adds_gets_a_write_job()
+    {
+        _handler.Lists["vn-1"] = [("fresh", ["fresh.vn.example.com"])];
+        _handler.Lists["vn-2"] = [];
+
+        await Run();
+
+        var job = await ClaimAsync(TenantRecordJobs.WriteKind);
+        Assert.Equal("fresh", job.Payload["tenantId"]!.GetValue<string>());
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+    }
+
+    [Fact]
+    public async Task A_second_run_with_the_same_lists_queues_no_job()
+    {
+        _handler.Lists["vn-1"] = [("acme", ["acme.vn.example.com"])];
+        _handler.Lists["vn-2"] = [];
+        await Run();
+
+        await Run();
+
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs"));
+    }
+
+    [Fact]
+    public async Task A_removal_job_for_a_tenant_that_is_back_in_the_directory_keeps_its_record()
+    {
+        await SeedTenantAsync("vn-1", "back", "back.vn.example.com");
+        var dns = new InMemoryDnsRecords();
+        await dns.SetCnameAsync("back.vn.example.com", "ingress.vn-1.vn.example.com", TestContext.Current.CancellationToken);
+        var job = new ClaimedJob(Guid.NewGuid(), TenantRecordJobs.RemoveKind, new() { ["tenantId"] = "back", ["tenantDomain"] = "vn.example.com" }, 1);
+
+        await new RemoveTenantRecordJobHandler(_dataSource, dns).RunAsync(job, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["back.vn.example.com"], dns.Records.Keys);
+    }
+
+    private async Task<ClaimedJob> ClaimAsync(string kind)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var connection = await _dataSource.OpenConnectionAsync(token);
+        return Assert.IsType<ClaimedJob>(await JobQueue.ClaimAsync(connection, "test", [kind], TimeSpan.FromMinutes(5), token));
     }
 
     private Task Run() => _correction.RunAsync(new ClaimedJob(Guid.NewGuid(), DirectoryCorrection.JobKind, [], 1), TestContext.Current.CancellationToken);
