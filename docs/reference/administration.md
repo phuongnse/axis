@@ -411,14 +411,14 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
 and the E2E script each start one too. It runs `publish`, `validate`,
-[`rollback`](authoring.md#publishing) and `test` requests under both tenancy sources, and `publish`
+[`activate`](authoring.md#publishing) and `test` requests under both tenancy sources, and `publish`
 requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
 
 | Loop              | What it does |
 | ----------------- | ------------ |
-| Requests          | Claims and runs `publish`, `validate` and `rollback` requests, see [claiming](#claiming). Only this loop reads the tenants again. |
+| Requests          | Claims and runs `publish`, `validate` and `activate` requests, see [claiming](#claiming). Only this loop reads the tenants again. |
 | Tests             | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring.md#test). |
 | Jobs              | Under `Tenancy:Source=directory`, runs the jobs of `platform.jobs`, see [provisioning API](tenant-lifecycle.md#provisioning-api). It claims each job with a lease, runs one job at a time for each tenant and lets a running job finish when it is stopped. A job that it ends writes one [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. |
 | Host checks       | Checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`, `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names the operator who asked for the host. |
@@ -477,23 +477,23 @@ publisher. The `directory` source writes neither line.
 ### Claiming
 
 Each poll round, for each served tenant, the requests loop claims the oldest `queued` `publish`,
-`validate` or `rollback` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
+`validate` or `activate` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
 `test` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
 `lease_until`, and adds 1 to `claims`. A `running` request whose lease has run out is claimed the same
 way.
 
 - **Test requests.** `test` requests form their own queue for each tenant and application. At most
   one runs at a time, oldest first, independent of the other kinds. A `test` does not wait behind a
-  running `publish`, `validate` or `rollback`, and none of them waits behind a `test`, so a long test
+  running `publish`, `validate` or `activate`, and none of them waits behind a `test`, so a long test
   holds up no publish. The claim that skips an application with a `running` request therefore counts
   only the requests of the same queue.
 - **Target.** A request with target `tenant` is claimed as above. A request with target `preview` is
   claimed only when it is a `publish`, and only when the tenant has no preview tenant, or when the
-  publisher serves that preview tenant. A `validate` or `rollback` with target `preview` is never
+  publisher serves that preview tenant. A `validate` or `activate` with target `preview` is never
   claimed, and stays `queued`. A preview request that is not claimed does not block the later
   requests of its application.
 - **One at a time.** For one tenant and application it runs one request at a time, oldest first, so
-  when two publishes are queued the newer one ends up live, and a `rollback` that is queued after a
+  when two publishes are queued the newer one ends up live, and an `activate` that is queued after a
   publish runs after it. A `validate` waits behind a running `publish` of the same application. A
   claim skips an application that already has a `running` request. Requests of other applications
   and tenants can run at the same time. Each claim takes a lock of the tenant database before it
@@ -504,7 +504,7 @@ way.
   its tenant database connection is claimed again in the next round, without waiting for the lease. A
   request that has been claimed three times and whose lease runs out again ends `failed` with
   `AXC0215`, see the [lifecycle](authoring.md#lifecycle). A `publish` gets a
-  `release.publishFailed` audit record with it, a `rollback` gets a `release.rollbackFailed` one, and
+  `release.publishFailed` audit record with it, an `activate` gets a `release.rollbackFailed` one, and
   a `validate` gets none.
 - **Fencing.** The `claims` count is the fencing token. Renewal and the final update change the
   request only while its status is `running` and `claims` is still the value this publisher claimed.
@@ -553,8 +553,9 @@ tenant's schema role unless it says otherwise.
    so a clean `validate` means an activation with the same input would pass its checks, apart from
    the seed. A snapshot that cannot be read fails at `validate`. The transaction holds the schema
    lock until it rolls back, so other activations of the tenant wait for it.
-6. For `rollback`: the steps are `version`, `rollback`, `activate`, `seed` and `indexes`, and none of
-   them runs a contract scenario.
+6. For `activate`: the steps are `version`, `rollback`, `activate`, `seed` and `indexes`, and none of
+   them runs a contract scenario. The `rollback` step is the one that loads the stored release, and
+   the `activate` step is the one that activates it.
    - The `rollback` step reads the stored release the request names and rebuilds its model from the
      stored files, as the server does when it serves a release. It reads no folder, compiles nothing
      and stores no new release. It refuses a release that pins a package version that is not
@@ -562,7 +563,7 @@ tenant's schema role unless it says otherwise.
      another application, fails the step too.
    - The `activate` step then runs every activation check, so a migration that was applied after the
      release and is missing from it is `AXC0174`, and a field that the release lacks but the tables
-     hold is `AXC0015`. A refused `rollback` changes nothing. The activation adds a row to the
+     hold is `AXC0015`. A refused `activate` request changes nothing. The activation adds a row to the
      [release history](storage.md#release-history) with the requesting user and the request id, no
      label and no note, unless the release is already active. The step then updates the tenant's
      realm to match the activated release.
@@ -591,7 +592,7 @@ tenant's schema role unless it says otherwise.
    and the request ends `failed` with `AXC0219`. The scenarios that finished keep their outcomes, and
    those that had not started get none. The step writes `<tenant> test failed: AXC0219 …`. A `test`
    gets no audit record and no release id.
-8. Write the audit record of a `publish` or a `rollback`, with the request's final status, then set
+8. Write the audit record of a `publish` or an `activate`, with the request's final status, then set
    the request `succeeded` or `failed` and store its diagnostics and its release id, in one
    transaction. A `validate` gets its final status and diagnostics the same way, with no audit record
    and no release id. The diagnostics are all of them, warnings included, as in the
@@ -637,14 +638,14 @@ because it is stored on the request.
   run until the next activation of the tenant. The publisher calls the identity provider of each
   tenant that has a realm, so it must reach it and trust its certificate.
 - **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the request it is
-  running, then exits. A `publish`, `validate` or `rollback` finishes first, and so do the contract
+  running, then exits. A `publish`, `validate` or `activate` finishes first, and so do the contract
   scenarios of a `publish` or `validate`. A running `test` request is the exception, because a test
   may run for 10 minutes, which is longer than the stop grace period of both installs: the publisher
   stops it at once, the running scenario fails, its scenario database is dropped, and the request
   ends `failed` with `AXC0220`. The step writes `<tenant> test failed: AXC0220 …`.
 - **A stop mid-request.** It leaves a lease that runs out, and another publisher then claims the
   request again. So the platform's shutdown grace period must be longer than the longest `publish`,
-  `validate` or `rollback`, or the request is claimed twice.
+  `validate` or `activate`, or the request is claimed twice.
 - **Leftover databases.** A publisher that crashes in the middle of a scenario leaves its
   `axis_scenario_<uuid>` database behind. The publisher does not clean it up, because with several
   publishers none can tell which leftover database is still in use. The operator drops the

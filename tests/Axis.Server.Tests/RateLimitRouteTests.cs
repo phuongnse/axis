@@ -36,7 +36,7 @@ public sealed partial class RateLimitRouteTests
         "/api/studio/apps/{application}/publish",
         "/api/studio/apps/{application}/preview",
         "/api/studio/apps/{application}/test",
-        "/api/studio/apps/{application}/releases/{id}/rollback",
+        "/api/studio/apps/{application}/releases/{id}/activate",
     ];
 
     [Fact]

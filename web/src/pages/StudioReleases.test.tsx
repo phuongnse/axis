@@ -29,7 +29,7 @@ function item(
   }
 }
 
-// Out of order. Release 1 was activated again by a rollback with no label, and release 2 is live.
+// Out of order. Release 1 was activated again with no label, and release 2 is live.
 const history: StudioReleases = {
   active: { releaseId: 'r2', number: 2, contentHash: 'hash-2' },
   folderContentHash: null,
@@ -43,21 +43,21 @@ const history: StudioReleases = {
   ],
 }
 
-function renderList(overrides: { history?: StudioReleases; canRollBack?: boolean; busy?: boolean } = {}) {
-  const onRollBack = vi.fn()
+function renderList(overrides: { history?: StudioReleases; canActivate?: boolean; busy?: boolean } = {}) {
+  const onActivate = vi.fn()
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioReleasesList
           history={overrides.history ?? history}
-          canRollBack={overrides.canRollBack ?? true}
+          canActivate={overrides.canActivate ?? true}
           busy={overrides.busy ?? false}
-          onRollBack={onRollBack}
+          onActivate={onActivate}
         />
       </TextProvider>
     </ThemeModeProvider>,
   )
-  return onRollBack
+  return onActivate
 }
 
 afterEach(() => localStorage.clear())
@@ -147,7 +147,7 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('shows no Activate… button to a user who is not a publisher', () => {
-    renderList({ canRollBack: false })
+    renderList({ canActivate: false })
 
     expect(screen.queryByRole('button', { name: /^Activate release/ })).not.toBeInTheDocument()
   })
@@ -173,32 +173,32 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
 
   it('names the release that replaces the live one and activates it on confirmation', async () => {
     const user = userEvent.setup()
-    const onRollBack = renderList()
+    const onActivate = renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Activate release 1?')
-    expect(within(dialog).getByTestId('studio-rollback-release')).toHaveTextContent(
+    expect(within(dialog).getByTestId('studio-activate-release')).toHaveTextContent(
       'Release 1 replaces live release 2.',
     )
-    expect(onRollBack).not.toHaveBeenCalled()
+    expect(onActivate).not.toHaveBeenCalled()
 
     await user.click(within(dialog).getByRole('button', { name: 'Activate' }))
 
-    expect(onRollBack).toHaveBeenCalledTimes(1)
-    expect(onRollBack.mock.calls[0][0]).toMatchObject({ releaseId: 'r1', number: 1 })
+    expect(onActivate).toHaveBeenCalledTimes(1)
+    expect(onActivate.mock.calls[0][0]).toMatchObject({ releaseId: 'r1', number: 1 })
   })
 
   it('does not activate when the dialog is cancelled', async () => {
     const user = userEvent.setup()
-    const onRollBack = renderList()
+    const onActivate = renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 3' }))
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Release 3 replaces live release 2.')
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
-    expect(onRollBack).not.toHaveBeenCalled()
+    expect(onActivate).not.toHaveBeenCalled()
   })
 })

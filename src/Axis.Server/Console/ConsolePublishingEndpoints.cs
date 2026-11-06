@@ -16,7 +16,7 @@ namespace Axis.Server.Console;
 /// requests are newest first, paged by the optional <c>page</c> and <c>pageSize</c> as the record API pages. An application
 /// that no release or request names answers empty lists. A request shows its kind, target, status, label, note, who asked and
 /// when, when it started and finished, and its release. It never holds the file snapshot, the diagnostics or the test results.
-/// The route only reads: publishing, activating and rolling back stay in Studio.
+/// The route only reads: publishing and activating stay in Studio.
 /// </summary>
 internal static class ConsolePublishingEndpoints
 {

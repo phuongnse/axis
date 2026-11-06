@@ -192,7 +192,7 @@ resource.
   `<id> realm failed:` and the identity provider step and its status, and exits with code 1. The stored sign-in stays,
   and the next activation brings the realm in step. An activation that runs between the command's checks and its commit
   can still leave a clashing pair, which the next activation of that application refuses.
-- **Used by activation.** `tenant create` and `tenant restore` set accounts on. Every activation, `Axis.Admin` `activate`, `publish` and `rollback` and the server's startup
+- **Used by activation.** `tenant create` and `tenant restore` set accounts on. Every activation, the `Axis.Admin` `activate` command, the publisher's `publish` and `activate` requests and the server's startup
   activation, keeps the stored platform providers in the realm. The server's sign-in callback checks the sign-in against the realm, see
   [platform sign-in](identity-provider.md#platform-sign-in). `tenant backup` does not carry the providers, so a restored tenant has accounts on and no provider
   until the command runs again.

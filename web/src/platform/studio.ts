@@ -965,7 +965,7 @@ export interface StudioSkippedScenarioResult {
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'rollback' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1096,9 +1096,9 @@ export function previewSiteUrl(
   return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
 }
 
-/** Sends a rollback request to an earlier release. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function rollbackStudioRelease(application: string, releaseId: string): Promise<StudioRequest> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(releaseId)}/rollback`
+/** Sends an activate request for a release of the history. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function activateStudioRelease(application: string, releaseId: string): Promise<StudioRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(releaseId)}/activate`
   const response = await studioFetch(path, { method: 'POST' })
   if (!response.ok) {
     throw new Error(`Posting '${path}' failed with status ${response.status}.`)

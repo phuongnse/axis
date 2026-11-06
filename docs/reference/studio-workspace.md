@@ -182,7 +182,7 @@ There is no Status column, because a release that is not live has no state of it
 Every row but the live one has Activate…, an icon button named as in "Activate release 6", shown to a
 publisher only. It activates that release, back to an older one or forward to a newer one, and its
 dialog says which release replaces the live one. [D130](../decisions/d130-activate-a-release-replaces-roll-back.md)
-proposes the same word for the concept and the route.
+agrees the same word for the concept, the route and the request kind.
 
 - **The number opens the release page** _(planned for M31)_. The number in the Release column is the
   link to the [release page](#release-page).

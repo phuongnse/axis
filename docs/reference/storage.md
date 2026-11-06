@@ -641,8 +641,8 @@ user or service account as actor, and so do the actions that [audit actions](#au
 
 ### Audit actions
 
-Besides the record and process actions, these actions write audit records. A `publish` and a
-`rollback` write theirs as [audit records of publishing](#audit-records-of-publishing) says.
+Besides the record and process actions, these actions write audit records. A `publish` and an
+`activate` write theirs as [audit records of publishing](#audit-records-of-publishing) says.
 
 - **Import actions.** The commit of a [record import](import-export.md#import) writes
   `records.imported`, after the `record.created` or `record.updated` audit record of each row, in the
@@ -741,7 +741,7 @@ the first number of the period creates.
 Studio publishes by storing a request that the [publisher](administration.md#publisher) runs, and
 every activation adds a row to the release history, from which a release can be activated again.
 `Axis.Configuration` owns both tables, in the `axis` schema of each tenant database. The server
-inserts `validate`, `publish`, `rollback` and `test` requests through the
+inserts `validate`, `publish`, `activate` and `test` requests through the
 [authoring API](authoring.md#publishing), and a preview is a `publish` request with the target
 `preview`.
 
@@ -755,11 +755,11 @@ and only the publisher changes a row, over the schema role. An index on
 | ------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`                | `uuid`              | Primary key, a version 7 UUID                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `application_id`    | `uuid`              | The application `id`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `kind`              | `text`              | `validate`, `publish`, `rollback` or `test`, see [publishing](authoring.md#publishing) for `rollback`                                                                                                                                                                                                                                                                                                                                                    |
+| `kind`              | `text`              | `validate`, `publish`, `activate` or `test`, see [publishing](authoring.md#publishing) for `activate`                                                                                                                                                                                                                                                                                                                                                    |
 | `target`            | `text`              | `tenant` or `preview`, by default `tenant`. See the preview target below                                                                                                                                                                                                                                                                                                                                                                                 |
 | `status`            | `text`              | `queued`, `running`, `succeeded` or `failed`                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `snapshot`          | `jsonb`, null       | For `validate`, `publish` and `test`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `rollback`                                                                                                                                                                                                                                                                                                           |
-| `release_id`        | `uuid`, null        | For `rollback`, the release to activate. For `publish`, set when the release is stored                                                                                                                                                                                                                                                                                                                                                                   |
+| `snapshot`          | `jsonb`, null       | For `validate`, `publish` and `test`, an array of `{ file, version, content }`, one for every `*.json` file of the folder. Null for `activate`                                                                                                                                                                                                                                                                                                           |
+| `release_id`        | `uuid`, null        | For `activate`, the release to activate. For `publish`, set when the release is stored                                                                                                                                                                                                                                                                                                                                                                   |
 | `label`             | `text`, null        | The optional label, up to 100 characters                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `note`              | `text`, null        | The optional note, up to 2000 characters                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `requested_by`      | `text`              | The requesting user's id                                                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -778,21 +778,21 @@ and only the publisher changes a row, over the schema role. An index on
   reads back exactly as the author saw it. `version` is the SHA-256 of the file's bytes, as in
   [versions](authoring.md#versions). A later edit never changes a stored snapshot, and the publisher
   compiles the snapshot from these texts alone.
-- **Claim.** The publisher takes the oldest `queued` `publish`, `validate` or `rollback` row of an
+- **Claim.** The publisher takes the oldest `queued` `publish`, `validate` or `activate` row of an
   application with `FOR UPDATE SKIP LOCKED`, sets `running`, `claimed_by` and `lease_until`, and adds
   1 to `claims`. It skips an application that has a `running` row. A `running` row whose
   `lease_until` has passed is claimed again the same way, and a publisher that lost its connection
   sets `lease_until` to now. A row with `claims` of 3 and an expired lease becomes `failed` with
   `AXC0215`.
 - **Test requests.** A `test` row has its own queue for each application: at most one runs at a time,
-  oldest first, and it does not wait behind a `publish`, `validate` or `rollback` row. The claim of
+  oldest first, and it does not wait behind a `publish`, `validate` or `activate` row. The claim of
   each queue skips an application only for a `running` row of the same queue. The row has the target
   `tenant`, no `release_id` and no audit record. See [test](authoring.md#test).
 - **Preview target.** A row with `target` `preview` is stored in the session tenant's database and
   run against that tenant's preview tenant, see [preview](authoring.md#preview). Its history row
   lives in the preview tenant's `release_activations` and keeps this row's `id` as `request_id`,
   which points at a request in another database, so no foreign key can hold it. The publisher claims
-  only a `publish` row with target `preview`, and never claims a `validate` or `rollback` row with
+  only a `publish` row with target `preview`, and never claims a `validate` or `activate` row with
   that target. It sets the row `failed` with `AXC0216` when the main tenant no longer has a preview
   tenant. While the preview tenant exists but the publisher does not serve it, the row stays
   `queued`.
@@ -827,10 +827,10 @@ and only the publisher changes a row, over the schema role. An index on
   different numbers in two tenants.
 - **No copies.** Activating the release that is already active adds no row and keeps the number, so
   a restart under `scripts/dev.sh` and a request that runs again add nothing.
-- **Every path.** Startup activation, `axis-admin activate`, a publish and a `rollback` request each
-  add a row. The actor is the user for a publish and a `rollback`, `startup` for a startup and
+- **Every path.** Startup activation, `axis-admin activate`, a publish and an `activate` request each
+  add a row. The actor is the user for a publish and an `activate`, `startup` for a startup and
   `operator` for `axis-admin activate`. A publish passes its user, label, note and request to the
-  activation, which stores them as given. A `rollback` passes its user and its request, and no label
+  activation, which stores them as given. An `activate` passes its user and its request, and no label
   and no note, and the release keeps the number it got the first time.
 - **Backfill.** The migration that creates the table adds one row for each application's active
   release, with number 1, the actor `unknown`, the activation time of `axis.active_releases` and no
@@ -839,7 +839,7 @@ and only the publisher changes a row, over the schema role. An index on
 
 ### Refusals to activate a stored release
 
-A `rollback` request activates the stored release as it is and never compiles it again. The publisher
+An `activate` request activates the stored release as it is and never compiles it again. The publisher
 refuses it with one of these diagnostics, the request ends `failed`, and nothing is changed. Every
 other refusal of activation applies too, such as `AXC0015` for a field that the release lacks and
 the tables hold, because those checks protect stored data. So a stored release can be activated only
@@ -856,7 +856,7 @@ the meaning they have at activation. See also
 
 ### Audit records of publishing
 
-Each `publish` and each `rollback` writes one record in `axis.audit_records`, in the transaction that
+Each `publish` and each `activate` writes one record in `axis.audit_records`, in the transaction that
 sets the request's final status. The actor is the requesting user, and `application_id` is the
 application `id`. A `validate` writes no audit record, and neither does a preview request, whose
 publisher the preview tenant's release history records.
@@ -865,8 +865,8 @@ publisher the preview tenant's release history records.
 | ------------------------ | ---------------------- |
 | `release.published`      | A `publish` succeeded  |
 | `release.publishFailed`  | A `publish` failed     |
-| `release.rolledBack`     | A `rollback` succeeded |
-| `release.rollbackFailed` | A `rollback` failed    |
+| `release.rolledBack`     | An `activate` succeeded |
+| `release.rollbackFailed` | An `activate` failed    |
 
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are null when the request
 failed before a release was known. `number` is the release's number in the

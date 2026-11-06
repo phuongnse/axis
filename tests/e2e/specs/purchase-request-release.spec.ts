@@ -587,7 +587,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     }
   })
 
-  test('an author rolls back to an earlier release and Studio warns that the folder differs', async ({
+  test('an author activates an earlier release and Studio warns that the folder differs', async ({
     page,
   }, testInfo) => {
     test.setTimeout(300_000)
@@ -627,9 +627,9 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(dialog).toContainText(`Release ${number} replaces live release`)
       await confirmDialog(page, 'Activate')
 
-      await expect(status).toContainText('Rolled back', { timeout: 60_000 })
+      await expect(status).toContainText('Activated', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
-      // The rollback adds an activation, and the release keeps its one row, which is the live one now.
+      // The activation adds an activation, and the release keeps its one row, which is the live one now.
       await expect(
         page.locator(`[data-testid="studio-release-row"][data-number="${number}"][data-active="true"]`),
       ).toHaveCount(1)
@@ -646,7 +646,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     }
   })
 
-  test('a rollback across a rename migration is refused and the later release stays active', async ({
+  test('an activation across a rename migration is refused and the later release stays active', async ({
     page,
   }, testInfo) => {
     test.setTimeout(300_000)
@@ -727,7 +727,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     }
   })
 
-  test('an author takes a change from edit to preview, publish and rollback without the admin CLI, and a waiting request finishes on its release', async (
+  test('an author takes a change from edit to preview, publish and activation of an older release without the admin CLI, and a waiting request finishes on its release', async (
     { baseURL, browser, page },
     testInfo,
   ) => {
@@ -817,7 +817,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         .getByRole('button', { name: `Activate release ${before.number}`, exact: true })
         .click()
       await confirmDialog(page, 'Activate')
-      await expect(status).toContainText('Rolled back', { timeout: 60_000 })
+      await expect(status).toContainText('Activated', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
       await useSession(page, 'requester')
       await page.goto(suppliers)

@@ -25,12 +25,12 @@ Studio shows its test controls. Their defaults, environment variables and behavi
 | `Studio:Folders`          | The application folders that Studio edits                                                                                | Studio edits only the applications of `Studio:ApplicationsPath` |
 | `Studio:ApplicationsPath` | The folder where Studio [creates applications](#creating-an-application), whose application subfolders Studio also lists | Studio cannot create an application                             |
 | `Studio:AuthorRole`       | The roles claim value that may use the API. Application policies play no part, because an author edits them              | Nobody may author                                               |
-| `Studio:PublisherRole`    | The roles claim value that may `publish` and `rollback`, on top of the author role                                       | Nobody may publish or activate a release                        |
+| `Studio:PublisherRole`    | The roles claim value that may `publish` and `activate`, on top of the author role                                       | Nobody may publish or activate a release                        |
 | `Studio:Tests`            | Whether Studio shows its test controls                                                                                   | Off                                                             |
 
 Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set. When it is off,
 there is nothing to edit and every route answers `403`. Everything other than `publish` and
-`rollback` needs the author role only: `validate`, [`preview`](#preview), [`test`](#test), the request
+`activate` needs the author role only: `validate`, [`preview`](#preview), [`test`](#test), the request
 status and the release history among them.
 
 `GET /api/me` tells the SPA what the session may do in Studio, so that it shows only the controls
@@ -171,7 +171,7 @@ a caller without the roles cannot find out which applications, resources, reques
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
    the session's roles, see [Settings](#settings).
-4. The publisher role, `403`, on `publish` and `rollback` only. It needs `Studio:PublisherRole` to be
+4. The publisher role, `403`, on `publish` and `activate` only. It needs `Studio:PublisherRole` to be
    set and held in the session's roles.
 5. An unknown application, `404`: one that Studio does not list, see
    [the application list](#the-application-list).
@@ -180,7 +180,7 @@ a caller without the roles cannot find out which applications, resources, reques
    caller cannot learn from it which applications exist.
 7. On `validate`, `publish` and `preview`, a manifest with no UUID `id`, `409`, because the request
    needs the application id for the publisher's queue. On `publish` it comes before the body is read.
-   A `rollback` has no such check, because it names a release of the history.
+   An `activate` has no such check, because it names a release of the history.
 8. An unknown resource, text key, request or release, `404`. A release that is not in this tenant's
    history for the application is unknown, and so is a request or a release of another application
    or tenant.
@@ -237,7 +237,7 @@ Every error is problem details (`application/problem+json`). The titles are fixe
 text from the request.
 
 Every route answers `401` with no session and `403` with no author role or with Studio off, and every
-`POST`, `PUT`, `PATCH` and `DELETE` also answers `403` with no CSRF header. `publish` and `rollback`
+`POST`, `PUT`, `PATCH` and `DELETE` also answers `403` with no CSRF header. `publish` and `activate`
 also answer `403` with no publisher role, titled "You do not hold the publisher role.", and creating
 an application answers `403` with no `Studio:ApplicationsPath`. Listing the applications and the
 templates answers no `404` and no `409`. The other routes differ:
@@ -282,7 +282,7 @@ Some answers have titles of their own:
 
 `400` is a bad body, `415` a body of the wrong content type, `428` a missing `If-Match` and `503` a
 write lock that cannot be taken, as [Order of checks](#order-of-checks) says. A successful `validate`,
-`publish`, `preview`, `test` or `rollback` answers `202`, see [Publishing](#publishing).
+`publish`, `preview`, `test` or `activate` answers `202`, see [Publishing](#publishing).
 
 ## References
 
@@ -661,18 +661,17 @@ process: it stores a **publish request** in the tenant database, and a separate
 A request runs for the tenant of the author's session, so Studio on a tenant's host publishes to that
 tenant only.
 
-| Method and path                                                                  | Response                                                                                                                                                                                                                      |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/studio/apps/{application}/validate`                                   | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role                                                                                                                              |
-| `POST /api/studio/apps/{application}/publish`                                    | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
-| `POST /api/studio/apps/{application}/preview`                                    | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
-| `POST /api/studio/apps/{application}/test`                                       | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
-| `GET /api/studio/apps/{application}/requests/{id}`                               | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes                                                                                                                                    |
-| `GET /api/studio/apps/{application}/releases`                                    | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
-| `POST /api/studio/apps/{application}/releases/{id}/rollback`                     | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Activating a release](#activating-a-release)                                                                            |
-| `POST /api/studio/apps/{application}/releases/{id}/activate` _(planned for M31)_ | Replaces `.../rollback`, with the same request, rules and answer, and the publish request kind `rollback` becomes `activate`                                                                                                  |
+| Method and path                                              | Response                                                                                                                                                                                                                      |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/validate`               | `202` with the request and a `Location` header for `.../requests/{id}`. It needs the author role                                                                                                                              |
+| `POST /api/studio/apps/{application}/publish`                | `202` with the request and a `Location` header. The body is `application/json` with an optional `label` and an optional `note`. It needs the author role and the publisher role                                               |
+| `POST /api/studio/apps/{application}/preview`                | `202` with the request and a `Location` header. It needs the author role only, and answers `409` when the tenant has no preview tenant, see [Preview](#preview)                                                               |
+| `POST /api/studio/apps/{application}/test`                   | `202` with the request and a `Location` header. The body is optional `application/json`, `{ "scenarios": ["<name>", ...] }`, and none or an empty list means every scenario. It needs the author role only, see [Test](#test) |
+| `GET /api/studio/apps/{application}/requests/{id}`           | `200` with the request, its status, its diagnostics and, for `test`, its scenario outcomes                                                                                                                                    |
+| `GET /api/studio/apps/{application}/releases`                | `200` with the activation history, newest first, and which release is active, see [Release history](#release-history)                                                                                                         |
+| `POST /api/studio/apps/{application}/releases/{id}/activate` | `202` with the request and a `Location` header. It needs the author role and the publisher role, see [Activating a release](#activating-a-release)                                                                            |
 
-`validate`, `preview` and `rollback` take no body, and a body that is sent is ignored. A `publish`
+`validate`, `preview` and `activate` take no body, and a body that is sent is ignored. A `publish`
 without a body stores no label and no note, and a `test` without a body runs every scenario. A body
 that is sent to either must be `application/json`, or the answer is `415`. `{id}` of a request is its
 UUID, and `{id}` of a release is the release id from the history. The other refusals are those of the
@@ -687,7 +686,7 @@ A request is shown as
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`              | The request id, a UUID                                                                                                                                                                                                     |
 | `application`     | The application `name`                                                                                                                                                                                                     |
-| `kind`            | `validate`, `publish`, `rollback` or `test`                                                                                                                                                                                |
+| `kind`            | `validate`, `publish`, `activate` or `test`                                                                                                                                                                                |
 | `target`          | `tenant` or `preview`. `preview` marks a request that runs on the session tenant's preview tenant, see [Preview](#preview). Only the preview route writes `preview`, and the request status route reports the stored value |
 | `status`          | `queued`, `running`, `succeeded` or `failed`, see [Lifecycle](#lifecycle)                                                                                                                                                  |
 | `label`           | The optional label of a `publish`, up to 100 characters, or null                                                                                                                                                           |
@@ -697,7 +696,7 @@ A request is shown as
 | `requestedAt`     | When the request was stored                                                                                                                                                                                                |
 | `startedAt`       | When a publisher first started it, or null while `queued`                                                                                                                                                                  |
 | `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                    |
-| `releaseId`       | The release a `publish` activated or a `rollback` named, or null. A `validate` and a `test` have none                                                                                                                      |
+| `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate` and a `test` have none                                                                                                                      |
 | `diagnostics`     | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings                                                                                         |
 | `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish` or a `validate`, null until the request ends and when no contract scenario ran. Null for a `rollback`                        |
 
@@ -795,7 +794,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   publisher (`SIGTERM`) does the same at once, with `AXC0220`. The scenarios that finished keep their
   outcomes, and the one that was cut is stored as `failed` with no `step` and no `path`.
 - **Order.** At most one `test` request per application runs at a time, oldest first. Its queue is
-  separate from the one of `validate`, `publish` and `rollback`, so a `test` does not wait behind a
+  separate from the one of `validate`, `publish` and `activate`, so a `test` does not wait behind a
   `publish`.
 - **Audit.** A `test` writes no audit record.
 - **A request that runs again.** A request that is claimed again after a lost lease runs every
@@ -836,7 +835,7 @@ stateDiagram-v2
 
 `GET .../releases` answers the application's activations in this tenant, newest first, as
 `{ active: { releaseId, number, contentHash }, folderContentHash, changes, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`.
-The publisher writes the rows of a `publish` and a `rollback` request.
+The publisher writes the rows of a `publish` and an `activate` request.
 
 - **`active`** is the application's active release in this tenant, or null when there is none.
 - **`folderContentHash`** is the content hash that the folder would compile to now, so Studio can show
@@ -846,7 +845,7 @@ The publisher writes the rows of a `publish` and a `rollback` request.
   `removed`. A removed file has the other fields from the active release and its texts, and `titles`
   is null without a label text key. Files are read one by one, without scenarios and modules' copies.
   `changes` is null with no active release.
-- **Items.** Each item is one activation: a startup, an `axis-admin activate`, a publish or a `rollback`.
+- **Items.** Each item is one activation: a startup, an `axis-admin activate`, a publish or an `activate`.
   `actor` is a user id, `startup` or `operator`, and a row that a migration added for a release that
   was live before the history existed has the actor `unknown`. `actorName` is the actor's name from
   their [user profile](notifications.md#user-profiles), else the name stored with the activation, else
@@ -865,9 +864,11 @@ The publisher writes the rows of a `publish` and a `rollback` request.
 
 ### Activating a release
 
-A `rollback` request makes a release from the history live again, back to an older release or
+An `activate` request makes a release from the history live again, back to an older release or
 forward to a newer one. The publisher activates it as it is, without compiling it again: it rebuilds
-the release's model from its stored files, never from the folder, and stores no new release.
+the release's model from its stored files, never from the folder, and stores no new release. The
+route that was named `rollback` before [D130](../decisions/d130-activate-a-release-replaces-roll-back.md)
+is no longer a route. A `POST` to it answers `405`, because the `/api` fallback answers `GET` only.
 
 - **The activation.** It records an activation with the request's actor, which is the requesting
   user, and the request id, with no label and no note.
@@ -887,6 +888,6 @@ history stay as they were.
 
 ### Audit
 
-Each `publish` and `rollback` writes an [audit record](storage.md#audit-records-and-sequence-counters)
+Each `publish` and `activate` writes an [audit record](storage.md#audit-records-and-sequence-counters)
 with the actor, the application, the release and the request, when it succeeds and when it fails. A
 `validate`, a `preview` and a `test` write none.
