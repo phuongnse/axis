@@ -17,4 +17,8 @@ internal static class IanaTimeZones
         timeZone = TimeZoneInfo.Utc;
         return false;
     }
+
+    /// <summary>The system time zones that <see cref="TryFind"/> accepts, so every listed id passes the same rule as a configuration's.</summary>
+    public static IReadOnlyList<TimeZoneInfo> All() =>
+        [.. TimeZoneInfo.GetSystemTimeZones().Where(zone => TryFind(zone.Id, out _))];
 }

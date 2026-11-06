@@ -90,7 +90,7 @@ each and are described there:
 
 - **The release route.** `GET .../releases/{number}` answers one release for its
   page, see [release route](studio-workspace.md#release-route).
-- **The resource form's routes** _(planned for M31)_. `GET .../relaxed`, `GET /api/studio/catalog`
+- **The resource form's routes.** `GET .../relaxed`, `GET /api/studio/catalog`
   and `GET /api/studio/bindings` give the resource form what it chooses from, see
   [Studio API](studio-resource-form.md#studio-api).
 

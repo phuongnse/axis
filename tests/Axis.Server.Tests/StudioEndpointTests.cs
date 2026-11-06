@@ -244,6 +244,9 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     [InlineData("/api/studio/templates")]
+    [InlineData("/api/studio/catalog")]
+    [InlineData("/api/studio/bindings")]
+    [InlineData("/api/studio/apps/PurchaseRequests/relaxed")]
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
@@ -270,6 +273,9 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001/references")]
     [InlineData("/api/studio/apps/PurchaseRequests/texts/nav.departments/references")]
     [InlineData("/api/studio/templates")]
+    [InlineData("/api/studio/catalog")]
+    [InlineData("/api/studio/bindings")]
+    [InlineData("/api/studio/apps/PurchaseRequests/relaxed")]
     public async Task Studio_is_off_without_an_author_role_or_without_folders(string url)
     {
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })
@@ -290,6 +296,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [InlineData("/api/studio/apps/Unknown/policy-matrix", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/Unknown/releases", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/Unknown/releases/1", HttpStatusCode.NotFound)]
+    [InlineData("/api/studio/apps/Unknown/relaxed", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PURCHASEREQUESTS/resources", HttpStatusCode.OK)]
     [InlineData("/api/studio/apps/Unknown/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
     [InlineData("/api/studio/apps/PurchaseRequests/resources/00000000-0000-0000-0000-000000000001", HttpStatusCode.NotFound)]
