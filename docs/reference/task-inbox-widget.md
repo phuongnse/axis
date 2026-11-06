@@ -27,8 +27,8 @@ A page whose widget is a `taskInbox` lists the signed-in user's open tasks in th
 - **Order.** Rows keep the task API's order: the earliest due date first, and tasks with no due date
   last. The SPA does not sort them again, and there is no sort.
 - **Columns.** The columns are the task's label, from the step's label text key, the subject's label
-  and the due date, formatted as a `date-time` cell. An empty subject label or due date is an empty
-  cell.
+  and the due date, formatted as a `date-time` cell. An empty subject label or due date shows the muted
+  em dash, see [no value is a dash](actions-and-controls.md#text).
 - **Labels from each release.** The inbox loads the texts of each release its rows name through
   `releaseId`, once per release, so tasks from several releases each show their own release's labels.
   The table stays loading until those texts have arrived, and a failed load shows the inbox's load
