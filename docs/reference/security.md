@@ -125,8 +125,9 @@ These routes start and end a sign-in, and let a person see and end their own ses
   The SPA calls sign-out with `fetch` to send the CSRF header, which cannot follow a redirect to the
   identity provider as a page. A successful sign-out also sends
   `Clear-Site-Data: "cache", "storage"`, so the browser drops the site's HTTP cache and storage, and a
-  refused one sends no such header. The SPA keeps only the theme and the locale in browser storage,
-  under `axis.themeMode` and `axis.locale`, so a sign-out resets both. See
+  refused one sends no such header. The SPA keeps only the theme, the locale and the last export id in browser storage,
+  under `axis.themeMode`, `axis.locale` and `axis.tenantExport`, so a sign-out removes all three. The export id is not
+  sensitive data: the export routes still need an administrator session to answer it. See
   [headers](headers-and-rate-limits.md#security-headers).
 - **Starting a sign-in in the SPA.** The shell header's [account button](frontend.md) offers sign-in
   and sign-out. The home page `/` calls `GET /api/auth/sign-in` at once when `GET /api/me` or
