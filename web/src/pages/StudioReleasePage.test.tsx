@@ -7,6 +7,7 @@ import type {
   StudioRelaxedPoint,
   StudioRelease,
   StudioReleaseItem,
+  StudioReleasePartChange,
   StudioReleases,
   StudioResourceItem,
 } from '../platform/studio'
@@ -245,6 +246,66 @@ describe('StudioReleasePage', () => {
 
     await screen.findByRole('heading', { name: 'Release 3' })
     expect(screen.getByText('No file differs from release 4.')).toBeInTheDocument()
+  })
+
+  it('lists the modules and packages that differ after the files, modules first and each by label', async () => {
+    const partChanges: StudioReleasePartChange[] = [
+      { type: 'package', id: 'pdf', label: 'PDF export', change: 'added', version: '1.0.0', previousVersion: null },
+      {
+        type: 'module',
+        id: 'organization',
+        label: 'Organization',
+        change: 'upgraded',
+        version: '1.2.0',
+        previousVersion: '1.1.0',
+      },
+      { type: 'module', id: 'audit', label: 'Audit', change: 'removed', version: null, previousVersion: '1.0.0' },
+    ]
+    answer({ ...release, partChanges })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    const changes = section('If you activate it, compared with live release 4')
+    expect(changes.getAllByTestId('studio-change-row')).toHaveLength(3)
+    const rows = changes.getAllByTestId('studio-change-part')
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'AuditModuleRemoved, was 1.0.0',
+      'OrganizationModuleUpgraded from 1.1.0 to 1.2.0',
+      'PDF exportPackageAdded at 1.0.0',
+    ])
+  })
+
+  it('says no module or package differs when none does', async () => {
+    answer(release)
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    expect(screen.getByText('No module or package differs.')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-change-part')).not.toBeInTheDocument()
+  })
+
+  it('shows the module and package rows under the no-file line when no file differs', async () => {
+    answer({
+      ...release,
+      changes: [],
+      partChanges: [
+        {
+          type: 'module',
+          id: 'organization',
+          label: 'Organization',
+          change: 'upgraded',
+          version: '1.2.0',
+          previousVersion: '1.1.0',
+        },
+      ],
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    expect(screen.getByText('No file differs from release 4.')).toBeInTheDocument()
+    const rows = screen.getAllByTestId('studio-change-part')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toHaveTextContent('OrganizationModuleUpgraded from 1.1.0 to 1.2.0')
   })
 
   it('says a release follows every contract when it pins a module and relaxed none', async () => {

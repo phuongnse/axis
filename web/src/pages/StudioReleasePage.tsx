@@ -47,7 +47,8 @@ interface PartRow {
  * and Activate… on its right for a publisher (`canActivate`) when the release is not live, which asks for the same
  * confirmation as the release list and calls `onActivate` with the release's id. Under it, in order, come the facts
  * (Label, Status, Published, Published by and Note), the relaxed points in words grouped by module, the changes under
- * a title that names the release they compare with, the modules and packages the release pins, and every activation of
+ * a title that names the release they compare with, where the modules and packages that differ follow the files, then
+ * the modules and packages the release pins, and every activation of
  * the release. The facts and the activations come from `history`, and the rest from the release route, which loads
  * again when `history` does. A number that the history lacks shows one line and a link to every release, and so does a
  * failed load.
@@ -260,12 +261,20 @@ function ReleaseContent({
       <ReleaseBlock title={compareTitle(release, t)}>
         {release.previous === null || release.changes === null ? (
           <Typography.Text>{t('shell.studio.release.changes.first')}</Typography.Text>
-        ) : release.changes.length === 0 ? (
-          <Typography.Text>
-            {t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
-          </Typography.Text>
         ) : (
-          <StudioChangeList plainChanged rows={changeRows(release.changes, resources, locale, t)} address={address} />
+          <>
+            {release.changes.length === 0 && (
+              <Typography.Text>
+                {t('shell.studio.release.changes.none').replace('{previous}', String(release.previous))}
+              </Typography.Text>
+            )}
+            <StudioChangeList
+              plainChanged
+              rows={changeRows(release.changes, resources, locale, t)}
+              parts={release.partChanges ?? []}
+              address={address}
+            />
+          </>
         )}
       </ReleaseBlock>
       <ReleaseBlock title={t('shell.studio.release.parts')}>

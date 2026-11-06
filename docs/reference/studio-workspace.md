@@ -156,9 +156,11 @@ The Overview's changes and a release's changes share one list.
   such as Entity, and Added, Changed or Removed. A removed file is named from the live release and is
   not a link, as nothing is left to open. On a [release page](#release-page) a changed resource is plain
   text, because the folder may have moved on since that release.
-- **Modules and packages** _(planned for M31)_. The list also shows each module and package that
-  differs, as "Upgraded from 1.1.0 to 1.2.0", "Added at 1.0.0" or "Removed, was 1.0.0". With no
-  difference, one line says so.
+- **Modules and packages** on a [release page](#release-page). The list also shows each module and
+  package that differs, after the files, modules first and each group by name. A row has its label, its
+  type, Module or Package, and its change, such as "Upgraded from 1.1.0 to 1.2.0" or "Removed, was 1.0.0".
+  With no difference, one line says so.
+- **Modules and packages on the Overview** _(planned for M31)_. The Overview's list shows them the same way.
 - **Order:** by kind in the sidebar's order, then by name, see
   [list order](actions-and-controls.md#list-order).
 
