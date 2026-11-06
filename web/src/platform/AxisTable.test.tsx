@@ -1,9 +1,10 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { act, render, screen, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { tabTo } from '../test/antd'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -22,6 +23,7 @@ const texts = {
   'row.delete': 'Delete',
   'row.open': 'Open',
   'row.close': 'Close',
+  'shell.empty.noData': 'No data yet.',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -62,10 +64,19 @@ const openAction: AxisRowAction = { key: 'open', labelKey: 'row.open', onClick: 
 const closeAction: AxisRowAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
 
 describe('AxisTable', () => {
-  it('draws the empty text in the muted text colour, not the faint disabled one', () => {
-    renderTable({ dataSource: [], pagination: false })
+  it('keeps its column headers and draws the empty state in its body, with the line in the muted text colour', () => {
+    const { container } = renderTable({ dataSource: [], pagination: false })
 
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Amount' })).toBeInTheDocument()
+    expect(container.querySelector('.ant-table-tbody .ant-empty-image')).not.toBeNull()
     expect(screen.getByText('Nothing here')).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+  })
+
+  it('draws "No data yet." when the table names no empty text', () => {
+    renderTable({ dataSource: [], pagination: false, emptyText: undefined })
+
+    expect(screen.getByText('No data yet.')).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
   })
 
   describe('columns', () => {
@@ -289,7 +300,7 @@ describe('AxisTable', () => {
     it('names the Actions button in a tooltip on keyboard focus', async () => {
       renderTable({ rowActions: actionsFor(deleteAction, openAction, closeAction) })
 
-      act(() => screen.getByRole('button', { name: 'Actions' }).focus())
+      await tabTo(screen.getByRole('button', { name: 'Actions' }))
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
     })

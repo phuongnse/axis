@@ -6,7 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
-import { formItem, hasFieldError, isRequiredLabel } from '../test/antd'
+import { formItem, hasFieldError, isRequiredLabel, tabTo } from '../test/antd'
 import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
@@ -614,7 +614,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    act(() => screen.getByRole('button', { name: 'Choose…' }).focus())
+    await tabTo(screen.getByRole('button', { name: 'Choose…' }))
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose…')
   })
@@ -624,7 +624,7 @@ describe('FormWidget', () => {
     renderForm(noteId)
     await screen.findByLabelText('Category')
 
-    act(() => screen.getByRole('button', { name: 'Clear' }).focus())
+    await tabTo(screen.getByRole('button', { name: 'Clear' }))
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear')
   })

@@ -1,6 +1,7 @@
-import { Alert, Card, Empty, Flex, Pagination, Space, Spin, Typography } from 'antd'
+import { Alert, Card, Flex, Pagination, Space, Spin, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { EmptyState } from './EmptyState'
 import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
 import { inspectorPath, useInspectorPages } from './inspectorPages'
@@ -91,7 +92,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
       ) : (
         <Spin spinning={loading}>
           {!loading && items.length === 0 ? (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.history.empty')} />
+            <EmptyState text={t('shell.history.empty')} />
           ) : (
             <Flex vertical>
               {items.map((item) => {
