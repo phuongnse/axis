@@ -69,8 +69,9 @@ marks between issues, in NexKit's `request` skill.
 3. Create it in the milestone that delivers it:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
-   sweep, or autopilot plans it at once. When the milestone's docs sweep is
-   open, mark it *blocked by* the new issue too.
+   sweep, or autopilot plans it at once. A milestone's docs sweep gets the
+   `last-in-milestone` label and no *blocked by* marks: it waits for every
+   other issue of its milestone, also those opened later.
 
 ## Breaking down a milestone
 

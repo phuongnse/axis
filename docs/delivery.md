@@ -29,9 +29,9 @@ Four actors take part in the work, and each has its own part.
 - **The hourly driver** is a Claude Code routine that follows NexKit's [`drive` skill][nexkit-drive]
   with the [`axis-nexkit-routine` skill](../.claude/skills/axis-nexkit-routine/SKILL.md). It acts for
   the owner where NexKit stops for a person, and may take every option that NexKit, the plan, the
-  issue or the docs recommend or support, because the owner has accepted those in advance. It pushes
-  the hand merges NexKit cannot push, makes the hand-made changes that a plan puts in paths NexKit may
-  not change, and opens their pull requests. It never approves or merges, and it hands the owner only
+  issue or the docs recommend or support, because the owner has accepted those in advance. It merges
+  by hand the conflicts in paths NexKit may not change, makes the hand-made changes that a plan puts
+  in those paths, and opens their pull requests. It never approves or merges, and it hands the owner only
   what the owner alone can decide.
 - **The docs audit** is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs
@@ -54,13 +54,17 @@ that holds it.
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
   same milestone or across milestones. A `bug` issue for CI on `main` and an issue of the docs audit are in no milestone.
+- **Autopilot takes the docs audit's issues,** because its [`trusted_workflows`][nexkit-workflow-issues] setting lists
+  `docs-audit.yml`. NexKit checks that the issue came from a run of that workflow on `main` that NexKit
+  or a writer started. An issue that any other workflow opens waits for a person.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
   recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
   the answers on the issue and can change one with a comment before `/nexkit go`, or with
   `/nexkit fix` on the pull request.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
-  [`request` skill][nexkit-request]. The milestone's docs sweep is marked *blocked by* every other
-  issue of the milestone, with no reason line for each. Autopilot's `max_parallel` setting caps how
+  [`request` skill][nexkit-request]. The milestone's docs sweep carries the `last-in-milestone` label,
+  which autopilot's `last_in_milestone_label` setting names, so it starts only once every other issue
+  of its milestone is closed, also those opened later, with no *blocked by* marks. Autopilot's `max_parallel` setting caps how
   many issues run at once, as
   [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) agrees, so
   that their rounds of checks fit in the runner jobs that GitHub Free runs at once.
@@ -83,27 +87,34 @@ that holds it.
   request that conflicts with several merges in a row still merges by itself.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks, no approval from a
   person and no branch that is up to date. They do not require the CI workflow, which runs on pushes
-  to `main` and to hand-made branches but not on NexKit's branches, where NexKit's checks run the same
-  scripts.
+  to hand-made branches but not on NexKit's branches, where NexKit's checks run the same scripts.
 - **The owner guards the security checks.** A hand-made `.github/CODEOWNERS` and a rule the owner sets
   make a pull request that touches the files that define the security checks need the owner's review,
   as [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md)
   agrees. NexKit cannot merge it, so it waits, and the owner approves and merges it. The owner checks
   one thing: whether the change adds an exception to a check, or loosens one, and why.
-- **There is no push token.** NexKit pushes with the Actions token, so it cannot push a merge that
-  brings changes to `.github/workflows/`. The hourly driver merges those by hand.
+- **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
+  rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
+  check in the diff. An item not met requests changes like a blocking finding, so a pull request that
+  leaves a doc false does not merge.
+- **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
+  App for every repository that uses NexKit and installs it on this one, and its id and private key
+  are repository secrets. Its pushes and merges count like a person's: they start workflows, and
+  NexKit merges changes to `.github/workflows/` itself. Its agents still may not change `.github/` or
+  `.nexkit/`, and the jobs that run an agent or Axis's code hold neither the key nor a token. The
+  hourly driver merges by hand only a conflict in those paths.
 
 ### CI on main
 
 - **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
   merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
-  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) and
+  [D136](decisions/d136-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges-started-by-nexkit-alone.md) and
   [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agree.
-  A merge by NexKit starts no `push` workflow, and none of them has a schedule of its own for this,
-  so without the setting nothing would test `main`. CI also runs on a person's push and on demand.
-- **A failure on `main` is noticed when its run ends.** Each of these workflows ends with a job
-  that starts a NexKit sweep. A dispatch that GitHub's API keeps rejecting leaves a warning on the run
-  and does not fail it, so that run waits for the next sweep.
+  None of them runs on a push to `main` or has a schedule of its own for this, so a merge does not
+  start them too, and without the setting nothing would test `main`. CI also runs on a person's push
+  to another branch and on demand.
+- **A failure on `main` is noticed when its run ends.** The `workflow_run` trigger of NexKit's
+  workflow names each of these workflows, so the end of a run on `main` starts a NexKit sweep.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
   start. On any other branch a newer push stops the older run.
 - **CI runs its jobs in parallel:** the lint and unit tests, the smoke tests, three shards of the
@@ -136,9 +147,9 @@ that holds it.
   checks nor in CI's integration jobs, because they depend on the runner's load, as
   [D97](decisions/d97-reliable-test-runs.md) says.
 - **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm and the Playwright
-  browsers. The entries are in NexKit's [`cache`][nexkit-caches] setting, and the CI workflow has one
-  `actions/cache` step for each, with the same paths and key files in the same order. A change to
-  what setup downloads updates both in the same hand-made pull request.
+  browsers. The entries are in NexKit's [`cache`][nexkit-caches] setting, and each workflow that runs
+  setup restores them with NexKit's cache action, which reads the same entries and saves them on
+  `main`. A change to what setup downloads changes the entries in a hand-made pull request.
 
 ### Hand-made pull requests
 
@@ -187,7 +198,7 @@ follows NexKit's rules too. Axis adds these rules for writing it.
 - **Labels.** It gets at least one label, and every repository label whose description on GitHub fits
   its content. There is no fixed list, because the owner adds and removes labels.
 - **Who opens it.** The owner or the local agent opens it, because autopilot takes only issues opened
-  by someone with write access. It marks the issue *blocked by* what it must wait for, by the rules
+  by someone with write access or by the docs audit. It marks the issue *blocked by* what it must wait for, by the rules
   under [Decisions](#decisions).
 - **Design.** It may link a Design artifact as a picture, while the docs stay the source of
   behaviour.
@@ -216,8 +227,8 @@ A milestone goes from a readiness check to its close in five steps.
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
 4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes
-   what the milestone made stale. It is marked *blocked by* every other issue of the milestone, so it
-   runs last. It leaves what other milestones are still building to their own sweeps. It checks at
+   what the milestone made stale. It carries the `last-in-milestone` label, so it runs once every
+   other issue of the milestone is closed. It leaves what other milestones are still building to their own sweeps. It checks at
    least:
    - the roadmap status of this milestone and the next one;
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
@@ -338,3 +349,6 @@ issues, pull requests and sub-issues.
 [nexkit-unaffected]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#checks-that-a-change-cannot-affect
 [nexkit-autopilot]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
 [nexkit-evidence]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#evidence-from-ci-runs
+[nexkit-workflow-issues]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#issues-from-a-workflow
+[nexkit-checklist]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#review-checklist
+[nexkit-app]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#the-github-app

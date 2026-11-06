@@ -38,9 +38,8 @@ repository, this skill makes it.
 
 ## Hand merges
 
-When NexKit cannot push a merge, because it brings changes to
-`.github/workflows/` or the conflict is in a path NexKit may not change: merge
-`main` into the pull request's branch in a separate worktree, run
+When NexKit cannot resolve a conflict because it is in a path NexKit may not
+change: merge `main` into the pull request's branch in a separate worktree, run
 `scripts/build.sh`, `scripts/lint.sh` and `scripts/test.sh`, push to that
 branch, and comment `/nexkit review`.
 

@@ -1,15 +1,11 @@
 name: CodeQL
 
 # Scans the C# and TypeScript code. Alerts go to GitHub code scanning, and the owner sets the
-# high-or-critical threshold that fails the check in a repository code scanning rule. NexKit's
-# merges start no push workflow, so NexKit starts the scan on main once every 32 of its merges
-# (D112). It also scans a person's push to main, hand-made pull requests and on demand. A pull
-# request that NexKit opens with the Actions token gets a run that waits for approval and runs no
-# job. Nobody approves it, so it scans nothing, and GitHub ends it as failed when the pull request
-# merges.
+# high-or-critical threshold that fails the check in a repository code scanning rule. NexKit starts
+# the scan on main once every 32 of its merges (D136), and it also scans hand-made pull requests and
+# runs on demand. A NexKit pull request gets a run that skips its job, since the scan on main
+# covers NexKit's work.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -24,6 +20,7 @@ concurrency:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
+    if: ${{ !startsWith(github.head_ref, 'nexkit/') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -82,28 +79,3 @@ jobs:
       - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: /language:${{ matrix.language }}
-
-  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
-  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
-  nexkit-sweep:
-    needs: [analyze]
-    if: always() && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      actions: write
-    steps:
-      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
-      # tried again after growing pauses. If every try fails, the job warns and passes, because
-      # the dispatch only starts the sweep sooner.
-      - run: |
-          for pause in 30 60 120 240 0; do
-            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
-              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
-              exit 0
-            fi
-            if [ "$pause" -gt 0 ]; then sleep "$pause"; fi
-          done
-          echo "::warning::GitHub rejected every try to start a NexKit sweep. The next sweep looks at this run."
-        env:
-          GH_TOKEN: ${{ github.token }}

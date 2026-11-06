@@ -78,7 +78,7 @@ describe('issuesFrom', () => {
     assert.match(issues[0].body, /Wrong: .*docs\/a\.md:3/)
     assert.match(issues[0].body, /Built: .*docs\/a\.md:9/)
     assert.match(issues[0].body, /<!-- docs-audit docs docs\/a\.md -->/)
-    assert.match(issues[0].body, /<!-- nexkit:workflow docs-audit\.yml 42 -->/)
+    assert.equal(issues[0].body.split('\n')[0], '<!-- nexkit:workflow docs-audit.yml 42 -->')
   })
 
   test('gives each unbuilt rule a code issue and each untested list a test issue', () => {

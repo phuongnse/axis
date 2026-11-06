@@ -94,8 +94,10 @@ function evidence(finding) {
   return finding.evidence.map((e) => `${link(e.file, e.line)}${e.note ? `, ${e.note}` : ''}`).join('; ')
 }
 
+// NexKit reads its marker only on the first line, so text the issue quotes cannot forge it.
 function body(text, group, key, runId, criteria) {
   return [
+    `<!-- nexkit:workflow docs-audit.yml ${runId} -->`,
     text,
     '',
     `Found by the [docs audit](${repository}/blob/main/.claude/skills/axis-docs-audit/SKILL.md) of ` +
@@ -107,7 +109,6 @@ function body(text, group, key, runId, criteria) {
     ...criteria.map((c) => `- [ ] ${c}`),
     '',
     marker(group, key),
-    `<!-- nexkit:workflow docs-audit.yml ${runId} -->`,
   ].join('\n')
 }
 

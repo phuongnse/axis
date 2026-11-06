@@ -1,4 +1,4 @@
-# D112. CI, CodeQL and the performance tests run on main every few merges
+# D136. CI, CodeQL and the performance tests run on main every few merges, started by NexKit alone
 
 Status: **Agreed**
 
@@ -12,18 +12,22 @@ Still, `main` needs these runs: they find flaky tests, suites that a check skipp
 requests that pass alone but break `main` together, see
 [D113](d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md).
 
+NexKit acts as a GitHub App, so its merges are pushes that start `push` workflows, and the runs it
+starts send `workflow_run` events, as a person's do.
+
 ## Decision
 
 - **NexKit starts the workflows on `main` by a count of its merges:** CI once every 5 merges, CodeQL
   once every 32 and the performance workflow once every 62. NexKit counts the commits on `main` since
-  a workflow's latest run there, so a person's push that ran it starts the count again. 32 and 62 are
-  not multiples of 5, so the three seldom start at the same merge.
-- **No workflow has a schedule.** Each also runs on demand. CI also runs on a person's push, and
-  CodeQL on a person's push to `main` and on hand-made pull requests, as
+  a workflow's latest run there. 32 and 62 are not multiples of 5, so the three seldom start at the
+  same merge.
+- **No push to `main` starts them, and none has a schedule.** A push trigger for `main` would run them
+  after every merge as well. Each runs on demand. CI runs on a push to any other branch but NexKit's,
+  and CodeQL on hand-made pull requests, as
   [D50](d50-sign-in-audit-records-and-security-scanning-in-ci.md) says.
-- **A failure is noticed when the run ends.** Each of the three ends with a job that starts a NexKit
-  sweep, because a run that NexKit starts with the Actions token sends no `workflow_run` event. A
-  failure that repeats opens a `bug` issue, and pull requests that fail the same way wait.
+- **A failure is noticed when the run ends.** NexKit's workflow listens for the end of each of these
+  runs on `main` and starts a sweep. A failure that repeats opens a `bug` issue, and pull requests that
+  fail the same way wait.
 
 The settings are in [delivery](../delivery.md#decisions).
 
@@ -35,6 +39,8 @@ The settings are in [delivery](../delivery.md#decisions).
 - A flaky test, or a check that skipped work it should have done, shows up to five merges after the
   merge that caused it, a CodeQL alert up to 32 and a performance regression up to 62.
 - The last merges before a quiet spell wait for the next merges before `main` checks them.
+- The owner's merge of a hand-made pull request does not start CI on `main`. The pull request's
+  branch ran it, and the next count of NexKit's merges runs it on `main`.
 
 ## Alternatives
 
@@ -42,3 +48,6 @@ The settings are in [delivery](../delivery.md#decisions).
   requests wait for runners.
 - **Run on a schedule.** GitHub did not keep the schedules, and a schedule does not follow how much
   work lands.
+- **Keep the push trigger for `main` and skip NexKit's merges in the job.** It runs CI after the owner's
+  merges too, at the cost of a filter on the App's name in every workflow, and of a run that only
+  skips after each merge.
