@@ -9,6 +9,10 @@
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The axis realm sends its emails, such as a password reset link, to Mailpit. This script starts Mailpit on a Docker
 # network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end.
+# This script also starts MinIO, an S3-compatible store, with the bucket axis-exports and a KMS key, because the export
+# job stores its ZIP encrypted in a bucket that exists. It gives Playwright the five settings of Cell:ExportStorage as
+# AXIS_E2E_EXPORT_STORAGE_URL, _BUCKET, _REGION, _ACCESS_KEY and _SECRET_KEY, and removes the container at the end. Only
+# the cell console spec gives them to its server and publisher, and exports a tenant.
 # Keycloak also gets the axis-admin bootstrap client and the breached-password list, which Axis.Admin tenant create needs.
 # This script creates the PostgreSQL role axis_admin and gives Playwright AXIS_E2E_ADMIN_DATABASE and
 # AXIS_E2E_IDENTITY_ADMIN_SECRET. tests/e2e/admin-tool.ts runs Axis.Admin with them, and the realm emails go to
@@ -122,6 +126,12 @@ keycloak_image="quay.io/keycloak/keycloak:26.8.1"
 keycloak_container="axis-e2e-keycloak-$$"
 mailpit_image="axllent/mailpit:v1.32.0"
 mailpit_container="axis-e2e-mailpit-$$"
+# The last Bitnami build, which the integration tests pin too: MinIO no longer publishes its images on Docker Hub.
+minio_image="bitnamilegacy/minio:2025.7.23"
+minio_container="axis-e2e-minio-$$"
+minio_bucket="axis-exports"
+minio_user="axis-e2e"
+minio_password="e2e-$RANDOM$RANDOM$RANDOM"
 network="axis-e2e-$$"
 
 purchasing_pid=""
@@ -164,6 +174,7 @@ cleanup() {
   docker rm -f "$container" >/dev/null 2>&1 || true
   docker rm -f "$keycloak_container" >/dev/null 2>&1 || true
   docker rm -f "$mailpit_container" >/dev/null 2>&1 || true
+  docker rm -f "$minio_container" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -181,6 +192,13 @@ if affected playwright; then
   # The realm names Mailpit by its alias, so both containers join a network of their own.
   docker network create "$network" >/dev/null
   docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit "$mailpit_image" >/dev/null
+  # MinIO accepts the server-side encryption of the export upload only when it has a KMS key.
+  minio_kms_key="$(openssl rand -base64 32)"
+  docker run -d --name "$minio_container" -e MINIO_ROOT_USER="$minio_user" -e MINIO_ROOT_PASSWORD="$minio_password" \
+    -e MINIO_DEFAULT_BUCKETS="$minio_bucket" -e MINIO_KMS_SECRET_KEY="axis-e2e:$minio_kms_key" \
+    -p 127.0.0.1::9000 "$minio_image" >/dev/null
+  minio_port="$(docker port "$minio_container" 9000/tcp | head -n1 | sed 's/.*://')"
+  minio_url="http://127.0.0.1:$minio_port"
   docker run -d --name "$keycloak_container" --network "$network" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
     -e KC_BOOTSTRAP_ADMIN_CLIENT_ID=axis-admin -e KC_BOOTSTRAP_ADMIN_CLIENT_SECRET="$identity_admin_secret" \
@@ -310,6 +328,38 @@ if affected playwright; then
     } >&2
     exit 1
   fi
+
+  # The image starts a set-up server that creates the bucket before the final server, so the health check can pass early.
+  # The final check asks for the bucket without credentials: MinIO answers 403 for a bucket it holds and 404 for one it
+  # does not. curl prints 000 when it cannot connect.
+  ready=0
+  reason="did not answer after 60 seconds"
+  for _ in $(seq 1 60); do
+    if curl -fs -o /dev/null "$minio_url/minio/health/ready"; then
+      bucket_code="$(curl -s -o /dev/null -w '%{http_code}' "$minio_url/$minio_bucket/" || true)"
+      if [ "$bucket_code" != "404" ] && [ "$bucket_code" != "000" ]; then
+        ready=1
+        break
+      fi
+    fi
+    if [ "$(docker inspect -f '{{.State.Running}}' "$minio_container" 2>/dev/null)" != "true" ]; then
+      reason="stopped before it answered"
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$ready" -ne 1 ]; then
+    {
+      echo "MinIO in $minio_container $reason."
+      echo "Container logs:"
+      docker logs "$minio_container" 2>&1 || true
+    } >&2
+    exit 1
+  fi
+  export AXIS_E2E_EXPORT_STORAGE_URL="$minio_url" AXIS_E2E_EXPORT_STORAGE_BUCKET="$minio_bucket" \
+    AXIS_E2E_EXPORT_STORAGE_REGION=us-east-1 AXIS_E2E_EXPORT_STORAGE_ACCESS_KEY="$minio_user" \
+    AXIS_E2E_EXPORT_STORAGE_SECRET_KEY="$minio_password"
 
   # The realm sync names the axis first login flow on every brokered provider, and the import of axis-realm.json cannot
   # hold it. This adds it through the admin API before Playwright starts the server.

@@ -134,6 +134,9 @@ runs Playwright in Chromium. It:
   [the axis realm](#the-axis-realm);
 - gives Keycloak the `axis-admin` client and the breached-password list, and creates the PostgreSQL
   role `axis_admin`, so a spec can run `Axis.Admin tenant create`;
+- starts MinIO with the bucket `axis-exports` and a KMS key, which the export job's encrypted upload needs, and
+  gives Playwright its five `AXIS_E2E_EXPORT_STORAGE_*` values. Only the cell console spec passes them on, as the
+  `Cell:ExportStorage` settings of its server and its publisher;
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;

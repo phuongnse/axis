@@ -5,6 +5,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
+  downloadCellTenantExport,
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
@@ -14,6 +15,7 @@ import {
   type CellTenantDetail,
 } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
+import { saveFile } from '../platform/exports'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { useText } from '../platform/texts'
@@ -40,14 +42,22 @@ const actionTexts = {
     body: 'shell.cell.tenant.resumeBody',
     ok: 'shell.cell.tenant.resumeOk',
   },
+  export: {
+    button: 'shell.cell.tenant.export',
+    confirm: 'shell.cell.tenant.exportConfirm',
+    body: 'shell.cell.tenant.exportBody',
+    ok: 'shell.cell.tenant.exportOk',
+  },
 } as const
 
 /**
  * The Tenant view of the cell console: one tenant's status, application and hosts, its quotas with the ones it overrides,
  * and its jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
- * Suspend and a `suspended` or `readOnly` one offers Resume, each behind a confirmation. An action queues a job with an
- * `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
- * follows the job every 2 seconds until it ends and reloads the tenant and its jobs.
+ * Suspend and a `suspended` or `readOnly` one offers Resume, and any tenant but a `provisioning` one offers Export, each
+ * behind a confirmation. An action queues a job with an `Idempotency-Key`, which stays for a retry after a network
+ * error or a 5xx and goes with a final answer. The page then follows the job every 2 seconds until it ends and reloads
+ * the tenant and its jobs. With a succeeded `export` job among the jobs, Download opens a warning that the ZIP is
+ * restricted data, and only accepting it fetches the ZIP.
  */
 export function CellTenantPage() {
   const t = useText()
@@ -61,6 +71,8 @@ export function CellTenantPage() {
   const [confirming, setConfirming] = useState<CellTenantAction | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
   // The job to follow. Setting it again to the same id does not restart the check, so a queued job sets it once.
   const [following, setFollowing] = useState<string | null>(null)
   // Counts the jobs that ended, so the tenant and its jobs load again.
@@ -148,8 +160,36 @@ export function CellTenantPage() {
     }
   }
 
+  async function runDownload(exportId: string) {
+    setBusy(true)
+    setDownloadError(null)
+    try {
+      let result
+      try {
+        result = await downloadCellTenantExport(id, exportId)
+      } catch (error: unknown) {
+        console.warn(`Downloading the export of the cell tenant '${id}' failed`, error)
+        setDownloadError(t('shell.cell.tenant.actionFailed'))
+        return
+      }
+      if (result.kind === 'ok') {
+        saveFile(result.value.blob, result.value.fileName)
+        setDownloading(false)
+      } else if (result.kind === 'problem') {
+        setDownloadError(t('shell.cell.tenant.actionRefused').replace('{title}', result.title))
+      } else {
+        onRefused(result.kind)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const canSuspend = tenant?.status === 'active' || tenant?.status === 'readOnly'
   const canResume = tenant?.status === 'suspended' || tenant?.status === 'readOnly'
+  const canExport = tenant !== undefined && tenant !== null && tenant.status !== 'provisioning'
+  // The newest succeeded export job, as the jobs come newest first. Its id is the export id.
+  const ready = jobs?.find((job) => job.kind === 'export' && job.state === 'succeeded')
 
   const quotas: QuotaRow[] = tenant ? Object.entries(tenant.quotas).map(([key, quota]) => ({ key, ...quota })) : []
   const quotaColumns: AxisColumn<QuotaRow>[] = [
@@ -202,7 +242,7 @@ export function CellTenantPage() {
                 },
               ]}
             />
-            {(canSuspend || canResume) && (
+            {(canSuspend || canResume || canExport) && (
               <Flex gap="small">
                 {canSuspend && (
                   <AxisButton
@@ -228,6 +268,32 @@ export function CellTenantPage() {
                     }}
                   >
                     {t(actionTexts.resume.button)}
+                  </AxisButton>
+                )}
+                {canExport && (
+                  <AxisButton
+                    role="secondary"
+                    data-testid="cell-tenant-export"
+                    disabled={following !== null}
+                    onClick={() => {
+                      setActionError(null)
+                      setConfirming('export')
+                    }}
+                  >
+                    {t(actionTexts.export.button)}
+                  </AxisButton>
+                )}
+                {ready && (
+                  <AxisButton
+                    role="secondary"
+                    data-testid="cell-tenant-download"
+                    disabled={following !== null}
+                    onClick={() => {
+                      setDownloadError(null)
+                      setDownloading(true)
+                    }}
+                  >
+                    {t('shell.cell.tenant.download')}
                   </AxisButton>
                 )}
               </Flex>
@@ -259,6 +325,23 @@ export function CellTenantPage() {
           <Flex vertical gap="small">
             <Typography.Text>{t(actionTexts[confirming].body)}</Typography.Text>
             {actionError && <Alert data-testid="cell-tenant-action-error" type="error" title={actionError} />}
+          </Flex>
+        </Modal>
+      )}
+      {downloading && ready && (
+        <Modal
+          open
+          data-testid="cell-tenant-download-warning"
+          title={t('shell.cell.tenant.downloadConfirm').replace('{tenant}', id)}
+          okText={t('shell.cell.tenant.downloadOk')}
+          cancelText={t('shell.users.roles.cancel')}
+          confirmLoading={busy}
+          onOk={() => void runDownload(ready.id)}
+          onCancel={() => setDownloading(false)}
+        >
+          <Flex vertical gap="small">
+            <Typography.Text>{t('shell.cell.tenant.downloadBody')}</Typography.Text>
+            {downloadError && <Alert data-testid="cell-tenant-download-error" type="error" title={downloadError} />}
           </Flex>
         </Modal>
       )}

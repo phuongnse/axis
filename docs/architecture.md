@@ -588,7 +588,9 @@ on the tenant host with no port in the address. No redirect address is added by 
 `Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
 `axis-cell-console` client. The spec's browser maps `console.localhost` and the tenant host on
 port 443 to that server. The operator signs in through the `axis-operators` realm with a password and
-a code, and a user of the tenant it creates is refused on the console host.
+a code, and a user of the tenant it creates is refused on the console host. Its server and publisher get the
+`Cell:ExportStorage` settings of the MinIO that `scripts/e2e.sh` starts, and the spec exports a tenant and downloads
+the ZIP after the warning.
 
 **The purchasing system.** The E2E run starts the [purchasing system stub](#purchasing-system-stub)
 from the build output, and fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`.
