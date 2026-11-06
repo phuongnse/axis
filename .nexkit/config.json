@@ -320,7 +320,8 @@
       "An Agreed decision changes only in wording or links: a change to its choice is a new decision that supersedes it whole",
       "A doc list of what the code defines that the change adds or extends has a unit test that reads the list from the doc and from the code and compares them",
       "A change that adds a new kind of route, host, caller, stored secret or integration updates docs/reference/threat-model.md",
-      "The change adds no exception to a check and loosens none: no new entry in an accepted list or rise of a baseline count, and no rule removed, narrowed or skipped in a check script under scripts/ or its test"
+      "The change adds no exception to a check and loosens none: no new entry in an accepted list or rise of a baseline count, and no rule removed, narrowed or skipped in a check script under scripts/ or its test",
+      "No test or check names something that was removed: a removal deletes the thing and its tests, and a rule against a kind of mistake is stated as the current rule, never as a list of removed names"
     ]
   },
   "github_app": {
