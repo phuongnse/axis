@@ -121,6 +121,42 @@ public sealed class ModuleUpgradeCheckTests
         Assert.Contains("none", diagnostics[0].Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_removed_module_is_one_blocker_with_no_version()
+    {
+        var active = Module("1.0.0", Entity("Department.json", _departmentId, Code), Entity("Office.json", _otherId, Name));
+
+        var blocker = Assert.Single(ModuleUpgradeCheck.Blockers(active, [Plain("Request.json")]));
+
+        Assert.Equal(new ModuleUpgradeBlocker("departments", "1.0.0", null), blocker);
+    }
+
+    [Fact]
+    public void A_dropped_field_is_a_blocker_with_both_versions_and_blockers_are_ordered_by_module_id()
+    {
+        var active = Module("1.0.0", id: "zeta", Entity("Thing.json", _otherId, Code, Name))
+            .Concat(Module("2.0.0", Entity("Department.json", _departmentId, Code, Name)))
+            .ToList();
+        var next = Module("1.1.0", id: "zeta", Entity("Thing.json", _otherId, Code))
+            .Concat(Module("2.1.0", Entity("Department.json", _departmentId, Code)))
+            .ToList();
+
+        var blockers = ModuleUpgradeCheck.Blockers(active, next);
+
+        Assert.Equal(
+            [new ModuleUpgradeBlocker("departments", "2.0.0", "2.1.0"), new ModuleUpgradeBlocker("zeta", "1.0.0", "1.1.0")],
+            blockers);
+    }
+
+    [Fact]
+    public void Additive_upgrades_are_no_blockers()
+    {
+        var active = Module("1.0.0", Entity("Department.json", _departmentId, Code));
+        var next = Module("1.1.0", Entity("Department.json", _departmentId, Code, Budget));
+
+        Assert.Empty(ModuleUpgradeCheck.Blockers(active, next));
+    }
+
     private static List<ReleaseResource> Module(string version, params ReleaseResource[] entities) => Module(version, "departments", entities);
 
     private static List<ReleaseResource> Module(string version, string id, params ReleaseResource[] entities) =>

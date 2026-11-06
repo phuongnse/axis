@@ -223,19 +223,24 @@ the same module check on the two stored releases, so the page says, for example,
 replace release 2", with each module and the rule, and Activate… is off. What depends on the tenant
 at that moment, such as its bindings, is still checked only when the release is activated.
 
-### Release route
+## Release route
 
 `GET /api/studio/apps/{application}/releases/{number}` answers an author with
-`{ number, previous, previousIsLive, live, changes, partChanges, modules, packages, blockers }`:
+`{ number, previous, previousIsLive, live, changes, partChanges, modules, packages, blockers }`. A
+user without the author role is refused, and a number that the history lacks answers 404.
 
-- `previous` is the release it compares with: the live one when this one is not live, with
-  `previousIsLive` true, else the one just below it, or `null` for the first.
+- `previous` is the number of the release it compares with: the live one when this one is not live,
+  with `previousIsLive` true, else the one just below it, or `null` for the first. `live` is true when
+  this release is the live one.
 - `changes` lists the files that differ from `previous`, as in the
-  [release history](authoring.md#release-history).
+  [release history](authoring.md#release-history). It is `null` without `previous`.
 - `partChanges` lists the modules and packages that differ, each
   `{ type, id, label, change, version, previousVersion }`, where `change` is `added`, `removed`,
-  `upgraded` or `downgraded`.
+  `upgraded` or `downgraded`. It is `null` without `previous`.
 - `modules` and `packages` list what the release pins, each with its `id`, `label`, `version` and
   `previousVersion`.
 - `blockers` lists the modules that stop it from replacing the live one, each
-  `{ module, label, liveVersion, version }`.
+  `{ module, label, liveVersion, version }`, where `version` is `null` when the release lacks the
+  module. It is empty for the live release and when no release is live.
+- A module's `label` is the one in the `module.json` that the release stores, and a package's `label`
+  is the one of the installed package of that version. The id stands in when there is none.

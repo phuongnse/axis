@@ -210,6 +210,11 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             (relaxed.GetProperty("module").GetString(), relaxed.GetProperty("point").GetString(), relaxed.GetProperty("reason").GetString()));
         Assert.False(items[1].GetProperty("offStandard").GetBoolean());
         Assert.Equal(0, items[1].GetProperty("relaxed").GetArrayLength());
+
+        // The words come from the module copy that the release stores. The fixture entity has no label, so its name stands in.
+        Assert.Equal(("Requests", "transition"), (relaxed.GetProperty("moduleTitle").GetString(), relaxed.GetProperty("part").GetString()));
+        Assert.Equal("Submit", relaxed.GetProperty("titles").GetProperty("en").GetString());
+        Assert.Equal("Request", relaxed.GetProperty("entityTitles").GetProperty("en").GetString());
     }
 
     private static string? ActorName(JsonElement history, string actor) =>
@@ -243,7 +248,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         await File.WriteAllTextAsync(path, text.Replace(from, to, StringComparison.Ordinal), CancellationToken);
     }
 
-    private static async Task<JsonElement> GetAsync(HttpClient client, string url)
+    internal static async Task<JsonElement> GetAsync(HttpClient client, string url)
     {
         using var request = RecordApiFixture.Request(url, Host);
         using var response = await client.SendAsync(request, CancellationToken);
@@ -274,7 +279,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
     }
 
     // Like ActivateAsync, but for an application that pins modules from modulesPath and needs no bindings.
-    private static async Task ActivateWithModulesAsync(string connectionString, string folder, string modulesPath, ActivationActor actor)
+    internal static async Task ActivateWithModulesAsync(string connectionString, string folder, string modulesPath, ActivationActor actor)
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
@@ -289,7 +294,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Empty(result.Diagnostics);
     }
 
-    private static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder, string? modulesPath = null) =>
+    internal static WebApplicationFactory<Program> CreateFactory(string connectionString, string folder, string? modulesPath = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -316,7 +321,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"), new TestIdentity("requester", "Requester", "employee"));
         });
 
-    private static void CopyDirectory(string source, string target)
+    internal static void CopyDirectory(string source, string target)
     {
         foreach (var directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
         {

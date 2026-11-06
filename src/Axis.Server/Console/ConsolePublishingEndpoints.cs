@@ -59,11 +59,11 @@ internal static class ConsolePublishingEndpoints
             connection,
             [.. activations.Select(row => row.Actor), .. requests.Select(row => row.RequestedBy)],
             cancellationToken);
-        var manifests = await store.GetManifestsAsync([.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
+        var relaxedPoints = await StudioRelaxedWords.ReadAsync(store, [.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
         var releases = activations
             .Select(row =>
             {
-                var relaxed = StudioEndpoints.RelaxedPoints(manifests.GetValueOrDefault(row.ReleaseId));
+                var relaxed = relaxedPoints.GetValueOrDefault(row.ReleaseId) ?? [];
                 return new StudioReleaseItem(
                     row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
                     relaxed.Count > 0, relaxed);

@@ -22,23 +22,31 @@ internal static class StudioReleaseChanges
     /// text resources, and its locale when it is a text resource. The other entries carry only the path and the change.
     /// </summary>
     public static IReadOnlyList<StudioReleaseChange> Compare(
-        IReadOnlyList<StudioSnapshotFile> folder, IReadOnlyList<ResourceContent> release)
+        IReadOnlyList<StudioSnapshotFile> folder, IReadOnlyList<ResourceContent> release) =>
+        Compare([.. folder.Select(file => new ResourceContent(file.File, file.Content))], release);
+
+    /// <summary>
+    /// The files of <paramref name="current"/> that were added, changed or removed since <paramref name="baseline"/>, as
+    /// for a folder. A release compares with another release this way.
+    /// </summary>
+    public static IReadOnlyList<StudioReleaseChange> Compare(
+        IReadOnlyList<ResourceContent> current, IReadOnlyList<ResourceContent> baseline)
     {
-        var current = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var file in folder)
+        var currentTexts = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var file in current)
         {
-            if (!IsModuleCopy(file.File) && Canonical(file.Content) is { } text)
+            if (!IsModuleCopy(file.Path) && Canonical(file.Content) is { } text)
             {
-                current[file.File] = text;
+                currentTexts[file.Path] = text;
             }
         }
 
-        var live = release
+        var live = baseline
             .Where(resource => !IsModuleCopy(resource.Path))
             .ToDictionary(resource => resource.Path, resource => resource.Content, StringComparer.Ordinal);
         var texts = TextResources(live.Values);
         var changes = new List<StudioReleaseChange>();
-        foreach (var (path, text) in current)
+        foreach (var (path, text) in currentTexts)
         {
             if (!live.TryGetValue(path, out var stored))
             {
@@ -52,7 +60,7 @@ internal static class StudioReleaseChanges
 
         foreach (var (path, stored) in live)
         {
-            if (!current.ContainsKey(path))
+            if (!currentTexts.ContainsKey(path))
             {
                 changes.Add(Removal(path, stored, texts));
             }
@@ -81,7 +89,7 @@ internal static class StudioReleaseChanges
     }
 
     // The texts of every text resource of the release, keyed by locale.
-    private static List<(string Locale, JsonElement Texts)> TextResources(IEnumerable<string> contents)
+    internal static List<(string Locale, JsonElement Texts)> TextResources(IEnumerable<string> contents)
     {
         var texts = new List<(string, JsonElement)>();
         foreach (var content in contents)
@@ -105,30 +113,36 @@ internal static class StudioReleaseChanges
         using var document = JsonDocument.Parse(stored);
         var root = document.RootElement;
         var kind = StringProperty(root, "kind");
-        var key = root.ValueKind == JsonValueKind.Object
-            && root.TryGetProperty("label", out var label)
-            && label.ValueKind == JsonValueKind.Object
-                ? StringProperty(label, "textKey")
-                : null;
-        Dictionary<string, string>? titles = null;
-        if (key is not null)
-        {
-            titles = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var (locale, values) in texts)
-            {
-                if (values.TryGetProperty(key, out var text) && text.ValueKind == JsonValueKind.String && text.GetString() is { } value)
-                {
-                    titles[locale] = value;
-                }
-            }
-        }
+        var key = LabelKey(root);
+        var titles = key is null ? null : Titles(key, texts);
 
         return new StudioReleaseChange(
             path, Removed, kind, StringProperty(root, "name"), titles,
             kind == ResourceKinds.Text ? StringProperty(root, "locale") : null);
     }
 
-    private static string? StringProperty(JsonElement element, string name) =>
+    // The text key of the label of a resource or of one element of it, or null without a label.
+    internal static string? LabelKey(JsonElement element) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty("label", out var label) && label.ValueKind == JsonValueKind.Object
+            ? StringProperty(label, "textKey")
+            : null;
+
+    // The text of a key in each locale that has it.
+    internal static Dictionary<string, string> Titles(string key, List<(string Locale, JsonElement Texts)> texts)
+    {
+        var titles = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (locale, values) in texts)
+        {
+            if (values.TryGetProperty(key, out var text) && text.ValueKind == JsonValueKind.String && text.GetString() is { } value)
+            {
+                titles[locale] = value;
+            }
+        }
+
+        return titles;
+    }
+
+    internal static string? StringProperty(JsonElement element, string name) =>
         element.ValueKind == JsonValueKind.Object
             && element.TryGetProperty(name, out var value)
             && value.ValueKind == JsonValueKind.String
