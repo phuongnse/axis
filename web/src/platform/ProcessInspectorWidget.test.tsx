@@ -189,6 +189,9 @@ describe('ProcessInspectorWidget', () => {
     expect(within(waiting).getAllByRole('cell')[3]).toHaveTextContent(/^1$/)
     // An instance that has not ended shows a muted dash in its end cell.
     expect(within(waiting).getAllByRole('cell')[5]).toHaveTextContent('—')
+    expect(within(within(waiting).getAllByRole('cell')[5]).getByText('—')).toHaveStyle({
+      color: designTokensFor('light').colour.textMuted,
+    })
     expect(within(completed).getByText('Completed')).toBeInTheDocument()
     expect(within(completed).getByText('done')).toBeInTheDocument()
     expect(within(completed).getByRole('link', { name: 'Open' })).toHaveAttribute(
