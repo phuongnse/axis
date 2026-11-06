@@ -104,21 +104,28 @@ actions of the Tenant view.
   - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
   - **Host verification** _(planned for M31)_: the verification state of each host.
   - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
-  - **Actions.** A Suspend and a Resume button, each with a confirmation that names the tenant, and a Set quotas
-    and an Add a host button, each with a dialog that names the tenant, see [actions](#actions).
+  - **Actions.** A Suspend, a Resume, a Delete and a Cancel deletion button, each with a confirmation that
+    names the tenant, and a Set quotas and an Add a host button, each with a dialog that names the tenant, see
+    [actions](#actions).
   - **Other actions** _(planned for M31)_: the other [actions](#actions), each a button with a confirmation
     that names the tenant.
 
 ## Actions
 
 Each action calls one route of the [provisioning API](tenant-lifecycle.md#provisioning-api) through the
-operator's session. Suspend, Resume and Create a tenant queue a job. Set quotas and Add a host apply at once.
+operator's session. Suspend, Resume, Delete, Cancel deletion and Create a tenant queue a job. Set quotas and Add a host apply at once.
 
 - **Suspend and Resume.** The Tenant view shows Suspend for an `active` or a `readOnly` tenant and Resume for
   a `suspended` or a `readOnly` one, the statuses that [`tenant suspend`](tenant-status-commands.md#tenant-suspend)
   and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
   shows neither. A button opens a confirmation that names the tenant and says what the action does, and
   confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
+- **Delete and Cancel deletion.** The Tenant view shows Delete for an `active`, a `readOnly` or a `suspended`
+  tenant. Its confirmation names the tenant, says what is lost and that the deletion can be cancelled for 7
+  days, and keeps its Delete button off until the operator types the tenant id exactly, with the same case
+  and no spaces added. Confirming it calls `DELETE /api/cell/tenants/{id}`. A `deleting` tenant shows only
+  Cancel deletion, in place of Suspend, Resume and Delete, and its confirmation calls
+  `POST /api/cell/tenants/{id}/deletion/cancel`. A `provisioning` tenant shows neither.
 - **Create a tenant.** The Tenants view's Create tenant button opens a dialog with the tenant id, the
   application and the administrator's email. The application is the id of an installed
   [application template](modules-and-templates.md#application-templates), typed as text, such as `approvals`.
@@ -144,9 +151,8 @@ operator's session. Suspend, Resume and Create a tenant queue a job. Set quotas 
   the console's sign-in and forbidden handling.
 - **The job.** The queued job heads the tenant's jobs. The view reads it at once and then every 2 seconds, and
   shows its state and steps. When the job succeeds or fails, the view loads the tenant and its jobs again. The
-  Suspend and Resume buttons are off while it follows a job.
-- **Other actions** _(planned for M31)_. Export, download an export, delete and cancel a deletion. Delete asks the
-  operator to type the tenant id.
+  Suspend, Resume, Delete and Cancel deletion buttons are off while it follows a job.
+- **Other actions** _(planned for M31)_. Export and download an export.
 
 ## What the console never shows
 
