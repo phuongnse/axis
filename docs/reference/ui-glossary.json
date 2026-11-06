@@ -417,6 +417,12 @@
       "status": "proposed"
     },
     {
+      "concept": "Usage",
+      "en": "usage",
+      "vi": "mức sử dụng",
+      "status": "proposed"
+    },
+    {
       "concept": "Action: Save",
       "en": "Save",
       "vi": "Lưu",

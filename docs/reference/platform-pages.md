@@ -125,8 +125,7 @@ one for the platform, where the administrator gives and removes them. Their text
 In a tenant of a cell, the users page has two more sections for an administrator:
 
 - **Export data.** Described below.
-- **Usage** _(planned for M33)_. The tenant's quotas and its usage of the last 30 days, see
-  [usage](tenant-quotas.md#usage).
+- **Usage.** The tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
 
 The "Export data" section is a component of its own below the list. It loads `GET /api/me` and renders nothing unless
 `tenantExports` is true, see [the current user](security.md#roles-and-the-current-user). Its texts are `shell.users.export.*`.
@@ -145,3 +144,13 @@ The "Export data" section is a component of its own below the list. It loads `GE
   storage, so a reload shows the same export again. Local storage belongs to each host, so another host of the tenant
   does not show it. A `404` or `410` on reading forgets the id and offers Start again. A `404` or `410` on the
   download forgets it too and shows "The file was deleted after 7 days. Start a new export."
+
+The "Usage" section is a component of its own, below "Export data". It loads `GET /api/tenant/usage` and renders nothing
+unless the route answers `200`. That keeps it hidden outside a cell and from a user who is not an administrator. Its texts
+are `shell.users.usage.*`.
+
+- **Quotas.** Each quota is a row with its name, a bar and "{used} of {limit}". A quota that has reached its limit also
+  shows an "At limit" tag, so the state is not shown by colour alone. A quota with no limit shows "No limit", with its
+  use when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
+- **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
+  applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash.
