@@ -1,3 +1,4 @@
+using Axis.Hosting;
 using Axis.Worker;
 using Microsoft.AspNetCore.Builder;
 
@@ -6,7 +7,7 @@ var builder = WebApplication.CreateSlimBuilder(args);
 builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
 using var app = builder.Build();
-app.MapWorkerHealth();
+app.MapHostHealth();
 // Resolve the state before Run(), which disposes the host before it returns.
 var startupCheck = app.Services.GetRequiredService<StartupCheckState>();
 app.Run();

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
+using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -119,7 +120,7 @@ public sealed class WorkerCallLeaseTests(PostgreSqlFixture database) : IClassFix
         builder.Services.AddSingleton<IExternalWorkItemHandler>(new SlowCallHandler(ProcessStarts.PackageCallWorkItemKind, calls));
         builder.Services.AddSingleton<IWorkItemHandler, NothingHandler>();
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

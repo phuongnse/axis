@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace Axis.Worker;
+namespace Axis.Hosting;
 
-public static class WorkerHealthEndpoints
+/// <summary>The health endpoints that the worker and the agent host share.</summary>
+public static class HostHealthEndpoints
 {
     public const string LiveTag = "live";
     public const string ReadyTag = "ready";
@@ -14,7 +16,7 @@ public static class WorkerHealthEndpoints
     /// Listens on <c>Health:Urls</c> and serves <c>/health/live</c> and <c>/health/ready</c>. Every other
     /// path answers <c>404</c>.
     /// </summary>
-    public static WebApplication MapWorkerHealth(this WebApplication app)
+    public static WebApplication MapHostHealth(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Runs Axis locally: PostgreSQL, Keycloak, Mailpit and the purchasing system stub in Docker, the server
-# and the worker under dotnet watch, the publisher and the SPA on Vite, in one terminal. The server starts once
+# and the worker under dotnet watch, the publisher, the agent host and the SPA on Vite, in one terminal. The server starts once
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
 # server signs people in through that realm at /api/auth/sign-in. Before the server starts, this script adds the axis first
 # login flow to the realm through the admin API. The SPA does not offer it yet. The realm signs
@@ -8,8 +8,8 @@
 # The worker and the publisher start once the server has migrated the tenant databases. The
 # publisher runs the publish requests of Studio. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
-# activates the edited configuration. The worker, the publisher and the SPA keep running. Ctrl+C
-# stops the server, the worker, the publisher and the SPA. PostgreSQL, Keycloak, Mailpit and the purchasing
+# activates the edited configuration. The worker, the publisher, the agent host and the SPA keep running. Ctrl+C
+# stops the server, the worker, the publisher, the agent host and the SPA. PostgreSQL, Keycloak, Mailpit and the purchasing
 # system stub keep running.
 # Mailpit is a local mail server that keeps every email. The worker sends its emails to it, and they can be read on
 # its web page. This script sets Email__Smtp__Host, Email__Smtp__Port, Email__Smtp__UseTls and Email__From for the
@@ -23,6 +23,10 @@
 # and seeds as axis_runtime. Docker Compose creates both roles. The publisher also gets the role
 # axis_scenario, which has CREATEDB, to run test scenarios. The server turns on Studio's test controls
 # through appsettings.Development.json.
+# The agent host runs from the built Axis.Agent.dll, not under dotnet watch, so a change to its code needs a
+# restart of this script. It starts at once and waits for nothing, because it does no database work yet. With
+# no Ai settings it runs idle. It serves its health endpoints on http://127.0.0.1:5209, and
+# AXIS_AGENT_HEALTH_PORT moves that port. An exported Health__Urls moves only the worker's address.
 # The server creates Studio's new applications in artifacts/studio-apps, which git ignores. An exported
 # Studio__ApplicationsPath replaces that folder.
 # The publisher runs from the built Axis.Admin.dll, not under dotnet watch, so a change to its code
@@ -40,8 +44,8 @@
 # applications under applications are installed into artifacts/templates, which the server reads through
 # Templates:Path, and a template change needs a restart too.
 # AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, AXIS_MAILPIT_SMTP_PORT,
-# AXIS_MAILPIT_WEB_PORT, AXIS_SERVER_PORT and AXIS_WEB_PORT move the ports (5432, 8080, 5207, 1025, 8025,
-# 5206, 5173).
+# AXIS_MAILPIT_WEB_PORT, AXIS_SERVER_PORT, AXIS_WEB_PORT and AXIS_AGENT_HEALTH_PORT move the ports (5432,
+# 8080, 5207, 1025, 8025, 5206, 5173, 5209).
 # Works with the bash 3.2 that ships with macOS.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -53,6 +57,7 @@ mailpit_smtp_port="${AXIS_MAILPIT_SMTP_PORT:-1025}"
 mailpit_web_port="${AXIS_MAILPIT_WEB_PORT:-8025}"
 server_port="${AXIS_SERVER_PORT:-5206}"
 web_port="${AXIS_WEB_PORT:-5173}"
+agent_health_port="${AXIS_AGENT_HEALTH_PORT:-5209}"
 studio_apps="${Studio__ApplicationsPath:-$PWD/artifacts/studio-apps}"
 
 log() { printf '[dev] %s\n' "$*"; }
@@ -143,6 +148,7 @@ state="$(mktemp -d)"
 server=""
 worker=""
 publisher=""
+agent=""
 web=""
 
 # Prefixes each line with the process name. It ignores SIGINT so it keeps draining output
@@ -173,12 +179,12 @@ prefix() {
 
 source scripts/lib/dev-stop.sh
 
-# Stops the server, the worker, the publisher and the SPA. Safe to call twice.
+# Stops the server, the worker, the publisher, the agent host and the SPA. Safe to call twice.
 stopped=0
 stop() {
   [ "$stopped" -eq 0 ] || return 0
   stopped=1
-  stop_processes $server $worker $publisher $web
+  stop_processes $server $worker $publisher $agent $web
 }
 
 cleanup() {
@@ -206,6 +212,10 @@ bash scripts/lib/install-sample-templates.sh
 # the worker's and risk file-lock failures, so it is built here, before the server starts.
 log "Building the publisher"
 dotnet build src/Axis.Admin/Axis.Admin.csproj --nologo -v quiet
+
+# The agent host runs from this build too, for the same reason.
+log "Building the agent host"
+dotnet build src/Axis.Agent/Axis.Agent.csproj --nologo -v quiet
 
 # A stop signal only sets a flag. The main loop stops everything, so a signal cannot arrive
 # between starting a process and saving its pid.
@@ -239,7 +249,15 @@ start_server
 web=$!
 disown "$web" 2>/dev/null || true
 
-log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port, Mailpit on http://localhost:$mailpit_web_port. Press Ctrl+C to stop."
+# The agent host does no database work yet, so it does not wait for the server. The explicit Health__Urls wins over an
+# exported one, which is for the worker.
+(exec env DOTNET_ENVIRONMENT=Development Health__Urls="http://127.0.0.1:$agent_health_port" \
+  dotnet "$PWD/src/Axis.Agent/bin/Debug/net10.0/Axis.Agent.dll") \
+  </dev/null > >(prefix agent) 2>&1 &
+agent=$!
+disown "$agent" 2>/dev/null || true
+
+log "Server on http://localhost:$server_port, preview on http://preview.localhost:$server_port, SPA on http://localhost:$web_port (preview on http://preview.localhost:$web_port), Keycloak on http://localhost:$keycloak_port, purchasing system stub on http://localhost:$purchasing_port, Mailpit on http://localhost:$mailpit_web_port, agent host health on http://127.0.0.1:$agent_health_port. Press Ctrl+C to stop."
 
 code=0
 while :; do
@@ -249,22 +267,27 @@ while :; do
     break
   fi
   if [ -e "$state/server-exited-$generation" ] || ! kill -0 "$server" 2>/dev/null; then
-    log "The server exited. Stopping the worker, the publisher and the SPA."
+    log "The server exited. Stopping the worker, the publisher, the agent host and the SPA."
     code=1
     break
   fi
   if ! kill -0 "$web" 2>/dev/null; then
-    log "The SPA dev server exited. Stopping the server, the worker and the publisher."
+    log "The SPA dev server exited. Stopping the server, the worker, the publisher and the agent host."
     code=1
     break
   fi
   if [ -n "$worker" ] && { [ -e "$state/worker-exited" ] || ! kill -0 "$worker" 2>/dev/null; }; then
-    log "The worker exited. Stopping the server, the publisher and the SPA."
+    log "The worker exited. Stopping the server, the publisher, the agent host and the SPA."
     code=1
     break
   fi
   if [ -n "$publisher" ] && ! kill -0 "$publisher" 2>/dev/null; then
-    log "The publisher exited. Stopping the server, the worker and the SPA."
+    log "The publisher exited. Stopping the server, the worker, the agent host and the SPA."
+    code=1
+    break
+  fi
+  if ! kill -0 "$agent" 2>/dev/null; then
+    log "The agent host exited. Stopping the server, the worker, the publisher and the SPA."
     code=1
     break
   fi

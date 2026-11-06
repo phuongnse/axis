@@ -3,6 +3,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
 using Axis.Data.Records;
+using Axis.Hosting;
 using Axis.Processes;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -20,7 +21,7 @@ public static class WorkerServiceCollectionExtensions
     /// <summary>
     /// Registers the tenancy and processes services, the installed extension packages and the
     /// background service that runs the due work items of every tenant, and the health checks
-    /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
+    /// that <see cref="HostHealthEndpoints.MapHostHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
     /// <c>Tenancy:RefreshInterval</c>. Under <c>directory</c> the worker also holds one direct connection to the platform database, named <c>axis-worker-listen</c>,
     /// that runs <c>LISTEN axis_work</c>: a wake signal for a tenant runs its work at once, and the worker connects again when the connection drops. The dry run of an import fails a file with more data rows than
@@ -83,12 +84,7 @@ public static class WorkerServiceCollectionExtensions
         var statementTimeout = StatementTimeout.Read(configuration, "Worker:StatementTimeout", WorkItemSettings.DefaultStatementTimeout);
         var pool = TenantPoolSettings.Load(configuration);
 
-        var health = new HealthOptions();
-        configuration.GetSection(HealthOptions.SectionName).Bind(health);
-        if (string.IsNullOrWhiteSpace(health.Urls))
-        {
-            throw new InvalidOperationException($"'{HealthOptions.SectionName}:{nameof(HealthOptions.Urls)}' must not be empty.");
-        }
+        var health = HealthOptions.Load(configuration, "http://127.0.0.1:5208");
 
         var cell = CellOptions.Load(configuration);
         services.AddSingleton(cell);
@@ -168,9 +164,9 @@ public static class WorkerServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<WorkerHealth>();
         services.AddHealthChecks()
-            .AddCheck<WorkerLoopHealthCheck>("loop", tags: [WorkerHealthEndpoints.LiveTag, WorkerHealthEndpoints.ReadyTag])
-            .AddCheck<TenantDirectoryHealthCheck>("directory", tags: [WorkerHealthEndpoints.ReadyTag])
-            .AddCheck<TenantMigrationsHealthCheck>("migrations", tags: [WorkerHealthEndpoints.ReadyTag]);
+            .AddCheck<WorkerLoopHealthCheck>("loop", tags: [HostHealthEndpoints.LiveTag, HostHealthEndpoints.ReadyTag])
+            .AddCheck<TenantDirectoryHealthCheck>("directory", tags: [HostHealthEndpoints.ReadyTag])
+            .AddCheck<TenantMigrationsHealthCheck>("migrations", tags: [HostHealthEndpoints.ReadyTag]);
         services.AddSingleton<StartupCheckState>();
         services.AddSingleton<AxisGauges>();
         services.AddSingleton<WorkerGauges>();

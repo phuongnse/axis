@@ -10,7 +10,7 @@ source scripts/lib/tools.sh
 bash scripts/lib/install-modules.sh
 bash scripts/lib/install-sample-templates.sh
 
-for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests; do
+for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests Axis.Agent.Tests; do
   run_suite "$project" "tests/$project" dotnet test --project "tests/$project" -c Release \
     --report-xunit-junit --report-xunit-junit-filename "$project.xml" --results-directory "$results_dir"
 done

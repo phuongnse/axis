@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using Axis.Configuration.Tests;
+using Axis.Hosting;
 using Axis.PurchasingStub;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
@@ -192,7 +193,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             builder.Configuration,
             new HostingEnvironment { EnvironmentName = Environments.Development, ContentRootPath = AppContext.BaseDirectory });
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         await app.StartAsync(CancellationToken);
         return app;
     }

@@ -4,6 +4,7 @@ using Axis.Admin;
 using Axis.Core.Tenancy;
 using Axis.Data.Files;
 using Axis.Data.Storage;
+using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -375,7 +376,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         builder.Services.AddSingleton<IWorkItemHandler, RecordingHandler>();
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

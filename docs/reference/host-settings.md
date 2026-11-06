@@ -458,10 +458,11 @@ minute for one replica. The rules of the limits are in
 
 ## AI settings
 
-_(planned for M35)_
+The agent host reads the `Ai` settings: the model bindings and the default and review bindings. Their
+table is in [model bindings](model-bindings.md#bindings).
 
-The agent host reads the `Ai` settings: the model bindings, the default and review bindings, tenant
-keys and the budgets of a request. Their table is in [model bindings](model-bindings.md#bindings).
+**Tenant keys and the budgets of a request** _(planned for M35)_ are settings of the same section and
+of the same table.
 
 ## Telemetry export
 

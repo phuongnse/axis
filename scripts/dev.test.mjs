@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'artifacts', 'wwwroot', 'playwright-report', 'test-results'])
 const project = `axis-dev-test-${process.pid}`
-const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis\.Admin|vite/
+const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis\.Admin|Axis\.Agent|vite/
 
 let copy
 let scratch
@@ -64,6 +64,7 @@ async function pickPorts() {
     server: await freePort(),
     web: await freePort(),
     workerHealth: await freePort(),
+    agentHealth: await freePort(),
   }
   env = {
     ...process.env,
@@ -75,6 +76,7 @@ async function pickPorts() {
     AXIS_MAILPIT_WEB_PORT: String(ports.mailpitWeb),
     AXIS_SERVER_PORT: String(ports.server),
     AXIS_WEB_PORT: String(ports.web),
+    AXIS_AGENT_HEALTH_PORT: String(ports.agentHealth),
     Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
     MSBUILDDISABLENODEREUSE: '1',
   }
@@ -142,18 +144,18 @@ async function waitForOutput(run, pattern, timeoutMs = 300_000) {
   assert.fail(`No output matching ${pattern} after ${timeoutMs} ms.\n${run.stdout}\n${run.stderr}`)
 }
 
-/** The leftover processes of a finished run: its Vite by its port, and the server, worker and publisher of this copy. */
+/** The leftover processes of a finished run: its Vite by its port, and the server, worker, publisher and agent host of this copy. */
 function leftoverProcs() {
   return execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
     .split('\n')
     .filter(
       (line) =>
         (/vite/.test(line) && line.includes(`--port ${ports.web}`)) ||
-        (/Axis\.(Server|Worker|Admin)/.test(line) && line.includes(copy)),
+        (/Axis\.(Server|Worker|Admin|Agent)/.test(line) && line.includes(copy)),
     )
 }
 
-/** The server, worker, publisher, dotnet watch and Vite processes below the dev.sh process. */
+/** The server, worker, publisher, agent host, dotnet watch and Vite processes below the dev.sh process. */
 function runProcs(rootPid) {
   const rows = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
     .split('\n')
@@ -252,7 +254,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true })
   })
 
-  it('installs the SPA packages, serves the app through Vite, starts the worker and the publisher and stops cleanly on SIGINT', async () => {
+  it('installs the SPA packages, serves the app through Vite, starts the worker, the publisher and the agent host and stops cleanly on SIGINT', async () => {
     const run = await startDev()
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
@@ -334,6 +336,21 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.equal(workerReady.status, 200)
     assert.equal((await workerReady.json()).status, 'Healthy')
 
+    // The agent host starts at once, idle, and answers ready on its own health address. It ignores the exported Health__Urls of the worker.
+    let agentReady
+    const agentDeadline = Date.now() + 120_000
+    while (!agentReady && Date.now() < agentDeadline) {
+      try {
+        agentReady = await fetch(`http://127.0.0.1:${ports.agentHealth}/health/ready`)
+      } catch {
+        await sleep(1000)
+      }
+    }
+    assert.ok(agentReady, `The agent host did not answer.\n${run.stdout}`)
+    assert.equal(agentReady.status, 200)
+    assert.equal((await agentReady.json()).status, 'Healthy')
+    assert.match(run.stdout, /\[agent\] /)
+
     const page = await fetch(`http://localhost:${ports.web}/`)
     assert.equal(page.status, 200)
     assert.match(await page.text(), /<div id="root">/)
@@ -343,6 +360,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(procs.some((p) => /Axis\.Server/.test(p.command)), `No server process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Worker/.test(p.command)), `No worker process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Admin/.test(p.command)), `No publisher process in:\n${JSON.stringify(procs)}`)
+    assert.ok(procs.some((p) => /Axis\.Agent/.test(p.command)), `No agent host process in:\n${JSON.stringify(procs)}`)
 
     // The worker runs with its mail settings pointing at Mailpit. /proc exists on Linux only.
     const workerProc = procs.find((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))

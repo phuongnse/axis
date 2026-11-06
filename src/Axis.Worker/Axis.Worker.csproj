@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Hosting\Axis.Hosting.csproj" />
     <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />
     <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
   </ItemGroup>
