@@ -17,8 +17,9 @@ Four actors take part in the work, and each has its own part.
 
 - **The owner** decides **Proposed** design points, questions that nothing in the plan, the issue or
   the docs settles, whether NexKit merges its own pull requests, and when a milestone closes. The
-  owner merges hand-made pull requests, with an admin bypass of the rules on `main` once the CI
-  workflow passes. NexKit mentions the owner when a run needs a person, through its `notify` setting.
+  owner merges hand-made pull requests, see [hand-made pull requests](#hand-made-pull-requests), and
+  vouches with [`/nexkit trust`][nexkit-trust] for an issue that autopilot leaves alone, after reading
+  it. NexKit mentions the owner when a run needs a person, through its `notify` setting.
 - **The local agent session** works for the owner when the owner asks. It writes issues and their
   order, checks whether a milestone is ready and breaks it down, proposes changes to the NexKit
   settings as hand-made pull requests, runs design reviews and publishes the Design System artifact in
@@ -53,10 +54,16 @@ that holds it.
   [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
-  same milestone or across milestones. A `bug` issue for CI on `main` and an issue of the docs audit are in no milestone.
+  same milestone or across milestones. A `bug` issue for CI on `main`, an issue for a Dependabot
+  advisory and an issue of the docs audit are in no milestone.
 - **Autopilot takes the docs audit's issues,** because its [`trusted_workflows`][nexkit-workflow-issues] setting lists
   `docs-audit.yml`. NexKit checks that the issue came from a run of that workflow on `main` that NexKit
-  or a writer started. An issue that any other workflow opens waits for a person.
+  or a writer started. An issue that any other workflow or a person without write access opens waits
+  until the owner reads it and comments `/nexkit trust` on it.
+- **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
+  because its [`dependabot`][nexkit-dependabot] setting is `high`, as
+  [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
+  NexKit's App reads the alerts with its *Dependabot alerts: read* permission.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
   recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
   the answers on the issue and can change one with a comment before `/nexkit go`, or with
@@ -159,6 +166,12 @@ that holds it.
   the docs change that ends a design review, so a design change is never one, see
   [design changes](#design-changes). The owner or the hourly driver opens them, and the owner merges
   them.
+- **NexKit checks and reviews them on request.** Whoever pushes to one comments
+  [`/nexkit review`][nexkit-person-review] on it after the push. NexKit runs its checks and its review
+  on the head and sets the two statuses that the rules on `main` require, and it pushes nothing and
+  merges nothing there. The owner merges once both are green, with no admin bypass. The bypass is left
+  for a pull request that needs the owner's code-owner review and that the owner opened, since GitHub
+  does not let an author approve their own pull request.
 
 ## Profiles
 
@@ -330,13 +343,14 @@ issues, pull requests and sub-issues.
 
   Nobody names a branch like NexKit's or a cloud session's by hand. `<topic>` is a few lower-case
   English words joined by hyphens, such as `widget-review`. Only release tags start with `v`.
-- Keep branches from piling up. GitHub's automatic deletion of head branches is on, but it deletes
-  neither the branches of the pull requests NexKit merges nor those of cloud sessions that push
-  nothing. When the owner asks, the local session lists every `nexkit/` branch whose pull request is
-  merged or that NexKit closed as `already_on_base`, because `main` already holds its change, every
-  `claude/` branch with no pull request and no commit that `main` lacks, and every `design/` branch
-  whose `design-review/` tag exists, and the owner deletes them. A branch with an open pull request,
-  or any other closed one that was not merged, stays.
+- Keep branches from piling up. GitHub's automatic deletion of head branches is on, and with it NexKit
+  deletes the branch of each pull request it merges or closes itself, and each sweep deletes the
+  `nexkit/issue-<n>` branches of closed work, as *Branches of closed work* in NexKit's
+  [stages][nexkit-branches] says. Neither deletes the branches of cloud sessions that push nothing.
+  When the owner asks, the local session lists every `claude/` branch with no pull request and no
+  commit that `main` lacks, and every `design/` branch whose `design-review/` tag exists, and the
+  owner deletes them. A branch with an open pull request, or any other closed one that was not merged,
+  stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
@@ -352,3 +366,7 @@ issues, pull requests and sub-issues.
 [nexkit-workflow-issues]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#issues-from-a-workflow
 [nexkit-checklist]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#review-checklist
 [nexkit-app]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#the-github-app
+[nexkit-trust]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#vouching-for-an-issue
+[nexkit-dependabot]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#dependabot-advisories
+[nexkit-person-review]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#reviewing-your-own-pull-requests
+[nexkit-branches]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md#stages
