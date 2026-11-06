@@ -62,6 +62,12 @@ const openAction: AxisRowAction = { key: 'open', labelKey: 'row.open', onClick: 
 const closeAction: AxisRowAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
 
 describe('AxisTable', () => {
+  it('draws the empty text in the muted text colour, not the faint disabled one', () => {
+    renderTable({ dataSource: [], pagination: false })
+
+    expect(screen.getByText('Nothing here')).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+  })
+
   describe('columns', () => {
     it('fits a fixed column to its content without wrapping', () => {
       renderTable()

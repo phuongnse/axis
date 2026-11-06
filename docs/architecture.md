@@ -584,6 +584,12 @@ directory. The server listens on https at `AXIS_E2E_TENANT_HTTPS_PORT`, with a c
 on the tenant host with no port in the address. No redirect address is added by hand: only
 `tenant create` writes them.
 
+**The cell console spec** starts a server of its own in `Testing`, on the next port offset, with the
+`Cell:*` settings of a cell, `Cell:ConsoleHost` set to `console.localhost` and the secret of the
+`axis-cell-console` client. The spec's browser maps `console.localhost` and the tenant host on
+port 443 to that server. The operator signs in through the `axis-operators` realm with a password and
+a code, and a user of the tenant it creates is refused on the console host.
+
 **The purchasing system.** The E2E run starts the [purchasing system stub](#purchasing-system-stub)
 from the build output, and fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`.
 The E2E server and worker run in the `Development` environment, because only Development lets a

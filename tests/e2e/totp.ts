@@ -64,11 +64,14 @@ export async function nextTotp(secret: string | Uint8Array, used: string) {
   return code;
 }
 
-/** The Base32 secret of `user`'s `otp` credential in the development realm file, which is the only place that holds it. */
-export function totpSecret(user: string) {
-  const realm = JSON.parse(
+/**
+ * The Base32 secret of `user`'s `otp` credential in the file of the development realm `realm`, which is the only place
+ * that holds it.
+ */
+export function totpSecret(user: string, realm = "axis") {
+  const file = JSON.parse(
     readFileSync(
-      path.resolve(import.meta.dirname, "../../samples/keycloak/axis-realm.json"),
+      path.resolve(import.meta.dirname, `../../samples/keycloak/${realm}-realm.json`),
       "utf8",
     ),
   ) as {
@@ -77,9 +80,9 @@ export function totpSecret(user: string) {
       credentials?: { type: string; secretData: string }[];
     }[];
   };
-  const credential = realm.users
+  const credential = file.users
     .find((candidate) => candidate.username === user)
     ?.credentials?.find((candidate) => candidate.type === "otp");
-  if (!credential) throw new Error(`The development realm has no authenticator for ${user}.`);
+  if (!credential) throw new Error(`The ${realm} development realm has no authenticator for ${user}.`);
   return (JSON.parse(credential.secretData) as { value: string }).value;
 }

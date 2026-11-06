@@ -66,6 +66,8 @@
 # tenant directory and stops when the test ends. The spec's browser maps the tenant host on port 443 to it. The same
 # spec runs the M28 journey on that tenant: its first administrator disables a person on the users page, the person's
 # sign-in is refused until the administrator enables them, and after tenant host add a person signs in on the added host.
+# Keycloak imports the operator realm axis-operators too. The cell console spec serves a cell on the offset 3 of that port,
+# with the console host console.localhost, and signs the development operator in to the cell console through that realm.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit (see
 # scripts/lib/affected.mjs) is under docs/, .github/ or .nexkit/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
@@ -294,6 +296,15 @@ if affected playwright; then
   if ! curl -fs -o /dev/null "http://127.0.0.1:$keycloak_port/realms/company/.well-known/openid-configuration"; then
     {
       echo "The company realm of Keycloak in $keycloak_container did not answer."
+      echo "Container logs:"
+      docker logs "$keycloak_container" 2>&1 || true
+    } >&2
+    exit 1
+  fi
+
+  if ! curl -fs -o /dev/null "http://127.0.0.1:$keycloak_port/realms/axis-operators/.well-known/openid-configuration"; then
+    {
+      echo "The axis-operators realm of Keycloak in $keycloak_container did not answer."
       echo "Container logs:"
       docker logs "$keycloak_container" 2>&1 || true
     } >&2
