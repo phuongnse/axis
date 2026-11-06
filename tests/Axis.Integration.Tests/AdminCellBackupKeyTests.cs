@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
 using Axis.Admin;
 using Axis.Configuration.Tests;
+using Axis.Server.Studio;
 using Axis.Tenancy.Platform;
+using LibGit2Sharp;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Integration.Tests;
@@ -125,6 +127,57 @@ public sealed class AdminCellBackupKeyTests(PostgreSqlFixture database) : IClass
 
         // The source folder is as it was.
         Assert.Equal(files["app-a/application.json"], await File.ReadAllBytesAsync(Path.Combine(studio.Path, source, "app-a/application.json"), CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_a_cell_the_revisions_of_a_tenant_are_backed_up_and_restored_with_their_history()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var tools = await PostgresClientTools.CreateAsync();
+        WriteCellKey();
+        using var studio = new TemporaryFolder();
+        var cell = new Dictionary<string, string?>(CellSettings()) { ["Studio:ApplicationsPath"] = studio.Path };
+        var source = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.RunAsync(AdminScenario.CreateArgs(source, $"{source}.example.test"), extra: cell)).Exit);
+        var sourceFolder = Path.Combine(studio.Path, source);
+        var commits = await TenantRevisions.BuildAsync(sourceFolder, "app-a", CancellationToken);
+        Assert.Equal(2, commits.Count);
+
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        var backup = await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: tools.PathSetting, extra: cell);
+        Assert.Equal(0, backup.Exit);
+
+        var restored = scenario.NewTenantId();
+        var restore = await scenario.RunAsync(
+            ["tenant", "restore", file, "--tenant", restored, "--host", $"{restored}.example.test", "--from", source],
+            path: tools.PathSetting,
+            extra: cell);
+
+        Assert.Equal(0, restore.Exit);
+        Assert.Empty(restore.Error);
+        Assert.Contains($"{restored} studio ok", restore.Output);
+
+        // The restored history is the one Studio continues: the path rule is the server's.
+        var options = new StudioOptions([], null, null, ApplicationsPath: studio.Path, PerTenant: true).ForTenant(restored);
+        var repository = Path.Combine(options.RevisionsPath!, "app-a.git");
+        Assert.True(Repository.IsValid(repository));
+        Assert.Equal(commits, TenantRevisions.CommitShas(repository));
+
+        var restoredFolder = Path.Combine(studio.Path, restored);
+        await File.WriteAllTextAsync(Path.Combine(restoredFolder, "app-a", "application.json"), "{\"name\":\"app-a\",\"version\":3}", CancellationToken);
+        TenantRevisions.For(restoredFolder, "app-a").RecordOutside();
+
+        using (var git = new Repository(repository))
+        {
+            var tip = TenantRevisions.Commits(git)[^1];
+            Assert.Equal("Outside change", tip.MessageShort);
+            Assert.Equal(commits[^1], Assert.Single(tip.Parents).Sha);
+            Assert.Equal(3, TenantRevisions.Commits(git).Count);
+        }
+
+        // The source history is as it was.
+        Assert.Equal(commits, TenantRevisions.CommitShas(Path.Combine(sourceFolder, ".revisions", "app-a.git")));
     }
 
     [Fact]
