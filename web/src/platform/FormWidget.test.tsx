@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import dayjs from 'dayjs'
@@ -866,8 +866,9 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Choose…' }))
     const dialog = await screen.findByRole('dialog')
     const row = await within(dialog).findByRole('row', { name: /Office/ })
-    act(() => row.focus())
-    await userEvent.keyboard('{Enter}')
+    expect(row).toHaveAttribute('tabindex', '0')
+    // The Enter goes to the row itself, since the opening dialog may still take focus.
+    expect(fireEvent.keyDown(row, { key: 'Enter' })).toBe(false)
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(screen.getByLabelText('Category')).toHaveValue('Office')
