@@ -82,10 +82,11 @@ An unverified sign-up expires after 24 hours with nothing created, and its subdo
 The control plane provisions the tenant as one job, with the sign-up's id as the idempotency key.
 
 1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell).
-2. Write the tenant and its host to the [directory](region-directory.md), and its `CNAME` record.
-3. Call `POST /api/cell/tenants` with the tenant id, the built-in application, the person's email as
-   the administrator, and the trial's quotas, see
+2. Call `POST /api/cell/tenants` on it with the tenant id, the built-in application, the person's
+   email as the administrator, and the trial's quotas, see
    [creating a tenant](tenant-lifecycle.md#creating-a-tenant).
+3. When the cell accepts, write the tenant and its host to the [directory](region-directory.md), and
+   its `CNAME` record.
 4. Poll the cell job until it ends. A failed job is run again, up to 3 times. After that the operator
    is alerted, and the person gets an email that the team is on it.
 5. On success, email the person that their Axis is ready, with the tenant's address. The identity

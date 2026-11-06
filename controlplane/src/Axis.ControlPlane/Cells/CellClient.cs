@@ -13,10 +13,14 @@ namespace Axis.ControlPlane.Cells;
 /// <see cref="CellClientOptions.TokenRefreshMargin"/> before it expires. A <c>401</c> from the cell drops the token, and the
 /// call is sent once more with a new one. Every <c>POST</c> carries the <c>Idempotency-Key</c> of its
 /// <see cref="CellOperation"/>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
-/// response body, a token, the client secret or a request body, and none of them is logged.
+/// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
+/// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
 /// </summary>
 internal sealed class CellClient : IDisposable
 {
+    /// <summary>The title of the problem that a cell answers with <c>409</c> when it holds as many tenants as its cap.</summary>
+    public const string FullTitle = "This cell is full.";
+
     private readonly CellOptions _cell;
     private readonly string _clientSecret;
     private readonly Func<HttpClient> _httpClient;
@@ -163,6 +167,11 @@ internal sealed class CellClient : IDisposable
             : response.StatusCode == HttpStatusCode.OK;
         if (!accepted)
         {
+            if (response.StatusCode == HttpStatusCode.Conflict && await IsFullAnswerAsync(response, cancellationToken))
+            {
+                throw new CellCallException($"The call {call} to the cell '{CellId}' answered that the cell is full.", status, cellFull: true);
+            }
+
             throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
         }
 
@@ -180,6 +189,24 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a job.", status);
+    }
+
+    private static async Task<bool> IsFullAnswerAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+            var root = document.RootElement;
+            return root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("title", out var title)
+                && title.ValueKind == JsonValueKind.String
+                && string.Equals(title.GetString(), FullTitle, StringComparison.Ordinal);
+        }
+        catch (JsonException)
+        {
+            // The body is not JSON, so the answer is an ordinary 409.
+            return false;
+        }
     }
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
