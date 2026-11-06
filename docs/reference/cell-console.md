@@ -103,8 +103,8 @@ notification bell. The built views are read only, except for the actions of the 
   - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
   - **Host verification** _(planned for M31)_: the verification state of each host.
   - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
-  - **Actions.** A Suspend and a Resume button, each with a confirmation that names the tenant, see
-    [actions](#actions).
+  - **Actions.** A Suspend, a Resume, a Delete and a Cancel deletion button, each with a confirmation that
+    names the tenant, see [actions](#actions).
   - **Other actions** _(planned for M31)_: the other [actions](#actions), each a button with a confirmation
     that names the tenant.
 
@@ -118,6 +118,12 @@ operator's session and queues a job.
   and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
   shows neither. A button opens a confirmation that names the tenant and says what the action does, and
   confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
+- **Delete and Cancel deletion.** The Tenant view shows Delete for an `active`, a `readOnly` or a `suspended`
+  tenant. Its confirmation names the tenant, says what is lost and that the deletion can be cancelled for 7
+  days, and keeps its Delete button off until the operator types the tenant id exactly, with the same case
+  and no spaces added. Confirming it calls `DELETE /api/cell/tenants/{id}`. A `deleting` tenant shows only
+  Cancel deletion, in place of the other buttons, and its confirmation calls
+  `POST /api/cell/tenants/{id}/deletion/cancel`. A `provisioning` tenant shows neither.
 - **Idempotency key.** Each action sends an `Idempotency-Key`. The console keeps the key in the page's memory,
   for each tenant and action, while the request has no final answer. A retry after a network error or a `5xx`
   sends the same key, so it cannot queue a second job. Any `2xx` or `4xx` answer is final and drops the key,
@@ -127,8 +133,7 @@ operator's session and queues a job.
 - **The job.** The queued job heads the tenant's jobs. The view reads it at once and then every 2 seconds, and
   shows its state and steps. When the job succeeds or fails, the view loads the tenant and its jobs again. The
   buttons are off while it follows a job.
-- **Other actions** _(planned for M31)_. Create a tenant, set quotas, add a host, export, download an export,
-  delete and cancel a deletion. Delete asks the operator to type the tenant id.
+- **Other actions** _(planned for M31)_. Create a tenant, set quotas, add a host, export and download an export.
 
 ## What the console never shows
 

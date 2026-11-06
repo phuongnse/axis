@@ -1,5 +1,5 @@
-import { Alert, Card, Descriptions, Flex, Modal, Typography } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { Alert, Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -43,13 +43,26 @@ const actionTexts = {
     body: 'shell.cell.tenant.resumeBody',
     ok: 'shell.cell.tenant.resumeOk',
   },
+  delete: {
+    button: 'shell.cell.tenant.delete',
+    confirm: 'shell.cell.tenant.deleteConfirm',
+    body: 'shell.cell.tenant.deleteBody',
+    ok: 'shell.cell.tenant.deleteOk',
+  },
+  'cancel-deletion': {
+    button: 'shell.cell.tenant.cancelDeletion',
+    confirm: 'shell.cell.tenant.cancelDeletionConfirm',
+    body: 'shell.cell.tenant.cancelDeletionBody',
+    ok: 'shell.cell.tenant.cancelDeletionOk',
+  },
 } as const
 
 /**
  * The Tenant view of the cell console: one tenant's status, application and hosts, its quotas with the ones it overrides,
  * and its jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
- * Suspend and a `suspended` or `readOnly` one offers Resume, each behind a confirmation. An action queues a job with an
- * `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
+ * Suspend and a `suspended` or `readOnly` one offers Resume. An `active`, `readOnly` or `suspended` tenant offers Delete,
+ * which stays off until the operator types the tenant id exactly, and a `deleting` one offers only Cancel deletion. Each
+ * action is behind a confirmation. An action queues a job with an `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
  * follows the job every 2 seconds until it ends and reloads the tenant and its jobs.
  */
 export function CellTenantPage() {
@@ -62,6 +75,9 @@ export function CellTenantPage() {
   const [jobs, setJobs] = useState<CellJob[]>()
   const [jobsFailed, setJobsFailed] = useState(false)
   const [confirming, setConfirming] = useState<CellTenantAction | null>(null)
+  // The text typed to confirm a deletion. It starts empty whenever a confirmation opens.
+  const [typed, setTyped] = useState('')
+  const typedId = useId()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   // The job to follow. Setting it again to the same id does not restart the check, so a queued job sets it once.
@@ -184,6 +200,14 @@ export function CellTenantPage() {
 
   const canSuspend = tenant?.status === 'active' || tenant?.status === 'readOnly'
   const canResume = tenant?.status === 'suspended' || tenant?.status === 'readOnly'
+  const canDelete = tenant?.status === 'active' || tenant?.status === 'readOnly' || tenant?.status === 'suspended'
+  const canCancelDeletion = tenant?.status === 'deleting'
+
+  function openConfirmation(action: CellTenantAction) {
+    setActionError(null)
+    setTyped('')
+    setConfirming(action)
+  }
 
   const quotas: QuotaRow[] = tenant ? Object.entries(tenant.quotas).map(([key, quota]) => ({ key, ...quota })) : []
   const quotaColumns: AxisColumn<QuotaRow>[] = [
@@ -236,17 +260,14 @@ export function CellTenantPage() {
                 },
               ]}
             />
-            {(canSuspend || canResume) && (
+            {(canSuspend || canResume || canDelete || canCancelDeletion) && (
               <Flex gap="small">
                 {canSuspend && (
                   <AxisButton
                     role="secondary"
                     data-testid="cell-tenant-suspend"
                     disabled={following !== null}
-                    onClick={() => {
-                      setActionError(null)
-                      setConfirming('suspend')
-                    }}
+                    onClick={() => openConfirmation('suspend')}
                   >
                     {t(actionTexts.suspend.button)}
                   </AxisButton>
@@ -256,12 +277,29 @@ export function CellTenantPage() {
                     role="secondary"
                     data-testid="cell-tenant-resume"
                     disabled={following !== null}
-                    onClick={() => {
-                      setActionError(null)
-                      setConfirming('resume')
-                    }}
+                    onClick={() => openConfirmation('resume')}
                   >
                     {t(actionTexts.resume.button)}
+                  </AxisButton>
+                )}
+                {canDelete && (
+                  <AxisButton
+                    role="secondary"
+                    data-testid="cell-tenant-delete"
+                    disabled={following !== null}
+                    onClick={() => openConfirmation('delete')}
+                  >
+                    {t(actionTexts.delete.button)}
+                  </AxisButton>
+                )}
+                {canCancelDeletion && (
+                  <AxisButton
+                    role="secondary"
+                    data-testid="cell-tenant-cancel-deletion"
+                    disabled={following !== null}
+                    onClick={() => openConfirmation('cancel-deletion')}
+                  >
+                    {t(actionTexts['cancel-deletion'].button)}
                   </AxisButton>
                 )}
               </Flex>
@@ -284,14 +322,31 @@ export function CellTenantPage() {
           data-testid="cell-tenant-confirm"
           title={t(actionTexts[confirming].confirm).replace('{tenant}', id)}
           okText={t(actionTexts[confirming].ok)}
-          okButtonProps={{ danger: confirming === 'suspend' }}
-          cancelText={t('shell.users.roles.cancel')}
+          okButtonProps={{
+            danger: confirming === 'suspend' || confirming === 'delete',
+            disabled: confirming === 'delete' && typed !== id,
+          }}
+          cancelText={t(
+            confirming === 'cancel-deletion' ? 'shell.cell.tenant.cancelDeletionClose' : 'shell.users.roles.cancel',
+          )}
           confirmLoading={busy}
           onOk={() => void runAction(confirming)}
           onCancel={() => setConfirming(null)}
         >
           <Flex vertical gap="small">
             <Typography.Text>{t(actionTexts[confirming].body)}</Typography.Text>
+            {confirming === 'delete' && (
+              <Flex vertical gap="small">
+                <label htmlFor={typedId}>{t('shell.cell.tenant.deleteTypeId').replace('{tenant}', id)}</label>
+                <Input
+                  id={typedId}
+                  data-testid="cell-tenant-delete-id"
+                  value={typed}
+                  autoComplete="off"
+                  onChange={(event) => setTyped(event.target.value)}
+                />
+              </Flex>
+            )}
             {actionError && <Alert data-testid="cell-tenant-action-error" type="error" title={actionError} />}
           </Flex>
         </Modal>

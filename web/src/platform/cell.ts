@@ -148,8 +148,8 @@ export function fetchCellJob(id: string, signal?: AbortSignal): Promise<CellResu
   return fetchCellRoute<CellJob>(`/api/cell/jobs/${encodeURIComponent(id)}`, 'job', signal)
 }
 
-/** The actions of the Tenant view that queue a job. */
-export type CellTenantAction = 'suspend' | 'resume'
+/** The actions of the Tenant view that queue a job, named by the kind of the job. */
+export type CellTenantAction = 'suspend' | 'resume' | 'delete' | 'cancel-deletion'
 
 /**
  * The answer of {@link queueCellTenantJob}: the queued job, the refusal that the console shows, or the problem that the
@@ -158,7 +158,7 @@ export type CellTenantAction = 'suspend' | 'resume'
 export type CellActionResult = CellResult<CellJob> | { kind: 'problem'; status: number; title: string }
 
 /**
- * Queues the job of `action` for the tenant `id` and sends `idempotencyKey` as its `Idempotency-Key`. A 202 answers the
+ * Queues the job of `action` for the tenant `id`, with the route of the provisioning API that the action names, and sends `idempotencyKey` as its `Idempotency-Key`. A 202 answers the
  * queued job, whose `steps` are empty and `error` is `null`, because the 202 holds neither. A 401 or 403 is a refusal.
  * Any other 4xx is a final answer and comes back as the problem. A 5xx and a network error throw, so the caller may
  * retry with the same key. The request has no body, because the server hashes the body into the request that the key
@@ -169,9 +169,16 @@ export async function queueCellTenantJob(
   action: CellTenantAction,
   idempotencyKey: string,
 ): Promise<CellActionResult> {
+  const tenantUrl = `/api/cell/tenants/${encodeURIComponent(id)}`
+  const request = {
+    suspend: { method: 'POST', url: `${tenantUrl}/suspend` },
+    resume: { method: 'POST', url: `${tenantUrl}/resume` },
+    delete: { method: 'DELETE', url: tenantUrl },
+    'cancel-deletion': { method: 'POST', url: `${tenantUrl}/deletion/cancel` },
+  }[action]
   const response = await apiFetch(
-    `/api/cell/tenants/${encodeURIComponent(id)}/${action}`,
-    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+    request.url,
+    { method: request.method, headers: { 'Idempotency-Key': idempotencyKey } },
     { promptSignInOnUnauthorized: false },
   )
   if (response.status === 401) {
