@@ -219,3 +219,32 @@ test("the create dialog shows the title of the cell's refusal when a tenant alre
   await expect(dialog.getByTestId('cell-create-error')).toContainText('A tenant of the cell already has this id.')
   await expect(dialog).toBeVisible()
 })
+
+// This test runs last: the 7-day grace period keeps the publisher from purging the tenant, and the cancelled deletion
+// leaves the tenant suspended.
+test('the platform operator deletes a tenant by typing its id and cancels the deletion', async () => {
+  const page = operator
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+
+  await page.getByTestId('cell-tenant-delete').click()
+  const dialog = await waitForDialog(page)
+  await expect(dialog).toContainText(tenant)
+  await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeDisabled()
+  await dialog.getByTestId('cell-tenant-delete-id').fill(tenant)
+  await expect(dialog.getByRole('button', { name: 'Delete', exact: true })).toBeEnabled()
+  await expectNoViolations(page)
+  await confirmDialog(page, 'Delete')
+
+  const jobs = page.getByTestId('cell-jobs')
+  await expect(jobs.getByRole('row').nth(1)).toContainText('delete', { timeout: 60_000 })
+  await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
+  await expect(page.getByTestId('cell-tenant')).toContainText('Deleting', { timeout: 60_000 })
+  await expect(page.getByTestId('cell-tenant-suspend')).toHaveCount(0)
+
+  await page.getByTestId('cell-tenant-cancel-deletion').click()
+  await confirmDialog(page, 'Cancel deletion')
+  await expect(jobs.getByRole('row').nth(1)).toContainText('cancel-deletion', { timeout: 60_000 })
+  await expect(jobs.getByRole('row').nth(1)).toContainText('Succeeded', { timeout: 60_000 })
+  await expect(page.getByTestId('cell-tenant')).toContainText('Suspended', { timeout: 60_000 })
+})
