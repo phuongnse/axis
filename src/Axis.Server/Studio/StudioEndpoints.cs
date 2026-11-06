@@ -90,8 +90,10 @@ namespace Axis.Server.Studio;
 /// <c>folderContentHash</c> is the content hash the folder compiles to now, or null when it has errors. <c>changes</c>
 /// lists the files that differ from the active release, see <see cref="StudioReleaseChanges"/>, and is null when nothing
 /// is active. Each item has
-/// <c>offStandard</c> and <c>relaxed: [{ module, point, reason }]</c>, read from the <c>application.json</c> stored with
-/// that release. It reads the tenant database and changes nothing.
+/// <c>offStandard</c> and <c>relaxed: [{ module, point, reason, moduleTitle, part, entityTitles, titles }]</c>, read from the
+/// <c>application.json</c> stored with that release, with the words that <see cref="StudioRelaxedWords"/> reads from its module
+/// copies. It reads the tenant database and changes nothing.
+/// <c>GET /api/studio/apps/{application}/releases/{number}</c> is in <see cref="StudioReleaseEndpoints"/>.
 /// </summary>
 internal static class StudioEndpoints
 {
@@ -117,6 +119,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioPublishEndpoints();
         endpoints.MapStudioAuthoringRequestEndpoints();
         endpoints.MapStudioRevisionEndpoints();
+        endpoints.MapStudioReleaseEndpoints();
         endpoints.MapStudioExpressionEndpoints();
         endpoints.MapStudioPageMetadataEndpoints();
         endpoints.MapStudioTemplateEndpoints();
@@ -653,11 +656,11 @@ internal static class StudioEndpoints
                 : null;
         var names = await UserProfiles.FindDisplayNamesAsync(
             await database.GetConnectionAsync(cancellationToken), [.. activations.Select(row => row.Actor)], cancellationToken);
-        var manifests = await store.GetManifestsAsync([.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
+        var relaxedPoints = await StudioRelaxedWords.ReadAsync(store, [.. activations.Select(row => row.ReleaseId).Distinct()], cancellationToken);
         var items = activations
             .Select(row =>
             {
-                var relaxed = RelaxedPoints(manifests.GetValueOrDefault(row.ReleaseId));
+                var relaxed = relaxedPoints.GetValueOrDefault(row.ReleaseId) ?? [];
                 return new StudioReleaseItem(
                     row.ReleaseId, row.Number, row.ContentHash, row.ActivatedAt, row.Actor, names.GetValueOrDefault(row.Actor) ?? row.ActorName, row.Label, row.Note, row.RequestId,
                     relaxed.Count > 0, relaxed);
@@ -665,14 +668,6 @@ internal static class StudioEndpoints
             .ToList();
         return Results.Ok(new StudioReleaseHistoryResponse(activeRelease, folderContentHash, changes, items));
     }
-
-    // The relax entries of a stored application.json, in manifest order. A missing manifest has none.
-    internal static List<StudioRelaxedPoint> RelaxedPoints(string? manifest) =>
-        manifest is null
-            ? []
-            : ApplicationLoader.Load([new ResourceContent("application.json", manifest)]).Application?.Modules
-                .SelectMany(module => module.Relax.Select(entry => new StudioRelaxedPoint(module.Id, entry.Point, entry.Reason ?? "")))
-                .ToList() ?? [];
 
     private static async Task<IResult> PatchAsync(
         string application,
@@ -1244,5 +1239,17 @@ internal sealed record StudioReleaseItem(
     bool OffStandard,
     IReadOnlyList<StudioRelaxedPoint> Relaxed);
 
-/// <summary>A relax entry of a release's application: the module, the point it turns off and the reason.</summary>
-internal sealed record StudioRelaxedPoint(string Module, string Point, string Reason);
+/// <summary>
+/// A relax entry of a release's application: the module, the point it turns off and the reason, with the words read from the
+/// module files that the release stores, see <see cref="StudioRelaxedWords"/>. <c>Part</c> is the kind of point.
+/// <c>EntityTitles</c> and <c>Titles</c> are the labels of the entity and of the point by locale. Each word is null when the
+/// release has none.
+/// </summary>
+internal sealed record StudioRelaxedPoint(
+    string Module,
+    string Point,
+    string Reason,
+    string? ModuleTitle,
+    string? Part,
+    IReadOnlyDictionary<string, string>? EntityTitles,
+    IReadOnlyDictionary<string, string>? Titles);

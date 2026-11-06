@@ -26,14 +26,29 @@ public static class ModuleUpgradeCheck
     /// is not additive. Files outside <c>modules/</c> are ignored. A release stored before module copies
     /// existed has none, and then nothing is reported.
     /// </summary>
-    public static IReadOnlyList<Diagnostic> Check(IReadOnlyList<ReleaseResource> active, IReadOnlyList<ReleaseResource> next)
+    public static IReadOnlyList<Diagnostic> Check(IReadOnlyList<ReleaseResource> active, IReadOnlyList<ReleaseResource> next) =>
+        DiagnosticOrder.Sort([.. Findings(active, next).Select(finding => finding.Diagnostic)]);
+
+    /// <summary>
+    /// The modules of <paramref name="active"/> that <paramref name="next"/> cannot replace, one entry for each module,
+    /// ordered by id. <see cref="ModuleUpgradeBlocker.Version"/> is null when <paramref name="next"/> lacks the module.
+    /// </summary>
+    public static IReadOnlyList<ModuleUpgradeBlocker> Blockers(IReadOnlyList<ReleaseResource> active, IReadOnlyList<ReleaseResource> next) =>
+        [
+            .. Findings(active, next)
+                .GroupBy(finding => finding.ModuleId, StringComparer.Ordinal)
+                .OrderBy(group => group.Key, StringComparer.Ordinal)
+                .Select(group => new ModuleUpgradeBlocker(group.Key, group.First().ActiveVersion, group.First().Version)),
+        ];
+
+    private static IEnumerable<(string ModuleId, string ActiveVersion, string? Version, Diagnostic Diagnostic)> Findings(
+        IReadOnlyList<ReleaseResource> active, IReadOnlyList<ReleaseResource> next)
     {
         ArgumentNullException.ThrowIfNull(active);
         ArgumentNullException.ThrowIfNull(next);
 
         var before = ReadModules(active);
         var after = ReadModules(next);
-        var diagnostics = new List<Diagnostic>();
         foreach (var (moduleId, oldModule) in before)
         {
             after.TryGetValue(moduleId, out var newModule);
@@ -42,7 +57,7 @@ public static class ModuleUpgradeCheck
             {
                 if (newModule is null || !newModule.Entities.TryGetValue(entityId, out var newEntity))
                 {
-                    diagnostics.Add(new Diagnostic(
+                    yield return (moduleId, oldModule.Version, newModule?.Version, new Diagnostic(
                         DiagnosticCodes.NonAdditiveModuleUpgrade,
                         $"Version {newVersion} of the module '{moduleId}' drops the entity '{oldEntity.Name}' that version {oldModule.Version} has. {Rule}",
                         oldEntity.Path,
@@ -55,7 +70,7 @@ public static class ModuleUpgradeCheck
                 {
                     if (!newEntity.Fields.TryGetValue(fieldName, out var newField))
                     {
-                        diagnostics.Add(new Diagnostic(
+                        yield return (moduleId, oldModule.Version, newModule.Version, new Diagnostic(
                             DiagnosticCodes.NonAdditiveModuleUpgrade,
                             $"Version {newVersion} of the module '{moduleId}' drops the field '{oldField.Name}' of the entity '{oldEntity.Name}' that version {oldModule.Version} has. {Rule}",
                             newEntity.Path,
@@ -64,7 +79,7 @@ public static class ModuleUpgradeCheck
                     }
                     else if (!string.Equals(oldField.Type, newField.Type, StringComparison.Ordinal))
                     {
-                        diagnostics.Add(new Diagnostic(
+                        yield return (moduleId, oldModule.Version, newModule.Version, new Diagnostic(
                             DiagnosticCodes.NonAdditiveModuleUpgrade,
                             $"Version {newVersion} of the module '{moduleId}' changes the type of the field '{newField.Name}' of the entity '{oldEntity.Name}' from '{oldField.Type}' in version {oldModule.Version} to '{newField.Type}'. {Rule}",
                             newEntity.Path,
@@ -74,8 +89,6 @@ public static class ModuleUpgradeCheck
                 }
             }
         }
-
-        return DiagnosticOrder.Sort(diagnostics);
     }
 
     private static Dictionary<string, ModuleCopy> ReadModules(IReadOnlyList<ReleaseResource> resources)
@@ -153,3 +166,6 @@ public static class ModuleUpgradeCheck
 
     private sealed record FieldCopy(string Name, int Index, string? Type);
 }
+
+/// <summary>A module of the active release that another release cannot replace: its id, its version in the active release and its version in the other release, or null when the other release lacks the module.</summary>
+public sealed record ModuleUpgradeBlocker(string Module, string ActiveVersion, string? Version);

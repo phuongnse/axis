@@ -459,8 +459,8 @@ release history see which promises of a module the business turned off, and why.
 
 - **What the release keeps.** The release keeps the list of relaxed points with their reasons, and the
   [release history](storage.md#release-history) shows it. The Studio release history route answers
-  `offStandard` and `relaxed: [{ module, point, reason }]` for each release, read from the
-  `application.json` stored with it.
+  `offStandard` and `relaxed` for each release, read from the `application.json` stored with it, see
+  [release history](authoring.md#release-history).
 - **Where it shows.** Studio's [releases](studio-workspace.md#releases) show the Off-standard tag beside
   the number of an off-standard release, and the operator console's publishing view shows the tag with
   the module, point and reason of each relaxed entry.

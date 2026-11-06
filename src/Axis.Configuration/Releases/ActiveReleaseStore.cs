@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -84,6 +85,29 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
             .AsNoTracking()
             .Where(row => releaseIds.Contains(row.ReleaseId) && row.Path == "application.json")
             .ToDictionaryAsync(row => row.ReleaseId, row => row.Content, cancellationToken);
+
+    /// <summary>
+    /// The module copies (<c>modules/…</c>) of each of the releases, sorted by path, in one query. A release without
+    /// module copies has no entry.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ResourceContent>>> GetModuleCopiesAsync(
+        IReadOnlyCollection<Guid> releaseIds, CancellationToken cancellationToken = default)
+    {
+        var rows = await context.ReleaseResources
+            .AsNoTracking()
+            .Where(row => releaseIds.Contains(row.ReleaseId) && row.Path.StartsWith(ApplicationLoader.ModulesFolderPrefix))
+            .Select(row => new { row.ReleaseId, row.Path, row.Content })
+            .ToListAsync(cancellationToken);
+
+        // Database collation may not be ordinal, so the copies are put in path order here.
+        return rows
+            .GroupBy(row => row.ReleaseId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ResourceContent>)[.. group
+                    .OrderBy(row => row.Path, StringComparer.Ordinal)
+                    .Select(row => new ResourceContent(row.Path, row.Content))]);
+    }
 
     public async Task<SetActiveReleaseResult> TrySetAsync(
         Guid applicationId,

@@ -88,7 +88,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 The publishing routes are in [Publishing](#publishing). Two groups of routes serve one Studio page
 each and are described there:
 
-- **The release route** _(planned for M31)_. `GET .../releases/{number}` answers one release for its
+- **The release route.** `GET .../releases/{number}` answers one release for its
   page, see [release route](studio-workspace.md#release-route).
 - **The resource form's routes** _(planned for M31)_. `GET .../relaxed`, `GET /api/studio/catalog`
   and `GET /api/studio/bindings` give the resource form what it chooses from, see
@@ -820,7 +820,7 @@ stateDiagram-v2
 ### Release history
 
 `GET .../releases` answers the application's activations in this tenant, newest first, as
-`{ active: { releaseId, number, contentHash }, folderContentHash, changes, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason }] }] }`.
+`{ active: { releaseId, number, contentHash }, folderContentHash, changes, items: [{ releaseId, number, contentHash, activatedAt, actor, actorName, label, note, requestId, offStandard, relaxed: [{ module, point, reason, moduleTitle, part, entityTitles, titles }] }] }`.
 The publisher writes the rows of a `publish` and an `activate` request.
 
 - **`active`** is the application's active release in this tenant, or null when there is none.
@@ -839,9 +839,14 @@ The publisher writes the rows of a `publish` and an `activate` request.
 - **Relaxed points.** `relaxed` lists the relax entries of the release's application in manifest
   order, read from the `application.json` stored with that release, and `offStandard` is true when it
   is not empty, see [off-standard releases](module-contracts.md#off-standard-releases).
-- **Words for relaxed points** _(planned for M31)_. Each `relaxed` entry also has `moduleTitle`,
-  `part`, what kind of point it is, `entityTitles` and `titles`, the point's label in each locale, read
-  from the module files that the release stores, each null when the release has no words for it.
+- **Words for relaxed points.** `moduleTitle` is the module's label, `part` is `transition`, `initial`,
+  `deletable`, `validation`, `effect` or `ceiling`, and `entityTitles` and `titles` are the labels of the
+  entity and of the point by locale. They are read from the module files that the release stores, so a
+  release keeps the words it was published with. A part without a label shows its name in each locale of
+  the module's texts, or in `en` when the module has none. `moduleTitle` is the module's id when its label
+  is blank. `titles` is null for `ceiling/others`, which reads "Other roles". Every word is null when the
+  release has no copy of the module. `part` and `titles` are also null when the module's contract lacks
+  the point.
 - **Numbers.** A release gets its `number` the first time it is activated in the tenant: 1, 2, 3… per
   application. Activating it again keeps the number, so the same content can have different numbers in
   two tenants.
