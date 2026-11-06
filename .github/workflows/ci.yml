@@ -1,16 +1,15 @@
 name: CI
 
-# A push to any branch runs CI, so hand-made pull requests show its result. NexKit's
-# branches are left out: NexKit runs the same scripts as its own checks, and its pushes and
-# pull requests use the Actions token, which starts no workflow or waits for approval. A design
-# review's prototype branches are left out too: a prototype changes the widgets without their tests
-# and is never merged, so CI could only fail on it.
-# A merge by NexKit starts no push workflow, so NexKit starts CI on main once every 5 of its merges
-# (D112). It also runs on a person's push and on demand. Once a week the schedule runs the dependency
-# and image scans alone, so a new advisory fails CI on main even when nothing merged (D107).
+# A push to a branch runs CI, so hand-made pull requests show its result. NexKit's branches are
+# left out, because NexKit runs the same scripts as its own checks. A design review's prototype
+# branches are left out too: a prototype changes the widgets without their tests and is never
+# merged, so CI could only fail on it. On main, NexKit starts CI once every 5 of its merges rather
+# than a push starting it after each one (D136). It also runs on demand. Once a week the schedule
+# runs the dependency and image scans alone, so a new advisory fails CI on main even when nothing
+# merged (D107).
 on:
   push:
-    branches-ignore: ['nexkit/**', 'design/**']
+    branches-ignore: [main, 'nexkit/**', 'design/**']
   workflow_dispatch:
   schedule:
     - cron: '17 5 * * 1'
@@ -97,24 +96,9 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
-      # NexKit restores these caches before its setup but never saves them; CI on main does.
-      # Each step must match its `cache` entry in .nexkit/config.json: the same paths and
-      # key files, in the same order, and before Setup so the key files are as committed.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.nuget/packages
-          key: nexkit-${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj', '.config/dotnet-tools.json') }}
-          restore-keys: nexkit-${{ runner.os }}-nuget-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.npm
-          key: nexkit-${{ runner.os }}-npm-${{ hashFiles('web/package-lock.json', 'tests/e2e/package-lock.json') }}
-          restore-keys: nexkit-${{ runner.os }}-npm-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: nexkit-${{ runner.os }}-playwright-${{ hashFiles('tests/e2e/package-lock.json') }}
-          restore-keys: nexkit-${{ runner.os }}-playwright-
+      # Restores the caches that .nexkit/config.json names and, on main, saves them for NexKit's
+      # runs, which only restore. It comes before Setup, so the key files are as committed.
+      - uses: phuongnse/nexkit/cache@a4ba5d3226f8fe0a72bc71417427c85d86f788ab # v6.0.0
       - name: Setup
         run: scripts/setup.sh
       - name: Build
@@ -196,28 +180,3 @@ jobs:
           node-version: 24
       - name: Dependency scan
         run: scripts/scan.sh
-
-  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
-  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
-  nexkit-sweep:
-    needs: [checks, dependency-scan, image-scan]
-    if: always() && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      actions: write
-    steps:
-      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
-      # tried again after growing pauses. If every try fails, the job warns and passes, because
-      # the dispatch only starts the sweep sooner.
-      - run: |
-          for pause in 30 60 120 240 0; do
-            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
-              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
-              exit 0
-            fi
-            if [ "$pause" -gt 0 ]; then sleep "$pause"; fi
-          done
-          echo "::warning::GitHub rejected every try to start a NexKit sweep. The next sweep looks at this run."
-        env:
-          GH_TOKEN: ${{ github.token }}

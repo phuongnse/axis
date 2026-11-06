@@ -289,7 +289,11 @@
     "scope": null,
     "answer": "recommended",
     "max_parallel": 3,
-    "watch_workflows": []
+    "watch_workflows": [],
+    "trusted_workflows": [
+      "docs-audit.yml"
+    ],
+    "last_in_milestone_label": "last-in-milestone"
   },
   "evidence": {
     "artifacts": [
@@ -306,5 +310,19 @@
   },
   "notify": [
     "phuongnse"
-  ]
+  ],
+  "review": {
+    "checklist": [
+      "Every doc statement the change makes false is fixed in the change: the section that describes what changed is rewritten, the rule it replaces is deleted, and the planned marker of what it builds is removed",
+      "No setting, route, command, code or other name that the change renames or removes is still named under docs/, in AGENTS.md or under .claude/skills/",
+      "Each rule the docs diff touches is stated in one place, and the docs diff adds no progress, history, dates or issue numbers",
+      "A doc list of what the code defines that the change adds or extends has a unit test that reads the list from the doc and from the code and compares them",
+      "A change that adds a new kind of route, host, caller, stored secret or integration updates docs/reference/threat-model.md"
+    ]
+  },
+  "github_app": {
+    "slug": "nexkit-agent",
+    "app_id_secret": "NEXKIT_APP_ID",
+    "private_key_secret": "NEXKIT_APP_PRIVATE_KEY"
+  }
 }

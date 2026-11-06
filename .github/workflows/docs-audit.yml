@@ -1,8 +1,8 @@
 name: Docs audit
 
 # Reads a quarter of the docs against the code and opens a NexKit issue for each finding (D135).
-# NexKit merges start no push workflow, so NexKit starts it on main once every 100 of its merges,
-# and it also runs on demand. The audit job runs Claude Code with read-only tools, no GitHub
+# NexKit starts it on main once every 100 of its merges, and it also runs on demand. NexKit takes
+# its issues because autopilot.trusted_workflows lists this file. The audit job runs Claude Code with read-only tools, no GitHub
 # token in its checkout and no permission to write; the file job runs no model and only opens
 # issues from the findings, so a page that tries to steer the model cannot write to the repository.
 on:
@@ -75,29 +75,3 @@ jobs:
         run: |
           printf '%s' "$FINDINGS" > findings.json
           node scripts/docs-audit.mjs file findings.json "$GITHUB_RUN_ID"
-
-  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with the
-  # Actions token sends no workflow_run event, but it may dispatch NexKit's sweep, which also takes
-  # the issues this run opened.
-  nexkit-sweep:
-    needs: [audit, file]
-    if: always() && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      actions: write
-    steps:
-      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
-      # tried again after growing pauses. If every try fails, the job warns and passes, because
-      # the dispatch only starts the sweep sooner.
-      - run: |
-          for pause in 30 60 120 240 0; do
-            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
-              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
-              exit 0
-            fi
-            if [ "$pause" -gt 0 ]; then sleep "$pause"; fi
-          done
-          echo "::warning::GitHub rejected every try to start a NexKit sweep. The next sweep looks at this run."
-        env:
-          GH_TOKEN: ${{ github.token }}

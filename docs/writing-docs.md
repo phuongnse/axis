@@ -158,7 +158,9 @@ every pull request, the tests, and an audit every hundred merges, as
    searches the docs for every name it renames or removes, such as a setting, a route, a command or a
    code. A pull request that makes any doc statement false fixes it. The review checks the docs diff
    against the code diff: each rule it touches has one home, nothing of an old rule is left, nothing
-   it built is still marked planned, and no progress or history entered the text.
+   it built is still marked planned, and no progress or history entered the text. NexKit's plan and
+   review answer these checks one by one, as the
+   [review checklist](delivery.md#how-pull-requests-merge) in its settings.
 2. **A changed decision is a new decision,** which replaces the old one as
    [Decisions](#decisions) says.
 3. **A design review writes reference pages.** The docs change that ends a

@@ -51,8 +51,8 @@ Three layers, each closing one kind of drift. The rules are in
 - A page that tries to steer the model reaches nothing that can write: the model reads, and a job
   with no model writes.
 - The audit's runs show on the repository's Actions, and its issues add to NexKit's queue.
-- The audit needs NexKit to trust the issues of a listed workflow, as the trusted workflows setting
-  that NexKit's issue phuongnse/nexkit#205 asks for.
+- NexKit takes the audit's issues only while its trusted workflows setting lists the workflow, and
+  only from a run on `main` that NexKit or a writer started.
 
 ## Alternatives
 
