@@ -11,10 +11,12 @@ namespace Axis.ControlPlane.RegionDirectory;
 /// lists and sets the cell's count to the length of the list. A cell that cannot be reached or answers an error keeps its rows, a
 /// warning log names it and the job goes on to the next cell, so the job still succeeds. A tenant or a host that the directory holds
 /// under another cell is left alone and counted in a warning log, as a person must decide which cell owns it. The job writes
-/// nothing to <c>directory.held</c>. A database error fails the attempt, and the job runner queues it again.
+/// nothing to <c>directory.held</c>. After each commit it queues a <c>writeTenantRecord</c> job for each tenant it added and a
+/// <c>removeTenantRecord</c> job for each it removed, on the control plane database, see <see cref="TenantRecordJobs"/>. A database error fails the attempt, and the job runner queues it again.
 /// </summary>
 internal sealed partial class DirectoryCorrection(
     [FromKeyedServices("directory")] NpgsqlDataSource directory,
+    NpgsqlDataSource controlPlane,
     CellClients cells,
     ILogger<DirectoryCorrection> logger) : IJobHandler
 {
@@ -57,14 +59,24 @@ internal sealed partial class DirectoryCorrection(
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         // The lock serializes the correction with the cell picker, which raises the count of the same row.
-        string? region;
-        await using (var lockRow = new NpgsqlCommand("SELECT region_code FROM directory.cells WHERE id = @cell FOR UPDATE", connection, transaction))
+        string? region = null;
+        string? tenantDomain = null;
+        await using (var lockRow = new NpgsqlCommand(
+            """
+            SELECT c.region_code, r.tenant_domain FROM directory.cells c JOIN directory.regions r ON r.code = c.region_code
+            WHERE c.id = @cell FOR UPDATE OF c
+            """, connection, transaction))
         {
             lockRow.Parameters.AddWithValue("cell", cellId);
-            region = await lockRow.ExecuteScalarAsync(cancellationToken) as string;
+            await using var reader = await lockRow.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                region = reader.GetString(0);
+                tenantDomain = reader.GetString(1);
+            }
         }
 
-        if (region is null)
+        if (region is null || tenantDomain is null)
         {
             LogCellMissing(cellId);
             await transaction.RollbackAsync(cancellationToken);
@@ -88,13 +100,13 @@ internal sealed partial class DirectoryCorrection(
             connection, transaction, region, cellId, ids, hosts, hostTenants,
             "DELETE FROM directory.hosts WHERE cell_id = @cell AND NOT ((host, tenant_id) IN (SELECT * FROM unnest(@hosts, @hostTenants)))",
             cancellationToken);
-        await ExecuteAsync(
+        var removed = await IdsAsync(
             connection, transaction, region, cellId, ids, hosts, hostTenants,
-            "DELETE FROM directory.tenants WHERE cell_id = @cell AND NOT (id = ANY(@ids))",
+            "DELETE FROM directory.tenants WHERE cell_id = @cell AND NOT (id = ANY(@ids)) RETURNING id",
             cancellationToken);
-        await ExecuteAsync(
+        var added = await IdsAsync(
             connection, transaction, region, cellId, ids, hosts, hostTenants,
-            "INSERT INTO directory.tenants (id, region_code, cell_id) SELECT unnest(@ids), @region, @cell ON CONFLICT (id) DO NOTHING",
+            "INSERT INTO directory.tenants (id, region_code, cell_id) SELECT unnest(@ids), @region, @cell ON CONFLICT (id) DO NOTHING RETURNING id",
             cancellationToken);
         await ExecuteAsync(
             connection, transaction, region, cellId, ids, hosts, hostTenants,
@@ -112,6 +124,17 @@ internal sealed partial class DirectoryCorrection(
             ids.Length);
 
         await transaction.CommitAsync(cancellationToken);
+
+        // After the commit: the queue is in another database, and a job that ran first would find the old rows.
+        foreach (var id in removed)
+        {
+            await TenantRecordJobs.EnqueueRemoveAsync(controlPlane, id, tenantDomain, cancellationToken);
+        }
+
+        foreach (var id in added)
+        {
+            await TenantRecordJobs.EnqueueWriteAsync(controlPlane, id, cancellationToken);
+        }
     }
 
     private static async Task<T> ScalarAsync<T>(
@@ -119,6 +142,28 @@ internal sealed partial class DirectoryCorrection(
     {
         await using var command = Command(connection, transaction, sql, null, cellId, ids, hosts, hostTenants, null);
         return (T)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    private static async Task<string[]> IdsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string region,
+        string cellId,
+        string[] ids,
+        string[] hosts,
+        string[] hostTenants,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        await using var command = Command(connection, transaction, sql, region, cellId, ids, hosts, hostTenants, null);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var result = new List<string>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(reader.GetString(0));
+        }
+
+        return [.. result];
     }
 
     private static async Task ExecuteAsync(
