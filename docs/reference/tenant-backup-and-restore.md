@@ -419,7 +419,8 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
   first try, and a retry writes none.
 - **Last success.** After a tenant's archive is uploaded, the command stores the time of the upload,
   from the clock of the admin tool, in `platform.tenant_backups`. A tenant that fails keeps the time it
-  had. At the end of the run, also when it stopped at its limit, the command records the gauge
+  had. The [provisioning API's tenant reads](tenant-lifecycle.md#routes) answer the stored time as
+  `newestArchiveAt`. At the end of the run, also when it stopped at its limit, the command records the gauge
   `axis.backup.last_success` for each `active` and `suspended` tenant that has a stored time. The value
   is in Unix seconds and the tag `axis.tenant` names the tenant. A tenant that never succeeded has no
   point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command

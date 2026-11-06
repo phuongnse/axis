@@ -27,6 +27,13 @@ const acme: CellTenantDetail = {
   application: 'crm',
   hosts: ['acme.example.com', 'portal.acme.test'],
   failedWork: null,
+  usage: {
+    storage: { limit: null, used: null },
+    users: { limit: null, used: null },
+    applications: { limit: null, used: null },
+    emailsPerDay: { limit: null, used: null },
+  },
+  newestArchiveAt: null,
   quotas: {
     users: { value: 100, overridden: true },
     applications: { value: 10, overridden: false },

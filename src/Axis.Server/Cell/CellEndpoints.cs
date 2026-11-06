@@ -48,13 +48,21 @@ namespace Axis.Server.CellApi;
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants</c> answers <c>{ "items": [...] }</c>, ordered by id, with each tenant's <c>id</c>,
-/// <c>status</c>, <c>application</c>, <c>hosts</c> and <c>failedWork</c>. <c>GET /api/cell/tenants/{id}</c> answers one such tenant. Both read the
-/// platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
+/// <c>status</c>, <c>application</c>, <c>hosts</c>, <c>failedWork</c>, <c>usage</c> and <c>newestArchiveAt</c>. <c>GET /api/cell/tenants/{id}</c> answers one
+/// such tenant. Both read the platform tables over the reader role. The <c>failedWork</c> is <c>{ instances, unknownCalls, deadLetters }</c>, the counts of the worker's
 /// latest hourly sample in <c>platform.tenant_usage_latest</c>, and <see langword="null"/> until the worker has counted the tenant. The <c>status</c> is <c>deleting</c> while the tenant has a scheduled deletion, whatever
 /// its stored status, which stays <c>suspended</c>. A preview tenant belongs to its main tenant's Studio and is not a tenant of the
 /// cell, so the list leaves it out and its id is a <c>404</c>. The <c>application</c> is <see langword="null"/> until the
 /// create job records it. The one tenant also answers its <c>quotas</c>: each quota key with its effective <c>value</c> and
 /// whether the tenant <c>overridden</c> it, worked out from its <c>platform.tenant_quotas</c> rows and the cell's defaults.
+/// </para>
+/// <para>
+/// Both reads answer each tenant's <c>usage</c>: <c>storage</c>, <c>users</c>, <c>applications</c> and <c>emailsPerDay</c>, each as
+/// <c>{ limit, used }</c> as <c>GET /api/tenant/usage</c> does, with the limit of the tenant's <c>quotas</c>. The <c>used</c> of
+/// <c>storage</c> is the latest hourly sample, that of <c>users</c> and <c>applications</c> is the newest day row of
+/// <c>platform.tenant_usage</c>, and each is <see langword="null"/> while nothing fills it. The <c>used</c> of <c>emailsPerDay</c> is
+/// today's <c>emails</c> counter, 0 when none was sent. The <c>newestArchiveAt</c> is the time of the tenant's newest daily archive in
+/// <c>platform.tenant_backups</c>, or <see langword="null"/> when the tenant was never backed up.
 /// </para>
 /// <para>
 /// <c>GET /api/cell/tenants/{id}/administrators</c> answers <c>{ "items": [{ email, displayName, language }] }</c>, ordered by email: the
@@ -231,7 +239,11 @@ internal static partial class CellEndpoints
         return Results.Ok(new CellResponse(cell.Id!, cell.Region!, tenants, cell.TenantCap));
     }
 
-    private static async Task<IResult> ListTenantsAsync(NpgsqlDataSource dataSource, CancellationToken cancellationToken)
+    private static async Task<IResult> ListTenantsAsync(
+        NpgsqlDataSource dataSource,
+        QuotaDefaults defaults,
+        TimeProvider time,
+        CancellationToken cancellationToken)
     {
         await using var platform = Open(dataSource);
         var tenants = await platform.Tenants.AsNoTracking()
@@ -240,19 +252,29 @@ internal static partial class CellEndpoints
             .ToListAsync(cancellationToken);
         var ids = tenants.Select(tenant => tenant.Id).ToList();
         var hosts = await ReadHostsAsync(platform, ids, cancellationToken);
-        var failedWork = await ReadFailedWorkAsync(platform, ids, cancellationToken);
+        var latest = await ReadLatestSamplesAsync(platform, ids, cancellationToken);
+        var quotas = await ReadQuotasAsync(platform, ids, defaults, cancellationToken);
+        var usage = await ReadUsageAsync(platform, ids, quotas, latest, Today(time), cancellationToken);
+        var archives = await ReadNewestArchivesAsync(platform, ids, cancellationToken);
 
         return Results.Ok(new CellTenantListResponse(
             [.. tenants
                 .OrderBy(tenant => tenant.Id, StringComparer.Ordinal)
                 .Select(tenant => new CellTenantResponse(
-                    tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id)))]));
+                    tenant.Id,
+                    tenant.Status,
+                    null,
+                    HostsOf(hosts, tenant.Id),
+                    latest.GetValueOrDefault(tenant.Id)?.FailedWork,
+                    usage[tenant.Id],
+                    archives.TryGetValue(tenant.Id, out var archive) ? archive : null))]));
     }
 
     private static async Task<IResult> GetTenantAsync(
         string id,
         NpgsqlDataSource dataSource,
         QuotaDefaults defaults,
+        TimeProvider time,
         CancellationToken cancellationToken)
     {
         await using var platform = Open(dataSource);
@@ -266,10 +288,19 @@ internal static partial class CellEndpoints
         }
 
         var hosts = await ReadHostsAsync(platform, [tenant.Id], cancellationToken);
-        var failedWork = await ReadFailedWorkAsync(platform, [tenant.Id], cancellationToken);
-        var quotas = await ReadQuotasAsync(platform, tenant.Id, defaults, cancellationToken);
+        var latest = await ReadLatestSamplesAsync(platform, [tenant.Id], cancellationToken);
+        var quotas = await ReadQuotasAsync(platform, [tenant.Id], defaults, cancellationToken);
+        var usage = await ReadUsageAsync(platform, [tenant.Id], quotas, latest, Today(time), cancellationToken);
+        var archives = await ReadNewestArchivesAsync(platform, [tenant.Id], cancellationToken);
         return Results.Ok(new CellTenantDetailResponse(
-            tenant.Id, tenant.Status, null, HostsOf(hosts, tenant.Id), failedWork.GetValueOrDefault(tenant.Id), quotas));
+            tenant.Id,
+            tenant.Status,
+            null,
+            HostsOf(hosts, tenant.Id),
+            latest.GetValueOrDefault(tenant.Id)?.FailedWork,
+            quotas[tenant.Id],
+            usage[tenant.Id],
+            archives.TryGetValue(tenant.Id, out var archive) ? archive : null));
     }
 
     // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
@@ -374,9 +405,9 @@ internal static partial class CellEndpoints
 
         await PlatformAuditRecords.WriteAsync(
             platform, "tenant quotas set", id, [.. QuotaKeys.All.Where(named.Contains)], cancellationToken);
-        var quotas = await ReadQuotasAsync(platform, id, defaults, cancellationToken);
+        var quotas = await ReadQuotasAsync(platform, [id], defaults, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Results.Ok(new CellQuotasResponse(quotas));
+        return Results.Ok(new CellQuotasResponse(quotas[id]));
     }
 
     private static async Task<IResult> QueueJobAsync(
@@ -791,18 +822,27 @@ internal static partial class CellEndpoints
         return negative is null ? null : $"The value of '{negative}' must be zero or more, or null for no limit.";
     }
 
-    private static async Task<Dictionary<string, CellQuotaResponse>> ReadQuotasAsync(
+    private static async Task<Dictionary<string, Dictionary<string, CellQuotaResponse>>> ReadQuotasAsync(
         PlatformDbContext platform,
-        string tenantId,
+        List<string> tenantIds,
         QuotaDefaults defaults,
         CancellationToken cancellationToken)
     {
-        var rows = await platform.TenantQuotas.AsNoTracking()
-            .Where(row => row.TenantId == tenantId)
-            .ToDictionaryAsync(row => row.Quota, row => row.Value, StringComparer.Ordinal, cancellationToken);
-        return QuotaKeys.All.ToDictionary(
-            key => key,
-            key => rows.TryGetValue(key, out var value) ? new CellQuotaResponse(value, true) : new CellQuotaResponse(defaults[key], false),
+        var rows = (await platform.TenantQuotas.AsNoTracking()
+                .Where(row => tenantIds.Contains(row.TenantId))
+                .Select(row => new { row.TenantId, row.Quota, row.Value })
+                .ToListAsync(cancellationToken))
+            .ToLookup(row => row.TenantId, StringComparer.Ordinal);
+        return tenantIds.ToDictionary(
+            tenantId => tenantId,
+            tenantId =>
+            {
+                var overrides = rows[tenantId].ToDictionary(row => row.Quota, row => row.Value, StringComparer.Ordinal);
+                return QuotaKeys.All.ToDictionary(
+                    key => key,
+                    key => overrides.TryGetValue(key, out var value) ? new CellQuotaResponse(value, true) : new CellQuotaResponse(defaults[key], false),
+                    StringComparer.Ordinal);
+            },
             StringComparer.Ordinal);
     }
 
@@ -821,22 +861,70 @@ internal static partial class CellEndpoints
         return rows.ToLookup(row => row.TenantId, row => row.Host, StringComparer.Ordinal);
     }
 
-    // A tenant without a row, or with a row the worker wrote before it counted failed work, has no entry.
-    private static async Task<Dictionary<string, CellFailedWorkResponse>> ReadFailedWorkAsync(
+    // A tenant without a row has no entry. A row the worker wrote before it counted failed work has a null FailedWork.
+    private static async Task<Dictionary<string, LatestSample>> ReadLatestSamplesAsync(
         PlatformDbContext platform,
         List<string> tenantIds,
         CancellationToken cancellationToken)
     {
         var rows = await platform.TenantUsageLatest.AsNoTracking()
-            .Where(row => tenantIds.Contains(row.TenantId)
-                && row.FailedInstances != null && row.UnknownCalls != null && row.OpenDeadLetters != null)
-            .Select(row => new { row.TenantId, row.FailedInstances, row.UnknownCalls, row.OpenDeadLetters })
+            .Where(row => tenantIds.Contains(row.TenantId))
+            .Select(row => new { row.TenantId, row.DatabaseBytes, row.FileBytes, row.FailedInstances, row.UnknownCalls, row.OpenDeadLetters })
             .ToListAsync(cancellationToken);
         return rows.ToDictionary(
             row => row.TenantId,
-            row => new CellFailedWorkResponse(row.FailedInstances!.Value, row.UnknownCalls!.Value, row.OpenDeadLetters!.Value),
+            row => new LatestSample(
+                row.DatabaseBytes + row.FileBytes,
+                row is { FailedInstances: { } instances, UnknownCalls: { } calls, OpenDeadLetters: { } deadLetters }
+                    ? new CellFailedWorkResponse(instances, calls, deadLetters)
+                    : null),
             StringComparer.Ordinal);
     }
+
+    // The limits are those of the tenants' quotas. A count the worker has not filled stays null, and no email sent today is 0.
+    private static async Task<Dictionary<string, CellTenantUsageResponse>> ReadUsageAsync(
+        PlatformDbContext platform,
+        List<string> tenantIds,
+        Dictionary<string, Dictionary<string, CellQuotaResponse>> quotas,
+        Dictionary<string, LatestSample> latest,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        var days = (await platform.TenantUsage.AsNoTracking()
+                .Where(row => tenantIds.Contains(row.TenantId))
+                .GroupBy(row => row.TenantId)
+                .Select(group => group.OrderByDescending(row => row.Day)
+                    .Select(row => new { row.TenantId, row.Users, row.Applications })
+                    .First())
+                .ToListAsync(cancellationToken))
+            .ToDictionary(row => row.TenantId, StringComparer.Ordinal);
+        var emails = await platform.TenantDailyCounters.AsNoTracking()
+            .Where(row => tenantIds.Contains(row.TenantId) && row.Day == today && row.Counter == TenantDailyCounterStore.Emails)
+            .ToDictionaryAsync(row => row.TenantId, row => row.Value, StringComparer.Ordinal, cancellationToken);
+        return tenantIds.ToDictionary(
+            tenantId => tenantId,
+            tenantId =>
+            {
+                var limits = quotas[tenantId];
+                days.TryGetValue(tenantId, out var day);
+                return new CellTenantUsageResponse(
+                    new TenantQuotaUseResponse(limits[QuotaKeys.Storage].Value, latest.GetValueOrDefault(tenantId)?.Storage),
+                    new TenantQuotaUseResponse(limits[QuotaKeys.Users].Value, day?.Users),
+                    new TenantQuotaUseResponse(limits[QuotaKeys.Applications].Value, day?.Applications),
+                    new TenantQuotaUseResponse(limits[QuotaKeys.EmailsPerDay].Value, emails.GetValueOrDefault(tenantId)));
+            },
+            StringComparer.Ordinal);
+    }
+
+    private static Task<Dictionary<string, DateTimeOffset>> ReadNewestArchivesAsync(
+        PlatformDbContext platform,
+        List<string> tenantIds,
+        CancellationToken cancellationToken) =>
+        platform.TenantBackups.AsNoTracking()
+            .Where(row => tenantIds.Contains(row.TenantId))
+            .ToDictionaryAsync(row => row.TenantId, row => row.LastSuccessAt, StringComparer.Ordinal, cancellationToken);
+
+    private static DateOnly Today(TimeProvider time) => DateOnly.FromDateTime(time.GetUtcNow().UtcDateTime);
 
     private static string[] HostsOf(ILookup<string, string> hosts, string tenantId) =>
         [.. hosts[tenantId].Order(StringComparer.Ordinal)];
@@ -851,16 +939,31 @@ internal sealed record CellResponse(string Id, string Region, int Tenants, int? 
 /// <summary>The counts of a tenant's failed work: numbers only, with no ids, inputs or errors.</summary>
 internal sealed record CellFailedWorkResponse(long Instances, long UnknownCalls, long DeadLetters);
 
+/// <summary>The newest hourly sample of a tenant: its storage in bytes, and its failed work once the worker has counted it.</summary>
+internal sealed record LatestSample(long Storage, CellFailedWorkResponse? FailedWork);
+
+/// <summary>
+/// A tenant's use against its limits: sizes and counts only. Each <c>Used</c> is null while nothing fills it, see
+/// <c>docs/reference/tenant-lifecycle.md#routes</c>.
+/// </summary>
+internal sealed record CellTenantUsageResponse(
+    TenantQuotaUseResponse Storage,
+    TenantQuotaUseResponse Users,
+    TenantQuotaUseResponse Applications,
+    TenantQuotaUseResponse EmailsPerDay);
+
 /// <summary>
 /// One tenant of the cell. <c>Application</c> is null until the create job records it. <c>FailedWork</c> is null until the
-/// worker has counted the tenant.
+/// worker has counted the tenant. <c>NewestArchiveAt</c> is null for a tenant that was never backed up.
 /// </summary>
 internal sealed record CellTenantResponse(
     string Id,
     string Status,
     string? Application,
     IReadOnlyList<string> Hosts,
-    CellFailedWorkResponse? FailedWork);
+    CellFailedWorkResponse? FailedWork,
+    CellTenantUsageResponse Usage,
+    DateTimeOffset? NewestArchiveAt);
 
 /// <summary>The tenants of the cell, ordered by id.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
@@ -872,7 +975,9 @@ internal sealed record CellTenantDetailResponse(
     string? Application,
     IReadOnlyList<string> Hosts,
     CellFailedWorkResponse? FailedWork,
-    IReadOnlyDictionary<string, CellQuotaResponse> Quotas);
+    IReadOnlyDictionary<string, CellQuotaResponse> Quotas,
+    CellTenantUsageResponse Usage,
+    DateTimeOffset? NewestArchiveAt);
 
 /// <summary>The category of the logs of the administrators route.</summary>
 internal sealed class CellAdministratorsLog;
