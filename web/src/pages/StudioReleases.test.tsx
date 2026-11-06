@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -48,12 +49,15 @@ function renderList(overrides: { history?: StudioReleases; canActivate?: boolean
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioReleasesList
-          history={overrides.history ?? history}
-          canActivate={overrides.canActivate ?? true}
-          busy={overrides.busy ?? false}
-          onActivate={onActivate}
-        />
+        <MemoryRouter>
+          <StudioReleasesList
+            application="PurchaseRequests"
+            history={overrides.history ?? history}
+            canActivate={overrides.canActivate ?? true}
+            busy={overrides.busy ?? false}
+            onActivate={onActivate}
+          />
+        </MemoryRouter>
       </TextProvider>
     </ThemeModeProvider>,
   )
@@ -101,6 +105,17 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(releaseCell).toHaveTextContent('2')
   })
 
+  it('links each release number to the release page', () => {
+    renderList()
+
+    for (const number of ['1', '2', '3', '4']) {
+      expect(screen.getByRole('link', { name: number })).toHaveAttribute(
+        'href',
+        `/studio?app=PurchaseRequests&view=release&release=${number}`,
+      )
+    }
+  })
+
   it('shows the em dash for an empty label and an empty note', () => {
     renderList()
 
@@ -123,7 +138,15 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     const relaxed = item('r3', 3, '2026-05-03T10:00:00Z', {
       offStandard: true,
       relaxed: [
-        { module: 'department-budgets', point: 'Budget/transitions/approve', reason: 'Approvers decide alone' },
+        {
+          module: 'department-budgets',
+          point: 'Budget/transitions/approve',
+          reason: 'Approvers decide alone',
+          moduleTitle: null,
+          part: null,
+          entityTitles: null,
+          titles: null,
+        },
       ],
     })
     renderList({ history: { ...history, items: [history.items[0], relaxed] } })

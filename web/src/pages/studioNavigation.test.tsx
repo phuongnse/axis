@@ -233,6 +233,7 @@ describe('studioActiveEntry', () => {
 
   it('marks Releases, History and the policy matrix from the view', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=releases`), [], [])).toBe('releases')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=release&release=3`), [], [])).toBe('releases')
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=history`), [], [])).toBe('history')
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=history&revision=abc`), [], [])).toBe(
       'history',

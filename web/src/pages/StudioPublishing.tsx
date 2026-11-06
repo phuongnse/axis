@@ -29,9 +29,10 @@ import { StudioTestResults } from './StudioTestResults'
 /** How long Studio waits between two checks of a request. */
 const pollDelay = 1000
 
-/** What the page calls on this component: a test run of every scenario, or of the named ones. */
+/** What the page calls on this component: a test run of every scenario, or of the named ones, and an activation. */
 export interface StudioPublishingHandle {
   runTests(scenarios?: string[]): void
+  activate(releaseId: string): void
 }
 
 /**
@@ -41,12 +42,14 @@ export interface StudioPublishingHandle {
  * panel beside the page, then the release state, and `bandState` after it. The request status, test results and
  * preview links show at the top of the content, under the band, then `children`, which is called with the release history
  * when it is a function, then the release list. The release
- * list keeps its own title unless `releasesView`, where the page's heading names it. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * list keeps its own title unless `releasesView`, where the page's heading names it, and is hidden on `releasePage`,
+ * where a release's own page stands in the content. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
  * sends a publish request. A publish refused by a tenant quota shows the server's title in the error alert.
- * An Activate… button in the history sends an activate request.
+ * An Activate… button in the history sends an activate request, and so does the ref's `activate`, which a release
+ * page's Activate… calls.
  * Run tests shows only when `canTest`, and sends a test request, which runs every scenario. The ref's `runTests`
  * sends the same request with the names it is given. A test request shows its results under the status line, and
  * selecting a failed scenario calls `onOpenScenario`. A publish, validate or preview shows the contract scenarios it
@@ -76,6 +79,7 @@ export function StudioPublishing({
   bandState,
   problems,
   releasesView,
+  releasePage,
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
@@ -95,6 +99,7 @@ export function StudioPublishing({
   bandState?: ReactNode
   problems: ReactNode
   releasesView: boolean
+  releasePage: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
@@ -247,6 +252,10 @@ export function StudioPublishing({
     setNote('')
   }
 
+  function activateRelease(releaseId: string) {
+    return send(() => activateStudioRelease(application, releaseId))
+  }
+
   const busy = running || sending || reconnecting
 
   useEffect(() => {
@@ -255,6 +264,7 @@ export function StudioPublishing({
 
   useImperativeHandle(ref, () => ({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
+    activate: activateRelease,
   }))
 
   return (
@@ -315,13 +325,14 @@ export function StudioPublishing({
             </Flex>
           )}
           {typeof children === 'function' ? children(history) : children}
-          {history && history !== 'failed' && (
+          {history && history !== 'failed' && !releasePage && (
             <StudioReleasesList
+              application={application}
               history={history}
               canActivate={canPublish}
               busy={busy}
               titled={!releasesView}
-              onActivate={(row: StudioReleaseListRow) => send(() => activateStudioRelease(application, row.releaseId))}
+              onActivate={(row: StudioReleaseListRow) => activateRelease(row.releaseId)}
             />
           )}
         </Flex>

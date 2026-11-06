@@ -85,6 +85,9 @@ export function studioActiveEntry(
     return `kind:${kind}`
   }
   const view = params.get('view')
+  if (view === 'release') {
+    return 'releases'
+  }
   if (view === 'releases' || view === 'history' || view === 'policies') {
     return view
   }

@@ -186,15 +186,13 @@ publisher only. It activates that release, back to an older one or forward to a 
 dialog says which release replaces the live one. [D130](../decisions/d130-activate-a-release-replaces-roll-back.md)
 agrees the same word for the concept, the route and the request kind.
 
-- **The number opens the release page** _(planned for M31)_. The number in the Release column is the
+- **The number opens the release page.** The number in the Release column is the
   link to the [release page](#release-page).
 - **Activate… checks first** _(planned for M31)_. When the release
   [cannot replace the live one](#release-page), the dialog titles itself with the same sentence as the
   release page and offers Close alone.
 
 ## Release page
-
-_(planned for M31)_
 
 A release opens as a page of its own, at `&view=release&release=N` under the Releases entry, because it
 can relax many points across modules, each with a long reason, which a popover cannot hold. A number
@@ -217,11 +215,12 @@ The page shows, in order:
 5. **Modules and packages** that the release pins: name, type and version.
 6. **Activations:** when, by whom, the release it replaced and until when it was live.
 
-An older release that lacks a module that the live release pins, or pins it at a version without some
-of its entities or fields, cannot replace the live release, as `AXC0213` says. The release route runs
-the same module check on the two stored releases, so the page says, for example, "Release 1 cannot
-replace release 2", with each module and the rule, and Activate… is off. What depends on the tenant
-at that moment, such as its bindings, is still checked only when the release is activated.
+- **Cannot replace the live one** _(planned for M31)_. An older release that lacks a module that the live
+  release pins, or pins it at a version without some of its entities or fields, cannot replace the live
+  release, as `AXC0213` says. The release route runs the same module check on the two stored releases,
+  so the page says, for example, "Release 1 cannot replace release 2", with each module and the rule,
+  and Activate… is off. What depends on the tenant at that moment, such as its bindings, is still
+  checked only when the release is activated.
 
 ## Release route
 

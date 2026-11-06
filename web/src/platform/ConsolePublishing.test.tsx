@@ -179,8 +179,24 @@ describe('ConsolePublishing', () => {
           release('r2', 2, {
             offStandard: true,
             relaxed: [
-              { module: 'department-budgets', point: 'Budget/transitions/approve', reason: 'Approvers decide alone' },
-              { module: 'department-budgets', point: 'Budget/fields/limit', reason: 'Pilot' },
+              {
+                module: 'department-budgets',
+                point: 'Budget/transitions/approve',
+                reason: 'Approvers decide alone',
+                moduleTitle: null,
+                part: null,
+                entityTitles: null,
+                titles: null,
+              },
+              {
+                module: 'department-budgets',
+                point: 'Budget/fields/limit',
+                reason: 'Pilot',
+                moduleTitle: null,
+                part: null,
+                entityTitles: null,
+                titles: null,
+              },
             ],
           }),
           release('r1', 1, { activatedAt: '2026-10-27T10:00:00Z' }),
