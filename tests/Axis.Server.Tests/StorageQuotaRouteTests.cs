@@ -63,6 +63,9 @@ public sealed class StorageQuotaRouteTests
         "POST /api/auth/sign-out",
         "POST /api/cell/auth/sign-out",
 
+        // An MCP session message writes nothing: the session id is a protected token, and no tenant data is stored.
+        "POST /mcp",
+
         // The provisioning API writes platform rows and no tenant data, so the storage quota does not count it.
         "DELETE /api/cell/tenants/{id}",
         "POST /api/cell/tenants",

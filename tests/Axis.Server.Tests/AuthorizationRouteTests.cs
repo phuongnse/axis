@@ -25,10 +25,11 @@ public sealed partial class AuthorizationRouteTests
     // Port 1 on loopback refuses connections immediately, so the database is unreachable.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
-    // The routes that need no session, as the docs list them: the health probes, the site, the texts, sign-in, sign-out, the cell
-    // console's sign-in and sign-out, and the SPA's pages.
+    // The routes that need no session, as the docs list them: the health probes, the site, the texts, the MCP server's metadata,
+    // sign-in, sign-out, the cell console's sign-in and sign-out, and the SPA's pages.
     private static readonly string[] _openRoutes =
     [
+        "GET /.well-known/oauth-protected-resource/mcp",
         "* /health/live",
         "* /health/ready",
         "GET /api/site",
@@ -83,6 +84,12 @@ public sealed partial class AuthorizationRouteTests
             if (new PathString(path).StartsWithSegments("/api/cell", StringComparison.OrdinalIgnoreCase))
             {
                 refused = response.StatusCode == HttpStatusCode.NotFound && contentType == "application/problem+json";
+            }
+            else if (route.Metadata.GetMetadata<McpRoute>() is not null)
+            {
+                refused = refused
+                    && response.StatusCode == HttpStatusCode.Unauthorized
+                    && response.Headers.WwwAuthenticate.ToString().StartsWith("Bearer resource_metadata=", StringComparison.Ordinal);
             }
             else if (EndpointCaller.IsEndpointPath(path))
             {

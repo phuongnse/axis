@@ -1,4 +1,5 @@
 using Axis.Server.Authentication;
+using Axis.Server.Mcp;
 
 namespace Axis.Server.Http;
 
@@ -38,6 +39,19 @@ internal static class Grants
         return Results.Problem(
             statusCode: StatusCodes.Status401Unauthorized,
             title: "A valid bearer token is needed to call this endpoint.");
+    }
+
+    /// <summary>
+    /// The 401 of an MCP server call without a valid bearer token. Its challenge points to the protected-resource metadata
+    /// of the request's host.
+    /// </summary>
+    public static IResult McpTokenRequired(HttpContext context)
+    {
+        var request = context.Request;
+        BearerChallenge.Write(context, $"{request.Scheme}://{request.Host}{McpServer.MetadataPath}");
+        return Results.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "A valid bearer token is needed for the MCP server.");
     }
 
     public static IResult Forbidden() =>

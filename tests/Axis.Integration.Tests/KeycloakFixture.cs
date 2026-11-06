@@ -47,6 +47,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
 
     public const string CompanyBrokerClientSecret = "axis-broker-development-secret";
 
+    /// <summary>The client whose tokens carry the audience <c>https://localhost/mcp</c>, for the MCP server's tests.</summary>
+    public const string McpClientId = "axis-mcp-test";
+
+    public const string McpClientSecret = "axis-mcp-test-development-secret";
+
     /// <summary>The client that the realm's FAPI 2.0 client policy covers. It has no secret, only the two keys below.</summary>
     public const string FapiClientId = "axis-fapi";
 
