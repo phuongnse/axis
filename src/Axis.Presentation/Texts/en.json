@@ -961,6 +961,7 @@
   "shell.studio.band.changesNotLive": "Changes not live",
   "shell.studio.band.notPublished": "Not published yet",
   "shell.studio.band.live": "Release {release} is live",
+  "shell.studio.band.liveOffStandard": "Release {release} is live, off-standard",
   "shell.studio.band.releasesFailed": "Releases did not load",
   "shell.studio.activate": "Activate release",
   "shell.studio.activate.title": "Activate release {release}?",

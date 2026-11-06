@@ -67,14 +67,12 @@ The state is words, with no icon:
   errors in `dangerText` and the warnings in `warningText`. It opens the
   [problems panel](#problems-panel).
 - After it, in `textMuted` and never a link, comes one of: "Changes not live" when the folder differs
-  from the live release, "Not published yet" when there is no live release, or "Release 7 is live"
-  when nothing needs attention, so that a quiet band never looks as if it is still loading. When the
-  release history fails it reads "Releases did not load", in `warningText`. While the history loads,
-  only the problems show.
-- **Off-standard in words** _(planned for M31)_. When the live release is
-  [off-standard](module-contracts.md#off-standard-releases), the state reads "Release 3 is live,
-  off-standard". The Off-standard tag marks a release, never the folder, so it shows only beside a
-  release's number.
+  from the live release, "Not published yet" when there is no live release, "Release 7 is live" when
+  nothing needs attention, or "Release 7 is live, off-standard" when the live release is
+  [off-standard](module-contracts.md#off-standard-releases). A quiet band never looks as if it is
+  still loading. The off-standard words mark a release, never the folder, so a relax entry that is
+  not live shows nothing in the band. When the release history fails it reads "Releases did not load",
+  in `warningText`. While the history loads, only the problems show.
 
 The actions are New resource…, Validate, Preview and Run tests as text buttons with no icon, then
 Publish… as the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource…

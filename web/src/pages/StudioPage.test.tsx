@@ -342,8 +342,8 @@ describe('StudioPage', () => {
     expect(screen.queryByTestId(`studio-resource-${formId}`)).not.toBeInTheDocument()
   })
 
-  it('shows the off-standard mark above Validate and Publish when application.json has a relax entry', async () => {
-    stubServer(undefined, undefined, undefined, {
+  it('shows no off-standard text in the band when only application.json has a relax entry', async () => {
+    const fetchMock = stubServer(undefined, undefined, undefined, {
       manifest: {
         modules: [
           {
@@ -356,20 +356,11 @@ describe('StudioPage', () => {
     })
     renderPage()
 
-    expect(await screen.findByTestId('studio-off-standard')).toHaveTextContent('Off-standard')
-  })
-
-  it('shows no off-standard mark when application.json has no relax entry', async () => {
-    const fetchMock = stubServer(undefined, undefined, undefined, {
-      manifest: { modules: [{ id: 'approvals', version: '^1.0.0', relax: [] }] },
-    })
-    renderPage()
-
-    await screen.findByRole('heading', { level: 4, name: 'PurchaseRequests' })
+    expect(await screen.findByText('Not published yet')).toBeInTheDocument()
     await waitFor(() =>
       expect(fetchMock.mock.calls.some(([input]) => input === `${folder}/resources/${manifestId}`)).toBe(true),
     )
-    expect(screen.queryByTestId('studio-off-standard')).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-band')).not.toHaveTextContent(/off-standard/i)
   })
 
   describe('names', () => {

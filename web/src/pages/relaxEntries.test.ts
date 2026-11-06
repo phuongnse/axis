@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  hasRelaxEntry,
   moduleIndex,
   relaxedManifest,
   relaxEntries,
@@ -39,13 +38,6 @@ describe('relaxEntries', () => {
     ])
     expect(relaxEntries(bare, 'checklists')).toEqual([])
     expect(relaxEntries(bare, 'missing')).toEqual([])
-  })
-
-  it('tells whether any module has an entry, and not for an empty list', () => {
-    expect(hasRelaxEntry(one)).toBe(true)
-    expect(hasRelaxEntry(bare)).toBe(false)
-    expect(hasRelaxEntry({ modules: [{ id: 'checklists', relax: [] }] })).toBe(false)
-    expect(hasRelaxEntry({})).toBe(false)
   })
 
   it('accepts a reason of 1 to 500 characters after trimming', () => {

@@ -32,11 +32,6 @@ export function relaxEntries(manifest: Record<string, unknown>, module: string):
   return list(entry?.relax).map((relax) => ({ point: text(relax.point), reason: text(relax.reason) }))
 }
 
-/** Whether any module in `application.json` has a relax entry. An empty `relax` list is none. */
-export function hasRelaxEntry(manifest: Record<string, unknown>): boolean {
-  return list(manifest.modules).some((entry) => list(entry.relax).length > 0)
-}
-
 /** Whether a reason is acceptable: 1 to 500 characters once trimmed. */
 export function relaxReasonValid(reason: string): boolean {
   const length = reason.trim().length

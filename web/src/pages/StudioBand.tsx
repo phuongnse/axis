@@ -13,23 +13,21 @@ export const problemsPanelId = 'studio-problems-panel'
  * scrolls. On its left is the application's state in words. Errors and warnings are one text button, such as "2 errors,
  * 1 warning", that calls `onToggleProblems` and shows only when there is one. After it come the release state, in
  * `textMuted`: "Changes not live" when the folder differs from the live release, "Not published yet" when there is no
- * live release, and "Release 7 is live" otherwise. "Releases did not load" is in `warningText` when `history` is
- * `'failed'`, and nothing shows while `history` is `undefined`. No state has an icon or a link. `state` is extra
- * content after the words, and `children` are the actions on the right.
+ * live release, and "Release 7 is live" otherwise, or "Release 7 is live, off-standard" when the live release is
+ * off-standard. "Releases did not load" is in `warningText` when `history` is `'failed'`, and nothing shows while
+ * `history` is `undefined`. No state has an icon or a link. `children` are the actions on the right.
  */
 export function StudioBand({
   diagnostics,
   history,
   problemsOpen,
   onToggleProblems,
-  state,
   children,
 }: {
   diagnostics: StudioDiagnostic[]
   history: StudioReleases | 'failed' | undefined
   problemsOpen: boolean
   onToggleProblems: () => void
-  state?: ReactNode
   children?: ReactNode
 }) {
   const t = useText()
@@ -92,11 +90,14 @@ export function StudioBand({
                 ? t('shell.studio.band.notPublished')
                 : folderDiffers(history)
                   ? t('shell.studio.band.changesNotLive')
-                  : t('shell.studio.band.live').replace('{release}', String(history.active.number))}
+                  : t(
+                      history.items.find((item) => item.releaseId === history.active?.releaseId)?.offStandard
+                        ? 'shell.studio.band.liveOffStandard'
+                        : 'shell.studio.band.live',
+                    ).replace('{release}', String(history.active.number))}
             </Typography.Text>
           )
         )}
-        {state}
       </Flex>
       {children}
     </Flex>

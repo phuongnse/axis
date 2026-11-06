@@ -518,8 +518,8 @@ transitions through a layer, and relaxes and restores points.
   the last entry removes the `relax` array. Both write with the authoring API's `PATCH` and `If-Match`,
   so a write is refused with a conflict when `application.json` changed since Studio loaded it, and
   Studio loads it again.
-- **Mark in the band** _(planned for M31)_. When the live release is off-standard, the
-  [band](studio-workspace.md#band) says so in words.
+- **Mark in the band.** When the live release is off-standard, the [band](studio-workspace.md#band)
+  says so in words.
 - **Diagnostics.** A grant past a ceiling, a relax entry for an unknown point and a failing contract
   scenario show where Studio shows other diagnostics and publish results. The contract scenarios of a
   publish or validate, skipped ones with their relaxed point included, show in a **Contract scenarios**
