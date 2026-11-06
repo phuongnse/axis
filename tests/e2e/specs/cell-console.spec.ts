@@ -1,16 +1,11 @@
-import { spawnSync } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
-import { chromium, type Browser, type Page } from '@playwright/test'
+import type { Browser, Page } from '@playwright/test'
 import { expect, test } from '../test'
-import { runAdmin, startPublisher } from '../admin-tool'
-import { startDirectoryServer } from '../directory-server'
+import { runAdmin } from '../admin-tool'
+import { startCell } from '../cell'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { submitCode, submitPassword } from '../keycloak'
-import { required } from '../server-settings'
+import { psql } from '../postgres'
 import { addRealmAccount, type RealmAccount } from '../tenant-realm'
 import { liveTotp, totpSecret } from '../totp'
 
@@ -22,44 +17,11 @@ const tenant = 'console-made'
 const tenantHost = `${tenant}.localhost`
 const consoleUrl = 'https://console.localhost/'
 
-let server: Awaited<ReturnType<typeof startDirectoryServer>>
-let publisher: Awaited<ReturnType<typeof startPublisher>>
+let cell: Awaited<ReturnType<typeof startCell>>
 let browser: Browser
 let member: RealmAccount
 // The page that the first test signs the operator in on, which the later tests reuse: Keycloak refuses a code twice in one period.
 let operator: Page
-// Holds the backup key and the applications folder that the create job needs.
-let publisherFolder: string
-
-const cellSettings = {
-  Cell__Id: 'vn-1',
-  Cell__Region: 'vn',
-  Cell__TenantDomain: 'localhost',
-  Cell__ConsoleHost: 'console.localhost',
-}
-
-// The export job stores its ZIP in the MinIO that scripts/e2e.sh starts. The server reads it back for the download.
-const exportStorage = {
-  Cell__ExportStorage__ServiceUrl: required('AXIS_E2E_EXPORT_STORAGE_URL', 'the address of the export storage'),
-  Cell__ExportStorage__Region: required('AXIS_E2E_EXPORT_STORAGE_REGION', 'the region of the export storage'),
-  Cell__ExportStorage__Bucket: required('AXIS_E2E_EXPORT_STORAGE_BUCKET', 'the bucket of the export storage'),
-  Cell__ExportStorage__AccessKeyId: required('AXIS_E2E_EXPORT_STORAGE_ACCESS_KEY', 'the access key of the export storage'),
-  Cell__ExportStorage__SecretAccessKey: required('AXIS_E2E_EXPORT_STORAGE_SECRET_KEY', 'the secret key of the export storage'),
-}
-
-/** Runs `sql` on the platform database in the E2E PostgreSQL container. */
-function psql(sql: string) {
-  const container = process.env.AXIS_E2E_POSTGRES_CONTAINER
-  if (!container) {
-    throw new Error('AXIS_E2E_POSTGRES_CONTAINER is not set. Run the E2E tests with scripts/e2e.sh.')
-  }
-  const result = spawnSync('docker', ['exec', container, 'psql', '-U', 'axis', '-d', 'axis', '-tAc', sql], {
-    encoding: 'utf8',
-  })
-  if (result.status !== 0) {
-    throw new Error(`psql failed with status ${result.status}: ${result.stderr}`)
-  }
-}
 
 test.beforeAll(async () => {
   const created = await runAdmin(['tenant', 'create', tenant, '--host', tenantHost, '--administrator', `first-admin@${tenant}.test`])
@@ -67,49 +29,24 @@ test.beforeAll(async () => {
   member = await addRealmAccount(tenant, { email: `member@${tenant}.test` })
   // A daily archive that is 30 hours old, so the Tenants view marks it.
   psql(
+    'axis',
     `INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('${tenant}', now() - interval '30 hours')
      ON CONFLICT (tenant_id) DO UPDATE SET last_success_at = EXCLUDED.last_success_at`,
   )
   // A day three days back, so the worker's sample of today cannot overwrite it.
   psql(
+    'axis',
     `INSERT INTO platform.tenant_usage (tenant_id, day, work_items_run) VALUES ('${tenant}', (now() AT TIME ZONE 'UTC')::date - 3, 4321)
      ON CONFLICT (tenant_id, day) DO UPDATE SET work_items_run = EXCLUDED.work_items_run`,
   )
 
   // Offset 3, because the tenant create spec, the terms spec and the read-only spec serve their tenants on offsets 0 to 2.
-  server = await startDirectoryServer(3, {
-    ...cellSettings,
-    ...exportStorage,
-    Cell__ConsoleClientSecret: 'axis-cell-console-development-secret',
-    IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
-  })
-  // The create job encrypts its first backup and creates the application's folder, so the publisher needs a backup key
-  // and an applications folder.
-  publisherFolder = mkdtempSync(path.join(os.tmpdir(), 'axis-cell-console-'))
-  const backupKeyFile = path.join(publisherFolder, 'backup.key')
-  writeFileSync(backupKeyFile, randomBytes(32).toString('base64'))
-  const applications = path.join(publisherFolder, 'applications')
-  mkdirSync(applications)
-  // The run's shared publisher runs no provisioning jobs, so this one runs the jobs that the console queues.
-  publisher = await startPublisher({
-    ...cellSettings,
-    ...exportStorage,
-    Cell__BackupKeyFile: backupKeyFile,
-    Studio__ApplicationsPath: applications,
-    IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
-  })
-  browser = await chromium.launch({
-    args: [`--host-resolver-rules=MAP *.localhost:443 127.0.0.1:${server.httpsPort}`],
-  })
+  cell = await startCell(3)
+  browser = cell.browser
 })
 
 test.afterAll(async () => {
-  await browser?.close()
-  await publisher?.stop()
-  await server?.stop()
-  if (publisherFolder) {
-    rmSync(publisherFolder, { recursive: true, force: true })
-  }
+  await cell?.stop()
 })
 
 async function expectNoViolations(page: Page) {

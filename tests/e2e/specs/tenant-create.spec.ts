@@ -1,10 +1,10 @@
-import { spawnSync } from 'node:child_process'
 import { chromium } from '@playwright/test'
 import { expect, test } from '../test'
 import { runAdmin } from '../admin-tool'
 import { startDirectoryServer } from '../directory-server'
 import { waitForDialog } from '../dialogs'
 import { addAuthenticator, submitCode, submitPassword } from '../keycloak'
+import { psql } from '../postgres'
 import { addRealmAccount, realmClientIds, setRealmPassword, userCredentialTypes } from '../tenant-realm'
 import { liveTotp, nextTotp } from '../totp'
 
@@ -30,21 +30,6 @@ function auditActors(action: string, userId: string): string[] {
     `axis_${tenant}`,
     `SELECT actor FROM axis.audit_records WHERE action = '${action}' AND details->>'userId' = '${userId}'`,
   )
-}
-
-/** The lines that `sql` returns from `database` in the E2E PostgreSQL container. */
-function psql(database: string, sql: string): string[] {
-  const container = process.env.AXIS_E2E_POSTGRES_CONTAINER
-  if (!container) {
-    throw new Error('AXIS_E2E_POSTGRES_CONTAINER is not set. Run the E2E tests with scripts/e2e.sh.')
-  }
-  const result = spawnSync('docker', ['exec', container, 'psql', '-U', 'axis', '-d', database, '-tAc', sql], {
-    encoding: 'utf8',
-  })
-  if (result.status !== 0) {
-    throw new Error(`psql failed with status ${result.status}: ${result.stderr}`)
-  }
-  return result.stdout.split('\n').filter((line) => line !== '')
 }
 
 test('tenant create makes an active tenant with a realm that has its three clients', async () => {

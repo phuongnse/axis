@@ -135,13 +135,13 @@ runs Playwright in Chromium. It:
 - gives Keycloak the `axis-admin` client and the breached-password list, and creates the PostgreSQL
   role `axis_admin`, so a spec can run `Axis.Admin tenant create`;
 - starts MinIO with the bucket `axis-exports` and a KMS key, which the export job's encrypted upload needs, and
-  gives Playwright its five `AXIS_E2E_EXPORT_STORAGE_*` values. Only the cell console spec passes them on, as the
-  `Cell:ExportStorage` settings of its server and its publisher;
+  gives Playwright its five `AXIS_E2E_EXPORT_STORAGE_*` values. Only the cell specs pass them on, as the
+  `Cell:ExportStorage` settings of their server and their publisher;
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
 - makes a throwaway TLS certificate for the run, which the https server of the tenant create spec and
-  of the cell console spec uses on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
+  of the two cell specs use on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](#widget-previews).
 
@@ -659,12 +659,13 @@ command against the E2E stack. It turns `AXIS_E2E_ADMIN_DATABASE` and
 `AXIS_E2E_IDENTITY_ADMIN_SECRET`, which `scripts/e2e.sh` gives only to Playwright, into the tool's own
 settings, so the server and the worker never inherit them. The tool's realm emails, such as the first
 administrator's invitation, go to the run's Mailpit. `tests/e2e/tenant-realm.ts` lists a realm's
-clients and adds an account with a password and an authenticator to a tenant's realm, through the
-`axis-admin` client.
+clients, adds an account with a password and an authenticator to a tenant's realm, gives a user a realm role and
+clears a user's required actions, through the `axis-admin` client.
 
 The run's shared publisher reads the `Tenants` section, so it runs no provisioning jobs. A spec that queues
-jobs, such as the cell console spec, starts its own publisher with `startPublisher` of the same file, which
-reads the tenant directory with a cell's settings and runs the jobs.
+jobs, such as the cell console spec and the cell quota journey, starts its own publisher with `startPublisher` of the
+same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
+and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](architecture.md#the-e2e-stack).
 
 ## Hot reload with `scripts/dev.sh`
 
