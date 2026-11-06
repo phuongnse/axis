@@ -65,6 +65,41 @@ public sealed class DocumentationTests
     }
 
     [Fact]
+    public void System_tables_table_matches_the_tables_of_ConfigurationDbContext()
+    {
+        var documented = new List<string>();
+        var tables = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Table\s*\|\s*Module\s*\|\s*One row is\s*\|"))
+                {
+                    continue;
+                }
+
+                tables++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var cells = lines[j].Split('|');
+                    if (cells.Length > 3 && cells[2].Trim() == "`Axis.Configuration`")
+                    {
+                        documented.AddRange(Regex.Matches(cells[1], @"`axis\.([a-z_]+)`").Select(match => match.Groups[1].Value));
+                    }
+                }
+            }
+        }
+
+        Assert.True(tables == 1, $"Expected exactly one table with header '| Table | Module | One row is |' under docs/, found {tables}.");
+        using var context = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql("Host=unused").Options);
+        var declared = context.Model.GetEntityTypes().Select(type => type.GetTableName()!).ToList();
+
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the System tables table in docs/reference/storage.md: {string.Join(", ", declared.Except(documented))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not a table of ConfigurationDbContext: {string.Join(", ", documented.Except(declared))}.");
+        Assert.Equal(documented.Count, documented.Distinct().Count());
+    }
+
+    [Fact]
     public void Function_table_matches_ExpressionFunctions()
     {
         // The aggregates table has other columns, so it is not matched.
@@ -186,26 +221,6 @@ public sealed class DocumentationTests
         }
 
         return tables;
-    }
-
-    [Fact]
-    public void System_tables_list_rows_of_Axis_Configuration_match_the_tables_of_ConfigurationDbContext()
-    {
-        var documented = new List<string>();
-        foreach (var line in File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Docs", "reference", "storage.md")))
-        {
-            // The rows of the system tables list: | `axis.<table>` | `<Module>` | ... |
-            var match = Regex.Match(line, @"^\|\s*`axis\.([a-z_]+)`\s*\|\s*`Axis\.Configuration`\s*\|");
-            if (match.Success)
-            {
-                documented.Add(match.Groups[1].Value);
-            }
-        }
-
-        using var context = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql("Host=unused").Options);
-        var tables = context.Model.GetEntityTypes().Select(entity => entity.GetTableName()!).Order(StringComparer.Ordinal).ToList();
-
-        Assert.Equal(tables, documented.Order(StringComparer.Ordinal).ToList());
     }
 
     private static IEnumerable<string> DocsFiles() =>

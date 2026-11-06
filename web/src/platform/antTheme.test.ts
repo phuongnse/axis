@@ -43,6 +43,10 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
   const token = theme.getDesignToken(config)
   const { colour, shadow } = designTokensFor(mode)
 
+  it('draws a placeholder in the muted text colour', () => {
+    expect(token.colorTextPlaceholder).toBe(colour.textMuted)
+  })
+
   it('draws links and state text in the text tokens', () => {
     expect(token.colorLink).toBe(colour.primaryText)
     expect(token.colorLinkHover).toBe(colour.primaryText)

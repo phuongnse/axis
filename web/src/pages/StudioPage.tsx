@@ -35,6 +35,7 @@ import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
 import { StudioEditor } from './StudioEditor'
+import { StudioHistory, StudioRevisionPage } from './StudioHistory'
 import { ModuleResourceView } from './StudioModuleView'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
@@ -233,6 +234,8 @@ function StudioWorkspace() {
   const kind = params.get('kind')
   const policiesView = params.get('view') === 'policies'
   const releasesView = params.get('view') === 'releases'
+  const historyView = params.get('view') === 'history'
+  const revisionId = params.get('revision')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [canPublish, setCanPublish] = useState(false)
@@ -437,6 +440,24 @@ function StudioWorkspace() {
     setFolderRevision((value) => value + 1)
   }
 
+  /** An undo can add or remove files, so the folder's resources load again with the diagnostics it answered. */
+  function onUndone(diagnostics: StudioDiagnostic[]) {
+    fetchStudioResources(application!).then(
+      (items) => {
+        setFolder({ application: application!, resources: items, diagnostics })
+        setFolderRevision((value) => value + 1)
+      },
+      (error: unknown) => {
+        if (error instanceof ServerUnreachableError) {
+          lost()
+          return
+        }
+        console.warn(`Loading the Studio folder of '${application}' failed`, error)
+        setFolder({ application: application!, failed: true })
+      },
+    )
+  }
+
   function onManifestSaved(saved: StudioResource, diagnostics: StudioDiagnostic[]) {
     setManifestState({ application: application!, resource: saved })
     onWritten(diagnostics)
@@ -563,6 +584,15 @@ function StudioWorkspace() {
             {(history) =>
               releasesView ? (
                 <StudioPageHeading title={t('shell.studio.releases')} />
+              ) : historyView ? (
+                revisionId !== null ? (
+                  <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />
+                ) : (
+                  <Flex vertical gap="middle">
+                    <StudioPageHeading title={t('shell.studio.history')} />
+                    <StudioHistory application={application!} folderRevision={folderRevision} onUndone={onUndone} />
+                  </Flex>
+                )
               ) : policiesView ? (
                 <Flex vertical gap="middle">
                   <StudioPageHeading title={t('shell.studio.view.policies')} />
@@ -605,6 +635,7 @@ function StudioWorkspace() {
                         key={`editor-${selected.id}`}
                         application={application!}
                         item={selected}
+                        publisher={canPublish}
                         resources={loaded.resources}
                         path={path}
                         diagnosticPaths={diagnosticPaths}

@@ -73,14 +73,15 @@ nothing:
   refused request evaluates nothing and writes nothing, not even an audit record. It writes a log
   event `quota.refused` with the tenant and the quota.
 - **What a person sees.** The SPA shows the title.
-- **The usage page** _(planned for M33)_. An administrator sees which quota was reached on the usage
-  page, see [readers](#usage).
+- **The usage page.** An administrator sees which quota was reached in the users page's "Usage" section, see
+  [readers](#usage).
 
 **What each quota refuses.**
 
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create or
   update through the record API, an import, an inbound endpoint call that writes, a file upload, a
-  save, reset or undo in Studio and a publish. A delete is never refused. Process steps, task completions,
+  save, reset or undo in Studio and a publish. A delete is never refused, and neither is a change of an
+  [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. The server reads the last sample on each such write. A
   tenant with no sample yet is not refused, and neither is a write when the platform database cannot
@@ -234,6 +235,7 @@ sizes only, never a record value, a file name or a user name.
   [read routes](user-administration.md#read-routes) and answers `503` when the platform database
   cannot be read.
 - **Plans** _(planned for M34)_. The [plans](plans.md) and their prices read the usage.
-- **The tenant's own usage** _(planned for M33)_. A tenant administrator sees the tenant's own quotas
-  and its usage of the last 30 days in the users page's "Usage" section, and the
-  [billing portal](billing-portal.md#pages) shows them to its owner.
+- **The tenant's own usage.** A tenant administrator sees the tenant's own quotas and its usage of the last 30 days
+  in the users page's "Usage" section, see [platform pages](platform-pages.md#export-data-and-usage).
+- **The billing portal's usage** _(planned for M33)_. The [billing portal](billing-portal.md#pages) shows the tenant's
+  quotas and usage to its owner.

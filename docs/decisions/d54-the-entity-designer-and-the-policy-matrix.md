@@ -28,7 +28,7 @@ call, while a field change and its migration are two.
 
 The screens are in [Studio](../reference/studio.md) and the
 [entity designer](../reference/entity-designer.md), and the routes in
-[changes](../reference/authoring.md#changes) and [policy matrix](../reference/authoring.md#policy-matrix).
+[changes](../reference/authoring.md#changes) and [policy matrix](../reference/authoring-policy-matrix.md).
 
 ## Consequences
 

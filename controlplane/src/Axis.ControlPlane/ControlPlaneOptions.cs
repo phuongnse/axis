@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.SignUp;
 using MimeKit;
 using Npgsql;
 
@@ -11,7 +12,7 @@ namespace Axis.ControlPlane;
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
-/// provider is named, the ones it needs are required. A bad value stops the start. A message names the setting and never holds its value.
+/// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id and both titles. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -58,6 +59,9 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
+
+    /// <summary>What the sign-up page offers. Optional.</summary>
+    public SignUpOptions SignUp { get; set; } = new();
 
     /// <summary>Reads and checks the settings, and returns them.</summary>
     /// <exception cref="InvalidOperationException">
@@ -146,6 +150,7 @@ public sealed partial class ControlPlaneOptions
         }
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
+        problems.AddRange(SignUpProblems(options.SignUp));
 
         if (problems.Count > 0)
         {
@@ -200,6 +205,37 @@ public sealed partial class ControlPlaneOptions
         if (!string.IsNullOrWhiteSpace(options.CellCertificateAuthorityPath) && !File.Exists(options.CellCertificateAuthorityPath))
         {
             problems.Add($"The file of the setting {SectionName}:{nameof(CellCertificateAuthorityPath)} does not exist.");
+        }
+
+        return problems;
+    }
+
+    private static List<string> SignUpProblems(SignUpOptions signUp)
+    {
+        var problems = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < signUp.Applications.Count; index++)
+        {
+            var application = signUp.Applications[index];
+            var prefix = $"{SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.Applications)}:{index.ToString(CultureInfo.InvariantCulture)}";
+            if (string.IsNullOrWhiteSpace(application?.Id))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Id)} is required.");
+            }
+            else if (!seen.Add(application.Id))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Id)} repeats the id of an earlier application.");
+            }
+
+            if (string.IsNullOrWhiteSpace(application?.Titles.En))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Titles)}:en is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(application?.Titles.Vi))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Titles)}:vi is required.");
+            }
         }
 
         return problems;

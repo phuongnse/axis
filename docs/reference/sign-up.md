@@ -8,14 +8,12 @@ through the [provisioning API](tenant-lifecycle.md#creating-a-tenant).
 
 ## The page
 
-_(planned for M33)_
-
 The sign-up page asks for who the person is, the business, its subdomain and its application, and
 sends nothing outside the region.
 
-- **Where.** `https://account.<region domain>/sign-up`, on the regional control plane. Axis's public
-  site links each region's page, so the person picks the region by the link they follow, and the form
-  never sends their data to another region.
+- **Where.** `https://account.<region domain>/sign-up`, on the regional control plane, which serves the
+  page from its web root. Axis's public site links each region's page, so the person picks the region
+  by the link they follow, and the form never sends their data to another region.
 - **No third party.** The page loads no script, font or image from another host. Its
   Content-Security-Policy allows `'self'` only, as the platform's
   [security headers](headers-and-rate-limits.md#security-headers) do.
@@ -25,16 +23,24 @@ sends nothing outside the region.
   - the subdomain, see [the subdomain](#the-subdomain);
   - the built-in application to start from, from the region's list, such as
     [approvals](built-in-modules.md#the-approvals-application);
-  - the language, `en` or `vi`, which the tenant and every email use;
-  - a box to accept the terms of service and the data processing agreement, each linked at its
-    current version, see [terms acceptance](#terms-acceptance).
-- **Languages.** The page is in `en` and `vi`, from the browser's language, with a switch.
+  - the language, `en` or `vi`, which the tenant and every email use. It starts at the page's
+    language and the person may change it;
+  - a box to accept the terms of service and the data processing agreement, see
+    [terms acceptance](#terms-acceptance).
+- **Links in the terms box** _(planned for M33)_. The box links each document at its current version.
+- **Applications.** The region's list is the setting `ControlPlane:SignUp:Applications`, see the
+  [settings](control-plane.md#settings), and `GET /api/sign-up/applications` serves it as
+  `{ applications: [{ id, titles: { en, vi } }] }`. The page shows each title in its language.
+- **Languages.** The page is in `en` and `vi`. It starts in `vi` for a Vietnamese browser and in `en`
+  otherwise, and the shared "Language and theme" menu switches between them.
+- **Sending** _(planned for M33)_. A button sends the form, see
+  [verifying the email first](#verifying-the-email-first).
 
 ## The subdomain
 
 The person chooses the subdomain, which becomes the tenant's id, and the page checks it as they type.
 
-- **The person chooses.** _(planned for M33)_ The page suggests one from the business's name, in lower-case letters,
+- **The person chooses.** The page suggests one from the business's name, in lower-case letters,
   digits and `-`, and the person may change it.
 - **Checked as they type.** `GET /api/sign-up/subdomains/{name}` answers `{ free, reason }`. The name
   is not free when it breaks the rule below (`invalid`), when it is

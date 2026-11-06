@@ -33,6 +33,7 @@ export function studioNavigation(
   const entries: (ShellNavigationEntry | ShellNavigationGroup)[] = [
     { key: 'overview', path: path(), icon: 'dashboard', label: t('shell.studio.nav.overview') },
     { key: 'releases', path: path({ view: 'releases' }), icon: 'tag', label: t('shell.studio.releases') },
+    { key: 'history', path: path({ view: 'history' }), icon: 'clock', label: t('shell.studio.history') },
   ]
   if (manifest !== undefined) {
     entries.push({
@@ -84,7 +85,7 @@ export function studioActiveEntry(
     return `kind:${kind}`
   }
   const view = params.get('view')
-  if (view === 'releases' || view === 'policies') {
+  if (view === 'releases' || view === 'history' || view === 'policies') {
     return view
   }
   return 'overview'

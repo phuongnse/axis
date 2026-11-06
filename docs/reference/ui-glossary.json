@@ -84,6 +84,12 @@
       "status": "approved"
     },
     {
+      "concept": "Revision",
+      "en": "revision",
+      "vi": "bản sửa đổi",
+      "status": "proposed"
+    },
+    {
       "concept": "Publish (action)",
       "en": "Publish",
       "vi": "Phát hành",
@@ -381,6 +387,12 @@
       "note": "Kept in English: operators say it."
     },
     {
+      "concept": "Tenant subdomain",
+      "en": "subdomain",
+      "vi": "tên miền phụ",
+      "status": "proposed"
+    },
+    {
       "concept": "Operator console",
       "en": "operator console",
       "vi": "bảng điều khiển vận hành",
@@ -414,6 +426,12 @@
       "concept": "Quota",
       "en": "quota",
       "vi": "hạn mức",
+      "status": "proposed"
+    },
+    {
+      "concept": "Usage",
+      "en": "usage",
+      "vi": "mức sử dụng",
       "status": "proposed"
     },
     {

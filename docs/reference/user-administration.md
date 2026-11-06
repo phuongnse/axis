@@ -54,7 +54,7 @@ In a tenant of a cell, the users page also shows two sections, see
 [export data and usage](platform-pages.md#export-data-and-usage):
 
 - **Export data.** An administrator starts, follows and downloads the tenant's export.
-- **Usage** _(planned for M33)_. The tenant's quotas and usage.
+- **Usage.** The tenant's quotas and usage.
 
 ### Read routes
 

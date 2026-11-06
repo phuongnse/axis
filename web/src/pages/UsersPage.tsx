@@ -17,6 +17,7 @@ import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantExportSection } from './TenantExportSection'
+import { TenantUsageSection } from './TenantUsageSection'
 import { UserRolesDrawer } from './UserRolesDrawer'
 
 const pageSize = 20
@@ -54,7 +55,7 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * with the person's roles. The Invite button opens the form that invites a person. An invited account has a Resend
  * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
- * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data section.
+ * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data and Usage sections.
  */
 export function UsersPage() {
   const t = useText()
@@ -240,6 +241,7 @@ export function UsersPage() {
             ]}
           />
           <TenantExportSection />
+          <TenantUsageSection />
         </>
       )}
       <UserRolesDrawer user={selected} onClose={() => setSelected(null)} />

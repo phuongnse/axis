@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { moduleKinds } from './moduleKinds'
 import { assignLocation } from './navigation'
+import { QuotaRefusedError } from './quota'
 import {
   changeRows,
   checkStudioExpression,
@@ -16,10 +17,14 @@ import {
   releaseList,
   releasePublisher,
   resourceTitle,
+  revisionAuthor,
+  revisionClient,
   ServerUnreachableError,
   studioAppDescription,
   studioAppTitle,
+  undoStudioRevision,
   type StudioReleaseChange,
+  type StudioRevision,
   type StudioReleaseItem,
   type StudioReleases,
   type StudioNames,
@@ -552,5 +557,94 @@ describe('studioAppTitle and studioAppDescription', () => {
 
   it('give no description when there is none', () => {
     expect(studioAppDescription({ name: 'Leave', titles: {}, descriptions: {} }, 'en')).toBeNull()
+  })
+})
+
+describe('undoStudioRevision', () => {
+  const blocker: StudioRevision = {
+    id: 'b'.repeat(40),
+    summary: 'Change entity Request',
+    author: 'Author User',
+    userId: 'u1',
+    client: 'studio',
+    request: null,
+    time: '2026-05-01T10:00:00Z',
+  }
+  const problem = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/problem+json' } })
+
+  it('answers undone with the new revision and the diagnostics on a 200', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(json({ id: 'c'.repeat(40), diagnostics: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await undoStudioRevision('Shop', 'a'.repeat(40))
+
+    expect(result).toEqual({ status: 'undone', id: 'c'.repeat(40), diagnostics: [] })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe(`/api/studio/apps/Shop/revisions/${'a'.repeat(40)}/undo`)
+    expect(init.method).toBe('POST')
+  })
+
+  it('answers blocked with the later revisions on a 409 that lists them', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          problem(409, { title: 'A later revision changed the same files.', revisions: [blocker] }),
+        ),
+    )
+
+    expect(await undoStudioRevision('Shop', 'a'.repeat(40))).toEqual({ status: 'blocked', revisions: [blocker] })
+  })
+
+  it('answers start on a 409 with no revisions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(problem(409, { title: 'The start of history cannot be undone.' })),
+    )
+
+    expect(await undoStudioRevision('Shop', 'a'.repeat(40))).toEqual({ status: 'start' })
+  })
+
+  it('throws a quota refusal, a 404 and an unreachable server as errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(problem(403, { reason: 'quota-exceeded', title: 'Storage is full.' }))
+        .mockResolvedValueOnce(new Response(null, { status: 404 }))
+        .mockResolvedValueOnce(new Response(null, { status: 503 })),
+    )
+
+    await expect(undoStudioRevision('Shop', 'a'.repeat(40))).rejects.toBeInstanceOf(QuotaRefusedError)
+    const missing = await undoStudioRevision('Shop', 'a'.repeat(40)).catch((reason: unknown) => reason)
+    expect(missing).toBeInstanceOf(Error)
+    expect(missing).not.toBeInstanceOf(ServerUnreachableError)
+    await expect(undoStudioRevision('Shop', 'a'.repeat(40))).rejects.toBeInstanceOf(ServerUnreachableError)
+  })
+})
+
+describe('revisionAuthor and revisionClient', () => {
+  const revision = (overrides: Partial<StudioRevision>): StudioRevision => ({
+    id: 'a'.repeat(40),
+    summary: 'Change entity Request',
+    author: 'Author User',
+    userId: 'u1',
+    client: 'studio',
+    request: null,
+    time: '2026-05-01T10:00:00Z',
+    ...overrides,
+  })
+
+  it('names the person, and says System for a revision the server made', () => {
+    expect(revisionAuthor(revision({}), t)).toBe('Author User')
+    expect(revisionAuthor(revision({ userId: null, author: 'Axis', client: null }), t)).toBe('System')
+  })
+
+  it('names Studio for studio, nothing for no client and the id of any other client', () => {
+    expect(revisionClient(revision({ client: 'studio' }), t)).toBe('Studio')
+    expect(revisionClient(revision({ client: null }), t)).toBeNull()
+    expect(revisionClient(revision({ client: 'claude-desktop' }), t)).toBe('claude-desktop')
   })
 })

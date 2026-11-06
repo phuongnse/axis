@@ -67,7 +67,9 @@ function json(body: unknown, status = 200) {
 }
 
 function stubServer(answer: (input: string, init?: RequestInit) => Response) {
-  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => answer(input, init))
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+    input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : answer(input, init),
+  )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }

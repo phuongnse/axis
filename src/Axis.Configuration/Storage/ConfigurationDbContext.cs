@@ -46,6 +46,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public DbSet<PublishRequest> PublishRequests => Set<PublishRequest>();
 
+    public DbSet<ApplicationSettingsRow> ApplicationSettings => Set<ApplicationSettingsRow>();
+
     public DbSet<AuthoringRequest> AuthoringRequests => Set<AuthoringRequest>();
 
     public DbSet<AuthoringRequestStep> AuthoringRequestSteps => Set<AuthoringRequestStep>();
@@ -204,6 +206,14 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             // Serves the publisher's claim of the oldest queued request of an application.
             request.HasIndex(r => new { r.ApplicationId, r.Status, r.RequestedAt, r.Id })
                 .HasDatabaseName("ix_publish_requests_application_id_status_requested_at_id");
+        });
+
+        modelBuilder.Entity<ApplicationSettingsRow>(settings =>
+        {
+            settings.ToTable("application_settings");
+            settings.HasKey(s => s.ApplicationId).HasName("pk_application_settings");
+            settings.Property(s => s.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
+            settings.Property(s => s.AutoAccept).HasColumnName("auto_accept").HasDefaultValue(false);
         });
 
         modelBuilder.Entity<AuthoringRequest>(request =>

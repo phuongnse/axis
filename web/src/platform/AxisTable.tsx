@@ -209,7 +209,8 @@ export function AxisTable<T extends object>({
             scroll={{ x: 'max-content' }}
             dataSource={dataSource as T[] | undefined}
             loading={loading}
-            locale={{ emptyText }}
+            // Ant Design draws the empty text in its disabled colour, which is too faint to read.
+            locale={{ emptyText: <span style={{ color: tokens.colour.textMuted }}>{emptyText}</span> }}
             pagination={
               pagination
                 ? {

@@ -24,7 +24,8 @@ Core migrations shipped with Axis.
 | `axis.release_computed_fingerprints` | `Axis.Configuration` | The hash of an entity's computed definitions in a release, see [recomputing](migrations.md#recompute-tables)                                                                |
 | `axis.release_activations`           | `Axis.Configuration` | An activation, with its release number, see [release history](#release-history)                                                                                             |
 | `axis.publish_requests`              | `Axis.Configuration` | A request that Studio stores and the publisher runs, see [publish requests](#publish-requests)                                                                              |
-| `axis.authoring_requests`            | `Axis.Configuration` | A request that an author sends and the agent host works on, see [authoring requests](#authoring-requests)                                                                   |
+| `axis.application_settings`          | `Axis.Configuration` | A setting of an application that lives in no resource file, keyed by the manifest's `id`. Today that is [auto-accept](ai-authoring-in-studio.md#auto-accept). No row means the defaults|
+| `axis.authoring_requests`            | `Axis.Configuration` | A request that an author sends and the agent host works on, see [authoring request storage](authoring-request-storage.md#authoring-requests)                                                                   |
 | `axis.authoring_request_steps`       | `Axis.Configuration` | A step of an authoring request, in order                                                                                                                                    |
 | `axis.provisioned_entities`          | `Axis.Data`          | A provisioned entity, with its application and table                                                                                                                        |
 | `axis.provisioned_enum_values`       | `Axis.Data`          | A recorded enum value                                                                                                                                                       |
@@ -313,7 +314,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                                                                                                                                                               | Schema database role                                             | Runtime database role                                             |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                                                                                                                                                                     | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, `webhook_deliveries`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `given_roles`, `record_imports`, `files`, `file_contents`, `authoring_requests`, `authoring_request_steps` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, `webhook_deliveries`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `given_roles`, `application_settings`, `record_imports`, `files`, `file_contents`, `authoring_requests`, `authoring_request_steps` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                                                                                                                                                               | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                                                                                                                                                                   | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                                                                                                                                                                    | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -717,6 +718,11 @@ Besides the record and process actions, these actions write audit records. A `pu
   `csv` or `xlsx`, and `truncated` says whether the file stopped at `Data:ExportMaxRows`. They never
   hold a field value.
 
+- **Application setting actions.** A change of an [application setting](authoring.md#application-settings)
+  writes `application.autoAcceptChanged`, with the user as `actor`. The `application_id` is set, and
+  `entity_id`, `record_id` and `process_instance_id` are null. The `details` are `{ "autoAccept" }`,
+  the new value. It is written only when the value changes, in the transaction that saves the value.
+
 - **Authoring request actions.** Sending, approving and dropping an
   [authoring request](authoring-requests.md#routes) write `authoringRequest.sent`,
   `authoringRequest.approved` and `authoringRequest.dropped`, with the author as `actor`. The
@@ -879,21 +885,3 @@ publisher the preview tenant's release history records.
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are null when the request
 failed before a release was known. `number` is the release's number in the
 [release history](#release-history), and it is also null when the release was never activated.
-
-## Authoring requests
-
-`Axis.Configuration` owns the two tables of [authoring requests](authoring-requests.md#durable-requests)
-in the `axis` schema of each tenant database. The server inserts a request and changes its state
-when the author approves, changes the plan or drops it. The agent host writes the rest.
-
-- **`axis.authoring_requests`.** One row per request: `id` (`uuid`, a version 7 UUID),
-  `application_id` (`uuid`, the application `id`), `author` (`text`, a user id), `text`, `state`
-  (`text`, see [states](authoring-requests.md#states)), `binding`, `plan`, `claimed_by` (all `text`,
-  null), `draft_id` (`uuid`, null), `round` (`integer`) and `tokens` (`bigint`), both 0 at first,
-  `auto_accept` (`boolean`, false at first), `sent_at` (`timestamptz`), and `approved_at`,
-  `finished_at` and `claimed_until` (`timestamptz`, null). Indexes on
-  `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
-- **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
-  with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
-  (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `started_at` (`timestamptz`) and
-  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step.

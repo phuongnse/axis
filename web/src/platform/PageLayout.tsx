@@ -11,8 +11,8 @@ export interface BreadcrumbStep {
 }
 
 /**
- * The layout of a page: its title as a heading, with the page's sections stacked below it. With a
- * breadcrumb, the title sits under it in a band on the surface colour that spans the page area, and
+ * The layout of a page: its title as the page's level-one heading, drawn at the size of a level-four one, with
+ * the page's sections stacked below it. With a breadcrumb, the title sits under it in a band on the surface colour that spans the page area, and
  * the last step is marked as the current page. It replaces the old page container. Pages add no
  * spacing or styling of their own.
  */
@@ -26,7 +26,8 @@ export function PageLayout({
   children: ReactNode
 }) {
   const heading = (
-    <Typography.Title level={4} style={{ margin: 0 }}>
+    // Level one for the outline, at the 20px and 28px that a level-four heading has.
+    <Typography.Title level={1} style={{ margin: 0, fontSize: 20, lineHeight: '28px' }}>
       {title}
     </Typography.Title>
   )

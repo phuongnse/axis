@@ -161,6 +161,9 @@ test('no image holds samples, development settings or source control metadata', 
         'the server holds no libgit2',
       )
     }
+    if (target === 'axis-controlplane') {
+      assert.ok(paths.includes('app/wwwroot/sign-up.html'), 'the control plane holds no sign-up page')
+    }
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
     assert.ok(config.User && config.User !== '0' && config.User !== 'root', `${target} runs as ${config.User}`)

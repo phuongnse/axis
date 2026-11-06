@@ -385,6 +385,8 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         var state = Assert.Single(await tenant.TriggerSchedulesAsync());
         var target = $"{state.TriggerId:D}/2026-01-01T05:00:00Z";
         var worker = fixture.NewWorker();
+        // The daily schedule item must not fall due during the run, or the worker queues a second fan-out.
+        await tenant.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() + interval '1 day' WHERE kind = @kind", ("kind", ProcessStarts.TriggerScheduleWorkItemKind));
         await InstallFailureAsync(tenant, "test_injected_fan_out_failure", subjectId);
         try
         {

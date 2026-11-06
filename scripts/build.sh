@@ -2,7 +2,8 @@
 # Builds the SPA into the server web root, checks its size against web/bundle-budget.json and its font files
 # and license texts, then writes the open source licence lists (the public wwwroot/licences.json and the server's
 # licences.json with versions) from the SPA's lock file and the NuGet project assets, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
-# files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the .NET solution,
+# files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the sign-up page into the
+# control plane's web root and checks it and its fonts, then builds the .NET solution,
 # which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
 # applications in artifacts/templates.
 set -euo pipefail
@@ -44,6 +45,9 @@ test -f "$email/text/executeActions.ftl"
 test -f "$email/text/password-reset.ftl"
 test -f "$email/messages/messages_en.properties"
 test -f "$email/messages/messages_vi.properties"
+npm run build:sign-up --prefix web
+test -f controlplane/src/Axis.ControlPlane/wwwroot/sign-up.html
+node scripts/check-fonts.mjs controlplane/src/Axis.ControlPlane/wwwroot
 dotnet build Axis.slnx -c Release --no-restore
 bash scripts/lib/install-modules.sh
 test -f artifacts/modules/department-budgets/1.2.0/module.json

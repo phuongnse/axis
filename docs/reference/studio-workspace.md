@@ -1,10 +1,11 @@
 # Studio workspace
 
 This page describes how Studio is laid out around the work: the list of applications, the workspace
-that an open application takes, and the band, headings, Overview and Releases that every application
-shares. The form that edits one resource is in [Studio resource form](studio-resource-form.md), and
-what each editor and designer does is in [Studio](studio.md). Shared controls, such as buttons and
-tables, follow [actions and controls](actions-and-controls.md).
+that an open application takes, and the band, headings, Overview, Releases and History that every
+application shares. The form that edits one resource is in
+[Studio resource form](studio-resource-form.md), and what each editor and designer does is in
+[Studio](studio.md). Shared controls, such as buttons and tables, follow
+[actions and controls](actions-and-controls.md).
 
 ## Applications
 
@@ -30,8 +31,9 @@ row and the band stay in place while the page scrolls, and only the sidebar's en
 the row. Beside a sidebar the footer sits under the content column only, so the sidebar always runs to
 the bottom of the window.
 
-Under the row come Overview, Releases and Settings, which concern the whole application, and then the
-resource kinds in groups by what an author does with them:
+Under the row come Overview, Releases, History and Settings, which concern the whole application.
+History lists the application's revisions, see [revisions](ai-authoring-in-studio.md#revisions). Then
+come the resource kinds in groups by what an author does with them:
 
 | Group       | Kinds                                                  |
 | ----------- | ------------------------------------------------------ |
