@@ -1204,6 +1204,105 @@ export function releasePublisher(row: { actor: string; actorName: string | null 
   }
 }
 
+/** A revision of an application's history. `userId` and `client` are null for a revision the server made. */
+export interface StudioRevision {
+  id: string
+  summary: string
+  author: string
+  userId: string | null
+  client: string | null
+  request: string | null
+  time: string
+}
+
+/** A file one revision added, changed or removed. `before` and `after` are the file's JSON text, null where it does not exist. */
+export interface StudioRevisionChange {
+  file: string
+  change: 'added' | 'changed' | 'removed'
+  id: string | null
+  kind: string | null
+  name: string | null
+  before: string | null
+  after: string | null
+}
+
+/** One revision with the files it changed, sorted by file. */
+export interface StudioRevisionDiff {
+  revision: StudioRevision
+  resources: StudioRevisionChange[]
+}
+
+/** Loads the revisions of an application, newest first. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function fetchStudioRevisions(application: string, signal?: AbortSignal): Promise<StudioRevision[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioRevision[] }).items
+}
+
+/** Loads one revision with its files. A 404 and any other failure throw, as does a 401 after it shows the sign-in prompt. */
+export async function fetchStudioRevision(
+  application: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioRevisionDiff> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions/${encodeURIComponent(id)}`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRevisionDiff
+}
+
+/**
+ * The answer of an undo: `undone` with the new revision, `blocked` with the later revisions that changed the same files,
+ * or `start` for the start of history, which nothing undoes.
+ */
+export type UndoResult =
+  | { status: 'undone'; id: string | null; diagnostics: StudioDiagnostic[] }
+  | { status: 'blocked'; revisions: StudioRevision[] }
+  | { status: 'start' }
+
+/**
+ * Undoes a revision. A 409 with a `revisions` list is `blocked` and any other 409 is `start`, and nothing was written in
+ * either. A quota refusal throws a {@link QuotaRefusedError}. A 401 shows the sign-in prompt and throws, as any other
+ * failure does.
+ */
+export async function undoStudioRevision(application: string, id: string): Promise<UndoResult> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/revisions/${encodeURIComponent(id)}/undo`
+  const response = await studioFetch(path, { method: 'POST' })
+  if (response.status === 409) {
+    const problem = (await response.json().catch(() => null)) as { revisions?: unknown } | null
+    return Array.isArray(problem?.revisions)
+      ? { status: 'blocked', revisions: problem.revisions as StudioRevision[] }
+      : { status: 'start' }
+  }
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Undoing '${path}' failed with status ${response.status}.`)
+  }
+  const body = (await response.json()) as { id: string | null; diagnostics: StudioDiagnostic[] }
+  return { status: 'undone', id: body.id, diagnostics: body.diagnostics }
+}
+
+/** Who made a revision: the author's name, or "System" for a revision the server made. */
+export function revisionAuthor(revision: StudioRevision, t: (key: string) => string): string {
+  return revision.userId === null ? t('shell.studio.releases.system') : revision.author
+}
+
+/** The client a revision came through: "Studio" for Studio, the client's own id for any other, and null for none. */
+export function revisionClient(revision: StudioRevision, t: (key: string) => string): string | null {
+  if (revision.client === null) {
+    return null
+  }
+  return revision.client === 'studio' ? t('shell.studio.title') : revision.client
+}
+
 /** Whether a release is active and the folder compiles to other content than that release. */
 export function folderDiffers(history: StudioReleases): boolean {
   return (

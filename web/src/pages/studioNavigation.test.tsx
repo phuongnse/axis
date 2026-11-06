@@ -1,5 +1,8 @@
+/// <reference types="node" />
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { MemoryRouter } from 'react-router'
 import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -64,10 +67,11 @@ const fullFolder: StudioResourceItem[] = [
 ]
 
 describe('studioNavigation', () => {
-  it('lists Overview, Releases and Settings, then the groups in order, with Other last', () => {
+  it('lists Overview, Releases, History and Settings, then the groups in order, with Other last', () => {
     expect(keysOf(navigationFor(fullFolder))).toEqual([
       'overview',
       'releases',
+      'history',
       'settings',
       'group:data',
       'group:pages',
@@ -78,6 +82,20 @@ describe('studioNavigation', () => {
       'group:tests',
       'group:other',
     ])
+  })
+
+  it('lists the entries that concern the whole application in the order of the workspace doc', () => {
+    // Vitest runs from the web folder, as `npm test --prefix web` does.
+    const doc = readFileSync(join(process.cwd(), '../docs/reference/studio-workspace.md'), 'utf8').replace(/\s+/g, ' ')
+    const sentence = /Under the row come (.+?), which concern/.exec(doc)
+    expect(sentence).not.toBeNull()
+    const documented = sentence![1].split(/, | and /)
+
+    const built = navigationFor(fullFolder)
+      .filter((node): node is ShellNavigationEntry => !('entries' in node))
+      .map((entry) => entry.label)
+
+    expect(built).toEqual(documented)
   })
 
   it('lists the kinds of each group in order, with the policy matrix ending Access', () => {
@@ -138,7 +156,7 @@ describe('studioNavigation', () => {
   it('leaves Settings out when the folder has no manifest', () => {
     const nav = navigationFor([resource('request', 'entity')])
 
-    expect(keysOf(nav)).toEqual(['overview', 'releases', 'group:data', 'group:access'])
+    expect(keysOf(nav)).toEqual(['overview', 'releases', 'history', 'group:data', 'group:access'])
   })
 
   it('points each entry at its view, kind or manifest', () => {
@@ -147,6 +165,7 @@ describe('studioNavigation', () => {
 
     expect(pathOf('overview')).toBe('/studio?app=purchase-requests')
     expect(pathOf('releases')).toBe('/studio?app=purchase-requests&view=releases')
+    expect(pathOf('history')).toBe('/studio?app=purchase-requests&view=history')
     expect(pathOf('settings')).toBe('/studio?app=purchase-requests&resource=purchase-requests')
     expect(pathOf('kind:entity')).toBe('/studio?app=purchase-requests&kind=entity')
     expect(pathOf('policies')).toBe('/studio?app=purchase-requests&view=policies')
@@ -212,8 +231,12 @@ describe('studioActiveEntry', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&kind=page`), [], [])).toBe('kind:page')
   })
 
-  it('marks Releases and the policy matrix from the view', () => {
+  it('marks Releases, History and the policy matrix from the view', () => {
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=releases`), [], [])).toBe('releases')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=history`), [], [])).toBe('history')
+    expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=history&revision=abc`), [], [])).toBe(
+      'history',
+    )
     expect(studioActiveEntry(new URLSearchParams(`app=${application}&view=policies`), [], [])).toBe('policies')
   })
 
