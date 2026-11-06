@@ -106,6 +106,13 @@ export function segmentLabel(text: string): HTMLElement {
   return screen.getByText(text, { selector: '.ant-segmented-item-label' })
 }
 
+/** Moves keyboard focus to `element` with Tab, as a person reaches an icon button, so its tooltip opens. */
+export async function tabTo(element: HTMLElement): Promise<void> {
+  for (let presses = 0; presses < 100 && document.activeElement !== element; presses++) {
+    await userEvent.tab()
+  }
+}
+
 /** The description of an empty state that shows `text`. */
 export function emptyDescription(text: string): HTMLElement {
   return screen.getByText(text, { selector: '.ant-empty-description' })

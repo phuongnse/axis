@@ -43,7 +43,7 @@ widget names a role, never an Ant Design button type.
 - **The platform picks the icons.** Configuration names no icon, except a site's navigation entry,
   which names one from Axis's own list, see [navigation icons](shell.md#navigation-icons). So the
   platform gives an icon only to an action whose meaning it knows.
-- **A tooltip goes with the pointer** _(planned for M31)_. A click on an icon-only button closes its
+- **A tooltip goes with the pointer**. A click on an icon-only button closes its
   tooltip until the pointer comes back, and focus that a click or a closing dialog gives the button
   opens none. Keyboard focus still shows it.
 
@@ -80,8 +80,6 @@ setting on the shared `ConfigProvider` carries them, so no widget keeps its own 
   beside it.
 
 ## Tab bars
-
-_(planned for M31)_
 
 A tab bar sits `spacing-md` under what precedes it. The theme starts a tab's label at the top of its
 bar, with the underline right under the label, for every tab bar, because Ant Design's padding above
@@ -130,7 +128,7 @@ be kept right.
   From three actions on, or at narrow width, they fold into one "…" menu of text entries.
 - **Opening a row** _(planned for M31)_. A row opens from its identifying cell, a real link, so a row
   has no Edit icon, see [opening things](#opening-things).
-- **An empty table keeps its header** _(planned for M31)_, with the
+- **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
 - **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls
   sideways rather than squeezing them.
@@ -175,22 +173,20 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 
 ## Showing what is empty
 
-_(planned for M31)_
-
 Information always shows rather than being hidden, so a person can tell an empty value from a missing
 one.
 
 - **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and
   the muted dash in a table cell, see [text](#text).
-- **A list that is a standing part of the object always shows.** Empty, it says in one line what that
-  means.
-- **Hide only what does not apply or is not allowed.** A part that does not apply to the object's kind
-  or state, or a field the person may not read, is left out.
-- **Loading and failing are never empty.** A part that is still loading or failed to load says so,
-  never Not set.
-- **One empty state.** `EmptyState` draws every empty table and list: Ant Design's simple picture and
-  one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line is "No data yet."
-  unless the emptiness says something the reader needs.
+- **A list that is a standing part of the object always shows.** _(planned for M31)_ Empty, it says in
+  one line what that means.
+- **Hide only what does not apply or is not allowed.** _(planned for M31)_ A part that does not apply to
+  the object's kind or state, or a field the person may not read, is left out.
+- **Loading and failing are never empty.** _(planned for M31)_ A part that is still loading or failed to
+  load says so, never Not set.
+- **One empty state.** _(planned for M31)_ `EmptyState` draws every empty table and list: Ant Design's
+  simple picture and one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line
+  is "No data yet." unless the emptiness says something the reader needs.
 
 ## List order
 

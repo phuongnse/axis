@@ -25,6 +25,7 @@ Each common job has one shared widget or helper:
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | A button                                       | `AxisButton` with a role, never Ant Design's `Button`                                                  |
 | A table                                        | `AxisTable`, never Ant Design's `Table`                                                                |
+| An empty table or list                         | `EmptyState`, never Ant Design's `Empty`                                                               |
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |

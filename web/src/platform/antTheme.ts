@@ -88,10 +88,14 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       // D114: every dropdown menu keeps spacing-xs round its items.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
+      // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
       Tabs: {
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,
         itemActiveColor: colour.primaryText,
+        horizontalItemPadding: `0 0 ${spacing.sm}px`,
+        horizontalItemPaddingSM: `0 0 ${spacing.xs}px`,
+        horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
       },
       Menu: {
         itemSelectedColor: colour.primaryText,

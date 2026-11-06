@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -13,7 +13,7 @@ import type {
   WidgetAccess,
   WidgetMetadata,
 } from './site'
-import { isSortableHeader } from '../test/antd'
+import { isSortableHeader, tabTo } from '../test/antd'
 import { hostileMarkup } from '../test/hostile'
 import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
@@ -1149,7 +1149,7 @@ describe('TableWidget', () => {
       const row = await screen.findByRole('row', { name: /Buy paper/ })
       const button = within(row).getByRole('button', { name: 'Delete note' })
       expect(button).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
-      act(() => button.focus())
+      await tabTo(button)
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete note')
     })
@@ -1159,7 +1159,7 @@ describe('TableWidget', () => {
       renderWidget('', { ...noteWidget, rowActions: [open, close, edit, remove] })
 
       const row = await screen.findByRole('row', { name: /Buy paper/ })
-      act(() => within(row).getByRole('button', { name: 'Actions' }).focus())
+      await tabTo(within(row).getByRole('button', { name: 'Actions' }))
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
     })
@@ -1238,7 +1238,7 @@ describe('TableWidget', () => {
       renderWidget()
 
       const refresh = await screen.findByRole('button', { name: 'Refresh' })
-      act(() => refresh.focus())
+      await tabTo(refresh)
 
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')
     })

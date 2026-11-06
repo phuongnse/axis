@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { tabTo } from '../test/antd'
 import { designTokensFor } from './designTokens'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
@@ -362,9 +363,9 @@ describe('ProcessInspectorWidget', () => {
     const row = await screen.findByRole('row', { name: /event\.deliver/ })
     const discard = within(row).getByRole('button', { name: 'Discard' })
     expect(discard).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
-    act(() => discard.focus())
+    await tabTo(discard)
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Discard')
+    expect(await screen.findByText('Discard', { selector: '[role="tooltip"]' })).toBeInTheDocument()
   })
 
   it('shows the empty text when no dead letter is open', async () => {

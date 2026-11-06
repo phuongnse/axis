@@ -445,6 +445,7 @@
   "shell.table.exportTimeout": "Việc xuất mất quá nhiều thời gian. Hãy thu hẹp tìm kiếm hoặc bộ lọc rồi thử lại.",
   "shell.table.exportFailed": "Không thể xuất các bản ghi.",
   "shell.value.notSet": "Chưa có",
+  "shell.empty.noData": "Chưa có dữ liệu.",
   "shell.kpi.empty": "Không có giá trị",
   "shell.kpi.loading": "Đang tải…",
   "shell.kpi.loadFailed": "Không thể tải giá trị.",
