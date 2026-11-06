@@ -590,7 +590,19 @@ on the tenant host with no port in the address. No redirect address is added by 
 port 443 to that server. The operator signs in through the `axis-operators` realm with a password and
 a code, and a user of the tenant it creates is refused on the console host. Its server and publisher get the
 `Cell:ExportStorage` settings of the MinIO that `scripts/e2e.sh` starts, and the spec exports a tenant and downloads
-the ZIP after the warning.
+the ZIP after the warning. Both cell specs start their server, publisher and browser through `tests/e2e/cell.ts`.
+
+**The cell quota journey** runs a cell on the port offset after the cell console spec's, with a server that reads the
+tenant directory every 2 seconds, so a new tenant and a changed quota take effect within seconds. It signs in as an
+operator account of its own in the `axis-operators` realm, because the cell console spec may sign the development
+operator in at the same moment and Keycloak refuses one code twice in a period. The operator creates two tenants from
+the built-in `approvals` application in the Create tenant dialog, and each first administrator gives themselves the
+application's `admin` role and saves a department. No worker samples the directory tenants of the run, so the spec
+writes each tenant's storage sample to `platform.tenant_usage_latest` from the size of its database, and the operator
+sets one tenant's storage quota below it. That tenant's next save is refused with the quota title and the other tenant's
+save goes through. The operator then exports the first tenant, downloads the ZIP after the warning and deletes the
+tenant. The grace period is 7 days, so the spec moves the tenant's `delete_after` back and waits for the publisher's
+purge job, after which the tenant's host answers `404`.
 
 **The purchasing system.** The E2E run starts the [purchasing system stub](#purchasing-system-stub)
 from the build output, and fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`.

@@ -100,6 +100,17 @@ export async function addRealmAccount(
   return { id, username: email, password, secret }
 }
 
+/** Removes the required actions of the user `userId` of `realm`, such as the setup of an authenticator that a realm adds to every new account. */
+export async function clearRequiredActions(realm: string, userId: string): Promise<void> {
+  await admin(`Clearing the required actions of ${userId}`, 'PUT', `/${realm}/users/${userId}`, { requiredActions: [] })
+}
+
+/** Gives the user `userId` of `realm` the realm role `role`, such as `cell-operator` in `axis-operators`. */
+export async function giveRealmRole(realm: string, userId: string, role: string): Promise<void> {
+  const found = await admin(`Reading the role ${role} of ${realm}`, 'GET', `/${realm}/roles/${encodeURIComponent(role)}`)
+  await admin(`Giving ${role} to ${userId}`, 'POST', `/${realm}/users/${userId}/role-mappings/realm`, [await found.json()])
+}
+
 /**
  * Gives the user with `email` in `realm` a new password that is not temporary, through the admin API. That removes the
  * `UPDATE_PASSWORD` required action of an invited account and leaves `CONFIGURE_TOTP` for the first sign-in.

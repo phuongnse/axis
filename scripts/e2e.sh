@@ -12,7 +12,8 @@
 # This script also starts MinIO, an S3-compatible store, with the bucket axis-exports and a KMS key, because the export
 # job stores its ZIP encrypted in a bucket that exists. It gives Playwright the five settings of Cell:ExportStorage as
 # AXIS_E2E_EXPORT_STORAGE_URL, _BUCKET, _REGION, _ACCESS_KEY and _SECRET_KEY, and removes the container at the end. Only
-# the cell console spec gives them to its server and publisher, and exports a tenant.
+# the two cell specs (the cell console spec and the cell quota journey) give them to their server and publisher, and
+# export a tenant.
 # Keycloak also gets the axis-admin bootstrap client and the breached-password list, which Axis.Admin tenant create needs.
 # This script creates the PostgreSQL role axis_admin and gives Playwright AXIS_E2E_ADMIN_DATABASE and
 # AXIS_E2E_IDENTITY_ADMIN_SECRET. tests/e2e/admin-tool.ts runs Axis.Admin with them, and the realm emails go to
@@ -72,6 +73,8 @@
 # sign-in is refused until the administrator enables them, and after tenant host add a person signs in on the added host.
 # Keycloak imports the operator realm axis-operators too. The cell console spec serves a cell on the offset 3 of that port,
 # with the console host console.localhost, and signs the development operator in to the cell console through that realm.
+# The cell quota journey serves a cell on the offset 4 and signs in an operator account of its own. Both start their cell
+# through tests/e2e/cell.ts.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit (see
 # scripts/lib/affected.mjs) is under docs/, .github/ or .nexkit/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
