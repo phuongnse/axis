@@ -59,7 +59,7 @@ public static class CallQueries
         var attempts = new Dictionary<Guid, List<ProcessCallAttemptDetail>>();
         await using (var command = new NpgsqlCommand(
             """
-            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error
+            SELECT call_id, kind, number, started_at, finished_at, outcome, http_status, error, trace_id
             FROM axis.process_call_attempts WHERE call_id = ANY(@ids)
             ORDER BY started_at, id
             """,
@@ -84,6 +84,7 @@ public static class CallQueries
                     Outcome = reader.GetString(5),
                     HttpStatus = reader.IsDBNull(6) ? null : reader.GetInt32(6),
                     Error = reader.IsDBNull(7) ? null : reader.GetString(7),
+                    TraceId = reader.IsDBNull(8) ? null : reader.GetString(8),
                 });
             }
         }
@@ -153,4 +154,7 @@ public sealed class ProcessCallAttemptDetail
     public int? HttpStatus { get; init; }
 
     public string? Error { get; init; }
+
+    /// <summary>The trace id of the run that wrote the row, or null when the row stored none.</summary>
+    public string? TraceId { get; init; }
 }

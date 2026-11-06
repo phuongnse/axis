@@ -191,6 +191,17 @@ export function InstanceDetailView({
   const due = timerDueAt(instance)
   const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
+  const traceIdColumn = {
+    key: 'traceId',
+    kind: 'fixed' as const,
+    title: t('shell.inspector.traceId'),
+    render: (_v: unknown, row: { traceId: string | null }) =>
+      row.traceId === null ? null : (
+        <Typography.Text code copyable>
+          {row.traceId}
+        </Typography.Text>
+      ),
+  }
   const historyColumns: AxisColumn<PathEntry>[] = [
     {
       key: 'step',
@@ -217,6 +228,7 @@ export function InstanceDetailView({
       render: (_v, row) => row.decision ?? null,
     },
     { key: 'error', kind: 'freeText', title: t('shell.inspector.error'), render: (_v, row) => row.error ?? null },
+    traceIdColumn,
   ]
   const taskColumns: AxisColumn<InstanceTask>[] = [
     { key: 'step', kind: 'freeText', title: t('shell.inspector.step'), render: (_v, row) => stepLabel(row.step) },
@@ -263,6 +275,7 @@ export function InstanceDetailView({
     { key: 'outcome', title: t('shell.inspector.outcome'), render: (_v: unknown, row) => row.outcome },
     { key: 'httpStatus', title: t('shell.inspector.httpStatus'), render: (_v: unknown, row) => row.httpStatus ?? '' },
     { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
+    traceIdColumn,
   ]
 
   const subProcessColumns: AxisColumn<SubProcess>[] = [

@@ -55,6 +55,7 @@ const detail = {
       decision: null,
       output: null,
       error: 'System.InvalidOperationException',
+      traceId: null,
     },
   ],
   tasks: [],

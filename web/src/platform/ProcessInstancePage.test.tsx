@@ -74,7 +74,8 @@ const detailText = `{
       "finishedAt": "2026-10-10T02:05:00.130000Z",
       "decision": null,
       "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
-      "error": null
+      "error": null,
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
     }
   ],
   "tasks": [
@@ -106,7 +107,8 @@ const detailText = `{
           "finishedAt": "2026-10-10T04:00:03.000000Z",
           "outcome": "retryable",
           "httpStatus": 503,
-          "error": null
+          "error": null,
+          "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       ],
       "input": null,
@@ -186,6 +188,7 @@ function detailWithRelatives() {
         decision: null,
         output: { state: 'waiting', dueAt: '2026-10-11T02:05:00Z' },
         error: null,
+        traceId: null,
       },
     ],
     tasks: [],
@@ -361,6 +364,9 @@ describe('ProcessInstancePage', () => {
     const attemptRow = screen.getByRole('row', { name: /retryable/ })
     expect(within(attemptRow).getByText('503')).toBeInTheDocument()
     expect(within(attemptRow).getByText('attempt')).toBeInTheDocument()
+    expect(within(attemptRow).getByText('0af7651916cd43dd8448eb211c80319c')).toBeInTheDocument()
+    const historyRow = screen.getByRole('row', { name: /^Manager approval .*4bf92f/ })
+    expect(within(historyRow).getByText('4bf92f3577b34da6a3ce929d0e0e4736')).toBeInTheDocument()
   })
 
   it('shows the hidden text and no input value for a call whose input is hidden', async () => {

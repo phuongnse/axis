@@ -149,11 +149,12 @@ in any state. The body has these parts:
   - `labelKey` is set only for a `task` step.
 - `path` is the history rows of the instance, ordered by `finished_at`, then
   by `id`. Each is
-  `{ "step", "startedAt", "finishedAt", "decision", "output", "error" }`.
+  `{ "step", "startedAt", "finishedAt", "decision", "output", "error", "traceId" }`.
   - `decision` and `output` are the stored values, see
     [Tables](process-tables.md#tables). `output` holds no field values.
   - `error` is the stored error, see
     [Step errors](#step-errors-in-inspection).
+  - `traceId` is the trace id of the run that wrote the row, see [Attempts](#attempts).
   - The history's `input` is not returned. It holds only the subject id and
     version, which the instance already has.
 - `tasks` are the tasks of the instance, ordered by `createdAt`, then by `id`.
@@ -171,8 +172,8 @@ in any state. The body has these parts:
     `succeeded` or `failed`.
   - `attempts` lists the rows of [Attempts](#attempts) for the call, ordered
     by `startedAt`, then by `id`. Each is
-    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error" }`,
-    with `kind` either `attempt` or `lookup`.
+    `{ "kind", "number", "startedAt", "finishedAt", "outcome", "httpStatus", "error", "traceId" }`,
+    with `kind` either `attempt` or `lookup`. `traceId` follows [Attempts](#attempts).
   - `input` and `inputHidden` follow [Values and masking](#values-and-masking).
   - A call has no output. The engine writes the outputs of a call straight to
     the subject record and stores no response body.
@@ -244,7 +245,8 @@ in any state. The body has these parts:
       "finishedAt": "2026-10-10T02:05:00.130000Z",
       "decision": null,
       "output": { "state": "waiting", "taskId": "0192f4b1-7a2c-7d3e-8f40-5b6c7d8e9f01" },
-      "error": null
+      "error": null,
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736"
     }
   ],
   "tasks": [
@@ -276,7 +278,8 @@ in any state. The body has these parts:
           "finishedAt": "2026-10-10T04:00:03.000000Z",
           "outcome": "retryable",
           "httpStatus": 503,
-          "error": null
+          "error": null,
+          "traceId": "0af7651916cd43dd8448eb211c80319c"
         }
       ],
       "input": null,
@@ -367,9 +370,10 @@ connector or package call, see [Tables](process-tables.md#tables). The call row 
 attempts and keeps only the last status and error, so the attempt rows hold the
 earlier ones.
 
-- **Trace ids** _(planned for M31)_. Each `path` entry and each attempt carries the `traceId` of the
+- **Trace ids.** Each `path` entry and each attempt carries the `traceId` of the
   run that wrote it, from its stored `trace_id`, and the process inspector shows it, so an operator can
-  find the run's logs and spans, see [telemetry](telemetry.md).
+  find the run's logs and spans, see [telemetry](telemetry.md). `traceId` is `null` for a row that
+  stores no `trace_id`.
 
 - **Attempt.** One send of a connector call, or one run of a package
   operation. Its outcome is `succeeded`, `retryable`, `unknown` or `failed`,
