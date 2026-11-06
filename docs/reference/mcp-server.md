@@ -1,7 +1,5 @@
 # MCP server
 
-_(planned for M35)_
-
 Axis serves an MCP server over the [authoring API](authoring.md), and it is the only way any agent
 acts on Axis. The [agent host](authoring-requests.md#the-agent-host) and outside clients, such as
 Claude Code or NexKit, use the same tools, so there is one surface to secure, test and limit, and a
@@ -13,15 +11,23 @@ client registration, tools, limits and audit. The reasons are in
 
 The server speaks the Streamable HTTP transport of the MCP specification, on the tenant's own host.
 
-- **Route.** `POST /mcp` and `GET /mcp` on each tenant's host. The host names the tenant, as for every
-  route. A preview tenant's host serves no MCP server.
+- **Route.** `POST /mcp` on each tenant's host takes the JSON-RPC messages `initialize`,
+  `notifications/*` and `ping`. The host names the tenant, as for every route. `GET /mcp` answers `405`,
+  because the server offers no server-sent stream. A preview tenant's host serves no MCP server: both MCP
+  routes there answer `404`.
 - **Pinned version.** Axis serves MCP specification version `2025-11-25`. This line is the one place
   the version is written. An upgrade of the version is a change of its own, checked like any other
   dependency, and the [authoring eval](model-bindings.md#the-authoring-eval) runs on it.
-- **Sessions.** The server gives each connection an `Mcp-Session-Id` and keeps no state in it beyond
-  the client's identity and its protocol version. Every tool call is checked again on its own.
-- **Origin.** A request with an `Origin` header that is not the tenant's host is refused with `403`,
-  as the specification asks against DNS rebinding.
+- **Sessions.** `initialize` with the pinned version answers an `Mcp-Session-Id`. The id is a
+  data-protected token that holds the person's subject, the client id (`azp`) and the protocol version.
+  Its protection is bound to the tenant, so the server stores nothing and a session id of one tenant
+  never reads on another. Every later call sends the id and the version in `MCP-Protocol-Version`.
+  Without the id, or with another version than the session's, the answer is `400`. An id that is not
+  this person's session on this tenant is `404`. An `initialize` for another version answers `400` with
+  the JSON-RPC error `-32602`, names the supported version in the error's data and issues no session.
+- **Refused first.** Before any method runs, a request with an `Origin` header that is not the
+  tenant's host is refused with `403`, as the specification asks against DNS rebinding. A request from a
+  person without the [author role](authoring.md#settings) gets `403` too.
 
 ## Sign-in
 
@@ -29,21 +35,27 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
 [Axis's identity provider](identity-provider.md) is the authorization server.
 
 - **Discovery.** `GET /.well-known/oauth-protected-resource/mcp` answers the protected resource
-  metadata of RFC 9728, naming the realm as the authorization server. A call without a valid token
-  answers `401` with a `WWW-Authenticate` header that points to it.
-- **Flow.** The authorization code flow with PKCE (`S256`). The client sends the resource indicator
-  of RFC 8707, the MCP server's URL, such as `https://acme.vn.example.com/mcp`.
-- **Tokens.** The access token's audience is that URL, and the server refuses any other audience, so
-  a token for another resource or another tenant never works here. Access tokens live 5 minutes.
-  Refresh tokens rotate on each use and end with the realm session, at most 8 hours.
-- **Who acts.** The token's subject is the person, and every tool runs with the person's grants: the
-  [author role](authoring.md#settings) for reading and writing drafts, and the rules of
-  [accepting](authoring-requests.md#accepting) for `accept_draft`. A person without the author role
-  gets `403` on every tool.
-- **Consent.** The realm shows a consent screen, in the Axis theme, that names the client, its home
-  page and the scope `axis:authoring`. Without consent, no token is issued.
+  metadata of RFC 9728 with the resource URL, the realm as the authorization server, the scope
+  `axis:authoring` and the header as the bearer method. The route is open and has no rate limit. A call
+  without a valid token answers `401` with a `WWW-Authenticate` header that points to it.
+- **Flow** _(planned for M35)_. The authorization code flow with PKCE (`S256`). The client sends the
+  resource indicator of RFC 8707, the MCP server's URL, such as `https://acme.vn.example.com/mcp`.
+- **Tokens.** The server takes only a bearer token whose audience is the MCP server's URL on the
+  request's own host, such as `https://acme.vn.example.com/mcp`, and refuses any other audience, so a
+  token for another resource or another tenant never works here.
+- **Token lifetime** _(planned for M35)_. Access tokens live 5 minutes. Refresh tokens rotate on each
+  use and end with the realm session, at most 8 hours.
+- **Who acts.** The token's subject is the person. The route needs the [author role](authoring.md#settings)
+  and answers `403` without it.
+- **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for
+  reading and writing drafts, and the rules of [accepting](authoring-requests.md#accepting) for
+  `accept_draft`.
+- **Consent** _(planned for M35)_. The realm shows a consent screen, in the Axis theme, that names the
+  client, its home page and the scope `axis:authoring`. Without consent, no token is issued.
 
 ## Client registration
+
+_(planned for M35)_
 
 A client registers as the pinned specification prefers, and a tenant administrator decides which
 clients may connect at all.
@@ -67,6 +79,8 @@ clients may connect at all.
   platform audit record.
 
 ## Tools
+
+_(planned for M35)_
 
 Each tool takes the application's `name`, and a tool that writes names a draft. Every write goes
 through the authoring API's checks, so a tool can do nothing that the person could not do in Studio.
@@ -99,6 +113,8 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 
 ## Limits
 
+_(planned for M35)_
+
 Tool calls are limited in rate and size, and the agent host's requests count toward a quota.
 
 - **Rate limit.** Tool calls count in the MCP partition, by tenant and client, see
@@ -110,6 +126,8 @@ Tool calls are limited in rate and size, and the agent host's requests count tow
   draft, is cut into pages that the tool's `cursor` reads.
 
 ## Audit
+
+_(planned for M35)_
 
 What an agent did is recorded, but never the content it read or wrote.
 

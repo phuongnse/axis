@@ -565,8 +565,9 @@ session or a valid caller token. A request with neither is refused before the ro
 opens a tenant database. The policy only requires an authenticated user, because the request's scheme
 already picks the session, the service account or the endpoint caller.
 
-- **The open list.** Nine routes need no session: `/health/live`, `/health/ready`, `GET /api/site`,
-  `GET /api/texts/{locale}`, `GET /api/auth/sign-in`, `POST /api/auth/sign-out`,
+- **The open list.** Ten routes need no session: `/health/live`, `/health/ready`, `GET /api/site`,
+  `GET /api/texts/{locale}`, `GET /.well-known/oauth-protected-resource/mcp` (the
+  [MCP server](mcp-server.md#sign-in)'s metadata), `GET /api/auth/sign-in`, `POST /api/auth/sign-out`,
   `GET /api/cell/auth/sign-in`, `POST /api/cell/auth/sign-out` and the SPA's pages. The two `/api/cell`
   routes are the [cell console](cell-console.md#sign-in)'s, and they answer only on its host. On the
   console host the open routes that answer are the health probes, `GET /api/site`,
@@ -575,11 +576,13 @@ already picks the session, the service account or the endpoint caller.
   authentication, so they are outside the routes.
 - **The answers.** A session route answers `401` with the title "Sign in to read or write this data.".
   A service account route keeps its bearer answer. An inbound endpoint route keeps its
-  `WWW-Authenticate: Bearer` challenge and its title. Every answer is problem details. An anonymous
+  `WWW-Authenticate: Bearer` challenge and its title. The [MCP server](mcp-server.md#route-and-transport)'s
+  route answers `401` with a `Bearer` challenge that points to its metadata. Every answer is problem details. An anonymous
   request for a file path that matches no route and no file answers `401`, not `404`. A signed-in GET
   to an unknown `/api` path answers `404`, not the page.
 - **The test.** `AuthorizationRouteTests` calls every route with no session and no token and expects a
-  `401` or `403` problem off the open list, and a bearer challenge on each inbound endpoint route. It
+  `401` or `403` problem off the open list, and a bearer challenge on each inbound endpoint route and on
+  the MCP server's route. It
   also checks that the routes marked open are exactly that list, so a route added later is checked
   automatically.
 

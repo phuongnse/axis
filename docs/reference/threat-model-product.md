@@ -363,8 +363,6 @@ flowchart LR
 
 ### MCP server and agent host
 
-_(planned for M35)_
-
 The MCP server at `/mcp` on each tenant host is the only way an agent acts on Axis. The agent host is
 one of its clients, see [MCP server](mcp-server.md) and [authoring requests](authoring-requests.md#the-agent-host).
 It has three boundaries, each with its own diagram below.
@@ -389,7 +387,7 @@ flowchart LR
     Mcp -->|checks Origin, audience and the author role| Api
 ```
 
-**Author and agent host**
+**Author and agent host** _(planned for M35)_
 
 ```mermaid
 flowchart LR
@@ -415,7 +413,7 @@ flowchart LR
     Agent -->|calls /mcp with the exchanged token| Studio
 ```
 
-**Agent host and model provider**
+**Agent host and model provider** _(planned for M35)_
 
 ```mermaid
 flowchart LR
@@ -439,12 +437,12 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| P117 | A token for another resource or tenant is accepted. | Outside client and MCP server | Spoofing | Critical | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which answers `401` to a token for another audience or tenant, and by [#3111](https://github.com/phuongnse/axis/issues/3111), which opens a session at `/mcp` only for a token whose audience is that tenant's URL. |
+| P117 | A token for another resource or tenant is accepted. | Outside client and MCP server | Spoofing | Critical | **Mitigated** | `McpServerTests` shows that a token without the `/mcp` audience, and a token for another tenant's `/mcp` URL sent to a host, answer `401` with a challenge that points to the metadata, and that a session opens only for a token whose audience is that host's URL. See [sign-in](mcp-server.md#sign-in). |
 | P118 | A malicious client registers under a misleading name or redirect URI and asks for consent. | Outside client and MCP server | Spoofing | High | **Gap** | [#2530](https://github.com/phuongnse/axis/issues/2530) allows only `https` or loopback redirect URIs, and its consent screen shows the client's name. [#2529](https://github.com/phuongnse/axis/issues/2529) shows the client and the scope on the consent screen and issues no token when the person declines. |
 | P119 | A client that the `Ai:OutsideClients` setting does not allow gets a token. | Outside client and MCP server | Elevation of privilege | High | **Gap** | Closed by [#2531](https://github.com/phuongnse/axis/issues/2531), which allows no outside client by default and gives no token to a client that is not allowed. See [client registration](mcp-server.md#client-registration). |
-| P120 | A page on another origin drives `/mcp` through DNS rebinding. | Outside client and MCP server | Tampering | Medium | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which refuses a foreign `Origin` with `403` before any method runs. |
+| P120 | A page on another origin drives `/mcp` through DNS rebinding. | Outside client and MCP server | Tampering | Medium | **Mitigated** | `McpServerTests` shows that a request with a foreign `Origin` answers `403` before any method runs. See [route and transport](mcp-server.md#route-and-transport). |
 | P121 | A tool reads a record, a file, a secret or a binding value, or publishes a release. | Outside client and MCP server | Information disclosure | High | **Gap** | [#2537](https://github.com/phuongnse/axis/issues/2537) adds a guard test that fails when a tool is not in the documented list, or when a tool output holds a record, a secret or a binding value. See [tools](mcp-server.md#tools). |
-| P122 | A person without the author role calls a tool. | Outside client and MCP server | Elevation of privilege | High | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which answers `403` to a person without the author role before any method runs. |
+| P122 | A person without the author role calls a tool. | Outside client and MCP server | Elevation of privilege | High | **Mitigated** | `McpServerTests` shows that a person without the author role answers `403` before any method runs. See [sign-in](mcp-server.md#sign-in). |
 | P123 | A revoked client keeps using its refresh token. | Outside client and MCP server | Spoofing | Medium | **Gap** | [#2532](https://github.com/phuongnse/axis/issues/2532) gives a revoked client `401` on its next call. [#2529](https://github.com/phuongnse/axis/issues/2529) rotates each refresh token on use and ends it with the realm session. |
 | P124 | Tool calls flood the server. | Outside client and MCP server | Denial of service | Medium | **Gap** | Closed by [#3113](https://github.com/phuongnse/axis/issues/3113), which counts MCP calls in their own rate-limit partition, by tenant and client. |
 | P125 | A write through a tool leaves no record of the person and the client. | Outside client and MCP server | Repudiation | Medium | **Gap** | [#3112](https://github.com/phuongnse/axis/issues/3112) writes one log entry for each call, with the tool, the client ID and the outcome. An accept writes a revision that names its author and request, see [revisions](revisions-and-drafts.md#revisions). |
@@ -459,6 +457,8 @@ flowchart LR
 | P134 | Tenant data, secrets or people's names reach the model. | Agent host and model provider | Information disclosure | High | **Gap** | [#2543](https://github.com/phuongnse/axis/issues/2543) keeps record values, people's names and tenant secrets out of the messages sent to the adapter. [#2537](https://github.com/phuongnse/axis/issues/2537) keeps them out of tool output. See [what reaches the model](authoring-requests.md#what-reaches-the-model). |
 | P135 | A model API key appears in a log, a tool output or a request row. | Agent host and model provider | Information disclosure | High | **Gap** | [#2539](https://github.com/phuongnse/axis/issues/2539) reads the key from its file at start, keeps it in memory and writes it to no log line or exception message. [#2546](https://github.com/phuongnse/axis/issues/2546) writes audit records for a tenant's own key without its value. [#2537](https://github.com/phuongnse/axis/issues/2537) keeps secrets out of tool output. |
 | P136 | The model provider keeps or trains on the configuration Axis sends. | Agent host and model provider | Information disclosure | Medium | **Delegated** | The operator chooses the binding and its provider, and so the provider's terms. See [model bindings](model-bindings.md#bindings). |
+| P137 | A forged, another tenant's or another person's `Mcp-Session-Id` is accepted. | Outside client and MCP server | Spoofing | Medium | **Mitigated** | `McpServerTests` shows that an altered session id answers `404`, and `McpSessionTests` that a session id of one tenant does not read on another. A session id also holds the person's subject and client id, which must match the token. See [sessions](mcp-server.md#route-and-transport). |
+| P138 | A preview tenant serves the MCP server. | Outside client and MCP server | Elevation of privilege | Medium | **Mitigated** | `McpServerTests` shows that a preview tenant's host answers `404` on `/mcp` and on its metadata. See [route and transport](mcp-server.md#route-and-transport). |
 
 Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 

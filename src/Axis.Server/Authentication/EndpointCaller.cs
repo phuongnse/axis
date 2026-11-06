@@ -17,7 +17,7 @@ namespace Axis.Server.Authentication;
 /// audience and expiry against the tenant resolved from the host, with one JWT bearer scheme per
 /// tenant. It accepts a token only on endpoint paths, and there it reads no session cookie. The routes of the record API,
 /// the data source rows, process start and process inspection take a bearer token too, through
-/// <see cref="ServiceAccount"/>. A tenant under <c>fapi2</c> accepts only a token that is bound to a DPoP key, sent as
+/// <see cref="ServiceAccount"/>, and the MCP server's route takes a person's token through <see cref="McpCaller"/>. A tenant under <c>fapi2</c> accepts only a token that is bound to a DPoP key, sent as
 /// <c>Authorization: DPoP</c> with a proof (see <see cref="DpopProof"/>).
 /// </summary>
 internal static class EndpointCaller
@@ -29,7 +29,7 @@ internal static class EndpointCaller
     /// The default scheme of every request: the bearer token on endpoint paths, the operator realm's bearer token on a
     /// route of the provisioning API (see <see cref="CellOperator"/>) when the request carries a bearer token, the
     /// console operator's <see cref="CellOperatorSession"/> on such a route otherwise, the service account's bearer token
-    /// on a service account route, and the <see cref="Session"/> everywhere else.
+    /// on a service account route, the person's bearer token on the MCP server's route, and the <see cref="Session"/> everywhere else.
     /// </summary>
     public const string RequestScheme = "Axis.Request";
 
@@ -37,6 +37,7 @@ internal static class EndpointCaller
     private const string DisplayNameClaim = "axis:caller_display_name";
     private const string RoleClaim = "axis:caller_role";
     private const string TenantIdClaim = "axis:tenant_id";
+    private const string ClientIdClaim = "axis:caller_client_id";
 
     public const string SchemePrefix = "endpoint-";
 
@@ -70,7 +71,12 @@ internal static class EndpointCaller
     /// A principal with its own claim types, so <see cref="Session.Read"/> never takes a caller
     /// for a session user.
     /// </summary>
-    public static ClaimsPrincipal CreatePrincipal(string tenantId, string callerId, string displayName, IEnumerable<string> roles)
+    public static ClaimsPrincipal CreatePrincipal(
+        string tenantId,
+        string callerId,
+        string displayName,
+        IEnumerable<string> roles,
+        string? clientId = null)
     {
         Claim[] claims =
         [
@@ -78,6 +84,7 @@ internal static class EndpointCaller
             new(DisplayNameClaim, displayName),
             .. roles.Select(role => new Claim(RoleClaim, role)),
             new(TenantIdClaim, tenantId),
+            .. string.IsNullOrWhiteSpace(clientId) ? [] : new[] { new Claim(ClientIdClaim, clientId) },
         ];
         return new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme, CallerIdClaim, RoleClaim));
     }
@@ -88,12 +95,13 @@ internal static class EndpointCaller
             ? new EndpointCallerIdentity(
                 id,
                 principal.FindFirstValue(DisplayNameClaim) ?? id,
-                [.. principal.FindAll(RoleClaim).Select(claim => claim.Value)])
+                [.. principal.FindAll(RoleClaim).Select(claim => claim.Value)],
+                principal.FindFirstValue(ClientIdClaim))
             : null;
 
     /// <summary>
-    /// Registers the default request scheme, the endpoint caller and service account schemes and two JWT bearer
-    /// schemes for each tenant in <paramref name="settings"/>, one for each audience. A refresh of the tenant directory
+    /// Registers the default request scheme, the endpoint caller, service account and MCP caller schemes and three JWT bearer
+    /// schemes for each tenant in <paramref name="settings"/>, one for each kind of caller. A refresh of the tenant directory
     /// adds and removes bearer schemes later through <see cref="TenantSignInSchemes"/>. A tenant without
     /// <c>Oidc:EndpointAudience</c> accepts no endpoint caller token, and one without <c>Oidc:ServiceAudience</c>
     /// accepts no service account token.
@@ -117,6 +125,7 @@ internal static class EndpointCaller
             options.ForwardDefaultSelector = context =>
                 IsEndpointPath(context.Request.Path) ? Scheme
                 : context.GetEndpoint()?.Metadata.GetMetadata<CellOperatorRoute>() is not null ? CellOperatorScheme(context)
+                : McpCaller.Applies(context) ? McpCaller.Scheme
                 : ServiceAccount.Applies(context) ? ServiceAccount.Scheme
                 : Session.Scheme);
 
@@ -138,10 +147,19 @@ internal static class EndpointCaller
                 return ServiceAccount.SchemeName(current.TenantId);
             });
 
+        builder.AddPolicyScheme(McpCaller.Scheme, displayName: null, options =>
+            options.ForwardDefaultSelector = context =>
+            {
+                var current = context.RequestServices.GetRequiredService<ITenantContextAccessor>().Current
+                    ?? throw new InvalidOperationException("No tenant context is set.");
+                return McpCaller.SchemeName(current.TenantId);
+            });
+
         foreach (var tenantId in settings.Current.Keys)
         {
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(SchemeName(tenantId), displayName: null, configureOptions: null);
             builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(ServiceAccount.SchemeName(tenantId), displayName: null, configureOptions: null);
+            builder.AddScheme<JwtBearerOptions, JwtBearerHandler>(McpCaller.SchemeName(tenantId), displayName: null, configureOptions: null);
         }
 
         return builder;
@@ -151,6 +169,7 @@ internal static class EndpointCaller
 /// <summary>
 /// Builds the options of a tenant's bearer schemes from its settings, each time the options are created. The endpoint
 /// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
+/// MCP caller scheme has no configured audience: it expects the request's own MCP URL, see <see cref="McpCaller.Resource"/>. The
 /// token checks and the claim mapping are the same for both. A token must be signed with an algorithm in
 /// <see cref="Algorithms"/> and must not be marked as another type than an access token, so an ID token is refused.
 /// A refused token writes a warning with the tenant and the reason. The reason is a fixed text, or the type name of the
@@ -215,22 +234,34 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
         {
             prefix = ServiceAccount.SchemePrefix;
         }
+        else if (name.StartsWith(McpCaller.SchemePrefix, StringComparison.Ordinal))
+        {
+            prefix = McpCaller.SchemePrefix;
+        }
         else
         {
             return;
         }
 
-        var caller = prefix == ServiceAccount.SchemePrefix ? "service account" : "endpoint";
+        var mcp = prefix == McpCaller.SchemePrefix;
+        var caller = mcp ? "mcp" : prefix == ServiceAccount.SchemePrefix ? "service account" : "endpoint";
         var tenantId = name[prefix.Length..];
         if (settings.Find(tenantId) is not { } tenant)
         {
             return;
         }
 
-        var audience = prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience : tenant.EndpointAudience;
+
+        // An MCP token's audience depends on the request's host, so the library's check is off and OnTokenValidated makes it.
+        var audience = mcp ? null : prefix == ServiceAccount.SchemePrefix ? tenant.ServiceAudience : tenant.EndpointAudience;
         var dpopRequired = tenant.Profile == TenantSignInProfiles.Fapi2;
         options.Authority = tenant.Authority;
         options.Audience = audience;
+        if (mcp)
+        {
+            options.TokenValidationParameters.ValidateAudience = false;
+        }
+
         options.RequireHttpsMetadata = !allowHttp;
         options.MapInboundClaims = false;
         options.IncludeErrorDetails = false;
@@ -246,7 +277,7 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
             OnMessageReceived = context =>
             {
                 var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
-                if (current?.TenantId != tenantId || string.IsNullOrWhiteSpace(audience))
+                if (current?.TenantId != tenantId || (!mcp && string.IsNullOrWhiteSpace(audience)))
                 {
                     context.NoResult();
                     return Task.CompletedTask;
@@ -292,6 +323,12 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                     }
                 }
 
+                if (mcp && !token.Audiences.Contains(McpCaller.Resource(context.Request), StringComparer.Ordinal))
+                {
+                    Refuse(context, "The token's audience is not this MCP server.");
+                    return;
+                }
+
                 var principal = context.Principal;
                 var callerId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
                 if (principal is null || string.IsNullOrWhiteSpace(callerId))
@@ -312,7 +349,8 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                     tenantId,
                     callerId,
                     string.IsNullOrWhiteSpace(displayName) ? callerId : displayName,
-                    roles);
+                    roles,
+                    mcp ? principal.FindFirst("azp")?.Value : null);
             },
         };
 
@@ -329,5 +367,8 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
     }
 }
 
-/// <summary>The id, display name and role names of a system that calls an inbound endpoint.</summary>
-internal sealed record EndpointCallerIdentity(string Id, string DisplayName, IReadOnlyList<string> Roles);
+/// <summary>
+/// The id, display name and role names of a system that calls an inbound endpoint. <paramref name="ClientId"/> is the
+/// token's <c>azp</c> claim, which only an MCP caller carries.
+/// </summary>
+internal sealed record EndpointCallerIdentity(string Id, string DisplayName, IReadOnlyList<string> Roles, string? ClientId = null);

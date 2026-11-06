@@ -13,16 +13,17 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// Every route of the server is either open or has a rate limit partition. The routes come from the server's
-/// endpoint data source, so a route added later without a partition fails here.
+/// endpoint data source, so a route added later without a partition fails here. An endpoint route and the MCP server's route also have the bearer partition.
 /// </summary>
 public sealed partial class RateLimitRouteTests
 {
     // Port 1 on loopback refuses connections immediately, so the database is unreachable.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
-    // The routes with no limit, as the docs list them: the site, the texts, the health probes and the SPA's pages.
+    // The routes with no limit, as the docs list them: the site, the texts, the MCP server's metadata, the health probes and the SPA's pages.
     private static readonly string[] _openRoutes =
     [
+        "/.well-known/oauth-protected-resource/mcp",
         "/api/site",
         "/api/texts/{locale}",
         "/health/live",
@@ -62,7 +63,7 @@ public sealed partial class RateLimitRouteTests
             var pattern = Pattern(route);
             var limit = route.Metadata.GetMetadata<RateLimitRoute>();
             Assert.True(limit is { Open: false }, $"{pattern} has no rate limit partition.");
-            if (EndpointCaller.IsEndpointPath(ParameterPattern().Replace(pattern, "x")))
+            if (EndpointCaller.IsEndpointPath(ParameterPattern().Replace(pattern, "x")) || route.Metadata.GetMetadata<McpRoute>() is not null)
             {
                 Assert.True(limit.Bearer, $"{pattern} takes a bearer token and has no bearer partition.");
             }

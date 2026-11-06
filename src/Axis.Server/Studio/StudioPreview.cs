@@ -11,4 +11,8 @@ internal static class StudioPreview
     /// <summary>The served tenant whose <c>PreviewOf</c> is <paramref name="tenantId"/>, or <c>null</c>.</summary>
     public static TenantEntry? Find(ITenantCatalog catalog, string tenantId) =>
         catalog.Tenants.FirstOrDefault(entry => string.Equals(entry.PreviewOf, tenantId, StringComparison.Ordinal));
+
+    /// <summary>Whether the served tenant <paramref name="tenantId"/> is itself a preview tenant, one that has a <c>PreviewOf</c>.</summary>
+    public static bool IsPreview(ITenantCatalog catalog, string tenantId) =>
+        catalog.Find(tenantId)?.PreviewOf is not null;
 }

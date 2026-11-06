@@ -202,7 +202,7 @@ internal static partial class UserEndpoints
             : null;
 
     private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
-        tenants.Current is { } tenant && catalog.Find(tenant.TenantId)?.PreviewOf is not null;
+        tenants.Current is { } tenant && StudioPreview.IsPreview(catalog, tenant.TenantId);
 
     private static string? PreviewHost(bool studioUser, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         studioUser && tenants.Current is { } tenant && StudioPreview.Find(catalog, tenant.TenantId)?.Hosts is [var host, ..] ? host : null;

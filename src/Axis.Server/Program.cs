@@ -16,6 +16,7 @@ using Axis.Server.Exports;
 using Axis.Server.Files;
 using Axis.Server.Health;
 using Axis.Server.Http;
+using Axis.Server.Mcp;
 using Axis.Server.Presentation;
 using Axis.Server.Processes;
 using Axis.Server.Records;
@@ -265,6 +266,7 @@ StudioRevisions.Start();
 builder.Services.AddSingleton(ConsoleSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(UsersSettings.Load(builder.Configuration));
 
+builder.Services.AddSingleton<McpSession>();
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
@@ -305,6 +307,9 @@ app.UseTenantResolution();
 // Right after tenant resolution and before the CSRF check and authentication, so a request that a site's host refuses
 // or redirects does no sign-in work and renews no session.
 app.UseSiteHosts();
+
+// Right after, so a preview tenant's host and a foreign origin are refused on the MCP routes before any sign-in work.
+app.UseMcpGuard();
 
 // After tenant resolution, so the warning for a 403 carries the tenant, and before the CSRF check, so that refusal is logged.
 app.UseRefusedRequestLog();
@@ -381,6 +386,7 @@ sessions.MapFallback("/api/{**path}", () => Results.Problem(statusCode: StatusCo
     .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();
+app.MapGroup(string.Empty).WithBearerRateLimit().WithMetadata(McpRoute.Instance).MapMcpEndpoints();
 
 app.Run();
 

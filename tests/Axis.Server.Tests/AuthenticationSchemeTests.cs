@@ -10,10 +10,11 @@ namespace Axis.Server.Tests;
 
 /// <summary>
 /// The server signs people in only through each tenant's identity provider, and checks machine
-/// callers' and service accounts' bearer tokens only against it. It registers the session cookie scheme,
-/// one OpenID Connect scheme and two JWT bearer schemes per tenant, and the three policy schemes that
+/// callers', service accounts' and MCP callers' bearer tokens only against it. It registers the session cookie scheme,
+/// one OpenID Connect scheme and three JWT bearer schemes per tenant, and the four policy schemes that
 /// choose between them, and nothing else. The default scheme picks the bearer token on endpoint paths,
-/// the service account's token on a record route with a bearer token, and the session everywhere else.
+/// the person's token on the MCP route, the service account's token on a record route with a bearer token, and the
+/// session everywhere else.
 /// </summary>
 public sealed class AuthenticationSchemeTests
 {
@@ -47,6 +48,11 @@ public sealed class AuthenticationSchemeTests
             },
             scheme =>
             {
+                Assert.Equal("Axis.McpCaller", scheme.Name);
+                Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
                 Assert.Equal("Axis.Request", scheme.Name);
                 Assert.Equal(typeof(PolicySchemeHandler), scheme.HandlerType);
             },
@@ -63,6 +69,11 @@ public sealed class AuthenticationSchemeTests
             scheme =>
             {
                 Assert.Equal("endpoint-default", scheme.Name);
+                Assert.Equal(typeof(JwtBearerHandler), scheme.HandlerType);
+            },
+            scheme =>
+            {
+                Assert.Equal("mcp-default", scheme.Name);
                 Assert.Equal(typeof(JwtBearerHandler), scheme.HandlerType);
             },
             scheme =>
