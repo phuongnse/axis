@@ -93,8 +93,9 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
   text exactly, see [Testing](architecture.md#testing);
 - that no file under `web/` writes raw HTML, and that the SPA has no code that a key such as
   `__proto__` can turn into prototype pollution;
-- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own,
-  within the baseline in `scripts/shared-widgets-baseline.json`, which only goes down, see
+- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own, with
+  no `Table` import from `antd` and the other uses within the baseline in
+  `scripts/shared-widgets-baseline.json`, which only goes down, see
   [shared widgets](reference/shared-widgets.md);
 - that no test outside a `*PerformanceTests` class measures elapsed time;
 - the Markdown link and anchor check and the docs structure check, see

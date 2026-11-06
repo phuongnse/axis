@@ -109,10 +109,10 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
 Every table of the platform follows one set of rules, because tables that each go their own way cannot
 be kept right.
 
-- **One table** _(planned for M31)_. The `table` widget and the tables of Studio, the console and the
+- **One table.** The `table` widget and the tables of Studio, the console and the
   users page are all drawn by one shared table, `AxisTable` in `web/src/platform/`, on Ant Design's
-  table, and a lint rule refuses `Table` from `antd` anywhere but `AxisTable.tsx`, see
-  [what the build checks](shared-widgets.md#what-the-build-checks).
+  table, and the shared-widgets check refuses an import of `Table` from `antd` anywhere but
+  `AxisTable.tsx`, see [what the build checks](shared-widgets.md#what-the-build-checks).
 - **Toolbar.** One toolbar holds for every table: the view controls, search and filters on the left,
   and Refresh, the secondary actions such as Import and Export, and the main action last on the right.
   Their places and looks are fixed, and whether a table has each depends on what it needs, so a short

@@ -1,5 +1,6 @@
-import { Alert, Button, Checkbox, Flex, Input, Select, Table, type TableColumnsType, Tag, Typography } from 'antd'
+import { Alert, Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
   createStudioResource,
@@ -72,15 +73,17 @@ export function StudioPolicyMatrixTable({
   const target = selection === undefined ? undefined : matrix.targets[selection.index]
   const cell = selection === undefined ? undefined : role?.cells[selection.index]
 
-  const columns: TableColumnsType<StudioMatrixRole> = [
+  const columns: AxisColumn<StudioMatrixRole>[] = [
     {
       key: 'role',
+      kind: 'fixed',
       title: t('shell.studio.matrix.role'),
       fixed: 'left',
       render: (_, row) => <RoleHeader role={row} />,
     },
     ...matrix.targets.map((item, index) => ({
       key: `${item.kind}-${item.name}`,
+      kind: 'fixed' as const,
       title: (
         <Flex vertical>
           <span>{item.name}</span>
@@ -105,13 +108,11 @@ export function StudioPolicyMatrixTable({
 
   return (
     <Flex vertical gap="middle" data-testid="studio-matrix">
-      <Table<StudioMatrixRole>
-        size="small"
-        pagination={false}
+      <AxisTable<StudioMatrixRole>
         rowKey={(row) => row.id}
         dataSource={matrix.roles}
         columns={columns}
-        scroll={{ x: 'max-content' }}
+        emptyText={t('shell.table.empty')}
       />
       {role && target && cell && (
         <GrantPanel
