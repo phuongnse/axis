@@ -45,6 +45,19 @@ public sealed class TenantDailyCounterStore(NpgsqlDataSource platform)
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
+    /// <summary>The counter of the tenant on <paramref name="day"/>, or 0 when it has no row.</summary>
+    public async Task<long> ValueAsync(string tenantId, string counter, DateOnly day, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(counter);
+        await using var command = platform.CreateCommand(
+            "SELECT value FROM platform.tenant_daily_counters WHERE tenant_id = @tenant AND day = @day AND counter = @counter");
+        command.Parameters.AddWithValue("tenant", tenantId);
+        command.Parameters.AddWithValue("day", day);
+        command.Parameters.AddWithValue("counter", counter);
+        return await command.ExecuteScalarAsync(cancellationToken) as long? ?? 0;
+    }
+
     /// <summary>
     /// Takes one back from the counter of the tenant on <paramref name="day"/>. The counter never goes below 0.
     /// </summary>

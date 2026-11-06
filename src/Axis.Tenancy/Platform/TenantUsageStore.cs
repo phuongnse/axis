@@ -4,7 +4,7 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// Writes the usage of a cell's tenants to <c>platform.tenant_usage_latest</c> and <c>platform.tenant_usage</c> over
-/// the platform database, and reads a tenant's latest storage sample. It writes counts and sizes only, among them the counts of failed work. The platform
+/// the platform database, and reads a tenant's latest storage sample and its day rows. It writes counts and sizes only, among them the counts of failed work. The platform
 /// role that the data source connects as has the write grant of <see cref="PlatformRoleGrants"/> on these two tables.
 /// </summary>
 public sealed class TenantUsageStore(NpgsqlDataSource platform)
@@ -92,6 +92,42 @@ public sealed class TenantUsageStore(NpgsqlDataSource platform)
             "SELECT database_bytes + file_bytes FROM platform.tenant_usage_latest WHERE tenant_id = @tenant");
         command.Parameters.AddWithValue("tenant", tenantId);
         return await command.ExecuteScalarAsync(cancellationToken) as long?;
+    }
+
+    /// <summary>
+    /// The tenant's day rows from <paramref name="from"/> on, newest first. The rows hold sizes and counts only.
+    /// </summary>
+    public async Task<IReadOnlyList<TenantUsageRow>> ListDaysAsync(string tenantId, DateOnly from, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        await using var command = platform.CreateCommand(
+            """
+            SELECT day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run
+            FROM platform.tenant_usage
+            WHERE tenant_id = @tenant AND day >= @from
+            ORDER BY day DESC
+            """);
+        command.Parameters.AddWithValue("tenant", tenantId);
+        command.Parameters.AddWithValue("from", from);
+        var rows = new List<TenantUsageRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new TenantUsageRow
+            {
+                TenantId = tenantId,
+                Day = reader.GetFieldValue<DateOnly>(0),
+                DatabaseBytes = reader.GetInt64(1),
+                FileBytes = reader.GetInt64(2),
+                Users = reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                Applications = reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                EmailsSent = reader.GetInt32(5),
+                ConnectorCalls = reader.GetInt64(6),
+                WorkItemsRun = reader.GetInt64(7),
+            });
+        }
+
+        return rows;
     }
 
     /// <summary>

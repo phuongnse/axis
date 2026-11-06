@@ -178,6 +178,7 @@ builder.Services.AddHostedService<PlatformKeyRingStart>();
 
 builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(platformConnectionString));
 builder.Services.AddSingleton<TenantUsageStore>();
+builder.Services.AddSingleton<TenantDailyCounterStore>();
 builder.Services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>();
 builder.Services.AddSingleton(provider => new TenantLeases(provider.GetRequiredService<NpgsqlDataSource>(), provider.GetRequiredService<ILogger<TenantLeases>>()));
 builder.Services.AddSingleton<QueryLeases>();
@@ -371,6 +372,7 @@ sessions.MapUserIdFieldEndpoints();
 sessions.MapStudioEndpoints();
 sessions.MapCellEndpoints();
 sessions.MapTenantExportEndpoints();
+sessions.MapTenantUsageEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
 // so a wrong method on a real route still answers 405.
