@@ -49,9 +49,12 @@ their own.
    them. It fails when either list has no npm or no NuGet entries.
 3. It builds the Keycloak login theme `axis` into `artifacts/keycloak-theme/axis/login`, and the email
    theme `axis` beside it, and checks their files and fonts.
-4. It builds the .NET solution, which installs the sample extension package in
+4. It builds the [sign-up page](reference/sign-up.md#the-page) into the control plane's web root,
+   `controlplane/src/Axis.ControlPlane/wwwroot`, and checks that `sign-up.html` is there and runs the
+   [font check](#fonts-and-the-keycloak-theme) on the folder.
+5. It builds the .NET solution, which installs the sample extension package in
    `artifacts/extensions`.
-5. It installs the built-in and sample modules in `artifacts/modules`, and the built-in applications
+6. It installs the built-in and sample modules in `artifacts/modules`, and the built-in applications
    in `artifacts/templates`.
 
 #### Bundle budget
@@ -75,8 +78,8 @@ budget to make the check pass: find what grew.
 
 #### Fonts and the Keycloak theme
 
-[`scripts/check-fonts.mjs`](../scripts/check-fonts.mjs) runs on the SPA build output and on
-`artifacts/keycloak-theme/axis/login/resources`. It lists the font files in `assets/` and fails when a
+[`scripts/check-fonts.mjs`](../scripts/check-fonts.mjs) runs on the SPA build output, on
+`artifacts/keycloak-theme/axis/login/resources` and on the control plane's web root. It lists the font files in `assets/` and fails when a
 file is not IBM Plex Sans or IBM Plex Mono in the Latin, Latin Extended or Vietnamese subset, when one
 of the six combinations has no `.woff2` file, or when a licence text is missing from `fonts/`. The
 build also fails when the login theme has no `theme.properties`, `login.ftl` or

@@ -22,5 +22,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "keycloak-theme"]
+  "include": ["src", "keycloak-theme", "sign-up"]
 }

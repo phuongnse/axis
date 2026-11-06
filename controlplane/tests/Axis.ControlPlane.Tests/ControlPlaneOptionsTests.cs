@@ -397,6 +397,65 @@ public sealed class ControlPlaneOptionsTests
         Assert.Null(factory.Services.GetService<IDnsRecords>());
     }
 
+    [Theory]
+    [InlineData("Id", "ControlPlane:SignUp:Applications:0:Id")]
+    [InlineData("Titles:en", "ControlPlane:SignUp:Applications:0:Titles:en")]
+    [InlineData("Titles:vi", "ControlPlane:SignUp:Applications:0:Titles:vi")]
+    public void A_sign_up_application_missing_its_id_or_a_title_stops_the_start_and_the_message_names_it(string missing, string setting)
+    {
+        var settings = SignUpApplicationSettings("approvals", "Approvals", "Phê duyệt");
+        settings[$"ControlPlane:SignUp:Applications:0:{missing}"] = string.Empty;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_sign_up_application_that_repeats_an_earlier_id_stops_the_start_and_the_message_names_it()
+    {
+        var settings = SignUpApplicationSettings("approvals", "Approvals", "Phê duyệt");
+        settings["ControlPlane:SignUp:Applications:1:Id"] = "approvals";
+        settings["ControlPlane:SignUp:Applications:1:Titles:en"] = "Approvals again";
+        settings["ControlPlane:SignUp:Applications:1:Titles:vi"] = "Phê duyệt nữa";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:Applications:1:Id", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_valid_sign_up_application_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: SignUpApplicationSettings("approvals", "Approvals", "Phê duyệt"));
+
+        using var client = factory.CreateClient();
+
+        var application = Assert.Single(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.Applications);
+        Assert.Equal("approvals", application.Id);
+        Assert.Equal("Approvals", application.Titles.En);
+        Assert.Equal("Phê duyệt", application.Titles.Vi);
+    }
+
+    [Fact]
+    public void With_no_sign_up_application_the_service_starts_with_an_empty_list()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Empty(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.Applications);
+    }
+
+    private static Dictionary<string, string?> SignUpApplicationSettings(string id, string en, string vi) => new()
+    {
+        ["ControlPlane:SignUp:Applications:0:Id"] = id,
+        ["ControlPlane:SignUp:Applications:0:Titles:en"] = en,
+        ["ControlPlane:SignUp:Applications:0:Titles:vi"] = vi,
+    };
+
     /// <summary>Empty files that exist, so a test of the settings needs no certificate.</summary>
     private sealed class CellFiles : IDisposable
     {

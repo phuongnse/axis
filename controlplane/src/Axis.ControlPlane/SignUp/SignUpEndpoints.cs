@@ -16,5 +16,15 @@ internal static class SignUpEndpoints
 
             return Results.Ok(await check.CheckAsync(name, cancellationToken));
         });
+
+        // The region's built-in applications from the settings, each with its id and its title in both languages.
+        endpoints.MapGet("/api/sign-up/applications", (ControlPlaneOptions options) => Results.Ok(new
+        {
+            applications = options.SignUp.Applications.Select(application => new
+            {
+                id = application.Id,
+                titles = new { en = application.Titles.En, vi = application.Titles.Vi },
+            }),
+        }));
     }
 }

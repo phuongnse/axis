@@ -154,6 +154,9 @@ test('no image holds samples, development settings or source control metadata', 
       assert.ok(paths.includes('modules/'), `${target} has no /modules`)
     }
     if (target === 'axis-server') assert.ok(paths.includes('app/wwwroot/index.html'), 'the server holds no SPA')
+    if (target === 'axis-controlplane') {
+      assert.ok(paths.includes('app/wwwroot/sign-up.html'), 'the control plane holds no sign-up page')
+    }
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
     assert.ok(config.User && config.User !== '0' && config.User !== 'root', `${target} runs as ${config.User}`)

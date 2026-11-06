@@ -82,8 +82,13 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 // Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
 
+app.UseStaticFiles();
+
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
+
+// The sign-up page, built by web/vite.sign-up.config.ts into the web root.
+app.MapFallbackToFile("/sign-up", "sign-up.html");
 
 app.Run();
 

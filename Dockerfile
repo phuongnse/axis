@@ -16,7 +16,8 @@
 # The Axis version. It sets only the informational version of the assemblies, not their assembly version.
 ARG AXIS_VERSION=0.0.0-dev
 
-# The SPA. Vite writes it to ../src/Axis.Server/wwwroot, the server's web root.
+# The SPA and the sign-up page. Vite writes the SPA to ../src/Axis.Server/wwwroot, the server's web root, and the sign-up page
+# to ../controlplane/src/Axis.ControlPlane/wwwroot, the control plane's.
 FROM node:24-slim AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
@@ -27,7 +28,7 @@ COPY src/Axis.Configuration/Schemas/ /src/src/Axis.Configuration/Schemas/
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
 COPY samples/apps/purchase-requests/processes/purchase-request-approval.json /src/samples/apps/purchase-requests/processes/
 COPY tests/e2e/fixtures/studio-connector-oauth2.json /src/tests/e2e/fixtures/
-RUN npm run build
+RUN npm run build && npm run build:sign-up
 
 # The built-in and sample modules, installed in /src/artifacts/modules/<id>/<version> by the script that
 # scripts/build.sh runs. The id and the version come from each module.json.
@@ -94,7 +95,8 @@ USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.PurchasingStub.dll"]
 
-# The production hosts, published without any samples. This stage copies no samples/ folder, and it deletes
+# The production hosts, published without any samples. The control plane is published with the sign-up page in its web
+# root. This stage copies no samples/ folder, and it deletes
 # appsettings.Development.json here, so the file is in no layer of a production image.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS production-build
 ARG AXIS_VERSION
@@ -103,11 +105,13 @@ COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
 COPY controlplane/src/ controlplane/src/
 COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
+COPY --from=web /src/controlplane/src/Axis.ControlPlane/wwwroot controlplane/src/Axis.ControlPlane/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/server \
     && test -f /out/server/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/worker
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/admin
-RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane
+RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane \
+    && test -f /out/controlplane/wwwroot/sign-up.html
 RUN rm -f /out/*/appsettings.Development.json
 
 # Production server. It runs as the non-root user of the base image and can run on a read-only root file
