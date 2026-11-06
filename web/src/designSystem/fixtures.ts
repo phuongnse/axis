@@ -778,6 +778,7 @@ const currentUser: CurrentUser = {
   users: true,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 
 const purchaseApplication = {

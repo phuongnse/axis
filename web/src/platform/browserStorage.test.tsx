@@ -31,15 +31,15 @@ describe('browser storage', () => {
     expect(storageApi.test('const stored = readStoredLocale()')).toBe(false)
   })
 
-  it('is used only by the theme and the locale', () => {
+  it('is used only by the theme, the locale and the export section', () => {
     const users = Object.entries(sources)
       .filter(([, text]) => storageApi.test(text))
       .map(([file]) => file)
       .sort()
-    expect(users).toEqual(['./locale.ts', './theme.tsx'])
+    expect(users).toEqual(['../pages/TenantExportSection.tsx', './locale.ts', './theme.tsx'])
   })
 
-  it('keeps only the theme and the locale in local storage and nothing in session storage', async () => {
+  it('keeps only the theme, the locale and the export id in local storage and nothing in session storage', async () => {
     localStorage.clear()
     sessionStorage.clear()
 
@@ -50,8 +50,9 @@ describe('browser storage', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Dark' }))
     storeLocale('vi')
+    localStorage.setItem('axis.tenantExport', 'export-1')
 
-    expect(Object.keys(localStorage).sort()).toEqual(['axis.locale', 'axis.themeMode'])
+    expect(Object.keys(localStorage).sort()).toEqual(['axis.locale', 'axis.tenantExport', 'axis.themeMode'])
     expect(sessionStorage.length).toBe(0)
   })
 })

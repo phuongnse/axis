@@ -270,7 +270,7 @@ A tenant administrator exports their own tenant from the application, with the s
 ZIP as the provisioning API, so that a business can take its data without asking the operator.
 
 - **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role).
-  _(The users page's "Export data" section is planned for M33.)_
+  The users page's [Export data section](platform-pages.md#export-data-and-usage) starts and follows it.
 - **Routes.** `POST /api/tenant/exports` on the tenant's host starts it, and
   `GET /api/tenant/exports/{exportId}` answers it and its download, for 7 days. They are platform
   routes, in the session partition, with the CSRF header on the `POST`.
@@ -285,7 +285,7 @@ ZIP as the provisioning API, so that a business can take its data without asking
 - **When.** While the tenant is `active` or `readOnly`, so a business whose trial ended or that
   stopped paying can still take its data, see [subscriptions](subscriptions.md#the-timeline). One
   export of a tenant runs at a time, whoever started it.
-- **Warning** _(planned for M33)_. Before it starts, the page says that the file holds every value in
+- **Warning.** Before it starts, the page says that the file holds every value in
   clear, sensitive ones included, and must be kept safe.
 - **Audit.** A start that queues a job writes the platform audit record `tenant export start`, and each
   download writes `tenant export download`. Both name the administrator as actor and `export:<id>` in

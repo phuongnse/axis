@@ -122,8 +122,26 @@ one for the platform, where the administrator gives and removes them. Their text
 
 ### Export data and usage
 
-_(planned for M33)_
+In a tenant of a cell, the users page has two more sections for an administrator:
 
-In a tenant of a cell, the users page has two more sections for an administrator: "Export data", see
-[exports by a tenant administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator), and
-"Usage", the tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
+- **Export data.** Described below.
+- **Usage** _(planned for M33)_. The tenant's quotas and its usage of the last 30 days, see
+  [usage](tenant-quotas.md#usage).
+
+The "Export data" section is a component of its own below the list. It loads `GET /api/me` and renders nothing unless
+`tenantExports` is true, see [the current user](security.md#roles-and-the-current-user). Its texts are `shell.users.export.*`.
+
+- **Warning.** The section says that the file holds every value in clear, sensitive ones included, and must be kept
+  safe, see [exports by a tenant administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator).
+- **Start.** The "Start export…" button opens a confirmation titled "Start the export?" that repeats the warning. Only
+  the confirmation's "Start" button sends `POST /api/tenant/exports`. A failed start shows "The export could not be
+  started."
+- **Following.** While the export is `queued` or `running`, the section says so and reads the export every 2 seconds.
+  It leaves the page free to close. A `failed` export shows "The export failed. Start it again." with the Start button.
+- **Download.** A `succeeded` export shows when the file expires and a "Download ZIP" button. The button requests the
+  export with `Accept: application/zip` and saves the file under the name of `Content-Disposition`. A failed download
+  shows "The file could not be downloaded."
+- **Local storage.** The section keeps the id of the last export under `axis.tenantExport` in the browser's local
+  storage, so a reload shows the same export again. Local storage belongs to each host, so another host of the tenant
+  does not show it. A `404` or `410` on reading forgets the id and offers Start again. A `404` or `410` on the
+  download forgets it too and shows "The file was deleted after 7 days. Start a new export."

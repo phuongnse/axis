@@ -23,6 +23,8 @@ export interface CurrentUser {
   tenantStatus: 'active' | 'readOnly'
   /** The tenant's page in the billing portal, or `null` outside a cell, for a user without the administrator role and in a preview tenant. */
   billingUrl: string | null
+  /** Whether the user may export the tenant's data: an administrator in a cell tenant that is not a preview tenant. */
+  tenantExports: boolean
 }
 
 /**
