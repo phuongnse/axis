@@ -357,4 +357,5 @@ public static class DiagnosticCodes
     public const string ModuleUpgradeBreaksLayers = "AXC0373";
     public const string RemovedResourceCoveredByContract = "AXC0374";
     public const string RemovedFieldStillRead = "AXC0375";
+    public const string MissingContractLabel = "AXC0376";
 }

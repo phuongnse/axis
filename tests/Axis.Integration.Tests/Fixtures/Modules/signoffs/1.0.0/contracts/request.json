@@ -7,14 +7,15 @@
   "lifecycle": {
     "field": "status",
     "states": [
-      { "name": "draft", "initial": true, "deletable": true },
-      { "name": "submitted" },
-      { "name": "approved" }
+      { "name": "draft", "label": { "textKey": "signoffs.request.state.draft" }, "initial": true, "deletable": true },
+      { "name": "submitted", "label": { "textKey": "signoffs.request.state.submitted" } },
+      { "name": "approved", "label": { "textKey": "signoffs.request.state.approved" } }
     ],
     "transitions": [
-      { "name": "submit", "from": ["draft"], "to": "submitted" },
+      { "name": "submit", "label": { "textKey": "signoffs.request.transition.submit" }, "from": ["draft"], "to": "submitted" },
       {
         "name": "approve",
+        "label": { "textKey": "signoffs.request.transition.approve" },
         "from": ["submitted"],
         "to": "approved",
         "guard": "accountableUser() != null and accountableUser() != requester"

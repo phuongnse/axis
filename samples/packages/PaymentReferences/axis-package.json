@@ -1,6 +1,7 @@
 {
   "id": "payment-references",
   "version": "1.0.0",
+  "label": "Payment references",
   "assembly": "PaymentReferences.dll",
   "operations": [
     {

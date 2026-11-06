@@ -6,18 +6,20 @@
   "entity": "Ticket",
   "lifecycle": {
     "field": "status",
-    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }],
-    "transitions": [{ "name": "submit", "from": ["draft"], "to": "submitted" }]
+    "states": [{ "name": "draft", "label": { "textKey": "stages.ticket.state.draft" }, "initial": true, "deletable": true }, { "name": "submitted", "label": { "textKey": "stages.ticket.state.submitted" } }],
+    "transitions": [{ "name": "submit", "label": { "textKey": "stages.ticket.transition.submit" }, "from": ["draft"], "to": "submitted" }]
   },
   "validations": [
     {
       "name": "amountFrozenAfterSubmit",
+      "label": { "textKey": "stages.ticket.validation.amountFrozenAfterSubmit" },
       "expression": "previous(status) == null or previous(status) == 'draft' or amount == previous(amount)",
       "message": { "textKey": "stages.ticket.amountFrozen" },
       "field": "amount"
     },
     {
       "name": "stepMovesWithNewDecision",
+      "label": { "textKey": "stages.ticket.validation.stepMovesWithNewDecision" },
       "expression": "previous(status) == null or step == previous(step) or stepDecision != previous(stepDecision)",
       "message": { "textKey": "stages.ticket.stepNeedsDecision" },
       "field": "step"

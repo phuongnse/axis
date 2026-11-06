@@ -6,15 +6,16 @@
   "entity": "Claim",
   "lifecycle": {
     "field": "status",
-    "states": [{ "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }, { "name": "approved" }],
+    "states": [{ "name": "draft", "label": { "textKey": "ledgers.claim.state.draft" }, "initial": true, "deletable": true }, { "name": "submitted", "label": { "textKey": "ledgers.claim.state.submitted" } }, { "name": "approved", "label": { "textKey": "ledgers.claim.state.approved" } }],
     "transitions": [
-      { "name": "submit", "from": ["draft"], "to": "submitted" },
-      { "name": "approve", "from": ["submitted"], "to": "approved" }
+      { "name": "submit", "label": { "textKey": "ledgers.claim.transition.submit" }, "from": ["draft"], "to": "submitted" },
+      { "name": "approve", "label": { "textKey": "ledgers.claim.transition.approve" }, "from": ["submitted"], "to": "approved" }
     ]
   },
   "effects": [
     {
       "name": "entryRecorded",
+      "label": { "textKey": "ledgers.claim.effect.entryRecorded" },
       "on": "approve",
       "create": {
         "entity": "Entry",

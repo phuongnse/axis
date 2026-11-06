@@ -1,7 +1,9 @@
+using System.Text.RegularExpressions;
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
+using Axis.Configuration.Releases;
 using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Tests;
@@ -16,14 +18,14 @@ public sealed class ModuleContractTests
     private const string ScenarioPath = "scenarios/Covers.json";
 
     private const string DefaultStates = """
-        [ { "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }, { "name": "approved" } ]
+        [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true, "deletable": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]
         """;
 
     private const string DefaultTransitions = """
         [
-          { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "IsSmall(amount)",
+          { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "IsSmall(amount)",
             "message": { "textKey": "approvals.request.small" } },
-          { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "amount > 0" }
+          { "name": "approve", "label": { "textKey": "approvals.point" }, "from": ["submitted"], "to": "approved", "guard": "amount > 0" }
         ]
         """;
 
@@ -180,7 +182,7 @@ public sealed class ModuleContractTests
     public void A_state_that_is_not_a_value_of_the_field_is_axc0326_at_the_state()
     {
         var states = """
-            [ { "name": "draft", "initial": true }, { "name": "submitted" }, { "name": "approved" }, { "name": "archived" } ]
+            [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } }, { "name": "archived", "label": { "textKey": "approvals.point" } } ]
             """;
 
         var diagnostic = Single(Contract(Lifecycle(states: states)));
@@ -192,8 +194,8 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_value_of_the_field_without_a_state_is_axc0326_at_the_states()
     {
-        var states = """[ { "name": "draft", "initial": true }, { "name": "submitted" } ]""";
-        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted" } ]""";
+        var states = """[ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted" } ]""";
 
         var diagnostic = Single(Contract(Lifecycle(states: states, transitions: transitions)));
 
@@ -204,8 +206,8 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_state_is_compared_with_the_values_exactly()
     {
-        var states = """[ { "name": "Draft", "initial": true }, { "name": "submitted" }, { "name": "approved" } ]""";
-        var transitions = """[ { "name": "submit", "from": ["Draft"], "to": "submitted" } ]""";
+        var states = """[ { "name": "Draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["Draft"], "to": "submitted" } ]""";
 
         var diagnostics = Compile(Contract(Lifecycle(states: states, transitions: transitions)));
 
@@ -217,7 +219,7 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_lifecycle_without_an_initial_state_is_axc0327_at_the_states()
     {
-        var states = """[ { "name": "draft" }, { "name": "submitted" }, { "name": "approved" } ]""";
+        var states = """[ { "name": "draft", "label": { "textKey": "approvals.point" } }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]""";
 
         var diagnostic = Single(Contract(Lifecycle(states: states)));
 
@@ -228,7 +230,7 @@ public sealed class ModuleContractTests
     public void A_state_name_that_repeats_ignoring_letter_case_is_axc0328_at_the_later_state()
     {
         var states = """
-            [ { "name": "draft", "initial": true }, { "name": "submitted" }, { "name": "approved" }, { "name": "draft" } ]
+            [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } }, { "name": "draft", "label": { "textKey": "approvals.point" } } ]
             """;
 
         var diagnostics = Compile(Contract(Lifecycle(states: states)));
@@ -242,8 +244,8 @@ public sealed class ModuleContractTests
     {
         var transitions = """
             [
-              { "name": "submit", "from": ["draft"], "to": "submitted" },
-              { "name": "Submit", "from": ["submitted"], "to": "approved" }
+              { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted" },
+              { "name": "Submit", "label": { "textKey": "approvals.point" }, "from": ["submitted"], "to": "approved" }
             ]
             """;
 
@@ -253,8 +255,8 @@ public sealed class ModuleContractTests
     }
 
     [Theory]
-    [InlineData("""{ "name": "submit", "from": ["draft", "nowhere"], "to": "submitted" }""", "/lifecycle/transitions/0/from/1")]
-    [InlineData("""{ "name": "submit", "from": ["draft"], "to": "nowhere" }""", "/lifecycle/transitions/0/to")]
+    [InlineData("""{ "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft", "nowhere"], "to": "submitted" }""", "/lifecycle/transitions/0/from/1")]
+    [InlineData("""{ "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "nowhere" }""", "/lifecycle/transitions/0/to")]
     public void A_transition_state_that_names_no_state_is_axc0329(string transition, string path)
     {
         var diagnostic = Single(Contract(Lifecycle(transitions: $"[{transition}]")));
@@ -268,8 +270,8 @@ public sealed class ModuleContractTests
     {
         var transitions = """
             [
-              { "name": "submit", "from": ["draft"], "to": "submitted" },
-              { "name": "resubmit", "from": ["submitted", "draft"], "to": "submitted" }
+              { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted" },
+              { "name": "resubmit", "label": { "textKey": "approvals.point" }, "from": ["submitted", "draft"], "to": "submitted" }
             ]
             """;
 
@@ -283,7 +285,7 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_to_state_that_is_also_in_from_is_axc0331_at_the_to()
     {
-        var transitions = """[ { "name": "submit", "from": ["draft", "submitted"], "to": "submitted" } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft", "submitted"], "to": "submitted" } ]""";
 
         var diagnostic = Single(Contract(Lifecycle(transitions: transitions)));
 
@@ -295,8 +297,8 @@ public sealed class ModuleContractTests
     {
         var transitions = """
             [
-              { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "IsSmall(amount)" },
-              { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "amount + 1" }
+              { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "IsSmall(amount)" },
+              { "name": "approve", "label": { "textKey": "approvals.point" }, "from": ["submitted"], "to": "approved", "guard": "amount + 1" }
             ]
             """;
 
@@ -308,7 +310,7 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_guard_that_names_an_unknown_field_reports_the_expression_code_at_the_guard()
     {
-        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "missing > 0" } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "missing > 0" } ]""";
 
         var diagnostics = Compile(Contract(Lifecycle(transitions: transitions)));
 
@@ -319,7 +321,7 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_guard_can_read_the_previous_value_of_a_field()
     {
-        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "previous(amount) == amount" } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "previous(amount) == amount" } ]""";
 
         using var modules = Modules(Contract(Lifecycle(transitions: transitions)));
         using var folder = Application();
@@ -334,7 +336,7 @@ public sealed class ModuleContractTests
     [Fact]
     public void A_guard_that_reads_the_previous_value_of_a_child_collection_is_axc0337_at_the_guard()
     {
-        var transitions = """[ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "previous(lines) == null" } ]""";
+        var transitions = """[ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "previous(lines) == null" } ]""";
 
         var diagnostics = Compile(Contract(Lifecycle(transitions: transitions)));
 
@@ -346,13 +348,115 @@ public sealed class ModuleContractTests
     public void A_message_text_key_without_the_module_prefix_is_axc0209_at_the_text_key()
     {
         var transitions = """
-            [ { "name": "submit", "from": ["draft"], "to": "submitted", "message": { "textKey": "request.small" } } ]
+            [ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "message": { "textKey": "request.small" } } ]
             """;
 
         var diagnostic = Single(Contract(Lifecycle(transitions: transitions)));
 
         AssertDiagnostic(DiagnosticCodes.ModuleTextKeyWithoutPrefix, "/lifecycle/transitions/0/message/textKey", diagnostic);
         Assert.Contains("'approvals.'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_state_without_a_label_is_axc0376_at_the_state()
+    {
+        var states = """
+            [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted" }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]
+            """;
+
+        var diagnostic = Single(Contract(Lifecycle(states: states)));
+
+        AssertDiagnostic(DiagnosticCodes.MissingContractLabel, "/lifecycle/states/1", diagnostic);
+        Assert.Contains("state 'submitted'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_transition_without_a_label_is_axc0376_at_the_transition()
+    {
+        var transitions = """
+            [
+              { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted" },
+              { "name": "approve", "from": ["submitted"], "to": "approved" }
+            ]
+            """;
+
+        var diagnostic = Single(Contract(Lifecycle(transitions: transitions)));
+
+        AssertDiagnostic(DiagnosticCodes.MissingContractLabel, "/lifecycle/transitions/1", diagnostic);
+        Assert.Contains("transition 'approve'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_core_validation_without_a_label_is_axc0376_at_the_validation()
+    {
+        var validation = """
+            { "name": "amountSmall", "expression": "amount < 100", "message": { "textKey": "approvals.request.small" }, "field": "amount" }
+            """;
+
+        var diagnostic = Single(Contract(null, extra: Validations(validation)));
+
+        AssertDiagnostic(DiagnosticCodes.MissingContractLabel, "/validations/0", diagnostic);
+        Assert.Contains("core validation 'amountSmall'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_effect_without_a_label_is_axc0376_at_the_effect()
+    {
+        var effects = """
+            [ { "name": "decided", "on": "approve", "create": { "entity": "Decision", "values": { "outcome": "'x'" } } } ]
+            """;
+
+        var diagnostic = Single(Contract(Lifecycle(), extra: Effects(effects)));
+
+        AssertDiagnostic(DiagnosticCodes.MissingContractLabel, "/effects/0", diagnostic);
+        Assert.Contains("effect 'decided'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_label_key_that_no_text_holds_is_axc0028_at_the_key()
+    {
+        var states = """
+            [ { "name": "draft", "label": { "textKey": "approvals.unknown" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]
+            """;
+
+        var diagnostic = Single(Contract(Lifecycle(states: states)));
+
+        AssertDiagnostic(DiagnosticCodes.MissingTextKey, "/lifecycle/states/0/label/textKey", diagnostic);
+        Assert.Contains("'approvals.unknown'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_label_key_without_the_module_prefix_is_axc0209_at_the_key()
+    {
+        var effects = """
+            [ { "name": "decided", "label": { "textKey": "request.small" }, "on": "approve", "create": { "entity": "Decision", "values": { "outcome": "'x'" } } } ]
+            """;
+
+        var diagnostics = Compile(Contract(Lifecycle(), extra: Effects(effects)));
+
+        Assert.Contains(
+            diagnostics,
+            diagnostic => (diagnostic.Code, diagnostic.Path) == (DiagnosticCodes.ModuleTextKeyWithoutPrefix, "/effects/0/label/textKey"));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.MissingTextKey);
+    }
+
+    [Fact]
+    public void A_stored_release_whose_module_contract_has_no_labels_rebuilds_with_no_diagnostics()
+    {
+        using var modules = Modules(Contract(Lifecycle(), extra: Validations(Validation("amountSmall", "amount < 100")) + Effects(Effect())));
+        using var folder = Application();
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+        Assert.Empty(compiled.Diagnostics);
+        var contract = Assert.Single(compiled.Resources, resource => resource.Path.EndsWith("/Contract.json", StringComparison.Ordinal));
+        var unlabelled = new ResourceContent(
+            contract.Path,
+            Regex.Replace(contract.Content, """\s*"label":\s*\{\s*"textKey":\s*"approvals.point"\s*\},?""", ""));
+        Assert.DoesNotContain("\"label\"", unlabelled.Content, StringComparison.Ordinal);
+
+        var rebuilt = ApplicationCompiler.Compile([.. compiled.Resources.Select(resource => resource.Path == contract.Path ? unlabelled : resource)]);
+
+        Assert.Empty(rebuilt.Diagnostics);
+        Assert.NotNull(rebuilt.Model);
     }
 
     [Fact]
@@ -523,8 +627,8 @@ public sealed class ModuleContractTests
     private const string ScenarioFile = "modules/approvals/scenarios/Covers.json";
 
     private const string CoveredPointsExtra = """
-        , "validations": [ { "name": "amountPositive", "expression": "amount >= 0", "message": { "textKey": "approvals.request.small" }, "field": "amount" } ],
-          "effects": [ { "name": "submitted", "on": "submit", "create": { "entity": "Decision", "values": { "outcome": "'x'" } } } ],
+        , "validations": [ { "name": "amountPositive", "label": { "textKey": "approvals.point" }, "expression": "amount >= 0", "message": { "textKey": "approvals.request.small" }, "field": "amount" } ],
+          "effects": [ { "name": "submitted", "label": { "textKey": "approvals.point" }, "on": "submit", "create": { "entity": "Decision", "values": { "outcome": "'x'" } } } ],
           "ceiling": { "slots": { "requester": [{ "actions": ["read"], "fields": ["title"] }] }, "others": [{ "actions": ["read"], "fields": ["title"] }] }
         """;
 
@@ -593,7 +697,7 @@ public sealed class ModuleContractTests
     private static string Effects(string effects) => $$""", "effects": {{effects}}""";
 
     private static string Effect(string name = "decided", string on = "approve", string entity = "Decision", string values = """{ "outcome": "'x'" }""") => $$"""
-        [ { "name": "{{name}}", "on": "{{on}}", "create": { "entity": "{{entity}}", "values": {{values}} } } ]
+        [ { "name": "{{name}}", "label": { "textKey": "approvals.point" }, "on": "{{on}}", "create": { "entity": "{{entity}}", "values": {{values}} } } ]
         """;
 
     [Fact]
@@ -601,8 +705,8 @@ public sealed class ModuleContractTests
     {
         var effects = """
             [
-              { "name": "decided", "on": "approve", "create": { "entity": "Decision", "values": {} } },
-              { "name": "Decided", "on": "submit", "create": { "entity": "Decision", "values": {} } }
+              { "name": "decided", "label": { "textKey": "approvals.point" }, "on": "approve", "create": { "entity": "Decision", "values": {} } },
+              { "name": "Decided", "label": { "textKey": "approvals.point" }, "on": "submit", "create": { "entity": "Decision", "values": {} } }
             ]
             """;
 
@@ -733,7 +837,7 @@ public sealed class ModuleContractTests
         $$""", "validations": [ {{string.Join(", ", validations)}} ]""";
 
     private static string Validation(string name, string expression, string field = "amount", string textKey = "approvals.request.small") => $$"""
-        { "name": "{{name}}", "expression": "{{expression}}", "message": { "textKey": "{{textKey}}" }, "field": "{{field}}" }
+        { "name": "{{name}}", "label": { "textKey": "approvals.point" }, "expression": "{{expression}}", "message": { "textKey": "{{textKey}}" }, "field": "{{field}}" }
         """;
 
     private static string Seed(string status) => $$"""
@@ -811,7 +915,7 @@ public sealed class ModuleContractTests
                 """)
             .With("approvals/1.0.0/TextsEn.json", """
                 { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "approvals.request.small": "Only small requests can be submitted.", "approvals.slot": "Slot" } }
+                  "texts": { "approvals.request.small": "Only small requests can be submitted.", "approvals.slot": "Slot", "approvals.point": "Point" } }
                 """);
 
     private static TemporaryFolder Application() =>

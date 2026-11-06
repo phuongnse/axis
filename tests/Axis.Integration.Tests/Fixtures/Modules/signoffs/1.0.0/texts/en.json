@@ -6,6 +6,11 @@
   "locale": "en",
   "texts": {
     "signoffs.roles.requester": "Requester",
-    "signoffs.roles.approver": "Approver"
+    "signoffs.roles.approver": "Approver",
+    "signoffs.request.transition.submit": "Submit",
+    "signoffs.request.transition.approve": "Approve",
+    "signoffs.request.state.draft": "Draft",
+    "signoffs.request.state.submitted": "Submitted",
+    "signoffs.request.state.approved": "Approved"
   }
 }

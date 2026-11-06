@@ -1,6 +1,7 @@
 {
   "id": "test-package",
   "version": "1.0.0",
+  "label": "Test package",
   "assembly": "Axis.TestPackage.dll",
   "operations": [
     {

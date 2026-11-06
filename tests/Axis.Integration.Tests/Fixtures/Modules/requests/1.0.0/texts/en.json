@@ -6,6 +6,13 @@
   "locale": "en",
   "texts": {
     "requests.roles.requester": "Requester",
-    "requests.request.amountRequired": "A request needs an amount above zero to be submitted."
+    "requests.request.amountRequired": "A request needs an amount above zero to be submitted.",
+    "requests.request.transition.submit": "Submit",
+    "requests.request.transition.approve": "Approve",
+    "requests.request.transition.archive": "Archive",
+    "requests.request.state.draft": "Draft",
+    "requests.request.state.submitted": "Submitted",
+    "requests.request.state.approved": "Approved",
+    "requests.request.state.archived": "Archived"
   }
 }

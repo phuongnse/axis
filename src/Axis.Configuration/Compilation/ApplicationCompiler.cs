@@ -152,7 +152,7 @@ public static partial class ApplicationCompiler
         var copyDiagnostics = new List<Diagnostic>();
         var copies = ReadModuleCopies(moduleResources, copyDiagnostics);
         var applicationResources = resources.Where(resource => !IsModuleCopy(resource)).ToList();
-        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies, collectReferences: true, maxFileSize);
+        var result = Compile(ApplicationLoader.Load(applicationResources), installedPackages ?? [], copies, collectReferences: true, maxFileSize, storedRelease: true);
         if (copyDiagnostics.Count == 0)
         {
             return result;
@@ -307,7 +307,8 @@ public static partial class ApplicationCompiler
         bool collectReferences,
         long maxFileSize,
         ExpressionProbe? probe = null,
-        IReadOnlyCollection<InstalledModule>? previousModules = null)
+        IReadOnlyCollection<InstalledModule>? previousModules = null,
+        bool storedRelease = false)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -613,6 +614,8 @@ public static partial class ApplicationCompiler
             DeclaredModulesOf,
             moduleResources.RoleSlots,
             FilterRulesFor,
+            new ReferenceIndexBuilder(textKeys, loaded.Rules, false),
+            requireLabels: !storedRelease,
             diagnostics);
 
         // From here on a contract is the copy without the points its module's entry relaxes. Seed checks, grant

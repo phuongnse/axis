@@ -39,6 +39,11 @@
     "organization.actions.new": "Thêm mới",
     "organization.actions.open": "Mở",
     "organization.roles.admin": "Quản trị viên tổ chức",
-    "organization.roles.member": "Thành viên tổ chức"
+    "organization.roles.member": "Thành viên tổ chức",
+    "organization.department.validation.notOwnParent": "Không là cấp trên của chính nó",
+    "organization.employee.validation.notOwnManager": "Không là quản lý của chính mình",
+    "organization.employee.validation.notOwnDelegate": "Không tự ủy quyền cho mình",
+    "organization.employee.validation.delegateHasDates": "Ủy quyền cần cả hai ngày",
+    "organization.employee.validation.delegateDatesInOrder": "Ngày ủy quyền đúng thứ tự"
   }
 }
