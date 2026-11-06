@@ -130,6 +130,7 @@ const signedInUser: CurrentUser = {
   users: false,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 
 const e2eSite: ApplicationSite = {

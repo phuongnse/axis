@@ -42,8 +42,8 @@ function formatTime(value: string | null, locale: string) {
 /**
  * The Publishing view of the operator console: the release history and the publish requests of one application, read
  * only. The picker starts on the first application of the tenant. The releases table marks the active release and every off-standard release with its relaxed points, and the
- * requests table lists the publish requests newest first, one page at a time. The view has no publish, activate or
- * rollback command, because those stay in Studio. A failure shows an error in this card only.
+ * requests table lists the publish requests newest first, one page at a time. The view has no publish or activate
+ * command, because those stay in Studio. A failure shows an error in this card only.
  */
 export function ConsolePublishing({ applications, locale }: ConsolePublishingProps) {
   const t = useText()

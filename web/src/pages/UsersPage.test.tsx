@@ -184,7 +184,9 @@ describe('UsersPage', () => {
     const fetchMock = stubServer(() => json(users))
     renderPage()
     await screen.findByText('Ann Invited')
-    expect(requested(fetchMock)).toEqual(['/api/users?page=1&pageSize=20'])
+    expect(requested(fetchMock).filter((input) => input.startsWith('/api/users'))).toEqual([
+      '/api/users?page=1&pageSize=20',
+    ])
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or email' }), 'ann{Enter}')
     await vi.waitFor(() => expect(requested(fetchMock)).toContain('/api/users?search=ann&page=1&pageSize=20'))

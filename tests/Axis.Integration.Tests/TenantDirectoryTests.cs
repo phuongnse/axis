@@ -231,6 +231,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var active = await ReadMeAsync(client, "quiz.example.test");
         Assert.Equal("active", active.GetProperty("tenantStatus").GetString());
         Assert.Equal(JsonValueKind.Null, active.GetProperty("billingUrl").ValueKind);
+        Assert.False(active.GetProperty("tenantExports").GetBoolean());
 
         await UpdateTenantAsync(platform, "quiz", row => row.Status = "readOnly");
         await RefreshAsync(factory);
@@ -255,6 +256,23 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
 
         var memberMe = await ReadMeAsync(member, "quiz.example.test");
         Assert.Equal(JsonValueKind.Null, memberMe.GetProperty("billingUrl").ValueKind);
+        Assert.True(administratorMe.GetProperty("tenantExports").GetBoolean());
+        Assert.False(memberMe.GetProperty("tenantExports").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Me_answers_no_exports_to_an_administrator_on_a_preview_tenant_in_a_cell()
+    {
+        var role = NewRole();
+        var quiz = await PrepareTenantAsync("quiz", role);
+        var preview = await PrepareTenantAsync("quizpreview", role);
+        var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" }, preview with { Host = "preview.example.test" });
+        await UpdateTenantAsync(platform, "quizpreview", row => row.PreviewOf = "quiz");
+        await using var factory = CreateFactory(platform, new LogCollector(), [.. _cellSettings, ("Users:AdministratorRole", "author")]);
+        using var administrator = factory.CreateClient().SignedInAs("author");
+
+        Assert.True((await ReadMeAsync(administrator, "quiz.example.test")).GetProperty("tenantExports").GetBoolean());
+        Assert.False((await ReadMeAsync(administrator, "preview.example.test")).GetProperty("tenantExports").GetBoolean());
     }
 
     private static async Task<JsonElement> ReadMeAsync(HttpClient client, string host)

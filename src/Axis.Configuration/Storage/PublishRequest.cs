@@ -11,7 +11,7 @@ public sealed class PublishRequest
     /// <summary>The <c>id</c> of the application manifest.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary><c>validate</c>, <c>publish</c>, <c>rollback</c> or <c>test</c>.</summary>
+    /// <summary><c>validate</c>, <c>publish</c>, <c>activate</c> or <c>test</c>.</summary>
     public required string Kind { get; init; }
 
     /// <summary><c>queued</c>, <c>running</c>, <c>succeeded</c> or <c>failed</c>.</summary>
@@ -20,7 +20,7 @@ public sealed class PublishRequest
     /// <summary><c>tenant</c> runs the request on the tenant itself, <c>preview</c> runs a publish on the tenant's preview tenant.</summary>
     public string Target { get; init; } = "tenant";
 
-    /// <summary>The resource files as a JSON array, or null for a rollback.</summary>
+    /// <summary>The resource files as a JSON array, or null for an activation.</summary>
     public string? Snapshot { get; init; }
 
     public Guid? ReleaseId { get; init; }

@@ -23,6 +23,7 @@ const requester: CurrentUser = {
   users: false,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 const author: CurrentUser = { ...requester, id: 'author', displayName: 'Author User', roles: ['author'], studio: true }
 const olga: CurrentUser = { ...requester, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
@@ -36,6 +37,7 @@ const una: CurrentUser = {
   users: true,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 
 const sites: SiteListItem[] = [

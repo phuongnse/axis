@@ -149,9 +149,10 @@ The person picks a locale and a theme in the shell's [language and theme](shell.
 and the SPA keeps both in the browser.
 
 - **Browser storage.** The chosen locale is kept in `localStorage` under `axis.locale`, beside the theme mode that
-  [themes](shell.md#app-switcher-and-preferences) keeps. These are the only keys the SPA keeps in browser storage.
-  Sign-out clears both through `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default
-  locale.
+  [themes](shell.md#app-switcher-and-preferences) keeps. The only other key the SPA keeps in browser storage is
+  `axis.tenantExport`, the id of the last [export](platform-pages.md#export-data-and-usage). The id is not sensitive
+  data, because the export routes still need an administrator session. Sign-out clears all three through
+  `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
 - **One key for every site.** A site starts in the stored locale when it offers it, and in its default locale
   otherwise.
 - **Changing the locale.** The shell keeps the current texts until the chosen locale's texts have loaded. If they fail

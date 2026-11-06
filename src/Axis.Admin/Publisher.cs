@@ -18,22 +18,22 @@ using NpgsqlTypes;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>rollback</c> and <c>test</c> requests that Studio stores in the tenant
+/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>activate</c> and <c>test</c> requests that Studio stores in the tenant
 /// databases, until it is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
-/// version. A <c>publish</c> runs the steps of <c>activate</c>, compiling from the stored snapshot and never from a folder. A
-/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. A <c>rollback</c> runs the
+/// version. A <c>publish</c> runs the steps of an activation, compiling from the stored snapshot and never from a folder. A
+/// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. An <c>activate</c> runs the
 /// same steps with the stored release in place of the compile: it rebuilds the release's model from its stored files, refuses
 /// a release that pins a package version that is not installed with <c>AXC0146</c>, and then activates it with every
 /// activation check, so a migration that the release lacks is <c>AXC0174</c>. It never reads a folder and stores no new
-/// release. A <c>publish</c> and a <c>rollback</c> also update the realm of a tenant that has one, after the activation committed: a
+/// release. A <c>publish</c> and an <c>activate</c> also update the realm of a tenant that has one, after the activation committed: a
 /// realm failure fails the request, and the new release stays active. A preview tenant has no realm, and a <c>validate</c> or a
-/// <c>test</c> never updates one. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and a <c>rollback</c> write
+/// <c>test</c> never updates one. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and an <c>activate</c> write
 /// their audit record in the same transaction, and a <c>validate</c> writes none. A request of another tenant stays queued.
 /// A <c>publish</c> request with target <c>preview</c> runs the same steps on the tenant's preview tenant, with that tenant's
 /// database, schema role and bindings, and writes its history row there. The request itself stays in the tenant's database,
 /// where its final status and diagnostics go, and it writes no audit record. Without a preview tenant it fails with
 /// <c>AXC0216</c>. While the preview tenant exists but is not served, the request stays queued. A <c>validate</c> or
-/// <c>rollback</c> with target <c>preview</c> is never claimed.
+/// <c>activate</c> with target <c>preview</c> is never claimed.
 /// A <c>publish</c> and a <c>validate</c> first run the contract scenarios of the pinned modules in a <c>contracts</c> step, after
 /// <c>version</c> and before the compile, in the same way and with the same limit as a <c>test</c>, except that a stop never cuts
 /// them short. A failing scenario fails the request with <c>AXC0342</c>, so nothing is stored or activated, and the outcomes go on
@@ -52,8 +52,8 @@ namespace Axis.Admin;
 /// so the next round claims it again on a new connection, within the same three claims. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
 /// 10 minutes, and past that its running scenario fails, its database is dropped and the request ends <c>failed</c> with
 /// <c>AXC0219</c>. A stop ends a running <c>test</c> at once in the same way, with <c>AXC0220</c>, and lets a running
-/// <c>publish</c>, <c>validate</c> or <c>rollback</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
-/// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or a <c>rollback</c> that left a work item due now for the tenant, such
+/// <c>publish</c>, <c>validate</c> or <c>activate</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
+/// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or an <c>activate</c> that left a work item due now for the tenant, such
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
 /// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
 /// A stop lets a running job finish. In a fourth loop it also checks the pending host requests of <c>platform.tenant_host_requests</c> every
@@ -95,7 +95,7 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind IN ('publish', 'validate', 'rollback', 'test') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE kind IN ('publish', 'validate', 'activate', 'test') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
         RETURNING id, application_id, requested_by, kind, release_id, target
         """;
 
@@ -104,7 +104,7 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind IN ('publish', 'validate', 'rollback', 'test') AND (r.kind = 'test') = @tests
+          WHERE r.kind IN ('publish', 'validate', 'activate', 'test') AND (r.kind = 'test') = @tests
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND (r.target = 'tenant' OR (r.target = 'preview' AND r.kind = 'publish' AND @preview))
@@ -406,7 +406,7 @@ internal sealed class Publisher(
         return claimed;
     }
 
-    // A running request that was claimed three times and whose lease ran out again ends failed. A publish and a rollback on the tenant get their audit record.
+    // A running request that was claimed three times and whose lease ran out again ends failed. A publish and an activate on the tenant get their audit record.
     private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
     {
         const string message = "The publisher stopped three times while running the request.";
@@ -427,7 +427,7 @@ internal sealed class Publisher(
 
         foreach (var request in exhausted)
         {
-            if (request.Kind is "publish" or "rollback" && request.Target == "tenant")
+            if (request.Kind is "publish" or "activate" && request.Target == "tenant")
             {
                 await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, false, request.ReleaseId);
             }
@@ -507,10 +507,10 @@ internal sealed class Publisher(
             return;
         }
 
-        if (request.Kind == "rollback")
+        if (request.Kind == "activate")
         {
-            using var rollbackSignals = WorkSignals.Collect();
-            var rolledBack = await activation.RunAsync(
+            using var activateSignals = WorkSignals.Collect();
+            var activated = await activation.RunAsync(
                 tenant.Id,
                 tenant.SchemaVersion,
                 connections,
@@ -520,9 +520,9 @@ internal sealed class Publisher(
                 ActivationActor.User(request.RequestedBy, null, null, request.Id),
                 loadStep: "rollback",
                 syncRealm: tenant.SyncRealm);
-            await WakeAsync(tenant.Id, rollbackSignals);
+            await WakeAsync(tenant.Id, activateSignals);
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(tenant.Id, connections, request, rolledBack, diagnostics, audit: true);
+            await FinishAsync(tenant.Id, connections, request, activated, diagnostics, audit: true);
             return;
         }
 
@@ -582,7 +582,7 @@ internal sealed class Publisher(
     // The outcomes of the contract scenarios of a publish or validate, or null when none ran.
     private static string? ContractResultsJson(JsonArray results) => results.Count > 0 ? results.ToJsonString() : null;
 
-    // The release of a rollback, rebuilt from its stored files as the server does when it serves a release. A release that
+    // The release of an activate, rebuilt from its stored files as the server does when it serves a release. A release that
     // is missing, or that belongs to another application, is a failure of the step, and so is a failure to rebuild it.
     private async Task<ReleaseCompilationResult> LoadStoredAsync(ConfigurationDbContext configuration, ClaimedRequest request, string tenantId)
     {
@@ -728,9 +728,9 @@ internal sealed class Publisher(
         await transaction.CommitAsync();
     }
 
-    // A rollback names its release from the start, so a failed one still has it. A publish has it once it is compiled.
+    // An activate names its release from the start, so a failed one still has it. A publish has it once it is compiled.
     private static Guid? ReleaseOf(ClaimedRequest request, ReleaseRun run) =>
-        request.Kind == "rollback" ? request.ReleaseId : run.ReleaseId;
+        request.Kind == "activate" ? request.ReleaseId : run.ReleaseId;
 
     // The number is the release's number in the release history. It is null when the request failed before a release was
     // known, or when the release was never activated.
@@ -759,7 +759,7 @@ internal sealed class Publisher(
             transaction,
             new AuditEntry(
                 requestedBy,
-                kind == "rollback"
+                kind == "activate"
                     ? succeeded ? "release.rolledBack" : "release.rollbackFailed"
                     : succeeded ? "release.published" : "release.publishFailed",
                 applicationId,

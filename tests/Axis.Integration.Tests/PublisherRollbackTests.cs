@@ -139,7 +139,7 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, status, release_id, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, 'rollback', 'queued', @release, 'author', 'Author User', clock_timestamp())
+            VALUES (@id, @application, 'activate', 'queued', @release, 'author', 'Author User', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);

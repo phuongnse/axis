@@ -26,6 +26,7 @@ const user: CurrentUser = {
   users: false,
   tenantStatus: 'readOnly',
   billingUrl: null,
+  tenantExports: false,
 }
 
 /** Stubs `GET /api/me` with `current`. Every other request is a 404. */

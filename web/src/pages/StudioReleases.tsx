@@ -12,23 +12,23 @@ import { PlatformContext } from './context'
  * shows the release number with the Live tag when it is the release that runs, and the Off-standard tag with each
  * relaxed module, point and reason when it relaxed a contract point. The other columns are the label, the time it was
  * published, who published it and the note, from the release's first activation. An empty label or note shows the em
- * dash, and Published by is a name, never an id. When `canRollBack`, every row but the live one has an Activate… icon
+ * dash, and Published by is a name, never an id. When `canActivate`, every row but the live one has an Activate… icon
  * button, off while `busy`. The button opens a dialog that says which release replaces the live one, and its
- * confirmation calls `onRollBack`. The list has a level-5 title unless `titled` is false, where the page's own heading
+ * confirmation calls `onActivate`. The list has a level-5 title unless `titled` is false, where the page's own heading
  * names it.
  */
 export function StudioReleasesList({
   history,
-  canRollBack,
+  canActivate,
   busy,
   titled = true,
-  onRollBack,
+  onActivate,
 }: {
   history: StudioReleases
-  canRollBack: boolean
+  canActivate: boolean
   busy: boolean
   titled?: boolean
-  onRollBack: (row: StudioReleaseListRow) => void
+  onActivate: (row: StudioReleaseListRow) => void
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale
@@ -40,7 +40,7 @@ export function StudioReleasesList({
     const row = pending
     setPending(null)
     if (row) {
-      onRollBack(row)
+      onActivate(row)
     }
   }
 
@@ -94,7 +94,7 @@ export function StudioReleasesList({
             }) as HTMLAttributes<HTMLElement>
           }
           rowActions={
-            canRollBack
+            canActivate
               ? {
                   configured: 1,
                   actions: (row) =>
@@ -124,7 +124,7 @@ export function StudioReleasesList({
         onCancel={() => setPending(null)}
       >
         {pending && (
-          <Typography.Text data-testid="studio-rollback-release">
+          <Typography.Text data-testid="studio-activate-release">
             {liveNumber === undefined
               ? t('shell.studio.activate.becomesLive').replace('{release}', String(pending.number))
               : t('shell.studio.activate.replaces')

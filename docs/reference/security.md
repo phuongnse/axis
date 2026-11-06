@@ -125,8 +125,9 @@ These routes start and end a sign-in, and let a person see and end their own ses
   The SPA calls sign-out with `fetch` to send the CSRF header, which cannot follow a redirect to the
   identity provider as a page. A successful sign-out also sends
   `Clear-Site-Data: "cache", "storage"`, so the browser drops the site's HTTP cache and storage, and a
-  refused one sends no such header. The SPA keeps only the theme and the locale in browser storage,
-  under `axis.themeMode` and `axis.locale`, so a sign-out resets both. See
+  refused one sends no such header. The SPA keeps only the theme, the locale and the last export id in browser storage,
+  under `axis.themeMode`, `axis.locale` and `axis.tenantExport`, so a sign-out removes all three. The export id is not
+  sensitive data: the export routes still need an administrator session to answer it. See
   [headers](headers-and-rate-limits.md#security-headers).
 - **Starting a sign-in in the SPA.** The shell header's [account button](frontend.md) offers sign-in
   and sign-out. The home page `/` calls `GET /api/auth/sign-in` at once when `GET /api/me` or
@@ -272,6 +273,7 @@ platform tools they may open.
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                                                             |
 | `tenantStatus`      | `readOnly` while the tenant is [read-only](subscriptions.md#the-read-only-tenant), otherwise `active`. A suspended tenant is never served                   |
 | `billingUrl`        | `https://account.<Cell:TenantDomain>/tenants/<tenant id>` for a user who holds the administrator role in a tenant of a cell, see [billing portal](billing-portal.md#where). Otherwise null, also in a preview tenant |
+| `tenantExports`     | True for a user who holds the administrator role in a tenant of a cell that is not a preview tenant, the tenants whose [export routes](tenant-lifecycle.md#exports-by-a-tenant-administrator) answer. Otherwise false |
 
 Record writes, process starts and the task API read the current user the same way, and their audit
 records store the user's id and no display name.

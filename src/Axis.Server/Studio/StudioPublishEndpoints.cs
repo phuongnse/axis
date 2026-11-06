@@ -25,7 +25,7 @@ namespace Axis.Server.Studio;
 /// <c>note</c> of up to 2000 (400). A <c>validate</c> ignores its body. The status route answers 404 for a request
 /// of another application or tenant, because it reads this tenant's database for this application only.
 /// In a cell, <c>publish</c> checks the tenant's storage quota (403 <c>quota-exceeded</c>) right after the session.
-/// <c>POST /api/studio/apps/{application}/releases/{id}/rollback</c> stores a <c>rollback</c> request that names a release of
+/// <c>POST /api/studio/apps/{application}/releases/{id}/activate</c> stores an <c>activate</c> request that names a release of
 /// the application's history in this tenant, with no snapshot, and answers as <c>publish</c> does. It runs the same checks
 /// as <c>publish</c>, and then answers 404 for an <c>id</c> that is not a UUID or is not in the history. It ignores its body.
 /// <c>POST /api/studio/apps/{application}/test</c> needs the author role only. It stores a <c>test</c> request with target
@@ -48,11 +48,11 @@ internal static class StudioPublishEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/publish", PublishAsync).WithRateLimit(Partition.Publishing).WithStorageQuota();
         endpoints.MapPost("/api/studio/apps/{application}/preview", PreviewAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapPost("/api/studio/apps/{application}/test", TestAsync).WithRateLimit(Partition.Publishing);
-        endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/rollback", RollbackAsync).WithRateLimit(Partition.Publishing);
+        endpoints.MapPost("/api/studio/apps/{application}/releases/{id}/activate", ActivateAsync).WithRateLimit(Partition.Publishing);
         endpoints.MapGet("/api/studio/apps/{application}/requests/{id}", GetRequestAsync);
     }
 
-    private static async Task<IResult> RollbackAsync(
+    private static async Task<IResult> ActivateAsync(
         string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database)
     {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options, publisher: true);
@@ -72,7 +72,7 @@ internal static class StudioPublishEndpoints
         }
 
         var user = (await CurrentUsers.FindAsync(httpContext))!;
-        return await InsertAsync("rollback", application, manifest.Name, applicationId, snapshot: null, releaseId, label: null, note: null, user, database, cancellationToken);
+        return await InsertAsync("activate", application, manifest.Name, applicationId, snapshot: null, releaseId, label: null, note: null, user, database, cancellationToken);
     }
 
     private static async Task<IResult> ValidateAsync(

@@ -24,6 +24,7 @@ const requester: CurrentUser = {
   users: false,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 const author: CurrentUser = {
   id: 'author',
@@ -38,6 +39,7 @@ const author: CurrentUser = {
   users: false,
   tenantStatus: 'active',
   billingUrl: null,
+  tenantExports: false,
 }
 const signOutUrl = 'http://127.0.0.1:8080/realms/axis/protocol/openid-connect/logout?client_id=axis'
 
