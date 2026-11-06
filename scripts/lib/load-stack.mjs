@@ -106,7 +106,7 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
   )
 
   const secrets = folderOf('secrets')
-  const passwords = { schema: password(), platform: password(), admin: password(), postgres: password(), identity: password() }
+  const passwords = { schema: password(), platform: password(), admin: password(), postgres: password(), identity: password(), reader: password() }
   const trusted = verifyFull('/run/test-ca/ca.crt')
   const connection = (user, pass) => `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}${trusted}`
   writeFile(join(secrets, 'ConnectionStrings__PlatformSchema'), connection('axis_platform_schema', passwords.schema))
@@ -117,6 +117,10 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
   writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt')
   writeFile(join(secrets, 'KC_DB_USERNAME'), 'axis_identity')
   writeFile(join(secrets, 'KC_DB_PASSWORD'), passwords.identity)
+  writeFile(
+    join(secrets, 'IdentityProvider__DatabaseConnectionString'),
+    `Host=postgres;Port=5432;Database=axis_identity;Username=axis_identity_reader;Password=${passwords.reader}${trusted}`,
+  )
 
   // The database roles: the SQL of the installation guide.
   const initSql = join(folder, 'init-roles.sql')
@@ -129,6 +133,7 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
       'CREATE DATABASE axis_platform OWNER axis_platform_schema;',
       `CREATE ROLE axis_identity LOGIN PASSWORD '${passwords.identity}';`,
       'CREATE DATABASE axis_identity OWNER axis_identity;',
+      `CREATE ROLE axis_identity_reader LOGIN PASSWORD '${passwords.reader}';`,
       '',
     ].join('\n'),
   )

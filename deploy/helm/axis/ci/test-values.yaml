@@ -64,6 +64,8 @@ secrets:
     name: axis-backup-storage
   cellBackupKey:
     name: axis-cell-backup-key
+  identityCredentialsConnection:
+    name: axis-identity-reader
 backup:
   bucket: axis-backups-vn
   serviceUrl: https://s3.vn.example.com

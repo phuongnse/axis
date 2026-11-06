@@ -130,7 +130,8 @@ cell:
 # 03:00 in timeZone. The second one also needs secrets.adminConnection and cell.internalDomain.
 # timeZone, serviceUrl and region are required with a bucket. The storage
 # credentials are the two Secret references secrets.backupStorageAccessKeyId and
-# secrets.backupStorageSecretAccessKey, and never values. The operator sets the bucket's object lock
+# secrets.backupStorageSecretAccessKey, and never values. The backup CronJob also needs
+# secrets.identityCredentialsConnection, so every archive holds the tenant's realm. The operator sets the bucket's object lock
 # in compliance mode for 30 days and a lifecycle rule that deletes an archive after 30 days. The chart
 # does not create or change the bucket. The schema rejects any other field.
 backup:
@@ -307,3 +308,9 @@ secrets:
   cellBackupKey:
     name: ""
     key: cell-backup-key
+  # IdentityProvider:DatabaseConnectionString, the connection of a read-only role of the identity
+  # provider's database, with SELECT on Keycloak's credential table only and SSL Mode=VerifyFull. It lets
+  # "tenant backup" write realm.json. Used by the cell backup CronJob only. Required with backup.bucket.
+  identityCredentialsConnection:
+    name: ""
+    key: IdentityProvider__DatabaseConnectionString

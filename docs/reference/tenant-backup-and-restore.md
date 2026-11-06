@@ -387,8 +387,13 @@ archive and the steps are those above.
   `Cell:BackupKeyFile` is missing or cannot be read. A tenant without a backup key cannot be backed up.
   `platform rekey` leaves `platform.tenant_backup_keys` alone, because the installation key does not
   wrap it.
-- **The realm in every daily archive** _(planned for M31)_. Every archive that `cell backup` writes holds
-  the tenant's `realm.json`, so a restore gives the tenant back with its people.
+- **The realm in every daily archive.** Every archive that `cell backup` writes for a tenant with its
+  own realm holds the tenant's `realm.json`, so a restore gives the tenant back with its people. The
+  chart gives the cell backup CronJob `IdentityProvider__DatabaseConnectionString`, the connection of a
+  read-only role of the identity provider's database, from the Secret in `secrets.identityCredentialsConnection`,
+  see [which pod gets which secret](installation.md#which-pod-gets-which-secret). The chart requires the Secret with
+  `backup.bucket`. The [weekly restore check](#weekly-restore-check) fails an archive of such a tenant
+  that holds no `realm.json`.
 - **Crypto-shredding.** [Deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) destroys its backup
   key in the purge's `keys` step. Its archives stay in object storage until their lock ends, and nothing
   can read them. One leaked tenant key opens only that tenant's archives.
@@ -464,8 +469,10 @@ no argument and runs only in a cell. It does these steps:
    though the source tenant's realm exists. It does not write the audit record of `tenant restore`.
 6. **Compare.** It compares the row count of each table in `counts` with the restored database, leaving
    out `axis.sessions` and the tables that `counts` does not hold. It compares the usernames of the
-   scratch realm with those of `realm.json`, leaving out service accounts. An archive without
-   `realm.json` counts as zero users, and an archive without `counts` fails.
+   scratch realm with those of `realm.json`, leaving out service accounts. An archive of a tenant
+   that signs in elsewhere has no `realm.json` and counts as zero users. An archive whose manifest says
+   `realm: true` and that holds no `realm.json` fails the users comparison, and an archive without
+   `counts` fails.
 7. **Scenarios.** It runs the scenarios of each application of the scratch tenant's Studio folder, see
    below.
 8. **Remove.** Whatever the result, it removes the scratch tenant at once, with no grace window: its
@@ -496,7 +503,8 @@ no argument and runs only in a cell. It does these steps:
 - **Output.** Each line starts with the tenant id: `<source> download ok|failed: <message>`, the lines of
   the `tenant restore` steps, `<scratch> counts ok` or
   `<scratch> counts failed: <schema.table> has <n> rows and the archive <m>`, `<scratch> users ok` or
-  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ`, for each
+  `<scratch> users failed: the realm has <n> users and the archive <m>, <k> differ` or
+  `<scratch> users failed: the archive holds no realm.json`, for each
   application `<scratch> version ok`, `<scratch> scenario <name> passed|failed: <message>` for each
   scenario and `<scratch> test ok|failed: <message>`, `<scratch> cleanup ok|failed: <message>`,
   `<scratch> remove ok|failed: <message>` and last `<source> restore-check passed|failed`. No line holds

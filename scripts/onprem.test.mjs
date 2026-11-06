@@ -54,7 +54,7 @@ const secretFiles = {
   proxy: [],
   identity: ['IdentityProvider__AdminClientSecret', 'KC_DB_PASSWORD', 'KC_DB_URL', 'KC_DB_USERNAME'],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
-  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'Platform__SecretKey'],
+  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
 
@@ -638,7 +638,7 @@ describe('the on-premises installation', () => {
       const secrets = join(folder, 'secrets')
       mkdirSync(secrets)
       chmodSync(secrets, 0o755)
-      const passwords = { schema: password(), platform: password(), admin: password(), scenario: password(), postgres: password(), identity: password() }
+      const passwords = { schema: password(), platform: password(), admin: password(), scenario: password(), postgres: password(), identity: password(), reader: password() }
       const trust = verifyFull('/run/test-ca/ca.crt')
       const connection = (user, pass) =>
         `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}${trust}`
@@ -660,6 +660,11 @@ describe('the on-premises installation', () => {
       writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt')
       writeFile(join(secrets, 'KC_DB_USERNAME'), 'axis_identity')
       writeFile(join(secrets, 'KC_DB_PASSWORD'), passwords.identity)
+      // The read-only role of the identity provider's database, which `tenant backup` reads to write realm.json.
+      writeFile(
+        join(secrets, 'IdentityProvider__DatabaseConnectionString'),
+        `Host=postgres;Port=5432;Database=axis_identity;Username=axis_identity_reader;Password=${passwords.reader}${trust}`,
+      )
 
       // Step 3, the database roles. This is the SQL of the installation guide.
       const initSql = join(folder, 'init-roles.sql')
@@ -673,6 +678,7 @@ describe('the on-premises installation', () => {
           'CREATE DATABASE axis_platform OWNER axis_platform_schema;',
           `CREATE ROLE axis_identity LOGIN PASSWORD '${passwords.identity}';`,
           'CREATE DATABASE axis_identity OWNER axis_identity;',
+          `CREATE ROLE axis_identity_reader LOGIN PASSWORD '${passwords.reader}';`,
           '',
         ].join('\n'),
       )

@@ -29,7 +29,7 @@ namespace Axis.Admin;
 /// <c>restore-check-&lt;yyyymmdd&gt;</c>, with a host under <c>Cell:InternalDomain</c> and always a new realm. The users of that realm get new ids, because
 /// the ids of the live source realm cannot be imported a second time. It then compares the row count of each table with the manifest's
 /// <c>counts</c>, leaving out <c>axis.sessions</c> and the tables that <c>counts</c> does not hold, and the users of the realm with those of
-/// <c>realm.json</c>, leaving out service accounts. An archive without <c>realm.json</c> counts as zero users, and one without <c>counts</c> fails.
+/// <c>realm.json</c>, leaving out service accounts. An archive of a tenant that signs in elsewhere has no <c>realm.json</c> and counts as zero users. One of a tenant with its own realm (<c>realm</c> is <c>true</c> in the manifest) that holds no <c>realm.json</c> fails, and so does one without <c>counts</c>.
 /// Then it compiles each application folder that the restore wrote under <c>Studio:ApplicationsPath</c>/&lt;scratch id&gt; with the cell's extension packages
 /// and modules (<c>Extensions:Path</c>, <c>Modules:Path</c>) and runs its test scenarios, module scenarios included, with the logic of the publisher's test step. Each scenario
 /// runs in its own temporary database on <c>Scenarios:ServerConnectionString</c>, for at most the publisher's test limit for each application, and writes a
@@ -356,7 +356,7 @@ internal static partial class CellRestoreCheck
 
             // The comparisons and the scenarios all run, so one line each tells what was wrong.
             var counts = await CompareCountsAsync(create, row, plan.Manifest.Counts, output, cancellationToken);
-            var users = await CompareUsersAsync(realm, scratch, plan.Realm, output, cancellationToken);
+            var users = await CompareUsersAsync(realm, scratch, plan.Realm, plan.Manifest.Directory.Realm, output, cancellationToken);
             var scenarios = await RunScenariosAsync(run, settings, release, scenarioServer, scratch, row.SchemaVersion);
             return counts && users && scenarios;
         }
@@ -554,9 +554,16 @@ internal static partial class CellRestoreCheck
     }
 
     // The usernames of the scratch realm against those of realm.json. A service account is no user of the archive. A username is never printed.
+    // An archive of a tenant with its own realm that holds no realm.json fails, because its users would be lost.
     private static async Task<bool> CompareUsersAsync(
-        TenantRealm realm, string scratch, JsonObject? document, TextWriter output, CancellationToken cancellationToken)
+        TenantRealm realm, string scratch, JsonObject? document, bool hasRealm, TextWriter output, CancellationToken cancellationToken)
     {
+        if (hasRealm && document is null)
+        {
+            output.WriteLine($"{scratch} users failed: the archive holds no realm.json");
+            return false;
+        }
+
         var token = await realm.AdminTokenAsync(cancellationToken);
         var actual = new List<string>();
         for (var first = 0; ; first += UserPageSize)

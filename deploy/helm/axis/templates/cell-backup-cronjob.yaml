@@ -65,7 +65,7 @@ spec:
                 - name: tmp
                   mountPath: /tmp
           volumes:
-            - {{ include "axis.secretsVolume" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey" "backupStorageAccessKeyId" "backupStorageSecretAccessKey")) | nindent 14 | trim }}
+            - {{ include "axis.secretsVolume" (dict "root" . "entries" (list "platformSchemaConnection" "platformSecretKey" "backupStorageAccessKeyId" "backupStorageSecretAccessKey" "identityCredentialsConnection")) | nindent 14 | trim }}
             - name: cell-backup-key
               secret:
                 secretName: {{ required "secrets.cellBackupKey.name is required: the Kubernetes Secret that holds the cell's backup key" .Values.secrets.cellBackupKey.name | quote }}

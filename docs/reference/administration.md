@@ -818,8 +818,10 @@ up, its output, its audit records and its metric are in
 [daily backup](tenant-backup-and-restore.md#daily-backup).
 
 - **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey`, `Cell:BackupKeyFile`, the
-  five `Cell:BackupStorage` settings and `PATH`, to find `pg_dump`. It needs no
-  `Admin:ConnectionString`.
+  five `Cell:BackupStorage` settings, `IdentityProvider:DatabaseConnectionString`, which puts
+  `realm.json` into the archive of a tenant with its own realm, and `PATH`, to find `pg_dump`. The
+  chart sets `IdentityProvider:DatabaseConnectionString` for its CronJob from a Secret and requires it.
+  Without the setting a run writes archives with no `realm.json`. It needs no `Admin:ConnectionString`.
 - **Exit codes.** `0` when every tenant succeeded. `1` when a tenant failed, the run reached its
   6-hour limit or the gauge could not be recorded. `2`, before anything is uploaded or audited,
   outside a cell, with an argument, for a missing setting or `pg_dump`, or for an OTLP endpoint

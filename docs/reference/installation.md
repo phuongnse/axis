@@ -77,7 +77,7 @@ from a secret store of the platform, never from a committed file.
 | `IdentityProvider:Url` | `IdentityProvider__Url` | admin, publisher (in a cell) | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https` outside `Development` and `Testing`. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin, publisher (in a cell) | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin, publisher (in a cell) | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
-| `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | admin | yes | Optional. A read-only role of the identity provider's database, with `SELECT` on Keycloak's `credential` table only. With it, `tenant backup` writes the realm's users and credentials into the archive as `realm.json`, which a `tenant restore` into a new realm imports. Without it, no archive holds `realm.json`. Outside `Development` and `Testing` it must set `SSL Mode=VerifyFull`. |
+| `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | admin, cell backup CronJob | yes | A read-only role of the identity provider's database, with `SELECT` on Keycloak's `credential` table only. With it, `tenant backup` writes the realm's users and credentials into the archive as `realm.json`, which a `tenant restore` into a new realm imports. The Compose example mounts it in the admin host, and the chart requires it for the cell backup CronJob, so every daily archive of a tenant with its own realm holds `realm.json`. Without it, no archive holds `realm.json`. Outside `Development` and `Testing` it must set `SSL Mode=VerifyFull`. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [the scenario role](#the-scenario-role). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
@@ -136,6 +136,7 @@ CREATE ROLE axis_admin LOGIN PASSWORD '<password>' CREATEDB CREATEROLE;
 CREATE DATABASE axis_platform OWNER axis_platform_schema;
 CREATE ROLE axis_identity LOGIN PASSWORD '<password>';
 CREATE DATABASE axis_identity OWNER axis_identity;
+CREATE ROLE axis_identity_reader LOGIN PASSWORD '<password>';
 ```
 
 | Database role | Used for |
@@ -144,6 +145,18 @@ CREATE DATABASE axis_identity OWNER axis_identity;
 | `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`, to `platform.tenant_leases` and to `platform.operator_sessions`, insert on `platform.jobs`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
+| `axis_identity_reader` | `IdentityProvider:DatabaseConnectionString`. It reads Keycloak's `credential` table and nothing else, so `tenant backup` can write `realm.json`. |
+
+Keycloak creates its tables at its first start, so give `axis_identity_reader` its right after that,
+once, connected to `axis_identity`:
+
+```sql
+GRANT USAGE ON SCHEMA public TO axis_identity_reader;
+GRANT SELECT ON credential TO axis_identity_reader;
+```
+
+A later Keycloak upgrade that recreates the `credential` table drops the grant. Then the `realm` step of
+`tenant backup` fails until you grant it again.
 
 The names are examples. Create the tenant database roles through `tenant create`, not by hand.
 `tenant create` also creates each tenant's realm in
@@ -190,6 +203,7 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
 | `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
 | `IdentityProvider__AdminClientSecret` | admin, identity |
+| `IdentityProvider__DatabaseConnectionString` | admin |
 | `KC_DB_URL` | identity |
 | `KC_DB_USERNAME` | identity |
 | `KC_DB_PASSWORD` | identity |
@@ -204,6 +218,10 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
   [TLS](#tls). They name the database server as the hosts reach it, which is a name in the PostgreSQL
   certificate. The admin host records the host and port of `Admin__ConnectionString` as the tenant
   database server, so the server and the worker must reach it there too.
+- **The identity provider's read-only role.** `IdentityProvider__DatabaseConnectionString` names the
+  database `axis_identity` and the role `axis_identity_reader`, with `SSL Mode=VerifyFull`. The admin
+  host reads it only for `tenant backup`. You can write the file before Keycloak's first start and run
+  the grant of [the database roles](#database-roles) after it.
 - **Keycloak's database settings.** The three `KC_DB_*` files hold a JDBC URL such as
   `jdbc:postgresql://db.example.com:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt`,
   the user name and the password. Without `sslrootcert`, the PostgreSQL JDBC driver reads
@@ -269,8 +287,8 @@ Install in this order:
    client from the hosts you give it. The compose file points the admin host at
    `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell
    variable, and the admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is
-   in no command line. Every `admin` run needs that file, because Compose refuses to start a service
-   whose secret file is missing.
+   in no command line. Every `admin` run needs that file and the `IdentityProvider__DatabaseConnectionString`
+   file, because Compose refuses to start a service whose secret file is missing.
 5. Activate an application with `docker compose run --rm admin activate /apps/<folder>`. The
    activation copies the redirect addresses and mappers of the `axis` client to the client of each
    site, and it does not copy later changes until the next activation.
@@ -462,6 +480,17 @@ The `axis-identity` Secret holds the four settings of the identity provider, as 
 authority certificate with `sslrootcert=/db-ca/root.crt` when you set
 `identity.databaseAuthority.volume`.
 
+The cell backup CronJob also needs the connection of the read-only role `axis_identity_reader` of the
+identity provider's database, so every daily archive holds the tenant's realm. Keycloak creates its
+`credential` table at its first start, so give the role its `SELECT` after that, see
+[the database roles](#database-roles). Create it in its own Secret and set
+`secrets.identityCredentialsConnection`:
+
+```sh
+kubectl create secret generic axis-identity-reader \
+  --from-literal=IdentityProvider__DatabaseConnectionString='<connection string with SSL Mode=VerifyFull>'
+```
+
 To let Studio run test scenarios, add
 `--from-literal=Scenarios__ServerConnectionString='<connection string>'` to the same Secret, or to
 another one. Then set `secrets.scenarioServerConnection` and `studio.tests`, see the values table.
@@ -571,12 +600,13 @@ values schema rejects any field in a reference other than `name` and `key`.
 | Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set. In a cell also `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |
 | PgBouncer | `pgbouncerAuth` and `pgbouncerCertificate`, which no other pod mounts |
-| Cell backup CronJob | `platformSchemaConnection`, `platformSecretKey`, `backupStorageAccessKeyId` and `backupStorageSecretAccessKey`, and `cellBackupKey` read-only at `/cell-backup-key/key`, outside `/run/secrets` |
-| Cell restore-check CronJob | The backup CronJob's secrets, `adminConnection`, `identityAdminClientSecret`, and `scenarioServerConnection` when it is set |
+| Cell backup CronJob | `platformSchemaConnection`, `platformSecretKey`, `backupStorageAccessKeyId`, `backupStorageSecretAccessKey` and `identityCredentialsConnection`, and `cellBackupKey` read-only at `/cell-backup-key/key`, outside `/run/secrets` |
+| Cell restore-check CronJob | The backup CronJob's secrets except `identityCredentialsConnection`, `adminConnection`, `identityAdminClientSecret`, and `scenarioServerConnection` when it is set |
 
 So outside a cell no pod has an `Admin:ConnectionString`, and in a cell only the publisher and the
 restore-check CronJob have the admin role. Only those two, besides the identity provider, get
-`IdentityProvider__AdminClientSecret`, and only the two CronJobs get the storage credentials.
+`IdentityProvider__AdminClientSecret`, and only the two CronJobs get the storage credentials. The cell backup CronJob alone gets
+`identityCredentialsConnection`.
 
 ### Values
 
@@ -623,6 +653,7 @@ The values of the chart, with their defaults:
 | `secrets.backupStorageAccessKeyId` | key `Cell__BackupStorage__AccessKeyId` | Secret `name` and `key` of the access key id of the backup storage. The cell backup and cell restore-check CronJobs alone mount it. Required with `backup.bucket`. |
 | `secrets.backupStorageSecretAccessKey` | key `Cell__BackupStorage__SecretAccessKey` | Secret `name` and `key` of the secret access key of the backup storage. The cell backup and cell restore-check CronJobs alone mount it. Required with `backup.bucket`. |
 | `secrets.cellBackupKey` | key `cell-backup-key` | Secret `name` and `key` of the cell's backup key. The cell backup and cell restore-check CronJobs and, in a cell, the publisher alone mount it, at `/cell-backup-key/key`, and set `Cell__BackupKeyFile` to that path. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
+| `secrets.identityCredentialsConnection` | key `IdentityProvider__DatabaseConnectionString` | Secret `name` and `key` of `IdentityProvider:DatabaseConnectionString`, the connection of the read-only role of the identity provider's database. The cell backup CronJob alone mounts it, so `tenant backup` writes `realm.json` into every archive. Required with `backup.bucket`: rendering fails with a message that names it when the `name` is empty. |
 | `secrets.adminConnection` | key `Admin__ConnectionString` | Secret `name` and `key` of `Admin:ConnectionString`, the connection of the admin role. The publisher in a cell and the cell restore-check CronJob alone mount it. Required in a cell: rendering fails with a message that names it when the `name` is empty. |
 | `cell.pgbouncer.enabled` | `false` | `true` renders PgBouncer, see [PgBouncer](#pgbouncer). Rendering then fails with a message that names the value when `cell.id`, `cell.pgbouncer.databaseHost`, `cell.pgbouncer.authUser`, `secrets.pgbouncerAuth.name` or `secrets.pgbouncerCertificate.name` is empty. The schema rejects any field under `cell.pgbouncer` that this table does not list. |
 | `cell.pgbouncer.image` | the PgBouncer image that `PgBouncerServer.Image` pins | The whole image reference of PgBouncer. `image.registry` and `image.tag` do not apply to it. The pod runs as user 70 of that image, with a read-only root file system, and one replica. |
@@ -658,10 +689,10 @@ restore check. It has no Job for tenants and releases.
   `<release>-cell-backup` that runs `axis-admin cell backup` with the admin image every day at 01:00
   in `backup.timeZone`, see [backups in a cell](tenant-backup-and-restore.md#backups-in-a-cell). It
   never runs two backups at once and never retries, and Kubernetes stops the Job after 6 hours 15
-  minutes. It gets the platform schema connection, the installation key, the storage credentials and
-  the cell backup key from Secret references, and the storage settings from `backup.*`. The job needs
-  all five `Cell__BackupStorage__*` settings, so the chart requires the service URL and the region
-  too. The job has no Studio volume, so its archives hold no Studio files. The operator sets the
+  minutes. It gets the platform schema connection, the installation key, the storage credentials, the
+  identity provider's read-only connection and the cell backup key from Secret references, and the
+  storage settings from `backup.*`. The job needs all five `Cell__BackupStorage__*` settings, so the
+  chart requires the service URL and the region too. The job has no Studio volume, so its archives hold no Studio files. The operator sets the
   bucket's object lock in compliance mode for 30 days and its lifecycle rule that deletes an archive
   after 30 days, and the chart does not create or change the bucket.
 - **The cell restore-check CronJob.** In a cell with `backup.bucket` set, the chart also renders a

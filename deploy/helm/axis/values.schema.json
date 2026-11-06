@@ -230,7 +230,8 @@
         "pgbouncerCertificate": { "$ref": "#/definitions/tlsSecretReference" },
         "backupStorageAccessKeyId": { "$ref": "#/definitions/secretReference" },
         "backupStorageSecretAccessKey": { "$ref": "#/definitions/secretReference" },
-        "cellBackupKey": { "$ref": "#/definitions/secretReference" }
+        "cellBackupKey": { "$ref": "#/definitions/secretReference" },
+        "identityCredentialsConnection": { "$ref": "#/definitions/secretReference" }
       },
       "additionalProperties": false
     }
