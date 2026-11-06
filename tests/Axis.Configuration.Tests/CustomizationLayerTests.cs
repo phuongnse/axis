@@ -591,12 +591,12 @@ public sealed class CustomizationLayerTests
             .With("approvals/1.0.0/RequestContract.json", """
                 { "id": "5c1d3a0e-8a0f-4e57-9a43-1e0f6d0c2b71", "kind": "contract", "name": "RequestContract", "formatVersion": 1, "entity": "Request",
                   "lifecycle": { "field": "status",
-                    "states": [ { "name": "draft", "initial": true }, { "name": "submitted" } ],
-                    "transitions": [ { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "amount > 0" } ] } }
+                    "states": [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } } ],
+                    "transitions": [ { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "amount > 0" } ] } }
                 """)
             .With("approvals/1.0.0/TextsEn.json", """
                 { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "approvals.request": "Request" } }
+                  "texts": { "approvals.request": "Request", "approvals.point": "Point" } }
                 """);
 
     private static CompilationResult CompileAgainstActiveRelease(TemporaryFolder folder, TemporaryFolder modules)

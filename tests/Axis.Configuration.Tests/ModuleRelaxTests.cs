@@ -13,15 +13,15 @@ public sealed class ModuleRelaxTests
     private const string Submit = "Request/transitions/submit";
 
     private const string States = """
-        [ { "name": "draft", "initial": true, "deletable": true }, { "name": "submitted" }, { "name": "approved" } ]
+        [ { "name": "draft", "label": { "textKey": "approvals.point" }, "initial": true, "deletable": true }, { "name": "submitted", "label": { "textKey": "approvals.point" } }, { "name": "approved", "label": { "textKey": "approvals.point" } } ]
         """;
 
     private const string SubmitTransition = """
-        { "name": "submit", "from": ["draft"], "to": "submitted", "guard": "amount > 0" }
+        { "name": "submit", "label": { "textKey": "approvals.point" }, "from": ["draft"], "to": "submitted", "guard": "amount > 0" }
         """;
 
     private const string ApproveTransition = """
-        { "name": "approve", "from": ["submitted"], "to": "approved", "guard": "amount > 0" }
+        { "name": "approve", "label": { "textKey": "approvals.point" }, "from": ["submitted"], "to": "approved", "guard": "amount > 0" }
         """;
 
     [Fact]
@@ -219,7 +219,7 @@ public sealed class ModuleRelaxTests
 
     private const string Texts = """
         { "id": "c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5b6c", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-          "texts": { "approvals.slot": "Slot" } }
+          "texts": { "approvals.slot": "Slot", "approvals.point": "Point" } }
         """;
 
     private const string SubmittedSeed = """

@@ -38,6 +38,7 @@ identity, its main assembly and its operations. This example uses an illustrativ
 {
   "id": "purchasing-tools",
   "version": "1.0.0",
+  "label": "Purchasing tools",
   "assembly": "PurchasingTools.dll",
   "operations": [
     {
@@ -58,9 +59,10 @@ identity, its main assembly and its operations. This example uses an illustrativ
   `<id>/<operation>`.
 - **`version`.** A SemVer version in plain `major.minor.patch` form, such as
   `1.2.0`.
-- **`label`** _(planned for M31)_. The package's name for people, 1 to 100
-  characters and required, as a module's is, so Studio never names a package by
-  its id.
+- **`label`.** The package's name for people, 1 to 100 characters and
+  required, as a module's is, so Studio never names a package by its id. A
+  manifest without one is refused with `PackageManifestInvalid`, and the package
+  is not loaded.
 - **`assembly`.** The file name of the package's main assembly, in the
   package folder.
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no

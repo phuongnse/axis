@@ -7,6 +7,7 @@
   "validations": [
     {
       "name": "notOwnParent",
+      "label": { "textKey": "organization.department.validation.notOwnParent" },
       "expression": "parent == null or parent != id",
       "message": { "textKey": "organization.department.notOwnParent" },
       "field": "parent"

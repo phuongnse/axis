@@ -230,6 +230,7 @@ public sealed class PackageCatalog
         new(
             root.GetProperty("id").GetString()!,
             root.GetProperty("version").GetString()!,
+            root.GetProperty("label").GetString()!,
             root.GetProperty("assembly").GetString()!,
             [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)]);
 

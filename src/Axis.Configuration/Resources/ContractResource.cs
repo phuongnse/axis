@@ -42,6 +42,9 @@ public sealed record ContractEffectDefinition
 {
     public required string Name { get; init; }
 
+    /// <summary>The text that names the effect in words. Its key starts with the module id.</summary>
+    public TextReference? Label { get; init; }
+
     /// <summary>The name of the transition of the same contract that runs the effect.</summary>
     public required string On { get; init; }
 
@@ -64,6 +67,9 @@ public sealed record ContractValidationDefinition
 {
     /// <summary>The validation's name, unique in the contract ignoring letter case.</summary>
     public required string Name { get; init; }
+
+    /// <summary>The text that names the validation in words. Its key starts with the module id.</summary>
+    public TextReference? Label { get; init; }
 
     /// <summary>A boolean expression that must be true for the write.</summary>
     public required string Expression { get; init; }
@@ -117,6 +123,9 @@ public sealed record LifecycleStateDefinition
 {
     public required string Name { get; init; }
 
+    /// <summary>The text that names the state in words. Its key starts with the module id. A module's own state has one, and one that a layer adds may have none.</summary>
+    public TextReference? Label { get; init; }
+
     /// <summary>Whether a record may be created in this state.</summary>
     public bool? Initial { get; init; }
 
@@ -131,6 +140,9 @@ public sealed record LifecycleStateDefinition
 public sealed record LifecycleTransitionDefinition
 {
     public required string Name { get; init; }
+
+    /// <summary>The text that names the transition in words. Its key starts with the module id. A module's own transition has one, and one that a layer adds may have none.</summary>
+    public TextReference? Label { get; init; }
 
     /// <summary>The states the transition leaves, at least one.</summary>
     public required IReadOnlyList<string> From { get; init; }

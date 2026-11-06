@@ -39,6 +39,11 @@
     "organization.actions.new": "New",
     "organization.actions.open": "Open",
     "organization.roles.admin": "Organization administrator",
-    "organization.roles.member": "Organization member"
+    "organization.roles.member": "Organization member",
+    "organization.department.validation.notOwnParent": "Not its own parent",
+    "organization.employee.validation.notOwnManager": "Not their own manager",
+    "organization.employee.validation.notOwnDelegate": "Not their own delegate",
+    "organization.employee.validation.delegateHasDates": "Delegate needs both dates",
+    "organization.employee.validation.delegateDatesInOrder": "Delegation dates in order"
   }
 }

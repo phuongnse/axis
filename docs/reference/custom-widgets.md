@@ -21,6 +21,7 @@ it has no `assembly`. This example uses an illustrative package, `asset-maps`:
 {
   "id": "asset-maps",
   "version": "0.3.0",
+  "label": "Asset maps",
   "widgets": [
     {
       "name": "floorPlan",

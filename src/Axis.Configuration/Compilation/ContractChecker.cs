@@ -22,7 +22,10 @@ namespace Axis.Configuration.Compilation;
 /// expression in the same scope as a guard. The effects are checked too: each name is unique, ignoring letter
 /// case, <c>on</c> names a transition of the contract exactly, <c>create.entity</c> is a plain name of a root
 /// entity of the module, and each <c>values</c> key is a writable field of it with an expression that fits the
-/// field in the effect scope. Every problem of a contract is reported in one pass.
+/// field in the effect scope. Each state, transition, core validation and effect of the module has a label,
+/// a text reference whose key starts with the module's prefix and is held by some locale. A state or transition
+/// that a layer added needs no label, and its label key needs no prefix. Every problem of a contract is reported
+/// in one pass.
 /// </summary>
 internal static class ContractChecker
 {
@@ -31,7 +34,9 @@ internal static class ContractChecker
     /// owner of a child entity, or gives null for a root entity. <paramref name="rulesFor"/> and
     /// <paramref name="modulesFor"/> give the rules and the declared module ids a contract's expressions see.
     /// <paramref name="moduleSlots"/> holds the role slot names of each pinned module, and
-    /// <paramref name="filterRulesFor"/> gives the rules a ceiling filter sees.
+    /// <paramref name="filterRulesFor"/> gives the rules a ceiling filter sees. A label is looked up in
+    /// <paramref name="labelTexts"/>, which collects no references. A missing label is reported only when
+    /// <paramref name="requireLabels"/> is true.
     /// </summary>
     public static Dictionary<string, ContractResource> Check(
         IReadOnlyList<ModuleContract> contracts,
@@ -42,6 +47,8 @@ internal static class ContractChecker
         Func<Resource, IReadOnlySet<string>> modulesFor,
         IReadOnlyDictionary<string, IReadOnlySet<string>> moduleSlots,
         Func<Resource, IReadOnlyList<ExpressionRule>> filterRulesFor,
+        ReferenceIndexBuilder labelTexts,
+        bool requireLabels,
         List<Diagnostic> diagnostics)
     {
         var checkedContracts = new Dictionary<string, ContractResource>(StringComparer.OrdinalIgnoreCase);
@@ -51,22 +58,24 @@ internal static class ContractChecker
             var before = diagnostics.Count;
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, contract.File, path, contract.Id));
+            void CheckLabel(string kind, string name, TextReference? label, string path, bool added) =>
+                CheckPointLabel(moduleId, contract, kind, name, label, path, added, requireLabels, labelTexts, diagnostics);
 
             if (CheckEntity(moduleId, contract, findEntity, ownerOf, unloadedEntityNames, firstFileByEntity, Report) is { } entity)
             {
                 if (contract.Lifecycle is { } lifecycle)
                 {
-                    CheckLifecycle(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, Report);
+                    CheckLifecycle(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, CheckLabel, Report);
                 }
 
                 if (contract.Validations is { } validations)
                 {
-                    CheckValidations(moduleId, contract, validations, entity, findEntity, rulesFor, modulesFor, Report);
+                    CheckValidations(moduleId, contract, validations, entity, findEntity, rulesFor, modulesFor, CheckLabel, Report);
                 }
 
                 if (contract.Effects is { } effects)
                 {
-                    CheckEffects(moduleId, contract, effects, entity, findEntity, ownerOf, unloadedEntityNames, rulesFor, modulesFor, Report);
+                    CheckEffects(moduleId, contract, effects, entity, findEntity, ownerOf, unloadedEntityNames, rulesFor, modulesFor, CheckLabel, Report);
                 }
 
                 if (contract.Ceiling is { } ceiling)
@@ -91,6 +100,51 @@ internal static class ContractChecker
         return checkedContracts;
     }
 
+    /// <summary>
+    /// Checks the label of a point of a contract. A point of the module has a label when <paramref name="requireLabels"/>,
+    /// and its key starts with the module's prefix. An added point is not a point of the module, so it needs neither,
+    /// but a label it has must still resolve.
+    /// </summary>
+    private static void CheckPointLabel(
+        string moduleId,
+        ContractResource contract,
+        string kind,
+        string name,
+        TextReference? label,
+        string path,
+        bool added,
+        bool requireLabels,
+        ReferenceIndexBuilder labelTexts,
+        List<Diagnostic> diagnostics)
+    {
+        if (label is null)
+        {
+            if (!added && requireLabels)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.MissingContractLabel,
+                    $"The {kind} '{name}' has no label. Each state, transition, core validation and effect of a contract needs a 'label' text reference.",
+                    contract.File,
+                    path,
+                    contract.Id));
+            }
+
+            return;
+        }
+
+        if (!added && !label.TextKey.StartsWith($"{moduleId}.", StringComparison.Ordinal))
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.ModuleTextKeyWithoutPrefix,
+                $"The text key '{label.TextKey}' lacks the prefix '{moduleId}.'. Start each text key of the module with it.",
+                contract.File,
+                $"{path}/label/textKey",
+                contract.Id));
+        }
+
+        ApplicationCompiler.CheckTextKey(label, contract, $"{path}/label", labelTexts, diagnostics);
+    }
+
     private static void CheckEffects(
         string moduleId,
         ContractResource contract,
@@ -101,6 +155,7 @@ internal static class ContractChecker
         IReadOnlySet<string> unloadedEntityNames,
         Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
         Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, TextReference?, string, bool> checkLabel,
         Action<string, string, string> report)
     {
         var transitions = contract.Lifecycle?.Transitions ?? [];
@@ -110,6 +165,7 @@ internal static class ContractChecker
         {
             var effect = effects[index];
             var path = $"/effects/{index.ToString(CultureInfo.InvariantCulture)}";
+            checkLabel("effect", effect.Name, effect.Label, path, false);
 
             if (!firstIndexByName.TryAdd(effect.Name, index))
             {
@@ -371,6 +427,7 @@ internal static class ContractChecker
         Func<string, EntityResource?> findEntity,
         Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
         Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, TextReference?, string, bool> checkLabel,
         Action<string, string, string> report)
     {
         var field = ApplicationCompiler.FindField(entity, lifecycle.Field);
@@ -383,8 +440,8 @@ internal static class ContractChecker
                 "/lifecycle/field");
         }
 
-        CheckStates(contract, lifecycle, problem is null ? field!.Values ?? [] : null, report);
-        CheckTransitions(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, report);
+        CheckStates(contract, lifecycle, problem is null ? field!.Values ?? [] : null, checkLabel, report);
+        CheckTransitions(moduleId, contract, lifecycle, entity, findEntity, rulesFor, modulesFor, checkLabel, report);
     }
 
     /// <summary>Says why a field cannot hold a state, or gives null when it can.</summary>
@@ -404,13 +461,16 @@ internal static class ContractChecker
         ContractResource contract,
         ContractLifecycleDefinition lifecycle,
         IReadOnlyList<string>? values,
+        Action<string, string, TextReference?, string, bool> checkLabel,
         Action<string, string, string> report)
     {
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < lifecycle.States.Count; index++)
         {
-            var name = lifecycle.States[index].Name;
+            var state = lifecycle.States[index];
+            var name = state.Name;
             var path = $"/lifecycle/states/{index}/name";
+            checkLabel("state", name, state.Label, $"/lifecycle/states/{index}", contract.AddedStates.Contains(name));
             if (!firstIndexByName.TryAdd(name, index))
             {
                 report(
@@ -456,6 +516,7 @@ internal static class ContractChecker
         Func<string, EntityResource?> findEntity,
         Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
         Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, TextReference?, string, bool> checkLabel,
         Action<string, string, string> report)
     {
         var stateNames = lifecycle.States.Select(state => state.Name).ToHashSet(StringComparer.Ordinal);
@@ -466,6 +527,7 @@ internal static class ContractChecker
         {
             var transition = lifecycle.Transitions[index];
             var path = $"/lifecycle/transitions/{index}";
+            checkLabel("transition", transition.Name, transition.Label, path, contract.AddedTransitions.Contains(transition.Name));
 
             if (!firstIndexByName.TryAdd(transition.Name, index))
             {
@@ -547,6 +609,7 @@ internal static class ContractChecker
         Func<string, EntityResource?> findEntity,
         Func<Resource, IReadOnlyList<ExpressionRule>> rulesFor,
         Func<Resource, IReadOnlySet<string>> modulesFor,
+        Action<string, string, TextReference?, string, bool> checkLabel,
         Action<string, string, string> report)
     {
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -555,6 +618,7 @@ internal static class ContractChecker
         {
             var validation = validations[index];
             var path = $"/validations/{index.ToString(CultureInfo.InvariantCulture)}";
+            checkLabel("core validation", validation.Name, validation.Label, path, false);
 
             if (!firstIndexByName.TryAdd(validation.Name, index))
             {

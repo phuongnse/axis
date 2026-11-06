@@ -6,7 +6,7 @@
   "entity": "Entry",
   "lifecycle": {
     "field": "status",
-    "states": [{ "name": "open", "initial": true }, { "name": "closed" }],
-    "transitions": [{ "name": "close", "from": ["open"], "to": "closed" }]
+    "states": [{ "name": "open", "label": { "textKey": "ledgers.entry.state.open" }, "initial": true }, { "name": "closed", "label": { "textKey": "ledgers.entry.state.closed" } }],
+    "transitions": [{ "name": "close", "label": { "textKey": "ledgers.entry.transition.close" }, "from": ["open"], "to": "closed" }]
   }
 }
