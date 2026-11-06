@@ -55,25 +55,33 @@ A revision is one commit on the repository's `main` branch, and every change to 
 - **A failed revision.** When recording a revision fails, the server logs a warning and the write
   still succeeds, because its files are already written. The next write records the missed change as
   "Outside change".
-- **Versions.** _(planned for M35)_ A resource's `version` is the one the authoring API gives, see
-  [versions](authoring.md#versions). A draft records it for each resource it reads.
+- **Versions.** A resource's `version` is the one the authoring API gives, see
+  [versions](authoring.md#versions). A draft records it for each resource it reads or changes.
 
 ## Drafts
-
-_(planned for M35)_
 
 A draft is a branch where an authoring request makes its change, apart from the working folder and
 from every other draft.
 
 - **A branch.** A draft is a branch `drafts/<draft id>` that starts at the `main` commit of the time it
-  was created. The working folder is never checked out to it.
+  was created. Creating a draft first records any outside change in the folder, so the draft starts at
+  what the folder holds. The working folder is never checked out to it.
 - **Writes.** Each tool write commits to the branch from memory, as a tree of the changed files, so
-  writing a draft never touches the working folder or another draft.
+  writing a draft never touches the working folder or another draft. A write holds the full content of
+  a resource. It replaces the file of the resource the draft has, and a new resource goes where a
+  create puts it. The manifest cannot be deleted.
 - **What it records.** For each resource it reads or changes, the version that resource had on `main`
-  when the draft first used it.
-- **Diff.** The diff of a draft is the difference between its branch and the `main` commit it started
+  when the draft first used it. A resource `main` lacks is recorded as absent. Listing resources
+  records nothing, so an unrelated change on `main` is not a conflict.
+- **The record.** A draft's record holds its owner, the commit it started at, its creation time and
+  the recorded versions. It is kept in the same repository as the branch, under `refs/axis/drafts/<draft id>`.
+- **The owner.** A draft belongs to the person who made it. For anyone else it does not exist and
+  answers "not found", as an unknown id does.
+- **Diff.** _(planned for M35)_ The diff of a draft is the difference between its branch and the `main` commit it started
   from, resource by resource, see `diff_draft` in [the MCP server](mcp-server.md#tools).
-- **Ending.** An accepted or dropped draft's branch is deleted. Its accept stays as a revision.
+- **Dropping.** Dropping a draft deletes its branch and its record.
+- **Ending by accept.** _(planned for M35)_ An accepted draft's branch is deleted, and its accept stays
+  as a revision.
 
 ## Accepting a draft
 

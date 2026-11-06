@@ -358,7 +358,7 @@ internal static class StudioWrites
         }
 
         File.Delete(target);
-        revisions?.Record($"Delete {current.Kind} {current.Name ?? current.File}");
+        revisions?.Record(ResourceSummary("Delete", current));
         return new StudioWriteOutcome(null, null);
     }
 
@@ -564,7 +564,7 @@ internal static class StudioWrites
         }
 
         return string.Equals(version, current.Version, StringComparison.Ordinal)
-            ? new StudioCheck(null, target, Serialize(patchedObject), $"Change {current.Kind} {current.Name ?? current.File}")
+            ? new StudioCheck(null, target, Serialize(patchedObject), ResourceSummary("Change", current))
             : StudioCheck.Refused(StudioWriteRefusal.Stale);
     }
 
@@ -587,8 +587,12 @@ internal static class StudioWrites
     }
 
     // "Create {kind} {name}" from the content of a new resource, with its file when it has no name.
-    private static string CreateSummary(JsonObject content, string file) =>
+    internal static string CreateSummary(JsonObject content, string file) =>
         $"Create {StringValue(content, "kind") ?? "resource"} {StringValue(content, "name") ?? file}";
+
+    // "{verb} {kind} {name}" of an existing resource, with its file when it has no name.
+    internal static string ResourceSummary(string verb, StudioFile resource) =>
+        $"{verb} {resource.Kind} {resource.Name ?? resource.File}";
 
     // "Change layer {module}/{name}" for a saved layer and "Reset layer {module}/{name}" for a deleted one.
     private static string LayerSummary(string moduleId, string name, JsonObject? changes) =>
@@ -625,7 +629,7 @@ internal static class StudioWrites
     private static string Version(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     // The held lock, or null when it cannot be taken.
-    private static async Task<IAsyncDisposable?> TryTakeAsync(IStudioWriteLock writeLock, string folder, CancellationToken cancellationToken)
+    internal static async Task<IAsyncDisposable?> TryTakeAsync(IStudioWriteLock writeLock, string folder, CancellationToken cancellationToken)
     {
         try
         {
