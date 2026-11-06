@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { fetchUserRoles, inviteUser, type RoleChange, type UserRoles } from '../platform/users'
 
 /** The fields of the form. */
@@ -36,6 +37,7 @@ export function InviteUserModal({
   onReload: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<InviteFields>()
   const [roles, setRoles] = useState<Pick<UserRoles, 'applications' | 'platformRoles'>>()
   const [rolesFailed, setRolesFailed] = useState(false)
@@ -115,6 +117,7 @@ export function InviteUserModal({
     <>
       <Modal
         open
+        width={size.dialog.medium}
         title={t('shell.users.invite.title')}
         okText={t('shell.users.invite.send')}
         cancelText={t('shell.users.roles.cancel')}
@@ -178,6 +181,7 @@ export function InviteUserModal({
       </Modal>
       <Modal
         open={pending !== null}
+        width={size.dialog.small}
         title={t('shell.users.invite.confirm')}
         okText={t('shell.users.invite.send')}
         cancelText={t('shell.users.roles.cancel')}

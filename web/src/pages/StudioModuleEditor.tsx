@@ -33,6 +33,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { isObject } from '../platform/scenarioSteps'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
 import { SchemaForm } from './SchemaForm'
@@ -95,6 +96,7 @@ export function StudioModuleEditor({
   onWritten: (diagnostics: StudioDiagnostic[], layer: { added?: StudioResourceItem; removedId?: string }) => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { generation, reconnecting, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<Loaded>()
   const loadedRef = useRef<Loaded>(undefined)
@@ -509,6 +511,7 @@ export function StudioModuleEditor({
       </AxisActionRow>
       <Modal
         open={resetOpen}
+        width={size.dialog.small}
         title={t('shell.studio.module.resetAllConfirm')}
         okText={t('shell.studio.module.resetAll')}
         okButtonProps={{ danger: true }}

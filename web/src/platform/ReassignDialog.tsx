@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RecordProblem } from './records'
 import { searchUsers, type ReassignBody, type ReassignRole, type UserOption } from './tasks'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 interface ReassignDialogProps {
   roles: readonly ReassignRole[]
@@ -39,6 +40,7 @@ type FieldErrors = Parameters<FormInstance<ReassignValues>['setFields']>[0]
  */
 export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<ReassignValues>()
   const kind = Form.useWatch('kind', form)
   const [users, setUsers] = useState<UserOption[]>([])
@@ -113,6 +115,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
   return (
     <Modal
       open
+      width={size.dialog.medium}
       title={t('shell.task.reassignTitle')}
       okText={t('shell.task.reassignSend')}
       cancelText={t('shell.task.reassignCancel')}

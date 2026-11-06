@@ -2,6 +2,7 @@ import { Alert, Flex, InputNumber, Modal, Radio, Typography } from 'antd'
 import { useState } from 'react'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { currentChoice, quotaChanges, type QuotaChoice, type QuotaChoiceKind } from './cellQuotaChoices'
 
 interface CellTenantQuotasDialogProps {
@@ -19,6 +20,7 @@ interface CellTenantQuotasDialogProps {
  */
 export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onClose }: CellTenantQuotasDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [choices, setChoices] = useState<Record<string, QuotaChoice>>(() =>
     Object.fromEntries(Object.entries(quotas).map(([key, quota]) => [key, currentChoice(quota)])),
   )
@@ -57,6 +59,7 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
   return (
     <Modal
       open
+      width={size.dialog.medium}
       data-testid="cell-tenant-quotas-dialog"
       title={t('shell.cell.tenant.setQuotasTitle').replace('{tenant}', tenant)}
       okText={t('shell.cell.tenant.setQuotasOk')}

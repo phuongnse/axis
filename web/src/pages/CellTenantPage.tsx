@@ -20,6 +20,7 @@ import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
@@ -80,6 +81,7 @@ const actionTexts = {
  */
 export function CellTenantPage() {
   const t = useText()
+  const { size } = useDesignTokens()
   const { locale } = usePlatform().current
   const { onRefused } = useCellConsole()
   const { id = '' } = useParams()
@@ -374,6 +376,7 @@ export function CellTenantPage() {
       {confirming && (
         <Modal
           open
+          width={size.dialog.small}
           data-testid="cell-tenant-confirm"
           title={t(actionTexts[confirming].confirm).replace('{tenant}', id)}
           okText={t(actionTexts[confirming].ok)}
@@ -409,6 +412,7 @@ export function CellTenantPage() {
       {downloading && ready && (
         <Modal
           open
+          width={size.dialog.small}
           data-testid="cell-tenant-download-warning"
           title={t('shell.cell.tenant.downloadConfirm').replace('{tenant}', id)}
           okText={t('shell.cell.tenant.downloadOk')}

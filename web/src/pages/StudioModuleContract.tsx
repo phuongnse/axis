@@ -18,6 +18,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { type ContractView, contractView } from './contractView'
 import {
   moduleIndex,
@@ -63,6 +64,7 @@ const RelaxContextValue = createContext<RelaxContext | undefined>(undefined)
 /** A named point with its Relax button, or its reason and Undo relax button when it is relaxed. */
 function Point({ value }: { value: string }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const relax = useContext(RelaxContextValue)
   const [open, setOpen] = useState(false)
@@ -158,6 +160,7 @@ function Point({ value }: { value: string }) {
       )}
       <Modal
         open={open}
+        width={size.dialog.small}
         title={t('shell.studio.contract.relaxTitle')}
         okText={t('shell.studio.contract.relax')}
         cancelText={t('shell.studio.cancel')}
@@ -244,6 +247,7 @@ function AddStateDialog({
   onClose: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [name, setName] = useState('')
   const [initial, setInitial] = useState(false)
   const [deletable, setDeletable] = useState(false)
@@ -267,6 +271,7 @@ function AddStateDialog({
   return (
     <Modal
       open={open}
+      width={size.dialog.medium}
       title={t('shell.studio.contract.addState')}
       okText={t('shell.studio.addItem')}
       cancelText={t('shell.studio.cancel')}
@@ -310,6 +315,7 @@ function AddTransitionDialog({
   onClose: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [name, setName] = useState('')
   const [from, setFrom] = useState<string[]>([])
   const [to, setTo] = useState<string>()
@@ -335,6 +341,7 @@ function AddTransitionDialog({
   return (
     <Modal
       open={open}
+      width={size.dialog.medium}
       title={t('shell.studio.contract.addTransition')}
       okText={t('shell.studio.addItem')}
       cancelText={t('shell.studio.cancel')}

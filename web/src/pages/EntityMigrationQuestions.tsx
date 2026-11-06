@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 
 /** The answers so far, with a `skip` for each question that the earlier answers make unnecessary. */
 function advance(questions: FieldQuestion[], answers: FieldAnswer[]): FieldAnswer[] {
@@ -30,6 +31,7 @@ export function EntityMigrationQuestions({
   onCancel: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [answers, setAnswers] = useState<FieldAnswer[]>(() => advance(questions, []))
   const question = questions[answers.length]
 
@@ -53,7 +55,7 @@ export function EntityMigrationQuestions({
   return (
     <Modal
       open
-      centered
+      width={size.dialog.small}
       title={t(rename ? 'shell.studio.entity.migration.renameTitle' : 'shell.studio.entity.migration.removeTitle')}
       onCancel={onCancel}
       footer={
@@ -97,6 +99,7 @@ function ExpressionQuestion({
   onCancel: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [value, setValue] = useState('')
   const convert = question.type === 'convert'
   const hint = !convert
@@ -110,7 +113,7 @@ function ExpressionQuestion({
   return (
     <Modal
       open
-      centered
+      width={size.dialog.small}
       title={t(convert ? 'shell.studio.entity.migration.convertTitle' : 'shell.studio.entity.migration.fillTitle')}
       onCancel={onCancel}
       footer={

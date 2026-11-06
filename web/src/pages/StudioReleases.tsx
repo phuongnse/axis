@@ -6,6 +6,7 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { releaseList, releasePublisher, type StudioReleaseListRow, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 
 /** The Live tag of the release that runs, in the release list and on the release page's heading. */
@@ -31,9 +32,11 @@ export function StudioActivateDialog({
   onCancel: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   return (
     <Modal
       open={release !== null}
+      width={size.dialog.small}
       title={release !== null && t('shell.studio.activate.title').replace('{release}', String(release))}
       okText={t('shell.studio.activate.confirm')}
       cancelText={t('shell.studio.cancel')}

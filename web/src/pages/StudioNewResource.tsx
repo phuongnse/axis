@@ -12,6 +12,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { kindGroupNames, kindSingular, studioKinds } from '../platform/studioKinds'
 import { createStarter, starterKinds, textResourceName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 
 /** The locale a new text resource copies when the application has no site. */
 const fallbackLocale = 'en'
@@ -41,6 +42,7 @@ export function StudioNewResource({
   onCreated: (item: StudioResourceItem, diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [open, setOpen] = useState(false)
   const [chosenKind, setKind] = useState<string | undefined>(fixedKind)
@@ -112,6 +114,7 @@ export function StudioNewResource({
       </AxisButton>
       <Modal
         open={open}
+        width={size.dialog.medium}
         title={t(
           fixedKind === undefined
             ? 'shell.studio.newResource.title'

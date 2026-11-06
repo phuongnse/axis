@@ -1,8 +1,9 @@
-import { act, render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { Modal, theme } from 'antd'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { sizeTokens } from './designTokens'
 import { ThemeModeProvider } from './theme'
-import { useThemeMode } from './themeMode'
+import { useDesignTokens, useThemeMode } from './themeMode'
 import { reducedMotionQuery } from './useReducedMotion'
 import { darkSchemeQuery } from './useSystemThemeMode'
 
@@ -209,6 +210,15 @@ describe('ThemeModeProvider and reduced motion', () => {
   })
 })
 
+function SizedDialog({ name }: { name: 'small' | 'medium' | 'large' }) {
+  const { size } = useDesignTokens()
+  return (
+    <Modal open width={size.dialog[name]}>
+      x
+    </Modal>
+  )
+}
+
 describe('a dialog under the theme provider', () => {
   it('draws its Cancel as a text button beside a solid OK', () => {
     render(
@@ -221,5 +231,35 @@ describe('a dialog under the theme provider', () => {
 
     expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('ant-btn-variant-text')
     expect(screen.getByRole('button', { name: /ok/i })).toHaveClass('ant-btn-variant-solid')
+  })
+
+  it.each(['small', 'medium', 'large'] as const)('takes the %s dialog width token', (name) => {
+    render(
+      <ThemeModeProvider>
+        <SizedDialog name={name} />
+      </ThemeModeProvider>,
+    )
+
+    expect(document.querySelector<HTMLElement>('.ant-modal')!.style.width).toBe(`${sizeTokens.dialog[name]}px`)
+  })
+
+  it('opens centred within the window margins, with its body scrolling and its title and buttons outside the body', () => {
+    render(
+      <ThemeModeProvider>
+        <Modal open title="Pick">
+          x
+        </Modal>
+      </ThemeModeProvider>,
+    )
+
+    const body = document.querySelector<HTMLElement>('.ant-modal-body')!
+    expect(document.querySelector('.ant-modal-wrap')).toHaveClass('ant-modal-centered')
+    expect(document.querySelector<HTMLElement>('.ant-modal')!.style.maxWidth).toBe('calc(100vw - 64px)')
+    expect(document.querySelector<HTMLElement>('.ant-modal-container')!.style.maxHeight).toBe('calc(100vh - 64px)')
+    expect(body.style.overflowY).toBe('auto')
+    expect(within(body).queryByText('x')).not.toBeNull()
+    expect(within(body).queryByRole('button', { name: /ok/i })).toBeNull()
+    expect(within(body).queryByRole('button', { name: /cancel/i })).toBeNull()
+    expect(body.querySelector('.ant-modal-title')).toBeNull()
   })
 })

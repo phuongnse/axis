@@ -155,17 +155,16 @@ A thing opens at one of three levels, chosen by what the person does, never by t
 
 ## Dialogs
 
-_(planned for M31)_
-
 These rules hold for every dialog, through the shared `ConfigProvider`.
 
 - **Three sizes, by what a dialog holds:** `small` for a confirmation or one question, `medium` for a
   short form of two to six fields, and `large` for content that needs the width, such as a list to
   choose from or an import's preview. There is no larger size, because what needs more is a page. At
-  narrow width every dialog takes the width less the page margin. The size is a token that a dialog
-  names, never a width of its own.
-- **Its height.** A dialog is as tall as its content, at most the window less its margins. Its body
-  scrolls while its title and buttons stay.
+  narrow width every dialog takes the window's width less its `spacing-xl` margins. The size is a
+  token that a dialog names, never a width of its own. A Vitest test fails on a dialog that names no
+  size token.
+- **Its place and height.** A dialog opens centred in the window and is as tall as its content, at
+  most the window less its `spacing-xl` margins. Its body scrolls while its title and buttons stay.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
