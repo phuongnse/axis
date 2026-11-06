@@ -5,7 +5,6 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
-  fetchCellJob,
   fetchCellJobs,
   fetchCellTenant,
   queueCellTenantJob,
@@ -18,6 +17,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
 import { useText } from '../platform/texts'
+import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
 import { CellTenantHostDialog } from './CellTenantHostDialog'
@@ -27,9 +27,6 @@ import { NotFoundPage } from './NotFoundPage'
 interface QuotaRow extends CellQuota {
   key: string
 }
-
-/** How long the page waits between two checks of a queued or running job. */
-const pollDelay = 2000
 
 /** The texts of each action, by their full keys. */
 const actionTexts = {
@@ -111,45 +108,14 @@ export function CellTenantPage() {
     return () => controller.abort()
   }, [id, onRefused, reload])
 
-  useEffect(() => {
-    if (!following) {
-      return
-    }
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    async function check(jobId: string) {
-      let next: CellJob | undefined
-      try {
-        const result = await fetchCellJob(jobId, controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        if (result.kind !== 'ok') {
-          onRefused(result.kind)
-          return
-        }
-        next = result.value
-        setJobs((current) => current?.map((item) => (item.id === jobId ? result.value : item)))
-      } catch (error: unknown) {
-        if (controller.signal.aborted) {
-          return
-        }
-        console.warn('Reading the cell job failed', error)
-      }
-      // A failed read tries again, like a running job.
-      if (!next || next.state === 'queued' || next.state === 'running') {
-        timer = setTimeout(() => void check(jobId), pollDelay)
-      } else {
-        setFollowing(null)
-        setReload((count) => count + 1)
-      }
-    }
-    void check(following)
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [following, onRefused])
+  useFollowCellJob(following, {
+    onJob: (job) => setJobs((current) => current?.map((item) => (item.id === job.id ? job : item))),
+    onEnd: () => {
+      setFollowing(null)
+      setReload((count) => count + 1)
+    },
+    onRefused,
+  })
 
   if (tenant === null) {
     return <NotFoundPage />

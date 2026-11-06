@@ -35,9 +35,9 @@ namespace Axis.Admin;
 /// runs in its own temporary database on <c>Scenarios:ServerConnectionString</c>, for at most the publisher's test limit for each application, and writes a
 /// <c>scenario &lt;name&gt; passed</c> or <c>failed</c> line. A compile error or a failed scenario fails the check, and a tenant with an application but no
 /// scenario server fails it with <c>AXC0217</c>. A tenant without Studio applications needs no scenario server. A message names a table or a number, never a row or a username. The scratch tenant is removed at the end, whatever the result, with
-/// <see cref="ScratchTenantRemoval"/>, and the archive folder is deleted. The result goes to <see cref="AxisMetrics.BackupRestoreCheck"/>, tagged with
+/// <see cref="ScratchTenantRemoval"/>, and the archive folder is deleted. The result is stored as a row of <c>platform.restore_checks</c> with the time the run started, goes to <see cref="AxisMetrics.BackupRestoreCheck"/>, tagged with
 /// the source tenant and exported over OTLP when an OTLP endpoint is set, and to the output. Exit 0 means that the check passed, 1 that any step after
-/// the pick failed or that no tenant has an archive of today or yesterday, and 2 that nothing ran: arguments, outside a cell, or a missing setting or
+/// the pick failed, that the row could not be stored or that no tenant has an archive of today or yesterday, and 2 that nothing ran: arguments, outside a cell, or a missing setting or
 /// <c>pg_restore</c>, an invalid release or scenario server setting, or an OTLP endpoint that is not <c>https</c> outside Development.
 /// </summary>
 internal static partial class CellRestoreCheck
@@ -179,7 +179,7 @@ internal static partial class CellRestoreCheck
 
         var scratch = $"{ScratchTenantRemoval.IdPrefix}{now.ToString("yyyyMMdd", CultureInfo.InvariantCulture)}";
 
-        // The only audit record of the run: the result is not known yet, so it goes to the metric and the output.
+        // The only audit record of the run: the result is not known yet, so it goes to the stored row, the metric and the output.
         var audit = new TenantAudit(run.Command.Name, platformConnection);
         if (!await audit.WriteAsync(source.Tenant, output, cancellationToken, [$"tenant: {scratch}"]))
         {
@@ -209,9 +209,23 @@ internal static partial class CellRestoreCheck
             passed &= await RemoveAsync(removal, scratch, output);
         }
 
+        // Like the removal above, the store ignores the token of the run, so a cancel does not lose the result.
+        var stored = true;
+        try
+        {
+            await using var platform = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnection).Options);
+            platform.RestoreChecks.Add(new RestoreCheckRow { Id = Guid.CreateVersion7(), RanAt = new DateTimeOffset(now, TimeSpan.Zero), TenantId = source.Tenant, Passed = passed });
+            await platform.SaveChangesAsync(CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            stored = false;
+            output.WriteLine($"{source.Tenant} record failed: {TenantDatabaseSteps.Safe(exception)}");
+        }
+
         AxisMetrics.RecordBackupRestoreCheck(source.Tenant, passed);
         output.WriteLine($"{source.Tenant} restore-check {(passed ? "passed" : "failed")}");
-        return passed ? 0 : 1;
+        return passed && stored ? 0 : 1;
     }
 
     // Picks a tenant at random from those with an archive of today or yesterday, a backup key and no preview, and its newest archive.

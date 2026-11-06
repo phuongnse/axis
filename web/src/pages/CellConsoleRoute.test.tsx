@@ -18,7 +18,7 @@ const site: SiteMetadata = {
   cellConsole: true,
 }
 
-const cell = { id: 'vn-1', region: 'vn', tenants: 12, cap: 50 }
+const cell = { id: 'vn-1', region: 'vn', tenants: 12, cap: 50, restoreCheck: null }
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })

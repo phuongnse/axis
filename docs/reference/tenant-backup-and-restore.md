@@ -458,8 +458,8 @@ no argument and runs only in a cell. It does these steps:
    `cell restore-check failed: no tenant has an archive of today or yesterday`, records no point, writes
    no audit record and exits `1`.
 2. **Audit.** It writes one platform audit record for the source tenant, before the first change. The
-   record lists `tenant: <scratch tenant id>` and does not hold the result, which goes to the metric
-   and the output.
+   record lists `tenant: <scratch tenant id>` and does not hold the result, which goes to the stored
+   row, the metric and the output.
 3. **Clean up.** It removes every `restore-check-*` tenant that an earlier run left behind. It finds them
    by their directory rows and their `axis_restore-check-*` databases, and always removes today's id.
 4. **Download.** It downloads the archive to a folder that only its owner can use, and deletes the
@@ -478,12 +478,13 @@ no argument and runs only in a cell. It does these steps:
    below.
 8. **Remove.** Whatever the result, it removes the scratch tenant at once, with no grace window: its
    database, roles, realm, keys and Studio folder.
-9. **Result.** It records the gauge `axis.backup.restore_check`, `1` for a pass and `0` for a failure,
+9. **Result.** It stores one row in `platform.restore_checks` with the time the run started, the source
+   tenant and whether the check passed. It records the gauge `axis.backup.restore_check`, `1` for a pass and `0` for a failure,
    with the tag `axis.tenant` naming the source tenant, and exports it over OTLP as
    `axis.backup.last_success` is, see [telemetry export](host-settings.md#telemetry-export). Any failure
    after the pick, also a refused restore, a failed download, a compile error, a failed scenario of an
    application or a scratch tenant that cannot be removed, records `0` and exits `1`. A pass records `1`
-   and exits `0`.
+   and exits `0`, unless the row cannot be stored, which also exits `1` and still records the gauge.
 
 - **New user ids.** The users of `realm.json` and their credentials get new ids from the identity
   provider. The ids of a user and of a credential are unique across all realms, so importing them while
@@ -508,9 +509,8 @@ no argument and runs only in a cell. It does these steps:
   `<scratch> users failed: the archive holds no realm.json`, for each
   application `<scratch> version ok`, `<scratch> scenario <name> passed|failed: <message>` for each
   scenario and `<scratch> test ok|failed: <message>`, `<scratch> cleanup ok|failed: <message>`,
-  `<scratch> remove ok|failed: <message>` and last `<source> restore-check passed|failed`. No line holds
-  a row or a username.
-- **Shown on the console** _(planned for M31)_. The [cell console](cell-console.md#views) shows the
-  newest result.
+  `<scratch> remove ok|failed: <message>`, `<source> record failed: <message>` when the row cannot be
+  stored, and last `<source> restore-check passed|failed`. No line holds a row or a username.
+- **Shown on the console.** The [cell console](cell-console.md#views) shows the newest stored result.
 - **Settings and exit codes.** They are in
   [cell restore check](administration.md#cell-restore-check).

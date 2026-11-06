@@ -6,12 +6,20 @@ export interface CellSession {
   displayName: string
 }
 
-/** The cell, as served by `GET /api/cell`. `cap` is `null` when the cell has no cap on its tenants. */
+/** The newest stored result of the weekly restore check: when the run started, as an ISO 8601 time, its source tenant and whether it passed. */
+export interface CellRestoreCheck {
+  ranAt: string
+  tenantId: string
+  passed: boolean
+}
+
+/** The cell, as served by `GET /api/cell`. `cap` is `null` when the cell has no cap on its tenants and `restoreCheck` when no check has run. */
 export interface Cell {
   id: string
   region: string
   tenants: number
   cap: number | null
+  restoreCheck: CellRestoreCheck | null
 }
 
 /** One step of a job. `error` is `null` unless the step failed. */
@@ -174,31 +182,51 @@ async function cellWriteAnswer<T>(response: Response, name: string): Promise<Cel
 }
 
 /**
- * Queues the job of `action` for the tenant `id` and sends `idempotencyKey` as its `Idempotency-Key`. A 202 answers the
- * queued job, whose `steps` are empty and `error` is `null`, because the 202 holds neither. A 401 or 403 is a refusal.
- * Any other 4xx is a final answer and comes back as the problem. A 5xx and a network error throw, so the caller may
- * retry with the same key. The request has no body, because the server hashes the body into the request that the key
+ * Sends a POST that queues a job with `idempotencyKey` as its `Idempotency-Key`. A 202 answers the queued job, whose
+ * `steps` are empty and `error` is `null`, because the 202 holds neither. A 401 or 403 is a refusal. Any other 4xx is a
+ * final answer and comes back as the problem. A 5xx and a network error throw, so the caller may retry with the same
+ * key. A `body` is sent as JSON, exactly as given, because the server hashes the body into the request that the key
  * names.
  */
-export async function queueCellTenantJob(
-  id: string,
-  action: CellTenantAction,
-  idempotencyKey: string,
-): Promise<CellActionResult> {
-  const response = await apiFetch(
-    `/api/cell/tenants/${encodeURIComponent(id)}/${action}`,
-    { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
-    { promptSignInOnUnauthorized: false },
-  )
+async function postCellJob(url: string, idempotencyKey: string, body?: string): Promise<CellActionResult> {
+  const headers: Record<string, string> = { 'Idempotency-Key': idempotencyKey }
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json'
+  }
+  const response = await apiFetch(url, { method: 'POST', headers, body }, { promptSignInOnUnauthorized: false })
   const result = await cellWriteAnswer<Omit<CellJob, 'steps' | 'error'> & Partial<CellJob>>(
     response,
-    `Queuing the ${action} job of the cell tenant`,
+    'Queuing the cell job',
   )
   if (result.kind !== 'ok') {
     return result
   }
   const queued = result.value
   return { kind: 'ok', value: { ...queued, steps: queued.steps ?? [], error: queued.error ?? null } }
+}
+
+/** Queues the job of `action` for the tenant `id`, see {@link postCellJob}. The request has no body. */
+export function queueCellTenantJob(
+  id: string,
+  action: CellTenantAction,
+  idempotencyKey: string,
+): Promise<CellActionResult> {
+  return postCellJob(`/api/cell/tenants/${encodeURIComponent(id)}/${action}`, idempotencyKey)
+}
+
+/** The fields of a tenant to create. */
+export interface CellTenantRequest {
+  id: string
+  application: string
+  administrator: string
+}
+
+/**
+ * Queues the job that creates a tenant, see {@link postCellJob}. The caller builds `body` once, as the JSON of a
+ * {@link CellTenantRequest}, so a retry sends the same bytes under the same `idempotencyKey`.
+ */
+export function createCellTenant(body: string, idempotencyKey: string): Promise<CellActionResult> {
+  return postCellJob('/api/cell/tenants', idempotencyKey, body)
 }
 
 /** The quota changes of {@link setCellTenantQuotas}: `set` maps a quota key to its value, where `null` is no limit, and `remove` lists the keys that go back to the cell's default. */
