@@ -178,7 +178,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 
 - **Required.** The region, the tenant domain, the connection string, the mail sender and the mail
   relay are required, except `ControlPlane:Mail:UserName`. The directory connection string is
-  optional. The cell settings are optional, and once a cell is listed, all of its settings, its secret
+  optional, and once it is set a DNS provider is required. The cell settings are optional, and once a cell is listed, all of its settings, its secret
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id and both titles.
@@ -197,7 +197,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
-| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString` |
+| `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, and `ControlPlane:Dns:Provider` is required |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
 | `ControlPlane:Mail:Host` | The host of the SMTP relay | Not empty |
 | `ControlPlane:Mail:Port` | The SMTP port. Default 587 | 1 to 65535. Port 465 starts with TLS, any other port upgrades with STARTTLS |
@@ -211,7 +211,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:CellSecrets:<cell id>` | The client secret of that cell's client, a key-per-file secret | Not empty for every listed cell |
 | `ControlPlane:CellClientCertificate:Path` | The PEM certificate that the control plane presents to every cell | Set and the file exists, when a cell is listed |
 | `ControlPlane:CellClientCertificate:KeyPath` | The PEM private key of that certificate | Set and the file exists, when a cell is listed |
-| `ControlPlane:Dns:Provider` | The DNS adapter that sets and removes a tenant's `CNAME` record: `InMemory` or `Rfc2136`. Optional, and with none the service registers no adapter | `InMemory` is refused outside Development and Testing. Any other value is refused |
+| `ControlPlane:Dns:Provider` | The DNS adapter that sets and removes a tenant's `CNAME` record: `InMemory` or `Rfc2136`. Required when `ControlPlane:DirectoryConnectionString` is set. With none the service registers no adapter | `InMemory` is refused outside Development and Testing. Any other value is refused |
 | `ControlPlane:Dns:Server` | The host of the DNS server that takes the dynamic updates | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Port` | The TCP port of that server. Default 53 | 1 to 65535, with `Rfc2136` |
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |

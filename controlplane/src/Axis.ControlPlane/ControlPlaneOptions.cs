@@ -10,7 +10,7 @@ namespace Axis.ControlPlane;
 /// <summary>
 /// The <c>ControlPlane</c> settings of the service, see the settings table in
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
-/// and the mail relay are required, except the relay's user name. The directory connection string is optional. The cell
+/// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
 /// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id and both titles. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
@@ -107,6 +107,11 @@ public sealed partial class ControlPlaneOptions
             && ConnectionStringProblem(nameof(DirectoryConnectionString), options.DirectoryConnectionString, RequiresVerifiedTls(environment)) is { } directoryProblem)
         {
             problems.Add(directoryProblem);
+        }
+
+        if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && string.IsNullOrWhiteSpace(options.Dns.Provider))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(Dns)}:{nameof(ControlPlaneDnsOptions.Provider)} is required when {SectionName}:{nameof(DirectoryConnectionString)} is set.");
         }
 
         if (options.Cells.Count > 0)

@@ -16,7 +16,8 @@ public sealed class InMemoryDnsRecordsTests
 
         var record = Assert.Single(records.Records);
         Assert.Equal("acme.vn.example.com", record.Key);
-        Assert.Equal("ingress.vn-1.vn.example.com", record.Value);
+        Assert.Equal("ingress.vn-1.vn.example.com", record.Value.Target);
+        Assert.Equal(300, record.Value.TimeToLive);
     }
 
     [Fact]
@@ -28,7 +29,7 @@ public sealed class InMemoryDnsRecordsTests
         await records.SetCnameAsync("ACME.vn.example.com.", "ingress.vn-2.vn.example.com.", Token);
 
         var record = Assert.Single(records.Records);
-        Assert.Equal("ingress.vn-2.vn.example.com", record.Value);
+        Assert.Equal("ingress.vn-2.vn.example.com", record.Value.Target);
     }
 
     [Fact]

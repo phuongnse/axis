@@ -92,6 +92,7 @@ public sealed class DirectoryDatabaseTests(MailpitFixture mailpit) : IAsyncLifet
             builder.UseSetting("ControlPlane:TenantDomain", "vn.example.com");
             builder.UseSetting("ControlPlane:ConnectionString", ControlPlaneConnectionString);
             builder.UseSetting("ControlPlane:DirectoryConnectionString", DirectoryConnectionString);
+            builder.UseSetting("ControlPlane:Dns:Provider", "InMemory");
             builder.UseSetting("ControlPlane:MailFrom", "no-reply@vn.example.com");
             builder.UseSetting("ControlPlane:Mail:Host", host);
             builder.UseSetting("ControlPlane:Mail:Port", port.ToString(CultureInfo.InvariantCulture));

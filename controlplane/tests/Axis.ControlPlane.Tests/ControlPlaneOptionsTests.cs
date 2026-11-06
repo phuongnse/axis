@@ -1,4 +1,6 @@
 using Axis.ControlPlane.Dns;
+using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.RegionDirectory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
@@ -116,6 +118,33 @@ public sealed class ControlPlaneOptionsTests
         Assert.Contains("ControlPlane:DirectoryConnectionString", exception.Message, StringComparison.Ordinal);
         Assert.Contains("VerifyFull", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("secret-password", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_directory_connection_string_without_a_DNS_provider_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:DirectoryConnectionString"] = ControlPlaneFactory.UnreachableConnectionString,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:Dns:Provider", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_a_directory_and_the_in_memory_provider_the_tenant_record_handlers_are_registered()
+    {
+        var settings = DnsSettings("InMemory");
+        settings["ControlPlane:DirectoryConnectionString"] = ControlPlaneFactory.UnreachableConnectionString;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        using var client = factory.CreateClient();
+
+        var kinds = factory.Services.GetServices<IJobHandler>().Select(handler => handler.Kind).ToArray();
+        Assert.Contains(TenantRecordJobs.WriteKind, kinds);
+        Assert.Contains(TenantRecordJobs.RemoveKind, kinds);
     }
 
     [Fact]

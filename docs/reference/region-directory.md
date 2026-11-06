@@ -33,7 +33,8 @@ The directory sends a new tenant to the least full cell of its region that has r
 - **A full cell.** A cell that answers `409` "This cell is full." is marked full, and the next one is
   tried.
 - **Written on acceptance.** When the cell accepts the create, the tenant row is written and the
-  cell's count goes up by one, in one transaction.
+  cell's count goes up by one, in one transaction. The same transaction writes the host row
+  `<tenant id>.<tenant domain>` under the cell.
 - **No cell left.** The sign-up waits as `queued`, the operator is alerted to open a cell, and the
   person is told by email when their tenant is ready.
 - **Counts stay true.** Every 5 minutes the directory reads each cell's tenant list through the
@@ -56,10 +57,13 @@ A tenant's traffic goes from DNS straight to its cell, so nothing global sits in
 
 - **DNS, not a router.** Each tenant's subdomain gets a `CNAME` record of its own to its cell's
   ingress, `ingress.<cell id>.<tenant domain>`, with a time to live of 300 seconds. The control plane
-  writes the record with an RFC 2136 dynamic update over TCP, signed with a TSIG HMAC-SHA256 key, when
-  it creates the tenant, and removes it when the tenant is deleted. A set deletes the name's `CNAME`
-  record set and adds the new record in one update, and a remove deletes the record set, so both are
-  idempotent. The [settings](control-plane.md#settings) `ControlPlane:Dns` name the server, the zone and
+  writes the record with an RFC 2136 dynamic update over TCP, signed with a TSIG HMAC-SHA256 key. A set
+  deletes the name's `CNAME` record set and adds the new record in one update, and a remove deletes the
+  record set, so both are idempotent. The picker, and the correction for a tenant it adds, queue a
+  durable `writeTenantRecord` job after the directory commits. The correction queues a
+  `removeTenantRecord` job for a tenant it removes. Each job reads the tenant's directory row when it
+  runs, so a write for a tenant that is gone and a remove for a tenant that is back do nothing. The
+  [settings](control-plane.md#settings) `ControlPlane:Dns` name the server, the zone and
   the key.
 - **No shared hop.** A request goes from DNS straight to the cell, so a failure of the directory or
   the control plane never stops a tenant's traffic.

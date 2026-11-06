@@ -1,4 +1,6 @@
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Dns;
+using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -31,11 +33,13 @@ public sealed class CellPickerTests : IAsyncLifetime
             await context.Database.MigrateAsync(token);
         }
 
+        // The two schemas have their own history tables, so the directory and the control plane share this database.
+        await ControlPlaneDatabase.MigrateAsync(_container.GetConnectionString(), token);
         _dataSource = NpgsqlDataSource.Create(_container.GetConnectionString());
         await ControlPlaneDatabase.ExecuteAsync(
             _dataSource, "INSERT INTO directory.regions (code, tenant_domain, api_url) VALUES ('vn', 'vn.example.com', 'https://api.vn.example.com')", token);
         _loggers = LoggerFactory.Create(builder => builder.AddProvider(_logs));
-        _picker = new CellPicker(_dataSource, _loggers.CreateLogger<CellPicker>());
+        _picker = new CellPicker(_dataSource, _dataSource, _loggers.CreateLogger<CellPicker>());
     }
 
     public async ValueTask DisposeAsync()
@@ -170,6 +174,53 @@ public sealed class CellPickerTests : IAsyncLifetime
 
         Assert.Equal(CellPlacement.Queued, placement.State);
         Assert.Empty(asked);
+    }
+
+    [Fact]
+    public async Task Placing_a_tenant_queues_a_job_that_writes_its_record_to_its_cells_ingress_and_a_second_run_changes_nothing()
+    {
+        await SeedAsync(("vn-1", 100, 0, true));
+        var dns = new InMemoryDnsRecords();
+        await _picker.PlaceAsync("vn", "acme", Accept([]), Token);
+
+        var job = await ClaimAsync(TenantRecordJobs.WriteKind);
+        var handler = new WriteTenantRecordJobHandler(_dataSource, dns);
+        await handler.RunAsync(job, Token);
+        await handler.RunAsync(job, Token);
+
+        var record = Assert.Single(dns.Records);
+        Assert.Equal("acme.vn.example.com", record.Key);
+        Assert.Equal(new InMemoryCname("ingress.vn-1.vn.example.com", 300), record.Value);
+    }
+
+    [Fact]
+    public async Task A_placed_tenant_has_its_subdomain_as_a_host_under_its_cell()
+    {
+        await SeedAsync(("vn-1", 100, 50, true), ("vn-2", 100, 5, true));
+
+        await _picker.PlaceAsync("vn", "acme", Accept([]), Token);
+
+        Assert.Equal("vn-2", await ScalarAsync<string>("SELECT cell_id FROM directory.hosts WHERE host = 'acme.vn.example.com'"));
+        Assert.Equal("acme", await ScalarAsync<string>("SELECT tenant_id FROM directory.hosts WHERE host = 'acme.vn.example.com'"));
+    }
+
+    [Fact]
+    public async Task A_write_job_for_a_tenant_with_no_directory_row_writes_no_record()
+    {
+        var dns = new InMemoryDnsRecords();
+        var job = new ClaimedJob(Guid.NewGuid(), TenantRecordJobs.WriteKind, new() { ["tenantId"] = "ghost" }, 1);
+
+        await new WriteTenantRecordJobHandler(_dataSource, dns).RunAsync(job, Token);
+
+        Assert.Empty(dns.Records);
+    }
+
+    private static CancellationToken Token => TestContext.Current.CancellationToken;
+
+    private async Task<ClaimedJob> ClaimAsync(string kind)
+    {
+        await using var connection = await _dataSource.OpenConnectionAsync(Token);
+        return Assert.IsType<ClaimedJob>(await JobQueue.ClaimAsync(connection, "test", [kind], TimeSpan.FromMinutes(5), Token));
     }
 
     private static Func<string, CancellationToken, Task> Accept(List<string> asked) => (cell, _) =>
