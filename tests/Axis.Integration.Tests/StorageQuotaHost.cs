@@ -19,11 +19,11 @@ internal static class StorageQuotaHost
 {
     private static readonly CellOptions _cell = new() { Id = "vn-1", Region = "vn", TenantDomain = "vn.example.test" };
 
-    /// <summary>Gives every tenant of the host the storage quota <paramref name="limit"/>, as the cell's default.</summary>
-    public static IWebHostBuilder InCell(this IWebHostBuilder builder, long limit)
+    /// <summary>Gives every tenant of the host the quota <paramref name="quota"/> (storage by default) with <paramref name="limit"/>, as the cell's default.</summary>
+    public static IWebHostBuilder InCell(this IWebHostBuilder builder, long limit, string quota = QuotaKeys.Storage)
     {
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{QuotaDefaults.SectionName}:{QuotaKeys.Storage}"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture) })
+            .AddInMemoryCollection(new Dictionary<string, string?> { [$"{QuotaDefaults.SectionName}:{quota}"] = limit.ToString(System.Globalization.CultureInfo.InvariantCulture) })
             .Build();
         return builder.ConfigureTestServices(services =>
             services.AddSingleton(provider => new TenantQuotas(_cell, QuotaDefaults.Load(configuration, _cell), provider.GetRequiredService<ITenantCatalog>())));

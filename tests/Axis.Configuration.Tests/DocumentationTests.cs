@@ -3,8 +3,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
+using Axis.Configuration.Storage;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Functions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Configuration.Tests;
 
@@ -184,6 +186,26 @@ public sealed class DocumentationTests
         }
 
         return tables;
+    }
+
+    [Fact]
+    public void System_tables_list_rows_of_Axis_Configuration_match_the_tables_of_ConfigurationDbContext()
+    {
+        var documented = new List<string>();
+        foreach (var line in File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "Docs", "reference", "storage.md")))
+        {
+            // The rows of the system tables list: | `axis.<table>` | `<Module>` | ... |
+            var match = Regex.Match(line, @"^\|\s*`axis\.([a-z_]+)`\s*\|\s*`Axis\.Configuration`\s*\|");
+            if (match.Success)
+            {
+                documented.Add(match.Groups[1].Value);
+            }
+        }
+
+        using var context = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql("Host=unused").Options);
+        var tables = context.Model.GetEntityTypes().Select(entity => entity.GetTableName()!).Order(StringComparer.Ordinal).ToList();
+
+        Assert.Equal(tables, documented.Order(StringComparer.Ordinal).ToList());
     }
 
     private static IEnumerable<string> DocsFiles() =>
