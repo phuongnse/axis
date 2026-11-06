@@ -25,7 +25,7 @@ share a tenant, a replica and a database, at the
 
 The routes, the environment and the script are in [performance](../reference/performance.md). When
 the `*PerformanceTests` classes run is
-[D136](d136-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges-started-by-nexkit-alone.md).
+[D139](d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md).
 
 ## Consequences
 
