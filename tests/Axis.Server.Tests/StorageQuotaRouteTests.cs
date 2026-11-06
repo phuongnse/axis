@@ -118,6 +118,9 @@ public sealed class StorageQuotaRouteTests
         // Studio deletes are never refused.
         "DELETE /api/studio/apps/{application}/resources/{id}",
 
+        // An application setting is one flag, and a publisher can still turn it off over the quota.
+        "PUT /api/studio/apps/{application}/settings",
+
         // Validate, preview, test and activate store a request and go on over the quota.
         "POST /api/studio/apps/{application}/preview",
         "POST /api/studio/apps/{application}/releases/{id}/activate",

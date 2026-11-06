@@ -1155,6 +1155,30 @@ export async function fetchStudioReleases(application: string, signal?: AbortSig
   return (await response.json()) as StudioReleases
 }
 
+/** Loads the settings of an application that the tenant database keeps. A 401 shows the sign-in prompt and throws, as any other failure does. */
+export async function fetchStudioSettings(application: string, signal?: AbortSignal): Promise<{ autoAccept: boolean }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/settings`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as { autoAccept: boolean }
+}
+
+/** Sets "Let AI accept its own drafts" for an application and answers the saved value. Only a publisher may. */
+export async function saveStudioSettings(application: string, autoAccept: boolean): Promise<{ autoAccept: boolean }> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/settings`
+  const response = await studioFetch(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ autoAccept }),
+  })
+  if (!response.ok) {
+    throw new Error(`Saving '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as { autoAccept: boolean }
+}
+
 /**
  * The rows of the release list: one for each release, the highest number first. A release that was activated more than
  * once has one row, which takes its details from its first activation, the earliest `activatedAt`. On equal times the

@@ -635,6 +635,7 @@ function StudioWorkspace() {
                         key={`editor-${selected.id}`}
                         application={application!}
                         item={selected}
+                        publisher={canPublish}
                         resources={loaded.resources}
                         path={path}
                         diagnosticPaths={diagnosticPaths}

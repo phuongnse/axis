@@ -50,6 +50,7 @@ import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
+import { StudioAutoAccept } from './StudioAutoAccept'
 import type { FormUse } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 import { TextTable, type TextColumn } from './TextTable'
@@ -160,7 +161,9 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression, and its event as a picker with the event's `fields` as rows. When the server does not answer, the draft stays, and the resource loads
  * again after the reconnect unless the draft has changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
- * add a `renameField` or `dropField` migration that is saved with the entity in one changes call.
+ * add a `renameField` or `dropField` migration that is saved with the entity in one changes call. The application manifest's
+ * page also shows the auto-accept switch in a panel of its own below the Save row, which saves on its own, apart from
+ * the manifest. It is editable when `publisher` is true and disabled otherwise.
  */
 export function StudioEditor({
   application,
@@ -172,6 +175,7 @@ export function StudioEditor({
   onTextsWritten,
   onDeleted,
   onOpen,
+  publisher = false,
 }: {
   application: string
   item: StudioResourceItem
@@ -182,6 +186,7 @@ export function StudioEditor({
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
+  publisher?: boolean
 }) {
   const t = useText()
   const { type } = useDesignTokens()
@@ -989,6 +994,7 @@ export function StudioEditor({
         )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </AxisActionRow>
+      {item.kind === 'application' && <StudioAutoAccept application={application} publisher={publisher} />}
       {questions && (
         <EntityMigrationQuestions
           questions={questions}

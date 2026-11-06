@@ -58,17 +58,21 @@ _(planned for M35)_
 
 Auto-accept lets the agent accept its own drafts in an application, as an automatic merge does.
 
-- **The setting.** "Let AI accept its own drafts" is a setting of the application in Studio. It is off
-  by default.
-- **Who changes it.** Only a person with the publisher role. Each change writes an audit record with
-  the person, the application and the new value.
+- **The setting.** "Let AI accept its own drafts" is a switch on the application's Settings page,
+  beside the manifest. It saves on its own, apart from the manifest's Save, through
+  [the authoring API](authoring.md#application-settings). It is off by default.
+- **Who changes it.** Only a person with the publisher role. An author without it sees the value, with
+  the switch disabled. Each change writes an audit record with the person, the application and the new
+  value.
 - **Where it is kept.** In the tenant database, with the application, not in a resource file, so no
   tool and no draft can change it, and an agent cannot give itself the right to accept.
-- **What it allows.** The agent accepts a draft only under the rules of
+- **What it allows.** _(planned for M35)_ The agent accepts a draft only under the rules of
   [accepting](authoring-requests.md#accepting). An accepted draft is still not live until a person
   publishes.
 
 ## Revisions
+
+_(planned for M35)_
 
 Studio shows the application's [revisions](revisions-and-drafts.md#revisions), so an author sees who
 changed what and can undo it.

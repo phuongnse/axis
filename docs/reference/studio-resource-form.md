@@ -115,7 +115,7 @@ No file, path or relation code shows, and modules and packages show by their lab
   shows: every kind its labels' texts, and the application its modules and packages. A panel with
   nothing left is left out.
 - **Used by only where it can apply.** The application is the one kind that nothing can refer to, so it
-  has no Used by and its Settings ends at File storage. Every other kind keeps both panels.
+  has no Used by and its Settings ends at File storage and then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). Every other kind keeps both panels.
 
 ## Danger zone
 

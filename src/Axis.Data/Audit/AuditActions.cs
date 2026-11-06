@@ -75,6 +75,8 @@ public static class AuditActions
 
     public const string UserRoleRemoved = "user.roleRemoved";
 
+    public const string ApplicationAutoAcceptChanged = "application.autoAcceptChanged";
+
     public const string AuthoringRequestSent = "authoringRequest.sent";
 
     public const string AuthoringRequestApproved = "authoringRequest.approved";
