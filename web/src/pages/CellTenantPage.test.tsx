@@ -105,6 +105,36 @@ function stubActions(
   return { keys, sent }
 }
 
+const exportJob: CellJob = {
+  id: '7f3c1a52-0000-4000-8000-000000000001',
+  kind: 'export',
+  tenantId: 'acme',
+  state: 'succeeded',
+  createdAt: '2026-11-05T11:00:00Z',
+  steps: [],
+  error: null,
+}
+
+/**
+ * Answers the tenant, its jobs and the export download. Each download takes the next answer of `downloads` and records
+ * its Accept header.
+ */
+function stubDownload(jobs: CellJob[], downloads: Response[] = []) {
+  const accepts: (string | null)[] = []
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input.startsWith('/api/cell/tenants/acme/exports/')) {
+      accepts.push(new Headers(init?.headers).get('Accept'))
+      return downloads.shift()!
+    }
+    if (input.startsWith('/api/cell/jobs')) {
+      return new Response(JSON.stringify({ items: jobs }), { status: 200 })
+    }
+    return new Response(JSON.stringify(acme), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return { accepts, fetchMock }
+}
+
 function renderPage(path: string, onRefused = vi.fn()) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -286,6 +316,117 @@ describe('CellTenantPage', () => {
 
     await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
     expect(keys).toHaveLength(1)
+  })
+
+  it('offers Export for every status but provisioning', async () => {
+    stubRoutes(ok({ ...acme, status: 'suspended' }))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(screen.getByTestId('cell-tenant-export')).toBeInTheDocument()
+  })
+
+  it('queues an export job with an Idempotency-Key after the confirmation names the tenant', async () => {
+    const queued = { id: '11', kind: 'export', tenantId: 'acme', state: 'queued', createdAt: job.createdAt }
+    const { keys, sent } = stubActions(
+      { 'POST /api/cell/tenants/acme/exports': [{ status: 202, body: queued }] },
+      { 'POST /api/cell/tenants/acme/exports': 'active' },
+    )
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-export'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Export acme?')
+    await user.click(within(dialog).getByRole('button', { name: /Export$/ }))
+
+    await waitFor(() => expect(keys).toHaveLength(1))
+    expect(sent).toEqual(['POST /api/cell/tenants/acme/exports'])
+    expect(keys[0]).toBeTruthy()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('offers Download only with a succeeded export job', async () => {
+    stubDownload([{ ...exportJob, state: 'failed' }, job])
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    await screen.findByTestId('cell-jobs')
+    expect(screen.queryByTestId('cell-tenant-download')).not.toBeInTheDocument()
+  })
+
+  it('sends the ZIP request only after the warning is accepted, and saves the file under the name of the server', async () => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:export')
+    const revokeObjectURL = vi.fn()
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const { accepts, fetchMock } = stubDownload(
+      [exportJob, job],
+      [
+        new Response('zip', {
+          status: 200,
+          headers: { 'Content-Disposition': `attachment; filename="acme-${exportJob.id}.zip"` },
+        }),
+      ],
+    )
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-download'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Download the export of acme?')
+    expect(dialog).toHaveTextContent('restricted data')
+    expect(accepts).toEqual([])
+
+    await user.click(within(dialog).getByRole('button', { name: /Download$/ }))
+
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    expect(accepts).toEqual(['application/zip'])
+    expect(fetchMock).toHaveBeenCalledWith(`/api/cell/tenants/acme/exports/${exportJob.id}`, expect.anything())
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(`acme-${exportJob.id}.zip`)
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    click.mockRestore()
+  })
+
+  it('sends no ZIP request when the warning is cancelled', async () => {
+    const { accepts } = stubDownload([exportJob, job])
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-download'))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(accepts).toEqual([])
+  })
+
+  it('keeps the warning open with the title of a 410 answer', async () => {
+    const createObjectURL = vi.fn((_blob: Blob) => 'blob:export')
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }))
+    stubDownload([exportJob], [new Response(JSON.stringify({ title: 'The export has expired.' }), { status: 410 })])
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-download'))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /Download$/ }))
+
+    expect(await screen.findByTestId('cell-tenant-download-error')).toHaveTextContent('The export has expired.')
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('reports a refused download to the console', async () => {
+    stubDownload([exportJob], [new Response('{}', { status: 403 })])
+    const user = userEvent.setup()
+    const onRefused = renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-download'))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Download$/ }))
+
+    await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
   })
 
   it('offers Delete next to Suspend and Resume for a suspended tenant, and not for a provisioning one', async () => {
