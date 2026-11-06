@@ -87,6 +87,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       TreeSelect: errorBorder,
       // D114: every dropdown menu keeps spacing-xs round its items.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
+      Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       Tabs: {
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,
@@ -128,18 +129,32 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 }
 
 /**
- * The props every Axis `ConfigProvider` gets (D128): the theme; a Cancel of text type for every dialog, so it is a text
- * button beside the solid OK; and checkboxes and radios that sit at the top of their box, level with the first line of
- * a label that wraps.
+ * The props every Axis `ConfigProvider` gets (D128): the theme; every dialog centred, no taller or wider than the window
+ * less its `spacing-xl` margins, with a scrolling body; a Cancel of text type for every dialog, so it is a text button
+ * beside the solid OK; and checkboxes and radios that sit at the top of their box, level with the first line of a label
+ * that wraps.
  */
 export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
   const config = antThemeFor(mode, page, reducedMotion)
   const token = theme.getDesignToken(config)
+  const { spacing } = designTokensFor(mode, page)
   // Ant Design centres a box on the label's line. Half the gap between the line and the box puts its top on that line.
   const firstLineOffset = (boxSize: number) => (token.fontSize * token.lineHeight - boxSize) / 2
+  const margins = 2 * spacing.xl
   return {
     theme: config,
-    modal: { cancelButtonProps: { type: 'text' } },
+    modal: {
+      cancelButtonProps: { type: 'text' },
+      centered: true,
+      style: { maxWidth: `calc(100vw - ${margins}px)` },
+      // The padding sits in the header, body and footer, not the frame, so the body's scrollbar runs at the dialog's edge.
+      styles: {
+        container: { display: 'flex', flexDirection: 'column', maxHeight: `calc(100vh - ${margins}px)`, padding: 0 },
+        header: { padding: `${spacing.lg}px ${spacing.lg}px 0` },
+        body: { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: `${spacing.xs}px ${spacing.lg}px` },
+        footer: { padding: `0 ${spacing.lg}px ${spacing.lg}px` },
+      },
+    },
     checkbox: {
       styles: { icon: { alignSelf: 'flex-start', marginTop: firstLineOffset(token.controlInteractiveSize) } },
     },

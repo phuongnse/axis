@@ -53,8 +53,11 @@ export const spacingTokens = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 }
 
 export const radiusTokens = { base: 6 }
 
-/** Fixed heights in px: the shell header (`bar`), a small control and the line a table row holds, and a table row. */
-export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40 }
+/**
+ * Fixed sizes in px: the shell header (`bar`), a small control and the line a table row holds, and a table row. A
+ * dialog's width (`dialog`) is one of three, picked by what the dialog holds: a confirmation, a short form or a list.
+ */
+export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40, dialog: { small: 400, medium: 560, large: 880 } }
 
 /** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
 export const breakpointTokens = { narrowWidth: 992 }

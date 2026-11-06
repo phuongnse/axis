@@ -5,6 +5,7 @@ import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import { releaseList, releasePublisher, type StudioReleaseListRow, type StudioReleases } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 
 /**
@@ -31,6 +32,7 @@ export function StudioReleasesList({
   onActivate: (row: StudioReleaseListRow) => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale
   const [pending, setPending] = useState<StudioReleaseListRow | null>(null)
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
@@ -117,6 +119,7 @@ export function StudioReleasesList({
       </Flex>
       <Modal
         open={pending !== null}
+        width={size.dialog.small}
         title={pending && t('shell.studio.activate.title').replace('{release}', String(pending.number))}
         okText={t('shell.studio.activate.confirm')}
         cancelText={t('shell.studio.cancel')}
