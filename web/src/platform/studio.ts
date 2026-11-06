@@ -975,11 +975,20 @@ export interface StudioRequest {
   scenarios: (StudioScenarioResult | StudioSkippedScenarioResult)[] | null
 }
 
-/** One contract point that the application relaxed in a release, with the author's reason. */
+/**
+ * One contract point that the application relaxed in a release, with the author's reason. `moduleTitle` is the module's
+ * label, `part` the kind of point (`transition`, `initial`, `deletable`, `validation`, `effect` or `ceiling`), and
+ * `entityTitles` and `titles` the labels of the entity and of the point by locale. Each is `null` when the release has
+ * none.
+ */
 export interface StudioRelaxedPoint {
   module: string
   point: string
   reason: string
+  moduleTitle: string | null
+  part: string | null
+  entityTitles: Record<string, string> | null
+  titles: Record<string, string> | null
 }
 
 /**
@@ -1039,6 +1048,50 @@ export interface StudioReleaseListRow {
   live: boolean
   offStandard: boolean
   relaxed: StudioRelaxedPoint[]
+}
+
+/** A module or package that a release pins: its id, label and version, and its version in the release it compares with. */
+export interface StudioReleasePart {
+  id: string
+  label: string
+  version: string
+  previousVersion: string | null
+}
+
+/** A module of the live release that a release cannot replace. `version` is `null` when the release lacks the module. */
+export interface StudioReleaseBlocker {
+  module: string
+  label: string
+  liveVersion: string
+  version: string | null
+}
+
+/** A module or package that differs from the release a release compares with. */
+export interface StudioReleasePartChange {
+  type: 'module' | 'package'
+  id: string
+  label: string
+  change: 'added' | 'removed' | 'upgraded' | 'downgraded'
+  version: string | null
+  previousVersion: string | null
+}
+
+/**
+ * One release, as `GET /api/studio/apps/{application}/releases/{number}` answers. `previous` is the number of the release
+ * it compares with: the live one when `previousIsLive`, else the one just below it, or `null` for the first.
+ * `changes` and `partChanges` are `null` without `previous`. `blockers` lists the modules that stop it from replacing
+ * the live release.
+ */
+export interface StudioRelease {
+  number: number
+  previous: number | null
+  previousIsLive: boolean
+  live: boolean
+  changes: StudioReleaseChange[] | null
+  partChanges: StudioReleasePartChange[] | null
+  modules: StudioReleasePart[]
+  packages: StudioReleasePart[]
+  blockers: StudioReleaseBlocker[]
 }
 
 /** The optional label and note of a publish. */
@@ -1153,6 +1206,26 @@ export async function fetchStudioReleases(application: string, signal?: AbortSig
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as StudioReleases
+}
+
+/**
+ * Loads one release of an application's history by its number, or `null` when the history lacks it. A 401 shows the
+ * sign-in prompt and throws, as any other failure does.
+ */
+export async function fetchStudioRelease(
+  application: string,
+  number: string,
+  signal?: AbortSignal,
+): Promise<StudioRelease | null> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(number)}`
+  const response = await studioFetch(path, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRelease
 }
 
 /** Loads the settings of an application that the tenant database keeps. A 401 shows the sign-in prompt and throws, as any other failure does. */

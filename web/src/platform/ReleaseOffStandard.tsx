@@ -5,18 +5,25 @@ import { useText } from './texts'
 /**
  * The off-standard mark of a release in the release history, in Studio and in the operator console: the Off-standard
  * tag, then one line for each relaxed point with its module, point and reason. It shows nothing for a standard release,
- * which has no relaxed point. A long reason wraps at 360px, also in a column that does not wrap, so a table that scrolls sideways does not outgrow its card.
+ * which has no relaxed point. With `tagOnly`, which a heading sets because the page lists the points in words, it shows
+ * the tag alone. A long reason wraps at 360px, also in a column that does not wrap, so a table that scrolls sideways does not outgrow its card.
  */
-export function ReleaseOffStandard({ relaxed }: { relaxed: StudioRelaxedPoint[] }) {
+export function ReleaseOffStandard({ relaxed, tagOnly = false }: { relaxed: StudioRelaxedPoint[]; tagOnly?: boolean }) {
   const t = useText()
   if (relaxed.length === 0) {
     return null
   }
+  const tag = (
+    <Tag color="warning" data-testid="release-off-standard">
+      {t('shell.studio.offStandard')}
+    </Tag>
+  )
+  if (tagOnly) {
+    return tag
+  }
   return (
     <Flex vertical gap="small" align="flex-start" style={{ maxWidth: 360, whiteSpace: 'normal' }}>
-      <Tag color="warning" data-testid="release-off-standard">
-        {t('shell.studio.offStandard')}
-      </Tag>
+      {tag}
       {relaxed.map((entry) => (
         <Typography.Text key={`${entry.module}/${entry.point}`} data-testid="release-relaxed-point">
           {entry.module} <Typography.Text code>{entry.point}</Typography.Text>: {entry.reason}

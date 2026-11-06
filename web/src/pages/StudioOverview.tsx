@@ -2,13 +2,14 @@ import { Flex, Spin, Typography } from 'antd'
 import { type ReactNode, useContext, useEffect, useId, useState } from 'react'
 import { Link } from 'react-router'
 import { fetchSites, type SiteListItem } from '../platform/site'
-import { type StudioChangeRow, changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
-import { kindName, kindSingular, studioKinds } from '../platform/studioKinds'
+import { changeRows, type StudioReleases, type StudioResourceItem } from '../platform/studio'
+import { kindName, studioKinds } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { HomeTileStyle } from './HomeTileStyle'
 import { SiteTiles } from './SiteTiles'
+import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
 
 /** The kinds that Get started leads to, which More you can add leaves out while Get started shows. */
@@ -81,7 +82,7 @@ export function StudioOverview({
           ) : loaded.changes.length === 0 ? (
             <Typography.Text>{t('shell.studio.overview.changes.allLive')}</Typography.Text>
           ) : (
-            <ChangeGrid rows={changeRows(loaded.changes, resources, locale, t)} address={address} />
+            <StudioChangeList rows={changeRows(loaded.changes, resources, locale, t)} address={address} />
           )}
           <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
         </OverviewBlock>
@@ -151,39 +152,4 @@ function LiveSites({ application, locale, releaseId }: { application: string; lo
     return <Typography.Text>{t('shell.studio.overview.live.none')}</Typography.Text>
   }
   return <SiteTiles sites={own} locale={locale} newTab />
-}
-
-function ChangeGrid({
-  rows,
-  address,
-}: {
-  rows: StudioChangeRow[]
-  address: (extra: Record<string, string>) => string
-}) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) max-content max-content',
-        columnGap: spacing.lg,
-        rowGap: spacing.xs,
-      }}
-    >
-      {rows.map((row) => (
-        <div key={row.key} data-testid="studio-change-row" style={{ display: 'contents' }}>
-          {row.resourceId === null ? (
-            <Typography.Text>{row.name}</Typography.Text>
-          ) : (
-            <Link to={address({ resource: row.resourceId })}>{row.name}</Link>
-          )}
-          <Typography.Text style={{ color: colour.textMuted }}>
-            {row.kind === null ? '—' : kindSingular(row.kind, t)}
-          </Typography.Text>
-          <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-        </div>
-      ))}
-    </div>
-  )
 }

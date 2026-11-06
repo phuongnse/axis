@@ -637,6 +637,11 @@ test.describe('the active release of the purchase request sample changes', () =>
       // The folder still has heading B, so it differs from the release that is active again.
       await expect(page.getByTestId('studio-folder-differs')).toBeVisible()
 
+      // The number opens the release's page.
+      await first.getByRole('link', { name: `${number}`, exact: true }).click()
+      await expect(page).toHaveURL(new RegExp(`view=release&release=${number}`))
+      await expect(page.getByRole('heading', { name: `Release ${number}`, exact: true })).toBeVisible()
+
       await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: headingA, exact: true })).toBeVisible()

@@ -41,6 +41,7 @@ import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioOverview } from './StudioOverview'
 import { StudioPageHeading } from './StudioPageHeading'
+import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioProblems } from './StudioProblems'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -178,7 +179,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * and the release list again, as a save does. The sidebar's Policy matrix entry shows the policy matrix, kept in the address
  * as `&view=policies`. The matrix shows in place of the content under a Policy matrix heading, and
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.
- * `&view=releases` shows only the Releases heading and the release list.
+ * `&view=releases` shows only the Releases heading and the release list. `&view=release&release=<number>` shows that
+ * release's `StudioReleasePage` in place of the list, under the Releases entry, and its Activate… sends the same request as the list's.
  * Run tests sits beside Validate and shows only when `GET /api/me` answers `studioTest: true`. A selected scenario
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
@@ -234,6 +236,9 @@ function StudioWorkspace() {
   const kind = params.get('kind')
   const policiesView = params.get('view') === 'policies'
   const releasesView = params.get('view') === 'releases'
+  const releaseView = params.get('view') === 'release'
+  const releaseNumber = params.get('release')
+  const releasePage = releaseView && releaseNumber !== null
   const historyView = params.get('view') === 'history'
   const revisionId = params.get('revision')
   const [apps, setApps] = useState<AppsState>()
@@ -570,6 +575,7 @@ function StudioWorkspace() {
               )
             }
             releasesView={releasesView}
+            releasePage={releasePage}
             onDiagnostics={(diagnostics) =>
               setFolder((current) =>
                 current && current.application === application && 'resources' in current
@@ -582,7 +588,17 @@ function StudioWorkspace() {
             ref={publishing}
           >
             {(history) =>
-              releasesView ? (
+              releasePage ? (
+                <StudioReleasePage
+                  application={application!}
+                  number={releaseNumber}
+                  history={history}
+                  resources={resources}
+                  canActivate={canPublish}
+                  busy={requestBusy || reconnecting}
+                  onActivate={(releaseId) => publishing.current?.activate(releaseId)}
+                />
+              ) : releasesView ? (
                 <StudioPageHeading title={t('shell.studio.releases')} />
               ) : historyView ? (
                 revisionId !== null ? (
