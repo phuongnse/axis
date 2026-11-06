@@ -85,8 +85,11 @@ function IconButton(props: IconButtonProps) {
           onMouseLeave?.(event)
         }}
         onClick={(event) => {
-          hushed.current = true
-          setOpen(false)
+          // Enter and Space also click, with detail 0; only a pointer click hushes the tooltip.
+          if (event.detail > 0) {
+            hushed.current = true
+            setOpen(false)
+          }
           onClick?.(event)
         }}
       />

@@ -40,6 +40,26 @@ describe('the icon-only button', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
   })
 
+  it('shows its tooltip again after Enter, when focus leaves and returns by Tab', async () => {
+    renderIn(
+      'light',
+      <>
+        <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="plain">Next</AxisButton>
+      </>,
+    )
+    const button = screen.getByRole('button', { name: 'Add a row' })
+    await userEvent.tab()
+    await userEvent.keyboard('{Enter}')
+
+    await userEvent.tab()
+    expect(button).not.toHaveFocus()
+    await userEvent.tab({ shift: true })
+
+    expect(button).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
+  })
+
   it('shows its tooltip on hover', async () => {
     renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
 
