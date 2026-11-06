@@ -1,8 +1,8 @@
-# The files where a change is a risk decision that only the owner makes: accepting a known
-# vulnerability, the scans that find them, and the authentication default. A pull request that
-# changes one needs the owner's review, see
-# docs/decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md.
-# The other checks are guarded by NexKit's review checklist in .nexkit/config.json.
+# The security checks, their exceptions and the authentication default: the dependency and image
+# scans with their accepted lists, the raw HTML and prototype pollution checks, and the route
+# authorization. A pull request that changes one needs the owner's review, see
+# docs/decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md.
+# NexKit's review checklist in .nexkit/config.json guards the other checks.
 /tests/Axis.Server.Tests/AuthorizationRouteTests.cs @phuongnse
 /src/Axis.Server/Authentication/RouteAuthorization.cs @phuongnse
 /scripts/scan-accepted.json @phuongnse
@@ -10,6 +10,8 @@
 /scripts/scan-images-accepted.json @phuongnse
 /scripts/scan-images.mjs @phuongnse
 /scripts/lib/accepted-findings.mjs @phuongnse
+/scripts/check-raw-html.mjs @phuongnse
+/scripts/check-prototype-pollution.mjs @phuongnse
 
 # The approved terms of Axis's screens. A pull request that changes one needs the owner's review, see
 # docs/reference/ui-writing.md#the-glossary.

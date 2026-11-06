@@ -95,18 +95,19 @@ that holds it.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks, no approval from a
   person and no branch that is up to date. They do not require the CI workflow, which runs on pushes
   to hand-made branches but not on NexKit's branches, where NexKit's checks run the same scripts.
-- **The owner guards the risk decisions.** A hand-made `.github/CODEOWNERS` and a rule the owner sets
-  make a pull request that touches the accepted lists of the dependency and image scans, the scans
-  themselves or the authentication default need the owner's review, as
-  [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md)
+- **The owner guards the security checks.** A hand-made `.github/CODEOWNERS` and a rule the owner sets
+  make a pull request that touches a security check, its exceptions or the authentication default
+  need the owner's review, as
+  [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
   agrees. NexKit cannot merge it, so it waits, and the owner approves and merges it. The owner checks
   one thing: whether the change accepts a risk, adds an exception or loosens a check, and why. The
   other checks need no person: Axis's review checklist refuses a change that adds an exception to a
   check or loosens one, so NexKit mentions the owner only when a change does.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
   rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
-  check in the diff. An item not met requests changes like a blocking finding, so a pull request that
-  leaves a doc false does not merge.
+  check in the diff, and the rule that a change adds no exception to a check and loosens none. An item
+  not met requests changes like a blocking finding, so a pull request that leaves a doc false or
+  loosens a check does not merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
