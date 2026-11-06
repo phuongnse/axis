@@ -1,10 +1,16 @@
 import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { TextProvider } from '../platform/TextProvider'
 import type { TenantUsage } from '../platform/tenantUsage'
 import { PlatformContext, type Platform } from './context'
 import { TenantUsageSection } from './TenantUsageSection'
+
+vi.mock('../platform/TenantUsageDayTable', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../platform/TenantUsageDayTable')>()
+  return { TenantUsageDayTable: vi.fn(original.TenantUsageDayTable) }
+})
 
 const platform: Platform = {
   site: {
@@ -118,6 +124,10 @@ describe('TenantUsageSection', () => {
     const rows = within(days).getAllByRole('row')
     expect(rows).toHaveLength(3)
     expect(within(rows[1]).getByText('3 MB')).toBeVisible()
+    expect(vi.mocked(TenantUsageDayTable)).toHaveBeenCalledWith(
+      expect.objectContaining({ days: usage.days, locale: 'en', testId: 'tenant-usage-days' }),
+      undefined,
+    )
   })
 
   it('renders nothing when the route answers 404', async () => {

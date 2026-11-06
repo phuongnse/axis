@@ -279,6 +279,7 @@ internal static partial class CellEndpoints
         string id,
         NpgsqlDataSource dataSource,
         QuotaDefaults defaults,
+        TenantUsageStore usageStore,
         TimeProvider time,
         CancellationToken cancellationToken)
     {
@@ -297,6 +298,7 @@ internal static partial class CellEndpoints
         var quotas = await ReadQuotasAsync(platform, [tenant.Id], defaults, cancellationToken);
         var usage = await ReadUsageAsync(platform, [tenant.Id], quotas, latest, Today(time), cancellationToken);
         var archives = await ReadNewestArchivesAsync(platform, [tenant.Id], cancellationToken);
+        var days = await usageStore.ListDaysAsync(tenant.Id, Today(time).AddMonths(-TenantUsageStore.RetentionMonths), cancellationToken);
         return Results.Ok(new CellTenantDetailResponse(
             tenant.Id,
             tenant.Status,
@@ -305,7 +307,9 @@ internal static partial class CellEndpoints
             latest.GetValueOrDefault(tenant.Id)?.FailedWork,
             quotas[tenant.Id],
             usage[tenant.Id],
-            archives.TryGetValue(tenant.Id, out var archive) ? archive : null));
+            archives.TryGetValue(tenant.Id, out var archive) ? archive : null,
+            [.. days.Select(row => new TenantUsageDayResponse(
+                row.Day, row.DatabaseBytes, row.FileBytes, row.Users, row.Applications, row.EmailsSent, row.ConnectorCalls, row.WorkItemsRun))]));
     }
 
     // The tenant row, not the tenant catalog, which holds active tenants only. A suspended tenant has no pool, so the read opens one connection.
@@ -978,7 +982,7 @@ internal sealed record CellTenantResponse(
 /// <summary>The tenants of the cell, ordered by id.</summary>
 internal sealed record CellTenantListResponse(IReadOnlyList<CellTenantResponse> Items);
 
-/// <summary>One tenant of the cell with its effective quotas, keyed by quota key.</summary>
+/// <summary>One tenant of the cell with its effective quotas, keyed by quota key, and its day rows of the last 13 months, newest first.</summary>
 internal sealed record CellTenantDetailResponse(
     string Id,
     string Status,
@@ -987,7 +991,8 @@ internal sealed record CellTenantDetailResponse(
     CellFailedWorkResponse? FailedWork,
     IReadOnlyDictionary<string, CellQuotaResponse> Quotas,
     CellTenantUsageResponse Usage,
-    DateTimeOffset? NewestArchiveAt);
+    DateTimeOffset? NewestArchiveAt,
+    IReadOnlyList<TenantUsageDayResponse> Days);
 
 /// <summary>The category of the logs of the administrators route.</summary>
 internal sealed class CellAdministratorsLog;

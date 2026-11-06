@@ -222,8 +222,9 @@ sizes only, never a record value, a file name or a user name.
 - **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
   rows of both usage tables, see [storage](storage.md#database-roles).
 - **Readers.** The [cell console](cell-console.md#views) shows the usage through the
-  [provisioning API's tenant reads](tenant-lifecycle.md#routes), which answer `usage`, and a tenant's
-  administrator reads it through [the usage route](#usage).
+  [provisioning API's tenant reads](tenant-lifecycle.md#routes), which answer `usage`. The single tenant
+  read also answers the day rows of the last 13 months. A tenant's administrator reads it through
+  [the usage route](#usage).
 - **The usage route.** `GET /api/tenant/usage` on a tenant's own host answers
   `{ quotas, days }` to an administrator. `quotas` holds every quota by its key as `{ limit, used }`,
   with a `null` limit for no limit. `used` is the latest storage sample, the realm's enabled users,

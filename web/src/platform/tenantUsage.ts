@@ -6,7 +6,7 @@ export interface TenantQuotaUse {
   used: number | null
 }
 
-/** One day of the tenant's usage, as `GET /api/tenant/usage` serves it. Sizes are in bytes. */
+/** One day of the tenant's usage, as `GET /api/tenant/usage` and `GET /api/cell/tenants/{id}` serve it. Sizes are in bytes. */
 export interface TenantUsageDay {
   day: string
   databaseBytes: number

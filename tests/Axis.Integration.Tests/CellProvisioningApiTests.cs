@@ -196,6 +196,42 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
+    public async Task The_tenant_read_answers_the_days_of_the_last_13_months_newest_first()
+    {
+        await using var factory = await StartAsync();
+        using var client = CreateClient(factory, _console);
+        var token = await TokenAsync(_realm, CallerClientId, ClientSecret);
+        await ExecuteAsync(
+            """
+            INSERT INTO platform.tenant_usage (tenant_id, day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run)
+            VALUES
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '14 months')::date, 1, 1, 1, 1, 1, 1, 111),
+                ('a', ((now() AT TIME ZONE 'UTC')::date - interval '12 months')::date, 20, 21, NULL, NULL, 22, 23, 222),
+                ('a', (now() AT TIME ZONE 'UTC')::date - 1, 30, 31, 3, 2, 32, 33, 333)
+            """);
+
+        using var tenant = await GetAsync(client, "/api/cell/tenants/a", token);
+        using var other = await GetAsync(client, "/api/cell/tenants/b", token);
+        using var list = await GetAsync(client, "/api/cell/tenants", token);
+
+        var days = (await tenant.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("days");
+        Assert.Equal([333L, 222L], days.EnumerateArray().Select(day => day.GetProperty("workItemsRun").GetInt64()));
+        var newest = days[0];
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture), newest.GetProperty("day").GetString());
+        Assert.Equal((30L, 31L, 3, 2, 32, 33L), (
+            newest.GetProperty("databaseBytes").GetInt64(),
+            newest.GetProperty("fileBytes").GetInt64(),
+            newest.GetProperty("users").GetInt32(),
+            newest.GetProperty("applications").GetInt32(),
+            newest.GetProperty("emailsSent").GetInt32(),
+            newest.GetProperty("connectorCalls").GetInt64()));
+        Assert.Equal(JsonValueKind.Null, days[1].GetProperty("users").ValueKind);
+        Assert.Equal(0, (await other.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("days").GetArrayLength());
+        var items = (await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("items");
+        Assert.All(items.EnumerateArray(), item => Assert.False(item.TryGetProperty("days", out _)));
+    }
+
+    [Fact]
     public async Task A_row_written_before_the_counts_existed_answers_null_failed_work()
     {
         await using var factory = await StartAsync();
@@ -221,6 +257,8 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             $"""
             INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, failed_instances, unknown_calls, open_dead_letters, sampled_at)
             VALUES ('a', 1, 1, 1, 1, 1, now());
+            INSERT INTO platform.tenant_usage (tenant_id, day, database_bytes, file_bytes, users, applications, emails_sent, connector_calls, work_items_run)
+            VALUES ('a', (now() AT TIME ZONE 'UTC')::date - 1, 1, 1, 1, 1, 1, 1, 1);
             INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('a', now());
             INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('a', 'ReportsUrl', 'url', '{bindingUrl}')
             """);
@@ -268,9 +306,10 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             await list.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
             [.. tenantFields.Select(field => $"items[].{field}")],
             forbidden);
+        string[] days = ["day", "databaseBytes", "fileBytes", "users", "applications", "emailsSent", "connectorCalls", "workItemsRun"];
         AssertFields(
             await detail.Content.ReadFromJsonAsync<JsonElement>(CancellationToken),
-            [.. tenantFields, "quotas.*.value", "quotas.*.overridden"],
+            [.. tenantFields, "quotas.*.value", "quotas.*.overridden", .. days.Select(field => $"days[].{field}")],
             forbidden);
     }
 

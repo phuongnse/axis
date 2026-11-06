@@ -16,6 +16,7 @@ import {
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { newIdempotencyKey } from '../platform/processes'
+import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { useText } from '../platform/texts'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { usePlatform } from './context'
@@ -56,7 +57,7 @@ const actionTexts = {
 
 /**
  * The Tenant view of the cell console: one tenant's status, application and hosts, its quotas with the ones it overrides,
- * and its jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
+ * its usage of the last 13 months by day in the table of the users page's "Usage" section, and its jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume. An `active`, `readOnly` or `suspended` tenant offers Delete,
  * which stays off until the operator types the tenant id exactly, and a `deleting` one offers only Cancel deletion. Each
  * action is behind a confirmation. An action queues a job with an `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
@@ -279,6 +280,9 @@ export function CellTenantPage() {
               columns={quotaColumns}
               emptyText={t('shell.cell.tenant.noQuotas')}
             />
+          </Card>
+          <Card title={t('shell.cell.tenant.usage')}>
+            <TenantUsageDayTable days={tenant.days} locale={locale} testId="cell-tenant-usage" />
           </Card>
         </>
       )}

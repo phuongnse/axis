@@ -302,6 +302,7 @@
   "shell.cell.tenant.application": "Application",
   "shell.cell.tenant.hosts": "Hosts",
   "shell.cell.tenant.quotas": "Quotas",
+  "shell.cell.tenant.usage": "Usage",
   "shell.cell.tenant.noQuotas": "The tenant has no quotas.",
   "shell.cell.tenant.jobs": "Jobs",
   "shell.cell.tenant.jobsLoadFailed": "The jobs could not be loaded.",
