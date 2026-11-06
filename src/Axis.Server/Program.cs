@@ -308,11 +308,12 @@ app.UseTenantResolution();
 // or redirects does no sign-in work and renews no session.
 app.UseSiteHosts();
 
-// Right after, so a preview tenant's host and a foreign origin are refused on the MCP routes before any sign-in work.
-app.UseMcpGuard();
-
 // After tenant resolution, so the warning for a 403 carries the tenant, and before the CSRF check, so that refusal is logged.
 app.UseRefusedRequestLog();
+
+// Right after, so a foreign origin's 403 is logged, and before the CSRF check and authentication, so a preview tenant's
+// host and a foreign origin are refused on the MCP routes before any sign-in work.
+app.UseMcpGuard();
 
 // Before the session, so a refused write does no work and renews no cookie.
 app.UseCsrfHeader();
