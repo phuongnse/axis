@@ -691,6 +691,72 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
     }
 
     [Fact]
+    public async Task In_a_cell_the_revisions_of_two_tenants_live_under_their_own_Studio_folders_even_for_an_application_with_the_same_name()
+    {
+        var role = NewRole();
+        var a = await PrepareTenantAsync("a", role);
+        var b = await PrepareTenantAsync("b", role);
+        var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
+        var root = Directory.CreateTempSubdirectory("axis-studio-revisions-").FullName;
+        try
+        {
+            await using var factory = CreateFactory(
+                platform, new LogCollector(), [.. _cellSettings, ("Studio:ApplicationsPath", root), ("Studio:AuthorRole", "author")]);
+            using var client = factory.CreateClient().SignedInAs("author");
+
+            foreach (var host in new[] { "a.example.test", "b.example.test" })
+            {
+                using var created = await client.SendAsync(
+                    Request(HttpMethod.Post, "/api/studio/apps", host, """{ "name": "Shared" }"""), CancellationToken);
+                Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+                await ChangeSiteTitleAsync(client, "Shared", host, $"Changed on {host}");
+            }
+
+            Assert.False(Directory.Exists(Path.Combine(root, ".revisions")));
+            foreach (var (tenant, other) in new[] { ("a", "b"), ("b", "a") })
+            {
+                var repository = Path.Combine(root, tenant, ".revisions", "shared.git");
+                Assert.True(LibGit2Sharp.Repository.IsValid(repository));
+                using var git = new LibGit2Sharp.Repository(repository);
+                var commits = TenantRevisions.Commits(git);
+                Assert.Equal(2, commits.Count);
+                var texts = ((LibGit2Sharp.Blob)commits[^1]["texts/en.json"].Target).GetContentText();
+                Assert.Contains($"Changed on {tenant}.example.test", texts, StringComparison.Ordinal);
+                Assert.DoesNotContain($"{other}.example.test", texts, StringComparison.Ordinal);
+
+                // The tenant's folder holds its application and its repository, and no file of the other tenant's repository.
+                Assert.Equal([".revisions", "shared"], SubfolderNames(Path.Combine(root, tenant)));
+                Assert.Equal(["shared.git"], SubfolderNames(Path.Combine(root, tenant, ".revisions")));
+                Assert.DoesNotContain($"{other}.example.test", string.Concat(Directory.EnumerateFiles(Path.Combine(root, tenant), "*.json", SearchOption.AllDirectories).Select(File.ReadAllText)), StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    // Replaces the title of the application's English texts in one JSON Patch, from the list of its resources.
+    private static async Task ChangeSiteTitleAsync(HttpClient client, string app, string host, string title)
+    {
+        using var resources = await client.SendAsync(Request($"/api/studio/apps/{app}/resources", host), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, resources.StatusCode);
+        using var list = JsonDocument.Parse(await resources.Content.ReadAsStringAsync(CancellationToken));
+        var texts = list.RootElement.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("file").GetString() == "texts/en.json");
+        var id = texts.GetProperty("id").GetString()!;
+        var version = texts.GetProperty("version").GetString()!;
+        using var patch = Request(
+            HttpMethod.Patch,
+            $"/api/studio/apps/{app}/resources/{id}",
+            host,
+            $$"""[{"op":"replace","path":"/texts/site.title","value":"{{title}}"}]""",
+            "application/json-patch+json");
+        patch.Headers.TryAddWithoutValidation("If-Match", $"\"{version}\"");
+        using var patched = await client.SendAsync(patch, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, patched.StatusCode);
+    }
+
+    [Fact]
     public async Task In_a_cell_a_tenant_at_its_applications_quota_cannot_create_another_but_still_saves_and_publishes()
     {
         var role = NewRole();

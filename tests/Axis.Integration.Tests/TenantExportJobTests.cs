@@ -20,6 +20,7 @@ using Axis.Processes.Instances;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
+using LibGit2Sharp;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -184,6 +185,28 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Equal("first scan", files[$"{folder}/attachments_file/scan.pdf"]);
         Assert.Equal("second scan", files[$"{folder}/attachments_file/scan_2.pdf"]);
         Assert.Equal("the receipt", files[$"{folder}/receipt/My_receipt__1_.pdf"]);
+    }
+
+    [Fact]
+    public async Task The_zip_of_a_tenant_holds_the_revisions_of_its_applications_as_a_git_repository_with_the_same_history()
+    {
+        var (tenant, _) = await NewFilesTenantAsync();
+        using var studio = StudioFolder(tenant);
+        var commits = await TenantRevisions.BuildAsync(Path.Combine(studio.Path, tenant), "files-app", CancellationToken);
+        Assert.Equal(2, commits.Count);
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+
+        var (job, output) = await RunExportAsync(tenant, bucket, studio.Path);
+
+        Assert.Contains($"{tenant} export ok", output);
+        using var extracted = new TemporaryFolder();
+        var names = await ExtractAsync(s3, bucket, $"exports/{tenant}/{job:D}.zip", "applications/.revisions/", extracted.Path);
+        Assert.Contains("applications/.revisions/files-app.git/HEAD", names);
+        Assert.DoesNotContain(names, name => name.StartsWith("applications/.revisions/second-app.git/", StringComparison.Ordinal));
+        var repository = Path.Combine(extracted.Path, "applications", ".revisions", "files-app.git");
+        Assert.True(Repository.IsValid(repository));
+        Assert.Equal(commits, TenantRevisions.CommitShas(repository));
     }
 
     [Fact]
@@ -477,6 +500,30 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         }
 
         return files;
+    }
+
+    // The entries of the ZIP under the prefix, written as bytes below the folder. Git objects are not text, so ReadZipAsync cannot read them.
+    private static async Task<List<string>> ExtractAsync(IAmazonS3 s3, string bucket, string key, string prefix, string folder)
+    {
+        using var memory = new MemoryStream(await MinioFixture.ReadObjectAsync(s3, bucket, key, CancellationToken));
+        using var zip = new ZipArchive(memory, ZipArchiveMode.Read);
+        var names = new List<string>();
+        foreach (var entry in zip.Entries.Where(entry => entry.FullName.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            names.Add(entry.FullName);
+            if (entry.FullName.EndsWith('/'))
+            {
+                continue;
+            }
+
+            var path = Path.Combine(folder, entry.FullName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await using var stream = await entry.OpenAsync(CancellationToken);
+            await using var file = File.Create(path);
+            await stream.CopyToAsync(file, CancellationToken);
+        }
+
+        return names;
     }
 
     private static string[] Lines(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries);

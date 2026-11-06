@@ -68,6 +68,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
             Assert.Equal(2, await scenario.CountRolesAsync(tenant));
             Assert.NotEmpty(await scenario.KeysAsync(tenant));
             Assert.True(Directory.Exists(Path.Combine(studio.Path, tenant)));
+            Assert.True(LibGit2Sharp.Repository.IsValid(RevisionsOf(studio, tenant)));
         }
 
         Assert.True(await RealmExistsAsync(id));
@@ -152,6 +153,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.Equal(2, await scenario.CountRolesAsync(other));
         Assert.True(await RealmExistsAsync(other));
         Assert.True(Directory.Exists(Path.Combine(studio.Path, other)));
+        Assert.True(LibGit2Sharp.Repository.IsValid(RevisionsOf(studio, other)));
         await using var context = NewContext(scenario);
         Assert.Equal([id], await context.DeletedTenants.AsNoTracking().Select(row => row.Id).ToListAsync(CancellationToken));
     }
@@ -238,12 +240,11 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         return (id, preview);
     }
 
-    private static async Task WriteStudioFileAsync(TemporaryFolder studio, string id)
-    {
-        var file = Path.Combine(studio.Path, id, "app-a", "application.json");
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        await File.WriteAllTextAsync(file, "{\"name\":\"a\"}", CancellationToken);
-    }
+    // An application folder with a real revisions repository in the tenant's .revisions folder.
+    private static async Task WriteStudioFileAsync(TemporaryFolder studio, string id) =>
+        _ = await TenantRevisions.BuildAsync(Path.Combine(studio.Path, id), "app-a", CancellationToken);
+
+    private static string RevisionsOf(TemporaryFolder studio, string id) => Path.Combine(studio.Path, id, ".revisions", "app-a.git");
 
     // One row in each platform table that a purge removes by hand, and a job row, which stays.
     private static async Task SeedAsync(AdminScenario scenario, string id)
