@@ -130,6 +130,12 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   volume, such as `/studio/apps`, and every replica mounts the folders at the same path, because the
   [write lock](authoring.md#versions) is keyed by the full path. The
   [installation guide](installation.md) shows the Compose and Helm mounts.
+- **Revisions.** `Studio:RevisionsPath` (`Studio__RevisionsPath`) is the folder that holds the git
+  repository of each application folder, outside it, see [revisions](revisions-and-drafts.md#the-repository).
+  It defaults to `.revisions` under `Studio:ApplicationsPath`, and a relative value is resolved against
+  the server content root. With neither path set, the server keeps no revisions. In a cell it is
+  `<Studio:ApplicationsPath>/<tenant id>/.revisions`, and a value stops the start, and the message
+  names `Studio:RevisionsPath` and `Cell:Id`.
 - **Tests.** `Studio:Tests` grants no right: a `test` request needs the author role only, and the
   publisher runs it, see [test](authoring.md#test). Turn it on together with the publisher's
   `Scenarios:ServerConnectionString`, because the server cannot see the publisher's settings.
@@ -456,8 +462,6 @@ _(planned for M35)_
 
 The agent host reads the `Ai` settings: the model bindings, the default and review bindings, tenant
 keys and the budgets of a request. Their table is in [model bindings](model-bindings.md#bindings).
-The server reads `Studio:RevisionsPath`, the folder of the application repositories, which defaults
-to `.revisions` under `Studio:ApplicationsPath`, see [revisions and drafts](revisions-and-drafts.md).
 
 ## Telemetry export
 

@@ -33,8 +33,8 @@ internal sealed record StudioCreateChange(Guid Id, string File, JsonObject Conte
 /// <summary>A patch of a resource, with the bare hex version it was made from.</summary>
 internal sealed record StudioPatchChange(Guid Id, JsonPatch Patch, string Version) : StudioChange(Id);
 
-// A change that passed its checks: the file to write and its new bytes, or the reason it was refused.
-internal sealed record StudioCheck(StudioWriteRefusal? Refusal, string? Target, byte[]? Bytes)
+// A change that passed its checks: the file to write, its new bytes and the summary of its revision, or the reason it was refused.
+internal sealed record StudioCheck(StudioWriteRefusal? Refusal, string? Target, byte[]? Bytes, string? Summary = null)
 {
     public static StudioCheck Refused(StudioWriteRefusal refusal) => new(refusal, null, null);
 }
@@ -91,7 +91,7 @@ internal static class StudioWrites
     /// the version. Nothing is written when one fails.
     /// </summary>
     public static async Task<StudioWriteOutcome> PatchAsync(
-        IStudioWriteLock writeLock, string folder, Guid id, JsonPatch patch, string ifMatch, CancellationToken cancellationToken)
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, Guid id, JsonPatch patch, string ifMatch, CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
@@ -99,6 +99,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         var check = CheckPatch(folder, StudioFolder.List(folder), id, patch, Unquote(ifMatch));
         if (check.Refusal is { } refusal)
@@ -107,6 +108,7 @@ internal static class StudioWrites
         }
 
         await ReplaceAsync(check.Target!, check.Bytes!, cancellationToken);
+        revisions?.Record(check.Summary!);
         return new StudioWriteOutcome(null, Version(check.Bytes!));
     }
 
@@ -121,6 +123,7 @@ internal static class StudioWrites
     /// </summary>
     public static async Task<StudioLayerOutcome> WriteLayerAsync(
         IStudioWriteLock writeLock,
+        StudioRevisions? revisions,
         string folder,
         string moduleId,
         string name,
@@ -135,6 +138,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         var existing = FindLayer(StudioFolder.List(folder), moduleId, name);
         if (ifMatch is not null
@@ -161,6 +165,7 @@ internal static class StudioWrites
                 File.Delete(target);
             }
 
+            revisions?.Record(LayerSummary(moduleId, name, changes));
             return new StudioLayerOutcome(null, null, null);
         }
 
@@ -174,6 +179,7 @@ internal static class StudioWrites
             return StudioLayerOutcome.Refused(refused);
         }
 
+        revisions?.Record(LayerSummary(moduleId, name, changes));
         return new StudioLayerOutcome(null, file, Version(bytes));
     }
 
@@ -223,7 +229,7 @@ internal static class StudioWrites
     /// or the target file exists, and it never replaces a file. Nothing is written when it refuses.
     /// </summary>
     public static async Task<StudioWriteOutcome> CreateAsync(
-        IStudioWriteLock writeLock, string folder, Guid id, string file, JsonObject content, CancellationToken cancellationToken)
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, Guid id, string file, JsonObject content, CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
@@ -231,6 +237,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         var check = CheckCreate(folder, StudioFolder.List(folder), id, file, content);
         if (check.Refusal is { } refusal)
@@ -238,9 +245,13 @@ internal static class StudioWrites
             return StudioWriteOutcome.Refused(refusal);
         }
 
-        return await WriteNewAsync(check.Target!, check.Bytes!, cancellationToken) is { } refused
-            ? StudioWriteOutcome.Refused(refused)
-            : new StudioWriteOutcome(null, Version(check.Bytes!));
+        if (await WriteNewAsync(check.Target!, check.Bytes!, cancellationToken) is { } refused)
+        {
+            return StudioWriteOutcome.Refused(refused);
+        }
+
+        revisions?.Record(check.Summary!);
+        return new StudioWriteOutcome(null, Version(check.Bytes!));
     }
 
     /// <summary>
@@ -251,7 +262,7 @@ internal static class StudioWrites
     /// order of <paramref name="changes"/>.
     /// </summary>
     public static async Task<StudioChangesOutcome> ChangesAsync(
-        IStudioWriteLock writeLock, string folder, IReadOnlyList<StudioChange> changes, CancellationToken cancellationToken)
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, IReadOnlyList<StudioChange> changes, CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
@@ -259,6 +270,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         var files = StudioFolder.List(folder);
         var checks = new List<StudioCheck>(changes.Count);
@@ -293,6 +305,7 @@ internal static class StudioWrites
             }
         }
 
+        revisions?.Record(checks.Count == 1 ? checks[0].Summary! : $"Change {checks.Count} resources");
         return new StudioChangesOutcome(null, [.. checks.Select(check => Version(check.Bytes!))]);
     }
 
@@ -301,7 +314,7 @@ internal static class StudioWrites
     /// version. The checks run in this order: the resource (a resource that has gone since the route found it counts as a stale version), whether it is the manifest, then the version.
     /// </summary>
     public static async Task<StudioWriteOutcome> DeleteAsync(
-        IStudioWriteLock writeLock, string folder, Guid id, string ifMatch, CancellationToken cancellationToken)
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, Guid id, string ifMatch, CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
@@ -309,6 +322,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         // The route found the resource before this lock was held. When it is gone now, another write removed it, so
         // the version the author holds is stale.
@@ -333,6 +347,7 @@ internal static class StudioWrites
         }
 
         File.Delete(target);
+        revisions?.Record($"Delete {current.Kind} {current.Name ?? current.File}");
         return new StudioWriteOutcome(null, null);
     }
 
@@ -374,7 +389,7 @@ internal static class StudioWrites
     /// that is not an object. Every temporary file is written before the first rename, and nothing is written when it refuses.
     /// </summary>
     public static async Task<StudioTextWriteOutcome> WriteTextAsync(
-        IStudioWriteLock writeLock, string folder, string key, IReadOnlyDictionary<string, string> texts, CancellationToken cancellationToken)
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, string key, IReadOnlyDictionary<string, string> texts, CancellationToken cancellationToken)
     {
         if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
         {
@@ -382,6 +397,7 @@ internal static class StudioWrites
         }
 
         await using var _ = held;
+        revisions?.RecordOutside();
 
         var files = TextFiles(folder);
         if (files.Count != texts.Count || files.Any(file => !texts.ContainsKey(file.Locale)))
@@ -439,6 +455,7 @@ internal static class StudioWrites
             }
         }
 
+        revisions?.Record($"Change text {key}");
         return new StudioTextWriteOutcome(null, [.. writes.Select(write => write.Version)]);
     }
 
@@ -482,7 +499,7 @@ internal static class StudioWrites
         }
 
         return string.Equals(version, current.Version, StringComparison.Ordinal)
-            ? new StudioCheck(null, target, Serialize(patchedObject))
+            ? new StudioCheck(null, target, Serialize(patchedObject), $"Change {current.Kind} {current.Name ?? current.File}")
             : StudioCheck.Refused(StudioWriteRefusal.Stale);
     }
 
@@ -501,8 +518,19 @@ internal static class StudioWrites
 
         return File.Exists(target) || Directory.Exists(target)
             ? StudioCheck.Refused(StudioWriteRefusal.Exists)
-            : new StudioCheck(null, target, Serialize(content));
+            : new StudioCheck(null, target, Serialize(content), CreateSummary(content, file));
     }
+
+    // "Create {kind} {name}" from the content of a new resource, with its file when it has no name.
+    private static string CreateSummary(JsonObject content, string file) =>
+        $"Create {StringValue(content, "kind") ?? "resource"} {StringValue(content, "name") ?? file}";
+
+    // "Change layer {module}/{name}" for a saved layer and "Reset layer {module}/{name}" for a deleted one.
+    private static string LayerSummary(string moduleId, string name, JsonObject? changes) =>
+        $"{(changes is null ? "Reset" : "Change")} layer {moduleId}/{name}";
+
+    private static string? StringValue(JsonObject content, string name) =>
+        content[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 
     // Writes a new file without replacing one. The refusal is Exists when the target appeared since the check.
     private static async Task<StudioWriteRefusal?> WriteNewAsync(string target, byte[] bytes, CancellationToken cancellationToken)

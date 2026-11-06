@@ -55,7 +55,8 @@ public sealed class ReleaseCompilerTests(ConfigurationDatabaseFixture database) 
             migration => Assert.EndsWith("_CreatePublishRequests", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_AddPublishRequestTarget", migration, StringComparison.Ordinal),
             migration => Assert.EndsWith("_AddPublishRequestScenarios", migration, StringComparison.Ordinal),
-            migration => Assert.EndsWith("_RenameRollbackRequestKind", migration, StringComparison.Ordinal));
+            migration => Assert.EndsWith("_RenameRollbackRequestKind", migration, StringComparison.Ordinal),
+            migration => Assert.EndsWith("_CreateAuthoringRequests", migration, StringComparison.Ordinal));
     }
 
     [Fact]
