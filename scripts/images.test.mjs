@@ -153,7 +153,14 @@ test('no image holds samples, development settings or source control metadata', 
       assert.ok(paths.includes('extensions/'), `${target} has no /extensions`)
       assert.ok(paths.includes('modules/'), `${target} has no /modules`)
     }
-    if (target === 'axis-server') assert.ok(paths.includes('app/wwwroot/index.html'), 'the server holds no SPA')
+    if (target === 'axis-server') {
+      assert.ok(paths.includes('app/wwwroot/index.html'), 'the server holds no SPA')
+      // The server loads the git library at start, to keep each application folder's revisions.
+      assert.ok(
+        paths.some((path) => /^app\/runtimes\/linux-[^/]+\/native\/libgit2-[^/]+\.so$/.test(path)),
+        'the server holds no libgit2',
+      )
+    }
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
     assert.ok(config.User && config.User !== '0' && config.User !== 'root', `${target} runs as ${config.User}`)

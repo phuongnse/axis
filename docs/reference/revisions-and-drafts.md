@@ -1,7 +1,5 @@
 # Revisions and drafts
 
-_(planned for M35)_
-
 Each application folder has a history of revisions, so every change can be traced and undone, and
 authoring requests work on drafts apart from it, so an agent's change never touches the folder before
 it is accepted. Both live in an internal git repository for each folder, because git already does
@@ -15,36 +13,54 @@ LibGit2Sharp.
 
 - **Outside the folder.** The repository lives under `Studio:RevisionsPath`, as `<folder name>.git`,
   so an application folder that is itself in a git checkout, such as a sample, gets no nested
-  repository. The setting defaults to `.revisions` under `Studio:ApplicationsPath`, see
-  [AI settings](host-settings.md#ai-settings).
-- **In a cell.** The repositories are under the tenant's Studio folder,
-  `<Studio:ApplicationsPath>/<tenant id>/.revisions/`, so the tenant's backup, export and deletion
-  cover them, see [tenant lifecycle](tenant-lifecycle.md).
+  repository. Where the folder is, its default and the rule in a cell are in
+  [Studio settings](host-settings.md#studio-settings). A server with no such folder keeps no
+  revisions, and its writes work as before.
+- **In a cell.** The repositories are under the tenant's Studio folder, so the tenant's backup,
+  export and deletion cover them, see [tenant lifecycle](tenant-lifecycle.md).
 - **Never served.** No route serves the repository, and no git protocol listens. People and agents see
   revisions and drafts only through the authoring API and Studio.
 - **The working folder stays the source.** The files on disk are what the compiler, the publisher and
   Studio read. The repository records them and never replaces them.
 - **Created on first use.** The first write to a folder that has no repository commits the folder as
-  it is, as the revision "Start of history".
+  it is, as the revision "Start of history". Creating an application makes no revision, so its first
+  write records the template as "Start of history".
+- **Built in memory.** A revision is built from the folder's JSON files, as the authoring API reads
+  them, into a bare repository. Git never checks anything out, so no `.git` file ever appears in the
+  folder.
+- **Loaded at start.** The server loads the git library at start, so an installation without it fails
+  at once, not on the first save.
 
 ## Revisions
 
 A revision is one commit on the repository's `main` branch, and every change to the folder makes one.
 
-- **What makes one.** Each save in Studio, each `changes` call, each text write, each create and each
-  delete through the [authoring API](authoring.md#writes), and each accept. The commit is made under
-  the same platform lock as the write, after the files are written, so the history follows the folder
-  in the same order.
-- **What it names.** The author, as their user id and their display name at the time, the time, the
-  client (`studio`, the agent host or an outside client id) and, for an accept, the authoring request.
-  The commit message is a short summary of the change, such as "Change process RequestApproval".
+- **What makes one.** Each save in Studio, each `changes` call, each text write, each create, each
+  delete and each module layer save or reset through the [authoring API](authoring.md#writes). The
+  commit is made under the same platform lock as the write, after the files are written, so the
+  history follows the folder in the same order. A write that leaves every file byte for byte the same
+  makes no revision, and a refused write makes none.
+- **Accepts.** _(planned for M35)_ Each accept makes one revision, see
+  [accepting a draft](#accepting-a-draft).
+- **What it names.** The git author and committer are the user's display name at the time. The commit
+  message is a short summary of the change, such as "Change process RequestApproval", then the
+  trailers `Axis-User-Id` with the user id and `Axis-Client` with the client, which is `studio`.
+  The commit time is the time of the write.
+- **Agent clients.** _(planned for M35)_ The client can also be the agent host or an outside client id,
+  and a revision from an accept names the authoring request.
 - **Outside changes.** A change made on disk outside the authoring API, such as a hand edit under
   `scripts/dev.sh`, is committed as "Outside change" before the next write, so the next revision holds
-  only its own change.
-- **Versions.** A resource's `version` is the one the authoring API gives, see
+  only its own change. "Start of history" and "Outside change" name the server (`Axis`) as author,
+  with no user id and no client, because nobody known made those changes.
+- **A failed revision.** When recording a revision fails, the server logs a warning and the write
+  still succeeds, because its files are already written. The next write records the missed change as
+  "Outside change".
+- **Versions.** _(planned for M35)_ A resource's `version` is the one the authoring API gives, see
   [versions](authoring.md#versions). A draft records it for each resource it reads.
 
 ## Drafts
+
+_(planned for M35)_
 
 A draft is a branch where an authoring request makes its change, apart from the working folder and
 from every other draft.
@@ -61,6 +77,8 @@ from every other draft.
 
 ## Accepting a draft
 
+_(planned for M35)_
+
 The publisher runs an accept as a publish request of the kind `accept`, see
 [accepting](authoring-requests.md#accepting), in these steps:
 
@@ -74,6 +92,8 @@ The publisher runs an accept as a publish request of the kind `accept`, see
 5. On any failure the working folder and `main` are unchanged, and the request answers the failure.
 
 ## Undo
+
+_(planned for M35)_
 
 Undoing a revision commits a new revision that reverts it, so history never shrinks.
 
