@@ -33,10 +33,10 @@ Four actors take part in the work, and each has its own part.
   the hand merges NexKit cannot push, makes the hand-made changes that a plan puts in paths NexKit may
   not change, and opens their pull requests. It never approves or merges, and it hands the owner only
   what the owner alone can decide.
-- **The weekly docs audit** is a Claude Code routine that follows the
-  [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a share of the docs
-  against the code each week and opens a NexKit issue for each thing it finds, as
-  [D134](decisions/d134-docs-stay-true-while-work-merges.md) agrees. It changes no file itself.
+- **The docs audit** is the `docs-audit.yml` workflow, which follows the
+  [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs
+  against the code every hundred merges and opens a NexKit issue for each thing it finds, as
+  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees. It changes no file itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
 
@@ -53,7 +53,7 @@ that holds it.
   [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
-  same milestone or across milestones. A `bug` issue for CI on `main` and an issue of the weekly docs audit are in no milestone.
+  same milestone or across milestones. A `bug` issue for CI on `main` and an issue of the docs audit are in no milestone.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
   recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
   the answers on the issue and can change one with a comment before `/nexkit go`, or with
@@ -95,12 +95,13 @@ that holds it.
 
 ### CI on main
 
-- **NexKit starts CI, CodeQL and the performance workflow on `main` every few merges,** with its
-  `merge.after_workflows` setting, which holds how many merges each waits, as
-  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) agrees.
+- **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
+  merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
+  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) and
+  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agree.
   A merge by NexKit starts no `push` workflow, and none of them has a schedule of its own for this,
   so without the setting nothing would test `main`. CI also runs on a person's push and on demand.
-- **A failure on `main` is noticed when its run ends.** Each of the three workflows ends with a job
+- **A failure on `main` is noticed when its run ends.** Each of these workflows ends with a job
   that starts a NexKit sweep. A dispatch that GitHub's API keeps rejecting leaves a warning on the run
   and does not fail it, so that run waits for the next sweep.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to

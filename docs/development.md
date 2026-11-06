@@ -24,6 +24,8 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
 | `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
 | `scripts/dependabot-issues.mjs` | Prints the NexKit issues for the high and critical Dependabot alerts that no open issue names       | Network         |
+| `scripts/docs-audit.mjs`        | The docs audit of the `docs-audit.yml` workflow: picks a run's pages, reads them, opens the issues  | Network         |
+| `scripts/check-issue-links.mjs` | Prints the links of open issues to a file or heading of `main` that does not exist                  | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
 | `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |

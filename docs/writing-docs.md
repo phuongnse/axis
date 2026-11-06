@@ -149,8 +149,8 @@ pull requests rarely edit the same lines.
 Docs drift when a change adds a rule and leaves the old one beside it, when progress is written into
 the text, when one fact lives in two places, when work is built and its page still says planned, and
 when a list of what the code defines misses an entry. These rules close each of them, in three layers:
-every pull request, the tests, and a weekly audit, as
-[D134](decisions/d134-docs-stay-true-while-work-merges.md) agrees.
+every pull request, the tests, and an audit every hundred merges, as
+[D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees.
 
 1. **Every pull request states its docs.** Its plan and its description have a line `Docs:` that names
    the doc sections it changes, or says why it changes none. It rewrites the section that describes
@@ -181,11 +181,11 @@ every pull request, the tests, and a weekly audit, as
    them, so the test holds no copy that could go stale. It finds the table under `docs/` by its
    header, wherever it moves. Without such a test, the doc names the file that holds the list rather
    than copying it. The review refuses a new list without its test.
-8. **A weekly audit reads the docs against the code.** The audit routine reads a share of the pages
-   each week, in turn, so every page is read about once a month, as the
-   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. It changes nothing
-   itself: it opens a NexKit issue to fix a statement the code contradicts, and one to fix the code
-   where it does not follow an agreed rule.
+8. **An audit reads the docs against the code every hundred merges.** The docs audit workflow reads a
+   quarter of the pages each run, in turn, as the
+   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
+   job with no model opens a NexKit issue to fix a statement the code contradicts, and one to fix the
+   code where it does not follow an agreed rule.
 9. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
    added only once the whole tree passes it: there are no baselines and no lists of exceptions.
    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
