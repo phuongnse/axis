@@ -95,10 +95,10 @@ notification bell. The built views are read only.
     the hosts;
   - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a
     tenant that the worker has not counted yet;
-  - **Usage and quotas** _(planned for M31)_: the newest storage sample against its quota, the users and
-    applications against theirs, and the emails sent today;
-  - **Daily archive** _(planned for M31)_: the time of the newest daily archive, marked when it is more than 26
-    hours old.
+  - the usage: the newest storage sample, the users, the applications and the emails sent today, each against
+    its quota, with a dash while a count is missing, see [the tenant list](tenant-lifecycle.md#routes);
+  - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
+    that has no archive.
 - **Tenant.** One tenant's status, application and hosts, its quotas with the rows that override the cell's
   defaults, and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
   - **Usage** _(planned for M31)_: the usage of the last 13 months by day.

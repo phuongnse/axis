@@ -1,22 +1,37 @@
-import { Alert, Flex, Input, Select } from 'antd'
+import { Alert, Flex, Input, Select, Tag } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { fetchCellTenants, type CellFailedWork, type CellTenant, type CellTenantStatus } from '../platform/cell'
+import {
+  fetchCellTenants,
+  type CellFailedWork,
+  type CellTenant,
+  type CellTenantStatus,
+  type CellTenantUsage,
+} from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
+import { formatBytes } from '../platform/tenantUsage'
+import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
 
 const statuses: CellTenantStatus[] = ['active', 'readOnly', 'suspended', 'provisioning', 'deleting']
 
+/** An archive older than this is stale, see `docs/reference/cell-console.md#views`. The daily run leaves two hours of slack. */
+const staleArchiveMs = 26 * 60 * 60 * 1000
+
 /**
- * The Tenants view of the cell console: one row per tenant of the cell, with a search by id or host and a filter by
- * status. Both run in the browser on the loaded list. It is read only.
+ * The Tenants view of the cell console: one row per tenant of the cell, with its failed work, its usage against its
+ * limits and the time of its newest archive, which carries a mark when it is more than 26 hours old. It has a search by
+ * id or host and a filter by status. Both run in the browser on the loaded list. It is read only.
  */
 export function CellTenantsPage() {
   const t = useText()
   const { onRefused } = useCellConsole()
+  const { locale } = usePlatform().current
+  const { colour } = useDesignTokens()
   const [tenants, setTenants] = useState<CellTenant[]>()
   const [failed, setFailed] = useState(false)
   const [search, setSearch] = useState('')
@@ -55,6 +70,38 @@ export function CellTenantsPage() {
 
   const failedCount = (key: keyof CellFailedWork) => (_value: unknown, tenant: CellTenant) =>
     tenant.failedWork ? tenant.failedWork[key] : <EmptyDash />
+
+  const usageCell = (key: keyof CellTenantUsage) => (_value: unknown, tenant: CellTenant) => {
+    const { limit, used } = tenant.usage[key]
+    if (used === null) {
+      return <EmptyDash />
+    }
+    const amount = (value: number) => (key === 'storage' ? formatBytes(value, locale) : value.toLocaleString(locale))
+    return limit === null
+      ? t('shell.cell.tenants.usedNoLimit').replace('{used}', amount(used))
+      : t('shell.cell.tenants.usedOfLimit').replace('{used}', amount(used)).replace('{limit}', amount(limit))
+  }
+
+  const archiveCell = (_value: unknown, tenant: CellTenant) => {
+    if (tenant.newestArchiveAt === null) {
+      return <EmptyDash />
+    }
+    const stale = Date.now() - Date.parse(tenant.newestArchiveAt) > staleArchiveMs
+    return (
+      <Flex gap="small" align="center" wrap>
+        {new Date(tenant.newestArchiveAt).toLocaleString(locale)}
+        {stale && (
+          <Tag
+            data-testid="cell-tenants-archive-stale"
+            variant="outlined"
+            style={{ color: colour.dangerText, borderColor: colour.danger, background: 'transparent' }}
+          >
+            {t('shell.cell.tenants.archiveStale')}
+          </Tag>
+        )}
+      </Flex>
+    )
+  }
 
   const columns: AxisColumn<CellTenant>[] = [
     {
@@ -99,6 +146,21 @@ export function CellTenantsPage() {
       title: t('shell.cell.tenants.deadLetters'),
       render: failedCount('deadLetters'),
     },
+    { key: 'storage', kind: 'fixed', title: t('shell.cell.tenants.storage'), render: usageCell('storage') },
+    { key: 'users', kind: 'fixed', title: t('shell.cell.tenants.users'), render: usageCell('users') },
+    {
+      key: 'applications',
+      kind: 'fixed',
+      title: t('shell.cell.tenants.applications'),
+      render: usageCell('applications'),
+    },
+    {
+      key: 'emailsToday',
+      kind: 'fixed',
+      title: t('shell.cell.tenants.emailsToday'),
+      render: usageCell('emailsPerDay'),
+    },
+    { key: 'newestArchive', kind: 'fixed', title: t('shell.cell.tenants.newestArchive'), render: archiveCell },
   ]
 
   return (

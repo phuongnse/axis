@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import type { TenantQuotaUse } from './tenantUsage'
 
 /** The signed-in platform operator, as served by `GET /api/cell/session`. */
 export interface CellSession {
@@ -41,13 +42,26 @@ export interface CellFailedWork {
   deadLetters: number
 }
 
-/** One tenant of the cell, as served by `GET /api/cell/tenants`. `failedWork` is `null` until the worker has counted the tenant. */
+/** What a tenant uses against its limits. Each `used` is `null` while nothing fills it. */
+export interface CellTenantUsage {
+  storage: TenantQuotaUse
+  users: TenantQuotaUse
+  applications: TenantQuotaUse
+  emailsPerDay: TenantQuotaUse
+}
+
+/**
+ * One tenant of the cell, as served by `GET /api/cell/tenants`. `failedWork` is `null` until the worker has counted the
+ * tenant, and `newestArchiveAt`, an ISO 8601 time, is `null` for a tenant that was never backed up.
+ */
 export interface CellTenant {
   id: string
   status: CellTenantStatus
   application: string | null
   hosts: string[]
   failedWork: CellFailedWork | null
+  usage: CellTenantUsage
+  newestArchiveAt: string | null
 }
 
 /** One quota of a tenant. `value` is `null` for no limit, and `overridden` is true when the tenant overrides the cell's default. */
