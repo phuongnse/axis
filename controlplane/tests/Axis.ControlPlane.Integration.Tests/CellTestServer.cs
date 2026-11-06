@@ -14,7 +14,7 @@ namespace Axis.ControlPlane.Integration.Tests;
 
 /// <summary>
 /// A stand-in for a cell: a Kestrel server on a free local port that requires a client certificate and accepts only the one
-/// it issued. It serves a fake token endpoint, two <c>POST</c> routes and the job read, and records what it sees. The
+/// it issued. It serves a fake token endpoint, two <c>POST</c> routes, the job read and the tenant list, and records what it sees. The
 /// certificates are made fresh for each server, and written as PEM files to a folder of their own.
 /// </summary>
 internal sealed class CellTestServer : IAsyncDisposable
@@ -58,6 +58,12 @@ internal sealed class CellTestServer : IAsyncDisposable
 
     /// <summary>When set, the create route answers <c>409</c> with this title. Otherwise it queues a job.</summary>
     public string? ConflictTitle { get; set; }
+
+    /// <summary>The tenants that the tenant list route answers, in this order.</summary>
+    public IReadOnlyList<(string Id, string[] Hosts)> Tenants { get; set; } = [];
+
+    /// <summary>When set, the tenant list route answers this status and no list.</summary>
+    public int? TenantListStatus { get; set; }
 
     /// <summary>Makes the next <paramref name="count"/> calls to the cell, the token requests excepted, answer <c>401</c>.</summary>
     public void RefuseNext(int count) => Volatile.Write(ref _refusals, count);
@@ -171,6 +177,21 @@ internal sealed class CellTestServer : IAsyncDisposable
                 : Results.Json(
                     new { id = Guid.Parse("11111111-1111-1111-1111-111111111111"), kind = "create", tenantId = "acme", state = "queued", createdAt = DateTimeOffset.UnixEpoch },
                     statusCode: StatusCodes.Status202Accepted);
+        });
+
+        app.MapGet("/api/cell/tenants", () =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            return TenantListStatus is { } status
+                ? Results.StatusCode(status)
+                : Results.Json(new
+                {
+                    items = Tenants.Select(tenant => new { id = tenant.Id, status = "active", application = (string?)null, hosts = tenant.Hosts, failedWork = (object?)null }),
+                });
         });
 
         app.MapGet("/api/cell/jobs/{id:guid}", (Guid id) =>

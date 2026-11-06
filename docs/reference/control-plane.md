@@ -76,6 +76,9 @@ over a private network with mutual TLS.
   steps and error. Following a job for more than 30 minutes throws, and so does a failed call, so the
   job runner of the control plane retries the handler with the same key and finds the same cell job.
   These timings are code defaults and not `ControlPlane:` settings.
+- **The tenant list.** The client also reads `GET /api/cell/tenants` with the same token and
+  errors, and keeps each tenant's id and hosts. The directory's
+  [correction](region-directory.md#picking-a-cell) uses it.
 
 ## Its own work
 
@@ -105,6 +108,12 @@ every business change.
     `axis.controlplane.jobs.failed` counts it. A job claimed an 11th time, because its runner stopped
     on the 10th attempt, is `failed` the same way without running. These timings are code defaults
     and not `ControlPlane:` settings.
+  - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
+    such as the directory's correction every 5 minutes. Under a database lock on the kind, it queues
+    a job only when none of that kind is `queued` or `running` and none was created within the
+    interval, so the replicas together queue at most one job for each interval. The schedule looks
+    every 30 seconds and the job runner runs the job as any other. A job that waits for a retry
+    keeps the schedule from queuing another of its kind.
   - **At-least-once.** A runner that stops after the handler's side effect but before it marks the
     job done causes a second run, so a handler must be idempotent. The cell's `Idempotency-Key` makes
     the calls to a cell safe.

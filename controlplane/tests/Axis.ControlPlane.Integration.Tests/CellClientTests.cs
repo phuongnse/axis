@@ -203,6 +203,32 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_tenant_list_holds_each_tenant_id_and_hosts_in_the_order_of_the_cell()
+    {
+        _server.Tenants = [("acme", ["acme.vn.example.com", "www.acme.example"]), ("beta", [])];
+        var cell = Build().Get("vn-1");
+
+        var tenants = await cell.ListTenantsAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["acme", "beta"], tenants.Select(t => t.Id));
+        Assert.Equal(["acme.vn.example.com", "www.acme.example"], tenants[0].Hosts);
+        Assert.Empty(tenants[1].Hosts);
+        Assert.Equal(1, _server.TokenCount);
+    }
+
+    [Fact]
+    public async Task A_tenant_list_answered_with_an_error_throws_with_the_status_and_no_body()
+    {
+        _server.TenantListStatus = 500;
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() => cell.ListTenantsAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(500, exception.Status);
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task After_a_401_the_client_gets_one_new_token_and_sends_the_call_again()
     {
         var clients = Build();

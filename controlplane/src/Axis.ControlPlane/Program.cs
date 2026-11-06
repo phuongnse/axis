@@ -3,9 +3,11 @@ using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.Storage;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -29,8 +31,27 @@ builder.Services.AddSingleton(new JobRunnerOptions());
 builder.Services.AddSingleton<IJobHandler, SendEmailJobHandler>();
 builder.Services.AddHostedService<JobRunner>();
 
+// The clock of the job schedule. AddCellClients registers it too, whichever comes first.
+builder.Services.TryAddSingleton(TimeProvider.System);
+
 // The clients of the region's cells. With no cell listed they hold nothing and the service starts as before.
 builder.Services.AddCellClients(options);
+
+// The region directory's own database, keyed so that it does not clash with the control plane's. Without it the service starts as before.
+if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
+{
+    builder.Services.AddKeyedSingleton("directory", (_, _) => NpgsqlDataSource.Create(options.DirectoryConnectionString));
+}
+
+// The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
+if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cells.Count > 0)
+{
+    builder.Services.AddSingleton<IJobHandler, DirectoryCorrection>();
+    builder.Services.AddSingleton(new RecurringJob(DirectoryCorrection.JobKind, TimeSpan.FromMinutes(5)));
+}
+
+// The schedule that queues the recurring jobs above. It is idle when there are none.
+builder.Services.AddHostedService<JobSchedule>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: [HealthEndpoints.ReadyTag])
