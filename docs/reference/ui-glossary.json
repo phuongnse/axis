@@ -84,6 +84,12 @@
       "status": "approved"
     },
     {
+      "concept": "Revision",
+      "en": "revision",
+      "vi": "bản sửa đổi",
+      "status": "proposed"
+    },
+    {
       "concept": "Publish (action)",
       "en": "Publish",
       "vi": "Phát hành",
