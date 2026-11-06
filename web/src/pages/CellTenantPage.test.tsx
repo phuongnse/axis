@@ -1,4 +1,5 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -58,6 +59,34 @@ function stubRoutes(tenant: Answer, jobs: Answer = ok({ items: [job] })) {
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
+}
+
+/**
+ * Answers the actions of the page: each POST takes the next answer of its path and records its Idempotency-Key. The
+ * tenant answers the status that the last POST that was answered with 202 asks for.
+ */
+function stubActions(posts: Record<string, Answer[]>, statuses: Record<string, CellTenantDetail['status']>) {
+  const keys: (string | null)[] = []
+  let status: CellTenantDetail['status'] = 'active'
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      keys.push(new Headers(init.headers).get('Idempotency-Key'))
+      const answer = posts[input]!.shift()!
+      if (answer.status === 202) {
+        status = statuses[input]!
+      }
+      return new Response(JSON.stringify(answer.body), { status: answer.status })
+    }
+    if (input.startsWith('/api/cell/jobs/')) {
+      return new Response(JSON.stringify({ ...job, id: input.split('/').pop() }), { status: 200 })
+    }
+    if (input.startsWith('/api/cell/jobs')) {
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    }
+    return new Response(JSON.stringify({ ...acme, status }), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return keys
 }
 
 function renderPage(path: string, onRefused = vi.fn()) {
@@ -143,5 +172,77 @@ describe('CellTenantPage', () => {
 
     expect(await screen.findByTestId('cell-tenant-jobs-error')).toHaveTextContent('The jobs could not be loaded.')
     expect(await screen.findByTestId('cell-tenant')).toBeInTheDocument()
+  })
+
+  it('offers Suspend and no Resume for an active tenant, and neither for a provisioning one', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(screen.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
+    expect(screen.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
+  })
+
+  it('offers both buttons for a read-only tenant and Resume alone for a suspended one', async () => {
+    stubRoutes(ok({ ...acme, status: 'readOnly' }))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(screen.getByTestId('cell-tenant-suspend')).toBeInTheDocument()
+    expect(screen.getByTestId('cell-tenant-resume')).toBeInTheDocument()
+  })
+
+  it('offers no action for a provisioning tenant', async () => {
+    stubRoutes(ok({ ...acme, status: 'provisioning' }))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cell-tenant-resume')).not.toBeInTheDocument()
+  })
+
+  it('keeps the Idempotency-Key for a retry after a 5xx and sends a new one for the next action', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const queued = { id: '9', kind: 'suspend', tenantId: 'acme', state: 'queued', createdAt: job.createdAt }
+    const keys = stubActions(
+      {
+        '/api/cell/tenants/acme/suspend': [fail(500), { status: 202, body: queued }],
+        '/api/cell/tenants/acme/resume': [{ status: 202, body: { ...queued, id: '10', kind: 'resume' } }],
+      },
+      { '/api/cell/tenants/acme/suspend': 'suspended', '/api/cell/tenants/acme/resume': 'active' },
+    )
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-suspend'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Suspend acme?')
+    await user.click(within(dialog).getByRole('button', { name: /Suspend$/ }))
+    expect(await screen.findByTestId('cell-tenant-action-error')).toHaveTextContent('Try again.')
+    await user.click(await within(dialog).findByRole('button', { name: /Suspend$/ }))
+
+    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Suspended'))
+    expect(screen.queryByTestId('cell-tenant-suspend')).not.toBeInTheDocument()
+    await user.click(screen.getByTestId('cell-tenant-resume'))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Resume$/ }))
+
+    await waitFor(() => expect(screen.getByTestId('cell-tenant')).toHaveTextContent('Active'))
+    expect(keys).toHaveLength(3)
+    expect(keys[0]).toBeTruthy()
+    expect(keys[1]).toBe(keys[0])
+    expect(keys[2]).toBeTruthy()
+    expect(keys[2]).not.toBe(keys[0])
+  })
+
+  it('reports a refusal of an action to the console', async () => {
+    const keys = stubActions({ '/api/cell/tenants/acme/suspend': [fail(403)] }, {})
+    const user = userEvent.setup()
+    const onRefused = renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-suspend'))
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: /Suspend$/ }))
+
+    await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
+    expect(keys).toHaveLength(1)
   })
 })
