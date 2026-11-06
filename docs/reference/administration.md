@@ -832,7 +832,7 @@ up, its output, its audit records and its metric are in
 
 `cell restore-check` checks once that a recent archive restores: it restores the newest archive of a
 random tenant into a scratch tenant, checks it and removes it. It takes no argument and runs only in
-a cell, where `Cell:Id` is set. Its steps, output, audit record and metric are in
+a cell, where `Cell:Id` is set. Its steps, output, audit record, stored result and metric are in
 [weekly restore check](tenant-backup-and-restore.md#weekly-restore-check), and the weekly job is the
 chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
 
@@ -841,8 +841,8 @@ chart's [cell restore-check CronJob](installation.md#settings-and-secrets).
   `IdentityProvider` settings, `IdentityProvider:Url` included, `Studio:ApplicationsPath` when an
   archive holds Studio files, `Scenarios:ServerConnectionString`, which a tenant with a Studio
   application needs, `Extensions:Path` and `Modules:Path`, and `PATH`, to find `pg_restore`.
-- **Exit codes.** `0` when the check passed. `1` when any step after the pick failed or no tenant has
-  an archive of today or yesterday. `2`, with nothing changed and no audit record written, outside a
+- **Exit codes.** `0` when the check passed. `1` when any step after the pick failed, the result could
+  not be stored or no tenant has an archive of today or yesterday. `2`, with nothing changed and no audit record written, outside a
   cell, with an argument, for a missing setting or `pg_restore`, for a
   `Scenarios:ServerConnectionString` that is not a connection string or an `Extensions:Path` or
   `Modules:Path` folder that does not exist, or for an OTLP endpoint setting that is not an absolute

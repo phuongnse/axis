@@ -252,6 +252,34 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("audit_records", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.RestoreCheckRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Passed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("passed");
+
+                    b.Property<DateTimeOffset>("RanAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ran_at");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_restore_checks");
+
+                    b.HasIndex("RanAt")
+                        .HasDatabaseName("ix_restore_checks_ran_at");
+
+                    b.ToTable("restore_checks", "platform");
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantBackupKeyRow", b =>
                 {
                     b.Property<string>("TenantId")

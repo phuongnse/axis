@@ -13,7 +13,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <see cref="TenantPurge"/> on real PostgreSQL and Keycloak. The eight steps remove a tenant and its preview tenant with their databases, roles,
-/// realm, Studio folders, keys and every row of the <c>platform</c> tables that holds a <c>tenant_id</c>, except the jobs and the audit records.
+/// realm, Studio folders, keys and every row of the <c>platform</c> tables that holds a <c>tenant_id</c>, except the jobs, the restore checks and the audit records.
 /// Each purged tenant gets a tombstone with its id, time, actor and hosts. A purge that stopped after the <c>database</c> step finishes when it runs
 /// again and a second tenant stays whole. A job without an actor in its input is refused before it removes a host.
 /// </summary>
@@ -97,7 +97,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
     }
 
     [Fact]
-    public async Task A_purge_leaves_no_row_of_the_tenant_in_any_platform_table_but_the_jobs_and_the_audit_records()
+    public async Task A_purge_leaves_no_row_of_the_tenant_in_any_platform_table_but_the_jobs_the_restore_checks_and_the_audit_records()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         using var studio = new TemporaryFolder();
@@ -107,6 +107,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.Contains("tenant_hosts", tables);
         Assert.Contains("tenant_quotas", tables);
         Assert.DoesNotContain("jobs", tables);
+        Assert.DoesNotContain("restore_checks", tables);
         Assert.DoesNotContain("audit_records", tables);
         foreach (var table in tables)
         {
@@ -121,6 +122,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         }
 
         Assert.Equal(1L, await CountRowsAsync(scenario, "jobs", id));
+        Assert.Equal(1L, await CountRowsAsync(scenario, "restore_checks", id));
         Assert.NotEqual(0L, await CountRowsAsync(scenario, "audit_records", id));
     }
 
@@ -246,7 +248,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
 
     private static string RevisionsOf(TemporaryFolder studio, string id) => Path.Combine(studio.Path, id, ".revisions", "app-a.git");
 
-    // One row in each platform table that a purge removes by hand, and a job row, which stays.
+    // One row in each platform table that a purge removes by hand, and a job row and a restore check row, which stay.
     private static async Task SeedAsync(AdminScenario scenario, string id)
     {
         string[] statements =
@@ -262,6 +264,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
             $"INSERT INTO platform.tenant_platform_providers (tenant_id, name, type, role_values) VALUES ('{id}', 'corp', 'oidc', '[]')",
             $"INSERT INTO platform.tenant_bindings (tenant_id, name, kind, url) VALUES ('{id}', 'ReportsUrl', 'url', 'https://reports.example.test')",
             $"INSERT INTO platform.jobs (id, kind, tenant_id, state, steps, actor) VALUES (gen_random_uuid(), 'suspend', '{id}', 'succeeded', '[]', 'operator-1')",
+            $"INSERT INTO platform.restore_checks (id, ran_at, tenant_id, passed) VALUES (gen_random_uuid(), now(), '{id}', true)",
         ];
         foreach (var statement in statements)
         {
@@ -276,7 +279,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
         await using var command = new NpgsqlCommand(
             """
             SELECT table_name FROM information_schema.columns
-            WHERE table_schema = 'platform' AND column_name = 'tenant_id' AND table_name NOT IN ('jobs', 'audit_records')
+            WHERE table_schema = 'platform' AND column_name = 'tenant_id' AND table_name NOT IN ('jobs', 'restore_checks', 'audit_records')
             ORDER BY table_name
             """,
             connection);
