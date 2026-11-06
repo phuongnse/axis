@@ -92,7 +92,7 @@ over the schema role.
 | `POST /api/cell/auth/sign-out` | Deletes the operator's session and answers `204`. It needs the CSRF header. |
 | `GET /api/cell/session` | Answers the signed-in operator as `{ "displayName" }`, see [sign-in](cell-console.md#sign-in). Needs the operator role. |
 | `GET /api/cell/tenants` | Lists the tenants of the cell as `{ "items": [...] }`, ordered by id, each with its `id`, `status`, `application`, `hosts`, `failedWork`, `usage` and `newestArchiveAt`, read from the platform tables. `status` is `deleting` while a deletion is scheduled, though the stored status stays `suspended`. A preview tenant is left out. `failedWork` is `{ "instances", "unknownCalls", "deadLetters" }`, counts only: the failed instances, the connector and package calls whose outcome is unknown, and the open dead letters. It comes from the worker's hourly [usage sample](tenant-quotas.md#usage) and is `null` until the worker has counted the tenant. `usage` holds `storage`, `users`, `applications` and `emailsPerDay`, each as `{ "limit", "used" }` as [the usage route](tenant-quotas.md#usage) answers it, with the effective limit of the tenant's `quotas` (`null` is no limit). `storage.used` is the newest hourly sample and `null` before the first one. `users.used` and `applications.used` are the newest day row of `platform.tenant_usage` and `null` while nothing fills them. `emailsPerDay.used` is today's `emails` counter, 0 when none was sent. `newestArchiveAt` is the time of the tenant's newest [daily archive](tenant-backup-and-restore.md#daily-backup) in `platform.tenant_backups`, or `null` when the tenant was never backed up. |
-| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting`, `failedWork`, `usage` and `newestArchiveAt` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It answers `404` for an unknown id or a preview tenant's id. |
+| `GET /api/cell/tenants/{id}` | Answers one tenant as an item of the list, `deleting`, `failedWork`, `usage` and `newestArchiveAt` included, with its `quotas`: an object keyed by quota key whose entries hold the effective `value` (`null` is no limit) and `overridden`, which is true when the tenant has a row for the quota. It also answers `days`: the tenant's rows of `platform.tenant_usage` from the last 13 months, newest first, with the columns that [the usage route](tenant-quotas.md#usage) answers. The list answers no `days`. It answers `404` for an unknown id or a preview tenant's id. |
 | `POST /api/cell/tenants` | Creates a tenant, see [creating a tenant](#creating-a-tenant). |
 | `POST /api/cell/tenants/{id}/suspend` | Suspends a tenant, as [`tenant suspend`](tenant-status-commands.md#tenant-suspend) does, through a job. It answers `404` for an unknown id or a preview tenant's id, then `400` without a valid `Idempotency-Key`. |
 | `POST /api/cell/tenants/{id}/resume` | Resumes a tenant, as [`tenant resume`](tenant-status-commands.md#tenant-resume) does, through a job. It answers as `suspend` does. |
@@ -109,8 +109,6 @@ over the schema role.
 
 - **A tenant's application** _(planned for M31)_. The create job records the tenant's application,
   which the tenant reads answer as `application`.
-- **Usage history in the tenant read** _(planned for M31)_. The tenant read answers the tenant's usage
-  history.
 
 ## Creating a tenant
 

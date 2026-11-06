@@ -1,6 +1,6 @@
 import { apiFetch } from './api'
 import { fileNameOf } from './exports'
-import type { TenantQuotaUse } from './tenantUsage'
+import type { TenantQuotaUse, TenantUsageDay } from './tenantUsage'
 
 /** The signed-in platform operator, as served by `GET /api/cell/session`. */
 export interface CellSession {
@@ -79,9 +79,10 @@ export interface CellQuota {
   overridden: boolean
 }
 
-/** One tenant with its quotas, as served by `GET /api/cell/tenants/{id}`. */
+/** One tenant with its quotas and its usage of the last 13 months by day, newest first, as served by `GET /api/cell/tenants/{id}`. */
 export interface CellTenantDetail extends CellTenant {
   quotas: Record<string, CellQuota>
+  days: TenantUsageDay[]
 }
 
 /**

@@ -302,6 +302,7 @@
   "shell.cell.tenant.application": "Ứng dụng",
   "shell.cell.tenant.hosts": "Máy chủ",
   "shell.cell.tenant.quotas": "Hạn mức",
+  "shell.cell.tenant.usage": "Mức sử dụng",
   "shell.cell.tenant.noQuotas": "Tenant này chưa có hạn mức nào.",
   "shell.cell.tenant.jobs": "Tác vụ",
   "shell.cell.tenant.jobsLoadFailed": "Không tải được các tác vụ.",

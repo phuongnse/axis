@@ -100,8 +100,9 @@ actions of the Tenant view.
   - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
     that has no archive.
 - **Tenant.** One tenant's status, application and hosts, its quotas with the rows that override the cell's
-  defaults, and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
-  - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
+  defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
+  - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
+    section, see [the tenant read](tenant-lifecycle.md#routes).
   - **Host verification** _(planned for M31)_: the verification state of each host.
   - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation

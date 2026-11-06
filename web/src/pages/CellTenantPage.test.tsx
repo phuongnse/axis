@@ -40,6 +40,7 @@ const acme: CellTenantDetail = {
     applications: { value: 10, overridden: false },
     storage: { value: null, overridden: true },
   },
+  days: [],
 }
 const job: CellJob = {
   id: '3',
@@ -184,6 +185,32 @@ describe('CellTenantPage', () => {
     expect(jobRows).toHaveLength(2)
     expect(jobRows[1]).toHaveTextContent('suspend')
     expect(fetchMock).toHaveBeenCalledWith('/api/cell/jobs?tenant=acme', expect.anything())
+  })
+
+  it('lists the days of the tenant read in the usage table', async () => {
+    const day = {
+      day: '2026-11-04',
+      databaseBytes: 2048,
+      fileBytes: 0,
+      users: 3,
+      applications: null,
+      emailsSent: 7,
+      connectorCalls: 9,
+      workItemsRun: 4321,
+    }
+    stubRoutes(ok({ ...acme, days: [day] }))
+    renderPage('/tenants/acme')
+
+    const rows = within(await screen.findByTestId('cell-tenant-usage')).getAllByRole('row')
+    expect(rows).toHaveLength(2)
+    expect(rows[1]).toHaveTextContent('4,321')
+  })
+
+  it('shows the empty text when the tenant read has no days', async () => {
+    stubRoutes(ok(acme))
+    renderPage('/tenants/acme')
+
+    expect(await screen.findByTestId('cell-tenant-usage')).toHaveTextContent('No usage recorded yet.')
   })
 
   it('shows the not-found page and no quotas for an unknown id', async () => {

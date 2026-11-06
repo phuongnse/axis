@@ -70,6 +70,11 @@ test.beforeAll(async () => {
     `INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('${tenant}', now() - interval '30 hours')
      ON CONFLICT (tenant_id) DO UPDATE SET last_success_at = EXCLUDED.last_success_at`,
   )
+  // A day three days back, so the worker's sample of today cannot overwrite it.
+  psql(
+    `INSERT INTO platform.tenant_usage (tenant_id, day, work_items_run) VALUES ('${tenant}', (now() AT TIME ZONE 'UTC')::date - 3, 4321)
+     ON CONFLICT (tenant_id, day) DO UPDATE SET work_items_run = EXCLUDED.work_items_run`,
+  )
 
   // Offset 3, because the tenant create spec, the terms spec and the read-only spec serve their tenants on offsets 0 to 2.
   server = await startDirectoryServer(3, {
@@ -145,6 +150,7 @@ test('a platform operator signs in with a password and a code, sees the tenants 
 
   await link.click()
   await expect(page.getByTestId('cell-tenant')).toContainText(tenantHost)
+  await expect(page.getByTestId('cell-tenant-usage').getByRole('row').filter({ hasText: '4,321' })).toBeVisible()
   await expectNoViolations(page)
 })
 
