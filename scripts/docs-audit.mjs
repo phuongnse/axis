@@ -185,11 +185,24 @@ function trackedDocs() {
   return run('git', ['ls-files', 'docs'], { cwd: root }).split('\n').filter(Boolean)
 }
 
+export const maxReaders = 4
+
+// The only subagent a run may start. It has no Task tool, so it starts no subagents of its own,
+// and a run starts at most maxReaders of them, so a run stays within the subscription's limits.
+export const reader = {
+  'docs-auditor': {
+    description: 'Reads a group of Axis docs pages against the code and returns findings with evidence.',
+    prompt:
+      'Read .claude/skills/axis-docs-audit/SKILL.md, then follow its section "Reading a page" for the pages you are given. Return every finding with its page, line, kind, statement and evidence.',
+    tools: ['Read', 'Grep', 'Glob'],
+  },
+}
+
 export function promptFor(pages) {
   return [
     'Read .claude/skills/axis-docs-audit/SKILL.md, then follow its section "Reading a page" for these pages:',
     ...pages.map((p) => `- ${p}`),
-    'Use subagents for groups of about eight pages. Start each one in the foreground, never in the background. Wait until every subagent has returned. A subagent starts no subagents of its own. Then answer once, with the findings only, in the given schema.',
+    `Split the pages into at most ${maxReaders} groups and give each group to a docs-auditor subagent, the only kind you may start. Start each one in the foreground, never in the background. Wait until every subagent has returned. Then answer once, with the findings only, in the given schema.`,
   ].join('\n')
 }
 
@@ -206,6 +219,8 @@ function read(runNumber) {
       process.env.DOCS_AUDIT_MODEL ?? 'claude-opus-5-5',
       '--tools',
       'Read,Grep,Glob,Task',
+      '--agents',
+      JSON.stringify(reader),
       '--json-schema',
       JSON.stringify(findingsSchema),
     ],

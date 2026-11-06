@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { issuesFrom, maxIssues, pagesFor, parseAnswer, promptFor, shares } from './docs-audit.mjs'
+import { issuesFrom, maxIssues, maxReaders, pagesFor, parseAnswer, promptFor, reader, shares } from './docs-audit.mjs'
 
 const finding = (page, line, kind, extra = {}) => ({
   page,
@@ -60,12 +60,18 @@ describe('parseAnswer', () => {
 })
 
 describe('promptFor', () => {
-  test('asks for foreground subagents, a wait for all of them, and no subagents of subagents', () => {
+  test('asks for at most four docs-auditor subagents in the foreground, and a wait for all of them', () => {
     const prompt = promptFor(['docs/a.md'])
     assert.match(prompt, /foreground/)
     assert.match(prompt, /wait/i)
-    assert.match(prompt, /starts no subagents/)
+    assert.match(prompt, new RegExp(`at most ${maxReaders} groups`))
+    assert.match(prompt, /docs-auditor subagent, the only kind/)
     assert.match(prompt, /^- docs\/a\.md$/m)
+  })
+
+  test('gives the docs-auditor subagent read-only tools and no Task, so it starts no subagents', () => {
+    assert.deepEqual(Object.keys(reader), ['docs-auditor'])
+    assert.deepEqual(reader['docs-auditor'].tools, ['Read', 'Grep', 'Glob'])
   })
 })
 

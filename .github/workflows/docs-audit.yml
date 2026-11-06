@@ -36,8 +36,10 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Read this run's pages
         id: read
+        # The fallback subscription, which NexKit uses only when the main one is at its limit, so
+        # the audit does not take the main one's usage from NexKit's rounds.
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_FALLBACK_OAUTH_TOKEN }}
         run: |
           mkdir -p artifacts/docs-audit
           node scripts/docs-audit.mjs pages "$GITHUB_RUN_NUMBER" > artifacts/docs-audit/pages.txt
