@@ -38,6 +38,15 @@ const cellSettings = {
   Cell__ConsoleHost: 'console.localhost',
 }
 
+// The export job stores its ZIP in the MinIO that scripts/e2e.sh starts. The server reads it back for the download.
+const exportStorage = {
+  Cell__ExportStorage__ServiceUrl: required('AXIS_E2E_EXPORT_STORAGE_URL', 'the address of the export storage'),
+  Cell__ExportStorage__Region: required('AXIS_E2E_EXPORT_STORAGE_REGION', 'the region of the export storage'),
+  Cell__ExportStorage__Bucket: required('AXIS_E2E_EXPORT_STORAGE_BUCKET', 'the bucket of the export storage'),
+  Cell__ExportStorage__AccessKeyId: required('AXIS_E2E_EXPORT_STORAGE_ACCESS_KEY', 'the access key of the export storage'),
+  Cell__ExportStorage__SecretAccessKey: required('AXIS_E2E_EXPORT_STORAGE_SECRET_KEY', 'the secret key of the export storage'),
+}
+
 /** Runs `sql` on the platform database in the E2E PostgreSQL container. */
 function psql(sql: string) {
   const container = process.env.AXIS_E2E_POSTGRES_CONTAINER
@@ -65,6 +74,7 @@ test.beforeAll(async () => {
   // Offset 3, because the tenant create spec, the terms spec and the read-only spec serve their tenants on offsets 0 to 2.
   server = await startDirectoryServer(3, {
     ...cellSettings,
+    ...exportStorage,
     Cell__ConsoleClientSecret: 'axis-cell-console-development-secret',
     IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
   })
@@ -78,6 +88,7 @@ test.beforeAll(async () => {
   // The run's shared publisher runs no provisioning jobs, so this one runs the jobs that the console queues.
   publisher = await startPublisher({
     ...cellSettings,
+    ...exportStorage,
     Cell__BackupKeyFile: backupKeyFile,
     Studio__ApplicationsPath: applications,
     IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
@@ -216,6 +227,54 @@ test('the platform operator adds a host to a tenant and sees the records to add'
   await expect(records).toContainText(`_axis-verify.${host}`)
   await expect(records).toContainText(tenantHost)
   await expectNoViolations(page)
+})
+
+test('the platform operator exports a tenant, follows the job and downloads the ZIP after the warning', async () => {
+  // The export job reads the tenant's database and writes the ZIP to the export storage.
+  const page = operator
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+
+  await page.getByTestId('cell-tenant-export').click()
+  await expect(await waitForDialog(page)).toContainText(tenant)
+  await expectNoViolations(page)
+  await confirmDialog(page, 'Export')
+
+  const newestJob = page.getByTestId('cell-jobs').getByRole('row').nth(1)
+  await expect(newestJob).toContainText('export', { timeout: 60_000 })
+  await expect(newestJob).toContainText('Succeeded', { timeout: 120_000 })
+
+  await page.getByTestId('cell-tenant-download').click()
+  const warning = await waitForDialog(page)
+  await expect(warning).toContainText('restricted data')
+  await expectNoViolations(page)
+  const download = page.waitForEvent('download')
+  await confirmDialog(page, 'Download')
+  expect((await download).suggestedFilename()).toMatch(new RegExp(`^${tenant}-[0-9a-f-]{36}\\.zip$`))
+})
+
+test('cancelling the download warning downloads nothing', async () => {
+  const page = operator
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+  // The previous test's export is still among the jobs of the tenant.
+  await expect(page.getByTestId('cell-jobs')).toContainText('export')
+
+  const zipRequests: string[] = []
+  let downloads = 0
+  page.on('request', (request) => {
+    if (request.url().includes('/exports/') && (request.headers().accept ?? '').includes('application/zip')) {
+      zipRequests.push(request.url())
+    }
+  })
+  page.on('download', () => downloads++)
+
+  await page.getByTestId('cell-tenant-download').click()
+  const warning = await waitForDialog(page)
+  await warning.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(warning).toBeHidden()
+  await page.waitForTimeout(1_000)
+
+  expect(zipRequests).toEqual([])
+  expect(downloads).toBe(0)
 })
 
 test('the platform operator creates a tenant, follows the create job and opens the new tenant', async () => {

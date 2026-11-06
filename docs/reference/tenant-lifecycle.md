@@ -240,8 +240,8 @@ restore takes an [archive](tenant-backup-and-restore.md), never an export.
   record that names that caller as actor and `export:<id>` in `changed`.
 - **Sensitive fields.** The export holds their values in clear, because the data is the owner's. The
   ZIP is [restricted](keys-and-data-protection.md#restricted) data.
-- **The console's warning** _(planned for M31)_. The cell console says that the ZIP is restricted data
-  before the download.
+- **The console's warning.** The cell console asks the operator to accept a warning that the ZIP is
+  restricted data before it fetches the ZIP, see [cell console actions](cell-console.md#actions).
 
 ### ZIP layout
 
