@@ -321,7 +321,7 @@
     ]
   },
   "github_app": {
-    "slug": "nexkit-phuongnse",
+    "slug": "nexkit-agent",
     "app_id_secret": "NEXKIT_APP_ID",
     "private_key_secret": "NEXKIT_APP_PRIVATE_KEY"
   }
