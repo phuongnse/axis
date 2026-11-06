@@ -134,7 +134,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| C9 | A hijacked `CNAME` sends a tenant's traffic to another host. | Region directory and DNS | Tampering | High | **Gap** | [#2449](https://github.com/phuongnse/axis/issues/2449) writes the records through TSIG-signed dynamic updates. |
+| C9 | A hijacked `CNAME` sends a tenant's traffic to another host. | Region directory and DNS | Tampering | High | **Gap** | `Rfc2136DnsRecordsTests` (the adapter signs its dynamic updates with TSIG, a server refuses an update signed with a wrong key, and an answer without a valid signature is a failure) cover the adapter, but no tenant record is written through it yet. [#2449](https://github.com/phuongnse/axis/issues/2449) writes the record when a tenant is created. |
 | C10 | A record left behind after a tenant's deletion lets someone take over the subdomain. | Region directory and DNS | Spoofing | High | **Gap** | [#2449](https://github.com/phuongnse/axis/issues/2449) removes the record as an idempotent job when the tenant is deleted. |
 
 Information disclosure and elevation of privilege do not apply to a `CNAME` record, which holds only a

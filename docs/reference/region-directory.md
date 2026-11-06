@@ -56,8 +56,11 @@ A tenant's traffic goes from DNS straight to its cell, so nothing global sits in
 
 - **DNS, not a router.** Each tenant's subdomain gets a `CNAME` record of its own to its cell's
   ingress, `ingress.<cell id>.<tenant domain>`, with a time to live of 300 seconds. The control plane
-  writes the record through the DNS provider's API when it creates the tenant, and removes it when the
-  tenant is deleted.
+  writes the record with an RFC 2136 dynamic update over TCP, signed with a TSIG HMAC-SHA256 key, when
+  it creates the tenant, and removes it when the tenant is deleted. A set deletes the name's `CNAME`
+  record set and adds the new record in one update, and a remove deletes the record set, so both are
+  idempotent. The [settings](control-plane.md#settings) `ControlPlane:Dns` name the server, the zone and
+  the key.
 - **No shared hop.** A request goes from DNS straight to the cell, so a failure of the directory or
   the control plane never stops a tenant's traffic.
 - **No wildcard record.** Every tenant has a record of its own, so the region's DNS zone has no
