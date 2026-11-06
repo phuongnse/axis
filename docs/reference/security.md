@@ -385,9 +385,10 @@ users, clients and roles, and why a sign-in under Docker Compose cannot complete
 
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
-`scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json`.
-How a user signs in, with the development password and a code, is in
-[the axis realm](../development.md#the-axis-realm).
+`scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json` and
+`samples/keycloak/axis-operators-realm.json`. How a user signs in, with the development
+password and a code, is in [the axis realm](../development.md#the-axis-realm). The operator
+realm's user signs in as in [the operator realm](../development.md#the-operator-realm).
 
 | User                | Roles                   | Used by                                                                                                                                       |
 | ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -406,6 +407,7 @@ How a user signs in, with the development password and a code, is in
 | `auditor`           | `auditor`               | Asset management sample; E2E asset management journey; the user whose roles the E2E users page journey gives and removes                      |
 | `administrator`     | `tenant-administrator`  | "Users" in the shell, E2E shell journey; E2E users page journey                                                                               |
 | `platform-operator` | `platform-operator`     | The operator console under `scripts/dev.sh`; E2E operator console journey; E2E module contract journey                                        |
+| `cell-operator`     | `cell-operator`         | The cell console, in the `axis-operators` realm; E2E cell console journey                                                                     |
 
 ## Machine callers
 

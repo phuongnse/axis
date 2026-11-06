@@ -134,8 +134,8 @@ runs Playwright in Chromium. It:
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
-- makes a throwaway TLS certificate for the run, which the tenant create spec's https server uses on
-  `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
+- makes a throwaway TLS certificate for the run, which the https server of the tenant create spec and
+  of the cell console spec uses on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](#widget-previews).
 
@@ -505,9 +505,9 @@ health checks only. Studio runs scenarios only when the server turns on `Studio:
 
 ## Development realm and users
 
-Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with two realms from
-`samples/keycloak`: `axis`, the development realm, and `company`, which plays an organization's own
-identity provider. The [development users table](reference/security.md#development-users) lists each
+Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with three realms from
+`samples/keycloak`: `axis`, the development realm, `company`, which plays an organization's own
+identity provider, and `axis-operators`, the operator realm of the cell console. The [development users table](reference/security.md#development-users) lists each
 user of the `axis` realm and the roles they hold.
 
 ### The axis realm
@@ -583,6 +583,22 @@ organization's own identity provider, which the `axis` realm brokers to.
   `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a person sees that
   they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never
   ships.
+
+### The operator realm
+
+The realm `axis-operators`, from `samples/keycloak/axis-operators-realm.json`, is the
+[operator realm](reference/cell-console.md#sign-in) of a development cell.
+
+- It holds the role `cell-operator` and one user with it, `cell-operator` (Cell Operator), with the
+  password `axis` and the Base32 authenticator secret that the file holds. Specs read the secret with
+  `totpSecret('cell-operator', 'axis-operators')` in `tests/e2e/totp.ts`.
+- Its confidential client `axis-cell-console` has the secret `axis-cell-console-development-secret`
+  and one redirect, `https://console.localhost/api/cell/auth/callback`.
+- `CONFIGURE_TOTP` is a default required action, so an account made in the realm sets up an
+  authenticator at its first sign-in. The browser flow keeps Keycloak's own, which asks for a code only
+  from an account that has an authenticator.
+- Compose and `scripts/dev.sh` import the realm only when Keycloak first starts, so a Keycloak that
+  already runs needs to be recreated to get it.
 
 ### Deployment bindings of the default tenant
 

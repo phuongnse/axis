@@ -22,9 +22,10 @@
 //   docs/reference/threat-model-*.md, has a unique id across all of them, a status and a rating from
 //   the lists, and evidence. A Mitigated row names only test classes declared under tests/, controlplane/tests/
 //   or samples/, a Gap row links the GitHub issue that closes it, and an Accepted row gives a date.
-// - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
-//   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
-//   each realm user's id is its username.
+// - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json or axis-operators-realm.json,
+//   has a '### Development users' table that lists the same users as the users of the files that exist, except
+//   service accounts. Each user has the same roles in the table as in the realm: the axis roles of the axis realm,
+//   the realm roles of the operator realm. No username is in both files, and each realm user's id is its username.
 // - A doc under docs/ has at most 1,000 lines, and a change that grows a doc past 900 lines fails.
 //   The base for "grows" is NEXKIT_BASE_SHA, else the merge base with origin/main. With neither,
 //   only the 1,000 limit applies. AGENTS.md has at most 100 lines, no rule in it takes more than 5, and a SKILL.md under
@@ -63,6 +64,7 @@ const threatHeader = '| Id | Threat | Boundary | Category | Rating | Status | Ev
 const threatSeparator = '| --- | --- | --- | --- | --- | --- | --- |'
 const securityFile = 'docs/reference/security.md'
 export const realmFile = 'samples/keycloak/axis-realm.json'
+export const operatorRealmFile = 'samples/keycloak/axis-operators-realm.json'
 const developmentUsersHeading = '### Development users'
 const issueLinkPattern = /\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)/
 const isoDatePattern = /\b\d{4}-\d{2}-\d{2}\b/
@@ -193,10 +195,14 @@ function checkThreatTables(file, report, testClasses, seen, relative) {
   }
 }
 
-/** Checks the development users table of the security reference against the users of the development realm. */
+/** Checks the development users table of the security reference against the users of the development realms. */
 function checkDevelopmentUsers(root, report) {
   const security = path.join(root, securityFile)
-  const realm = path.join(root, realmFile)
+  const realms = [
+    { file: realmFile, roles: (user) => user.clientRoles?.axis ?? [] },
+    { file: operatorRealmFile, roles: (user) => user.realmRoles ?? [] },
+  ].filter(({ file }) => existsSync(path.join(root, file)))
+  const realmNames = realms.map(({ file }) => file).join(' or ')
   const text = lines(security)
   const heading = text.findIndex((line) => line === developmentUsersHeading)
   const header = heading < 0 ? -1 : text.findIndex((line, i) => i > heading && line.startsWith('|'))
@@ -204,7 +210,7 @@ function checkDevelopmentUsers(root, report) {
   const userColumn = columns.indexOf('User')
   const rolesColumn = columns.indexOf('Roles')
   if (userColumn < 0 || rolesColumn < 0) {
-    report(security, 1, `needs a ${developmentUsersHeading} section with a User and Roles table, checked against ${realmFile}`)
+    report(security, 1, `needs a ${developmentUsersHeading} section with a User and Roles table, checked against ${realmNames}`)
     return
   }
 
@@ -217,31 +223,40 @@ function checkDevelopmentUsers(root, report) {
     table.set(user, { line: i + 1, roles })
   }
 
-  const realmLines = lines(realm)
-  const realmLine = (username) => {
-    const index = realmLines.findIndex((line) => line.includes(`"username": "${username}"`))
-    return index < 0 ? 1 : index + 1
+  const realmUsers = new Map()
+  for (const { file, roles } of realms) {
+    const realmPath = path.join(root, file)
+    const realmLines = lines(realmPath)
+    const realmLine = (username) => {
+      const index = realmLines.findIndex((line) => line.includes(`"username": "${username}"`))
+      return index < 0 ? 1 : index + 1
+    }
+    const users = (JSON.parse(readFileSync(realmPath, 'utf8')).users ?? []).filter((user) => !user.serviceAccountClientId)
+    for (const user of users) {
+      const line = realmLine(user.username)
+      if (realmUsers.has(user.username)) {
+        report(realmPath, line, `${user.username} is in ${realmUsers.get(user.username).file} too: a username is in one development realm only`)
+        continue
+      }
+      realmUsers.set(user.username, { file, roles: roles(user) })
+      if (!table.has(user.username)) {
+        report(realmPath, line, `${user.username} is in ${file} but not in the development users table of ${securityFile}`)
+      }
+      if (user.id !== user.username) report(realmPath, line, `${user.username} has the id '${user.id}': a development user's id is its username`)
+    }
   }
-  const users = (JSON.parse(readFileSync(realm, 'utf8')).users ?? []).filter((user) => !user.serviceAccountClientId)
-  const realmUsers = new Map(users.map((user) => [user.username, user]))
 
   for (const [user, { line, roles }] of table) {
     const realmUser = realmUsers.get(user)
     if (!realmUser) {
-      report(security, line, `${user} is in the development users table but not in ${realmFile}`)
+      report(security, line, `${user} is in the development users table but not in ${realmNames}`)
       continue
     }
     const tableRoles = [...roles].sort().join(', ')
-    const realmRoles = [...(realmUser.clientRoles?.axis ?? [])].sort().join(', ')
+    const realmRoles = [...realmUser.roles].sort().join(', ')
     if (tableRoles !== realmRoles) {
-      report(security, line, `${user} has the roles ${tableRoles || 'none'} in the table and ${realmRoles || 'none'} in ${realmFile}`)
+      report(security, line, `${user} has the roles ${tableRoles || 'none'} in the table and ${realmRoles || 'none'} in ${realmUser.file}`)
     }
-  }
-  for (const { username, id } of users) {
-    if (!table.has(username)) {
-      report(realm, realmLine(username), `${username} is in ${realmFile} but not in the development users table of ${securityFile}`)
-    }
-    if (id !== username) report(realm, realmLine(username), `${username} has the id '${id}': a development user's id is its username`)
   }
 }
 
@@ -327,7 +342,7 @@ export function checkDocs(root, { baseLineCount } = {}) {
     if (lines(file).some((line) => line.trim() === threatHeader)) checkThreatTables(file, report, testClasses, seenThreats, relative)
   }
 
-  if (existsSync(path.join(root, securityFile)) && existsSync(path.join(root, realmFile))) {
+  if (existsSync(path.join(root, securityFile)) && [realmFile, operatorRealmFile].some((file) => existsSync(path.join(root, file)))) {
     checkDevelopmentUsers(root, report)
   }
 

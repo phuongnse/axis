@@ -21,6 +21,18 @@ describe('PageLayout', () => {
     expect(screen.getByText('Page content')).toBeInTheDocument()
   })
 
+  it('makes the title the level-one heading of the page', () => {
+    render(
+      <ThemeModeProvider>
+        <PageLayout title="Purchase requests">
+          <p>Page content</p>
+        </PageLayout>
+      </ThemeModeProvider>,
+    )
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Purchase requests' })).toBeInTheDocument()
+  })
+
   it('puts the breadcrumb above the title, with links but the last step, which is the current page', () => {
     render(
       <ThemeModeProvider>

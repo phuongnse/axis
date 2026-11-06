@@ -36,6 +36,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       colorBgContainer: colour.surface,
       colorText: colour.text,
       colorTextTertiary: colour.textMuted,
+      // A placeholder is text that a person reads, so it meets 4.5:1 contrast as well.
+      colorTextPlaceholder: colour.textMuted,
       // Text colours: Ant Design draws text in these as they are, not as seeds.
       colorPrimaryText: colour.primaryText,
       colorSuccessText: colour.successText,
