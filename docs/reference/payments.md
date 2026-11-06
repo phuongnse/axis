@@ -1,13 +1,13 @@
 # Payments
 
-_(planned for M34)_
-
 A tenant of Axis SaaS pays for its subscription by bank transfer in Vietnam and through a merchant of
 record abroad. This page covers the billing invoices, the two ways to pay, the providers' webhooks,
 the daily reconciliation and the ledger that holds every amount. No payment is taken before the
 company, the providers' contracts and the accountant are in place.
 
 ## Invoices
+
+_(planned for M34)_
 
 A billing invoice is Axis's own record of what a subscription owes for a period or a change.
 
@@ -21,6 +21,8 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
   Vietnam, `USD` when it pays abroad. It does not change.
 
 ## Paying in Vietnam
+
+_(planned for M34)_
 
 In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 
@@ -40,6 +42,8 @@ In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 
 ## Paying abroad
 
+_(planned for M34)_
+
 Abroad a merchant of record sells the subscription and takes the payment.
 
 - **Merchant of record.** Paddle Billing sells the subscription, takes the payment, handles tax and
@@ -51,6 +55,8 @@ Abroad a merchant of record sells the subscription and takes the payment.
 - **No e-invoice from Axis.** Paddle's invoice is the customer's invoice.
 
 ## Webhooks
+
+_(planned for M34)_
 
 Both providers tell Axis about payments by webhooks, at `POST /api/payments/payos/webhook` and
 `POST /api/payments/paddle/webhook` on the regional control plane.
@@ -67,6 +73,8 @@ Both providers tell Axis about payments by webhooks, at `POST /api/payments/payo
 
 ## Reconciliation
 
+_(planned for M34)_
+
 Webhooks can be lost, so each night the control plane asks each provider for the day's transactions
 and compares them with its ledger.
 
@@ -80,12 +88,24 @@ and compares them with its ledger.
 The ledger is the only source of money: every amount is an entry in it, and nothing else holds one.
 
 - **Append-only.** `billing.ledger_entries` holds every charge, credit, payment, refund and
-  proration: the subscription, the invoice, the kind, the signed amount in minor units, the currency,
-  the provider's reference and the time. No entry is updated or deleted: the control plane's database
-  role has `INSERT` and `SELECT` on the table and nothing else. A correction is a new entry.
-- **Balances are sums.** What a subscription owes is the sum of its entries, so the ledger is the
-  only source of money, and the invoices and the portal read it.
-- **Refunds.** The operator issues a refund with `Axis.ControlPlane.Admin`. A refund through Paddle
-  goes through its API. A refund in Vietnam is a bank transfer the operator makes, then records.
-- **Idempotent calls.** Each call to a provider carries an idempotency key from the ledger's record,
-  so a retry never charges twice.
+  proration. Its columns are the `id`, the `subscription_id`, the optional `invoice_id`, the `kind`
+  (`charge`, `credit`, `payment`, `refund` or `proration`), the signed `amount_minor`, the `currency`,
+  the optional `provider_reference`, the `idempotency_key` and `occurred_at`. The control plane's
+  database role has `INSERT` and `SELECT` on the table and nothing else, and triggers reject every
+  update, delete and truncate with `restrict_violation`, even from a superuser. A correction is a new
+  entry.
+- **Whole numbers.** `amount_minor` is a `bigint` of minor units, such as dong for `VND` and cents
+  for `USD`. A positive amount raises what the subscription owes and a negative one lowers it, so
+  charges and refunds are positive, payments and credits are negative, and a proration is never zero.
+  The `currency` is a three-letter upper-case ISO 4217 code. The database refuses an entry with
+  another kind, sign or currency.
+- **One entry for each key.** The `idempotency_key` is unique. An append with a key that exists adds
+  nothing and reports so, even if the amount differs, so a retried webhook or job never counts money
+  twice.
+- **Balances are sums.** What a subscription owes is the sum of its entries for each currency, as a
+  whole number, so the ledger is the only source of money, and the invoices and the portal read it.
+- **Refunds** _(planned for M34)_. The operator issues a refund with `Axis.ControlPlane.Admin`. A
+  refund through Paddle goes through its API. A refund in Vietnam is a bank transfer the operator
+  makes, then records.
+- **Idempotent calls** _(planned for M34)_. Each call to a provider carries an idempotency key from
+  the ledger's record, so a retry never charges twice.
