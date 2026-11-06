@@ -1,7 +1,7 @@
 # Health checks
 
-The server and the worker each serve `/health/live` and `/health/ready`, so that an orchestrator can
-restart a host that hangs and route traffic only to a host that is ready. This page says what each
+The server, the worker and the agent host each serve `/health/live` and `/health/ready`, so that an
+orchestrator can restart a host that hangs and route traffic only to a host that is ready. This page says what each
 endpoint answers and when. The reasons are in
 [D37](../decisions/d37-health-checks-for-the-server-and-the-worker.md).
 
@@ -83,6 +83,15 @@ work item can run for up to a lease.
   tenant directory has worked, while `/health/live` stays `200`. A failed refresh of the directory makes
   the worker Degraded (`200`), and the worker keeps running the last good read. It is Healthy again
   after the next refresh that works.
+
+## Agent host
+
+The agent host serves only `/health/live` and `/health/ready`, on the address `Health:Urls`, and
+answers `404` elsewhere. The default is `http://127.0.0.1:5209`, so nothing outside the host reaches it
+until someone changes the setting.
+
+Both endpoints are Healthy, with status `200`, while the process runs. The agent host has no check
+that can make either one Degraded or Unhealthy.
 
 ## Docker Compose
 

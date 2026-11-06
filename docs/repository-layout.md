@@ -14,6 +14,8 @@ it. The .NET projects are in the solution `Axis.slnx`.
 src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
+  Axis.Agent/             the agent host, which runs authoring requests
+  Axis.Hosting/           code that the hosts share: the health endpoints
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and
                           restore, and the publisher
   Axis.Administration/    library behind the Axis.Admin commands, such as the tenant setting commands

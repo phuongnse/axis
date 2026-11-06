@@ -3,6 +3,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Core.Tenancy;
 using Axis.Data;
+using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Server.Applications;
@@ -215,7 +216,7 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
         // Development, so that the worker accepts the stub's http address.
         builder.Services.AddAxisWorker(builder.Configuration, new HostingEnvironment { EnvironmentName = Environments.Development });
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

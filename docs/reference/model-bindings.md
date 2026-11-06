@@ -1,7 +1,5 @@
 # Model bindings and the authoring eval
 
-_(planned for M35)_
-
 The agent host calls a model through an adapter, by a binding that the installation names, so no
 model provider is built into Axis and a closed network can use a model of its own. An authoring eval
 decides which models Axis supports: a model earns its place by what it does, whoever makes it. This
@@ -18,7 +16,7 @@ installation chooses either.
   DeepSeek, Qwen, Mistral, or a model the installation serves itself through vLLM or Ollama.
 - **Who pays the provider.** On premises the customer pays its model provider. In Axis SaaS the
   plan includes a number of requests, see [tenant quotas](tenant-quotas.md).
-- **No provider is built in.** The request loop, the tools and the checks talk to an adapter and do
+- **No provider is built in.** _(planned for M35)_ The request loop, the tools and the checks talk to an adapter and do
   not know which model is behind it. A new provider is a new adapter, and nothing else changes.
 
 The agent host reads these settings:
@@ -32,21 +30,24 @@ The agent host reads these settings:
 | `Ai:Bindings:<name>:MaxOutputTokens` | The largest output of one call, 16,000 by default                                                      |
 | `Ai:DefaultBinding`                  | The binding requests use. With no value, AI authoring is off and Studio shows no request panel         |
 | `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the default binding                                      |
-| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default                                             |
-| `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets)                     |
-| `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default                                                               |
-| `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default                                      |
+| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default _(planned for M35)_                         |
+| `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ |
+| `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default _(planned for M35)_                                           |
+| `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default _(planned for M35)_                  |
 
-- **Bad values.** An unknown kind, a missing model, a key file that cannot be read, or a default
-  binding that names no binding stops the agent host's start and names the setting, never a value.
+- **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
+  `MaxOutputTokens` that is not a whole number of at least 1, or a default or review binding that names
+  no binding stops the agent host's start and names the setting, never a value.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
   tool or stored in a request.
-- **Axis SaaS** uses an `anthropic` binding with Claude by default, because it does well at long runs
+- **Axis SaaS** _(planned for M35)_ uses an `anthropic` binding with Claude by default, because it does well at long runs
   of tool calls. That is a setting of the cell, not a rule of the platform. Each SaaS plan includes a
   number of requests, the `authoringRequests` [quota](tenant-quotas.md#quotas), while on premises the
   customer pays its model provider.
 
 ## A tenant's own key
+
+_(planned for M35)_
 
 Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
 
@@ -58,6 +59,8 @@ Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
 - **Audit.** Setting, changing and removing the key write platform audit records with no key value.
 
 ## The authoring eval
+
+_(planned for M35)_
 
 The authoring eval is a set of authoring requests with known outcomes, run through the MCP server
 against any model.

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Axis.Admin;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
+using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -557,7 +558,7 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database, Mailp
         builder.Services.AddSingleton<SlowHandler>();
         builder.Services.AddSingleton<IWorkItemHandler>(services => services.GetRequiredService<SlowHandler>());
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

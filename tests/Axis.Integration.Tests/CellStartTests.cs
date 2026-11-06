@@ -1,5 +1,6 @@
 using System.Net;
 using Axis.Admin;
+using Axis.Hosting;
 using Axis.Server.Tests;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -189,7 +190,7 @@ public sealed class CellStartTests(PostgreSqlFixture database) : IClassFixture<P
         builder.Configuration.AddInMemoryCollection(settings.Select(setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)));
         builder.Services.AddAxisWorker(builder.Configuration, new HostingEnvironment { EnvironmentName = Environments.Development });
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

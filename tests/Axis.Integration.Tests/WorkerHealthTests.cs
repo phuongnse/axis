@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Core.Tenancy;
+using Axis.Hosting;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Worker;
@@ -109,7 +110,7 @@ public sealed class WorkerHealthTests(PostgreSqlFixture database) : IClassFixtur
         }
 
         var app = builder.Build();
-        app.MapWorkerHealth();
+        app.MapHostHealth();
         return app;
     }
 

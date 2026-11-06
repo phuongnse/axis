@@ -666,16 +666,19 @@ Docker, .NET and Node, and works on a fresh clone.
    `samples/templates/*`, into `artifacts/templates/<id>/<version>/`, and creates that folder even when
    there are none. The Development and E2E settings of the server point `Templates:Path` there. The
    production images and `deploy/` set no `Templates:Path`, so they list no template.
-8. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
+8. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
+   at once, not under `dotnet watch`. With no `Ai` settings it runs idle, and it serves its health
+   endpoints at `http://127.0.0.1:5209`, see [health checks](reference/health-checks.md#agent-host).
+9. It runs the server and the worker under `dotnet watch` and the SPA on Vite, in one terminal. It
    starts the worker once the server has migrated the tenant databases. The SPA proxies `/api` and
    `/health` to the server.
-9. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
+10. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
    The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
    tenant settings as environment variables of that process only, because `Axis.Admin` reads no
    `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
    [publisher](reference/administration.md#publisher).
 
-Each output line starts with `[server]`, `[worker]`, `[web]` or `[publisher]`, and the script's own
+Each output line starts with `[server]`, `[worker]`, `[web]`, `[publisher]` or `[agent]`, and the script's own
 messages start with `[dev]`.
 
 ### Settings it sets
@@ -702,8 +705,9 @@ messages start with `[dev]`.
   `localhost`, while `default` stays on `127.0.0.1`. The realm accepts sign-in and sign-out redirects
   to those addresses.
 - **Ports.** `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`, `AXIS_PURCHASING_PORT`,
-  `AXIS_MAILPIT_SMTP_PORT`, `AXIS_MAILPIT_WEB_PORT`, `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the
-  seven ports, whose defaults are 5432, 8080, 5207, 1025, 8025, 5206 and 5173. When
+  `AXIS_MAILPIT_SMTP_PORT`, `AXIS_MAILPIT_WEB_PORT`, `AXIS_SERVER_PORT`, `AXIS_WEB_PORT` and
+  `AXIS_AGENT_HEALTH_PORT` move the eight ports, whose defaults are 5432, 8080, 5207, 1025, 8025, 5206,
+  5173 and 5209. When
   `AXIS_POSTGRES_PORT` is set, the script points the server's connection strings and the worker's
   `Tenants__default__ConnectionString` at that port. When `AXIS_KEYCLOAK_PORT` is set, it points the
   server's `Tenants__default__Oidc__Authority` at Keycloak on that port, and its
@@ -714,7 +718,8 @@ messages start with `[dev]`.
   `Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value` at the stub on that port.
 - **Worker health.** The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208`
   and answers `404` elsewhere. `Health__Urls` moves that address, and two workers on one machine need
-  different addresses.
+  different addresses. An exported `Health__Urls` moves only the worker's address: the script sets the
+  agent host's address from `AXIS_AGENT_HEALTH_PORT`.
 - **Telemetry.** Neither Docker Compose nor `scripts/dev.sh` starts a telemetry collector, so logs go
   to the console only. Set `OTEL_EXPORTER_OTLP_ENDPOINT` for the server and the worker to export
   traces, metrics and logs, see [telemetry export](reference/host-settings.md#telemetry-export).
@@ -728,15 +733,15 @@ messages start with `[dev]`.
   folders itself, and prints a `[dev]` line when it restarts the server. The worker and the SPA keep
   running. If the edited configuration does not activate, the server exits on its own and the script
   stops with a non-zero code.
-- A change to the sample extension package's C# code, to the publisher's code, or to a module or a
-  template needs a restart of the script, because the server reads the module and template catalogs
+- A change to the sample extension package's C# code, to the publisher's code, to the agent host's
+  code, or to a module or a template needs a restart of the script, because the server reads the module and template catalogs
   only when it starts.
 
 ### Stopping
 
-Ctrl+C stops the server, the worker, the publisher and the SPA. PostgreSQL keeps running with its
+Ctrl+C stops the server, the worker, the publisher, the agent host and the SPA. PostgreSQL keeps running with its
 data, and Keycloak, Mailpit and the purchasing system stub keep running: run `docker compose down` to
-stop them. If any of the four processes exits on its own, the others stop too and the script exits
+stop them. If any of the five processes exits on its own, the others stop too and the script exits
 non-zero.
 
 ## Running a host on its own

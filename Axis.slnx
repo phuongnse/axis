@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Axis.Agent/Axis.Agent.csproj" />
     <Project Path="src/Axis.Admin/Axis.Admin.csproj" />
     <Project Path="src/Axis.Administration/Axis.Administration.csproj" />
     <Project Path="src/Axis.Configuration/Axis.Configuration.csproj" />
@@ -7,6 +8,7 @@
     <Project Path="src/Axis.Data/Axis.Data.csproj" />
     <Project Path="src/Axis.Expressions/Axis.Expressions.csproj" />
     <Project Path="src/Axis.Extensions/Axis.Extensions.csproj" />
+    <Project Path="src/Axis.Hosting/Axis.Hosting.csproj" />
     <Project Path="src/Axis.Policy/Axis.Policy.csproj" />
     <Project Path="src/Axis.Presentation/Axis.Presentation.csproj" />
     <Project Path="src/Axis.Processes/Axis.Processes.csproj" />
@@ -28,6 +30,7 @@
     <Project Path="samples/packages/PaymentReferences.Tests/PaymentReferences.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Axis.Agent.Tests/Axis.Agent.Tests.csproj" />
     <Project Path="tests/Axis.Configuration.Tests/Axis.Configuration.Tests.csproj" />
     <Project Path="tests/Axis.Data.Tests/Axis.Data.Tests.csproj" />
     <Project Path="tests/Axis.Expressions.Tests/Axis.Expressions.Tests.csproj" />
