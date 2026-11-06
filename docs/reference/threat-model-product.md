@@ -5,9 +5,9 @@ How its rows are found, rated and checked is in [threat model method](threat-mod
 
 ## The product
 
-The product is the server, the worker, the SPA, tenants, Studio and authoring, extension packages,
-connectors, endpoints and webhooks, the identity provider Axis ships and the personal data Axis
-holds. The overview shows how the parts connect, and each boundary below has its own table.
+The product is the server, the worker, the SPA, tenants, Studio and authoring, the MCP server and the
+agent host, extension packages, connectors, endpoints and webhooks, the identity provider Axis ships
+and the personal data Axis holds. The overview shows how the parts connect, and each boundary below has its own table.
 
 ```mermaid
 flowchart LR
@@ -360,6 +360,109 @@ flowchart LR
 | P58 | A module brings in roles or policies. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `ModuleCompilerTests` reports a role file in a module as an error. A module policy names only role slots of its module, which the application maps, and grants only on its own module. See [modules](modules-and-templates.md#processes-pages-policies-and-dependencies). |
 | P59 | An untrusted module or template is installed. | Modules and templates | Tampering | High | **Delegated** | The operator chooses what sits in `Modules:Path` and `Templates:Path`. See [modules](modules-and-templates.md#modules). |
 | P60 | A template brings a wide policy into a new application. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `StudioCreateApplicationTests` copies a template as a new application. `StudioPublishTests` shows that an author without the publisher role cannot publish it. |
+
+### MCP server and agent host
+
+_(planned for M35)_
+
+The MCP server at `/mcp` on each tenant host is the only way an agent acts on Axis. The agent host is
+one of its clients, see [MCP server](mcp-server.md) and [authoring requests](authoring-requests.md#the-agent-host).
+It has three boundaries, each with its own diagram below.
+
+**Outside client and MCP server**
+
+```mermaid
+flowchart LR
+    subgraph client [Outside client]
+        Tool[Client such as Claude Code or NexKit]
+    end
+    subgraph realm [Tenant realm]
+        Consent[Sign-in and consent]
+    end
+    subgraph server [Server]
+        Mcp[MCP server at /mcp]
+        Api[Authoring API]
+    end
+    Tool -->|registers by metadata document or dynamic registration| Consent
+    Consent -->|token for the tenant's /mcp audience| Tool
+    Tool -->|POST /mcp with the token| Mcp
+    Mcp -->|checks Origin, audience and the author role| Api
+```
+
+**Author and agent host**
+
+```mermaid
+flowchart LR
+    subgraph author [Author]
+        Person[Author in Studio]
+    end
+    subgraph server [Server]
+        Studio[Studio request API]
+    end
+    subgraph realm [Tenant realm]
+        Exchange[Token exchange for the agent host]
+    end
+    subgraph requestdb [Tenant database]
+        Requests[(axis.authoring_requests)]
+    end
+    subgraph host [Agent host]
+        Agent[Agent that claims the request]
+    end
+    Person -->|sends a request| Studio
+    Studio -->|exchanges the session| Exchange
+    Studio -->|stores the refresh token encrypted| Requests
+    Agent -->|claims the request| Requests
+    Agent -->|calls /mcp with the exchanged token| Studio
+```
+
+**Agent host and model provider**
+
+```mermaid
+flowchart LR
+    subgraph host [Agent host]
+        Agent[Agent that reads the key file]
+    end
+    subgraph adapter [Model adapter]
+        Adapter[anthropic or openai-compatible adapter]
+    end
+    subgraph provider [Model provider]
+        Model[Model API]
+    end
+    subgraph mcp [MCP server]
+        Tools[Tool output]
+    end
+    Tools -->|resources, configuration and diagnostics| Agent
+    Agent -->|messages and tool definitions| Adapter
+    Adapter -->|API call with the key| Model
+    Model -->|answers as tool calls| Adapter
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| P117 | A token for another resource or tenant is accepted. | Outside client and MCP server | Spoofing | Critical | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which answers `401` to a token for another audience or tenant, and by [#3111](https://github.com/phuongnse/axis/issues/3111), which opens a session at `/mcp` only for a token whose audience is that tenant's URL. |
+| P118 | A malicious client registers under a misleading name or redirect URI and asks for consent. | Outside client and MCP server | Spoofing | High | **Gap** | [#2530](https://github.com/phuongnse/axis/issues/2530) allows only `https` or loopback redirect URIs, and its consent screen shows the client's name. [#2529](https://github.com/phuongnse/axis/issues/2529) shows the client and the scope on the consent screen and issues no token when the person declines. |
+| P119 | A client that the `Ai:OutsideClients` setting does not allow gets a token. | Outside client and MCP server | Elevation of privilege | High | **Gap** | Closed by [#2531](https://github.com/phuongnse/axis/issues/2531), which allows no outside client by default and gives no token to a client that is not allowed. See [client registration](mcp-server.md#client-registration). |
+| P120 | A page on another origin drives `/mcp` through DNS rebinding. | Outside client and MCP server | Tampering | Medium | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which refuses a foreign `Origin` with `403` before any method runs. |
+| P121 | A tool reads a record, a file, a secret or a binding value, or publishes a release. | Outside client and MCP server | Information disclosure | High | **Gap** | [#2537](https://github.com/phuongnse/axis/issues/2537) adds a guard test that fails when a tool is not in the documented list, or when a tool output holds a record, a secret or a binding value. See [tools](mcp-server.md#tools). |
+| P122 | A person without the author role calls a tool. | Outside client and MCP server | Elevation of privilege | High | **Gap** | Closed by [#2528](https://github.com/phuongnse/axis/issues/2528), which answers `403` to a person without the author role before any method runs. |
+| P123 | A revoked client keeps using its refresh token. | Outside client and MCP server | Spoofing | Medium | **Gap** | [#2532](https://github.com/phuongnse/axis/issues/2532) gives a revoked client `401` on its next call. [#2529](https://github.com/phuongnse/axis/issues/2529) rotates each refresh token on use and ends it with the realm session. |
+| P124 | Tool calls flood the server. | Outside client and MCP server | Denial of service | Medium | **Gap** | Closed by [#3113](https://github.com/phuongnse/axis/issues/3113), which counts MCP calls in their own rate-limit partition, by tenant and client. |
+| P125 | A write through a tool leaves no record of the person and the client. | Outside client and MCP server | Repudiation | Medium | **Gap** | [#3112](https://github.com/phuongnse/axis/issues/3112) writes one log entry for each call, with the tool, the client ID and the outcome. An accept writes a revision that names its author and request, see [revisions](revisions-and-drafts.md#revisions). |
+| P126 | A refused call shows a stack trace or a path on disk. | Outside client and MCP server | Information disclosure | Low | **Gap** | Closed by [#3112](https://github.com/phuongnse/axis/issues/3112), which answers a tool error with a problem title, never a stack trace or a path. |
+| P127 | The agent host acts beyond the author's grants, or for a person who has lost the author role. | Author and agent host | Elevation of privilege | High | **Gap** | Closed by [#2541](https://github.com/phuongnse/axis/issues/2541), which exchanges the author's session for a token with exactly the author's grants, and refuses an exchange for a person who has lost the author role. |
+| P128 | The stored refresh token is read from the request row. | Author and agent host | Information disclosure | High | **Gap** | [#2541](https://github.com/phuongnse/axis/issues/2541) stores the refresh token encrypted with the tenant's data key, and deletes it when the request ends. See [durable requests](authoring-requests.md#durable-requests). |
+| P129 | The agent accepts a draft without auto-accept, without passing checks or without plan approval. | Author and agent host | Elevation of privilege | High | **Gap** | [#2549](https://github.com/phuongnse/axis/issues/2549) lets the agent accept only when auto-accept is on, the request asks for it, the last review passed and the author still has the role. [#2548](https://github.com/phuongnse/axis/issues/2548) lets only a publisher turn auto-accept on. [#2543](https://github.com/phuongnse/axis/issues/2543) makes no change before the author approves the plan. |
+| P130 | One tenant's long requests starve another tenant, or one request runs without bound. | Author and agent host | Denial of service | Medium | **Gap** | [#2542](https://github.com/phuongnse/axis/issues/2542) serves tenants in turn with leases, so one long request does not hold back another tenant. [#2545](https://github.com/phuongnse/axis/issues/2545) stops a request at its token budget or its time limit, and keeps its draft. |
+| P131 | Another author approves, changes or drops a person's request. | Author and agent host | Elevation of privilege | Medium | **Mitigated** | `AuthoringRequestTests` shows that another author cannot approve, change or drop a request, and that a person without the author role cannot send one. See [acting for the author](authoring-requests.md#acting-for-the-author). |
+| P132 | An author denies having sent, approved or dropped a request. | Author and agent host | Repudiation | Low | **Mitigated** | `AuthoringRequestTests` shows that sending, approving and dropping each write one audit record with the author, the application and the request. See [audit](authoring-requests.md#audit). |
+| P133 | Text in a resource, a module, the request or a tool output makes the agent act beyond the request. | Agent host and model provider | Tampering | High | **Gap** | Tools only, plan approval, an independent review and the accept rules limit what such text can do. They are built by [#2537](https://github.com/phuongnse/axis/issues/2537), [#2543](https://github.com/phuongnse/axis/issues/2543), [#2545](https://github.com/phuongnse/axis/issues/2545) and [#2549](https://github.com/phuongnse/axis/issues/2549). |
+| P134 | Tenant data, secrets or people's names reach the model. | Agent host and model provider | Information disclosure | High | **Gap** | [#2543](https://github.com/phuongnse/axis/issues/2543) keeps record values, people's names and tenant secrets out of the messages sent to the adapter. [#2537](https://github.com/phuongnse/axis/issues/2537) keeps them out of tool output. See [what reaches the model](authoring-requests.md#what-reaches-the-model). |
+| P135 | A model API key appears in a log, a tool output or a request row. | Agent host and model provider | Information disclosure | High | **Gap** | [#2539](https://github.com/phuongnse/axis/issues/2539) reads the key from its file at start, keeps it in memory and writes it to no log line or exception message. [#2546](https://github.com/phuongnse/axis/issues/2546) writes audit records for a tenant's own key without its value. [#2537](https://github.com/phuongnse/axis/issues/2537) keeps secrets out of tool output. |
+| P136 | The model provider keeps or trains on the configuration Axis sends. | Agent host and model provider | Information disclosure | Medium | **Delegated** | The operator chooses the binding and its provider, and so the provider's terms. See [model bindings](model-bindings.md#bindings). |
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Information disclosure, High) a model binding's endpoint may be a plain `http` address, which sends the key and the configuration without encryption.
 
 ### Identity provider
 

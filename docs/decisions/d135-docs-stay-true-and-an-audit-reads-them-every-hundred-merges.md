@@ -61,7 +61,7 @@ Three layers, each closing one kind of drift. The rules are in
 - **Generate the lists from the code.** It cannot drift either, but it needs a generator for each list,
   and generated text reads worse than text written for a person.
 - **A routine that relays the issues.** A Claude Code routine on a weekly clock, or the hourly
-  driver opening the audit's issues as it opens the Dependabot ones, would work today, but a relay is
-  one more moving part, and the runs would not show in the repository.
+  driver opening the audit's issues, would work today, but a relay is one more moving part, and the
+  runs would not show in the repository.
 - **Rely on the milestone docs sweep alone.** A milestone runs for weeks, and the drift found in the
   rewrite had outlived several sweeps.
