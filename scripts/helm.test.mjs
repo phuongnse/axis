@@ -181,7 +181,7 @@ describe('the Axis Helm chart', () => {
     }
     assert.doesNotMatch(
       output,
-      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret|Cell__BackupStorage__AccessKeyId|Cell__BackupStorage__SecretAccessKey)/,
+      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret|Cell__BackupStorage__AccessKeyId|Cell__BackupStorage__SecretAccessKey|IdentityProvider__DatabaseConnectionString)/,
     )
 
     const worker = find(output, 'Deployment', 'axis-worker')
@@ -351,7 +351,7 @@ describe('the Axis Helm chart', () => {
     }
     // In a cell the publisher gets the client secret as a file, and nothing else of the identity provider's.
     assert.doesNotMatch(find(output, 'Deployment', 'axis-publisher'), /identity-tls|KC_DB_/)
-    assert.doesNotMatch(find(output, 'CronJob', 'axis-cell-backup'), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    assert.doesNotMatch(find(output, 'CronJob', 'axis-cell-backup'), /identity-tls|name: "axis-identity"\n|KC_DB_|IdentityProvider__AdminClientSecret/)
     const restoreCheck = find(output, 'CronJob', 'axis-cell-restore-check')
     assert.match(restoreCheck, /- key: "IdentityProvider__AdminClientSecret"\n\s+path: IdentityProvider__AdminClientSecret\n/)
     assert.doesNotMatch(restoreCheck, /identity-tls|KC_DB_/)
@@ -535,6 +535,7 @@ describe('the Axis Helm chart', () => {
     ['secrets.backupStorageAccessKeyId.name', 'secrets.backupStorageAccessKeyId.name='],
     ['secrets.backupStorageSecretAccessKey.name', 'secrets.backupStorageSecretAccessKey.name='],
     ['secrets.cellBackupKey.name', 'secrets.cellBackupKey.name='],
+    ['secrets.identityCredentialsConnection.name', 'secrets.identityCredentialsConnection.name='],
     ['secrets.adminConnection.name', 'secrets.adminConnection.name='],
     ['templates.volume', 'templates.volume=null'],
     ['studio.persistence', 'studio.persistence=null'],
@@ -747,6 +748,19 @@ describe('the Axis Helm chart', () => {
     assert.match(job, /- name: cell-backup-key\n\s+mountPath: \/cell-backup-key\n\s+readOnly: true\n/)
     assert.match(job, /secretName: "axis-cell-backup-key"\n\s+defaultMode: 292\n\s+items:\n\s+- key: "cell-backup-key"\n\s+path: key\n/)
     assert.doesNotMatch(output, /- name: Cell__BackupStorage__(AccessKeyId|SecretAccessKey)/)
+  })
+
+  test('the identity provider read-only connection is a file from a Secret reference in the backup CronJob alone, and never an env entry', () => {
+    const output = renderOk()
+    const job = find(output, 'CronJob', 'axis-cell-backup')
+    assert.match(
+      job,
+      /- secret:\n\s+name: "axis-identity-reader"\n\s+items:\n\s+- key: "IdentityProvider__DatabaseConnectionString"\n\s+path: IdentityProvider__DatabaseConnectionString\n/,
+    )
+    for (const document of documents(output).filter((d) => !/^  name: axis-cell-backup$/m.test(d))) {
+      assert.doesNotMatch(document, /IdentityProvider__DatabaseConnectionString|axis-identity-reader/)
+    }
+    assert.doesNotMatch(output, /- name: IdentityProvider__DatabaseConnectionString/)
   })
 
   test('in a cell with a bucket, a CronJob runs cell restore-check on Sundays at 03:00 in the time zone, one at a time and with no retry', () => {

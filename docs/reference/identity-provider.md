@@ -730,7 +730,8 @@ serves local work and the tests.
   does not, because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials,
   and the operator backs it up with the installation. `tenant backup` carries the accounts and their
-  credentials as `realm.json` when `IdentityProvider:DatabaseConnectionString` is set. A tenant restored
+  credentials as `realm.json` when `IdentityProvider:DatabaseConnectionString` is set, which the chart sets
+  for the cell backup CronJob and the Compose example sets for the admin host. A tenant restored
   where its realm does not exist gets a new realm in the `realm` step of `tenant restore`, which imports
   `realm.json` when the archive holds it, so people sign in as before. An archive without `realm.json`
   gives a realm with no accounts, and the people need new invitations, see

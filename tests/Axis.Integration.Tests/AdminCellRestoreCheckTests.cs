@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// <c>cell restore-check</c> on real PostgreSQL, MinIO and Keycloak. A good archive restores into the scratch tenant, which has the
 /// counts and the users of the archive, is removed with its database, roles and realm, and records 1. An archive whose counts do not match its
-/// data records 0, exits 1 and still removes the scratch tenant. The command writes one platform audit record for the source tenant, before its
+/// data, or of a tenant with its own realm that holds no <c>realm.json</c>, records 0, exits 1 and still removes the scratch tenant. The command writes one platform audit record for the source tenant, before its
 /// first change. A missing <c>Cell:InternalDomain</c> makes it exit 2 and write no audit record. The test scenarios of an application in the
 /// source tenant's Studio folder run against the scratch tenant's copy of it: a passing scenario records 1, and a failing one records 0, exits 1
 /// and still removes the scratch tenant and its Studio folder.
@@ -135,6 +135,34 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         Assert.Equal(0, gauge.Points[source]);
         Assert.Contains($"{scratch} counts failed: {table} has {archived - 1} rows and the archive {archived}", result.Output);
         Assert.DoesNotContain(result.Output, line => line.Contains("counts ok", StringComparison.Ordinal));
+        Assert.Contains($"{scratch} remove ok", result.Output);
+        Assert.Equal($"{source} restore-check failed", result.Output[^1]);
+        await AssertScratchGoneAsync(scenario, scratch);
+        Assert.Equal(1, await CountTenantsAsync(scenario, source));
+    }
+
+    [Fact]
+    public async Task An_archive_of_a_tenant_with_its_own_realm_without_realm_json_fails_the_users_step_records_0_and_removes_the_scratch_tenant()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        using var s3 = minio.NewClient();
+        using var studio = new TemporaryFolder();
+        WriteCellKey();
+        var bucket = await NewBucketAsync(s3);
+        var cell = CellSettings(bucket, studio);
+        var source = await CreateSourceAsync(scenario, cell);
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.axisbak");
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: cell)).Exit);
+        await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = file }, CancellationToken);
+        var scratch = ScratchId();
+
+        using var gauge = new GaugeCapture(source);
+        var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
+
+        Assert.Equal(1, result.Exit);
+        Assert.Contains($"{scratch} users failed: the archive holds no realm.json", result.Output);
+        Assert.Equal(0, gauge.Points[source]);
         Assert.Contains($"{scratch} remove ok", result.Output);
         Assert.Equal($"{source} restore-check failed", result.Output[^1]);
         await AssertScratchGoneAsync(scenario, scratch);
@@ -323,7 +351,8 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
     {
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.axisbak");
-        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: cell)).Exit);
+        var backup = new Dictionary<string, string?>(cell) { ["IdentityProvider:DatabaseConnectionString"] = await keycloak.CredentialsConnectionStringAsync() };
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: backup)).Exit);
         await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = file }, CancellationToken);
     }
 

@@ -212,10 +212,13 @@ services:
       - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
       - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
       - ${AXIS_APPS_DIR:-./apps}:/apps:ro
+    # `tenant backup` reads IdentityProvider__DatabaseConnectionString, the connection of a read-only role of the
+    # identity provider's database, to write the tenant's realm.json.
     secrets:
       - Admin__ConnectionString
       - ConnectionStrings__PlatformSchema
       - IdentityProvider__AdminClientSecret
+      - IdentityProvider__DatabaseConnectionString
       - Platform__SecretKey
 
 # A fixed subnet gives the proxy a fixed address. Docker hands out the other addresses from the ip_range only,
@@ -237,6 +240,8 @@ secrets:
     file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__PlatformSchema
   IdentityProvider__AdminClientSecret:
     file: ${AXIS_SECRETS_DIR:-./secrets}/IdentityProvider__AdminClientSecret
+  IdentityProvider__DatabaseConnectionString:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/IdentityProvider__DatabaseConnectionString
   KC_DB_PASSWORD:
     file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_PASSWORD
   KC_DB_URL:
