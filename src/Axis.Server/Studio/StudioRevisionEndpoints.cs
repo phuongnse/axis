@@ -1,6 +1,7 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Server.Tenancy;
+using Axis.Server.Users;
 
 namespace Axis.Server.Studio;
 
@@ -10,6 +11,10 @@ namespace Axis.Server.Studio;
 /// <c>GET .../revisions/{revision}</c> answers one revision with its files as <c>{ revision, resources: [{ file, change,
 /// id, kind, name, before, after }] }</c>. <c>POST .../revisions/{revision}/undo</c> puts back the files the revision changed,
 /// records the revert as a new revision and answers <c>{ id, diagnostics }</c>. A revision is named by its full commit id.
+/// <c>GET /api/studio/apps/{application}/drafts/{draft}/diff?cursor=</c> answers one page of the diff of the signed-in
+/// user's draft as <c>{ start, tip, resources, cursor }</c>, 404 for an unknown draft or one that is someone else's, 400
+/// for a cursor the draft did not give and 503 when the write lock cannot be taken. See
+/// <c>docs/reference/revisions-and-drafts.md#drafts</c>.
 /// Each route checks the session (401), the author role (403) and the application (404). A server without
 /// <c>Studio:RevisionsPath</c>, or a folder with no history yet, lists no revisions and answers 404 for a diff and an undo, as
 /// it does for an id that is not 40 hex characters or not a revision. The undo then answers 503 when the write lock cannot be taken,
@@ -21,11 +26,40 @@ internal static class StudioRevisionEndpoints
 {
     private const string NoRevision = "The application has no revision with this id.";
 
+    private const string NoDraft = "The application has no draft with this id.";
+
     public static void MapStudioRevisionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/studio/apps/{application}/revisions", ListAsync);
         endpoints.MapGet("/api/studio/apps/{application}/revisions/{revision}", GetAsync);
         endpoints.MapPost("/api/studio/apps/{application}/revisions/{revision}/undo", UndoAsync).WithStorageQuota();
+        endpoints.MapGet("/api/studio/apps/{application}/drafts/{draft}/diff", DraftDiffAsync);
+    }
+
+    private static async Task<IResult> DraftDiffAsync(
+        string application, string draft, string? cursor, HttpContext httpContext, StudioOptions options, IStudioWriteLock writeLock)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var user = (await CurrentUsers.FindAsync(httpContext))!;
+        var drafts = StudioDrafts.For(StudioEndpoints.ForRequest(httpContext, options).RevisionsPath, folder, user.Id, user.DisplayName, writeLock);
+        if (drafts is null)
+        {
+            return StudioEndpoints.NotFound(NoDraft);
+        }
+
+        var outcome = await drafts.DiffAsync(draft, cursor, httpContext.RequestAborted);
+        return outcome.Refusal switch
+        {
+            null => Results.Ok(outcome.Value),
+            StudioWriteRefusal.Unavailable => StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable),
+            StudioWriteRefusal.DoesNotApply => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The cursor is not one this draft gave."),
+            _ => StudioEndpoints.NotFound(NoDraft),
+        };
     }
 
     private static async Task<IResult> ListAsync(string application, HttpContext httpContext, StudioOptions options)
