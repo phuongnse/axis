@@ -96,6 +96,36 @@ function stubActions(posts: Record<string, Answer[]>, statuses: Record<string, C
   return keys
 }
 
+/**
+ * Answers the quotas PUT and the hosts POST of the page with `answers`, by path, and records each write's method, path
+ * and body. The tenant and its jobs answer as for a plain read.
+ */
+function stubWrites(answers: Record<string, Answer>) {
+  const writes: { method: string; path: string; body: unknown }[] = []
+  const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (init?.method === 'PUT' || init?.method === 'POST') {
+      writes.push({ method: init.method, path: input, body: JSON.parse(init.body as string) })
+      const answer = answers[input]!
+      return new Response(JSON.stringify(answer.body), { status: answer.status })
+    }
+    if (input.startsWith('/api/cell/jobs')) {
+      return new Response(JSON.stringify({ items: [] }), { status: 200 })
+    }
+    return new Response(JSON.stringify(acme), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return writes
+}
+
+const hostRequest = {
+  host: 'portal.acme.test',
+  token: 'secret-token',
+  state: 'pending',
+  expiresAt: '2026-11-12T10:00:00Z',
+  txt: { name: '_axis-verify.portal.acme.test', value: 'axis-verify=secret-token' },
+  cname: { name: 'portal.acme.test', target: 'acme.localhost' },
+}
+
 function renderPage(path: string, onRefused = vi.fn()) {
   render(
     <MemoryRouter initialEntries={[path]}>
@@ -251,5 +281,152 @@ describe('CellTenantPage', () => {
 
     await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
     expect(keys).toHaveLength(1)
+  })
+
+  it('sends only the changed quota keys and shows the answered quotas', async () => {
+    const answered = {
+      users: { value: 100, overridden: false },
+      applications: { value: 25, overridden: true },
+      storage: { value: null, overridden: true },
+    }
+    const writes = stubWrites({ '/api/cell/tenants/acme/quotas': ok({ quotas: answered }) })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Set the quotas of acme')
+    // Users is overridden, Applications is the default and Storage has no limit. Storage stays as it is.
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('Cell default'))
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Applications' })).getByLabelText('A value'))
+    const applications = within(dialog).getByRole('spinbutton', { name: 'Applications value' })
+    await user.clear(applications)
+    await user.type(applications, '25')
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(writes).toEqual([
+      { method: 'PUT', path: '/api/cell/tenants/acme/quotas', body: { set: { applications: 25 }, remove: ['users'] } },
+    ])
+    const quotaRows = within(screen.getByTestId('cell-tenant-quotas')).getAllByRole('row').slice(1)
+    expect(quotaRows.map(cellTexts)).toEqual([
+      ['Users', '100', 'Cell default'],
+      ['Applications', '25', 'Set for this tenant'],
+      ['Storage (bytes)', 'No limit', 'Set for this tenant'],
+    ])
+  })
+
+  it('sends no limit as null', async () => {
+    const writes = stubWrites({ '/api/cell/tenants/acme/quotas': ok({ quotas: acme.quotas }) })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(writes).toHaveLength(1))
+    expect(writes[0]!.body).toEqual({ set: { users: null }, remove: [] })
+  })
+
+  it('keeps Save off until a quota changes', async () => {
+    stubWrites({})
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    expect(save).toBeDisabled()
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    expect(save).toBeEnabled()
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('A value'))
+    expect(save).toBeDisabled()
+  })
+
+  it('offers Set quotas and Add a host for every status', async () => {
+    stubRoutes(ok({ ...acme, status: 'provisioning' }))
+    renderPage('/tenants/acme')
+
+    await screen.findByTestId('cell-tenant')
+    expect(screen.getByTestId('cell-tenant-set-quotas')).toBeInTheDocument()
+    expect(screen.getByTestId('cell-tenant-add-host')).toBeInTheDocument()
+  })
+
+  it('adds a host and shows its TXT and CNAME records', async () => {
+    const writes = stubWrites({ '/api/cell/tenants/acme/hosts': { status: 201, body: hostRequest } })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog).toHaveTextContent('Add a host to acme')
+    const add = within(dialog).getByRole('button', { name: 'Add' })
+    expect(add).toBeDisabled()
+    await user.type(within(dialog).getByLabelText('Host'), 'portal.acme.test')
+    await user.click(add)
+
+    const records = await within(dialog).findByTestId('cell-tenant-host-records')
+    const rows = within(records).getAllByRole('row').slice(1)
+    expect(rows.map(cellTexts)).toEqual([
+      ['TXT', '_axis-verify.portal.acme.test', 'axis-verify=secret-token'],
+      ['CNAME', 'portal.acme.test', 'acme.localhost'],
+    ])
+    expect(dialog).toHaveTextContent('The request expires on')
+    expect(writes).toEqual([
+      { method: 'POST', path: '/api/cell/tenants/acme/hosts', body: { host: 'portal.acme.test' } },
+    ])
+    // The dialog's corner icon is also named Close, and the footer button comes last.
+    await user.click(within(dialog).getAllByRole('button', { name: 'Close' }).at(-1)!)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('keeps the host dialog open with the title of a refusal', async () => {
+    stubWrites({
+      '/api/cell/tenants/acme/hosts': { status: 409, body: { title: 'Another tenant holds this host.' } },
+    })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Host'), 'taken.example.com')
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    expect(await screen.findByTestId('cell-tenant-host-error')).toHaveTextContent(
+      'The cell refused the request: Another tenant holds this host.',
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.queryByTestId('cell-tenant-host-records')).not.toBeInTheDocument()
+  })
+
+  it('reports a forbidden host request to the console', async () => {
+    stubWrites({ '/api/cell/tenants/acme/hosts': { status: 403, body: { status: 403 } } })
+    const user = userEvent.setup()
+    const onRefused = renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Host'), 'portal.acme.test')
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))
+  })
+
+  it('shows the did-not-reach message when the quotas request fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubWrites({ '/api/cell/tenants/acme/quotas': fail(500) })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(within(dialog).getByRole('radiogroup', { name: 'Users' })).getByLabelText('No limit'))
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('cell-tenant-quotas-error')).toHaveTextContent(
+      'The request did not reach the cell.',
+    )
   })
 })

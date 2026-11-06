@@ -144,10 +144,34 @@ export function fetchCellJob(id: string, signal?: AbortSignal): Promise<CellResu
 export type CellTenantAction = 'suspend' | 'resume'
 
 /**
- * The answer of {@link queueCellTenantJob}: the queued job, the refusal that the console shows, or the problem that the
+ * The answer of a console route that writes: the data, the refusal that the console shows, or the problem that the
  * route answered with a final 4xx status.
  */
-export type CellActionResult = CellResult<CellJob> | { kind: 'problem'; status: number; title: string }
+export type CellWriteResult<T> = CellResult<T> | { kind: 'problem'; status: number; title: string }
+
+/** The answer of {@link queueCellTenantJob}: the queued job, a refusal or a problem. */
+export type CellActionResult = CellWriteResult<CellJob>
+
+/**
+ * Reads the answer of a console route that writes. A 401 or 403 is a refusal. Any other 4xx is a final answer and comes
+ * back as the problem. A 5xx throws, so the caller may retry. A 2xx answers its JSON body.
+ */
+async function cellWriteAnswer<T>(response: Response, name: string): Promise<CellWriteResult<T>> {
+  if (response.status === 401) {
+    return { kind: 'unauthorized' }
+  }
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (response.status >= 400 && response.status < 500) {
+    const problem = (await response.json().catch(() => ({}))) as { title?: string }
+    return { kind: 'problem', status: response.status, title: problem.title ?? '' }
+  }
+  if (!response.ok) {
+    throw new Error(`${name} failed with status ${response.status}.`)
+  }
+  return { kind: 'ok', value: (await response.json()) as T }
+}
 
 /**
  * Queues the job of `action` for the tenant `id` and sends `idempotencyKey` as its `Idempotency-Key`. A 202 answers the
@@ -166,19 +190,63 @@ export async function queueCellTenantJob(
     { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
     { promptSignInOnUnauthorized: false },
   )
-  if (response.status === 401) {
-    return { kind: 'unauthorized' }
+  const result = await cellWriteAnswer<Omit<CellJob, 'steps' | 'error'> & Partial<CellJob>>(
+    response,
+    `Queuing the ${action} job of the cell tenant`,
+  )
+  if (result.kind !== 'ok') {
+    return result
   }
-  if (response.status === 403) {
-    return { kind: 'forbidden' }
-  }
-  if (response.status >= 400 && response.status < 500) {
-    const problem = (await response.json().catch(() => ({}))) as { title?: string }
-    return { kind: 'problem', status: response.status, title: problem.title ?? '' }
-  }
-  if (!response.ok) {
-    throw new Error(`Queuing the ${action} job of the cell tenant failed with status ${response.status}.`)
-  }
-  const queued = (await response.json()) as Omit<CellJob, 'steps' | 'error'> & Partial<CellJob>
+  const queued = result.value
   return { kind: 'ok', value: { ...queued, steps: queued.steps ?? [], error: queued.error ?? null } }
+}
+
+/** The quota changes of {@link setCellTenantQuotas}: `set` maps a quota key to its value, where `null` is no limit, and `remove` lists the keys that go back to the cell's default. */
+export interface CellQuotaChanges {
+  set: Record<string, number | null>
+  remove: string[]
+}
+
+/**
+ * Sets and removes quotas of the tenant `id` and answers the tenant's quotas after the change. A 401 or 403 is a
+ * refusal and any other 4xx comes back as the problem. A 5xx and a network error throw.
+ */
+export async function setCellTenantQuotas(
+  id: string,
+  changes: CellQuotaChanges,
+): Promise<CellWriteResult<Record<string, CellQuota>>> {
+  const response = await apiFetch(
+    `/api/cell/tenants/${encodeURIComponent(id)}/quotas`,
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(changes) },
+    { promptSignInOnUnauthorized: false },
+  )
+  const result = await cellWriteAnswer<{ quotas: Record<string, CellQuota> }>(
+    response,
+    'Setting the cell tenant quotas',
+  )
+  return result.kind === 'ok' ? { kind: 'ok', value: result.value.quotas } : result
+}
+
+/** A pending request for a host of a tenant's own, with the DNS records that the customer must add. */
+export interface CellHostRequest {
+  host: string
+  token: string
+  state: string
+  /** When the request expires, as an ISO 8601 time. */
+  expiresAt: string
+  txt: { name: string; value: string }
+  cname: { name: string; target: string }
+}
+
+/**
+ * Requests the host `host` for the tenant `id` and answers the DNS records to add. A 401 or 403 is a refusal and any
+ * other 4xx, such as a host that another tenant holds, comes back as the problem. A 5xx and a network error throw.
+ */
+export async function requestCellTenantHost(id: string, host: string): Promise<CellWriteResult<CellHostRequest>> {
+  const response = await apiFetch(
+    `/api/cell/tenants/${encodeURIComponent(id)}/hosts`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ host }) },
+    { promptSignInOnUnauthorized: false },
+  )
+  return cellWriteAnswer<CellHostRequest>(response, 'Requesting the cell tenant host')
 }

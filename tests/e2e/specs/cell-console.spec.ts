@@ -22,7 +22,7 @@ let server: Awaited<ReturnType<typeof startDirectoryServer>>
 let publisher: Awaited<ReturnType<typeof startPublisher>>
 let browser: Browser
 let member: RealmAccount
-// The page that the first test signs the operator in on, which the last test reuses: Keycloak refuses a code twice in one period.
+// The page that the first test signs the operator in on, which the later tests reuse: Keycloak refuses a code twice in one period.
 let operator: Page
 
 const cellSettings = {
@@ -161,4 +161,41 @@ test('the platform operator suspends a tenant, follows the job and resumes it', 
   await confirmDialog(page, 'Resume')
   await expect(page.getByTestId('cell-jobs').getByRole('row').nth(1)).toContainText('resume', { timeout: 60_000 })
   await expect(page.getByTestId('cell-tenant')).toContainText('Active', { timeout: 60_000 })
+})
+
+test('the platform operator sets a quota of a tenant', async () => {
+  const page = operator
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+
+  await page.getByTestId('cell-tenant-set-quotas').click()
+  const dialog = await waitForDialog(page)
+  await expect(dialog).toContainText(tenant)
+  await dialog.getByRole('radiogroup', { name: 'Users', exact: true }).getByLabel('A value', { exact: true }).check()
+  await dialog.getByRole('spinbutton', { name: 'Users value', exact: true }).fill('25')
+  await expectNoViolations(page)
+  await confirmDialog(page, 'Save')
+
+  const users = page.getByTestId('cell-tenant-quotas').getByRole('row').filter({ hasText: 'Users' })
+  await expect(users).toContainText('25')
+  await expect(users).toContainText('Set for this tenant')
+})
+
+test('the platform operator adds a host to a tenant and sees the records to add', async () => {
+  const page = operator
+  const host = `portal.${tenant}.test`
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+
+  await page.getByTestId('cell-tenant-add-host').click()
+  const dialog = await waitForDialog(page)
+  await expect(dialog).toContainText(tenant)
+  await dialog.getByLabel('Host', { exact: true }).fill(host)
+  await dialog.getByRole('button', { name: 'Add', exact: true }).click()
+
+  // The TXT token is random, so the test reads the record names and the CNAME target.
+  const records = dialog.getByTestId('cell-tenant-host-records')
+  await expect(records).toContainText(`_axis-verify.${host}`)
+  await expect(records).toContainText(tenantHost)
+  await expectNoViolations(page)
 })

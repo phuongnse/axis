@@ -20,6 +20,8 @@ import { newIdempotencyKey } from '../platform/processes'
 import { useText } from '../platform/texts'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
+import { CellTenantHostDialog } from './CellTenantHostDialog'
+import { CellTenantQuotasDialog } from './CellTenantQuotasDialog'
 import { NotFoundPage } from './NotFoundPage'
 
 interface QuotaRow extends CellQuota {
@@ -50,7 +52,8 @@ const actionTexts = {
  * and its jobs in the shared job table. An unknown id shows the not-found page. An `active` or `readOnly` tenant offers
  * Suspend and a `suspended` or `readOnly` one offers Resume, each behind a confirmation. An action queues a job with an
  * `Idempotency-Key`, which stays for a retry after a network error or a 5xx and goes with a final answer. The page then
- * follows the job every 2 seconds until it ends and reloads the tenant and its jobs.
+ * follows the job every 2 seconds until it ends and reloads the tenant and its jobs. Set quotas and Add a host open their
+ * own dialogs, show for every status and queue no job: the quota table shows the quotas that the cell answered.
  */
 export function CellTenantPage() {
   const t = useText()
@@ -61,6 +64,7 @@ export function CellTenantPage() {
   const [tenantFailed, setTenantFailed] = useState(false)
   const [jobs, setJobs] = useState<CellJob[]>()
   const [jobsFailed, setJobsFailed] = useState(false)
+  const [openDialog, setOpenDialog] = useState<'quotas' | 'host' | null>(null)
   const [confirming, setConfirming] = useState<CellTenantAction | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -236,36 +240,40 @@ export function CellTenantPage() {
                 },
               ]}
             />
-            {(canSuspend || canResume) && (
-              <Flex gap="small">
-                {canSuspend && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-suspend"
-                    disabled={following !== null}
-                    onClick={() => {
-                      setActionError(null)
-                      setConfirming('suspend')
-                    }}
-                  >
-                    {t(actionTexts.suspend.button)}
-                  </AxisButton>
-                )}
-                {canResume && (
-                  <AxisButton
-                    role="secondary"
-                    data-testid="cell-tenant-resume"
-                    disabled={following !== null}
-                    onClick={() => {
-                      setActionError(null)
-                      setConfirming('resume')
-                    }}
-                  >
-                    {t(actionTexts.resume.button)}
-                  </AxisButton>
-                )}
-              </Flex>
-            )}
+            <Flex gap="small">
+              {canSuspend && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-suspend"
+                  disabled={following !== null}
+                  onClick={() => {
+                    setActionError(null)
+                    setConfirming('suspend')
+                  }}
+                >
+                  {t(actionTexts.suspend.button)}
+                </AxisButton>
+              )}
+              {canResume && (
+                <AxisButton
+                  role="secondary"
+                  data-testid="cell-tenant-resume"
+                  disabled={following !== null}
+                  onClick={() => {
+                    setActionError(null)
+                    setConfirming('resume')
+                  }}
+                >
+                  {t(actionTexts.resume.button)}
+                </AxisButton>
+              )}
+              <AxisButton role="secondary" data-testid="cell-tenant-set-quotas" onClick={() => setOpenDialog('quotas')}>
+                {t('shell.cell.tenant.setQuotas')}
+              </AxisButton>
+              <AxisButton role="secondary" data-testid="cell-tenant-add-host" onClick={() => setOpenDialog('host')}>
+                {t('shell.cell.tenant.addHost')}
+              </AxisButton>
+            </Flex>
           </Card>
           <Card title={t('shell.cell.tenant.quotas')}>
             <AxisTable<QuotaRow>
@@ -277,6 +285,18 @@ export function CellTenantPage() {
             />
           </Card>
         </>
+      )}
+      {tenant && openDialog === 'quotas' && (
+        <CellTenantQuotasDialog
+          tenant={id}
+          quotas={tenant.quotas}
+          onSaved={(quotas) => setTenant((current) => current && { ...current, quotas })}
+          onRefused={onRefused}
+          onClose={() => setOpenDialog(null)}
+        />
+      )}
+      {openDialog === 'host' && (
+        <CellTenantHostDialog tenant={id} onRefused={onRefused} onClose={() => setOpenDialog(null)} />
       )}
       {confirming && (
         <Modal

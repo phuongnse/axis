@@ -104,31 +104,38 @@ notification bell. The built views are read only, except for the actions of the 
   - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
   - **Host verification** _(planned for M31)_: the verification state of each host.
   - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
-  - **Actions.** A Suspend and a Resume button, each with a confirmation that names the tenant, see
-    [actions](#actions).
+  - **Actions.** A Suspend and a Resume button, each with a confirmation that names the tenant, and a Set quotas
+    and an Add a host button, each with a dialog that names the tenant, see [actions](#actions).
   - **Other actions** _(planned for M31)_: the other [actions](#actions), each a button with a confirmation
     that names the tenant.
 
 ## Actions
 
 Each action calls one route of the [provisioning API](tenant-lifecycle.md#provisioning-api) through the
-operator's session and queues a job.
+operator's session. Suspend and Resume queue a job. Set quotas and Add a host apply at once.
 
 - **Suspend and Resume.** The Tenant view shows Suspend for an `active` or a `readOnly` tenant and Resume for
   a `suspended` or a `readOnly` one, the statuses that [`tenant suspend`](tenant-status-commands.md#tenant-suspend)
   and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
   shows neither. A button opens a confirmation that names the tenant and says what the action does, and
   confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
-- **Idempotency key.** Each action sends an `Idempotency-Key`. The console keeps the key in the page's memory,
+- **Set quotas.** The Tenant view shows Set quotas for every status. A dialog that names the tenant lists every
+  quota key, and each key takes a value, no limit or the cell's default. Saving sends only the keys that
+  changed to `PUT /api/cell/tenants/{id}/quotas`, see [the routes](tenant-lifecycle.md#routes), and Save is off
+  until a key has changed. The quota table then shows the quotas that the route answered.
+- **Add a host.** The Tenant view shows Add a host for every status. A dialog that names the tenant asks for a
+  host and calls `POST /api/cell/tenants/{id}/hosts`, see [hosts](tenant-lifecycle.md#hosts). It then shows the
+  TXT and CNAME records that the customer must add and when the request expires.
+- **Idempotency key.** Each action that queues a job sends an `Idempotency-Key`. The console keeps the key in the page's memory,
   for each tenant and action, while the request has no final answer. A retry after a network error or a `5xx`
   sends the same key, so it cannot queue a second job. Any `2xx` or `4xx` answer is final and drops the key,
   and the next action gets a new one.
-- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation open with an error. A `401` or `403` goes through
+- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the dialog open with an error. A `401` or `403` goes through
   the console's sign-in and forbidden handling.
 - **The job.** The queued job heads the tenant's jobs. The view reads it at once and then every 2 seconds, and
   shows its state and steps. When the job succeeds or fails, the view loads the tenant and its jobs again. The
   buttons are off while it follows a job.
-- **Other actions** _(planned for M31)_. Create a tenant, set quotas, add a host, export, download an export,
+- **Other actions** _(planned for M31)_. Create a tenant, export, download an export,
   delete and cancel a deletion. Delete asks the operator to type the tenant id.
 
 ## What the console never shows
