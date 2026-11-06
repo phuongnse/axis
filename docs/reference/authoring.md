@@ -25,12 +25,12 @@ Studio shows its test controls. Their defaults, environment variables and behavi
 | `Studio:Folders`          | The application folders that Studio edits                                                                                | Studio edits only the applications of `Studio:ApplicationsPath` |
 | `Studio:ApplicationsPath` | The folder where Studio [creates applications](#creating-an-application), whose application subfolders Studio also lists | Studio cannot create an application                             |
 | `Studio:AuthorRole`       | The roles claim value that may use the API. Application policies play no part, because an author edits them              | Nobody may author                                               |
-| `Studio:PublisherRole`    | The roles claim value that may `publish` and `activate`, on top of the author role                                       | Nobody may publish or activate a release                        |
+| `Studio:PublisherRole`    | The roles claim value that may `publish`, `activate` and change [application settings](#application-settings), on top of the author role| Nobody may publish or activate a release                        |
 | `Studio:Tests`            | Whether Studio shows its test controls                                                                                   | Off                                                             |
 
 Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set. When it is off,
-there is nothing to edit and every route answers `403`. Everything other than `publish` and
-`activate` needs the author role only: `validate`, [`preview`](#preview), [`test`](#test), the request
+there is nothing to edit and every route answers `403`. Everything other than `publish`, `activate`
+and changing an [application setting](#application-settings) needs the author role only: `validate`, [`preview`](#preview), [`test`](#test), the request
 status and the release history among them.
 
 `GET /api/me` tells the SPA what the session may do in Studio, so that it shows only the controls
@@ -39,7 +39,7 @@ that work:
 | Field               | Value                                                                                                                         | Studio uses it to                   |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
 | `studio`            | True when Studio is on and the user holds the author role                                                                     | Show Studio                         |
-| `studioPublisher`   | True when `studio` is true and the user also holds the publisher role                                                         | Show Publish… and Activate…         |
+| `studioPublisher`   | True when `studio` is true and the user also holds the publisher role                                                         | Show Publish…, Activate… and the auto-accept switch as editable|
 | `studioCreate`      | True when `studio` is true and `Studio:ApplicationsPath` is set                                                               | Show New application…               |
 | `studioTest`        | True when `studio` is true and `Studio:Tests` is true                                                                         | Show Run tests and a scenario's Run |
 | `studioPreviewHost` | The first host of the served tenant whose `PreviewOf` is the session's tenant, else `null`, and `null` when `studio` is false | Show Preview, only when it is set   |
@@ -75,7 +75,9 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/apps/{application}/texts/{key}/references`                         | `200` with `{ usedBy }`, see [References](#references)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/studio/apps/{application}/diagnostics`                                    | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200`                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `GET /api/studio/apps/{application}/names`                                          | `200` with the names the application defines, see [Names](#names)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `GET /api/studio/apps/{application}/policy-matrix`                                  | `200` with what each role may do on each target, see [Policy matrix](#policy-matrix)                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/studio/apps/{application}/policy-matrix`                                  | `200` with what each role may do on each target, see [Policy matrix](authoring-policy-matrix.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `GET /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
 | `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes)                                                                                                                                                                                                                                                                                                                                                                                          |
 | `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
@@ -174,15 +176,16 @@ a caller without the roles cannot find out which applications, resources, reques
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
    the session's roles, see [Settings](#settings).
-4. The publisher role, `403`, on `publish` and `activate` only. It needs `Studio:PublisherRole` to be
-   set and held in the session's roles.
+4. The publisher role, `403`, on `publish`, `activate` and the settings `PUT` only. It needs
+   `Studio:PublisherRole` to be set and held in the session's roles.
 5. An unknown application, `404`: one that Studio does not list, see
    [the application list](#the-application-list).
 6. On `preview` only, a session's tenant with no served preview tenant, `409`. A preview tenant that is
    suspended is not served, so it counts as none. The check comes after the unknown application, so a
    caller cannot learn from it which applications exist.
-7. On `validate`, `publish` and `preview`, a manifest with no UUID `id`, `409`, because the request
-   needs the application id for the publisher's queue. On `publish` it comes before the body is read.
+7. On `validate`, `publish`, `preview` and the settings `PUT`, a manifest with no UUID `id`, `409`,
+   because the request needs the application id for the publisher's queue, and the setting is kept by
+   it. On `publish` and the settings `PUT` it comes before the body is read.
    An `activate` has no such check, because it names a release of the history.
 8. An unknown resource, text key, request or release, `404`. A release that is not in this tenant's
    history for the application is unknown, and so is a request or a release of another application
@@ -229,6 +232,8 @@ list above, except where it says so.
   `expression` that is not a string. Then `404` for an unknown `resourceId`, which comes after the body
   because the id is in it, then `400` for a `path` that holds no expression place. It takes no lock,
   so it has no `503`.
+- **Application settings.** Checks 1, 2, 3 and 5 on `GET`, plus 4 and 7 on `PUT`, then `415`, then `400`,
+  see [Application settings](#application-settings). A `GET` is a read, so it has no CSRF check.
 - **Page metadata.** Checks 1, 2, 3, 5 and 8, then those of
   [draft page metadata](draft-page-metadata.md#order-of-checks).
 - **Creating an application.** Its own list, see [Creating an application](#creating-an-application).
@@ -241,8 +246,8 @@ Every error is problem details (`application/problem+json`). The titles are fixe
 text from the request.
 
 Every route answers `401` with no session and `403` with no author role or with Studio off, and every
-`POST`, `PUT`, `PATCH` and `DELETE` also answers `403` with no CSRF header. `publish` and `activate`
-also answer `403` with no publisher role, titled "You do not hold the publisher role.", and creating
+`POST`, `PUT`, `PATCH` and `DELETE` also answers `403` with no CSRF header. `publish`, `activate` and
+the settings `PUT` also answer `403` with no publisher role, titled "You do not hold the publisher role.", and creating
 an application answers `403` with no `Studio:ApplicationsPath`. Listing the applications and the
 templates answers no `404` and no `409`. The other routes differ:
 
@@ -269,6 +274,8 @@ templates answers no `404` and no `409`. The other routes differ:
 | Draft page metadata                         | Unknown application, or a resource that is neither a page nor a form                        | Not used                                                                                                 |
 | Module page metadata                        | Unknown application, module or resource, or a resource that is not a page                   | Not used                                                                                                 |
 | Module form metadata                        | Unknown application, module or resource, or a resource that is not a form                   | Not used                                                                                                 |
+| Settings read                               | Unknown application                                                                         | Not used                                                                                                 |
+| Settings change                             | Unknown application                                                                         | The manifest has no UUID `id`                                                                            |
 | Validate                                    | Unknown application                                                                         | The manifest has no UUID `id`                                                                            |
 | Publish                                     | Unknown application                                                                         | The manifest has no UUID `id`                                                                            |
 | Preview                                     | Unknown application                                                                         | This tenant has no served preview tenant, or the manifest has no UUID `id`                               |
@@ -283,12 +290,32 @@ Some answers have titles of their own:
 | `409`, a manifest with no UUID `id`                   | "The application manifest has no valid id."               |
 | `409`, a tenant with no served preview tenant         | "This tenant has no preview tenant." It names no tenant   |
 | `400`, a bad `publish` body                           | "The body is not a valid publish request."                |
+| `400`, a bad settings body                            | "The body must be an object with a boolean autoAccept."   |
 | `409`, a text resource whose `texts` is not an object | "A text resource has no texts object."                    |
 | `403`, no `Studio:ApplicationsPath` on a create       | "Studio cannot create applications here."                 |
 
 `400` is a bad body, `415` a body of the wrong content type, `428` a missing `If-Match` and `503` a
 write lock that cannot be taken, as [Order of checks](#order-of-checks) says. A successful `validate`,
 `publish`, `preview`, `test` or `activate` answers `202`, see [Publishing](#publishing).
+
+## Application settings
+
+`GET` and `PUT .../settings` read and change the settings of an application that Studio keeps in the
+tenant database and not in a resource file. Today there is one, [auto-accept](ai-authoring-in-studio.md#auto-accept).
+
+- **Body.** A `PUT` takes `{ "autoAccept": true }` or `false` as `application/json`. Any other body is
+  `400`, and so is a body with another key.
+- **Answer.** `200` with `{ "autoAccept": <value> }`, on a `GET` and on a `PUT`. A `GET` answers `false`
+  for an application that has never had it changed, and for a folder whose manifest has no UUID `id`.
+- **Who.** Any author reads it. Changing it needs the publisher role, so an author without it gets
+  `403` and nothing is written.
+- **Only a session.** The routes serve a browser session only. A bearer token is never a session, so
+  it gets `401`.
+- **Not in the files.** No write to the application's resources changes the setting, whatever the file
+  holds. A `PATCH` that adds `autoAccept` to the manifest leaves the answer as it was.
+- **Kept and audited.** The setting is kept by the manifest's `id`, and each real change is audited, see
+  [system tables](storage.md#system-tables) and
+  [audit actions](storage.md#audit-actions). A `PUT` that sets the value it already has writes nothing.
 
 ## References
 
@@ -374,54 +401,6 @@ again after a save, a delete and a reconnect. The answer is:
   out for its own errors is absent.
 - **Size.** The answer holds every name and every text. At the typical application size it is a few
   hundred kilobytes.
-
-## Policy matrix
-
-`GET .../policy-matrix` answers what each role may do on each root entity, data source, process and
-endpoint, and which grants give that access. Studio's [policy matrix](studio.md#policy-matrix) is built on
-it. The answer is:
-
-```
-{ targets: [{ kind, id, name, module, actions: [...], entity }],
-  roles: [{ id, name, accessPolicy: { name, id }, editable, readOnlyReason,
-            cells: [{ kind, target, actions: [...], missingEntityRead,
-                      grants: [{ policyId, policy, index, actions, filter, fields, shared, module }] }] }] }
-```
-
-- **Columns.** `targets` lists root entities first, with module entities before the application's
-  own, then data sources, processes and endpoints. Child entities are left out. `kind` is `entity`,
-  `dataSource`, `process` or `endpoint`. A name is written as in [Names](#names), and `module` is the
-  module id, or null. `entity` is a data source's root entity, and null for the other kinds. A column
-  is identified by `kind` and `name`, not by `id`.
-- **`actions`.** On a target, they are the actions it accepts, in the order
-  [roles and policies](roles-and-policies.md) lists them. An entity takes `read`, `create`, `update`,
-  `delete`, `export` and `import`. A data source takes `read` and `export`. A process takes `start`,
-  `inspect`, `cancel`, `retry`, `resolve` and `reassign`. An endpoint takes `invoke`.
-- **Rows and cells.** Each declared role is one row, in the order of the `roles` resources. Each row
-  has one cell per column, in column order, empty ones included. A cell's `actions` are the role's
-  actions there from all its policies, combined with OR as in
-  [combining grants](security.md#combining-grants). An action that the column does not accept is left
-  out, though the grant still lists its actions as written.
-- **`export` and `import`.** An entity cell has `export` only when it also has `read`, and `import`
-  only when it also has `create`. A data source cell has `export` only when it also has `read`, so it
-  is dropped with `read` when the role cannot read the root entity. This is what the policy evaluator
-  decides.
-- **Data source `read`.** A data source cell has `read` only when the role can also read the data
-  source's root entity. When it has a `read` grant but not that entity read, `read` is left out and
-  `missingEntityRead` names the root entity. It is null otherwise.
-- **`grants`.** Each grant of a policy that names the role: its `policyId`, `policy` name, `index`,
-  and `actions`, `filter` and `fields` as written, not evaluated. `fields` is null for every field.
-  `module` is the module id of a grant from a
-  [module policy](modules-and-templates.md#processes-pages-policies-and-dependencies), else null.
-- **`shared`.** A grant is shared unless it comes from the role's own `<Role>Access` policy and that
-  policy names only that role.
-- **`<Role>Access`.** `accessPolicy` is the PascalCase role name plus `Access`. It is found by name,
-  ignoring letter case, and `id` is null when it does not exist. `editable` is true when it does not
-  exist, or when its `roles` is exactly that one role. Otherwise `editable` is false and
-  `readOnlyReason` is `accessPolicyShared`, for which Studio writes its own message.
-- **Compiled in memory.** The folder is compiled in memory, as for [diagnostics](#diagnostics), and no
-  database is touched. A folder with errors still answers, from the files that loaded. A policy file
-  left out for its own errors is absent, so its grants are missing.
 
 ## Text writes
 

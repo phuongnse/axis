@@ -332,7 +332,7 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 ## Policy matrix
 
 The policy matrix shows in one view who may do what in an application, and edits each role's own
-access policy. It reads the [policy matrix route](authoring.md#policy-matrix), is the last entry of
+access policy. It reads the [policy matrix route](authoring-policy-matrix.md), is the last entry of
 the sidebar's Access group, and is kept in the address as `&view=policies`.
 
 - **The table.** Roles are the rows. The columns are the entities without child entities, the data

@@ -111,13 +111,13 @@ These server settings turn Studio on and say who may author, publish and run tes
 allows in the authoring API, and the Studio fields of `GET /api/me` that follow from them, are in
 [authoring API settings](authoring.md#settings).
 
-| Setting                   | Environment variable                                       | Default | Meaning                                                                                         |
-| ------------------------- | ---------------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `Studio:Folders`          | `Studio__Folders__0`, `Studio__Folders__1` and so on       | empty   | The application folders that Studio may edit. An empty entry is ignored                         |
-| `Studio:ApplicationsPath` | `Studio__ApplicationsPath`                                 | none    | The folder where Studio creates new applications. With no value, Studio cannot create one       |
-| `Studio:AuthorRole`       | `Studio__AuthorRole`                                       | none    | The roles claim value, such as `author`, of a signed-in user who may use Studio                 |
-| `Studio:PublisherRole`    | `Studio__PublisherRole`                                    | none    | The roles claim value, such as `publisher`, that may also publish and activate a release        |
-| `Studio:Tests`            | `Studio__Tests`                                            | `false` | Shows the test controls in Studio to its users                                                  |
+| Setting                   | Environment variable                                 | Default | Meaning                                                                                                           |
+| ------------------------- | ---------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
+| `Studio:Folders`          | `Studio__Folders__0`, `Studio__Folders__1` and so on | empty   | The application folders that Studio may edit. An empty entry is ignored                                           |
+| `Studio:ApplicationsPath` | `Studio__ApplicationsPath`                           | none    | The folder where Studio creates new applications. With no value, Studio cannot create one                         |
+| `Studio:AuthorRole`       | `Studio__AuthorRole`                                 | none    | The roles claim value, such as `author`, of a signed-in user who may use Studio                                   |
+| `Studio:PublisherRole`    | `Studio__PublisherRole`                              | none    | The roles claim value, such as `publisher`, that may also publish and activate a release, and turn on auto-accept |
+| `Studio:Tests`            | `Studio__Tests`                                      | `false` | Shows the test controls in Studio to its users                                                                    |
 
 - **When Studio is on.** Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath`
   is set, and only for a user whose roles claim holds `Studio:AuthorRole`. So with the defaults,

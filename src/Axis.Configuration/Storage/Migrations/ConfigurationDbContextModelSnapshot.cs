@@ -73,6 +73,24 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("active_sites", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ApplicationSettingsRow", b =>
+                {
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<bool>("AutoAccept")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("auto_accept");
+
+                    b.HasKey("ApplicationId")
+                        .HasName("pk_application_settings");
+
+                    b.ToTable("application_settings", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.PublishRequest", b =>
                 {
                     b.Property<Guid>("Id")

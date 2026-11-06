@@ -74,4 +74,6 @@ public static class AuditActions
     public const string UserRoleGiven = "user.roleGiven";
 
     public const string UserRoleRemoved = "user.roleRemoved";
+
+    public const string ApplicationAutoAcceptChanged = "application.autoAcceptChanged";
 }

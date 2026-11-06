@@ -3,8 +3,10 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
+using Axis.Configuration.Storage;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Functions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Configuration.Tests;
 
@@ -59,6 +61,41 @@ public sealed class DocumentationTests
         Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
         Assert.True(!plannedCodes.Intersect(declared).Any(), $"Marked planned in the docs but already declared: {string.Join(", ", plannedCodes.Intersect(declared))}.");
         Assert.True(!builtCodes.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", builtCodes.Except(declared))}. Mark the row _(planned for Mx)_ or declare the code.");
+        Assert.Equal(documented.Count, documented.Distinct().Count());
+    }
+
+    [Fact]
+    public void System_tables_table_matches_the_tables_of_ConfigurationDbContext()
+    {
+        var documented = new List<string>();
+        var tables = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Table\s*\|\s*Module\s*\|\s*One row is\s*\|"))
+                {
+                    continue;
+                }
+
+                tables++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var cells = lines[j].Split('|');
+                    if (cells.Length > 3 && cells[2].Trim() == "`Axis.Configuration`")
+                    {
+                        documented.AddRange(Regex.Matches(cells[1], @"`axis\.([a-z_]+)`").Select(match => match.Groups[1].Value));
+                    }
+                }
+            }
+        }
+
+        Assert.True(tables == 1, $"Expected exactly one table with header '| Table | Module | One row is |' under docs/, found {tables}.");
+        using var context = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql("Host=unused").Options);
+        var declared = context.Model.GetEntityTypes().Select(type => type.GetTableName()!).ToList();
+
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the System tables table in docs/reference/storage.md: {string.Join(", ", declared.Except(documented))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not a table of ConfigurationDbContext: {string.Join(", ", documented.Except(declared))}.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 
