@@ -27,9 +27,10 @@ reports the findings to the owner instead.
 ## Reading a page
 
 Split the pages into groups of about eight and give each group to a subagent, with this section as its
-brief. For each page, compare every statement that the repository can confirm with the code: the
-server under `src/`, the SPA under `web/src/`, `scripts/`, `deploy/`, `.github/`, `.nexkit/`, the
-schemas and the tests. The code, not another doc, is the evidence.
+brief. Start each subagent in the foreground and wait until every subagent has returned before you
+answer. A subagent starts no subagents of its own. For each page, compare every statement that the
+repository can confirm with the code: the server under `src/`, the SPA under `web/src/`, `scripts/`,
+`deploy/`, `.github/`, `.nexkit/`, the schemas and the tests. The code, not another doc, is the evidence.
 
 Report each finding with the page and line, the statement, the evidence (file and line), and one kind:
 

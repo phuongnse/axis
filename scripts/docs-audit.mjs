@@ -69,9 +69,22 @@ export function pagesFor(files, run) {
 /** Returns the findings from Claude Code's JSON answer, taking its structured output or else the JSON in its result. */
 export function parseAnswer(text) {
   const answer = JSON.parse(text)
-  const output = answer.structured_output ?? (typeof answer.result === 'string' ? JSON.parse(answer.result) : answer.result)
+  if (answer.is_error) {
+    throw new Error(
+      `Claude Code answered with an error (${answer.terminal_reason ?? answer.subtype}): ${String(answer.result ?? '').slice(0, 300)}`,
+    )
+  }
+  const output = answer.structured_output ?? (typeof answer.result === 'string' ? resultJson(answer) : answer.result)
   if (!output || !Array.isArray(output.findings)) throw new Error('the answer holds no findings')
   return output.findings.filter((f) => kinds.includes(f.kind) && f.page && f.evidence?.length)
+}
+
+function resultJson(answer) {
+  try {
+    return JSON.parse(answer.result)
+  } catch {
+    throw new Error(`the answer holds no structured output (${answer.subtype}): ${answer.result.slice(0, 300)}`)
+  }
 }
 
 const marker = (group, key) => `<!-- docs-audit ${group} ${key} -->`
@@ -171,18 +184,20 @@ function trackedDocs() {
   return run('git', ['ls-files', 'docs'], { cwd: root }).split('\n').filter(Boolean)
 }
 
-function read(runNumber) {
-  const pages = pagesFor(trackedDocs(), runNumber)
-  const prompt = [
+export function promptFor(pages) {
+  return [
     'Read .claude/skills/axis-docs-audit/SKILL.md, then follow its section "Reading a page" for these pages:',
     ...pages.map((p) => `- ${p}`),
-    'Use subagents for groups of about eight pages. Answer with the findings only, in the given schema.',
+    'Use subagents for groups of about eight pages. Start each one in the foreground, never in the background. Wait until every subagent has returned. A subagent starts no subagents of its own. Then answer once, with the findings only, in the given schema.',
   ].join('\n')
+}
+
+function read(runNumber) {
   const answer = run(
     process.env.CLAUDE ?? 'claude',
     [
       '-p',
-      prompt,
+      promptFor(pagesFor(trackedDocs(), runNumber)),
       '--output-format',
       'json',
       '--no-session-persistence',

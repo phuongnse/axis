@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { issuesFrom, maxIssues, pagesFor, parseAnswer, shares } from './docs-audit.mjs'
+import { issuesFrom, maxIssues, pagesFor, parseAnswer, promptFor, shares } from './docs-audit.mjs'
 
 const finding = (page, line, kind, extra = {}) => ({
   page,
@@ -46,6 +46,26 @@ describe('parseAnswer', () => {
 
   test('fails on an answer without findings', () => {
     assert.throws(() => parseAnswer(JSON.stringify({ result: '{}' })), /no findings/)
+  })
+
+  test('fails with the start of the text on an answer that is prose', () => {
+    const text = JSON.stringify({ subtype: 'success', result: 'The `modules/` pages were read, and no finding was found.' })
+    assert.throws(() => parseAnswer(text), /no structured output.*The `modules\//)
+  })
+
+  test('fails with the error text on an answer that Claude Code marks as an error', () => {
+    const text = JSON.stringify({ is_error: true, terminal_reason: 'api_error', result: "You've hit your session limit" })
+    assert.throws(() => parseAnswer(text), /session limit/)
+  })
+})
+
+describe('promptFor', () => {
+  test('asks for foreground subagents, a wait for all of them, and no subagents of subagents', () => {
+    const prompt = promptFor(['docs/a.md'])
+    assert.match(prompt, /foreground/)
+    assert.match(prompt, /wait/i)
+    assert.match(prompt, /starts no subagents/)
+    assert.match(prompt, /^- docs\/a\.md$/m)
   })
 })
 
