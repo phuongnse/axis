@@ -113,7 +113,16 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         colorError: colour.dangerText,
         colorInfo: colour.infoText,
       },
-      Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
+      // A default button hovered or pressed draws its text in the text colour that passes contrast, not in a shade of the seed.
+      Button: {
+        defaultShadow: 'none',
+        primaryShadow: 'none',
+        dangerShadow: 'none',
+        defaultHoverColor: colour.primaryText,
+        defaultHoverBorderColor: colour.primaryText,
+        defaultActiveColor: colour.primaryText,
+        defaultActiveBorderColor: colour.primaryText,
+      },
     },
   }
 }

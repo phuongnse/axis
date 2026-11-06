@@ -81,7 +81,7 @@ The console has four views, which read the provisioning API. Its shell has the t
 navigation entry for each built view. A person with no session goes to the operator realm's sign-in, and a
 person without the operator role sees a forbidden page in place of the views. The header shows the
 operator's display name from the session read in place of the app switcher and the account button, and has no
-notification bell. The built views are read only.
+notification bell. The built views are read only, except for the actions of the Tenant view.
 
 - **Cell.** The cell id, its region, and the number of tenants against [the cap](cells.md#cell-size). With no
   cap it shows the count alone.
@@ -104,16 +104,32 @@ notification bell. The built views are read only.
   - **Usage** _(planned for M31)_: the usage of the last 13 months by day.
   - **Host verification** _(planned for M31)_: the verification state of each host.
   - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
-  - **Actions** _(planned for M31)_: each [action](#actions) is a button with a confirmation that names the
-    tenant.
+  - **Actions.** A Suspend and a Resume button, each with a confirmation that names the tenant, see
+    [actions](#actions).
+  - **Other actions** _(planned for M31)_: the other [actions](#actions), each a button with a confirmation
+    that names the tenant.
 
 ## Actions
 
-_(planned for M31)_
+Each action calls one route of the [provisioning API](tenant-lifecycle.md#provisioning-api) through the
+operator's session and queues a job.
 
-Each action calls one route of the [provisioning API](tenant-lifecycle.md#provisioning-api): create a
-tenant, suspend, resume, set quotas, add a host, export, download an export, delete and cancel a
-deletion. Delete asks the operator to type the tenant id.
+- **Suspend and Resume.** The Tenant view shows Suspend for an `active` or a `readOnly` tenant and Resume for
+  a `suspended` or a `readOnly` one, the statuses that [`tenant suspend`](tenant-status-commands.md#tenant-suspend)
+  and [`tenant resume`](tenant-status-commands.md#tenant-resume) change. A `provisioning` or `deleting` tenant
+  shows neither. A button opens a confirmation that names the tenant and says what the action does, and
+  confirming it calls `POST /api/cell/tenants/{id}/suspend` or `/resume`.
+- **Idempotency key.** Each action sends an `Idempotency-Key`. The console keeps the key in the page's memory,
+  for each tenant and action, while the request has no final answer. A retry after a network error or a `5xx`
+  sends the same key, so it cannot queue a second job. Any `2xx` or `4xx` answer is final and drops the key,
+  and the next action gets a new one.
+- **A failed request.** A network error, a `5xx` or a refusing `4xx` leaves the confirmation open with an error. A `401` or `403` goes through
+  the console's sign-in and forbidden handling.
+- **The job.** The queued job heads the tenant's jobs. The view reads it at once and then every 2 seconds, and
+  shows its state and steps. When the job succeeds or fails, the view loads the tenant and its jobs again. The
+  buttons are off while it follows a job.
+- **Other actions** _(planned for M31)_. Create a tenant, set quotas, add a host, export, download an export,
+  delete and cancel a deletion. Delete asks the operator to type the tenant id.
 
 ## What the console never shows
 

@@ -2,8 +2,9 @@ import { spawnSync } from 'node:child_process'
 import AxeBuilder from '@axe-core/playwright'
 import { chromium, type Browser, type Page } from '@playwright/test'
 import { expect, test } from '../test'
-import { runAdmin } from '../admin-tool'
+import { runAdmin, startPublisher } from '../admin-tool'
 import { startDirectoryServer } from '../directory-server'
+import { confirmDialog, waitForDialog } from '../dialogs'
 import { submitCode, submitPassword } from '../keycloak'
 import { required } from '../server-settings'
 import { addRealmAccount, type RealmAccount } from '../tenant-realm'
@@ -18,8 +19,18 @@ const tenantHost = `${tenant}.localhost`
 const consoleUrl = 'https://console.localhost/'
 
 let server: Awaited<ReturnType<typeof startDirectoryServer>>
+let publisher: Awaited<ReturnType<typeof startPublisher>>
 let browser: Browser
 let member: RealmAccount
+// The page that the first test signs the operator in on, which the last test reuses: Keycloak refuses a code twice in one period.
+let operator: Page
+
+const cellSettings = {
+  Cell__Id: 'vn-1',
+  Cell__Region: 'vn',
+  Cell__TenantDomain: 'localhost',
+  Cell__ConsoleHost: 'console.localhost',
+}
 
 /** Runs `sql` on the platform database in the E2E PostgreSQL container. */
 function psql(sql: string) {
@@ -47,11 +58,13 @@ test.beforeAll(async () => {
 
   // Offset 3, because the tenant create spec, the terms spec and the read-only spec serve their tenants on offsets 0 to 2.
   server = await startDirectoryServer(3, {
-    Cell__Id: 'vn-1',
-    Cell__Region: 'vn',
-    Cell__TenantDomain: 'localhost',
-    Cell__ConsoleHost: 'console.localhost',
+    ...cellSettings,
     Cell__ConsoleClientSecret: 'axis-cell-console-development-secret',
+    IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
+  })
+  // The run's shared publisher runs no provisioning jobs, so this one runs the jobs that the console queues.
+  publisher = await startPublisher({
+    ...cellSettings,
     IdentityProvider__Url: `${required('AXIS_E2E_KEYCLOAK_URL', 'the address of Keycloak')}/`,
   })
   browser = await chromium.launch({
@@ -61,6 +74,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await browser?.close()
+  await publisher?.stop()
   await server?.stop()
 })
 
@@ -75,6 +89,7 @@ function navigate(page: Page, name: string) {
 
 test('a platform operator signs in with a password and a code, sees the tenants and opens one', async () => {
   const page = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage()
+  operator = page
 
   // The SPA sends a person with no session to the console's sign-in, which sends them to the operator realm.
   await page.goto(consoleUrl)
@@ -124,4 +139,26 @@ test('a user of a tenant is refused on the console host', async () => {
   // page.goto, not the context's request, because Node requests ignore the host resolver rules.
   const session = await page.goto('https://console.localhost/api/cell/session')
   expect(session?.status()).toBe(401)
+})
+
+// This test runs after the one that signs a member in on the tenant host, which leaves the tenant active.
+test('the platform operator suspends a tenant, follows the job and resumes it', async () => {
+  const page = operator
+  await page.goto(`https://console.localhost/tenants/${tenant}`)
+  await expect(page.getByTestId('cell-tenant')).toContainText('Active')
+
+  await page.getByTestId('cell-tenant-suspend').click()
+  await expect(await waitForDialog(page)).toContainText(tenant)
+  await expectNoViolations(page)
+  await confirmDialog(page, 'Suspend')
+
+  const newestJob = page.getByTestId('cell-jobs').getByRole('row').nth(1)
+  await expect(newestJob).toContainText('suspend', { timeout: 60_000 })
+  await expect(newestJob).toContainText('Succeeded', { timeout: 60_000 })
+  await expect(page.getByTestId('cell-tenant')).toContainText('Suspended', { timeout: 60_000 })
+
+  await page.getByTestId('cell-tenant-resume').click()
+  await confirmDialog(page, 'Resume')
+  await expect(page.getByTestId('cell-jobs').getByRole('row').nth(1)).toContainText('resume', { timeout: 60_000 })
+  await expect(page.getByTestId('cell-tenant')).toContainText('Active', { timeout: 60_000 })
 })

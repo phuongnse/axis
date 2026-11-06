@@ -659,6 +659,10 @@ administrator's invitation, go to the run's Mailpit. `tests/e2e/tenant-realm.ts`
 clients and adds an account with a password and an authenticator to a tenant's realm, through the
 `axis-admin` client.
 
+The run's shared publisher reads the `Tenants` section, so it runs no provisioning jobs. A spec that queues
+jobs, such as the cell console spec, starts its own publisher with `startPublisher` of the same file, which
+reads the tenant directory with a cell's settings and runs the jobs.
+
 ## Hot reload with `scripts/dev.sh`
 
 `scripts/dev.sh` runs the local stack with hot reload, the way to work on Axis day to day. It needs
