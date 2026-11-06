@@ -217,10 +217,7 @@ public sealed class TenantExportUsersTests(KeycloakFixture keycloak, PostgreSqlF
 
     private static async Task<Dictionary<string, string>> ReadZipAsync(IAmazonS3 s3, string bucket, string key)
     {
-        using var response = await s3.GetObjectAsync(bucket, key, CancellationToken);
-        using var memory = new MemoryStream();
-        await response.ResponseStream.CopyToAsync(memory, CancellationToken);
-        memory.Position = 0;
+        using var memory = new MemoryStream(await MinioFixture.ReadObjectAsync(s3, bucket, key, CancellationToken));
         using var zip = new ZipArchive(memory, ZipArchiveMode.Read);
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var entry in zip.Entries)
