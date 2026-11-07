@@ -45,6 +45,9 @@
 # fails if it never answers. The server and the worker run in Development, because only
 # Development lets a connector call the stub over http. Their purchasing system bindings point at
 # the stub, so an approved purchase request creates its purchase order there.
+# The control plane runs from the build output on $AXIS_E2E_CONTROL_PLANE_PORT (default 5290) in Testing, with its
+# own database axis_controlplane and the region directory's database axis_directory. Specs find it at
+# $AXIS_E2E_CONTROL_PLANE_URL. The run fails if it never answers.
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
 # roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
 # requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
@@ -139,6 +142,7 @@ minio_password="e2e-$RANDOM$RANDOM$RANDOM"
 network="axis-e2e-$$"
 
 purchasing_pid=""
+control_plane_pid=""
 publisher_pid=""
 worker_pid=""
 worker_dir="$(mktemp -d)"
@@ -174,6 +178,10 @@ cleanup() {
   if [ -n "$purchasing_pid" ]; then
     kill "$purchasing_pid" 2>/dev/null || true
     wait "$purchasing_pid" 2>/dev/null || true
+  fi
+  if [ -n "$control_plane_pid" ]; then
+    kill "$control_plane_pid" 2>/dev/null || true
+    wait "$control_plane_pid" 2>/dev/null || true
   fi
   docker rm -f "$container" >/dev/null 2>&1 || true
   docker rm -f "$keycloak_container" >/dev/null 2>&1 || true
@@ -239,13 +247,17 @@ if affected playwright; then
     exit 1
   fi
 
-  # The journey tenant's database and roles. CREATE DATABASE cannot run in a multi-statement transaction, so each
-  # statement has its own -c.
+  # The journey tenant's database and roles, and the control plane's two databases. CREATE DATABASE cannot run in a
+  # multi-statement transaction, so each statement has its own -c.
   docker exec "$container" psql -U axis -d axis -v ON_ERROR_STOP=1 \
     -c "CREATE ROLE axis_journey_schema LOGIN PASSWORD 'axis'" \
     -c "CREATE ROLE axis_journey_runtime LOGIN PASSWORD 'axis'" \
     -c "CREATE ROLE axis_admin LOGIN PASSWORD 'axis' CREATEDB CREATEROLE" \
-    -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" >/dev/null
+    -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" \
+    -c "CREATE ROLE axis_controlplane LOGIN PASSWORD 'axis'" \
+    -c "CREATE ROLE axis_directory LOGIN PASSWORD 'axis'" \
+    -c "CREATE DATABASE axis_controlplane OWNER axis_controlplane" \
+    -c "CREATE DATABASE axis_directory OWNER axis_directory" >/dev/null
 
   # The tenant create spec's server answers https on *.localhost with this certificate, and Chromium accepts it there.
   openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=localhost' \
@@ -285,6 +297,43 @@ if affected playwright; then
       echo "The purchasing system stub at $AXIS_E2E_PURCHASING_URL $reason."
       echo "Last 100 lines of artifacts/logs/e2e-purchasing.log:"
       tail -n 100 "$purchasing_log"
+    } >&2
+    exit 1
+  fi
+
+  control_plane_log="$root/artifacts/logs/e2e-controlplane.log"
+  : >"$control_plane_log"
+  export AXIS_E2E_CONTROL_PLANE_URL="http://127.0.0.1:${AXIS_E2E_CONTROL_PLANE_PORT:-5290}"
+  # /health/ready would also probe the mail relay, which has no host port in this run, so this waits for /health/live.
+  ASPNETCORE_URLS="$AXIS_E2E_CONTROL_PLANE_URL" ASPNETCORE_ENVIRONMENT=Testing \
+    ControlPlane__Region=vn ControlPlane__TenantDomain=vn.example.com \
+    ControlPlane__ConnectionString="Host=127.0.0.1;Port=$port;Database=axis_controlplane;Username=axis_controlplane;Password=axis" \
+    ControlPlane__DirectoryConnectionString="Host=127.0.0.1;Port=$port;Database=axis_directory;Username=axis_directory;Password=axis" \
+    ControlPlane__Dns__Provider=InMemory ControlPlane__MailFrom=no-reply@vn.example.com \
+    ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port=1025 ControlPlane__Mail__UseTls=false \
+    dotnet controlplane/src/Axis.ControlPlane/bin/Release/net10.0/Axis.ControlPlane.dll \
+    --contentRoot "$root/controlplane/src/Axis.ControlPlane" >>"$control_plane_log" 2>&1 &
+  control_plane_pid=$!
+
+  ready=0
+  reason="did not answer after 30 seconds"
+  for _ in $(seq 1 30); do
+    if curl -fs -o /dev/null "$AXIS_E2E_CONTROL_PLANE_URL/health/live"; then
+      ready=1
+      break
+    fi
+    if ! kill -0 "$control_plane_pid" 2>/dev/null; then
+      reason="stopped before it answered"
+      break
+    fi
+    sleep 1
+  done
+
+  if [ "$ready" -ne 1 ]; then
+    {
+      echo "The control plane at $AXIS_E2E_CONTROL_PLANE_URL $reason."
+      echo "Last 100 lines of artifacts/logs/e2e-controlplane.log:"
+      tail -n 100 "$control_plane_log"
     } >&2
     exit 1
   fi
@@ -540,6 +589,7 @@ if affected playwright; then
   if [ "$playwright_status" -ne 0 ]; then
     print_log "Axis server log" "$AXIS_E2E_SERVER_LOG"
     print_log "Axis journey server log" "$AXIS_E2E_JOURNEY_SERVER_LOG"
+    print_log "Axis control plane log" "$control_plane_log"
   fi
   if [ "$playwright_status" -ne 0 ] || [ "$worker_failed" -ne 0 ]; then
     print_log "Axis worker log" "$AXIS_E2E_WORKER_LOG"

@@ -236,6 +236,25 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(playwright > realm, run.calls.join('\n'))
   })
 
+  test('the control plane gets its two databases, then starts before Playwright', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const databases = run.calls.findIndex(
+      (call) =>
+        call.startsWith('docker exec ') &&
+        call.includes('CREATE DATABASE axis_controlplane OWNER axis_controlplane') &&
+        call.includes('CREATE DATABASE axis_directory OWNER axis_directory'),
+    )
+    const controlPlane = run.calls.findIndex(
+      (call) => call.startsWith('dotnet ') && call.includes('Axis.ControlPlane.dll') && call.includes('--contentRoot'),
+    )
+    const playwright = run.calls.findIndex((call) => call.startsWith('npm test '))
+    assert.ok(databases >= 0, run.calls.join('\n'))
+    assert.ok(controlPlane > databases, run.calls.join('\n'))
+    assert.ok(playwright > controlPlane, run.calls.join('\n'))
+  })
+
   for (const shard of ['4/3', '0/3', 'abc']) {
     test(`a shard of ${shard} stops the script before any container starts`, () => {
       const run = runE2e(shard)
@@ -245,4 +264,17 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
       assert.ok(!run.calls.some((call) => call.startsWith('docker ')), run.calls.join('\n'))
     })
   }
+})
+
+describe('docs/development.md lists the E2E logs that scripts/e2e.sh writes', () => {
+  test('the log table under Results and logs has one row for each e2e-*.log file', () => {
+    const development = readFileSync(join(root, 'docs/development.md'), 'utf8')
+    const section = /### Results and logs\n([\s\S]*?)(?=\n##)/.exec(development)?.[1]
+    assert.ok(section, 'docs/development.md has no Results and logs section')
+    const documented = [...section.matchAll(/^\| `(e2e-[a-z-]+\.log)` /gm)].map((match) => match[1]).sort()
+    const script = readFileSync(join(root, 'scripts/e2e.sh'), 'utf8')
+    const written = [...new Set([...script.matchAll(/artifacts\/logs\/(e2e-[a-z-]+\.log)/g)].map((match) => match[1]))].sort()
+    assert.ok(written.length > 0, 'scripts/e2e.sh writes no E2E log')
+    assert.deepEqual(documented, written)
+  })
 })

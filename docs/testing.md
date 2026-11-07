@@ -97,7 +97,7 @@ The integration tests share their containers, so a run starts each service at mo
 ## The E2E stack
 
 `scripts/e2e.sh` starts the whole stack that the Playwright journeys run against: a main server, a
-journey server, the worker, the publisher and the purchasing system stub.
+journey server, the worker, the publisher, the purchasing system stub and the control plane.
 
 The main E2E server activates these applications in `ActivateOnStartup`, see
 [startup activation](reference/host-settings.md#startup-activation), so the journeys run against real
@@ -218,8 +218,16 @@ The E2E server, worker and publisher also hold the `PurchaseRequestApprovedWebho
 `PurchaseRequestApprovedWebhookSecret` bindings, which point at the stub, where the sample's approval
 webhook delivers.
 
+**The control plane.** The E2E run starts the [control plane](reference/control-plane.md) from the build
+output on `AXIS_E2E_CONTROL_PLANE_PORT` (default 5290), and fails if it does not answer. Specs find it at
+`AXIS_E2E_CONTROL_PLANE_URL`. It runs in `Testing`, with its own database `axis_controlplane` and the region
+directory's database `axis_directory`, both created through `psql`. It uses the `InMemory` DNS provider and sends
+no mail. It serves the [sign-up page](reference/sign-up.md#the-page), and the sign-up spec seeds its own tenant in
+the directory, so the subdomain check finds a taken name.
+
 **Logs.** The worker output goes to `artifacts/logs/e2e-worker.log`, the journey server output to
-`artifacts/logs/e2e-journey-server.log` and the stub output to `artifacts/logs/e2e-purchasing.log`.
+`artifacts/logs/e2e-journey-server.log`, the stub output to `artifacts/logs/e2e-purchasing.log` and the control
+plane output to `artifacts/logs/e2e-controlplane.log`.
 
 ## Journeys on the journey tenant
 
