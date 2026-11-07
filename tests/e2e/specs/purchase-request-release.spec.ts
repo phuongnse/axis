@@ -14,7 +14,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openKind, openProblems, openTab } from '../studio-resources'
+import { addMapping, openKind, openProblems, openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
 import { logInAtKeycloak } from '../keycloak'
 
@@ -445,7 +445,7 @@ test.describe('the active release of the purchase request sample changes', () =>
           .getByRole('textbox', { name: 'Text key', exact: true })
           .fill('notify.budgetApproved.body')
         const values = page.getByTestId('studio-field-/steps/4/message/values')
-        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await addMapping(values)
         await values.getByRole('textbox', { name: 'Placeholder', exact: true }).fill('name')
         await page
           .getByTestId('studio-field-/steps/4/message/values/name')

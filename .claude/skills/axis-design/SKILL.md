@@ -56,8 +56,10 @@ are under "Several changes are a design review" in Design changes.
 
 ### Start
 
-1. Agree a short topic with the owner, such as `field-look`. Create the
-   prototype branch from `main`, named as
+1. Take the review's design issue, or agree a short topic with the owner, such
+   as `field-look`. A review covers one screen or one group of screens. If an
+   earlier review's issues have not built what it touches, say so and stop: the
+   review waits for them. Create the prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
    `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
    `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch,
@@ -73,7 +75,9 @@ are under "Several changes are a design review" in Design changes.
 
 Take one change at a time, and do not start the next until the owner has
 seen this one. Build only what the design needs to be seen and agreed: no test
-changes, and logic goes in `design-review.md` for the review's issue.
+changes, no server changes, and logic goes in `design-review.md` for the docs
+change. What the screen needs from an API is a fixture here and a contract in
+the docs. What you find outside the review's topic becomes an issue.
 
 1. Restate the change in Axis terms: the tokens, the widgets and the
    previews it touches, by their names in
@@ -96,47 +100,26 @@ changes, and logic goes in `design-review.md` for the review's issue.
 5. Check every changed card as the artifact shows it (see below).
 6. Commit the change on the branch with a message that says what it shows,
    so the branch history lists the review's changes in order. Push the branch.
-7. Make sure the local stack serves the change, restarting `scripts/dev.sh`
-   after a text change, then tell the owner what changed and where to look,
-   and ask for a verdict. The owner looks on the stack; take no screenshots
-   for them. Keep, change or drop the change as they say. Write down each rule they agree, in
-   English as all committed text is, in `design-review.md` for the docs change
-   at the end, then commit and push it.
+7. Tell the owner what changed and which preview to open, and ask for a verdict.
+   The owner looks at the previews; take no screenshots for them. Keep, change
+   or drop the change as they say. Write down each rule they agree, in English
+   as all committed text is, in `design-review.md` for the docs change at the
+   end, then commit and push it.
 
 The artifact does not change during a review. It is published once, at the end.
 
 ### Bringing `main` into the prototype
 
-Use this when the owner asks to continue a review after design issues merged, or when `main` has moved on under the
-prototype. The rule is in [Design changes](../../../docs/delivery.md#design-changes).
+Use this when `main` has changed code the prototype touches. The rule is in
+[Design changes](../../../docs/delivery.md#design-changes).
 
-1. `git fetch origin --tags --prune`, then switch to the newest `design/` branch (`git branch -r --list
-   'origin/design/*' --sort=-committerdate`). Never start from an older one.
-2. Find what `main` built: `git log --oneline $(git merge-base HEAD origin/main)..origin/main`, and the issues that link a
-   `design-review/` tag, with `gh issue list --state all --search "design-review in:body"`. Tell the owner which design
-   issues have merged.
-3. `git merge origin/main`. Never rebase a pushed prototype.
-4. Resolve every conflict by one rule: `main` is the standard for behaviour, the prototype for look.
-   - Where both built the same thing, take `main`'s API, data shape, texts and logic as the base, and put the prototype's
-     look and its agreed additions back on it, as `design-review.md` lists them. Never keep the prototype's logic over
-     `main`'s, and never change `main`'s logic to suit the prototype.
-   - Where only the prototype built it, keep it, and move it to `main`'s names and APIs.
-   - Check what a past merge of the prototype lost: `git diff $(git merge-base HEAD origin/main) origin/main --stat`
-     shows what `main` has that a file without a conflict may still lack. Bring it back into the prototype's files and
-     list it under "Lost in merges".
-   - A text key that both gave a value takes `main`'s. Edit the text files as lines, as a JSON round trip drops their
-     duplicate keys.
-5. Check it: `npm ci --prefix web` when the packages are old, then `tsc -b --noEmit`, `oxlint --deny-warnings` and
-   `prettier --check` in `web/`, `dotnet build`, the tests of the shared widgets the merge touched (`AxisTable`,
-   `TableWidget`, `Shell`), and `scripts/design-system.sh`. A test that fails because the prototype changed a widget on
-   purpose is listed in `design-review.md`, not fixed on this branch.
-6. Search the merged code for one concern with two mechanisms, as the "One concern has one mechanism" rule in
-   [AGENTS.md](../../../AGENTS.md#working-rules) says: two components or helpers for the same job, a prop that does what a
-   context or a route already does, a caller that builds what its shared widget should know. Run
-   `node scripts/check-shared-widgets.mjs`, which on a prototype lists where the code differs from the baseline of `main` and
-   is not expected to pass, and put it with what else you find in `design-review.md`.
-7. Write the merge into `design-review.md`: which `main` commit, what was kept from each side, and what is left unused.
-   Commit it with the merge, and push the branch.
+1. `git fetch origin`, then `git merge origin/main`. Never rebase a pushed
+   prototype.
+2. Resolve each conflict on `main`'s API, data shape, texts and logic, and put
+   the prototype's look back on them. Never change `main`'s logic to suit the
+   prototype.
+3. Check it: `tsc -b --noEmit`, `oxlint --deny-warnings` and `prettier --check` in
+   `web/`, and `scripts/design-system.sh`. Then push the branch.
 
 ### Checking a card
 
@@ -161,28 +144,31 @@ A check passes only when the card behaves as it will in the artifact.
    shared one. The rule is in [AGENTS.md](../../../AGENTS.md#working-rules).
 1. When the owner has agreed every change, write one docs change on its own
    branch from `main` that rewrites each agreed rule where it lives, in the
-   reference pages, and deletes what it replaces. Add a decision only for a
-   choice between real alternatives, never one that lists the review's rules.
+   reference pages, and deletes what it replaces. Write what a screen needs from
+   an API as a contract there. Add a decision only for a choice between real
+   alternatives, never one that lists the review's rules.
    Follow [writing the docs](../../../docs/writing-docs.md), and mark what is
    not built yet. Open it as a hand-made pull request for the owner to merge.
-2. Before the issue, tag the prototype's last commit and push the tag, so
+2. Tag the prototype's last commit and push the tag, so
    NexKit's agents can read it and no link to it ever breaks:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and
    `git push origin design-review/<yyyy-mm-dd>-<topic>`. No push to a branch other than
-   `main` starts a workflow, so the tag starts no run; check with `gh run list`. The
-   issue links the tag's comparison with the commit the branch
+   `main` starts a workflow, so the tag starts no run; check with `gh run list`. Link
+   the tag's comparison with the commit the branch
    started from, `compare/<base>...design-review/<yyyy-mm-dd>-<topic>`, where
    `<base>` is `git merge-base design/<yyyy-mm-dd>-<topic> main`, so the diff stays the
    same as `main` moves on. The tag is never deleted. Once it is pushed,
    delete the branch, locally and with `git push origin --delete
    design/<yyyy-mm-dd>-<topic>`.
-3. Write one NexKit issue that builds the whole review, as
-   [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It
-   links the docs sections, the artifact and the prototype tag, and names
-   the tokens, widgets and previews it changes. Open it once the docs pull
-   request is merged, so its links point at `main`. Do not split it: NexKit
-   splits it if it needs to.
-4. After the issue is merged, publish the artifact as [A sync](#a-sync) says,
+3. Once the docs pull request is merged, so links point at `main`, hand over to
+   the build, as [Design changes](../../../docs/delivery.md#design-changes) says:
+   - With a design issue, correct each waiting issue so it links the docs and
+     the tag, then close the design issue, which starts them.
+   - Without one, write one NexKit issue that builds the whole review, as
+     [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It links
+     the docs sections, the artifact and the tag, and names the tokens, widgets
+     and previews it changes. Do not split it: NexKit splits it if it needs to.
+4. After the build is merged, publish the artifact as [A sync](#a-sync) says,
    with no need to ask when every difference comes from what merged. The sync
    keeps the card order and names, which `scripts/design-system.sh` writes as
    the bundle's first line, `/* @ds-bundle: {...} */`.
