@@ -28,17 +28,17 @@ last section with no heading.
 
 ## Fields
 
-_(planned for M31)_
-
-Every field is named in words. Its label and its optional help are the texts
-`shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as the form
-widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between the label
-and the input. Every field has its help, see [platform field help](frontend.md#platform-field-help). A
-property's raw name, such as `textKey`, never shows.
-
-The file's identity is hidden: `id`, `kind` and `formatVersion` are not shown, while `name` is, with
-its help. A group's fields sit in from the group's label, behind a rule in `borderSubtle`, so they read
-as its fields and not as its peers.
+- **Named in words.** _(planned for M31)_ Every field is named in words. Its label and its optional help
+  are the texts `shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as
+  the form widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between
+  the label and the input. Every field has its help, see
+  [platform field help](frontend.md#platform-field-help). A property's raw name, such as `textKey`, never
+  shows. The `<path>` is the property names from the root joined by dots, with list indices and map keys
+  left out, so every item of a list shares one label.
+- **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown, while `name` is. In a
+  module's view, `name` stays read-only.
+- **A group's fields sit in.** They sit in from the group's label, behind a rule in `borderSubtle`, so they
+  read as its fields and not as its peers.
 
 ## Labels
 
