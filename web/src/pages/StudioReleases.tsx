@@ -222,7 +222,7 @@ export function StudioReleasesList({
             {row.number}
           </Link>
           {row.live && <StudioLiveTag />}
-          <ReleaseOffStandard relaxed={row.relaxed} />
+          <ReleaseOffStandard relaxed={row.relaxed} locale={locale ?? 'en'} />
         </Flex>
       ),
     },

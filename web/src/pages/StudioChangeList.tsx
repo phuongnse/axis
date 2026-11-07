@@ -2,6 +2,7 @@ import { Typography } from 'antd'
 import { useContext } from 'react'
 import { Link } from 'react-router'
 import type { StudioChangeRow, StudioReleasePartChange } from '../platform/studio'
+import { sortByName } from '../platform/listOrder'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -28,12 +29,13 @@ export function StudioChangeList({
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, spacing } = useDesignTokens()
-  const sortedParts = parts
-    ?.slice()
-    .sort(
-      (left, right) =>
-        (left.type === right.type ? 0 : left.type === 'module' ? -1 : 1) ||
-        left.label.localeCompare(right.label, locale),
+  const sortedParts =
+    parts &&
+    sortByName(
+      parts,
+      (part) => part.label,
+      locale,
+      (part) => (part.type === 'module' ? 0 : 1),
     )
   return (
     <div

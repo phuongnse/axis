@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import en from '../../../src/Axis.Presentation/Texts/en.json'
 import vi from '../../../src/Axis.Presentation/Texts/vi.json'
-import { kindGroup, kindName, kindSingular, studioKinds } from './studioKinds'
+import { kindGroup, kindName, kindSingular, sidebarRank, studioKinds } from './studioKinds'
 import { starterKinds } from './studioStarters'
 
 const texts = en as Record<string, string>
@@ -30,5 +30,15 @@ describe('studioKinds', () => {
     expect(kindSingular('unknown', text)).toBe('unknown')
     expect(kindName('unknown', text)).toBe('unknown')
     expect(kindGroup('unknown')).toBe('other')
+  })
+})
+
+describe('sidebarRank', () => {
+  it('puts the manifest first, a named kind at its place in the sidebar and any other kind last', () => {
+    expect(sidebarRank('application')).toBe(-1)
+    expect(sidebarRank('entity')).toBe(0)
+    expect(sidebarRank('page')).toBeGreaterThan(sidebarRank('entity'))
+    expect(sidebarRank('unknown')).toBe(studioKinds.length)
+    expect(sidebarRank(null)).toBe(studioKinds.length)
   })
 })

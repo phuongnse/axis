@@ -248,6 +248,59 @@ describe('StudioReleasePage', () => {
     expect(screen.getByText('No file differs from release 4.')).toBeInTheDocument()
   })
 
+  it('lists the modules first and then the packages, each by label, when the server sends them out of order', async () => {
+    answer({
+      ...release,
+      modules: [
+        { id: 'organization', label: 'Organization', version: '1.0.0', previousVersion: null },
+        { id: 'audit', label: 'Audit', version: '1.0.0', previousVersion: null },
+      ],
+      packages: [
+        { id: 'zip', label: 'Zip export', version: '1.0.0', previousVersion: null },
+        { id: 'pdf', label: 'PDF export', version: '1.0.0', previousVersion: null },
+      ],
+    })
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    const names = section('Modules and packages')
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[0].textContent)
+    expect(names).toEqual(['Audit', 'Organization', 'PDF export', 'Zip export'])
+  })
+
+  it('lists the relaxed points by module label and then by point label, when the server sends them out of order', async () => {
+    const point = (module: string, moduleTitle: string, label: string): StudioRelaxedPoint => ({
+      module,
+      point: `Entity/transitions/${label}`,
+      reason: `${label} reason`,
+      moduleTitle,
+      part: null,
+      entityTitles: null,
+      titles: { en: label },
+    })
+    const relaxed = [
+      point('organization', 'Organization', 'Reject'),
+      point('audit', 'Audit', 'Sign'),
+      point('organization', 'Organization', 'Approve'),
+    ]
+    answer(release)
+    renderPage({
+      history: { ...history, items: [item('r3', 3, '2026-05-02T10:00:00Z', { offStandard: true, relaxed })] },
+    })
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    const section_ = section('Relaxed points')
+    expect(section_.getAllByText(/^(Audit|Organization)$/).map((heading) => heading.textContent)).toEqual([
+      'Audit',
+      'Organization',
+    ])
+    expect(
+      section_.getAllByTestId('studio-release-relaxed-point').map((entry) => entry.firstChild?.textContent),
+    ).toEqual(['Sign', 'Approve', 'Reject'])
+  })
+
   it('lists the modules and packages that differ after the files, modules first and each by label', async () => {
     const partChanges: StudioReleasePartChange[] = [
       { type: 'package', id: 'pdf', label: 'PDF export', change: 'added', version: '1.0.0', previousVersion: null },

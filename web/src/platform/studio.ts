@@ -3,7 +3,8 @@ import { forbidden } from './inspection'
 import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
-import { kindSingular, studioKinds } from './studioKinds'
+import { sortByName } from './listOrder'
+import { kindSingular, sidebarRank, studioKinds } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -298,6 +299,42 @@ export interface StudioReference {
 export interface StudioResourceReferences {
   uses: StudioReference[]
   usedBy: StudioReference[]
+}
+
+/**
+ * The entries of a Uses or Used by list: resources and text keys in the sidebar's kind order, then modules, then
+ * packages, each group by name in `locale`.
+ */
+export function sortReferences(entries: readonly StudioReference[], locale: string): StudioReference[] {
+  return sortByName(
+    entries,
+    (entry) => referenceTitle(entry.node),
+    locale,
+    (entry) => nodeRank(entry.node),
+  )
+}
+
+function nodeRank(node: StudioReferenceNode): number {
+  switch (node.type) {
+    case 'resource':
+      return sidebarRank(node.kind)
+    case 'text':
+      return sidebarRank('text')
+    case 'module':
+      return studioKinds.length + 1
+    case 'package':
+      return studioKinds.length + 2
+  }
+}
+
+function referenceTitle(node: StudioReferenceNode): string {
+  if (node.type === 'resource') {
+    return node.name ?? node.file
+  }
+  if (node.type === 'text') {
+    return node.key
+  }
+  return node.id
 }
 
 /** The `usedBy` entries of a text key: the labels and text resources that use it. */
@@ -1428,10 +1465,13 @@ export function changeRows(
   locale: string,
   t: (key: string) => string,
 ): StudioChangeRow[] {
-  return changes
-    .map((change) => changeRow(change, items, locale, t))
-    .sort((left, right) => left.order - right.order || left.row.name.localeCompare(right.row.name, locale))
-    .map(({ row }) => row)
+  const rows = changes.map((change) => changeRow(change, items, locale, t))
+  return sortByName(
+    rows,
+    ({ row }) => row.name,
+    locale,
+    ({ order }) => order,
+  ).map(({ row }) => row)
 }
 
 function changeRow(
@@ -1450,8 +1490,7 @@ function changeRow(
       row: { key, name: t('shell.studio.nav.settings'), kind: null, change: change.change, resourceId },
     }
   }
-  const index = studioKinds.findIndex((entry) => entry.kind === kind)
-  const order = index === -1 ? studioKinds.length : index
+  const order = sidebarRank(kind)
   if (kind === null) {
     return { order, row: { key, name: change.path, kind: null, change: change.change, resourceId: null } }
   }
@@ -1503,11 +1542,12 @@ function languageName(tag: string, locale: string): string {
 }
 
 /**
- * Groups resources by kind. Kinds are sorted ordinally, and each group's items by the shown name, or by name, or by
- * file when `title` is not given.
+ * Groups resources by kind. Kinds are sorted ordinally, and each group's items by the shown name in `locale`, or by
+ * name, or by file when `title` is not given.
  */
 export function groupByKind(
   items: StudioResourceItem[],
+  locale: string,
   title?: (item: StudioResourceItem) => string,
 ): ResourceGroup[] {
   const groups = new Map<string, StudioResourceItem[]>()
@@ -1519,13 +1559,13 @@ export function groupByKind(
       groups.set(item.kind, [item])
     }
   }
-  const compare = title
-    ? (left: StudioResourceItem, right: StudioResourceItem) => title(left).localeCompare(title(right))
-    : (left: StudioResourceItem, right: StudioResourceItem) =>
-        compareOrdinal(left.name ?? left.file, right.name ?? right.file)
+  const sortItems = title
+    ? (members: StudioResourceItem[]) => sortByName(members, title, locale)
+    : (members: StudioResourceItem[]) =>
+        members.toSorted((left, right) => compareOrdinal(left.name ?? left.file, right.name ?? right.file))
   return [...groups.entries()]
     .sort(([left], [right]) => compareOrdinal(left, right))
-    .map(([kind, members]) => ({ kind, items: members.toSorted(compare) }))
+    .map(([kind, members]) => ({ kind, items: sortItems(members) }))
 }
 
 /** The kind of a module resource that Studio lists. Every kind a module may hold is one. */
@@ -1539,7 +1579,7 @@ export interface ModuleResourceItem {
   module: string
 }
 
-/** The module resources of one kind, in the order the names give them. */
+/** The module resources of one kind, by name. */
 export interface ModuleResourceGroup {
   kind: ModuleResourceKind
   items: ModuleResourceItem[]
@@ -1567,10 +1607,10 @@ const moduleNameLists: Record<ModuleKind, (names: StudioNames) => ModuleNameItem
 
 /**
  * The module resources in the names, one group for each kind that has some, in the order of `moduleKinds`, with the
- * application's own left out. An item stays when its name or id contains `search`, ignoring letter case and
- * surrounding spaces. A kind with no item has no group.
+ * application's own left out and each group's items by name in `locale`. An item stays when its name or id contains
+ * `search`, ignoring letter case and surrounding spaces. A kind with no item has no group.
  */
-export function moduleResources(names: StudioNames | null, search: string): ModuleResourceGroup[] {
+export function moduleResources(names: StudioNames | null, search: string, locale: string): ModuleResourceGroup[] {
   if (names === null) {
     return []
   }
@@ -1578,13 +1618,15 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
   return moduleKinds
     .map((kind) => ({
       kind,
-      items: moduleNameLists[kind](names)
-        .filter(
+      items: sortByName(
+        moduleNameLists[kind](names).filter(
           (item) =>
             item.module !== null &&
             (needle === '' || item.name.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle)),
-        )
-        .map((item): ModuleResourceItem => ({ id: item.id, kind, name: item.name, module: item.module! })),
+        ),
+        (item) => item.name,
+        locale,
+      ).map((item): ModuleResourceItem => ({ id: item.id, kind, name: item.name, module: item.module! })),
     }))
     .filter((group) => group.items.length > 0)
 }
