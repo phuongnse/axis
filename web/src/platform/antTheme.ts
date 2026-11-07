@@ -85,8 +85,9 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       Mentions: errorBorder,
       Cascader: errorBorder,
       TreeSelect: errorBorder,
+      // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
-      Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
+      Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText, paddingXXS: spacing.xs },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
       Tabs: {

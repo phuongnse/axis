@@ -1,10 +1,8 @@
 import { SettingOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps } from 'antd'
-import { useMemo, type CSSProperties } from 'react'
-import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
-import { useDesignTokens, useThemeMode, type ThemeChoice } from './themeMode'
+import { useThemeMode, type ThemeChoice } from './themeMode'
 
 const choices: readonly ThemeChoice[] = ['system', 'light', 'dark']
 
@@ -22,15 +20,10 @@ export function PreferencesMenu({
   onLocaleChange: (locale: string) => void
 }) {
   const t = useText()
-  const { mode, choice, choose } = useThemeMode()
-  const { colour } = useDesignTokens()
-  const selected = useMemo<CSSProperties>(
-    () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
-    [colour, mode],
-  )
+  const { choice, choose } = useThemeMode()
 
   function option(key: string, label: string, current: boolean) {
-    return { key, label, role: 'menuitemradio', 'aria-checked': current, style: current ? selected : undefined }
+    return { key, label, role: 'menuitemradio', 'aria-checked': current }
   }
 
   const items = [
@@ -50,6 +43,7 @@ export function PreferencesMenu({
       ),
     },
   ] as MenuProps['items']
+  const selectedKeys = [`locale:${locale}`, `theme:${choice}`]
   const label = t('shell.preferences.label')
 
   function pick({ key }: { key: string }) {
@@ -62,7 +56,7 @@ export function PreferencesMenu({
   }
 
   return (
-    <Dropdown trigger={['click']} menu={{ items, onClick: pick, 'aria-label': label }}>
+    <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, onClick: pick, 'aria-label': label }}>
       <AxisButton role="icon" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
     </Dropdown>
   )

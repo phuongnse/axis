@@ -265,6 +265,15 @@ describe('UsersPage', () => {
     expect(JSON.parse(posts(fetchMock)[0][1]!.body as string).roles).toEqual([])
   })
 
+  it('lays the invite form out with each label above its input', async () => {
+    stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
+    const form = await confirmation('Invite a person')
+
+    expect(form.querySelector('form')).toHaveClass('ant-form-vertical')
+  })
+
   it('asks for the fields of the form before it asks to invite', async () => {
     const fetchMock = stubInvitations()
     renderPage()

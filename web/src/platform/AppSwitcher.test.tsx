@@ -219,6 +219,17 @@ describe('AppSwitcher', () => {
     expect(markedNames(menu)).toEqual(['Purchase requests'])
   })
 
+  it('draws the site of the current page as selected, and no other entry', async () => {
+    stubServer(requester)
+    renderSwitcher('en', platformEnglish, ['/purchasing/requests'])
+
+    const menu = await openSwitcher()
+    const selected = 'ant-dropdown-menu-item-selected'
+
+    expect(menu.getByRole('menuitem', { name: 'Purchase requests' })).toHaveClass(selected)
+    expect(menu.getByRole('menuitem', { name: 'E2E notes' })).not.toHaveClass(selected)
+  })
+
   it('marks Studio on its own page, and no site', async () => {
     stubServer(author)
     renderSwitcher('en', platformEnglish, ['/studio'])

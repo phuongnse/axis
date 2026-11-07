@@ -1548,6 +1548,17 @@ describe('StudioPage publishing', () => {
       expect(await screen.findByRole('dialog', { name: 'New application' })).toBeInTheDocument()
     })
 
+    it('lays the New application form out with each label above its input', async () => {
+      stubCreateAccess(true)
+      renderPage()
+
+      await userEvent.click(await screen.findByTestId('studio-application-row'))
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'New application…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New application' })
+      expect(dialog.querySelector('form')).toHaveClass('ant-form-vertical')
+    })
+
     it.each([
       ['studioCreate is true', true, true],
       ['studioCreate is false', false, false],

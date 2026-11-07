@@ -1,10 +1,11 @@
-import { Button, Form, Input, Select, Space } from 'antd'
+import { Button, Flex, Form, Input, Select, Space } from 'antd'
 import { useEffect, useState } from 'react'
 import { FieldInput } from './FieldInput'
 import { fetchRecord, type RecordItem, type RecordValue } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { DataSourceParameter, FieldMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 interface FilterBarProps {
   /** The data source parameters, in declaration order. */
@@ -62,34 +63,37 @@ function asField(parameter: DataSourceParameter): FieldMetadata {
  */
 export function FilterBar({ parameters, values, errors, onChange, locale }: FilterBarProps) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   return (
-    <Form layout="inline" data-testid="filter-bar">
-      {parameters.map((parameter) => {
-        const { name } = parameter
-        const id = `filter-${name}`
-        const messages = errors[name]
-        return (
-          <Form.Item
-            key={name}
-            label={parameter.labelKey ? t(parameter.labelKey) : name}
-            htmlFor={id}
-            validateStatus={messages ? 'error' : undefined}
-            help={
-              messages && (
-                <span data-testid={`filter-error-${name}`}>{messages.map((message) => t(message)).join(' ')}</span>
-              )
-            }
-          >
-            <FilterInput
-              parameter={parameter}
-              id={id}
-              value={values[name] ?? null}
-              onChange={(value) => onChange(name, value)}
-              locale={locale}
-            />
-          </Form.Item>
-        )
-      })}
+    <Form layout="vertical" data-testid="filter-bar">
+      <Flex wrap style={{ columnGap: spacing.lg }}>
+        {parameters.map((parameter) => {
+          const { name } = parameter
+          const id = `filter-${name}`
+          const messages = errors[name]
+          return (
+            <Form.Item
+              key={name}
+              label={parameter.labelKey ? t(parameter.labelKey) : name}
+              htmlFor={id}
+              validateStatus={messages ? 'error' : undefined}
+              help={
+                messages && (
+                  <span data-testid={`filter-error-${name}`}>{messages.map((message) => t(message)).join(' ')}</span>
+                )
+              }
+            >
+              <FilterInput
+                parameter={parameter}
+                id={id}
+                value={values[name] ?? null}
+                onChange={(value) => onChange(name, value)}
+                locale={locale}
+              />
+            </Form.Item>
+          )
+        })}
+      </Flex>
     </Form>
   )
 }

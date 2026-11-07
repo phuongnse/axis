@@ -229,8 +229,7 @@ test('the purchase request list filters by status, and keeps the filter and its 
   await expect(returned).toBeVisible()
 
   const filters = page.getByTestId('filter-bar')
-  // The inline filter label ends with a colon, so its accessible name includes it.
-  const statusFilter = filters.getByRole('combobox', { name: 'Status :', exact: true })
+  const statusFilter = filters.getByRole('combobox', { name: 'Status', exact: true })
   await pickOption(statusFilter, 'returned')
 
   const filteredPath = /\/purchasing\/purchaserequests\?statusFilter=returned&pageSize=100&sort=-title$/
