@@ -237,5 +237,5 @@ every pull request, the tests, and an audit every hundred merges, as
      decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size limits, the
      [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
-     realm.
+     realm. It runs one module per rule under `scripts/lib/docs/`, each with its own test.
    - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.

@@ -830,9 +830,7 @@ The publisher writes the rows of a `publish` and an `activate` request.
 
 An `activate` request makes a release from the history live again, back to an older release or
 forward to a newer one. The publisher activates it as it is, without compiling it again: it rebuilds
-the release's model from its stored files, never from the folder, and stores no new release. The
-route that was named `rollback` before [D130](../decisions/d130-activate-a-release-replaces-roll-back.md)
-is no longer a route. A `POST` to it answers `405`, because the `/api` fallback answers `GET` only.
+the release's model from its stored files, never from the folder, and stores no new release.
 
 - **The activation.** It records an activation with the request's actor, which is the requesting
   user, and the request id, with no label and no note.

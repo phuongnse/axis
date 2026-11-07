@@ -466,6 +466,9 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   `openStudio`, which opens Studio before a publish, each with a limit of 60 seconds. The other
   journeys of that spec write their changed files through the Studio resource API, without the
   browser.
+- **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks
+  what the code does now. A guard against a kind of mistake is a lint rule or a check of the current
+  rule, such as "every chart import goes through `ChartDrawing`", never a list of removed names.
 
 ### Shared test services
 
