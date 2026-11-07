@@ -79,6 +79,61 @@ public sealed class TextCatalogTests
     }
 
     [Fact]
+    public void The_glossary_files_hold_each_term_by_its_status()
+    {
+        using var approved = ReadGlossary("ui-glossary.json");
+        using var proposed = ReadGlossary("ui-glossary-proposed.json");
+
+        var problems = GlossaryProblems(approved.RootElement, proposed.RootElement);
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    [Fact]
+    public void A_concept_in_both_glossary_files_is_reported()
+    {
+        using var approved = JsonDocument.Parse("""{"terms":[{"concept":"Job","status":"approved"}]}""");
+        using var proposed = JsonDocument.Parse("""{"terms":[{"concept":"job","status":"proposed"}]}""");
+
+        Assert.Equal(
+            ["Concept 'job' is in both ui-glossary.json and ui-glossary-proposed.json"],
+            GlossaryProblems(approved.RootElement, proposed.RootElement));
+    }
+
+    [Fact]
+    public void A_term_that_is_not_approved_in_the_approved_glossary_is_reported()
+    {
+        using var approved = JsonDocument.Parse("""{"terms":[{"concept":"Job","status":"proposed"},{"concept":"Cell","status":"decide"}]}""");
+        using var proposed = JsonDocument.Parse("""{"terms":[]}""");
+
+        Assert.Equal(
+        [
+            "ui-glossary.json term 'Job' has the status 'proposed'. Move it to ui-glossary-proposed.json",
+            "ui-glossary.json term 'Cell' has the status 'decide'. Move it to ui-glossary-proposed.json",
+        ], GlossaryProblems(approved.RootElement, proposed.RootElement));
+    }
+
+    [Fact]
+    public void An_approved_term_in_the_proposed_glossary_is_reported()
+    {
+        using var approved = JsonDocument.Parse("""{"terms":[]}""");
+        using var proposed = JsonDocument.Parse("""{"terms":[{"concept":"Job","status":"approved"}]}""");
+
+        Assert.Equal(
+            ["ui-glossary-proposed.json term 'Job' has the status 'approved'. Move it to ui-glossary.json"],
+            GlossaryProblems(approved.RootElement, proposed.RootElement));
+    }
+
+    [Fact]
+    public void Glossary_files_that_hold_each_term_by_its_status_report_nothing()
+    {
+        using var approved = JsonDocument.Parse("""{"terms":[{"concept":"Role","status":"approved"}]}""");
+        using var proposed = JsonDocument.Parse("""{"terms":[{"concept":"Job","status":"proposed"},{"concept":"Cell","status":"decide"}]}""");
+
+        Assert.Empty(GlossaryProblems(approved.RootElement, proposed.RootElement));
+    }
+
+    [Fact]
     public void A_locale_that_loses_a_placeholder_of_english_is_reported()
     {
         var english = new Dictionary<string, string>(StringComparer.Ordinal) { ["count.label"] = "Delete {count} items", ["plain"] = "Plain" };
@@ -167,6 +222,44 @@ public sealed class TextCatalogTests
             .ToList();
     }
 
+    internal static IReadOnlyList<string> GlossaryProblems(JsonElement approved, JsonElement proposed)
+    {
+        const string approvedFile = "ui-glossary.json";
+        const string proposedFile = "ui-glossary-proposed.json";
+        var problems = new List<string>();
+        var approvedConcepts = new List<string>();
+        var proposedConcepts = new List<string>();
+
+        foreach (var term in approved.GetProperty("terms").EnumerateArray())
+        {
+            var concept = term.GetProperty("concept").GetString()!;
+            approvedConcepts.Add(concept);
+            var status = term.GetProperty("status").GetString();
+            if (status != "approved")
+            {
+                problems.Add($"{approvedFile} term '{concept}' has the status '{status}'. Move it to {proposedFile}");
+            }
+        }
+
+        foreach (var term in proposed.GetProperty("terms").EnumerateArray())
+        {
+            var concept = term.GetProperty("concept").GetString()!;
+            proposedConcepts.Add(concept);
+            var status = term.GetProperty("status").GetString();
+            if (status is not ("proposed" or "decide"))
+            {
+                problems.Add($"{proposedFile} term '{concept}' has the status '{status}'. Move it to {approvedFile}");
+            }
+        }
+
+        foreach (var concept in proposedConcepts.Where(candidate => approvedConcepts.Contains(candidate, StringComparer.OrdinalIgnoreCase)))
+        {
+            problems.Add($"Concept '{concept}' is in both {approvedFile} and {proposedFile}");
+        }
+
+        return problems;
+    }
+
     internal static IReadOnlySet<string> KeepWords(JsonElement glossary)
     {
         var words = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -212,9 +305,12 @@ public sealed class TextCatalogTests
 
     private static IReadOnlySet<string> ReadKeepWords()
     {
-        using var glossary = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "reference", "ui-glossary.json")));
+        using var glossary = ReadGlossary("ui-glossary.json");
         return KeepWords(glossary.RootElement);
     }
+
+    private static JsonDocument ReadGlossary(string fileName) =>
+        JsonDocument.Parse(File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "reference", fileName)));
 
     private static TextCatalogBaseline ReadBaseline()
     {

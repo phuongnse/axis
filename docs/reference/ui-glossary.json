@@ -1,5 +1,5 @@
 {
-  "$comment": "The terms Axis's own screens use for each concept, by locale. See docs/reference/ui-writing.md. status: approved, proposed or decide.",
+  "$comment": "The terms Axis's own screens use for each concept, by locale. See docs/reference/ui-writing.md. status: approved. Terms that wait for the owner are in ui-glossary-proposed.json.",
   "locales": [
     "en",
     "vi"
@@ -82,12 +82,6 @@
       "en": "release",
       "vi": "phiên bản",
       "status": "approved"
-    },
-    {
-      "concept": "Revision",
-      "en": "revision",
-      "vi": "bản sửa đổi",
-      "status": "proposed"
     },
     {
       "concept": "Publish (action)",
@@ -387,52 +381,10 @@
       "note": "Kept in English: operators say it."
     },
     {
-      "concept": "Tenant subdomain",
-      "en": "subdomain",
-      "vi": "tên miền phụ",
-      "status": "proposed"
-    },
-    {
       "concept": "Operator console",
       "en": "operator console",
       "vi": "bảng điều khiển vận hành",
       "status": "approved"
-    },
-    {
-      "concept": "Cell",
-      "en": "cell",
-      "vi": "cụm",
-      "status": "proposed"
-    },
-    {
-      "concept": "Job",
-      "en": "job",
-      "vi": "tác vụ",
-      "status": "proposed"
-    },
-    {
-      "concept": "Platform operator",
-      "en": "platform operator",
-      "vi": "người vận hành nền tảng",
-      "status": "proposed"
-    },
-    {
-      "concept": "Cell console",
-      "en": "cell console",
-      "vi": "bảng điều khiển cụm",
-      "status": "proposed"
-    },
-    {
-      "concept": "Quota",
-      "en": "quota",
-      "vi": "hạn mức",
-      "status": "proposed"
-    },
-    {
-      "concept": "Usage",
-      "en": "usage",
-      "vi": "mức sử dụng",
-      "status": "proposed"
     },
     {
       "concept": "Action: Save",
