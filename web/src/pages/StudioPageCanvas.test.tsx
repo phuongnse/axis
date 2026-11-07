@@ -510,7 +510,7 @@ describe('the Design tab of a page', () => {
     it('names a widget by its type and summary', async () => {
       const { design } = await openDesign([{ type: 'kpi', dataSource: 'RequestTotals' }])
 
-      expect(within(design).getByRole('group', { name: 'kpi · RequestTotals' })).toHaveAttribute(
+      expect(within(design).getByRole('group', { name: 'kpi, RequestTotals' })).toHaveAttribute(
         'data-path',
         '/widgets/0',
       )
@@ -879,7 +879,7 @@ describe('the Design tab of a page', () => {
         slow,
       )
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2 · position 2')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2, position 2')
     })
 
     it('names each inserted widget with a name that is unique on the whole page', async () => {
@@ -1000,7 +1000,7 @@ describe('the Design tab of a page', () => {
         slow,
       )
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2 · position 2')
+      expect(palette.getByTestId('studio-palette-announcement')).toHaveTextContent('Page › section 2, position 2')
     })
 
     it('does nothing when the draft has no such target', async () => {
@@ -1217,7 +1217,7 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'chart' }, section([{ type: 'kpi' }])]), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi · Page › section 2 · position 1')
+      expect(announcement).toHaveTextContent('Moved kpi, Page › section 2, position 1')
     })
 
     it('moves a widget before another on its upper half', async () => {
@@ -1254,14 +1254,14 @@ describe('the Design tab of a page', () => {
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['chart', 'kpi']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/1')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi · Page · position 2')
+      expect(announcement).toHaveTextContent('Moved kpi, Page, position 2')
       await waitFor(() => expect(frame('/widgets/1')).toHaveFocus(), slow)
 
       await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}')
 
       await waitFor(() => expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart']), slow)
       expect(within(design).getByTestId('studio-widget-/widgets/0')).toHaveAttribute('aria-current', 'true')
-      expect(announcement).toHaveTextContent('Moved kpi · Page · position 1')
+      expect(announcement).toHaveTextContent('Moved kpi, Page, position 1')
       await waitFor(() => expect(frame('/widgets/0')).toHaveFocus(), slow)
     })
 

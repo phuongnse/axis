@@ -598,9 +598,8 @@ describe('Shell footer', () => {
     stubAbout('0.1.0')
     renderShell('en', ['/'], notesNavigation)
 
-    await waitFor(() =>
-      expect(screen.getByRole('contentinfo')).toHaveTextContent(`© ${new Date().getFullYear()} Axis · v0.1.0`),
-    )
+    await waitFor(() => expect(within(screen.getByRole('contentinfo')).getByText('v0.1.0')).toBeInTheDocument())
+    expect(within(screen.getByRole('contentinfo')).getByText(`© ${new Date().getFullYear()} Axis`)).toBeInTheDocument()
   })
 
   it('shows no version to an anonymous visitor', async () => {
@@ -608,8 +607,8 @@ describe('Shell footer', () => {
 
     await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/about', expect.anything()))
     const footer = screen.getByRole('contentinfo')
-    expect(footer).toHaveTextContent(`© ${new Date().getFullYear()} Axis`)
-    expect(footer).not.toHaveTextContent(' · v')
+    expect(within(footer).getByText(`© ${new Date().getFullYear()} Axis`)).toBeInTheDocument()
+    expect(within(footer).queryByText(/^v\d/)).toBeNull()
   })
 
   it('shows the footer without a server status', async () => {

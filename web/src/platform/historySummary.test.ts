@@ -52,18 +52,18 @@ function item(action: string, details: Record<string, unknown>): HistoryItem {
 describe('historySummary', () => {
   it('lists the labels of the fields, or the name of a field without a label or no longer declared', () => {
     const withUnlabelled = [...fields, field('amount', 'decimal', null)]
-    expect(historySummary(item('record.updated', { fields: ['title', 'amount', 'gone'] }), withUnlabelled, t)).toBe(
+    expect(historySummary(item('record.updated', { fields: ['title', 'amount', 'gone'] }), withUnlabelled, t)).toEqual([
       'Changed: Title, amount, gone',
-    )
+    ])
   })
 
-  it('joins the fields, the outcome and the step', () => {
-    expect(historySummary(item('task.completed', { outcome: 'reject', fields: [], step: 'decide' }), fields, t)).toBe(
-      'Outcome: reject · Step: decide',
-    )
+  it('gives the outcome and the step a line each', () => {
+    expect(
+      historySummary(item('task.completed', { outcome: 'reject', fields: [], step: 'decide' }), fields, t),
+    ).toEqual(['Outcome: reject', 'Step: decide'])
   })
 
-  it('has no summary when the details name no field, outcome or step', () => {
-    expect(historySummary(item('record.created', { version: 1 }), fields, t)).toBeNull()
+  it('has no lines when the details name no field, outcome or step', () => {
+    expect(historySummary(item('record.created', { version: 1 }), fields, t)).toEqual([])
   })
 })

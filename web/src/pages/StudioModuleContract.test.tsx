@@ -73,9 +73,9 @@ describe('StudioModuleContract', () => {
     expect(checked).not.toHaveTextContent('Deletable')
     expect(within(lifecycle).getByTestId('studio-contract-state-closed')).toBeInTheDocument()
 
-    expect(await within(lifecycle).findByLabelText('open to checked · check · Guard')).toBeInTheDocument()
-    expect(within(lifecycle).getByLabelText('checked to open · reopen · No guard')).toBeInTheDocument()
-    expect(within(lifecycle).getByLabelText('checked to closed · close · No guard')).toBeInTheDocument()
+    expect(await within(lifecycle).findByLabelText('open to checked, check, Guard')).toBeInTheDocument()
+    expect(within(lifecycle).getByLabelText('checked to open, reopen, No guard')).toBeInTheDocument()
+    expect(within(lifecycle).getByLabelText('checked to closed, close, No guard')).toBeInTheDocument()
   })
 
   it('lists the states, transitions, validations, effects and ceiling entries with their named points', async () => {

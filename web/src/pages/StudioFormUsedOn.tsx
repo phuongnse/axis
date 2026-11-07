@@ -41,7 +41,7 @@ export function StudioFormUsedOn({
                     {entry.node.name ?? entry.node.file}
                   </Button>
                 </Flex>
-                <Typography.Text type="secondary">{`${entry.file} · ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
+                <Typography.Text type="secondary">{`${entry.file}, ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
               </Flex>
             </li>
           ))}

@@ -147,7 +147,7 @@ describe.each(['light', 'dark'])('PageEditor in %s mode', (mode) => {
     expect(screen.getByTestId('studio-field-/title')).toBeVisible()
     expect(screen.getAllByRole('textbox', { name: 'Text key' })[0]).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/0')).toBeVisible()
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form, PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/type')).toBeVisible()
     expect(screen.getByRole('combobox', { name: 'Widget type' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-field-/widgets/0/entity')).toBeVisible()
@@ -494,7 +494,7 @@ describe('PageEditor navigate actions', () => {
     renderEditor(page({ ...table, rowActions: [toReviewList] }))
 
     const row = screen.getByTestId(`${rows}/0/parameters/request`)
-    expect(row).toHaveTextContent('request · reference · required')
+    expect(row).toHaveTextContent('request, reference, required')
     expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('')
     expect(screen.queryByRole('button', { name: 'Add mapping' })).not.toBeInTheDocument()
   })
@@ -818,11 +818,11 @@ describe('PageEditor widget tree', () => {
 
     expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('columns')
     expect(screen.getByTestId('studio-widget-/widgets/0/columns/0/widgets/0')).toHaveTextContent(
-      'table · PurchaseRequestList',
+      'table, PurchaseRequestList',
     )
     expect(screen.getByTestId('studio-widget-/widgets/1')).toHaveTextContent('taskInbox')
     const nested = screen.getByTestId('studio-widget-/widgets/0/columns/1/widgets/0')
-    expect(nested).toHaveTextContent('form · PurchaseRequest')
+    expect(nested).toHaveTextContent('form, PurchaseRequest')
     expect(screen.queryByTestId('studio-field-/widgets/0/columns/1/widgets/0')).not.toBeInTheDocument()
 
     await userEvent.click(nested)
@@ -844,7 +844,7 @@ describe('PageEditor widget tree', () => {
       }),
     )
 
-    expect(screen.getByText('Column 2 · 6')).toBeVisible()
+    expect(screen.getByText('Column 2, 6')).toBeVisible()
     expect(screen.getByText('Tab 1')).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/1/tabs/0/widgets/0')).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/2/widgets/0')).toBeVisible()

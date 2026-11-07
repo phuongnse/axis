@@ -66,7 +66,7 @@ describe('FormProperties section', () => {
     expect(draft.steps[1].sections).toEqual(['a'])
     expect(draft.sections.map((section: { name: string }) => section.name)).toEqual(['b', 'a'])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a · steps.two · position 1')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a, steps.two, position 1')
   })
 
   it('has no Move to step picker on a form without steps', () => {
@@ -182,7 +182,7 @@ describe('FormProperties field', () => {
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft.sections[1].fields).toEqual([{ field: 'q' }])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
-    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p · Section 2')
+    expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p, Section 2')
   })
 
   it('writes the width of the field under width and removes it when the box is cleared', async () => {

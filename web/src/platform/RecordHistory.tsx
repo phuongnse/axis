@@ -124,7 +124,11 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                         </Link>
                       )}
                     </Space>
-                    {summary !== null && <Typography.Text type="secondary">{summary}</Typography.Text>}
+                    {summary.map((line) => (
+                      <Typography.Text key={line} type="secondary">
+                        {line}
+                      </Typography.Text>
+                    ))}
                   </Flex>
                 )
               })}

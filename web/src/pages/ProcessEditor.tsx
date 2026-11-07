@@ -306,7 +306,7 @@ function Step({
       <Card
         size="small"
         data-testid={`studio-step-${index}`}
-        title={`${text(step.name)} · ${type ?? ''}`}
+        title={`${text(step.name)}, ${type ?? ''}`}
         extra={
           <Flex gap="small">
             {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}

@@ -287,7 +287,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const node = page.getByTestId(`studio-graph-node-${i}`);
       await expect(node).toHaveAttribute("data-marked", "true");
       await expect(node).toHaveAccessibleName(
-        "markRejected · operation · has diagnostics",
+        "markRejected, operation, has diagnostics",
       );
       await expect(page.getByTestId(`rf__edge-/steps/${i}/next`)).toHaveCount(
         0,
@@ -318,10 +318,10 @@ test.describe("Studio edits a process in the process editor", () => {
       );
 
       const edge = page.getByTestId(`rf__edge-/steps/${first}/next`);
-      await expect(edge).toHaveAccessibleName(/^submit to \w+ · next$/);
+      await expect(edge).toHaveAccessibleName(/^submit to \w+, next$/);
       await page.getByTestId(`studio-graph-node-${first}`).click();
       await pick(page, `/steps/${first}/next`, "done");
-      await expect(edge).toHaveAccessibleName("submit to done · next");
+      await expect(edge).toHaveAccessibleName("submit to done, next");
 
       const node = page.getByTestId(`studio-graph-node-${removed}`);
       await node.focus();
@@ -348,7 +348,7 @@ test.describe("Studio edits a process in the process editor", () => {
       // The save marked steps by the saved file's numbers, so the restored node may carry another node's mark.
       await expect(
         page.getByTestId(`studio-graph-node-${removed}`),
-      ).toHaveAccessibleName(/^markReturned · operation/);
+      ).toHaveAccessibleName(/^markReturned, operation/);
     } finally {
       await writeFile(target, original);
     }
@@ -391,7 +391,7 @@ test.describe("Studio edits a process in the process editor", () => {
       await page.getByRole("button", { name: "Undo", exact: true }).click();
       await expect(
         page.getByTestId(`studio-graph-node-${moved}`),
-      ).toHaveAccessibleName(/^financeCheck · /);
+      ).toHaveAccessibleName(/^financeCheck, /);
     } finally {
       await writeFile(target, original);
     }
@@ -419,7 +419,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
       await expect(
         page.getByTestId(`rf__edge-/steps/${rejected}/next`),
-      ).toHaveAccessibleName("markRejected to done · next");
+      ).toHaveAccessibleName("markRejected to done, next");
       await dragTo(
         page,
         "studio-process-design",
@@ -492,7 +492,7 @@ test.describe("Studio edits a process in the process editor", () => {
       );
       const before = await edge.getAttribute("aria-label");
       expect(before).not.toBeNull();
-      expect(before).not.toBe("managerApproval to done · approve");
+      expect(before).not.toBe("managerApproval to done, approve");
 
       // The mouse works in viewport coordinates, and the graph starts below the release table.
       await scrollBelowHeader(page.getByTestId("studio-process-graph"));
@@ -519,7 +519,7 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByRole("menuitem", { name: "approve", exact: true })
         .click();
       await expect(edge).toHaveAccessibleName(
-        "managerApproval to done · approve",
+        "managerApproval to done, approve",
       );
       await expect(
         page.getByTestId("studio-process-announcement"),
@@ -529,7 +529,7 @@ test.describe("Studio edits a process in the process editor", () => {
       await expect(edge).toHaveAccessibleName(before!);
       await page.getByRole("button", { name: "Redo", exact: true }).click();
       await expect(edge).toHaveAccessibleName(
-        "managerApproval to done · approve",
+        "managerApproval to done, approve",
       );
 
       await page.getByRole("button", { name: "Save", exact: true }).click();

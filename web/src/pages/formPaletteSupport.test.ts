@@ -31,7 +31,7 @@ describe('dropOnForm', () => {
       { title: { textKey: 'steps.two' }, sections: ['a'] },
     ])
     expect(onSelect).toHaveBeenCalledWith('/sections/0')
-    expect(onAnnounce).toHaveBeenCalledWith('Moved b · steps.one · position 1')
+    expect(onAnnounce).toHaveBeenCalledWith('Moved b, steps.one, position 1')
   })
 
   it('refuses an unnamed section dropped on a step and changes nothing', () => {

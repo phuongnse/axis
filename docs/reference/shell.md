@@ -72,7 +72,7 @@ their own controls where they expect them.
   It shows no server status, and a page that cannot reach the server says so where it fails.
 - **Version.** A signed-in person also sees the server's version in the footer, after the copyright.
   An anonymous visitor never sees it, because it tells an attacker which known weaknesses to try.
-- **The version as an item of its own** _(planned for M31)_. The version stands beside the copyright as
+- **The version as an item of its own**. The version stands beside the copyright as
   an item of its own, "v0.1.0", never joined to it by a separator, see
   [text](actions-and-controls.md#text).
 

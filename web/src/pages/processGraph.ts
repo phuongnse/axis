@@ -26,10 +26,10 @@ export function transitionPointer(transition: ProcessGraphTransition): string {
   return transition.kind === 'branch' || transition.kind === 'outcome' ? `${transition.path}/next` : transition.path
 }
 
-/** The accessible name of a transition, such as "financeCheck to markApproved · otherwise". */
+/** The accessible name of a transition, such as "financeCheck to markApproved, otherwise". */
 export function transitionName(graph: ProcessGraph, transition: ProcessGraphTransition, to: string): string {
   const nameOf = (index: number) => graph.steps.find((step) => step.index === index)?.name ?? `/steps/${index}`
-  return `${nameOf(transition.source)} ${to} ${nameOf(transition.target)} · ${transition.label ?? transition.kind}`
+  return `${nameOf(transition.source)} ${to} ${nameOf(transition.target)}, ${transition.label ?? transition.kind}`
 }
 
 function isContent(value: unknown): value is Record<string, unknown> {

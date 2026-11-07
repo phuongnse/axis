@@ -19,9 +19,10 @@ export interface LegalLinks {
 
 /**
  * The legal line that ends the identity provider's pages and the shell's footer: the copyright in the muted colour at the
- * start, then Privacy, Terms and Licences as links in a navigation landmark. A link whose address is missing is left out.
+ * start, with the version beside it as an item of its own when given, then Privacy, Terms and Licences as links in a
+ * navigation landmark. A link whose address is missing is left out.
  */
-export function LegalLine({ copyright, links }: { copyright: string; links: LegalLinks }) {
+export function LegalLine({ copyright, version, links }: { copyright: string; version?: string; links: LegalLinks }) {
   const { colour, spacing } = useDesignTokens()
   const { privacyUrl, termsUrl, licencesUrl, texts } = links
   const items = [
@@ -32,7 +33,10 @@ export function LegalLine({ copyright, links }: { copyright: string; links: Lega
 
   return (
     <Flex wrap justify="space-between" align="center" gap={spacing.sm} style={{ width: '100%' }}>
-      <Typography.Text style={{ color: colour.textMuted }}>{copyright}</Typography.Text>
+      <Flex align="center" gap={spacing.xs}>
+        <Typography.Text style={{ color: colour.textMuted }}>{copyright}</Typography.Text>
+        {version !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{version}</Typography.Text>}
+      </Flex>
       {items.length > 0 && (
         <nav aria-label={texts.legal} style={{ marginInlineStart: 'auto' }}>
           <Flex wrap justify="flex-end" gap={spacing.sm}>

@@ -186,7 +186,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     for (let index = 0; index < process.steps.length; index++) {
       expect(screen.getByTestId(`studio-step-${index}`)).toBeVisible()
     }
-    expect(screen.getByTestId('studio-step-2')).toHaveTextContent('financeCheck · decision')
+    expect(screen.getByTestId('studio-step-2')).toHaveTextContent('financeCheck, decision')
     expect(selectRoot(screen.getByRole('combobox', { name: 'Add step' }))).toBeVisible()
   })
 

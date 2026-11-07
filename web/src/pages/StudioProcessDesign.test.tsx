@@ -263,10 +263,10 @@ describe('a module process with a customization layer', () => {
   it('marks a changed step on its graph node and on its card, with Reset to module', async () => {
     const onReset = renderLayered()
 
-    expect(await screen.findByRole('button', { name: 'check · decision · Changed' }, slow)).toBe(
+    expect(await screen.findByRole('button', { name: 'check, decision, Changed' }, slow)).toBe(
       screen.getByTestId('studio-graph-node-2'),
     )
-    expect(screen.getByRole('button', { name: 'submit · operation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'submit, operation' })).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-step-2')).getByRole('note', { name: 'Changed check' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Reset to module check' }))
 
@@ -294,7 +294,7 @@ describe('a module process with a customization layer', () => {
   it('shows no marks when the process has no layer', async () => {
     renderDesign(2)
 
-    expect(await screen.findByRole('button', { name: 'check · decision' }, slow)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'check, decision' }, slow)).toBeInTheDocument()
     expect(screen.queryByTestId('studio-layer-mark-/steps/2')).toBeNull()
   })
 })

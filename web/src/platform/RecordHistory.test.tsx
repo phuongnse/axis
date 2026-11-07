@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfigProvider } from 'antd'
 import { MemoryRouter } from 'react-router'
@@ -188,7 +188,8 @@ describe('RecordHistory', () => {
       'Created',
     ])
     expect(entries[0]).toHaveTextContent('Maria Manager')
-    expect(entries[0]).toHaveTextContent('Changed: Comment · Outcome: approve')
+    expect(within(entries[0]).getByText('Changed: Comment')).toBeInTheDocument()
+    expect(within(entries[0]).getByText('Outcome: approve')).toBeInTheDocument()
     expect(entries[0].querySelector('time')).toHaveAttribute('datetime', '2026-10-06T02:10:00Z')
     expect(entries[0].querySelector('time')?.textContent).toBe(
       new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium' }).format(

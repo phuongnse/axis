@@ -101,7 +101,9 @@ describe('TenantUsageSection', () => {
     expect(within(screen.getByTestId('tenant-usage-quota-emailsPerDay')).getByText('0 of 100')).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-workerWeight')).getByText('No limit')).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-concurrentQueries')).getByText('8')).toBeVisible()
-    expect(within(screen.getByTestId('tenant-usage-quota-authoringRequests')).getByText('No limit · 12')).toBeVisible()
+    const authoring = screen.getByTestId('tenant-usage-quota-authoringRequests')
+    expect(within(authoring).getByText('No limit')).toBeVisible()
+    expect(within(authoring).getByText('12')).toBeVisible()
     expect(within(screen.getByTestId('tenant-usage-quota-concurrentQueries')).queryByRole('progressbar')).toBeNull()
   })
 

@@ -154,6 +154,6 @@ are `shell.users.usage.*`.
 
 - **Quotas.** Each quota is a row with its name, a bar and "{used} of {limit}". A quota that has reached its limit also
   shows an "At limit" tag, so the state is not shown by colour alone. A quota with no limit shows "No limit", with its
-  use when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
+  use on a line of its own when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.

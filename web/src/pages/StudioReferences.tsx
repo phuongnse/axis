@@ -158,7 +158,7 @@ function ReferenceEntry({
             </Button>
           )}
         </Flex>
-        <Typography.Text type="secondary">{`${entry.file} · ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
+        <Typography.Text type="secondary">{`${entry.file}, ${t('shell.studio.path')}: ${entry.path}`}</Typography.Text>
         {expanded && (
           <Flex vertical gap="small" style={{ paddingLeft: 16 }}>
             {failed && <Alert type="error" title={t('shell.studio.referencesFailed')} />}
