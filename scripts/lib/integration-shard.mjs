@@ -12,14 +12,16 @@
 // one shard.
 // The second prints the full names of the classes given to shard K, one per line.
 // The third rewrites tests/Axis.Integration.Tests/class-durations.json from xUnit JUnit files, such
-// as the artifacts/test-results/Axis.Integration.Tests.xml of each shard of a full run. A class
-// missing from them keeps its entry, and an entry whose class no longer exists is dropped.
+// as the artifacts/test-results/Axis.Integration.Tests.xml of each shard of a full run, and the
+// Axis.ControlPlane.Integration.Tests.xml of shard 1. A class missing from them keeps its entry, and an
+// entry whose class no longer exists is dropped.
 //
 // A class is a type whose name ends in Tests, in a .cs file of the test project that holds a [Fact]
 // or a [Theory]. Classes that share an xUnit [Collection] stay in one shard, as one unit. Each class
 // weighs its seconds in class-durations.json. A class without an entry weighs its number of tests
 // times the median seconds per test of the classes that have one, or its number of tests when none
-// has. The units go one at a time, the heaviest first, to the shard that is then the lightest.
+// has. Shard 1 starts with the seconds of the control plane suite, which it runs beside its classes.
+// The units go one at a time, the heaviest first, to the shard that is then the lightest.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,6 +31,9 @@ const project = path.join(root, 'tests/Axis.Integration.Tests')
 
 /** Whether a class is a performance test, which scripts/performance.sh runs instead. */
 export const isPerformance = (name) => name.endsWith('PerformanceTests')
+
+/** The key in class-durations.json of the control plane suite, which shard 1 runs beside its classes (see scripts/integration.sh). */
+export const controlPlane = 'Axis.ControlPlane.Integration.Tests'
 
 /** The test classes of one C# source: [{ name, collection, tests }], with name its full name. */
 export function parseSource(source) {
@@ -79,8 +84,8 @@ export function weigh(classes, durations) {
   return classes.map((c) => ({ ...c, seconds: durations[c.name] ?? c.tests * perTest }))
 }
 
-/** Splits weighed classes over `total` shards and returns the class names of each. */
-export function split(classes, total) {
+/** Splits weighed classes over `total` shards and returns the class names of each. Shard 1 starts at `firstShardSeconds`. */
+export function split(classes, total, firstShardSeconds = 0) {
   const units = new Map()
   for (const testClass of classes) {
     const key = testClass.collection ? `collection:${testClass.collection}` : testClass.name
@@ -93,6 +98,7 @@ export function split(classes, total) {
     (a, b) => b.seconds - a.seconds || (a.names[0] < b.names[0] ? -1 : 1),
   )
   const shards = Array.from({ length: total }, () => ({ names: [], seconds: 0 }))
+  shards[0].seconds = firstShardSeconds
   for (const unit of heaviestFirst) {
     let lightest = shards[0]
     for (const shard of shards) if (shard.seconds < lightest.seconds) lightest = shard
@@ -122,7 +128,8 @@ export function junitDurations(texts) {
       const attribute = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(` ${attributes}`)?.[1]
       const name = attribute('classname')
       if (!name) continue
-      durations[name] = (durations[name] ?? 0) + Number(attribute('time') ?? 0)
+      const key = name.startsWith(`${controlPlane}.`) ? controlPlane : name
+      durations[key] = (durations[key] ?? 0) + Number(attribute('time') ?? 0)
     }
   }
   return Object.fromEntries(Object.entries(durations).map(([name, seconds]) => [name, Math.round(seconds)]))
@@ -151,13 +158,13 @@ export function main(args, dir = project) {
   const classes = readClasses(dir)
   if (args[0] === '--durations') {
     const measured = junitDurations(args.slice(1).map((junit) => readFileSync(junit, 'utf8')))
-    const merged = mergeDurations(durations, measured, classes.map((c) => c.name))
+    const merged = mergeDurations(durations, measured, [...classes.map((c) => c.name), controlPlane])
     writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`)
     return `${Object.keys(measured).length} classes measured, ${Object.keys(merged).length} kept in ${file}.`
   }
   const listing = args[0] === '--classes'
   const { index, total } = parseShard(listing ? args[1] : args[0])
-  const shards = split(weigh(classes, durations), total)
+  const shards = split(weigh(classes, durations), total, durations[controlPlane] ?? 0)
   return (listing ? shards[index - 1] : filterArgs(shards, index)).join('\n')
 }
 

@@ -7,8 +7,8 @@
 # on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
 # scripts/smoke.sh.
 # The control plane has an integration suite of its own, Axis.ControlPlane.Integration.Tests. It is built
-# first and then runs in the background beside Axis.Integration.Tests, so it adds no time to the run, and
-# it is skipped with it. Its output is printed when Axis.Integration.Tests ends.
+# first and then runs in the background beside Axis.Integration.Tests, and it is skipped with it. Its output
+# is printed when Axis.Integration.Tests ends. The split counts its seconds toward shard 1.
 # Arguments go to dotnet test, for example --filter-class 'Axis.Integration.Tests.Studio*'. With
 # arguments only the matching integration tests run and the summary lists only them: the scenario suites
 # and the control plane suite are not expected. A filtered run of the control plane suite goes through

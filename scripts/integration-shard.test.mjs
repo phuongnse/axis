@@ -60,6 +60,15 @@ describe('split', () => {
     assert.deepEqual(shards.slice(1).map((shard) => shard.length), [15, 15])
   })
 
+  test('gives shard 1 fewer classes when it starts with the control plane seconds', () => {
+    const classes = Array.from({ length: 30 }, (_, i) => testClass(`P${i}Tests`, 20))
+    const shards = split(classes, 3, 200)
+    const seconds = shards.map((shard, index) => shard.length * 20 + (index === 0 ? 200 : 0))
+
+    assert.ok(shards[0].length < shards[1].length && shards[0].length < shards[2].length, JSON.stringify(shards))
+    assert.ok(Math.max(...seconds) - Math.min(...seconds) <= 20, JSON.stringify(seconds))
+  })
+
   test('keeps the classes of one collection in one shard', () => {
     const classes = [
       testClass('ATests', 10, 'Scratch'),
@@ -132,6 +141,15 @@ describe('durations', () => {
     assert.deepEqual(junitDurations([junit]), { 'N.ATests': 4, 'N.BTests': 5 })
   })
 
+  test('folds the control plane classes into one entry', () => {
+    const junit = `<testsuites><testsuite name="t" tests="3">
+<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="one" time="1.4" />
+<testcase classname="Axis.ControlPlane.Integration.Tests.YTests" name="two" time="2.2" />
+<testcase classname="Axis.ControlPlane.Integration.Tests.YTests" name="three" time="5" />
+</testsuite></testsuites>`
+    assert.deepEqual(junitDurations([junit]), { 'Axis.ControlPlane.Integration.Tests': 9 })
+  })
+
   test('keeps known classes that were not measured and drops classes that no longer exist', () => {
     assert.deepEqual(mergeDurations({ A: 1, B: 2, Gone: 3 }, { A: 10 }, ['A', 'B']), { A: 10, B: 2 })
   })
@@ -188,6 +206,32 @@ describe('main', () => {
         'N.BTests': 8,
       })
       assert.equal(main(['--classes', '1/2'], dir), 'N.BTests')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('starts shard 1 with the control plane seconds from the durations', () => {
+    const dir = project()
+    try {
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 10, "N.BTests": 5, "Axis.ControlPlane.Integration.Tests": 8 }\n')
+      assert.equal(main(['--classes', '1/2'], dir), 'N.BTests')
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 10, "N.BTests": 5 }\n')
+      assert.equal(main(['--classes', '1/2'], dir), 'N.ATests')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('keeps the control plane entry when the durations are rewritten', () => {
+    const dir = project()
+    try {
+      const junit = path.join(dir, 'Axis.ControlPlane.Integration.Tests.xml')
+      writeFileSync(junit, '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="t" time="8.4" />')
+      main(['--durations', junit], dir)
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
+        'Axis.ControlPlane.Integration.Tests': 8,
+      })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

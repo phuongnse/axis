@@ -357,12 +357,15 @@ their own tests.
   A shard runs whole test classes of `Axis.Integration.Tests`, which `scripts/lib/integration-shard.mjs`
   gives it: classes that share an xUnit collection stay together, and the heaviest go first to the
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
-  or, without an entry, its number of tests times the median seconds per test. The last shard runs
-  every class that the other shards do not, so a class the split does not find still runs. Shard 1
-  also runs `Axis.ControlPlane.Integration.Tests`, and the scenario suites are expected only in the
-  shard that holds `ScenarioRunnerTests`, which writes them. A shard cannot be combined with
-  arguments. After a full run, refresh the durations with
-  `node scripts/lib/integration-shard.mjs --durations <the Axis.Integration.Tests.xml of each shard>`.
+  or, without an entry, its number of tests times the median seconds per test. Shard 1 also runs
+  `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
+  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The last shard runs
+  every class that the other shards do not, so a class the split does not find still runs. The
+  scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them.
+  A shard cannot be combined with arguments. When the shards drift apart by minutes, refresh the
+  durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
+  and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
+  `node scripts/lib/integration-shard.mjs --durations <those files>`.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
