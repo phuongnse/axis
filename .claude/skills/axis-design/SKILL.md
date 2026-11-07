@@ -19,7 +19,7 @@ links.
 - **Token names and the widget list** are in the
   [frontend reference](../../../docs/reference/frontend.md) under "Design
   tokens and previews". The preview names are in
-  [Widget previews](../../../docs/development.md#widget-previews).
+  [Widget previews](../../../docs/reference/widget-previews.md).
 
 Never ask NexKit's agents to read or write the artifact. Only this session
 acts on it.
@@ -84,7 +84,7 @@ becomes an issue.
 
 1. Restate the change in Axis terms: the tokens, the widgets and the
    previews it touches, by their names in
-   [Widget previews](../../../docs/development.md#widget-previews). Ask the
+   [Widget previews](../../../docs/reference/widget-previews.md). Ask the
    owner when the request is ambiguous.
    Then search for what already does the job (the shared widget, its context,
    the route that feeds it) and say which one the change extends. A change

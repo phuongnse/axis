@@ -294,7 +294,7 @@ The repository is the source of truth for the Axis design system, and the local 
 publishes it to Claude as a Design System artifact, as
 [D57](decisions/d57-a-design-system-published-from-the-repository.md) agrees. The token file and the
 preview pages are in the [frontend reference](reference/frontend.md) and
-[widget previews](development.md#widget-previews). The Design System artifact is at
+[widget previews](reference/widget-previews.md). The Design System artifact is at
 <https://claude.ai/artifact/N1E4ohLThxhhYtnCCsJgyc>, private to the owner. The steps for a requested
 change, a design review and a sync are in the
 [`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
@@ -316,7 +316,7 @@ change, a design review and a sync are in the
 - **Several changes are a design review.** When the owner reviews the design in words, one change at
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
-  in the [widget previews](development.md#widget-previews), on fixtures. A review covers one screen
+  in the [widget previews](reference/widget-previews.md), on fixtures. A review covers one screen
   or one group of screens, and what it finds outside them becomes an issue. The branch is pushed, so
   the review can go on from any machine, and is never merged. No push to a branch starts CI, as
   [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)

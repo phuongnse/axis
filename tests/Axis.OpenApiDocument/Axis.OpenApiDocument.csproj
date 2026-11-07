@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Axis.Server\Axis.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Axis.Server.Tests\OpenApiHost.cs" Link="OpenApiHost.cs" />
+    <Compile Include="..\Axis.Server.Tests\TestOidc.cs" Link="TestOidc.cs" />
+    <Compile Include="..\Axis.Server.Tests\TestPlatform.cs" Link="TestPlatform.cs" />
+    <Compile Include="..\Axis.Server.Tests\TestPlatformMigration.cs" Link="TestPlatformMigration.cs" />
+  </ItemGroup>
+
+</Project>

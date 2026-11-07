@@ -24,7 +24,7 @@ validation messages or hover states, and a token edited on the page changes noth
   [D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md), and gives configuration
   no new way to run code.
 
-The detail is in [widget previews](../development.md#widget-previews) and
+The detail is in [widget previews](../reference/widget-previews.md) and
 [frontend](../reference/frontend.md).
 
 ## Consequences

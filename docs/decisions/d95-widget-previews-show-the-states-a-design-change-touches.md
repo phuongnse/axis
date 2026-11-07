@@ -17,7 +17,7 @@ most often breaks.
 - **In the same change.** A change that adds such a state to a widget adds it to the preview.
 - **Live states need no state.** Hover, focus, pickers and dialogs work in the live preview.
 
-The states of each preview are in [widget previews](../development.md#widget-previews).
+The states of each preview are in [widget previews](../reference/widget-previews.md).
 
 ## Consequences
 

@@ -274,6 +274,10 @@ builder.Services.AddScoped<SiteSignIn>();
 builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
 builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 
+// Registers the OpenAPI document generator and maps no route for it. The build writes the document to a file, see
+// docs/development.md#build.
+builder.Services.AddOpenApi(options => options.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi3_1);
+
 var app = builder.Build();
 
 // First, so every answer carries the security headers. They are written when the response starts, after the

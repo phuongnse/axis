@@ -80,7 +80,7 @@ component holds a number of its own.
 
   A property the page leaves out, or sets to a value the theme cannot use, keeps its token file value. A shadow value
   is usable when it is not empty and has no `;`, `{` or `}`. Only the design-system bundle reads these properties. See
-  [widget previews](../development.md#widget-previews) and [design changes](../delivery.md#design-changes).
+  [widget previews](widget-previews.md) and [design changes](../delivery.md#design-changes).
 
 ## Icons
 
@@ -850,7 +850,7 @@ narrow one.
 - **What changes.** Below the breakpoint is narrow width: columns stack in file order, tab headers scroll, a row's
   actions fold into one menu and the shell navigation collapses. A widget has no setting of its own for it.
 - **One value.** The narrow-width hook reads the token, and each card's marker in the Design System artifact sets that
-  width, see [widget previews](../development.md#widget-previews). Studio's page designer previews the narrow layout,
+  width, see [widget previews](widget-previews.md). Studio's page designer previews the narrow layout,
   see [Studio](studio.md).
 - **Tables.** Every platform table, form line items and the reference lookup included, scrolls sideways inside its
   widget, so the page never does.

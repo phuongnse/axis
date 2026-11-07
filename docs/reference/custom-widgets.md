@@ -131,7 +131,7 @@ builds on, see [contracts](extension-packages.md#contracts).
   their own SemVer, apart from the platform version, and make no compatibility promise until the first production
   release.
 - **Template and harness.** A package template and a test harness come with the SDK. The harness draws a widget with
-  the fixtures of the [design system's widget previews](../development.md#widget-previews), and gives operations a
+  the fixtures of the [design system's widget previews](widget-previews.md), and gives operations a
   fake operation context.
 
 ## Designer palette
