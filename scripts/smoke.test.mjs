@@ -19,6 +19,7 @@ function runSmoke({ changed, failing = [] } = {}) {
       'scripts/smoke.sh',
       'scripts/lib/test-results.sh',
       'scripts/lib/affected.mjs',
+      '.nexkit/config.json',
       'scripts/lib/install-modules.sh',
       'scripts/test-report.mjs',
     ]) {

@@ -121,7 +121,8 @@ runs them.
 - **`AXIS_INTEGRATION_SHARD`**, such as `1/3`, runs only that shard, see
   [test runs and reports](#test-runs-and-reports).
 - **A skip.** The script skips every suite when NexKit gives a commit to compare with and every
-  file changed since it is on the safe list in `scripts/lib/affected.mjs`.
+  file changed since it is in the `unaffected_by` list of the integration checks in
+  `.nexkit/config.json`, see [skipped suites](#skipped-suites).
 
 ### End-to-end tests
 
@@ -165,8 +166,8 @@ in [Testing](architecture.md#testing).
 | `onprem`     | Installs `deploy/compose/` from the production images for two tenants          |
 
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
-on the safe list in `scripts/lib/affected.mjs`: under `docs/`, `.github/` or `.nexkit/`, or a Markdown
-file. CI and NexKit each run the smoke tests as a job of their own.
+in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
+`.nexkit/`, or a Markdown file. CI and NexKit each run the smoke tests as a job of their own.
 
 ### Performance and load tests
 
@@ -323,16 +324,18 @@ change since NexKit's commit can affect.
   whose checks all passed, is never used, because NexKit does not record which checks or commands that
   round ran, so a check added or changed since would skip without having passed. Without any of them,
   as in CI and local runs, every suite runs.
-- **The safe lists** are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs). The integration
-  tests and their scenarios use one that holds the SPA under `web/`, but not its package files, the
-  Keycloak login theme in `web/keycloak-theme/` or the Vite configs that build it, because
-  `scripts/integration.sh` builds that theme and the tests read its sign-in page. Playwright and the
-  smoke tests use the smaller list of `docs/`, Markdown files, the GitHub workflows in `.github/` and
-  NexKit's settings in `.nexkit/`.
+- **The safe lists** live only in the `unaffected_by` lists of the checks in
+  [`.nexkit/config.json`](../.nexkit/config.json). `scripts/lib/affected.mjs` reads them with NexKit's
+  glob rules: `*` stays within one folder, `**` crosses folders, a `!` pattern takes a path back out and
+  the last pattern that matches decides. A suite skips only when every check that runs its script lists
+  every changed path. A suite that no check lists runs in full. The integration tests and their scenarios
+  have a list that holds the SPA under `web/`, but not its package files, the Keycloak login theme in
+  `web/keycloak-theme/` or the Vite configs that build it, because `scripts/integration.sh` builds that
+  theme and the tests read its sign-in page. Playwright and the smoke tests have the smaller list of
+  `docs/`, Markdown files, the GitHub workflows in `.github/` and NexKit's settings in `.nexkit/`.
 - **Doubt runs the suite:** a missing base, a git error or an empty change list.
-- **NexKit's own skip.** The `unaffected_by` lists of the smoke, integration and E2E checks in
-  `.nexkit/config.json` name the same paths, so NexKit can skip such a check before it gets a runner.
-  `scripts/affected.test.mjs` checks that the two agree.
+- **NexKit's own skip.** NexKit reads the same `unaffected_by` lists, so it can skip a smoke,
+  integration or E2E check before it gets a runner.
 - **What a run shows.** Under NexKit, a suite that runs in full says which changed path made it run
   and which commit it compared with. A skipped suite is listed as skipped, and on GitHub Actions it
   gets a notice annotation, so the run's page lists what each check skipped. GitHub shows the check's
