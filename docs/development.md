@@ -117,7 +117,9 @@ OpenAPI document with the `tests/Axis.OpenApiDocument` console, as [the build](#
 NexKit runs it without `scripts/build.sh`. `OpenApiDocumentTests` in `Axis.Server.Tests` reads that
 file and compares it with the routes the server maps. It fails when a route is missing from the
 document or the document lists a route the server does not map, and it names each endpoint left out
-on purpose with a reason.
+on purpose with a reason. `RouteTableDocTests` reads the same file and every `Route` table and route
+heading under `docs/`. It fails, naming each route, when one side has a route that the other lacks.
+See [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
 
 Vitest runs without the CSS of the `<style>` elements in the document head, which holds Ant Design's styles, because
 jsdom matches every rule on each query. A test that checks a style calls `withAntdStyles()` from

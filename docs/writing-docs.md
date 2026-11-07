@@ -247,6 +247,10 @@ every pull request, the tests, and an audit every hundred merges, as
    them, so the test holds no copy that could go stale. It finds the table under `docs/` by its
    header, wherever it moves. Without such a test, the doc names the file that holds the list rather
    than copying it. The review refuses a new list without its test.
+   The routes are one such list. Their source is the server's OpenAPI document,
+   `artifacts/openapi/axis-server.json`: every route in it has a row in a table whose header is `Route`,
+   or a heading made of the backticked route, and the reverse holds too. A table of another service's
+   routes uses another header, such as `Stub route`.
 8. **An audit reads the docs against the code every hundred merges.** The docs audit workflow reads a
    quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every Markdown file of a
    skill under `.claude/skills/` and AGENTS.md. It reads them as the
