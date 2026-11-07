@@ -18,7 +18,8 @@ around it.
   connector or extension package.
 - **It needs no platform code.** A platform change that it needs is a gap to raise, not to hide in
   the sample.
-- **It reuses the realm roles `employee` and `department-manager`** of purchase requests, so the
+- **It reuses the roles `employee` and `department-manager`** of the development realm's `axis`
+  client, as purchase requests does, see [the axis realm](../development.md#the-axis-realm), so the
   realm needs no new role.
 - **It runs beside purchase requests** wherever the samples run, with its own test scenarios and one
   Playwright journey.
