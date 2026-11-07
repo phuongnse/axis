@@ -3,9 +3,12 @@
 This page lists the settings of the server and of `Axis.Admin`, with their defaults, their environment
 variables and what a wrong value does: startup activation, Studio, the operator console, the users
 page, tenancy and preview tenants, data limits, forwarded headers, the admin host, rate limits, AI,
-telemetry export and cells. The worker's own settings are in
-[worker settings](process-execution.md#worker-settings), and the commands of `Axis.Admin` are in
-[administration](administration.md).
+telemetry export and cells. The settings of the other hosts are on their own pages: the worker's in
+[worker settings](process-execution.md#worker-settings), the mail settings in
+[mail settings](notifications.md#mail-settings), the model bindings in
+[model bindings](model-bindings.md#bindings), the control plane's in
+[control plane settings](control-plane.md#settings), and the commands of `Axis.Admin` and their settings
+in [administration](administration.md).
 
 ## Startup activation
 
@@ -14,10 +17,12 @@ server serves a real application without a separate step. Production leaves it o
 goes live through [`Axis.Admin activate`](administration.md#activate) or the
 [publisher](administration.md#publisher).
 
-- **Setting.** `ActivateOnStartup` is an array of application folders, such as
-  `"ActivateOnStartup": ["../../samples/apps/purchase-requests"]` or the environment variable
-  `ActivateOnStartup__0=/path/to/folder`. Relative paths are resolved against the server content
-  root. When the setting is absent or empty, the default, the step does not run.
+| Setting                           | Environment variable                                     | Default | Meaning                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------- | -------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ActivateOnStartup`               | `ActivateOnStartup__0`, `ActivateOnStartup__1` and so on | empty   | The application folders that the step compiles and activates, in the listed order. Relative paths are resolved against the server content root. An empty value means the step does not run.                                                                                                                                                                            |
+| `Activation:InlineRecomputeLimit` | `Activation__InlineRecomputeLimit`                       | `10000` | The most affected rows of one entity that activation recomputes in its own transaction, when a release changes stored computed fields or a migration `fill` or `convert` changes the rows they read. Above it, the entity becomes pending and the worker recomputes the rows in batches, see [recomputing computed fields](migrations.md#recomputing-computed-fields). |
+
+- **Example.** In configuration: `"ActivateOnStartup": ["../../samples/apps/purchase-requests"]`.
 - **Order.** Tenants are processed in ordinal order of their id. For each tenant, the step applies the
   configuration, data and processes migrations to the tenant database, then compiles each listed
   folder against that database and activates the release, in the listed order. The same folders
@@ -43,13 +48,8 @@ goes live through [`Axis.Admin activate`](administration.md#activate) or the
   missing binding on a [preview tenant](#preview-tenants), is logged and does not stop the start. The
   previously active release stays active, and the first failing tenant stops the whole start, so no
   server runs with some tenants on old releases and others on new ones.
-- **Recompute limit.** `Activation:InlineRecomputeLimit`, or `Activation__InlineRecomputeLimit`, is
-  the most affected rows of one entity that activation recomputes in its own transaction when a
-  release changes stored computed fields, or when a migration `fill` or `convert` changes the rows
-  they read. It defaults to 10,000. Above the limit, the entity becomes pending and the worker
-  recomputes the rows in batches, see
-  [recomputing computed fields](migrations.md#recomputing-computed-fields). Above the limit,
-  activation also leaves a new non-unique index on a table with more rows to a concurrent build.
+- **Large tables.** Above the recompute limit, activation also leaves a new non-unique index on a table
+  with more rows to a concurrent build.
 - **Indexes.** After a folder is activated and seeded in a tenant, the step builds the non-unique
   indexes that activation left out of large tables, over the tenant's schema connection, see
   [schema planning](storage.md#schema-planning). It runs before the server listens, so readiness
@@ -111,13 +111,14 @@ These server settings turn Studio on and say who may author, publish and run tes
 allows in the authoring API, and the Studio fields of `GET /api/me` that follow from them, are in
 [authoring API settings](authoring.md#settings).
 
-| Setting                   | Environment variable                                 | Default | Meaning                                                                                                           |
-| ------------------------- | ---------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- |
-| `Studio:Folders`          | `Studio__Folders__0`, `Studio__Folders__1` and so on | empty   | The application folders that Studio may edit. An empty entry is ignored                                           |
-| `Studio:ApplicationsPath` | `Studio__ApplicationsPath`                           | none    | The folder where Studio creates new applications. With no value, Studio cannot create one                         |
-| `Studio:AuthorRole`       | `Studio__AuthorRole`                                 | none    | The roles claim value, such as `author`, of a signed-in user who may use Studio                                   |
-| `Studio:PublisherRole`    | `Studio__PublisherRole`                              | none    | The roles claim value, such as `publisher`, that may also publish and activate a release, and turn on auto-accept |
-| `Studio:Tests`            | `Studio__Tests`                                      | `false` | Shows the test controls in Studio to its users                                                                    |
+| Setting                   | Environment variable                                 | Default                                      | Meaning                                                                                                                                                                                               |
+| ------------------------- | ---------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Studio:Folders`          | `Studio__Folders__0`, `Studio__Folders__1` and so on | empty                                        | The application folders that Studio may edit. An empty entry is ignored                                                                                                                               |
+| `Studio:ApplicationsPath` | `Studio__ApplicationsPath`                           | none                                         | The folder where Studio creates new applications. With no value, Studio cannot create one                                                                                                             |
+| `Studio:RevisionsPath`    | `Studio__RevisionsPath`                              | `.revisions` under `Studio:ApplicationsPath` | The folder that holds the git repository of each application folder, outside it, see [revisions](revisions-and-drafts.md#the-repository). A relative path is resolved against the server content root |
+| `Studio:AuthorRole`       | `Studio__AuthorRole`                                 | none                                         | The roles claim value, such as `author`, of a signed-in user who may use Studio                                                                                                                       |
+| `Studio:PublisherRole`    | `Studio__PublisherRole`                              | none                                         | The roles claim value, such as `publisher`, that may also publish and activate a release, and turn on auto-accept                                                                                     |
+| `Studio:Tests`            | `Studio__Tests`                                      | `false`                                      | Shows the test controls in Studio to its users                                                                                                                                                        |
 
 - **When Studio is on.** Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath`
   is set, and only for a user whose roles claim holds `Studio:AuthorRole`. So with the defaults,
@@ -130,12 +131,9 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
   volume, such as `/studio/apps`, and every replica mounts the folders at the same path, because the
   [write lock](authoring.md#versions) is keyed by the full path. The
   [installation guide](installation.md) shows the Compose and Helm mounts.
-- **Revisions.** `Studio:RevisionsPath` (`Studio__RevisionsPath`) is the folder that holds the git
-  repository of each application folder, outside it, see [revisions](revisions-and-drafts.md#the-repository).
-  It defaults to `.revisions` under `Studio:ApplicationsPath`, and a relative value is resolved against
-  the server content root. With neither path set, the server keeps no revisions. In a cell it is
-  `<Studio:ApplicationsPath>/<tenant id>/.revisions`, and a value stops the start, and the message
-  names `Studio:RevisionsPath` and `Cell:Id`.
+- **Revisions.** With neither path set, the server keeps no revisions. In a cell the folder is
+  `<Studio:ApplicationsPath>/<tenant id>/.revisions`. Setting `Studio:RevisionsPath` there stops the
+  start, and the message names `Studio:RevisionsPath` and `Cell:Id`.
 - **Tests.** `Studio:Tests` grants no right: a `test` request needs the author role only, and the
   publisher runs it, see [test](authoring.md#test). Turn it on together with the publisher's
   `Scenarios:ServerConnectionString`, because the server cannot see the publisher's settings.
@@ -160,23 +158,22 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
 
 ## Console settings
 
-One server setting decides who may use the [operator console](operator-console.md).
+| Setting                | Environment variable    | Default | Meaning                                                                                                                                                |
+| ---------------------- | ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Console:OperatorRole` | `Console__OperatorRole` | none    | A roles claim value, such as `platform-operator`. Only a signed-in user whose roles claim holds it may use the [operator console](operator-console.md) |
 
-- **`Console:OperatorRole`.** A roles claim value, such as `platform-operator`, as the environment
-  variable `Console__OperatorRole`. Only a signed-in user whose roles claim holds the value may use
-  the console. It has no default, and with no value nobody may. The Development settings set it to
+- **Rules.** With no value nobody may use the console. The Development settings set it to
   `platform-operator`, a role apart from the `operator` role of the purchase request sample.
   Application policies play no part. `GET /api/me` answers `console: true` for a user who holds it,
   and `console: false` for everyone when no value is set.
 
 ## Users settings
 
-One server setting decides who may use the [users page](user-administration.md).
+| Setting                   | Environment variable       | Default | Meaning                                                                                                                                                                                                                                  |
+| ------------------------- | -------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Users:AdministratorRole` | `Users__AdministratorRole` | none    | A roles claim value, such as `tenant-administrator`. Only a signed-in user who holds it, from the [platform sign-in](identity-provider.md#platform-sign-in) or given on the users page, may use the [users page](user-administration.md) |
 
-- **`Users:AdministratorRole`.** A roles claim value, such as `tenant-administrator`, as the
-  environment variable `Users__AdministratorRole`. Only a signed-in user who holds the value, from
-  the [platform sign-in](identity-provider.md#platform-sign-in) or given on the users page, may use
-  the users page. It has no default, and with no value nobody may. The Development settings set it to
+- **Rules.** With no value nobody may use the users page. The Development settings set it to
   `tenant-administrator`. Application policies play no part. `GET /api/me` answers `users: true` for
   a user who holds it, `users: false` for everyone when no value is set, and `users: false` on a
   preview tenant, which has no users page.

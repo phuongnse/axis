@@ -12,10 +12,7 @@ every route it calls checks that role on the server.
 - **Route.** `/console` is a platform route on each tenant's hosts, outside every site, like
   `/studio`. It shows only the tenant of the host. There is no view across tenants.
 - **Operator role.** An installation-level role, not a `role` resource. The server setting
-  `Console:OperatorRole` names the roles claim value, such as `platform-operator`. The environment
-  variable is `Console__OperatorRole`. It has no default, and with no value nobody may use the
-  console. The Development settings set it to `platform-operator`, apart from the `operator` role
-  of the purchase request sample. See [console settings](host-settings.md#console-settings).
+  `Console:OperatorRole` names the roles claim value, see [console settings](host-settings.md#console-settings).
 - **Application policies play no part.** The role gives read access to the console views across
   every application of the tenant, and the commands below. It gives no grant on records, data
   sources, tasks or Studio.

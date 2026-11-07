@@ -10,7 +10,7 @@ The administrator role decides who may use the users page. It is an installation
 like the author and the operator roles.
 
 - **The setting.** `Users:AdministratorRole` names the roles claim value, see
-  [users settings](host-settings.md#users-settings). With no value, nobody may use the users page.
+  [users settings](host-settings.md#users-settings).
 - **One tenant.** The users page is a platform route, `/users`, on each tenant's hosts, and shows only that tenant. A
   site's own host does not serve it. A preview tenant has no users page, and `GET /api/me` answers `users: false` there.
 - **In the shell.** The app switcher and the home page's tools offer "Users" ("Invite people and give them roles.") to
