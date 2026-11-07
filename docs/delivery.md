@@ -229,6 +229,12 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   check whether the issue holds more than one behaviour, and if it does, it is split. If every
   criterion checks the same behaviour, more are fine. A plan is not revised only to cut the number of
   criteria.
+- **Criteria the review can verify.** The review verifies each acceptance criterion from what it
+  sees: the diff, and the output of the checks that ran on the head. A criterion about a measure,
+  such as a time, a size or a count, is met by a check that fails past the limit, and the
+  criterion names that check. For example, "the test check fails when Axis.Server.Tests runs
+  longer than 90 s" can be verified, while "Axis.Server.Tests finishes under 90 s" cannot, because
+  no check reports the time against the limit.
 - **Docs and concepts.** The issue links to the doc sections it implements, is in the milestone that
   delivers it, and names the concepts it touches in its own text, in the terms of
   [concepts.md](domain/concepts.md), so triage can choose the [profile](#profiles). Its plan and its
