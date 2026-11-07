@@ -8,7 +8,7 @@ import { dragTo, scrollBelowHeader } from "../design-drag";
 import { pickAction, pickOption } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { openFormTab, openProblems } from "../studio-resources";
+import { jsonViewText, openFormTab, openProblems } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -270,7 +270,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
       await page.getByRole("tab", { name: "JSON", exact: true }).click();
       const textarea = page.getByRole("textbox", { name: "JSON", exact: true });
-      const draft = JSON.parse(await textarea.inputValue()) as {
+      const draft = JSON.parse(await jsonViewText(textarea)) as {
         steps: { next?: string }[];
       };
       draft.steps[i].next = "noSuchStep";

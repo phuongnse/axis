@@ -5,7 +5,6 @@ import {
   type CompletionResult,
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
-import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
@@ -13,8 +12,8 @@ import { Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
 import { useText } from '../platform/texts'
-import type { designTokensFor } from '../platform/designTokens'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
+import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { expressionLanguage } from './expressionLanguage'
 import type { ScopeOption } from './expressionScope'
 
@@ -60,10 +59,10 @@ export default function ExpressionEditor({
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
-  const latest = useRef({ onChange, required, options, value, theme: editorTheme(tokens, mode), themeCompartment })
+  const latest = useRef({ onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment })
 
   useEffect(() => {
-    latest.current = { onChange, required, options, value, theme: editorTheme(tokens, mode), themeCompartment }
+    latest.current = { onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment }
   })
 
   useEffect(() => {
@@ -96,7 +95,6 @@ export default function ExpressionEditor({
         doc: initial.value,
         extensions: [
           expressionLanguage,
-          syntaxHighlighting(defaultHighlightStyle),
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           autocompletion({ override: [complete] }),
@@ -129,7 +127,7 @@ export default function ExpressionEditor({
   }, [application, resourceId, path, name])
 
   useEffect(() => {
-    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(editorTheme(tokens, mode)) })
+    viewRef.current?.dispatch({ effects: themeCompartment.reconfigure(expressionTheme(tokens, mode)) })
   }, [themeCompartment, tokens, mode])
 
   useEffect(() => {
@@ -206,21 +204,7 @@ function toCompletion(option: ScopeOption): Completion {
   }
 }
 
-function editorTheme({ colour, radius, type }: ReturnType<typeof designTokensFor>, mode: 'light' | 'dark') {
-  return EditorView.theme(
-    {
-      '&': {
-        color: colour.text,
-        backgroundColor: colour.surface,
-        border: `1px solid ${colour.border}`,
-        borderRadius: `${radius.base}px`,
-        fontFamily: type.codeFontFamily,
-        fontSize: `${type.fontSize}px`,
-      },
-      '&.cm-focused': { outline: `2px solid ${colour.focusRing}` },
-      '.cm-content': { caretColor: colour.text, padding: '4px 0' },
-      '.cm-scroller': { fontFamily: 'inherit' },
-    },
-    { dark: mode === 'dark' },
-  )
-}
+const expressionTheme = sharedTheme((tokens, mode) => [
+  codeEditorTheme(tokens, mode),
+  EditorView.theme({ '.cm-content': { padding: '4px 0' } }),
+])

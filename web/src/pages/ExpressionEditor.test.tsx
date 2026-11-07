@@ -1,10 +1,13 @@
+import { defaultHighlightStyle } from '@codemirror/language'
 import { EditorView } from '@codemirror/view'
+import { tags } from '@lezer/highlight'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
+import { colourTokens } from '../platform/designTokens'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import ExpressionEditor from './ExpressionEditor'
@@ -228,7 +231,7 @@ describe('ExpressionEditor completion', () => {
   })
 })
 
-describe.each(['light', 'dark'])('ExpressionEditor in %s mode', (mode) => {
+describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) => {
   beforeEach(() => {
     localStorage.setItem('axis.themeMode', mode)
     vi.stubGlobal(
@@ -247,5 +250,21 @@ describe.each(['light', 'dark'])('ExpressionEditor in %s mode', (mode) => {
     await user.click(editor)
     await user.tab()
     expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
+  })
+
+  it('draws its tokens in the token colours, with none of the default highlight colours', async () => {
+    renderEditor('title > 5 and true')
+
+    const span = (text: string) => screen.getByText(text, { selector: '.cm-line span' })
+    expect(span('title')).toHaveStyle({ color: colourTokens.primaryText[mode] })
+    expect(span('>')).toHaveStyle({ color: colourTokens.textMuted[mode] })
+    expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
+    expect(span('and')).toHaveStyle({ color: colourTokens.warningText[mode] })
+    const defaults = [defaultHighlightStyle.style([tags.keyword]), defaultHighlightStyle.style([tags.number])]
+    for (const element of document.querySelectorAll('.cm-line span')) {
+      for (const name of defaults) {
+        expect(element).not.toHaveClass(name!)
+      }
+    }
   })
 })
