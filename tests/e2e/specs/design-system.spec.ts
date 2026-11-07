@@ -96,6 +96,12 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
     }),
   identitySignIn: (page) =>
     figure(page, "Sign in").getByLabel("Email or username", { exact: true }),
+  studio: (page) =>
+    figure(page, "Typical").getByRole("heading", {
+      name: "Purchase requests",
+      exact: true,
+      level: 4,
+    }),
 };
 
 /** A key element of each state of the shell, sign-in and identity sign-in previews, relative to the state's figure. */
@@ -736,6 +742,81 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([]);
   });
 }
+
+for (const mode of modes) {
+  test(`the studio preview moves between Overview, Settings, a kind list and Releases from the sidebar in ${mode} mode`, async ({
+    page,
+  }) => {
+    const query = `?preview=studio&mode=${mode}`;
+    const recording = await openHarness(page, query, {
+      sandboxed: true,
+      frameWidth: 992,
+    });
+    const state = figure(page.frameLocator("iframe"), "Typical");
+    const heading = (name: string) =>
+      state.getByRole("heading", { name, exact: true, level: 4 });
+    const sidebar = state.getByRole("menu");
+
+    await expect(heading("Purchase requests")).toBeVisible();
+    await sidebar
+      .getByRole("menuitem", { name: "Settings", exact: true })
+      .click();
+    await expect(heading("DesignSystemSample")).toBeVisible();
+    await sidebar
+      .getByRole("menuitem", { name: "Entities", exact: true })
+      .click();
+    await expect(heading("Entities")).toBeVisible();
+    await sidebar
+      .getByRole("menuitem", { name: "Releases", exact: true })
+      .click();
+    await expect(heading("Releases")).toBeVisible();
+    await sidebar
+      .getByRole("menuitem", { name: "Overview", exact: true })
+      .click();
+    await expect(heading("Purchase requests")).toBeVisible();
+
+    expect(recording.errors).toEqual([]);
+    expect(
+      recording.requests.filter((url) => !url.startsWith("data:")),
+    ).toEqual([`${origin}/sandboxed.html`, `${harnessUrl}${query}`, bundleUrl]);
+  });
+}
+
+for (const [slug, testId] of [
+  ["empty", "studio-no-applications"],
+  ["failed", "studio-load-error"],
+  ["access-denied", "studio-forbidden"],
+]) {
+  test(`the studio preview opens its ${slug} state from the address`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(
+      page,
+      `?preview=studio&mode=light&state=${slug}`,
+    );
+
+    await expect(page.getByTestId(testId)).toBeVisible();
+    expect(recording.errors).toEqual([]);
+  });
+}
+
+test("the studio preview replaces one state's page with the next one picked in the Fixtures control", async ({
+  page,
+}) => {
+  const recording = await openHarness(page, "?preview=studio&mode=light");
+  const fixtures = page.getByRole("radiogroup", {
+    name: "Fixtures",
+    exact: true,
+  });
+  await expect(page.getByTestId("studio-apps")).toHaveCount(0);
+
+  await fixtures.getByText("Failed", { exact: true }).click();
+  await expect(page.getByTestId("studio-load-error")).toBeVisible();
+  await fixtures.getByText("Access denied", { exact: true }).click();
+  await expect(page.getByTestId("studio-forbidden")).toBeVisible();
+  await expect(page.getByTestId("studio-load-error")).toHaveCount(0);
+  expect(recording.errors).toEqual([]);
+});
 
 test("the field-date-time preview opens its date picker", async ({ page }) => {
   const recording = await openHarness(

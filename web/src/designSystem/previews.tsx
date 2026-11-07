@@ -16,7 +16,9 @@ import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
+import { studioFixtures } from './studioFixtures'
 import {
+  application,
   blankDetailWidget,
   chartWidget,
   columnsFormRoutes,
@@ -81,10 +83,17 @@ export interface PreviewState {
   caption: string
   draw: () => ReactNode
   routes?: Record<string, () => unknown>
+  /** Answers on paths the preview's other states answer too, so the state shows alone. */
+  fixtures?: Record<string, () => unknown>
   /** The address the state starts at. */
   entry?: InitialEntry
   /** The height of the frame the state draws in, with its menus and dialogs inside it. */
   frameHeight?: number
+}
+
+/** The caption of a state in kebab case, which `&state=` names. */
+export function stateSlug(caption: string): string {
+  return caption.toLowerCase().replaceAll(/[^a-z0-9]+/g, '-')
 }
 
 /** A preview with one state, the typical one. */
@@ -251,6 +260,19 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
   ],
+  studio: [
+    { caption: 'Typical', fixtures: studioFixtures.typical, entry: `/studio?app=${application}` },
+    { caption: 'Empty', fixtures: studioFixtures.empty, entry: '/studio' },
+    { caption: 'Loading', fixtures: studioFixtures.loading, entry: '/studio' },
+    { caption: 'Failed', fixtures: studioFixtures.failed, entry: '/studio' },
+    {
+      caption: 'Many rows',
+      fixtures: studioFixtures.manyRows,
+      entry: `/studio?app=${application}&kind=entity`,
+    },
+    { caption: 'Long names', fixtures: studioFixtures.longNames, entry: `/studio?app=${application}` },
+    { caption: 'Access denied', fixtures: studioFixtures.accessDenied, entry: '/studio' },
+  ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
   signIn: [
     {
       caption: 'Sign-in refused',
@@ -304,6 +326,35 @@ export const previews: Record<string, readonly PreviewState[]> = {
 export function stateRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
   return Object.fromEntries(
     Object.values(all).flatMap((states) => states.flatMap((state) => Object.entries(state.routes ?? {}))),
+  )
+}
+
+/** The answers of the state that the preview shows. */
+let chosen: Record<string, () => unknown> = {}
+
+/** Makes `state` the one whose `fixtures` answer, before it is drawn. */
+export function chooseFixtures(state: PreviewState): void {
+  chosen = state.fixtures ?? {}
+}
+
+/**
+ * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
+ * is logged as a missing fixture and answered with a 404, as a path with no route is.
+ */
+export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
+  const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
+  return Object.fromEntries(
+    paths.map((path) => [
+      path,
+      () => {
+        const answer = chosen[path]
+        if (answer) {
+          return answer()
+        }
+        console.error('No design-system fixture for', path)
+        return new Response(null, { status: 404 })
+      },
+    ]),
   )
 }
 

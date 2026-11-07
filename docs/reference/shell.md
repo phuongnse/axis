@@ -328,8 +328,10 @@ to the frame shows in every state. How previews work is in
 - **A frame holds the whole shell.** A shell preview draws the shell, from the header to the footer, in
   a frame at least as tall as its height, which grows to hold the whole shell, so several states fit
   one card.
-- **The Studio group** _(planned for M31)_. The eighth group of cards, Studio, follows Shell, with the
-  previews `studio` (Applications, Overview, Overview with errors and changes not live, Overview of a
-  new application, Entities, Entity, Releases and Policy matrix), `studioPageDesign`,
-  `studioFormDesign` and `studioProcessDesign`, drawn through the shell over fixtures of the purchase
-  request sample.
+- **The Studio group** is the eighth group of cards, after Shell. Its `studio` preview draws Studio
+  through the shell over fixtures of the purchase request sample, in seven states: Typical, Empty,
+  Loading, Failed, Many rows, Long names and Access denied. Clicks in the sidebar move between
+  Overview, Settings, the kind lists and Releases, all answered from fixtures.
+- **More Studio states** _(planned for M31)_. `studio` also shows Overview with errors and changes not
+  live, Overview of a new application, Entity and Policy matrix. The previews `studioPageDesign`,
+  `studioFormDesign` and `studioProcessDesign` follow it.

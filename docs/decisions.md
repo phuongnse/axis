@@ -106,7 +106,7 @@ the files agree, title and status included.
 | [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
 | [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
 | [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |
-| [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) | Widget previews show the states a design change touches | **Agreed** |
+| D95 | Widget previews show the states a design change touches | Superseded by [D142](decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md), [last text](https://github.com/phuongnse/axis/blob/91b43d2dc63d9f317b1c2bcbf7f217395b30bde9/docs/decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) |
 | D96 | Rules from the design system review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d96-rules-from-the-design-system-review.md) |
 | [D97](decisions/d97-reliable-test-runs.md) | Reliable test runs | **Agreed** |
 | D98 | Rules from the shell review | Superseded by [D133](decisions/d133-docs-state-each-current-rule-once.md), [last text](https://github.com/phuongnse/axis/blob/c6fefbe9cb6c26665612eb2a94f57ce716438ad7/docs/decisions/d98-rules-from-the-shell-review.md) |
@@ -153,3 +153,4 @@ the files agree, title and status included.
 | [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) | CI runs on main alone, and NexKit checks every branch | **Agreed** |
 | [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) | A new screen is designed first, on a short prototype with fixtures | **Agreed** |
 | [D141](decisions/d141-the-reference-index-and-what-uses-a-resource.md) | The reference index, and what uses a resource | **Agreed** |
+| [D142](decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md) | Widget previews show the states a design change touches, one at a time where they share fixtures | **Agreed** |

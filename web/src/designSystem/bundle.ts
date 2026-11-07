@@ -4,9 +4,9 @@ import { installFixtureFetch } from './fixtureFetch'
 import { installFormSubmission } from './formSubmission'
 import { fixtureScopes, routes } from './fixtures'
 import { Preview } from './Preview'
-import { previews, stateRoutes, type PreviewState } from './previews'
+import { chosenRoutes, previews, stateRoutes, type PreviewState } from './previews'
 
-installFixtureFetch({ ...routes, ...stateRoutes(previews) }, fixtureScopes)
+installFixtureFetch({ ...routes, ...stateRoutes(previews), ...chosenRoutes(previews) }, fixtureScopes)
 installFormSubmission()
 
 /** Mounts every state of a preview into an element of the page and returns the function that unmounts them all. */
