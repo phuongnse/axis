@@ -1,6 +1,6 @@
 import type { DndContextProps } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -17,6 +17,7 @@ import { TextProvider } from '../platform/TextProvider'
 import { chooseOption } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
 import { StudioPageCanvas } from './StudioPageCanvas'
+import { editJson, jsonText } from '../test/jsonView'
 
 // The drag library draws as it is, and the test calls the drop handler that the page designer gives it, because jsdom
 // has no layout to hit-test.
@@ -295,8 +296,7 @@ describe('the Design tab of a page', () => {
     expect(posts.at(-1)!.widgets.map((widget) => widget.type)).toEqual(['kpi', 'chart'])
 
     await openTab('JSON')
-    const json = screen.getByRole('textbox', { name: 'JSON' })
-    fireEvent.change(json, { target: { value: JSON.stringify(content([{ type: 'kpi' }])) } })
+    await editJson(JSON.stringify(content([{ type: 'kpi' }])))
     await openTab('Design')
     await waitFor(() => expect(posts.at(-1)!.widgets).toEqual([{ type: 'kpi' }]), slow)
     await waitFor(() => expect(screen.queryByTestId('chart-widget')).not.toBeInTheDocument(), slow)
@@ -958,8 +958,7 @@ describe('the Design tab of a page', () => {
         within(design).queryByTestId('studio-widget-/widgets/0/widgets/0/widgets/0/widgets/1'),
       ).not.toBeInTheDocument()
       await openTab('JSON')
-      const json = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON' })
-      expect(JSON.parse(json.value)).toEqual(content(nest))
+      expect(JSON.parse(await jsonText())).toEqual(content(nest))
     })
 
     it('inserts after a widget dropped on its lower half, selects the new widget and names the place', async () => {
@@ -1195,8 +1194,7 @@ describe('the Design tab of a page', () => {
 
     async function expectDraftUnchanged(widgets: Record<string, unknown>[]) {
       await openTab('JSON')
-      const json = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'JSON' })
-      expect(JSON.parse(json.value)).toEqual(content(widgets))
+      expect(JSON.parse(await jsonText())).toEqual(content(widgets))
     }
 
     it('moves a widget after another on its lower half and into an empty section, and selects it each time', async () => {

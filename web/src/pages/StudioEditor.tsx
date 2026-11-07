@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Input, Modal, Tabs } from 'antd'
+import { Alert, Button, Flex, Modal, Tabs } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
@@ -75,6 +75,7 @@ const noProblems = new Map<string, string>()
 const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
 const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
+const LazyJsonView = lazy(() => import('./JsonView'))
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -189,7 +190,7 @@ export function StudioEditor({
   publisher?: boolean
 }) {
   const t = useText()
-  const { size, type } = useDesignTokens()
+  const { size } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -930,14 +931,14 @@ export function StudioEditor({
                 label: t('shell.studio.json'),
                 children: (
                   <Flex vertical gap="small">
-                    <Input.TextArea
-                      aria-label={t('shell.studio.json')}
-                      autoSize={{ minRows: 10, maxRows: 40 }}
-                      spellCheck={false}
-                      style={{ fontFamily: type.codeFontFamily }}
-                      value={jsonText ?? JSON.stringify(draft, null, 2)}
-                      onChange={(event) => changeJson(event.target.value)}
-                    />
+                    <Suspense fallback={null}>
+                      <LazyJsonView
+                        label={t('shell.studio.json')}
+                        value={jsonText ?? JSON.stringify(draft, null, 2)}
+                        onChange={changeJson}
+                        boundary={rootRef}
+                      />
+                    </Suspense>
                     {jsonInvalid && (
                       <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
                     )}

@@ -8,7 +8,7 @@ import { waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
-import { openTab } from "../studio-resources";
+import { jsonViewText, openTab } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -78,7 +78,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     );
     await openTab(page, "JSON");
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    const draft = JSON.parse(await json.inputValue());
+    const draft = JSON.parse(await jsonViewText(json));
     draft.widgets[0].columns[1].widgets[0].dataSource = "MissingSource";
     await json.fill(JSON.stringify(draft));
     await page.getByRole("tab", { name: "Design", exact: true }).click();
@@ -458,7 +458,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await page.getByRole("tab", { name: "JSON", exact: true }).click();
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    const draft = JSON.parse(await json.inputValue());
+    const draft = JSON.parse(await jsonViewText(json));
     expect(draft.sections[1].fields.at(-1)).toEqual({ field: "resolution" });
   });
 
@@ -493,7 +493,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const fieldsOf = async () => {
       await page.getByRole("tab", { name: "JSON", exact: true }).click();
       const json = page.getByRole("textbox", { name: "JSON", exact: true });
-      const draft = JSON.parse(await json.inputValue());
+      const draft = JSON.parse(await jsonViewText(json));
       return draft.sections.map((section: { fields: { field: string }[] }) =>
         section.fields.map((field) => field.field),
       );
@@ -507,7 +507,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       ["number", "category", "priority", "assignedAgent"],
     ]);
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    expect(JSON.parse(await json.inputValue()).sections[1].fields[0]).toEqual({
+    expect(JSON.parse(await jsonViewText(json)).sections[1].fields[0]).toEqual({
       field: "number",
       readOnly: true,
     });
@@ -547,7 +547,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const layout = async () => {
       await page.getByRole("tab", { name: "JSON", exact: true }).click();
       const json = page.getByRole("textbox", { name: "JSON", exact: true });
-      const draft = JSON.parse(await json.inputValue());
+      const draft = JSON.parse(await jsonViewText(json));
       return {
         sections: draft.sections.map((item: { name: string }) => item.name),
         steps: draft.steps.map((item: { sections: string[] }) => item.sections),
@@ -661,7 +661,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await page.getByRole("tab", { name: "JSON", exact: true }).click();
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    const draft = JSON.parse(await json.inputValue());
+    const draft = JSON.parse(await jsonViewText(json));
     expect(draft.sections[0].name).toBe("issue");
     expect(draft.steps[0].sections).toEqual(["issue"]);
   });
@@ -697,7 +697,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await page.getByRole("tab", { name: "JSON", exact: true }).click();
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    const draft = JSON.parse(await json.inputValue());
+    const draft = JSON.parse(await jsonViewText(json));
     expect(draft.sections[1].fields[0]).toEqual({
       field: "status",
       readOnly: true,
@@ -743,7 +743,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await page.getByRole("tab", { name: "JSON", exact: true }).click();
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
-    const draft = JSON.parse(await json.inputValue());
+    const draft = JSON.parse(await jsonViewText(json));
     expect(
       draft.sections[1].fields.map((field: { field: string }) => field.field),
     ).toEqual(["category", "priority", "assignedAgent"]);

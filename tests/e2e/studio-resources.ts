@@ -103,6 +103,22 @@ export async function openTab(page: Page, name: 'Design' | 'Form' | 'JSON') {
 }
 
 /**
+ * The whole text of the JSON view. The editor draws only the lines near the window, so `textContent` can miss the rest
+ * and `inputValue` does not work on it. This reads the document from CodeMirror's own view.
+ */
+export async function jsonViewText(json: Locator): Promise<string> {
+  return json.evaluate((content) => {
+    const tile = (content as unknown as { cmTile?: { root?: { view?: { state: { doc: { toString(): string } } } } } })
+      .cmTile
+    const view = tile?.root?.view
+    if (!view) {
+      throw new Error('The JSON view has no CodeMirror view.')
+    }
+    return view.state.doc.toString()
+  })
+}
+
+/**
  * Selects the Form tab of the open resource. Under D65 and D66 a page or a form opens on its Design tab, so a spec that
  * uses the fields of its Form tab selects Form first. It does no harm when Form is selected.
  */

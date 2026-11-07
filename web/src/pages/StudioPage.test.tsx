@@ -1,5 +1,5 @@
 import { EditorView } from '@codemirror/view'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ import { TextProvider } from '../platform/TextProvider'
 import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
+import { editJson, jsonText } from '../test/jsonView'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
 
@@ -500,15 +501,14 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
     await screen.findByTestId('studio-field-/fields/0/name')
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const editor = screen.getByRole('textbox', { name: 'JSON' })
 
-    fireEvent.change(editor, { target: { value: JSON.stringify({ ...entityContent(), name: 'Renamed' }) } })
+    await editJson(JSON.stringify({ ...entityContent(), name: 'Renamed' }))
     await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
     expect(within(screen.getByTestId('studio-field-/name')).getByRole('textbox')).toHaveValue('Renamed')
     expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
 
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    fireEvent.change(screen.getByRole('textbox', { name: 'JSON' }), { target: { value: '{ "name": ' } })
+    await editJson('{ "name": ')
 
     expect(screen.getByTestId('studio-json-error')).toHaveTextContent('The JSON is not valid.')
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
@@ -983,7 +983,7 @@ describe('StudioPage', () => {
       () => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'),
       slow,
     )
-    expect(screen.getByRole('textbox', { name: 'JSON' })).toHaveValue(JSON.stringify(textContent, null, 2))
+    expect(await jsonText()).toBe(JSON.stringify(textContent, null, 2))
   })
 
   it('keeps the last expression result and Save enabled when a check gets no answer', async () => {

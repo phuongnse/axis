@@ -7,11 +7,13 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames, StudioResourceItem } from '../platform/studio'
+import { colourTokens } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
 import { chooseOption } from '../test/antd'
+import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
 
@@ -64,19 +66,21 @@ function stub(seed: unknown, patch: () => Response = () => json({ version: 's2',
 
 function renderEditor() {
   render(
-    <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-      <StudioEditor
-        application="Shop"
-        item={resources[0]}
-        resources={resources}
-        path={null}
-        diagnosticPaths={[]}
-        onOpen={vi.fn()}
-        onSaved={vi.fn()}
-        onTextsWritten={vi.fn()}
-        onDeleted={vi.fn()}
-      />
-    </TextProvider>,
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioEditor
+          application="Shop"
+          item={resources[0]}
+          resources={resources}
+          path={null}
+          diagnosticPaths={[]}
+          onOpen={vi.fn()}
+          onSaved={vi.fn()}
+          onTextsWritten={vi.fn()}
+          onDeleted={vi.fn()}
+        />
+      </TextProvider>
+    </ThemeModeProvider>,
   )
 }
 
@@ -152,11 +156,8 @@ describe('StudioEditor for a seed', () => {
     await screen.findByRole('textbox', { name: 'code' }, slow)
 
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const text = screen.getByRole('textbox', { name: 'JSON' })
     const edited = JSON.stringify(seedContent('Order', [{ id: 'a', values: { code: 5 } }]))
-    await userEvent.clear(text)
-    await userEvent.click(text)
-    await userEvent.paste(edited)
+    await editJson(edited)
 
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
@@ -923,11 +924,8 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
-    const json = screen.getByRole('textbox', { name: 'JSON' })
     const withExtraStep = { ...processContent, steps: [...processContent.steps, { name: 'notify', type: 'end' }] }
-    await userEvent.clear(json)
-    await userEvent.click(json)
-    await userEvent.paste(JSON.stringify(withExtraStep, null, 2))
+    await editJson(JSON.stringify(withExtraStep, null, 2))
     await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
 
     expect(await screen.findByTestId('studio-graph-node-11', {}, slow)).toHaveAccessibleName('notify · end')
@@ -1047,7 +1045,7 @@ describe('StudioEditor for a process', () => {
     expect(screen.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step done')
     expect(screen.getByText('Select a step on the canvas.')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const named = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    const named = JSON.parse(await jsonText())
     expect(named.steps).toHaveLength(10)
     expect(named.steps[7].next).toBe('done')
     await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
@@ -1600,18 +1598,16 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-      const view = screen.getByRole('textbox', { name: 'JSON' })
-      const original = (view as HTMLTextAreaElement).value
-      await userEvent.click(view)
-      fireEvent.change(view, { target: { value: original.replace('MyTasks', 'Renamed') } })
+      const original = await jsonText()
+      await editJson(original.replace('MyTasks', 'Renamed'))
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
 
       await userEvent.keyboard('{Control>}z{/Control}')
-      expect(view).toHaveValue(original)
+      expect(await jsonText()).toBe(original)
       expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
 
       await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}')
-      expect(view).toHaveValue(original.replace('MyTasks', 'Renamed'))
+      expect(await jsonText()).toBe(original.replace('MyTasks', 'Renamed'))
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
     })
 
@@ -1622,9 +1618,7 @@ describe('StudioEditor for a page', () => {
 
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-      const view = screen.getByRole('textbox', { name: 'JSON' })
-      await userEvent.click(view)
-      fireEvent.change(view, { target: { value: '{' } })
+      await editJson('{')
       expect(screen.getByTestId('studio-json-error')).toBeInTheDocument()
 
       await userEvent.click(undoButton())
@@ -1798,8 +1792,7 @@ describe('StudioEditor for a form', () => {
     expect(screen.queryByTestId('studio-form-palette-resolution')).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const view = screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement
-    expect(JSON.parse(view.value).sections[0].fields).toEqual([{ field: 'title' }, { field: 'resolution' }])
+    expect(JSON.parse(await jsonText()).sections[0].fields).toEqual([{ field: 'title' }, { field: 'resolution' }])
   })
 
   it('undoes an Add step in one step, restoring sections and steps', async () => {
@@ -1814,7 +1807,7 @@ describe('StudioEditor for a form', () => {
     expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
 
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    const draft = JSON.parse(await jsonText())
     expect(draft.sections).toEqual(formContent.sections)
     expect(draft.steps).toBeUndefined()
   })
@@ -1845,7 +1838,7 @@ describe('StudioEditor for a form', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    const draft = JSON.parse(await jsonText())
     expect(draft.sections).toEqual(steppedContent.sections)
     expect(draft.steps).toEqual(steppedContent.steps)
   })
@@ -1862,7 +1855,7 @@ describe('StudioEditor for a form', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getAllByTestId('studio-outline-step')).toHaveLength(2)
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
-    const draft = JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)
+    const draft = JSON.parse(await jsonText())
     expect(draft.sections).toEqual(steppedContent.sections)
     expect(draft.steps).toEqual(steppedContent.steps)
   })
@@ -1905,7 +1898,7 @@ describe('StudioEditor for an entity', () => {
     expect(designer).toBeVisible()
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
 
-    expect(JSON.parse((screen.getByRole('textbox', { name: 'JSON' }) as HTMLTextAreaElement).value)).toEqual(designed)
+    expect(JSON.parse(await jsonText())).toEqual(designed)
   })
 
   it('changes a decimal field to enum: the type changes, precision and scale go and unique stays', async () => {
@@ -2162,5 +2155,26 @@ describe('StudioEditor for an entity', () => {
     }
     // The first move puts `code` first, the second moves `total` below `note`.
     expect((moved as typeof designed).fields).toEqual([designed.fields[1], designed.fields[2], designed.fields[0]])
+  })
+})
+
+describe.each(['light', 'dark'] as const)('The JSON view in %s mode', (mode) => {
+  it('draws each kind of token in its token colour', async () => {
+    localStorage.setItem('axis.themeMode', mode)
+    stubResource(pageItem, { ...pageContent, count: 5, visible: true, owner: null })
+    renderResource(pageItem, pageNames)
+    await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
+    const view = await jsonView()
+
+    const span = (text: string) =>
+      within(view.contentDOM)
+        .getAllByText(text, { selector: 'span' })
+        .find((element) => element.className !== '')!
+    expect(span('"name"')).toHaveStyle({ color: colourTokens.primaryText[mode] })
+    expect(span('"MyTasks"')).toHaveStyle({ color: colourTokens.text[mode] })
+    expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
+    expect(span('true')).toHaveStyle({ color: colourTokens.warningText[mode] })
+    expect(span('null')).toHaveStyle({ color: colourTokens.warningText[mode] })
+    expect(span(':')).toHaveStyle({ color: colourTokens.textMuted[mode] })
   })
 })

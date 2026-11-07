@@ -10,7 +10,7 @@ import { assetManagement, journeyApplications, journeyURL } from '../server-sett
 import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
-import { createResource, hasKind, openFormTab, openKind, openTab } from '../studio-resources'
+import { createResource, hasKind, jsonViewText, openFormTab, openKind, openTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -1041,7 +1041,7 @@ test.describe('the author builds the asset management application with Studio on
       await openTab(page, 'JSON')
       const json = page.getByRole('textbox', { name: 'JSON', exact: true })
       const content = await sample<Record<string, unknown>>(file)
-      content.id = (JSON.parse(await json.inputValue()) as { id: string }).id
+      content.id = (JSON.parse(await jsonViewText(json)) as { id: string }).id
       await json.fill(JSON.stringify(content, null, 2))
 
       const diagnostics = await save(page)
