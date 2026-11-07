@@ -52,6 +52,8 @@ collection, and none writes a sensitive value in clear.
   is a `500`.
 - **Computed values.** A rule or form requirement that aggregates over a `references` field reads the target's
   decrypted values. The server reads a pending computed field, and writes a sensitive computed value, with the cipher.
+  Activation's inline recompute of computed fields reads and writes an entity that holds stored sensitive values with
+  the cipher.
 - **Seeds.** Seeds encrypt a sensitive value with the tenant's data key, at server start, in `axis-admin activate` and
   in the publisher. A synced seed decrypts the stored value and compares it with the declared one, so an unchanged
   value writes nothing.
@@ -62,8 +64,8 @@ collection, and none writes a sensitive value in clear.
 - **Triggers and start conditions** _(planned for M30)_. The data change trigger, the event trigger start, the task
   escalation and the inbound endpoint start condition read a record that holds a stored sensitive value with the
   cipher.
-- **Recomputing computed fields** _(planned for M30)_. Activation's inline recompute of computed fields and the worker's
-  `computed.backfill` read and write an entity that holds stored sensitive values with the cipher.
+- **The computed backfill** _(planned for M30)_. The worker's `computed.backfill` reads and writes an entity that holds
+  stored sensitive values with the cipher.
 
 ### Tests
 
@@ -74,7 +76,7 @@ collection, and none writes a sensitive value in clear.
 | `ProcessSensitiveValueTests`        | Process steps, the process start endpoint and the task form state                                                                                                                                                                            |
 | `ConnectorCallSensitiveOutputTests` | Connector call outputs                                                                                                                                                                                                                       |
 | `DataSourceSensitiveValueTests`     | Data source rows and exports                                                                                                                                                                                                                 |
-| `SensitiveComputedReadTests`        | Aggregates over a `references` field, pending computed fields and sensitive computed values                                                                                                                                                  |
+| `SensitiveComputedReadTests`        | Aggregates over a `references` field, pending computed fields, activation's inline recompute and sensitive computed values                                                                                                                   |
 | `StartupActivationTests`            | Seeds                                                                                                                                                                                                                                        |
 | `ScenarioRunnerTests`               | Scenarios                                                                                                                                                                                                                                    |
 | `ExactLookupFilterTests`            | A data source `filter` and a measure's `filter` on an exact lookup field                                                                                                                                                                     |
