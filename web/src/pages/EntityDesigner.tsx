@@ -447,12 +447,15 @@ function Fields({
             kind: 'fixed' as const,
             render: (_: unknown, { index }: FieldRow) => (
               <Flex gap="small">
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button disabled={index === 0} onClick={() => move(index, -1)}>
                   {t('shell.studio.entity.moveUp')}
                 </Button>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button disabled={index === fields.length - 1} onClick={() => move(index, 1)}>
                   {t('shell.studio.entity.moveDown')}
                 </Button>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button danger onClick={() => removeField(index)}>
                   {t('shell.studio.entity.removeField')}
                 </Button>
@@ -477,6 +480,7 @@ function Fields({
         />
         {readOnly ? null : (
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={addField}>{t('shell.studio.entity.addField')}</Button>
           </div>
         )}
@@ -988,12 +992,15 @@ function Indexes({
               </div>
               {readOnly ? null : (
                 <Flex gap="small">
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button disabled={position === 0} onClick={() => move(position, -1)}>
                     {t('shell.studio.entity.moveUp')}
                   </Button>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button disabled={position === list.length - 1} onClick={() => move(position, 1)}>
                     {t('shell.studio.entity.moveDown')}
                   </Button>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button danger onClick={() => write(list.filter((_, other) => other !== position))}>
                     {t('shell.studio.entity.removeIndex')}
                   </Button>
@@ -1004,6 +1011,7 @@ function Indexes({
         })}
         {readOnly ? null : (
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => write([...list, { name: uniqueStepName(list, 'index'), fields: [] }])}>
               {t('shell.studio.entity.addIndex')}
             </Button>
@@ -1082,6 +1090,7 @@ function Validations({
                 onPick={(next) => onChange(`${pointer}/field`, next ?? '')}
               />
               {readOnly ? null : (
+                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 <Button danger onClick={() => onChange(pointer, undefined)}>
                   {t('shell.studio.entity.removeValidation')}
                 </Button>
@@ -1091,6 +1100,7 @@ function Validations({
         })}
         {readOnly ? null : (
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button
               onClick={() =>
                 onChange('/validations', [

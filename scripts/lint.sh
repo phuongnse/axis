@@ -16,16 +16,18 @@ fi
 # Specs match accessible names and texts exactly. Only a regular expression matches part of one.
 node scripts/check-locators.mjs
 
-# The SPA shows every value as text and never writes one into the page as HTML (ASVS V1.2.1, V3.2.2).
-node scripts/check-raw-html.mjs
+# The SPA's raw HTML, prototype pollution and shared widget rules run in oxlint above. A disable comment never turns off a
+# security rule or every rule at once: a security rule's exception is an overrides entry in web/.oxlintrc.json.
+if git grep -nE --untracked '(eslint|oxlint)-disable(-next-line|-line)?([[:space:]]*(\*/|--|$)|[^-].*(react/no-danger|no-restricted-(properties|globals)|no-proto|no-extend-native|axis/no-(srcdoc|computed-key-write|prototype-write)))' -- web; then
+  echo 'A disable comment names a security rule or no rule. Add an overrides entry in web/.oxlintrc.json with its reason.' >&2
+  exit 1
+fi
 
-# The SPA draws a button, a table and a tag with the platform's shared widgets and tokens, not with the library's own
-# (AGENTS.md: one concern has one mechanism). No file but AxisTable.tsx imports Ant Design's Table. The button and tag
-# code that predates this check is counted in a baseline that only goes down.
-node scripts/check-shared-widgets.mjs
-
-# The SPA has no code that a key such as __proto__ can turn into prototype pollution (ASVS V15.3.6).
-node scripts/check-prototype-pollution.mjs
+# Oxlint does not read HTML, so the entry pages are matched as text.
+if git grep -niE 'dangerouslySetInnerHTML|innerHTML|outerHTML|insertAdjacentHTML|insertHTML|createContextualFragment|setHTMLUnsafe|parseHTMLUnsafe|DOMParser|srcdoc|document\.write' -- 'web/*.html'; then
+  echo 'An HTML entry page writes raw HTML.' >&2
+  exit 1
+fi
 
 # A test outside a *PerformanceTests class passes or fails the same way on any runner, so it measures
 # no elapsed time. A polling deadline built on DateTime.UtcNow only ends a wait and is allowed.

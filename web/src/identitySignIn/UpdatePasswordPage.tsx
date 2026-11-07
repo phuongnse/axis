@@ -55,6 +55,7 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
           <Input.Password name="password-confirm" autoComplete="new-password" />
         </Form.Item>
         <input ref={submitRef} type="hidden" name="logout-sessions" value="on" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.setPassword}
         </Button>
@@ -62,6 +63,7 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
       {appInitiated && (
         <form method="post" action={loginAction}>
           <input type="hidden" name="cancel-aia" value="true" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button htmlType="submit" name="cancel-aia" value="true" block>
             {texts.cancel}
           </Button>

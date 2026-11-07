@@ -1,8 +1,124 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
+  "jsPlugins": ["./lint/axis-plugin.mjs"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/only-export-components": ["warn", { "allowConstantExport": true }],
+
+    // Raw HTML (ASVS V1.2.1, V3.2.2): the SPA shows every value as text.
+    "react/no-danger": "error",
+    "axis/no-srcdoc": "error",
+    "no-restricted-globals": [
+      "error",
+      { "name": "DOMParser", "message": "DOMParser writes raw HTML. Render the value as text." }
+    ],
+
+    // Prototype pollution (ASVS V15.3.6): use setOwn from src/platform/ownProperty.ts, or a Map, for dynamic keys.
+    "no-proto": "error",
+    "no-extend-native": "error",
+    "axis/no-computed-key-write": "error",
+    "axis/no-prototype-write": "error",
+
+    // Raw HTML and prototype pollution, by property.
+    "no-restricted-properties": [
+      "error",
+      { "property": "innerHTML", "message": "innerHTML writes raw HTML. Render the value as text." },
+      { "property": "outerHTML", "message": "outerHTML writes raw HTML. Render the value as text." },
+      { "property": "insertAdjacentHTML", "message": "insertAdjacentHTML writes raw HTML. Render the value as text." },
+      {
+        "property": "createContextualFragment",
+        "message": "createContextualFragment writes raw HTML. Render the value as text."
+      },
+      { "property": "setHTMLUnsafe", "message": "setHTMLUnsafe writes raw HTML. Render the value as text." },
+      { "property": "parseHTMLUnsafe", "message": "parseHTMLUnsafe writes raw HTML. Render the value as text." },
+      { "property": "srcdoc", "message": "srcdoc writes raw HTML. Render the value as text." },
+      { "property": "execCommand", "message": "execCommand can insert raw HTML. Render the value as text." },
+      { "property": "DOMParser", "message": "DOMParser writes raw HTML. Render the value as text." },
+      {
+        "object": "document",
+        "property": "write",
+        "message": "document.write writes raw HTML. Render the value as text."
+      },
+      {
+        "object": "document",
+        "property": "writeln",
+        "message": "document.writeln writes raw HTML. Render the value as text."
+      },
+      {
+        "object": "Object",
+        "property": "assign",
+        "message": "Object.assign is open to prototype pollution. Spread the value into an object literal."
+      },
+      { "property": "setPrototypeOf", "message": "setPrototypeOf is open to prototype pollution." }
+    ],
+
+    // Shared widgets (AGENTS.md: one concern has one mechanism).
+    "axis/no-antd-button": "error",
+    "axis/no-preset-tag-colour": "error",
+    "no-restricted-imports": [
+      "error",
+      { "paths": [{ "name": "antd", "importNames": ["Table"], "message": "Use AxisTable." }] }
+    ]
+  },
+  "overrides": [
+    {
+      // AxisButton wraps the Button of antd.
+      "files": ["src/platform/AxisButton.tsx"],
+      "rules": { "axis/no-antd-button": "off" }
+    },
+    {
+      // AxisTable wraps the Table of antd.
+      "files": ["src/platform/AxisTable.tsx"],
+      "rules": { "no-restricted-imports": "off" }
+    },
+    {
+      // The design-system previews patch HTMLFormElement.prototype.requestSubmit to show a submit, and no user input
+      // reaches that code.
+      "files": ["src/designSystem/formSubmission.ts"],
+      "rules": { "axis/no-prototype-write": "off" }
+    },
+    {
+      // Tests patch prototypes such as Element.prototype.scrollIntoView, call Object.assign and draw their own widgets
+      // on purpose. They stay under the raw HTML rules.
+      "files": ["**/*.test.ts", "**/*.test.tsx", "src/test/**"],
+      "rules": {
+        "no-proto": "off",
+        "no-extend-native": "off",
+        "axis/no-computed-key-write": "off",
+        "axis/no-prototype-write": "off",
+        "axis/no-antd-button": "off",
+        "axis/no-preset-tag-colour": "off",
+        "no-restricted-imports": "off",
+        "no-restricted-properties": [
+          "error",
+          { "property": "innerHTML", "message": "innerHTML writes raw HTML. Render the value as text." },
+          { "property": "outerHTML", "message": "outerHTML writes raw HTML. Render the value as text." },
+          {
+            "property": "insertAdjacentHTML",
+            "message": "insertAdjacentHTML writes raw HTML. Render the value as text."
+          },
+          {
+            "property": "createContextualFragment",
+            "message": "createContextualFragment writes raw HTML. Render the value as text."
+          },
+          { "property": "setHTMLUnsafe", "message": "setHTMLUnsafe writes raw HTML. Render the value as text." },
+          { "property": "parseHTMLUnsafe", "message": "parseHTMLUnsafe writes raw HTML. Render the value as text." },
+          { "property": "srcdoc", "message": "srcdoc writes raw HTML. Render the value as text." },
+          { "property": "execCommand", "message": "execCommand can insert raw HTML. Render the value as text." },
+          { "property": "DOMParser", "message": "DOMParser writes raw HTML. Render the value as text." },
+          {
+            "object": "document",
+            "property": "write",
+            "message": "document.write writes raw HTML. Render the value as text."
+          },
+          {
+            "object": "document",
+            "property": "writeln",
+            "message": "document.writeln writes raw HTML. Render the value as text."
+          }
+        ]
+      }
+    }
+  ]
 }

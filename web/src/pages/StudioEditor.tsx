@@ -954,6 +954,7 @@ export function StudioEditor({
           data-testid="studio-conflict"
           type="warning"
           title={t('shell.studio.conflict')}
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
         />
       )}

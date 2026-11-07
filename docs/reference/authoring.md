@@ -649,7 +649,7 @@ An author validates, publishes, previews and tests an application from Studio, a
 release of its history. The server holds no tenant schema connection and never activates in its own
 process: it stores a **publish request** in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it with the tenant's schema role. The tables are in
-[publish requests and release history](storage.md#publish-requests-and-release-history).
+[publish requests and release history](publish-request-storage.md#publish-requests-and-release-history).
 
 A request runs for the tenant of the author's session, so Studio on a tenant's host publishes to that
 tenant only.
@@ -878,7 +878,7 @@ the release's model from its stored files, never from the folder, and stores no 
 - **The active release.** Activating the release that is already active succeeds and adds no row.
 
 Activating a stored release is refused, and the request ends `failed`, in the cases of
-[refusals to activate a stored release](storage.md#refusals-to-activate-a-stored-release), and with
+[refusals to activate a stored release](publish-request-storage.md#refusals-to-activate-a-stored-release), and with
 every other refusal of activation. A refused activation changes nothing: the active release and the
 history stay as they were.
 

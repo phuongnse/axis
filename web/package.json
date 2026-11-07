@@ -9,7 +9,7 @@
     "build:design-system": "vite build --config vite.design-system.config.ts",
     "build:sign-up": "vite build --config vite.sign-up.config.ts",
     "build:keycloak-theme": "vite build --config vite.keycloak-theme.config.ts",
-    "lint": "oxlint --deny-warnings && tsc -b --noEmit && prettier --check .",
+    "lint": "oxlint --deny-warnings --report-unused-disable-directives && tsc -b --noEmit && prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
     "format": "prettier --write ."

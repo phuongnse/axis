@@ -28,6 +28,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   fixes every doc statement it makes false, removes the planned marker of what it builds and greps the
   docs for each name it renames or removes. Follow [how the docs stay correct](docs/writing-docs.md#how-the-docs-stay-correct);
   a review checks the docs diff against the code diff.
+- A comment in the code links the reference section that holds its rule or cites a decision in force,
+  and names no milestone, see [references in the code](docs/writing-docs.md#references-in-the-code).
 - Keep the decision status words exact: **Agreed** means agreed and **Proposed** means still open.
   Never present a proposal as agreed.
 - One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test

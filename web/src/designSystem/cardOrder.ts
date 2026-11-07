@@ -1,6 +1,6 @@
-// The order of the design-system cards, in the groups that D96 agreed and then the Shell group, and the names the
-// Design System artifact gives them. It has no import, so scripts/design-system-header.mjs can load it with Node and
-// write the card names in this order as the bundle's first line.
+// The order of the design-system cards, in the groups of docs/reference/shell.md#design-system-previews, and the
+// names the Design System artifact gives them. It has no import, so scripts/design-system-header.mjs can load it with
+// Node and write the card names in this order as the bundle's first line.
 
 const pascal = (name: string) =>
   name

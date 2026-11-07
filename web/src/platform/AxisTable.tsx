@@ -12,7 +12,7 @@ import { useNarrowWidth } from './useNarrowWidth'
 import { visuallyHidden } from './visuallyHidden'
 
 /**
- * How wide a column is (D129).
+ * How wide a column is, see docs/reference/actions-and-controls.md#tables.
  * - `fixed`: a value of a fixed form, such as a number, a date, a boolean, an enum or the row's actions, as wide as
  *   its content and never wrapping.
  * - `freeText`: text, a reference or a file. The free-text columns share the width the others leave in equal parts, and
@@ -49,8 +49,9 @@ export interface AxisRowAction {
 }
 
 /**
- * The toolbar of every table (D96). The view controls, such as search, sit on the left. On the right come Refresh,
- * the secondary actions such as Import and Export, and the main action last. Each is there only when the table has it.
+ * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. The view controls, such as search, sit
+ * on the left. On the right come Refresh, the secondary actions such as Import and Export, and the main action last.
+ * Each is there only when the table has it.
  */
 export interface AxisTableToolbar {
   view?: ReactNode
@@ -95,16 +96,20 @@ const actionsKey = '$actions'
 /** A width of 1 % makes an auto-layout column as narrow as its content, which `nowrap` keeps on one line. */
 const fitContent = '1%'
 
-/** The most a free-text value is wide before it wraps, in px (D129). */
+/** The most a free-text value is wide before it wraps, in px, see docs/reference/actions-and-controls.md#tables. */
 const freeTextMaxWidth = 320
 
-/** The row's actions fold into one menu from this many on, and at narrow width whatever their number (D96). */
+/**
+ * The row's actions fold into one menu from this many on, and at narrow width whatever their number, see
+ * docs/reference/actions-and-controls.md#tables.
+ */
 const foldFrom = 3
 
 /**
- * The one table of the platform (D129). It draws the toolbar in its fixed order, the columns by their kind, rows and a
- * header of the `tableRow` size, the row actions, folded into one "…" menu from three on or below 992 px, the paging,
- * sideways scrolling when the page is narrower than the columns, and the em dash for an empty cell.
+ * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
+ * order, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
+ * from three on or below 992 px, the paging, sideways scrolling when the page is narrower than the columns, and the em
+ * dash for an empty cell.
  */
 export function AxisTable<T extends object>({
   columns,
@@ -277,6 +282,7 @@ function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: 
             {...action.attributes}
           />
         ) : (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button
             key={action.key}
             type="text"

@@ -227,6 +227,7 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
               )
             })}
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange('/parameters', [...list, { name: '', type: 'text' }])}>
                 {t('shell.studio.page.addParameter')}
               </Button>
@@ -306,6 +307,7 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
         </div>
       )}
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button danger onClick={() => onChange(base, undefined)}>
           {t('shell.studio.page.removeParameter')}
         </Button>
@@ -402,6 +404,7 @@ function WidgetRow({
     <div role="listitem">
       <Flex vertical gap="small">
         <Flex gap="small" wrap align="center" data-testid={`studio-widget-row-${pointer}`}>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             type={pointer === tree.selected ? 'primary' : 'default'}
             aria-current={pointer === tree.selected}
@@ -414,12 +417,15 @@ function WidgetRow({
           {tree.layer !== undefined && typeof content?.name === 'string' && (
             <LayerMarkTag layer={tree.layer} list={listPointer} index={index} name={content.name} />
           )}
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button disabled={index === 0} onClick={() => move(-1)}>
             {t('shell.studio.page.moveUp')}
           </Button>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button disabled={index === widgets.length - 1} onClick={() => move(1)}>
             {t('shell.studio.page.moveDown')}
           </Button>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             danger
             onClick={() =>
@@ -888,6 +894,7 @@ function KpiPanel({
         <Flex vertical gap="small">
           {comparison === undefined ? (
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(`${base}/comparison`, { measure: '', label: { textKey: '' } })}>
                 {t('shell.studio.page.addComparison')}
               </Button>
@@ -907,6 +914,7 @@ function KpiPanel({
                 <TextReferenceField pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
               </div>
               <div>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button danger onClick={() => onChange(`${base}/comparison`, undefined)}>
                   {t('shell.studio.page.removeComparison')}
                 </Button>
@@ -930,6 +938,7 @@ function KpiPanel({
         <Flex vertical gap="small">
           {navigate === undefined ? (
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button
                 onClick={() => {
                   onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })
@@ -944,6 +953,7 @@ function KpiPanel({
               <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
               <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
               <div>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   danger
                   onClick={() => {
@@ -1067,6 +1077,7 @@ function ChartPanel({
                       <JsonOnly />
                     )}
                     <div>
+                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                       <Button
                         danger
                         disabled={measures.length === 1}
@@ -1084,6 +1095,7 @@ function ChartPanel({
                 </Card>
               ))}
               <div>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   onClick={() => onChange(`${base}/measures`, [...measures, { name: '', label: { textKey: '' } }])}
                 >
@@ -1187,6 +1199,7 @@ function ColumnsPanel({
               <JsonOnly />
             )}
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button
                 danger
                 disabled={columns.length === 1}
@@ -1205,6 +1218,7 @@ function ColumnsPanel({
       ))}
       <RemovedRows layer={layer} list={`${base}/columns`} />
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => onChange(`${base}/columns`, [...columns, newColumn(columns)])}>
           {t('shell.studio.page.addColumn')}
         </Button>
@@ -1254,6 +1268,7 @@ function TabsPanel({
               <JsonOnly />
             )}
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button
                 danger
                 disabled={tabs.length === 1}
@@ -1272,6 +1287,7 @@ function TabsPanel({
       ))}
       <RemovedRows layer={layer} list={`${base}/tabs`} />
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => onChange(`${base}/tabs`, [...tabs, newTab(tabs)])}>
           {t('shell.studio.page.addTab')}
         </Button>
@@ -1507,6 +1523,7 @@ function ParameterExpressions({
               <div style={{ flex: 1, minWidth: 240 }}>
                 {expression(rowPointer, typeof entry === 'string' ? entry : '')}
               </div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
             </Flex>
           )
@@ -1621,6 +1638,7 @@ function Actions({
                       </div>
                     )}
                     <div>
+                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                       <Button
                         danger
                         onClick={() => {
@@ -1638,14 +1656,17 @@ function Actions({
             <RemovedRows layer={layer} list={pointer} />
             <Flex gap="small" wrap>
               {startProcess && (
+                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 <Button onClick={() => add({ type: 'startProcess', process: '', label: { textKey: '' } })}>
                   {t('shell.studio.page.addAction')}
                 </Button>
               )}
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => add({ type: 'navigate', page: '', label: { textKey: '' } })}>
                 {t('shell.studio.page.addNavigateAction')}
               </Button>
               {deleteAction && (
+                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 <Button onClick={() => add({ type: 'delete', label: { textKey: '' } })}>
                   {t('shell.studio.page.addDeleteAction')}
                 </Button>

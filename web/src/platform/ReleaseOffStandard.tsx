@@ -24,6 +24,7 @@ export function ReleaseOffStandard({
   }
   const compare = nameCompare(locale)
   const tag = (
+    // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
     <Tag color="warning" data-testid="release-off-standard">
       {t('shell.studio.offStandard')}
     </Tag>

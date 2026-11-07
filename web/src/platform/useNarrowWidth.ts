@@ -2,8 +2,9 @@ import { createContext, useContext, useSyncExternalStore } from 'react'
 import { breakpointTokens } from './designTokens'
 
 /**
- * Below 992 px, Ant Design's `lg` breakpoint, the layout is narrow width, see D96. The query ends 0.02 px below the
- * token, so a window of exactly 992 px is not narrow.
+ * Below 992 px, Ant Design's `lg` breakpoint, the layout is narrow width, see
+ * docs/reference/frontend.md#narrow-width. The query ends 0.02 px below the token, so a window of exactly 992 px is not
+ * narrow.
  */
 export const narrowWidthQuery = `(max-width: ${breakpointTokens.narrowWidth - 0.02}px)`
 
@@ -21,8 +22,8 @@ function isNarrowWidth() {
 }
 
 /**
- * Whether the window is narrower than 992 px, the one breakpoint of D96. It updates when the window is resized across
- * it. The page designer's canvas overrides it through {@link NarrowWidthOverride}.
+ * Whether the window is narrower than 992 px, the one breakpoint, see docs/reference/frontend.md#narrow-width. It updates
+ * when the window is resized across it. The page designer's canvas overrides it through {@link NarrowWidthOverride}.
  */
 export function useNarrowWidth(): boolean {
   const matches = useSyncExternalStore(subscribe, isNarrowWidth)

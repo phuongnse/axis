@@ -173,6 +173,7 @@ export function TextTable({
             onChange={(event) => setNewTexts((current) => ({ ...current, [column.locale]: event.target.value }))}
           />
         ))}
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button loading={adding} disabled={adding} onClick={add}>
           {t('shell.studio.texts.addKey')}
         </Button>

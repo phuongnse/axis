@@ -184,6 +184,7 @@ export function Shell({
                 {bell}
                 {hasAccount ? account : <AppSwitcher locale={locale} />}
                 {!hasAccount && <UserMenu />}
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   ref={toggle}
                   type="text"

@@ -69,8 +69,9 @@
 # 5283), the https port of the server that the spec starts after tenant create. The tenant terms spec serves its own
 # tenant on the next port, so the two can run at the same time. That server reads its tenants from the
 # tenant directory and stops when the test ends. The spec's browser maps the tenant host on port 443 to it. The same
-# spec runs the M28 journey on that tenant: its first administrator disables a person on the users page, the person's
-# sign-in is refused until the administrator enables them, and after tenant host add a person signs in on the added host.
+# spec runs the users and hosts journey on that tenant: its first administrator disables a person on the users page,
+# the person's sign-in is refused until the administrator enables them, and after tenant host add a person signs in on
+# the added host.
 # Keycloak imports the operator realm axis-operators too. The cell console spec serves a cell on the offset 3 of that port,
 # with the console host console.localhost, and signs the development operator in to the cell console through that realm.
 # The cell quota journey serves a cell on the offset 4 and signs in an operator account of its own. Both start their cell

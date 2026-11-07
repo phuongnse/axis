@@ -327,6 +327,7 @@ export default function StudioPageDesign({
       <DragOverlay dropAnimation={null}>
         {dragging === undefined ? null : (
           <Flex vertical align="flex-start">
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button>{dragging.label}</Button>
             {dragging.refusal !== undefined && (
               <Typography.Text type="danger" data-testid="studio-drag-refusal">

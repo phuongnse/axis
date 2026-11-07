@@ -13,10 +13,10 @@ import { lines, markdownFiles, relativePath } from './helpers.mjs'
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
-const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
-const supersededRowPattern =
+export const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
+export const supersededRowPattern =
   /^\| D(\d+) \| (.+?) \| Superseded by ((?:\[D\d+\]\(decisions\/[^)]+\)(?:, | and ))*\[D\d+\]\(decisions\/[^)]+\)), \[last text\]\((https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/blob\/[0-9a-f]{40}\/docs\/decisions\/d(\d+)-[a-z0-9-]+\.md)\) \|$/
-const successorPattern = /\[D(\d+)\]\(decisions\/([^)]+)\)/g
+export const successorPattern = /\[D(\d+)\]\(decisions\/([^)]+)\)/g
 
 /** Checks the decision files against the decisions index, docs/decisions.md. */
 export function checkDecisions(root, report) {

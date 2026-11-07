@@ -140,6 +140,7 @@ function ReferenceEntry({
         <Flex align="center" gap="small" wrap>
           <Tag>{entry.relation}</Tag>
           {node.type === 'resource' ? (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button
               type="link"
               style={{ padding: 0, height: 'auto' }}
@@ -151,6 +152,7 @@ function ReferenceEntry({
             <span>{nodeTitle(node)}</span>
           )}
           {expandable && (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button type="text" size="small" aria-expanded={expanded} onClick={toggle}>
               {expanded ? t('shell.studio.collapse') : t('shell.studio.expand')}
             </Button>

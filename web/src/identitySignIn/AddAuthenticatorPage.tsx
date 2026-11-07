@@ -54,6 +54,7 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
         >
           <Input name="userLabel" autoComplete="off" />
         </Form.Item>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.submit}
         </Button>
@@ -61,6 +62,7 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
       {appInitiated && (
         <form method="post" action={loginAction}>
           <input type="hidden" name="cancel-aia" value="true" />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button htmlType="submit" name="cancel-aia" value="true" block>
             {texts.cancel}
           </Button>

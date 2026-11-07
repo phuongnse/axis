@@ -91,6 +91,7 @@ function DiagnosticRow({
   const content = (
     <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
       <span>
+        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
         <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
         <strong>{diagnostic.code}</strong> {diagnostic.message}
       </span>
@@ -104,6 +105,7 @@ function DiagnosticRow({
   return resourceId === null ? (
     <div style={{ padding: '4px 15px' }}>{content}</div>
   ) : (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       type="text"
       style={{ height: 'auto', textAlign: 'left', width: '100%' }}

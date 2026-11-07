@@ -620,6 +620,7 @@ function StudioWorkspace() {
                       title={resourceTitle(selected, locale, t)}
                       actions={
                         canTest && selected.kind === 'scenario' && selected.name ? (
+                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                           <Button
                             data-testid="studio-run-scenario"
                             disabled={requestBusy || reconnecting}
@@ -733,6 +734,7 @@ function StudioWorkspace() {
                     <section key={group.kind} data-testid={`studio-group-${group.kind}`}>
                       <Flex vertical align="flex-start">
                         {group.items.map((item) => (
+                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                           <Button
                             key={item.id}
                             type="text"
@@ -750,6 +752,7 @@ function StudioWorkspace() {
                       <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
                       <Flex vertical align="flex-start">
                         {group.items.map((item) => (
+                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                           <Button
                             key={item.id}
                             type="text"

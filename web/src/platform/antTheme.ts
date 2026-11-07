@@ -85,7 +85,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       Mentions: errorBorder,
       Cascader: errorBorder,
       TreeSelect: errorBorder,
-      // D114: every dropdown menu keeps spacing-xs round its items.
+      // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
@@ -133,10 +133,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
 }
 
 /**
- * The props every Axis `ConfigProvider` gets (D128): the theme; every dialog centred, no taller or wider than the window
- * less its `spacing-xl` margins, with a scrolling body; a Cancel of text type for every dialog, so it is a text button
- * beside the solid OK; and checkboxes and radios that sit at the top of their box, level with the first line of a label
- * that wraps.
+ * The props every Axis `ConfigProvider` gets, see docs/reference/actions-and-controls.md#dialogs: the theme; every
+ * dialog centred, no taller or wider than the window less its `spacing-xl` margins, with a scrolling body; a Cancel of
+ * text type for every dialog, so it is a text button beside the solid OK; and checkboxes and radios that sit at the top
+ * of their box, level with the first line of a label that wraps.
  */
 export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ConfigProviderProps {
   const config = antThemeFor(mode, page, reducedMotion)
@@ -190,9 +190,9 @@ export function selectedItemTint(mode: ThemeMode): string {
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
 
 /**
- * The cell padding of a table (D129). A row is `spacing-xs` above and below a line of the `smallControl` size, which a
- * line of text and a small icon button both fill, and `spacing-lg` on each side keeps columns apart. `AxisTable` applies it
- * through a nested ConfigProvider.
+ * The cell padding of a table, see docs/reference/actions-and-controls.md#tables. A row is `spacing-xs` above and below
+ * a line of the `smallControl` size, which a line of text and a small icon button both fill, and `spacing-lg` on each
+ * side keeps columns apart. `AxisTable` applies it through a nested ConfigProvider.
  */
 export function tableTheme(tokens: DesignTokens): ThemeConfig {
   return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }

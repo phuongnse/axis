@@ -209,7 +209,9 @@ function ReferenceFilter({ parameter, id, value, onChange }: FilterInputProps) {
     <>
       <Space.Compact style={{ width: inputWidth + 150 }}>
         <Input id={id} readOnly value={label} />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => setOpen(true)}>{t('shell.form.choose')}</Button>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         {value !== null && <Button onClick={() => onChange(null)}>{t('shell.form.clear')}</Button>}
       </Space.Compact>
       <ReferenceLookup

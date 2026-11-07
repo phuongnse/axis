@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Authorization.Policy;
 namespace Axis.Server.Authentication;
 
 /// <summary>
-/// The open list and the authorization fallback (D111). A route that is not on the open list needs an authenticated
+/// The open list and the authorization fallback (D137). A route that is not on the open list needs an authenticated
 /// caller: a session, or a service account or machine caller token. A request without one is refused before the route runs,
 /// so it never opens a tenant database. The open routes are the two health probes, <c>GET /api/site</c>,
 /// <c>GET /api/texts/{locale}</c>, the MCP server's protected-resource metadata, sign-in, sign-out, the cell console's sign-in and sign-out and the SPA's pages. The policy names no scheme, because

@@ -112,6 +112,7 @@ function Recipients({ pointer, value, onChange }: { pointer: string; value: unkn
                   </div>
                 )}
               </div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(rowPointer, undefined)}>
                 {t('shell.studio.process.removeRecipient')}
               </Button>
@@ -119,6 +120,7 @@ function Recipients({ pointer, value, onChange }: { pointer: string; value: unkn
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(pointer, [...recipients, { user: '' }])}>
             {t('shell.studio.process.addRecipient')}
           </Button>

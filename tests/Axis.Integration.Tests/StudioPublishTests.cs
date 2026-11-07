@@ -109,7 +109,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             Assert.Equal("Renamed Author", renamed.RootElement.GetProperty("requestedByName").GetString());
         }
 
-        // A request written before M27 kept the name. New code writes none, so the test sets it.
+        // A request row written before requests stopped storing the name kept it. New code writes none, so the test sets it.
         await PostgreSqlServer.AdminScalarAsync(connectionString, "UPDATE axis.publish_requests SET requested_by_name = 'Author User'", CancellationToken);
         await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id = 'author'", CancellationToken);
         using (var stored = await GetJsonAsync(client, location, HostA))

@@ -130,12 +130,14 @@ export function MappingRows({
                   )}
                 </div>
               )}
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
             </Flex>
           )
         })}
         <div>
           {keyOptions === undefined ? (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
               {t('shell.studio.process.addMapping')}
             </Button>

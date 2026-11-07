@@ -9,6 +9,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkAsvs } from './lib/docs/asvs.mjs'
 import { checkDecisions } from './lib/docs/decisions.mjs'
+import { checkCodeReferences } from './lib/docs/code-references.mjs'
 import { checkDevelopmentUsers } from './lib/docs/development-users.mjs'
 import { checkDocsMap } from './lib/docs/docs-map.mjs'
 import { gitBaseLineCount, relativePath } from './lib/docs/helpers.mjs'
@@ -26,6 +27,7 @@ export const rules = [
   checkDevelopmentUsers,
   checkPlannedMarkers,
   checkDecisions,
+  checkCodeReferences,
 ]
 
 /** Checks the docs under root and returns the problems as { file, line, message }. */
@@ -45,7 +47,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the decisions, sections and milestones the code cites and the doc and skill sizes are in order.')
   return 0
 }
 

@@ -281,11 +281,13 @@ function SchemaNode({
                 onChange={onChange}
               />
             </div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange(`${pointer}/${index}`, undefined)}>{t('shell.studio.removeItem')}</Button>
           </Flex>
         ))}
         {keyProperty !== undefined && <RemovedRows layer={layer!.designer} list={pointer} />}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
             {t('shell.studio.addItem')}
           </Button>
@@ -395,12 +397,14 @@ function MarkedMap({
               onChange={onChange}
             />
           </div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(`${pointer}/${escapeSegment(key)}`, undefined)}>
             {t('shell.studio.removeItem')}
           </Button>
         </Flex>
       ))}
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button
           disabled={next === undefined}
           onClick={() =>

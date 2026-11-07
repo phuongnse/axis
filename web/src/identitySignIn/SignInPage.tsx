@@ -30,6 +30,7 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Typography.Paragraph>
       )}
       {providers.map((provider) => (
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
         <Button key={provider.alias} type="default" block onClick={() => goTo(provider.loginUrl)}>
           {texts.continueWith.replace('{provider}', provider.label)}
         </Button>
@@ -85,6 +86,7 @@ function AccountForm({ context }: { context: SignInContext }) {
         </Form.Item>
       )}
       <input ref={credentialRef} type="hidden" name="credentialId" value="" />
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button type="primary" htmlType="submit" block>
         {texts.signIn}
       </Button>

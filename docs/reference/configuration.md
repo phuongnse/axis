@@ -40,6 +40,32 @@ flowchart LR
 The compile reports every problem it finds, not only the first, as the
 [diagnostics](#diagnostics) say.
 
+Studio does not run this pipeline itself. It stores a [publish request](authoring.md#publishing) in the
+tenant database, and the [publisher](administration.md#publisher) claims it. The publisher compiles the
+stored snapshot, stores the release or finds it by content hash, and activates it in one transaction.
+It then updates the tenant's realm, sets the request's final status and writes the audit record. The
+server reads the new active release from the next request. The diagram leaves out the contract
+scenarios and the seed and index steps.
+
+```mermaid
+sequenceDiagram
+    actor Author
+    participant Server as Axis.Server
+    participant Publisher as axis-admin publisher
+    participant TenantDb as Tenant database
+    participant IdP as Identity provider
+
+    Author->>Server: POST /api/studio/apps/{application}/publish
+    Server->>TenantDb: Store the publish request as queued
+    Publisher->>TenantDb: Claim the oldest queued request
+    Publisher->>Publisher: Compile the stored snapshot (ReleaseCompiler)
+    Publisher->>TenantDb: Store the release, or find it by content hash
+    Publisher->>TenantDb: Activate in one transaction (ReleaseActivator)
+    Publisher->>IdP: Update the tenant's realm, when it has one
+    Publisher->>TenantDb: Set the final status and write the audit record
+    Server->>TenantDb: The next request reads the new active release
+```
+
 ## Load
 
 The Load step reads the folder's files and checks each one on its own, before any reference between

@@ -164,6 +164,7 @@ export function UsersPage() {
                 />
               ),
               main: (
+                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 <Button
                   type="primary"
                   onClick={() => {
@@ -228,6 +229,7 @@ export function UsersPage() {
                   return (
                     <Flex gap="small">
                       {buttons.map((command) => (
+                        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                         <Button
                           key={command}
                           size="small"

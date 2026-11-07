@@ -230,6 +230,7 @@ function TaskBody({
             children: (
               <Space size="small">
                 {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
+                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
                 {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
               </Space>
             ),
@@ -318,6 +319,7 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
       {message !== null && <Alert data-testid="task-command-message" type={message.type} title={message.text} />}
       <Flex gap="small">
         {listed.map((command) => (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button
             key={command}
             loading={pending === command}
@@ -328,6 +330,7 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
           </Button>
         ))}
         {canReassign && (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button disabled={pending !== null} onClick={() => setReassigning(true)}>
             {t('shell.task.reassign')}
           </Button>
@@ -435,18 +438,21 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
       </Form>
       <Flex gap="small">
         {!steps.first && (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button onClick={steps.back} disabled={steps.checking || sending !== null}>
             {t('shell.form.back')}
           </Button>
         )}
         {/* A quick check shows no spinner, because antd can leave one half removed after a flash. */}
         {!steps.last && (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button htmlType="submit" form={formId} type="primary" loading={steps.checking && { delay: 200 }}>
             {t('shell.form.next')}
           </Button>
         )}
         {steps.last &&
           task.outcomes.map((outcome, index) => (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button
               key={outcome.name}
               type={index === 0 ? 'primary' : 'default'}

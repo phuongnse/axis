@@ -220,7 +220,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
     private static string? ActorName(JsonElement history, string actor) =>
         history.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("actor").GetString() == actor).GetProperty("actorName").GetString();
 
-    // The history is append-only but accepts new rows. This one stands for a row written before M27, which kept the name.
+    // The history is append-only but accepts new rows. This one stands for a row written before the history stopped storing the name, when rows kept it.
     private static async Task StoreOlderRowAsync(string connectionString, string actor, string name)
     {
         await PostgreSqlServer.AdminScalarAsync(

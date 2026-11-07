@@ -117,6 +117,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   return (
     <>
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button type="text" aria-label={named} aria-haspopup="dialog" onClick={openPanel}>
         <Badge count={unread} size="small" offset={[2, -2]}>
           <BellOutlined aria-hidden />
@@ -129,6 +130,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
         <Flex vertical gap={spacing.md}>
           {failed && <Alert type="error" showIcon title={t('shell.notifications.loadFailed')} />}
           {markFailed && <Alert type="error" showIcon title={t('shell.notifications.markFailed')} />}
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>
             {t('shell.notifications.markAllRead')}
           </Button>

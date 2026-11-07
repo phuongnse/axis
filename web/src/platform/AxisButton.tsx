@@ -16,7 +16,7 @@ export type AxisButtonProps =
   | (Base & {
       role: Exclude<ButtonRole, 'icon'>
       icon?: never
-      /** A text trigger that opens a menu ends in a caret (D128). */
+      /** A text trigger that opens a menu ends in a caret, see docs/reference/actions-and-controls.md#menus. */
       caret?: boolean
     })
   | (Omit<Base, 'children' | 'aria-label'> & {
@@ -98,8 +98,9 @@ function IconButton(props: IconButtonProps) {
 }
 
 /**
- * A row of actions that has a solid `finish` button (D128). Beside it, `main`, `secondary` and `destructive` buttons
- * are text buttons in their own colour, so the finish button is the only filled shape.
+ * A row of actions that has a solid `finish` button, see docs/reference/actions-and-controls.md#buttons. Beside it,
+ * `main`, `secondary` and `destructive` buttons are text buttons in their own colour, so the finish button is the only
+ * filled shape.
  */
 export function AxisActionRow({
   children,
@@ -120,14 +121,14 @@ export function AxisActionRow({
 }
 
 /**
- * The one button of Axis (D96). `finish` completes a form or a dialog and is solid primary. `main` is the main
- * action of a page and is an outline in `primaryText`. `secondary` is every other action and is the grey outline.
- * `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so it takes a text key and shows
- * the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a bordered
- * default button for a control joined to an input. Inside an `AxisActionRow`, `main`, `secondary` and `destructive` are
- * text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is a borderless text button in the
- * text colour, for header controls such as the account button. `caret` adds a down caret after the text of any text
- * role. The role is not passed on to the DOM.
+ * The one button of Axis, see docs/reference/actions-and-controls.md#buttons. `finish` completes a form or a dialog and
+ * is solid primary. `main` is the main action of a page and is an outline in `primaryText`. `secondary` is every other
+ * action and is the grey outline. `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so
+ * it takes a text key and shows the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless
+ * `joined` draws it as a bordered default button for a control joined to an input. Inside an `AxisActionRow`, `main`,
+ * `secondary` and `destructive` are text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is
+ * a borderless text button in the text colour, for header controls such as the account button. `caret` adds a down
+ * caret after the text of any text role. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()

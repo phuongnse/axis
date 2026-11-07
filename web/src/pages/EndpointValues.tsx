@@ -107,12 +107,14 @@ export function EndpointValues({
                   />
                 )}
               </div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.endpoint.removeMapping')}</Button>
             </Flex>
           )
         })}
         <div>
           {fields === undefined ? (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange('/values/', '')}>
               {t('shell.studio.endpoint.addMapping')}
             </Button>

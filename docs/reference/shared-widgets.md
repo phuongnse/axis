@@ -42,21 +42,19 @@ Each common job has one shared widget or helper:
 
 ## What the build checks
 
-`scripts/check-shared-widgets.mjs`, tested by `scripts/check-shared-widgets.test.mjs`, fails
-`scripts/lint.sh` when a file under `web/src` imports Ant Design's `Table`, or uses its `Button` or a
-preset tag colour more often than `scripts/shared-widgets-baseline.json` allows. A test file and the
-shared widget itself are not checked.
+Oxlint in `npm run lint --prefix web`, which `scripts/lint.sh` runs, fails on each way round a shared
+widget. The plugin rules are in `web/lint/axis-plugin.mjs` and are on in `web/.oxlintrc.json`. Test
+files are not checked.
 
-- **The baseline only goes down.** It counts, by file and rule, the `button` and `tag` code that broke
-  a rule before the check existed. A file that uses a rule less than its baseline must lower it. A change that moves a
-  file off the baseline writes the new one with
-  `node scripts/check-shared-widgets.mjs --write-baseline`.
-- **The `tag` rule** refuses a `Tag` whose `color` is an Ant Design colour name, with or without
-  `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`, `warning`,
-  `processing` or `default`). It counts a preset written as a string or inside a `color={…}`
-  expression, even when Prettier wrapped the props onto later lines. It cannot see a colour picked from
-  a lookup table.
-- **The `table` rule** refuses a named `Table` import from `antd`, also when the import spans lines.
-  It has no baseline, so no file may import `Table`. It does not see an import from a deep path such
-  as `antd/es/table`.
-- **The `button` rule** matches within one line, so it misses a tag whose name ends its line.
+- **`axis/no-antd-button`** refuses a `<Button>` imported from `antd`. `AxisButton.tsx` is the one
+  file that may use it.
+- **`no-restricted-imports`** refuses a named `Table` import from `antd`. `AxisTable.tsx` is the one
+  file that may use it. It does not see an import from a deep path such as `antd/es/table`.
+- **`axis/no-preset-tag-colour`** refuses a `Tag` whose `color` is an Ant Design colour name, with or
+  without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
+  `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`
+  expression. It cannot see a colour picked from a lookup table.
+- **An older use carries its reason.** Each `Button` and `Tag` that predates the rules has an
+  `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
+  `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
+  older uses only go down.
