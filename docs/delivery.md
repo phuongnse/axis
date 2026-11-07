@@ -79,7 +79,7 @@ that holds it.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
   [`request` skill][nexkit-request]. A milestone ends in two waves, which the `labels` setting gives to
   two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
-  milestone is closed, and its docs sweep carries `last-in-milestone` (wave 2), so it starts once the
+  milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
   journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
   mark. Autopilot's `max_parallel` setting caps how
   many issues run at once, as
@@ -257,7 +257,7 @@ A milestone goes from a readiness check to its close in five steps.
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
 4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes
-   what the milestone made stale. It carries the `last-in-milestone` label, so it runs once every
+   what the milestone made stale. It carries the `docs-sweep` label, so it runs once every
    other issue of the milestone is closed, the journey included. It leaves what other milestones are still building to their own sweeps. It checks at
    least:
    - the roadmap status of this milestone and the next one;

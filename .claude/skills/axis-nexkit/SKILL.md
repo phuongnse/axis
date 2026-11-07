@@ -70,7 +70,7 @@ marks between issues, in NexKit's `request` skill.
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
-   `journey` label and its docs sweep the `last-in-milestone` label, with no
+   `journey` label and its docs sweep the `docs-sweep` label, with no
    *blocked by* marks: the journey waits for every other issue of its
    milestone, and the sweep for the journey too, also those opened later. A
    `bug` issue goes first, as [how issues run](../../../docs/delivery.md#how-issues-run)
