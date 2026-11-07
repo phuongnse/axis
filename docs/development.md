@@ -167,6 +167,10 @@ in [Testing](testing.md).
 | `images`     | Builds and runs the production images, from `scripts/images.test.mjs`         |
 | `onprem`     | Installs `deploy/compose/` from the production images for two tenants          |
 
+`dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
+its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
+agent host. The test removes the Compose project at the end.
+
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
 `.nexkit/`, or a Markdown file. CI and NexKit each run the smoke tests as a job of their own.
