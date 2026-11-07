@@ -190,8 +190,8 @@ that holds it.
   `protected_paths` setting names those paths. Such changes are hand-made pull requests on any branch
   name, for example a NexKit version bump. Hand-made pull requests are only for those paths and for
   the docs change that ends a design review, so a design change is never one, see
-  [design changes](#design-changes). The owner or the hourly driver opens them, and the owner merges
-  them.
+  [design changes](#design-changes). Work that waits for one follows [follow-ups](#the-life-of-an-issue).
+  The owner or the hourly driver opens them, and the owner merges them.
 - **NexKit checks and reviews them on request.** Whoever pushes to one comments
   [`/nexkit review`][nexkit-person-review] on it after the push. NexKit runs its checks and its review
   on the head and sets the two statuses that the rules on `main` require, and it pushes nothing and
@@ -241,8 +241,13 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   rules under [Decisions](#decisions).
 - **Design.** It may link a Design artifact as a picture, while the docs stay the source of
   behaviour.
-- **Exceptions.** Changes whose purpose is to edit paths NexKit may not change are hand-made pull
-  requests, as [hand-made pull requests](#hand-made-pull-requests) says.
+- **Follow-ups.** Work that must come after other work is opened as an issue when the work it follows
+  is agreed, and it is marked *blocked by* that work's issue. A pull request, a comment or a session's
+  notes never holds a follow-up. A change in a path NexKit may not change is an issue like any other:
+  its plan lists the change under *Needs a hand-made change*, and the hourly driver makes it as a
+  [hand-made pull request](#hand-made-pull-requests). A hand-made pull request that other work waits
+  for closes an issue of its own with the `on-hold` label, which [how issues run](#how-issues-run)
+  makes a hold, and the follow-ups are *blocked by* that issue.
 
 ## The life of a milestone
 
