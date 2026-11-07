@@ -63,7 +63,8 @@ Report each finding with the page and line, the statement, the evidence (file an
 The file step writes them, so this is what to expect, not what to do:
 
 - One docs issue per page, labelled `documentation`, with every `wrong`, `built`, `missing` and
-  `standard` finding of that page as an acceptance criterion.
+  `standard` finding of that page as an acceptance criterion. It is also labelled `bug` when it holds
+  a `wrong` finding, as [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct) says.
 - One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding.
 - Each issue is in no milestone, links the page and the code it rests on, and carries a hidden
   `docs-audit` marker, so a later run leaves it alone while it is open, and NexKit's marker of the run
