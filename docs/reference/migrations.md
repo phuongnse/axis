@@ -92,9 +92,8 @@ worker.
 - **Inline limit.** Activation counts the affected rows of each entity: every row of the table for a
   changed computed definition, and the rows left with a `NULL` stamp for a `fill` or `convert`. An
   entity with both counts every row once. When the count is at most
-  `Activation:InlineRecomputeLimit`, a [server setting](host-settings.md#startup-activation) that
-  defaults to 10,000, activation recomputes the rows in its own transaction with the release being
-  activated, and stamps each row.
+  `Activation:InlineRecomputeLimit`, a [server setting](host-settings.md#startup-activation), activation
+  recomputes the rows in its own transaction with the release being activated, and stamps each row.
 - **Pending.** Above the limit, activation writes a row in `axis.pending_computed_fields` and a
   `computed.backfill` work item, then commits without touching a row. The computed field is then
   _pending_: its stored values may still come from an older expression. The pending row lists every
