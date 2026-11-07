@@ -40,8 +40,9 @@ UMD build.
   width. The states of a card share one `minmax(0, 1fr)` column, so a wide table scrolls inside its
   widget, as it does on a page.
 - **The harness.** `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it
-  from disk. With no query it mounts every preview, and `?preview=<name>&mode=light|dark` mounts one
-  preview in that mode. The Vite dev server does not serve the previews.
+  from disk with the built bundle. Under the Vite dev server, the same page loads `bundle.ts` from
+  source, see [widget previews](../development.md#widget-previews). With no query it mounts every
+  preview, and `?preview=<name>&mode=light|dark` mounts one preview in that mode.
 
 ## The cards
 

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:design-system": "vite --config vite.design-system.config.ts",
     "build": "tsc -b && vite build",
     "build:design-system": "vite build --config vite.design-system.config.ts",
     "build:sign-up": "vite build --config vite.sign-up.config.ts",

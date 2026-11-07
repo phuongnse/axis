@@ -801,6 +801,13 @@ data, and Keycloak, Mailpit and the purchasing system stub keep running: run `do
 stop them. If any of the five processes exits on its own, the others stop too and the script exits
 non-zero.
 
+## Widget previews
+
+`npm run dev:design-system --prefix web` serves `http://localhost:5174/design-system.html` from
+`web/src/designSystem/`, with React Fast Refresh. It needs no Docker, server, database or sign-in. An edit to a
+widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. The query
+parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
+
 ## Running a host on its own
 
 A host can also run alone, outside `scripts/dev.sh`. To run the worker, run
