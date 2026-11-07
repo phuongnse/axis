@@ -10,13 +10,13 @@ commands that look after a cell. On this page, "database role" always means the 
 | `tenant backup`, `tenant restore`                                                     | [Tenant backup and restore](tenant-backup-and-restore.md)                         |
 | `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant list`                  | [Tenant status commands](tenant-status-commands.md)                               |
 | `tenant oidc set`, `tenant sign-in set`                                               | [Sign-in settings](tenant-setting-commands.md#sign-in-settings)                   |
-| `tenant binding list`, `set` and `remove`                                             | [Deployment bindings](tenant-setting-commands.md#deployment-bindings)             |
-| `tenant host add`, `remove` and `move`                                                | [Hosts](tenant-setting-commands.md#hosts)                                         |
-| `tenant email set` and `clear`                                                        | [Mail settings](tenant-setting-commands.md#mail-settings)                         |
-| `tenant legal set` and `clear`                                                        | [Legal links](tenant-setting-commands.md#legal-links)                             |
+| `tenant binding list`, `tenant binding set` and `tenant binding remove`               | [Deployment bindings](tenant-setting-commands.md#deployment-bindings)             |
+| `tenant host add`, `tenant host remove` and `tenant host move`                        | [Hosts](tenant-setting-commands.md#hosts)                                         |
+| `tenant email set` and `tenant email clear`                                           | [Mail settings](tenant-setting-commands.md#mail-settings)                         |
+| `tenant legal set` and `tenant legal clear`                                           | [Legal links](tenant-setting-commands.md#legal-links)                             |
 | `tenant session end`                                                                  | [Sessions](tenant-setting-commands.md#sessions)                                   |
 | `tenant rotate-passwords`                                                             | [Database passwords](tenant-setting-commands.md#database-passwords)               |
-| `tenant data-key rotate` and `retire`                                                 | [Rotating the keys](data-encryption.md#rotating-the-keys)                         |
+| `tenant data-key rotate` and `tenant data-key retire`                                 | [Rotating the keys](data-encryption.md#rotating-the-keys)                         |
 | `platform rekey`                                                                      | [Installation key](tenant-setting-commands.md#installation-key)                   |
 | `migrate`, `activate`, `publisher`, `cell operator invite`, `cell operator client add`, `cell backup`, `cell restore-check`, `version` | The sections of this page                                                         |
 
