@@ -303,10 +303,12 @@ A string property that the schema marks with `x-axis-expression` is a code edito
 [expression grammar](expressions.md#grammar), checks the text as the author types and completes names.
 It is CodeMirror 6, in a chunk that loads only when Studio first shows an expression or the JSON view.
 
-- **Checking.** 300 ms after the last keystroke, the editor sends the text to the
-  [expression check route](authoring.md#expression-check), and shows only the latest answer. It
-  underlines the range from `start` to `end` and shows the error code and message under the editor, or
-  the result `type` when there is no error.
+- **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
+  sends the text to the [expression check route](authoring.md#expression-check), and shows only the
+  latest answer. It underlines the range from `start` to `end` and shows the error code and message
+  under the editor, or the result `type` when there is no error. From its first draw or a keystroke
+  until the answer to its latest text arrives or the check fails, and while its code loads, the editor
+  has `aria-busy="true"`.
 - **No answer.** The check places the text in the saved resource, so a place inside a field or an item
   that is not saved yet has no answer, while a new property of a saved object has one, see
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last

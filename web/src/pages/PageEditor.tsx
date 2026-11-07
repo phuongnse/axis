@@ -1453,7 +1453,7 @@ function ParameterExpressions({
   function expression(rowPointer: string, current: string) {
     if (check) {
       return (
-        <Suspense fallback={<Input aria-label={expressionName} value={current} readOnly />}>
+        <Suspense fallback={<Input aria-label={expressionName} value={current} readOnly aria-busy="true" />}>
           <LazyExpressionEditor
             application={check.application}
             resourceId={check.resourceId}
