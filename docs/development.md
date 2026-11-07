@@ -89,8 +89,9 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
 `scripts/lint.sh` runs these checks:
 
 - the `dotnet format` check, oxlint, and the TypeScript and Prettier checks;
-- that no test selects an `ant-` class, and that every Playwright locator matches a string name or
-  text exactly, see [Testing](testing.md);
+- that no test selects an `ant-` class, and that oxlint, with the locator rule of Axis's plugin on
+  `tests/e2e`, finds every Playwright locator matching a string name or text exactly, see
+  [Testing](testing.md#rules-for-tests);
 - that no file under `web/` writes raw HTML and that the SPA has no code that a key such as
   `__proto__` can turn into prototype pollution. Oxlint runs these rules. The exception to a security
   rule is an `overrides` entry in `web/.oxlintrc.json` with its reason, and `scripts/lint.sh` refuses

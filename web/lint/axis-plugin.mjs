@@ -1,4 +1,5 @@
-// Axis's lint rules for the SPA's source, run by oxlint through `jsPlugins` in web/.oxlintrc.json.
+// Axis's lint rules, run by oxlint through `jsPlugins`. The rules for the SPA's source are on in
+// web/.oxlintrc.json. The rule for the end-to-end tests, exact-locators, is on in tests/e2e/.oxlintrc.json.
 //
 // They are written against ESLint's rule API only, so ESLint can run them if oxlint's JS plugins change.
 // Each rule reads the syntax tree, so a comment or a string that names a forbidden call is not reported.
@@ -172,6 +173,117 @@ const noAntdButton = {
   },
 }
 
+const locatorMethods = new Set(['getByRole', 'getByLabel', 'getByText', 'getByTitle'])
+const wrappers = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
+const scopes = new Set(['BlockStatement', 'StaticBlock', 'Program'])
+const maxHops = 5
+
+// Follows a `const` variable to the value it holds, through enclosing blocks, and returns any other node as it is.
+function resolve(node, hops = 0) {
+  let current = node
+  while (current && wrappers.has(current.type)) current = current.expression
+  if (current?.type !== 'Identifier' || hops >= maxHops) return current
+  for (let scope = current.parent; scope; scope = scope.parent) {
+    if (!scopes.has(scope.type)) continue
+    for (const statement of scope.body) {
+      if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') continue
+      const declarator = statement.declarations.find(
+        (item) => item.id?.type === 'Identifier' && item.id.name === current.name && item.init,
+      )
+      if (declarator) return resolve(declarator.init, hops + 1)
+    }
+  }
+  return current
+}
+
+// A regular expression, new RegExp(...) or fieldLabel(...), which state on purpose how much they match.
+function isPattern(node) {
+  const value = resolve(node)
+  if (value?.type === 'Literal') return Boolean(value.regex)
+  if ((value?.type === 'NewExpression' || value?.type === 'CallExpression') && value.callee?.type === 'Identifier') {
+    return value.callee.name === 'RegExp' || (value.type === 'CallExpression' && value.callee.name === 'fieldLabel')
+  }
+  return false
+}
+
+const keyIs = (property, name) =>
+  property.type === 'Property' &&
+  !property.computed &&
+  (property.key?.name === name || (property.key?.type === 'Literal' && property.key.value === name))
+
+// The last property of an object literal with the key, so that an earlier duplicate does not count.
+const lastProperty = (object, name) => object.properties.findLast((property) => keyIs(property, name))
+
+const exactIsTrue = (options) => {
+  const object = resolve(options)
+  if (object?.type !== 'ObjectExpression') return false
+  const property = lastProperty(object, 'exact')
+  const after = property ? object.properties.slice(object.properties.indexOf(property) + 1) : []
+  return (
+    property !== undefined &&
+    !after.some((item) => item.type === 'SpreadElement') &&
+    property.value.type === 'Literal' &&
+    property.value.value === true
+  )
+}
+
+const isDialogName = (node) =>
+  (node?.type === 'Literal' && node.value === 'dialog') ||
+  (node?.type === 'TemplateLiteral' && node.expressions.length === 0 && node.quasis[0]?.value.cooked === 'dialog')
+
+// A Playwright locator that takes a string name or text matches it exactly, see docs/testing.md#rules-for-tests.
+const exactLocators = {
+  meta: {
+    type: 'problem',
+    messages: {
+      looseName:
+        'A string name without exact: true can match the wrong element. Add exact: true or use a regular expression.',
+      hiddenOptions: 'The rule cannot see the options of this locator. Write them as an object literal or a const.',
+      dialog: 'Reach a dialog through waitForDialog or confirmDialog in tests/e2e/dialogs.ts.',
+    },
+    schema: [{ type: 'object', properties: { allowDialogLookup: { type: 'boolean' } }, additionalProperties: false }],
+  },
+  create(context) {
+    const allowDialogLookup = context.options[0]?.allowDialogLookup === true
+    return {
+      CallExpression(node) {
+        const callee = node.callee
+        const method =
+          callee.type === 'Identifier'
+            ? callee.name
+            : callee.type === 'MemberExpression' && !callee.computed
+              ? propertyName(callee.property)
+              : undefined
+        if (!method || !locatorMethods.has(method)) return
+        const [first, second] = node.arguments
+        // A chained call reports on the method, so the line is the one that names it.
+        const target = callee.type === 'MemberExpression' ? callee.property : callee
+
+        if (method !== 'getByRole') {
+          if (first && !isPattern(first) && !exactIsTrue(second))
+            context.report({ node: target, messageId: 'looseName' })
+          return
+        }
+
+        if (!allowDialogLookup && isDialogName(resolve(first))) context.report({ node: target, messageId: 'dialog' })
+        if (!second) return
+        const options = resolve(second)
+        if (options?.type !== 'ObjectExpression') {
+          context.report({ node: target, messageId: 'hiddenOptions' })
+          return
+        }
+        const name = lastProperty(options, 'name')
+        const spreadAfterName = options.properties
+          .slice(name ? options.properties.indexOf(name) + 1 : 0)
+          .some((item) => item.type === 'SpreadElement')
+        if (spreadAfterName) context.report({ node: target, messageId: 'hiddenOptions' })
+        else if (name && !isPattern(name.value) && !exactIsTrue(options))
+          context.report({ node: target, messageId: 'looseName' })
+      },
+    }
+  },
+}
+
 export default {
   meta: { name: 'axis' },
   rules: {
@@ -180,5 +292,6 @@ export default {
     'no-prototype-write': noPrototypeWrite,
     'no-preset-tag-colour': noPresetTagColour,
     'no-antd-button': noAntdButton,
+    'exact-locators': exactLocators,
   },
 }
