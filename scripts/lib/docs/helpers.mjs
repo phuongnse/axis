@@ -35,6 +35,7 @@ function sourceFiles(directory) {
 const splitLines = (text) => text.replace(/\n$/, '').split('\n')
 const countLines = (text) => splitLines(text).length
 export const lines = (file) => splitLines(readFileSync(file, 'utf8'))
+export const countWords = (text) => (text.match(/\S+/g) ?? []).filter((word) => /[\p{L}\p{N}]/u.test(word)).length
 
 /** Returns a function that gives the names of the classes declared under tests/, controlplane/tests/ and samples/, read once. */
 export function testClassLookup(root) {
