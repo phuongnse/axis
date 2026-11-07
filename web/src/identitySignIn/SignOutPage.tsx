@@ -15,6 +15,7 @@ export function SignOutPage({ context }: { context: SignOutContext }) {
       <form method="post" action={action}>
         <input type="hidden" name="session_code" value={sessionCode} />
         <input type="hidden" name="confirmLogout" value="on" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.signOut}
         </Button>

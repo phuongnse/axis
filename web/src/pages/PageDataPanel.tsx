@@ -62,6 +62,7 @@ function DataList({
 function DataName({ binding, onPick }: { binding: DataBinding; onPick: (binding: DataBinding) => void }) {
   const { setNodeRef, listeners } = useDraggable({ id: `data:${binding.kind}:${binding.name}`, data: { binding } })
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       ref={setNodeRef}
       {...listeners}
@@ -100,6 +101,7 @@ export function BindingChoice({
       open={binding !== undefined}
       width={size.dialog.medium}
       title={binding === undefined ? '' : `${t('shell.studio.data.bind')} ${binding.name}`}
+      // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
       footer={<Button onClick={onCancel}>{t('shell.studio.data.cancel')}</Button>}
       onCancel={onCancel}
     >
@@ -110,6 +112,7 @@ export function BindingChoice({
             const reasonId = `studio-binding-reason-${type}`
             return (
               <Flex vertical key={type}>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   disabled={limit !== undefined}
                   aria-describedby={limit === undefined ? undefined : reasonId}

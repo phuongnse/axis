@@ -363,7 +363,9 @@ export function InstanceDetailView({
               <Flex gap="small" align="center">
                 <Typography.Text strong>{stepLabel(step.name)}</Typography.Text>
                 <Typography.Text type="secondary">{step.type}</Typography.Text>
+                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
                 {taken.has(step.name) && <Tag color="green">{t('shell.inspector.taken')}</Tag>}
+                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
                 {step.name === instance.step && <Tag color="blue">{t('shell.inspector.current')}</Tag>}
               </Flex>
               {step.transitions.map((transition) => (
@@ -443,6 +445,7 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
   return (
     <Flex gap="small">
       {allowed.map((command) => (
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
         <Button key={command} data-testid={`inspector-command-${command}`} onClick={() => setOpen(command)}>
           {t(`shell.inspector.commands.${command}`)}
         </Button>
@@ -501,6 +504,7 @@ function CallItem({ call, instanceId, instancesPath, onChanged, stepLabel, attem
         <Typography.Text>{call.operation}</Typography.Text>
         <Tag>{call.state}</Tag>
         {call.resolvable && call.outputs && (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button size="small" data-testid={`inspector-resolve-${call.id}`} onClick={() => setResolving(true)}>
             {t('shell.inspector.commands.resolve')}
           </Button>

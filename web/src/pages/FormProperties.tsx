@@ -168,6 +168,7 @@ function FieldProperties({
           onChange={onChange}
         />
       ))}
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         danger
         data-testid="studio-design-remove-field"
@@ -252,6 +253,7 @@ function SectionProperties({
         </div>
       )}
       <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         danger
         data-testid="studio-design-remove-section"
@@ -339,6 +341,7 @@ function StepProperties({
   return (
     <Flex vertical gap="small" data-testid="studio-design-step">
       <TitleEditor pointer={pointer} element={step} onChange={onChange} />
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         danger
         data-testid="studio-design-remove-step"

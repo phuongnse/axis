@@ -128,6 +128,7 @@ function Point({ value }: { value: string }) {
     <Flex vertical gap={4} align="flex-start">
       {code}
       {entry === undefined ? (
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
         <Button
           size="small"
           data-testid={`studio-contract-relax-${value}`}
@@ -145,6 +146,7 @@ function Point({ value }: { value: string }) {
           <Typography.Text type="secondary" data-testid={`studio-contract-relaxed-${value}`}>
             {t('shell.studio.contract.relaxed')} {entry.reason}
           </Typography.Text>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button size="small" data-testid={`studio-contract-undo-relax-${value}`} disabled={busy} onClick={undo}>
             {t('shell.studio.contract.undoRelax')}
           </Button>
@@ -396,6 +398,7 @@ function RowName({ name, added, onRemove }: { name: string; added: boolean; onRe
       <Tag role="note" aria-label={`${t('shell.studio.module.added')} ${name}`}>
         {t('shell.studio.module.added')}
       </Tag>
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button size="small" aria-label={`${t('shell.studio.contract.remove')} ${name}`} onClick={onRemove}>
         {t('shell.studio.contract.remove')}
       </Button>
@@ -770,6 +773,7 @@ export function StudioModuleContract({
             data-testid="studio-conflict"
             type="warning"
             title={t('shell.studio.conflict')}
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
           />
         )}

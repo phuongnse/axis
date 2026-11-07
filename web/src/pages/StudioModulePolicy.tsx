@@ -74,10 +74,12 @@ export function StudioModulePolicy({
                   }
                 />
                 {unaccepted.map((action) => (
+                  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                   <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
                     {t('shell.studio.matrix.unacceptedAction')} {action}
                   </Tag>
                 ))}
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   size="small"
                   disabled={grants.length === 1}

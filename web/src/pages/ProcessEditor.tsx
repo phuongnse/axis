@@ -214,6 +214,7 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
                       onChange={(next: string) => onChange(`${pointer}/type`, next)}
                     />
                   </div>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button onClick={() => onChange(pointer, undefined)}>
                     {t('shell.studio.process.removeParameter')}
                   </Button>
@@ -221,6 +222,7 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
               )
             })}
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange('/parameters', [...parameters, { name: '', type: 'text' }])}>
                 {t('shell.studio.process.addParameter')}
               </Button>
@@ -307,12 +309,15 @@ function Step({
         title={`${text(step.name)} · ${type ?? ''}`}
         extra={
           <Flex gap="small">
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button disabled={index === 0} onClick={() => onMove(-1)}>
               {t('shell.studio.process.moveUp')}
             </Button>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button disabled={last} onClick={() => onMove(1)}>
               {t('shell.studio.process.moveDown')}
             </Button>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button danger onClick={onRemove}>
               {t('shell.studio.process.removeStep')}
             </Button>
@@ -559,6 +564,7 @@ function Deadline({
         <Typography.Text strong>{t('shell.studio.process.deadline')}</Typography.Text>
         {deadline === undefined ? (
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange(deadlinePointer, { after: '', next: '' })}>
               {t('shell.studio.process.addDeadline')}
             </Button>
@@ -580,6 +586,7 @@ function Deadline({
               names={names}
               onChange={onChange}
             />
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange(deadlinePointer, undefined)}>
               {t('shell.studio.process.removeDeadline')}
             </Button>
@@ -631,6 +638,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                     onChange={(event) => onChange(`${rowPointer}/after`, event.target.value)}
                   />
                 </div>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(escalations.length === 1 ? escalationsPointer : rowPointer, undefined)}>
                   {t('shell.studio.process.removeEscalation')}
                 </Button>
@@ -674,6 +682,7 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             onClick={() =>
               onChange(escalationsPointer, [
@@ -833,6 +842,7 @@ function WaitEvent({
       </div>
       <div data-testid={`studio-field-${timeoutPointer}`}>
         {timeout === undefined ? (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button onClick={() => onChange(timeoutPointer, { after: '', next: '' })}>
             {t('shell.studio.process.addTimeout')}
           </Button>
@@ -855,6 +865,7 @@ function WaitEvent({
               onChange={onChange}
             />
             <div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button danger onClick={() => onChange(timeoutPointer, undefined)}>
                 {t('shell.studio.process.removeTimeout')}
               </Button>
@@ -1021,6 +1032,7 @@ function Decision({
                   names={names}
                   onChange={onChange}
                 />
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(branchPointer, undefined)}>
                   {t('shell.studio.process.removeBranch')}
                 </Button>
@@ -1028,6 +1040,7 @@ function Decision({
             )
           })}
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button
               onClick={() =>
                 onChange(branchesPointer, [
@@ -1099,6 +1112,7 @@ function Outcomes({
                 names={names}
                 onChange={onChange}
               />
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(outcomePointer, undefined)}>
                 {t('shell.studio.process.removeOutcome')}
               </Button>
@@ -1106,6 +1120,7 @@ function Outcomes({
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             onClick={() => onChange(outcomesPointer, [...outcomes, { name: '', label: { textKey: '' }, next: '' }])}
           >

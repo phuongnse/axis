@@ -97,6 +97,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         render: (_value, row) => (
           <Flex gap="small" align="center">
             <span>{`#${row.number}`}</span>
+            {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
             {row === activeRow && <Tag color="success">{t('shell.console.publishing.active')}</Tag>}
           </Flex>
         ),

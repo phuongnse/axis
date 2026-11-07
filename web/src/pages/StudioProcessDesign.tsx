@@ -310,6 +310,7 @@ export default function StudioProcessDesign({
                       <Typography.Text>
                         {transitionName(graph, selectedTransition, t('shell.studio.processGraph.to'))}
                       </Typography.Text>
+                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                       <Button danger onClick={() => removeTransition(selectedTransition)}>
                         {t('shell.studio.process.removeTransition')}
                       </Button>
@@ -337,6 +338,7 @@ export default function StudioProcessDesign({
       </div>
       <DragOverlay dropAnimation={null}>
         {dragging === undefined ? null : (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button>{entryLabel(dragging, t('shell.studio.process.packageOperation'))}</Button>
         )}
       </DragOverlay>

@@ -214,6 +214,7 @@ export function SeedGrid({
               key: 'remove',
               kind: 'fixed',
               render: (_, row) => (
+                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 <Button onClick={() => onChange(`/records/${row.index}`, undefined)}>
                   {t('shell.studio.seed.removeRecord')}
                 </Button>
@@ -223,6 +224,7 @@ export function SeedGrid({
         />
         <RemovedRows layer={layer} list="/records" />
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange('/records', [...list, { id: newUuid(), values: {} }])}>
             {t('shell.studio.seed.addRecord')}
           </Button>

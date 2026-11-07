@@ -125,6 +125,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
         )}
         {navigate && canvas.active && (
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button type="link" size="small" {...canvas.props('navigate')}>
               {t(navigate.labelKey)}
             </Button>

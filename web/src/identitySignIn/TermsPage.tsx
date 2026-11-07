@@ -60,12 +60,14 @@ export function TermsPage({ context }: { context: TermsContext }) {
           <Checkbox>{label}</Checkbox>
         </Form.Item>
         <input ref={submitRef} type="hidden" name="accept" value="true" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.continue}
         </Button>
       </Form>
       <form method="post" action={loginAction}>
         <input type="hidden" name="cancel" value="true" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button htmlType="submit" block>
           {texts.decline}
         </Button>

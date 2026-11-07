@@ -117,6 +117,7 @@ export default function StudioFormDesign({
           />
         </Flex>
       </div>
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <DragOverlay dropAnimation={null}>{dragging === undefined ? null : <Button>{dragging}</Button>}</DragOverlay>
     </DndContext>
   )

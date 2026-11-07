@@ -16,6 +16,7 @@ export function SelectAuthenticatorPage({ context }: { context: SelectAuthentica
       <form method="post" action={loginAction}>
         <Flex vertical gap="small">
           {methods.map((method) => (
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button
               key={method.id}
               block

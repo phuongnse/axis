@@ -91,12 +91,13 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
 - the `dotnet format` check, oxlint, and the TypeScript and Prettier checks;
 - that no test selects an `ant-` class, and that every Playwright locator matches a string name or
   text exactly, see [Testing](architecture.md#testing);
-- that no file under `web/` writes raw HTML, and that the SPA has no code that a key such as
-  `__proto__` can turn into prototype pollution;
-- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own, with
-  no `Table` import from `antd` and the other uses within the baseline in
-  `scripts/shared-widgets-baseline.json`, which only goes down, see
-  [shared widgets](reference/shared-widgets.md);
+- that no file under `web/` writes raw HTML and that the SPA has no code that a key such as
+  `__proto__` can turn into prototype pollution. Oxlint runs these rules. The exception to a security
+  rule is an `overrides` entry in `web/.oxlintrc.json` with its reason, and `scripts/lint.sh` refuses
+  a disable comment that names one or names no rule;
+- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own.
+  Oxlint runs these rules too, and a use that predates them carries a disable comment with its reason, see
+  [shared widgets](reference/shared-widgets.md#what-the-build-checks);
 - that no test outside a `*PerformanceTests` class measures elapsed time;
 - the Markdown link and anchor check and the docs structure check, see
   [writing the docs](writing-docs.md#how-the-docs-stay-correct);

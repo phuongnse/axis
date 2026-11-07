@@ -107,6 +107,7 @@ function PaletteType({
   const reasonId = `studio-palette-reason-${type}`
   return (
     <Flex vertical>
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         ref={setNodeRef}
         {...listeners}

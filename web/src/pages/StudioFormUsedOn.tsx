@@ -32,6 +32,7 @@ export function StudioFormUsedOn({
               <Flex vertical gap={4}>
                 <Flex align="center" gap="small" wrap>
                   <Tag>{entry.relation}</Tag>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button
                     type="link"
                     style={{ padding: 0, height: 'auto' }}

@@ -107,6 +107,7 @@ export function StudioNewApplication({
   return (
     <>
       {!controlled && (
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
         <Button type={primary ? 'primary' : 'default'} onClick={() => setOpen(true)}>
           {t('shell.studio.newApplication.button')}
         </Button>
