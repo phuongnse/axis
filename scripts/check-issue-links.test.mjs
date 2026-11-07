@@ -40,6 +40,19 @@ describe('brokenLinks', () => {
     ])
   })
 
+  test('leaves out an issue that an open issue blocks', () => {
+    const body = `[later](${base}/docs/guide.md#added-later)`
+    const issues = [{ number: 9, body, blockedBy: [{ number: 3, state: 'CLOSED' }, { number: 4, state: 'OPEN' }] }]
+    assert.deepEqual(brokenLinks(issues, root), [])
+  })
+
+  test('checks an issue whose blockers are all closed, or that has none', () => {
+    const body = `[later](${base}/docs/guide.md#added-later)`
+    const expected = [{ issue: 9, link: 'docs/guide.md#added-later' }]
+    assert.deepEqual(brokenLinks([{ number: 9, body, blockedBy: [{ number: 3, state: 'CLOSED' }] }], root), expected)
+    assert.deepEqual(brokenLinks([{ number: 9, body, blockedBy: [] }], root), expected)
+  })
+
   test('ignores links to other repositories and to other branches', () => {
     const issues = [{ number: 2, body: 'https://github.com/phuongnse/nexkit/blob/main/docs/x.md https://github.com/phuongnse/axis/blob/v1/docs/x.md' }]
     assert.deepEqual(brokenLinks(issues, root), [])

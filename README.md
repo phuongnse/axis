@@ -43,9 +43,14 @@ Node. It runs the server, the worker and the SPA with hot reload. See
 
 ## Documentation
 
-The [docs map](docs/README.md) lists every doc and what it holds: the product brief, the roadmap,
-the decisions, the vocabulary, the architecture and the detailed reference. Contributors and agents
-start with [AGENTS.md](AGENTS.md).
+The [docs map](docs/README.md) groups every doc by the area a reader works in, with what it holds and
+when to read it. For how Axis fits together, start at the
+[architecture overview's context and scope](docs/architecture.md#context-and-scope).
+
+## Contributing
+
+All work goes through NexKit, one issue per agent session, as [delivery](docs/delivery.md) describes.
+[AGENTS.md](AGENTS.md) holds the working rules and the commands, for people and agents.
 
 ## Technology
 

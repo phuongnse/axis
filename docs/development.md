@@ -2,8 +2,8 @@
 
 This page says how to run Axis on one machine, what each script does, and the development data the
 scripts set up: the database roles, the Keycloak realms and their users, and the preview tenant.
-Production installs follow [installation](reference/installation.md), and the short list of commands
-is in [AGENTS.md](../AGENTS.md#commands).
+Production installs follow [installation](reference/installation.md), the short list of commands is
+in [AGENTS.md](../AGENTS.md#commands), and the test levels and rules are in [testing](testing.md).
 
 ## Scripts
 
@@ -24,7 +24,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
 | `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
 | `scripts/docs-audit.mjs`        | The docs audit of the `docs-audit.yml` workflow: picks a run's pages, reads them, opens the issues  | Network         |
-| `scripts/check-issue-links.mjs` | Prints the links of open issues to a file or heading of `main` that does not exist                  | Network         |
+| `scripts/check-issue-links.mjs` | Prints the links of open issues that no open issue blocks, to a missing file or heading of `main`   | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
 | `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |
@@ -90,7 +90,7 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
 
 - the `dotnet format` check, oxlint, and the TypeScript and Prettier checks;
 - that no test selects an `ant-` class, and that every Playwright locator matches a string name or
-  text exactly, see [Testing](architecture.md#testing);
+  text exactly, see [Testing](testing.md);
 - that no file under `web/` writes raw HTML, and that the SPA has no code that a key such as
   `__proto__` can turn into prototype pollution;
 - that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own, with
@@ -151,7 +151,7 @@ only the matching specs, after the sign-in setup. `AXIS_E2E_SHARD`, such as `1/3
 shard, and with arguments it runs Playwright's own `--shard` of the matching tests. Playwright and the
 services it starts are skipped when NexKit gives a commit to compare with and every file changed
 since it is under `docs/`, `.github/` or `.nexkit/` or is a Markdown file. What the E2E stack holds is
-in [Testing](architecture.md#testing).
+in [Testing](testing.md).
 
 ### Smoke tests
 
@@ -463,7 +463,7 @@ All six ports are published on `127.0.0.1` only. The Keycloak admin console logi
   with `Email__Smtp__UseTls` off, see [mail settings](reference/notifications.md#mail-settings).
 - **The purchasing system stub,** in `tests/Axis.PurchasingStub`, stands in for the purchasing system
   that the purchase request sample calls when a request is approved, see
-  [purchasing system stub](architecture.md#purchasing-system-stub).
+  [purchasing system stub](testing.md#purchasing-system-stub).
 - **The publisher,** `axis-admin publisher`, runs Studio's publish requests, see
   [publisher](reference/administration.md#publisher). It serves the tenants `default` and
   `default-preview`, so it runs preview requests too. It has no port and no health check, and writes
@@ -674,7 +674,7 @@ clears a user's required actions, through the `axis-admin` client.
 The run's shared publisher reads the `Tenants` section, so it runs no provisioning jobs. A spec that queues
 jobs, such as the cell console spec and the cell quota journey, starts its own publisher with `startPublisher` of the
 same file, which reads the tenant directory with a cell's settings and runs the jobs. Both start it, with their server
-and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](architecture.md#the-e2e-stack).
+and browser, through `startCell` of `tests/e2e/cell.ts`, see [the E2E stack](testing.md#the-e2e-stack).
 
 ## Hot reload with `scripts/dev.sh`
 

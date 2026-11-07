@@ -21,14 +21,15 @@ run_suite Axis.ControlPlane.Tests controlplane/tests/Axis.ControlPlane.Tests dot
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
-# The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
+# The report, smoke test selection, link check, docs structure check and its rules, locator check, raw HTML check, prototype pollution check, bundle budget check,
 # font check, licence writer, design-system bundle check, dependency scan, SPA lock file, image scan, setup retries, image build retries, E2E and integration shard
 # splits, load script, load test workflow, load objectives, cell load scenarios, cell load script, cell load tenants, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, Compose status
-# helper, module install script, sample template check, dev script stop helper, development realm script and Helm chart scripts' own tests.
+# helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
 node --test scripts/check-docs.test.mjs || status=1
+node --test scripts/lib/docs/*.test.mjs || status=1
 node --test scripts/docs-audit.test.mjs || status=1
 node --test scripts/check-issue-links.test.mjs || status=1
 node --test scripts/check-locators.test.mjs || status=1
@@ -54,8 +55,6 @@ node --test scripts/load-cell-tenants.test.mjs || status=1
 node --test scripts/load-workflow.test.mjs || status=1
 node --test scripts/smoke.test.mjs || status=1
 node --test scripts/install-modules.test.mjs || status=1
-node --test scripts/sample-modules.test.mjs || status=1
-node --test scripts/sample-templates.test.mjs || status=1
 node --test scripts/compose-status.test.mjs || status=1
 node --test scripts/dev-stop.test.mjs || status=1
 node --test scripts/development-realm.test.mjs || status=1

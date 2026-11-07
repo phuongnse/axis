@@ -68,10 +68,12 @@ says. Autopilot takes them all the same.
 
 1. For one CI failure, open one issue.
 2. For links of open issues that point nowhere, run
-   `node scripts/check-issue-links.mjs` on `main`. For each link it prints, find
-   where the file or heading went (`git log --follow`, the decisions index for
-   a superseded decision) and edit the issue to link the new place, with
-   `gh issue edit --body-file`. Change nothing else in the issue.
+   `node scripts/check-issue-links.mjs` on `main`. It skips an open issue that
+   an open issue blocks, and checks it once its blockers close. For each link it
+   prints, find where the file or heading went (`git log --follow`, the
+   decisions index for a superseded decision) and edit the issue to link the
+   new place, with `gh issue edit --body-file`. Change nothing else in the
+   issue.
 
 ## Hand to the owner
 

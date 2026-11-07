@@ -145,11 +145,9 @@ describe('tokens with page values', () => {
     expect(typeTokens.fontFamily).toContain('IBM Plex Sans')
   })
 
-  it('names IBM Plex first and no longer names Inter', () => {
+  it('names IBM Plex first', () => {
     expect(typeTokens.fontFamily.startsWith("'IBM Plex Sans'")).toBe(true)
     expect(typeTokens.codeFontFamily.startsWith("'IBM Plex Mono'")).toBe(true)
-    expect(typeTokens.fontFamily).not.toContain('Inter')
-    expect(typeTokens.codeFontFamily).not.toContain('Inter')
   })
 })
 

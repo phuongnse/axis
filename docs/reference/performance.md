@@ -3,7 +3,7 @@
 This page states the service level objectives of the server and the worker, the routes that need limits of their
 own, and the load tests that measure an installation and a cell. The reasons are in
 [D82](../decisions/d82-performance-slos-and-load-tests.md). The per-request budgets of the `*PerformanceTests`
-classes run in the performance workflow, see [testing](../architecture.md#testing).
+classes run in the performance workflow, see [testing](../testing.md).
 
 ## Resource-demanding routes
 

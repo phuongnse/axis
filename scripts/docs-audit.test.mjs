@@ -154,11 +154,24 @@ describe('issuesFrom', () => {
     const { issues } = issuesFrom([finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 9, 'built')], [], 42)
     assert.equal(issues.length, 1)
     assert.equal(issues[0].title, 'The docs of docs/a.md match the code')
-    assert.deepEqual(issues[0].labels, ['documentation'])
+    assert.deepEqual(issues[0].labels, ['documentation', 'bug'])
     assert.match(issues[0].body, /Wrong: .*docs\/a\.md:3/)
     assert.match(issues[0].body, /Built: .*docs\/a\.md:9/)
     assert.match(issues[0].body, /<!-- docs-audit docs docs\/a\.md -->/)
     assert.equal(issues[0].body.split('\n')[0], '<!-- nexkit:workflow docs-audit.yml 42 -->')
+  })
+
+  test('labels a docs issue bug only when it holds a wrong finding', () => {
+    const { issues } = issuesFrom(
+      [finding('docs/a.md', 3, 'wrong'), finding('docs/b.md', 4, 'missing'), finding('docs/b.md', 8, 'missing')],
+      [],
+      1,
+    )
+    const labels = Object.fromEntries(issues.map((issue) => [issue.title, issue.labels]))
+    assert.deepEqual(labels, {
+      'The docs of docs/a.md match the code': ['documentation', 'bug'],
+      'The docs of docs/b.md match the code': ['documentation'],
+    })
   })
 
   test('gives each unbuilt rule a code issue and each untested list a test issue', () => {

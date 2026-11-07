@@ -6,7 +6,8 @@ import { slugify } from './check-links.mjs'
 
 // Prints, as a JSON list of { issue, link }, every link of an open issue to a file of this repository
 // at main that is missing, or to a heading of a Markdown file that has no such anchor, so that a
-// renamed heading or a deleted decision does not leave an issue pointing nowhere. It reads the
+// renamed heading or a deleted decision does not leave an issue pointing nowhere. An issue that an
+// open issue blocks is left out, because the awaited work may add the section it links. It reads the
 // working tree as main. GH names the command, so the tests can replace it. The hourly driver runs it
 // and points each link at its new home, see .claude/skills/axis-nexkit-routine/SKILL.md.
 
@@ -30,11 +31,12 @@ export function anchorsOf(text) {
   return anchors
 }
 
-/** Returns each broken link of the issues, reading files from root. */
+/** Returns each broken link of the issues that no open issue blocks, reading files from root. */
 export function brokenLinks(issues, root) {
   const cache = new Map()
   const broken = []
-  for (const { number, body } of issues) {
+  for (const { number, body, blockedBy } of issues) {
+    if ((blockedBy ?? []).some((blocker) => blocker.state === 'OPEN')) continue
     for (const match of (body ?? '').matchAll(linkPattern)) {
       const relative = decodeURIComponent(match[1])
       const file = path.join(root, relative)
@@ -51,17 +53,33 @@ export function brokenLinks(issues, root) {
   return broken
 }
 
+const openIssuesQuery = `query($owner: String!, $name: String!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    issues(states: OPEN, first: 100, after: $after) {
+      nodes { number body blockedBy(first: 50) { nodes { number state } } }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`
+
 function main() {
   const gh = process.env.GH ?? 'gh'
-  const result = spawnSync(gh, ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'number,body'], {
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-  })
-  if (result.status !== 0) {
-    console.error(`${gh} issue list failed:\n${result.stdout}${result.stderr}`.trimEnd())
-    return 1
+  const issues = []
+  let after
+  for (;;) {
+    const args = ['api', 'graphql', '-f', `query=${openIssuesQuery}`, '-F', 'owner={owner}', '-F', 'name={repo}']
+    if (after) args.push('-f', `after=${after}`)
+    const result = spawnSync(gh, args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
+    if (result.status !== 0) {
+      console.error(`${gh} api graphql failed:\n${result.stdout}${result.stderr}`.trimEnd())
+      return 1
+    }
+    const { nodes, pageInfo } = JSON.parse(result.stdout).data.repository.issues
+    for (const node of nodes) issues.push({ number: node.number, body: node.body, blockedBy: node.blockedBy.nodes })
+    if (!pageInfo.hasNextPage) break
+    after = pageInfo.endCursor
   }
-  console.log(JSON.stringify(brokenLinks(JSON.parse(result.stdout), scriptRoot), null, 2))
+  console.log(JSON.stringify(brokenLinks(issues, scriptRoot), null, 2))
   return 0
 }
 

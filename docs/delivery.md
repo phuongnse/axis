@@ -70,10 +70,13 @@ that holds it.
   makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
   issue to stop work on it without closing it. A [design issue](#design-changes) is held until its
   review ends.
-- **Autopilot takes the docs audit's issues,** because its [`trusted_workflows`][nexkit-workflow-issues] setting lists
-  `docs-audit.yml`. NexKit checks that the issue came from a run of that workflow on `main` that NexKit
-  or a writer started. An issue that any other workflow or a person without write access opens waits
-  until the owner reads it and comments `/nexkit trust` on it.
+- **Autopilot takes only trusted issues.** An issue is trusted when a person with write access opens
+  it, or when NexKit's App opens it: for a failure of CI on `main`, a flaky test, a Dependabot advisory
+  or a part of a split. The docs audit's issues are trusted too, because autopilot's
+  [`trusted_workflows`][nexkit-workflow-issues] setting lists `docs-audit.yml`. NexKit checks that the
+  issue came from a run of that workflow on `main` that NexKit or a writer started, never a pull
+  request. Any other issue waits until the owner reads it and comments
+  [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
   because its [`dependabot`][nexkit-dependabot] setting is `high`, as
   [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
@@ -121,8 +124,8 @@ that holds it.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
   rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
   check in the diff, the rule that an Agreed [decision](writing-docs.md#decisions) changes only by a
-  new one, the rule that a change adds no exception to a check and loosens none, and the rule that no
-  test names something that was removed. Each item checks one thing. An item not met requests changes
+  new one, the rule that a change adds no exception to a check and loosens none, and the rule on
+  removals in [testing](testing.md#rules-for-tests). Each item checks one thing. An item not met requests changes
   like a blocking finding, so a pull request that leaves a doc false or loosens a check does not
   merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
@@ -187,8 +190,8 @@ that holds it.
   `protected_paths` setting names those paths. Such changes are hand-made pull requests on any branch
   name, for example a NexKit version bump. Hand-made pull requests are only for those paths and for
   the docs change that ends a design review, so a design change is never one, see
-  [design changes](#design-changes). The owner or the hourly driver opens them, and the owner merges
-  them.
+  [design changes](#design-changes). Work that waits for one follows [follow-ups](#the-life-of-an-issue).
+  The owner or the hourly driver opens them, and the owner merges them.
 - **NexKit checks and reviews them on request.** Whoever pushes to one comments
   [`/nexkit review`][nexkit-person-review] on it after the push. NexKit runs its checks and its review
   on the head and sets the two statuses that the rules on `main` require, and it pushes nothing and
@@ -233,13 +236,18 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
 - **Labels.** It gets at least one label, and every repository label whose description on GitHub fits
   its content. There is no fixed list, because the owner adds and removes labels.
-- **Who opens it.** The owner or the local agent opens it, because autopilot takes only issues opened
-  by someone with write access or by the docs audit. It marks the issue *blocked by* what it must wait for, by the rules
-  under [Decisions](#decisions).
+- **Who opens it.** The owner or the local agent opens it. Which issues autopilot takes is in
+  [how issues run](#how-issues-run). The issue marks what it must wait for with *blocked by*, by the
+  rules under [Decisions](#decisions).
 - **Design.** It may link a Design artifact as a picture, while the docs stay the source of
   behaviour.
-- **Exceptions.** Changes whose purpose is to edit paths NexKit may not change are hand-made pull
-  requests, as [hand-made pull requests](#hand-made-pull-requests) says.
+- **Follow-ups.** Work that must come after other work is opened as an issue when the work it follows
+  is agreed, and it is marked *blocked by* that work's issue. A pull request, a comment or a session's
+  notes never holds a follow-up. A change in a path NexKit may not change is an issue like any other:
+  its plan lists the change under *Needs a hand-made change*, and the hourly driver makes it as a
+  [hand-made pull request](#hand-made-pull-requests). A hand-made pull request that other work waits
+  for closes an issue of its own with the `on-hold` label, which [how issues run](#how-issues-run)
+  makes a hold, and the follow-ups are *blocked by* that issue.
 
 ## The life of a milestone
 
@@ -327,13 +335,18 @@ change, a design review and a sync are in the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
   differs from the repository.
-- **A review ends in one docs change.** When the owner has agreed the changes, one hand-made docs
-  pull request rewrites the rules where they live, in the reference pages, configuration and APIs
-  included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct) says. It adds a decision
-  only for a choice between real alternatives. Once it is merged, the issues that are waiting build
+- **A review writes its rules in the docs as they are agreed.** Each review has a design issue and
+  a docs branch. The docs branch takes each rule the owner agrees, where it lives, and the design issue
+  holds the review's state and what the build must do beyond the docs. No other file keeps them.
+- **A review ends in one docs change.** When the owner has agreed the changes, the docs branch is one
+  hand-made docs pull request, which rewrites the rules where they live, in the reference pages,
+  configuration and APIs included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct)
+  says. It adds a decision only for a choice between real alternatives. Once it is merged, the issues
+  that are waiting build
   the screens: they link the docs and the prototype's tag, and closing the design issue starts them.
   A review of a screen that is already built has no such issues, so one NexKit issue builds all of it
-  and links the docs, the artifact and the tag. NexKit splits it if it needs to, not the owner.
+  and links the docs, the artifact and the tag, and the design issue closes. NexKit splits it if it
+  needs to, not the owner.
 - **A sync follows the repository.** After a merged change to the tokens or a widget, or whenever the
   owner asks, the session renders the previews again with `scripts/design-system.sh`, reads the
   tokens from `web/src/platform/designTokens.ts`, and publishes both to the same artifact. It keeps
