@@ -79,7 +79,7 @@ async function giveApplicationAdmin(page: Page, tenant: string) {
   const main = page.getByRole('main')
   await main.getByRole('searchbox', { name: 'Search by name or email', exact: true }).fill(email)
   await page.keyboard.press('Enter')
-  await main.getByRole('row').filter({ hasText: email }).click()
+  await main.getByRole('row').filter({ hasText: email }).getByRole('link').click()
 
   const section = page.getByTestId('user-roles').getByRole('region', { name: 'Approvals', exact: true })
   const role = section.getByTestId('user-role').filter({ hasText: 'admin' })

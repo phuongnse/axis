@@ -126,7 +126,7 @@ be kept right.
 - **Row actions.** An action on one row sits on the row. One whose meaning the platform knows, such as
   open, delete or activate a release, is an icon button, and one an author configured keeps its text.
   From three actions on, or at narrow width, they fold into one "…" menu of text entries.
-- **Opening a row** _(planned for M31)_. A row opens from its identifying cell, a real link, so a row
+- **Opening a row.** A row opens from its identifying cell, a real link, so a row
   has no Edit icon, see [opening things](#opening-things).
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
@@ -137,8 +137,6 @@ be kept right.
   An action on one row stays on the row.
 
 ## Opening things
-
-_(planned for M31)_
 
 A thing opens at one of three levels, chosen by what the person does, never by taste.
 

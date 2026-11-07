@@ -138,9 +138,6 @@
   "web/src/pages/TextTable.tsx": {
     "button": 1
   },
-  "web/src/pages/UserRolesDrawer.tsx": {
-    "tag": 2
-  },
   "web/src/platform/ConsolePublishing.tsx": {
     "tag": 1
   },

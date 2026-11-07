@@ -33,7 +33,7 @@ namespace Axis.Server.Users;
 /// </para>
 /// <para>
 /// <c>GET /api/users/{id}/roles</c> lists to an administrator the roles that were given to a person, and the roles that can be
-/// given. <c>given</c> holds the rows of <c>axis.given_roles</c>, each with its application id (null for a platform role), its
+/// given. It also answers the person's <c>displayName</c> and <c>email</c> (<c>null</c> without one), as the list does. <c>given</c> holds the rows of <c>axis.given_roles</c>, each with its application id (null for a platform role), its
 /// role and <c>declared</c>: the active release of the application declares the role, or the platform role is one of the four
 /// kinds. A role of an application that has no active release is not declared. <c>applications</c> holds every active
 /// application with the roles that its active release declares, and <c>platformRoles</c> holds the four platform role kinds. A
@@ -139,13 +139,11 @@ internal static partial class UserEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no users page.");
         }
 
+        RealmUserState? person;
         try
         {
             using var client = httpClients.CreateClient(nameof(UserEndpoints));
-            if (await new RealmUsers(client, access).FindAsync(id, cancellationToken) is null)
-            {
-                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The tenant has no user with this id.");
-            }
+            person = await new RealmUsers(client, access).FindAsync(id, cancellationToken);
         }
         catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
         {
@@ -153,9 +151,16 @@ internal static partial class UserEndpoints
             return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not read the user.");
         }
 
+        if (person is null)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The tenant has no user with this id.");
+        }
+
         var models = await resolver.ListAsync(cancellationToken);
         var given = await GivenRoles.ListAsync(await database.GetConnectionAsync(cancellationToken), id, cancellationToken);
         return Results.Ok(new UserRolesResponse(
+            person.DisplayName,
+            person.Email,
             [.. given.Select(row => new GivenRoleItem(
                 row.ApplicationId,
                 row.Role,
@@ -215,10 +220,10 @@ internal sealed class UserLog;
 internal sealed record UserListResponse(IReadOnlyList<UserListItem> Items, int TotalCount);
 
 /// <summary>
-/// The answer of <c>GET /api/users/{id}/roles</c>: the roles given to the person, the active applications with the roles their
-/// active releases declare, and the four platform role kinds.
+/// The answer of <c>GET /api/users/{id}/roles</c>: the person's display name and email, the roles given to the person, the active
+/// applications with the roles their active releases declare, and the four platform role kinds.
 /// </summary>
-internal sealed record UserRolesResponse(IReadOnlyList<GivenRoleItem> Given, IReadOnlyList<GivableApplication> Applications, IReadOnlyList<string> PlatformRoles);
+internal sealed record UserRolesResponse(string DisplayName, string? Email, IReadOnlyList<GivenRoleItem> Given, IReadOnlyList<GivableApplication> Applications, IReadOnlyList<string> PlatformRoles);
 
 /// <summary>
 /// A role given to a person. <c>ApplicationId</c> is <c>null</c> for a platform role. <c>Declared</c> is false when the
