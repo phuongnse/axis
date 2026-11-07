@@ -227,6 +227,10 @@ addresses.
 
 The page uses three endpoints.
 
+| Route            | What it does                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------- |
+| `GET /api/about` | The server's informational version for a signed-in person, see [endpoints](#endpoints) |
+
 - `GET /api/sites` lists only the sites that allow the provider of the session, so a person signed in
   through a provider that one site allows sees that site only. It gives each site:
   - its `application`, `{ "name", "titles", "descriptions" }`, so the home page can group the sites:

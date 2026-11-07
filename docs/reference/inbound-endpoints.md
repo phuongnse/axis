@@ -15,6 +15,11 @@ an endpoint accepts only DPoP-bound tokens, sent as `Authorization: DPoP` with a
 
 ## The call
 
+| Route                                                         | What it does                                                        |
+| ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `POST /api/apps/{app}/endpoints/{name}`                       | Calls the endpoint, see [the call](#the-call)                       |
+| `GET /api/apps/{app}/endpoints/{name}/instances/{instanceId}` | Reads the status of a call, see [status location](#status-location) |
+
 A call is one `POST` to the endpoint's route with the input in its body. The purchasing system
 submits a purchase request through the sample's `SubmitPurchaseRequest` endpoint:
 

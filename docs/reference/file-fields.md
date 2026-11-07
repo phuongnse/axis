@@ -34,6 +34,12 @@ contain.
 
 ## Upload
 
+| Route                                                                      | What it does                                                       |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `POST /api/apps/{app}/entities/{entity}/fields/{field}/files`              | Uploads a file to a field, see [upload](#upload)                   |
+| `POST /api/apps/{app}/entities/{entity}/fields/{collection}/{field}/files` | Uploads a file to a field of a child entity, see [upload](#upload) |
+| `GET /api/apps/{app}/files/{id}`                                           | Downloads a file, see [download](#download)                        |
+
 An upload stores a file as `pending`, and a later record write attaches it. This section covers the
 upload route, its checks and the attach step.
 

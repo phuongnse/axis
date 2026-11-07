@@ -11,6 +11,12 @@ client registration, tools, limits and audit. The reasons are in
 
 The server speaks the Streamable HTTP transport of the MCP specification, on the tenant's own host.
 
+| Route                                           | What it does                                                                                               |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `POST /mcp`                                     | Takes the JSON-RPC messages of a session, see [route and transport](#route-and-transport)                  |
+| `GET /mcp`                                      | Answers `405`, as the server offers no server-sent stream, see [route and transport](#route-and-transport) |
+| `GET /.well-known/oauth-protected-resource/mcp` | Serves the protected resource metadata, see [sign-in](#sign-in)                                            |
+
 - **Route.** `POST /mcp` on each tenant's host takes the JSON-RPC messages `initialize`,
   `notifications/*` and `ping`. The host names the tenant, as for every route. `GET /mcp` answers `405`,
   because the server offers no server-sent stream. A preview tenant's host serves no MCP server: both MCP

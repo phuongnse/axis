@@ -33,14 +33,21 @@ action.
 The records of an entity are listed, read, created, updated and deleted through these routes, and a
 record's audit records are read through its history route.
 
-| Method and path | Response |
-| --- | --- |
-| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=&search=` | `200` with one page of records |
-| `GET /api/apps/{app}/entities/{entity}/records/{id}` | `200` with one record |
-| `POST /api/apps/{app}/entities/{entity}/records` | `201` with the new record and a `Location` header |
-| `PATCH /api/apps/{app}/entities/{entity}/records/{id}` | `200` with the updated record |
-| `DELETE /api/apps/{app}/entities/{entity}/records/{id}` | `204` with no body |
-| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=` | `200` with one page of the record's audit records. See [the history route](record-audit.md#the-history-route) |
+| Route                                                                                  | Response                                                                                                          |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=&search=`          | `200` with one page of records                                                                                    |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}`                                   | `200` with one record                                                                                             |
+| `POST /api/apps/{app}/entities/{entity}/records`                                       | `201` with the new record and a `Location` header                                                                 |
+| `PATCH /api/apps/{app}/entities/{entity}/records/{id}`                                 | `200` with the updated record                                                                                     |
+| `DELETE /api/apps/{app}/entities/{entity}/records/{id}`                                | `204` with no body                                                                                                |
+| `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=`           | `200` with one page of the record's audit records. See [the history route](record-audit.md#the-history-route)     |
+| `GET /api/apps/{app}/entities/{module}/{entity}/records?page=&pageSize=&sort=&search=` | `200` with one page of records of a module entity, see [routes](#routes)                                          |
+| `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}`                          | `200` with one record of a module entity, see [routes](#routes)                                                   |
+| `POST /api/apps/{app}/entities/{module}/{entity}/records`                              | `201` with the new record of a module entity, see [routes](#routes)                                               |
+| `PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}`                        | `200` with the updated record of a module entity, see [routes](#routes)                                           |
+| `DELETE /api/apps/{app}/entities/{module}/{entity}/records/{id}`                       | `204` with no body, for a module entity, see [routes](#routes)                                                    |
+| `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}/history?page=&pageSize=`  | One page of audit records of a module entity's record, see [the history route](record-audit.md#the-history-route) |
+| `POST /api/apps/{app}/forms/{form}/state`                                              | The form state of a draft record, see [form state](#form-state)                                                   |
 
 `{app}` is the name of an active release, and `{entity}` an entity name in that
 release. Both match ignoring letter case. `{id}` is a record id in the

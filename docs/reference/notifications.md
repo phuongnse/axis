@@ -126,6 +126,12 @@ period.
 The routes list a user's notifications of one application and mark them read. They need a session
 (`401`), and the POSTs follow the CSRF rule.
 
+| Route                                          | What it does                                                                                      |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/notifications`            | Lists the user's notifications of an application, see [notification routes](#notification-routes) |
+| `POST /api/apps/{app}/notifications/{id}/read` | Marks one notification read, see [notification routes](#notification-routes)                      |
+| `POST /api/apps/{app}/notifications/read-all`  | Marks every notification the user sees read, see [notification routes](#notification-routes)      |
+
 - **List.** `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the user's
   notifications, newest first. It answers `items`, `page`, `pageSize`, `totalCount` and `unreadCount`.
   With `unread=true` the items and `totalCount` are the unread ones only, and `unreadCount` always
@@ -150,6 +156,12 @@ The routes list a user's notifications of one application and mark them read. Th
 A tenant notice is an in-app notification, in `axis.notifications`, that the worker stores for the
 tenant's administrators. It has no application and no release, uses platform text keys and the
 recipient kind `platformRole`, and no application lists it.
+
+| Route                               | What it does                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /api/notifications`            | Lists the tenant notices of the user, see [tenant notices](#tenant-notices)         |
+| `POST /api/notifications/{id}/read` | Marks one tenant notice read, see [tenant notices](#tenant-notices)                 |
+| `POST /api/notifications/read-all`  | Marks every tenant notice the user sees read, see [tenant notices](#tenant-notices) |
 
 - **Routes.** `GET /api/notifications?page=&pageSize=&unread=`, `POST /api/notifications/{id}/read`
   and `POST /api/notifications/read-all` list tenant notices and mark them read. They answer in the

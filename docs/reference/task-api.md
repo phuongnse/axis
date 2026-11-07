@@ -6,6 +6,13 @@ shows for a draft and complete it with an outcome. The user is the user of the
 [process states](process-states.md#task-states), and claim, release, reassign, overdue tasks,
 escalations and deadlines are in [task deadlines and claims](task-deadlines.md).
 
+| Route                                        | What it does                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/tasks`                  | Lists the tasks the user may act on, see [list my tasks](#list-my-tasks)                          |
+| `GET /api/apps/{app}/tasks/{id}`             | Reads one task, see [read one task](#read-one-task)                                               |
+| `POST /api/apps/{app}/tasks/{id}/form-state` | Answers what the task's form shows for a draft, see [form state of a task](#form-state-of-a-task) |
+| `POST /api/apps/{app}/tasks/{id}/complete`   | Completes a task with an outcome, see [completing a task](#completing-a-task)                     |
+
 ## Who may act
 
 Who may act on a task is decided by its assignee, at the moment of each action. The user may act on
