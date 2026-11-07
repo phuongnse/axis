@@ -24,6 +24,8 @@
     "vite.design-system.config.ts",
     "vite.keycloak-theme.config.ts",
     "vite.sign-up.config.ts",
+    "schemaValidators.ts",
+    "schemaValidators.test.ts",
     "vitestWorkers.ts",
     "vitestWorkers.test.ts"
   ]

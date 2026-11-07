@@ -1,10 +1,15 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { diagnosticCount, linter, lintGutter, nextDiagnostic } from '@codemirror/lint'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import type { ValidateFunction } from 'ajv'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
+import { loadKindValidator } from '../platform/studioSchemas'
+import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { jsonLanguage } from './jsonLanguage'
+import { jsonProblems } from './jsonProblems'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
 
 /** Marks a change that came from the value, not from the author, so it is not reported as an edit. */
@@ -20,24 +25,50 @@ export interface JsonViewProps {
    * absent, nothing follows the view.
    */
   boundary?: RefObject<HTMLElement | null>
+  /** The resource kind whose schema the content is checked against. Without it, only the syntax is checked. */
+  kind?: string
+  /** Called with the number of problems that the checks mark, each time it changes. */
+  onProblems?: (count: number) => void
+  ref?: Ref<JsonViewHandle>
 }
 
+export interface JsonViewHandle {
+  /** Selects the next problem, and the first one after the last. */
+  nextProblem: () => void
+}
+
+/** How long the checks wait after the last keystroke. */
+const checkDelay = 250
+
 /** A code editor for a resource's JSON, with line numbers, that fills the window down to the shell footer. */
-export default function JsonView({ label, value, onChange, boundary }: JsonViewProps) {
+export default function JsonView({ label, value, onChange, boundary, kind, onProblems, ref }: JsonViewProps) {
+  const t = useText()
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [height, setHeight] = useState(minHeight)
-  const latest = useRef({ onChange, value, theme: jsonTheme(tokens, mode), themeCompartment })
+  const latest = useRef({ onChange, value, theme: jsonTheme(tokens, mode), themeCompartment, kind, onProblems, t })
+  const validator = useRef<{ kind: string | undefined; loaded: Promise<ValidateFunction | undefined> }>(null)
 
   useEffect(() => {
-    latest.current = { onChange, value, theme: jsonTheme(tokens, mode), themeCompartment }
+    latest.current = { onChange, value, theme: jsonTheme(tokens, mode), themeCompartment, kind, onProblems, t }
   })
+
+  useImperativeHandle(ref, () => ({
+    nextProblem() {
+      const view = viewRef.current
+      if (view) {
+        nextDiagnostic(view)
+        view.focus()
+      }
+    },
+  }))
 
   useEffect(() => {
     const initial = latest.current
+    let reported = 0
     const view = new EditorView({
       parent: hostRef.current!,
       state: EditorState.create({
@@ -49,7 +80,28 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
           keymap.of([...defaultKeymap, ...historyKeymap]),
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': label }),
+          lintGutter(),
+          linter(
+            async (editor) => {
+              const current = latest.current
+              const cached =
+                validator.current && validator.current.kind === current.kind
+                  ? validator.current
+                  : {
+                      kind: current.kind,
+                      loaded: current.kind === undefined ? Promise.resolve(undefined) : loadKindValidator(current.kind),
+                    }
+              validator.current = cached
+              return jsonProblems(editor.state.doc.toString(), await cached.loaded, current.t)
+            },
+            { delay: checkDelay },
+          ),
           EditorView.updateListener.of((update) => {
+            const count = diagnosticCount(update.state)
+            if (count !== reported) {
+              reported = count
+              latest.current.onProblems?.(count)
+            }
             if (update.docChanged && !update.transactions.some((transaction) => transaction.annotation(external))) {
               latest.current.onChange(update.state.doc.toString())
             }
@@ -61,6 +113,9 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
     return () => {
       view.destroy()
       viewRef.current = null
+      if (reported !== 0) {
+        latest.current.onProblems?.(0)
+      }
     }
     // The view is built once for its label. The value reaches it through the effect below.
   }, [label])

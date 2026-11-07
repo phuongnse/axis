@@ -510,7 +510,7 @@ describe('StudioPage', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
     await editJson('{ "name": ')
 
-    expect(screen.getByTestId('studio-json-error')).toHaveTextContent('The JSON is not valid.')
+    expect(await screen.findByRole('button', { name: '1 problem' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 

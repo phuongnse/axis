@@ -43,6 +43,7 @@ import { IdentityProviderEditor } from './IdentityProviderEditor'
 import { emptyHistory, endStep, recordStep, redoStep, undoStep, type DraftSnapshot } from './draftHistory'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import type { JsonViewHandle } from './JsonView'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
@@ -190,7 +191,7 @@ export function StudioEditor({
   publisher?: boolean
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, colour } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -202,6 +203,9 @@ export function StudioEditor({
   // The text of the JSON view while the author types in it. `null` shows the draft, formatted.
   const [jsonText, setJsonText] = useState<string | null>(null)
   const [jsonInvalid, setJsonInvalid] = useState(false)
+  // The problems that the JSON view marks, syntax errors and schema breaks.
+  const [jsonProblems, setJsonProblems] = useState(0)
+  const jsonRef = useRef<JsonViewHandle>(null)
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -775,6 +779,19 @@ export function StudioEditor({
           <Tabs
             activeKey={tab}
             onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
+            tabBarExtraContent={
+              tab === 'json' && jsonProblems > 0 ? (
+                <AxisButton
+                  role="plain"
+                  style={{ color: colour.dangerText }}
+                  onClick={() => jsonRef.current?.nextProblem()}
+                >
+                  {jsonProblems === 1
+                    ? t('shell.studio.jsonView.problem')
+                    : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
+                </AxisButton>
+              ) : undefined
+            }
             items={[
               // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
               // guard on return, and clears the guard when the author leaves. Its code loads on first use.
@@ -930,19 +947,17 @@ export function StudioEditor({
                 key: 'json',
                 label: t('shell.studio.json'),
                 children: (
-                  <Flex vertical gap="small">
-                    <Suspense fallback={null}>
-                      <LazyJsonView
-                        label={t('shell.studio.json')}
-                        value={jsonText ?? JSON.stringify(draft, null, 2)}
-                        onChange={changeJson}
-                        boundary={rootRef}
-                      />
-                    </Suspense>
-                    {jsonInvalid && (
-                      <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
-                    )}
-                  </Flex>
+                  <Suspense fallback={null}>
+                    <LazyJsonView
+                      ref={jsonRef}
+                      label={t('shell.studio.json')}
+                      value={jsonText ?? JSON.stringify(draft, null, 2)}
+                      onChange={changeJson}
+                      boundary={rootRef}
+                      kind={item.kind}
+                      onProblems={setJsonProblems}
+                    />
+                  </Suspense>
                 ),
               },
             ]}

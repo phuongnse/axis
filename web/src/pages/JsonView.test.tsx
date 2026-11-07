@@ -2,6 +2,8 @@ import { undo } from '@codemirror/commands'
 import { EditorView } from '@codemirror/view'
 import { act, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import JsonView from './JsonView'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
@@ -9,7 +11,9 @@ import { jsonViewHeight, minHeight } from './jsonViewHeight'
 function renderView(value: string, onChange = vi.fn()) {
   const view = (text: string) => (
     <ThemeModeProvider>
-      <JsonView label="JSON" value={text} onChange={onChange} />
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <JsonView label="JSON" value={text} onChange={onChange} />
+      </TextProvider>
     </ThemeModeProvider>
   )
   const { rerender } = render(view(value))
