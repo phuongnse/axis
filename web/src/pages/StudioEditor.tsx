@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Modal, Tabs } from 'antd'
+import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
+import { Alert, Button, Flex, message, Modal, Tabs } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
@@ -195,6 +196,8 @@ export function StudioEditor({
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
+  const jsonViewRef = useRef<JsonViewHandle>(null)
+  const [messageApi, messageHolder] = message.useMessage()
   const dirtyRef = useRef(false)
   const [loaded, setLoaded] = useState<Loaded>()
   const [schema, setSchema] = useState<JsonSchema>()
@@ -203,9 +206,9 @@ export function StudioEditor({
   // The text of the JSON view while the author types in it. `null` shows the draft, formatted.
   const [jsonText, setJsonText] = useState<string | null>(null)
   const [jsonInvalid, setJsonInvalid] = useState(false)
+  const shownJson = jsonText ?? JSON.stringify(draft, null, 2)
   // The problems that the JSON view marks, syntax errors and schema breaks.
   const [jsonProblems, setJsonProblems] = useState(0)
-  const jsonRef = useRef<JsonViewHandle>(null)
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -608,6 +611,21 @@ export function StudioEditor({
     }
   }
 
+  /** Lays the JSON out on two-space indents as an edit of the view, so it takes the path of typing. */
+  function format() {
+    jsonViewRef.current?.replace(JSON.stringify(JSON.parse(shownJson), null, 2))
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(shownJson)
+      void messageApi.success(t('shell.studio.json.copied'))
+    } catch (error) {
+      console.warn('Copying the JSON failed', error)
+      void messageApi.error(t('shell.studio.json.copyFailed'))
+    }
+  }
+
   /** Asks about the changed fields of an entity first, and writes when there are none. */
   async function save() {
     if (item.kind === 'entity') {
@@ -774,22 +792,41 @@ export function StudioEditor({
       ref={rootRef}
       onBlur={undoable ? () => setHistory(endStep) : undefined}
     >
+      {messageHolder}
       <ExpressionCheckContext.Provider value={checkContext}>
         <LabelTextsContext.Provider value={labelContext}>
           <Tabs
             activeKey={tab}
             onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
             tabBarExtraContent={
-              tab === 'json' && jsonProblems > 0 ? (
-                <AxisButton
-                  role="plain"
-                  style={{ color: colour.dangerText }}
-                  onClick={() => jsonRef.current?.nextProblem()}
-                >
-                  {jsonProblems === 1
-                    ? t('shell.studio.jsonView.problem')
-                    : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
-                </AxisButton>
+              tab === 'json' ? (
+                <AxisActionRow align="center">
+                  {jsonProblems > 0 && (
+                    <AxisButton
+                      role="plain"
+                      style={{ color: colour.dangerText }}
+                      onClick={() => jsonViewRef.current?.nextProblem()}
+                    >
+                      {jsonProblems === 1
+                        ? t('shell.studio.jsonView.problem')
+                        : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
+                    </AxisButton>
+                  )}
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.studio.json.find"
+                    icon={<SearchOutlined />}
+                    onClick={() => jsonViewRef.current?.openFind()}
+                  />
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.studio.json.format"
+                    icon={<AlignLeftOutlined />}
+                    disabled={jsonInvalid}
+                    onClick={format}
+                  />
+                  <AxisButton role="icon" nameKey="shell.studio.json.copy" icon={<CopyOutlined />} onClick={copy} />
+                </AxisActionRow>
               ) : undefined
             }
             items={[
@@ -949,13 +986,18 @@ export function StudioEditor({
                 children: (
                   <Suspense fallback={null}>
                     <LazyJsonView
-                      ref={jsonRef}
+                      ref={jsonViewRef}
                       label={t('shell.studio.json')}
-                      value={jsonText ?? JSON.stringify(draft, null, 2)}
+                      value={shownJson}
                       onChange={changeJson}
                       boundary={rootRef}
                       kind={item.kind}
                       onProblems={setJsonProblems}
+                      findTexts={{
+                        field: t('shell.studio.json.findField'),
+                        count: t('shell.studio.json.findCount'),
+                        none: t('shell.studio.json.findNone'),
+                      }}
                     />
                   </Suspense>
                 ),

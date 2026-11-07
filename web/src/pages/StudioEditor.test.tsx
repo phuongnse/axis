@@ -2187,6 +2187,97 @@ describe.each(['light', 'dark'] as const)('The JSON view in %s mode', (mode) => 
   })
 })
 
+describe('StudioEditor JSON view actions', () => {
+  const content = seedContent('Order', [{ id: 'a', values: { code: 'X1', size: 3 } }])
+
+  async function openJsonTab() {
+    await screen.findByRole('textbox', { name: 'code' }, slow)
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    await jsonView()
+  }
+
+  it('shows Find, Format and Copy on the JSON tab only', async () => {
+    stub(content)
+    renderEditor()
+    await screen.findByRole('textbox', { name: 'code' }, slow)
+    const names = ['Find', 'Format', 'Copy']
+
+    for (const name of names) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+    await openJsonTab()
+    for (const name of names) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    await openFormTab()
+    for (const name of names) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+  })
+
+  it('opens the find bar from Find', async () => {
+    stub(content)
+    renderEditor()
+    await openJsonTab()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Find' }))
+
+    expect(await screen.findByRole('textbox', { name: 'Find in JSON' })).toBeInTheDocument()
+  })
+
+  it('formats compact JSON on two-space indents and keeps Save off when the data is the same', async () => {
+    stub(content)
+    renderEditor()
+    await openJsonTab()
+    const loaded: unknown = JSON.parse(await jsonText())
+    await editJson(JSON.stringify(loaded))
+    expect(await jsonText()).toBe(JSON.stringify(loaded))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Format' }))
+
+    expect(await jsonText()).toBe(JSON.stringify(loaded, null, 2))
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
+
+  it('turns Format off while the text is not JSON', async () => {
+    stub(content)
+    renderEditor()
+    await openJsonTab()
+    expect(screen.getByRole('button', { name: 'Format' })).toBeEnabled()
+
+    await editJson('{')
+
+    expect(screen.getByRole('button', { name: 'Format' })).toBeDisabled()
+  })
+
+  it('copies the whole text and says so', async () => {
+    stub(content)
+    renderEditor()
+    await openJsonTab()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(await screen.findByText('JSON copied.')).toBeInTheDocument()
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(await jsonText())
+  })
+
+  it('says so when the clipboard refuses the copy', async () => {
+    stub(content)
+    renderEditor()
+    await openJsonTab()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }))
+
+    expect(await screen.findByText('The JSON could not be copied.')).toBeInTheDocument()
+    warn.mockRestore()
+  })
+})
+
 describe('StudioEditor problems in the JSON view', () => {
   const roleItem: StudioResourceItem = {
     id: '33333333-3333-4333-8333-333333333333',

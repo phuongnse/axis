@@ -131,13 +131,14 @@ what changed.
   [editors by kind](#editors-by-kind), and keeps the JSON view as the second view of the same draft. A
   typed editor saves through the same JSON Patch and never drops a value it does not show, so unknown
   keys stay as they are.
-- **The form's layout** _(planned for M31)_. The sections, field names, labels, lists, JSON view and
+- **The form's layout** _(planned for M31)_. The sections, field names, labels, lists and
   save bar of every form follow [Studio resource form](studio-resource-form.md).
 - **A description** _(planned for M31)_. Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
   shows it after the name and the label.
 - **The JSON view** shows the draft as text, and a valid edit there updates the form. Invalid JSON
-  shows an error and turns Save off.
+  shows an error and turns Save off. Its look and its actions are in
+  [JSON view](studio-resource-form.md#json-view).
 - **Save** sends only the changes, as a JSON Patch with the version the editor loaded in `If-Match`,
   and stays off while nothing changed. An array whose length changed is replaced whole, and an array of
   the same length is compared item by item. Clearing an optional value removes its key. After a save
