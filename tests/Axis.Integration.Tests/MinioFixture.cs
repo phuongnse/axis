@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using Amazon.Runtime;
@@ -19,6 +20,8 @@ public sealed class MinioFixture : IAsyncLifetime
     public const string Image = "bitnamilegacy/minio:2025.7.23";
 
     private const int ApiContainerPort = 9000;
+
+    private static readonly TimeSpan[] _waits = [TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
 
     private readonly IContainer _container;
 
@@ -67,43 +70,53 @@ public sealed class MinioFixture : IAsyncLifetime
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
 
-    /// <summary>The whole object. When MinIO drops a connection or ends a response early, the read starts again from the start, up to three times.</summary>
+    /// <summary>The whole object. When MinIO drops a connection, answers that the client disconnected or ends a response early, the read starts again from the start, up to five tries.</summary>
     public static Task<byte[]> ReadObjectAsync(IAmazonS3 s3, string bucket, string key, CancellationToken cancellationToken) =>
         ReadWholeAsync(token => s3.GetObjectAsync(bucket, key, token), cancellationToken);
 
-    internal static async Task<byte[]> ReadWholeAsync(Func<CancellationToken, Task<GetObjectResponse>> get, CancellationToken cancellationToken)
+    internal static async Task<byte[]> ReadWholeAsync(Func<CancellationToken, Task<GetObjectResponse>> get, CancellationToken cancellationToken, Func<TimeSpan, CancellationToken, Task>? wait = null)
     {
-        for (var attempt = 1; ; attempt++)
-        {
-            try
+        byte[] bytes = [];
+        await RetryDroppedAsync(
+            async token =>
             {
-                using var response = await get(cancellationToken);
+                using var response = await get(token);
                 using var memory = new MemoryStream();
-                await response.ResponseStream.CopyToAsync(memory, cancellationToken);
-                return memory.ToArray();
-            }
-            catch (Exception exception) when (attempt < 3 && IsDroppedConnection(exception))
-            {
-            }
-        }
+                await response.ResponseStream.CopyToAsync(memory, token);
+                bytes = memory.ToArray();
+            },
+            wait,
+            cancellationToken);
+        return bytes;
     }
 
-    /// <summary>Stores the whole object. When MinIO drops a connection during the upload, the upload starts again from the first byte, up to three times.</summary>
+    /// <summary>Stores the whole object. When MinIO drops a connection or answers that the client disconnected during the upload, the upload starts again from the first byte, up to five tries.</summary>
     public static Task UploadObjectAsync(IAmazonS3 s3, string bucket, string key, byte[] bytes, CancellationToken cancellationToken) =>
         UploadWholeAsync((request, token) => s3.PutObjectAsync(request, token), bucket, key, bytes, cancellationToken);
 
-    internal static async Task UploadWholeAsync(Func<PutObjectRequest, CancellationToken, Task> put, string bucket, string key, byte[] bytes, CancellationToken cancellationToken)
+    internal static Task UploadWholeAsync(Func<PutObjectRequest, CancellationToken, Task> put, string bucket, string key, byte[] bytes, CancellationToken cancellationToken, Func<TimeSpan, CancellationToken, Task>? wait = null) =>
+        RetryDroppedAsync(
+            async token =>
+            {
+                using var content = new MemoryStream(bytes);
+                await put(new PutObjectRequest { BucketName = bucket, Key = key, InputStream = content }, token);
+            },
+            wait,
+            cancellationToken);
+
+    private static async Task RetryDroppedAsync(Func<CancellationToken, Task> attempt, Func<TimeSpan, CancellationToken, Task>? wait, CancellationToken cancellationToken)
     {
-        for (var attempt = 1; ; attempt++)
+        wait ??= Task.Delay;
+        for (var tries = 0; ; tries++)
         {
-            using var content = new MemoryStream(bytes);
             try
             {
-                await put(new PutObjectRequest { BucketName = bucket, Key = key, InputStream = content }, cancellationToken);
+                await attempt(cancellationToken);
                 return;
             }
-            catch (Exception exception) when (attempt < 3 && IsDroppedConnection(exception))
+            catch (Exception exception) when (tries < _waits.Length && IsDroppedConnection(exception))
             {
+                await wait(_waits[tries], cancellationToken);
             }
         }
     }
@@ -112,7 +125,7 @@ public sealed class MinioFixture : IAsyncLifetime
     {
         for (var current = exception; current is not null; current = current.InnerException)
         {
-            if (current is IOException or HttpRequestException or SocketException or AmazonS3Exception { ErrorCode: "ClientDisconnected" })
+            if (current is IOException or HttpRequestException or SocketException or AmazonS3Exception { ErrorCode: "ClientDisconnected" } or AmazonS3Exception { StatusCode: (HttpStatusCode)499 })
             {
                 return true;
             }
