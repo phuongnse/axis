@@ -20,8 +20,10 @@ This skill says how to read a page. The audit changes no file.
    answer follows [reading a page](#reading-a-page) for its group and gives the findings in the script's
    JSON schema. When a group's answer fails, the step fails after every group has finished. The calls
    run on the fallback Claude subscription, so the audit does not use up the one NexKit runs on.
-3. `file <findings> <run id>`, in a job that runs no model, groups the findings, leaves out those an
-   open issue covers, opens at most ten issues and marks each with the run that found it.
+3. `file <findings> <run id>`, in a job that runs no model, groups the findings, leaves out those that an
+   open issue or an earlier issue of the run covers, opens at most ten issues and marks each with the run
+   that found it. It opens the `unbuilt` issues first, then the `untested-list` issues, then one docs issue
+   per page. It prints each finding the cap leaves out, and the next run of that finding's page reports it again.
 
 A run in the owner's local session for named pages follows [reading a page](#reading-a-page) and
 reports the findings to the owner instead.
@@ -56,7 +58,9 @@ The file step writes them, so this is what to expect, not what to do:
 
 - One docs issue per page, labelled `documentation`, with every `wrong`, `built`, `missing` and
   `standard` finding of that page as an acceptance criterion.
-- One `bug` issue per `unbuilt` rule, and one test issue per `untested-list`.
+- One `bug` issue per `unbuilt` finding, and one test issue per `untested-list` finding.
 - Each issue is in no milestone, links the page and the code it rests on, and carries a hidden
   `docs-audit` marker, so a later run leaves it alone while it is open, and NexKit's marker of the run
   that opened it.
+- A code or test issue's marker holds the page, the kind and the statement with its spaces and case
+  normalised, not the line, so a moved line or a repeated finding opens no second issue.

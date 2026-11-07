@@ -36,8 +36,10 @@ Four actors take part in the work, and each has its own part.
   what the owner alone can decide.
 - **The docs audit** is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs
-  against the code every hundred merges and opens a NexKit issue for each thing it finds, as
-  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees. It changes no file itself.
+  against the code every hundred merges and opens a NexKit issue for each group of findings that no open
+  issue covers, code and test fixes first and at most ten a run, as
+  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees and the
+  skill says. It changes no file itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
 
@@ -84,8 +86,7 @@ that holds it.
   two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
   milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
   journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
-  mark. Autopilot's `max_parallel` setting caps how
-  many issues run at once, as
+  mark. Autopilot's `max_parallel` setting caps how many issues run at once, as
   [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) agrees, so
   that their rounds of checks fit in the runner jobs that GitHub Free runs at once.
 - **A second Claude subscription takes over at the usage limit,** as the fallback agent in
@@ -299,8 +300,9 @@ change, a design review and a sync are in the
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
   on the local stack. The branch is pushed, so the review can go on from any machine, and is never
-  merged. CI leaves `design/` branches out, because a prototype changes the widgets without their
-  tests. Before the review's issue is written, the branch's last commit gets a
+  merged. No push to a branch starts CI, as [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)
+  agrees. A prototype is never merged, and it never gets `/nexkit review`, because it changes the widgets
+  without their tests. Before the review's issue is written, the branch's last commit gets a
   `design-review/<yyyy-mm-dd>-<topic>` tag with the same date and topic, which is pushed and never
   deleted, so the links to the prototype never break. A tag starts no CI run. The branch is then
   deleted, locally and on GitHub.

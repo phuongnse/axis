@@ -132,7 +132,7 @@ describe('groupsOf and readGroups', () => {
 
 describe('issuesFrom', () => {
   test('groups the docs findings of a page into one docs issue, with each finding as a criterion', () => {
-    const issues = issuesFrom([finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 9, 'built')], [], 42)
+    const { issues } = issuesFrom([finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 9, 'built')], [], 42)
     assert.equal(issues.length, 1)
     assert.equal(issues[0].title, 'The docs of docs/a.md match the code')
     assert.deepEqual(issues[0].labels, ['documentation'])
@@ -143,7 +143,7 @@ describe('issuesFrom', () => {
   })
 
   test('gives each unbuilt rule a code issue and each untested list a test issue', () => {
-    const issues = issuesFrom([finding('docs/a.md', 5, 'unbuilt'), finding('docs/b.md', 7, 'untested-list')], [], 1)
+    const { issues } = issuesFrom([finding('docs/a.md', 5, 'unbuilt'), finding('docs/b.md', 7, 'untested-list')], [], 1)
     assert.deepEqual(
       issues.map((i) => [i.title, i.labels]),
       [
@@ -154,13 +154,54 @@ describe('issuesFrom', () => {
   })
 
   test('leaves out what an open issue already covers', () => {
-    const open = ['text\n<!-- docs-audit docs docs/a.md -->', '<!-- docs-audit code docs/a.md:5 -->']
-    const issues = issuesFrom([finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 5, 'unbuilt'), finding('docs/b.md', 1, 'missing')], open, 1)
-    assert.deepEqual(issues.map((i) => i.title), ['The docs of docs/b.md match the code'])
+    const open = ['text\n<!-- docs-audit docs docs/a.md -->', '<!-- docs-audit code docs/a.md unbuilt statement at 5. -->']
+    const { issues } = issuesFrom(
+      [finding('docs/a.md', 3, 'wrong'), finding('docs/a.md', 5, 'unbuilt'), finding('docs/b.md', 1, 'missing')],
+      open,
+      1,
+    )
+    assert.deepEqual(
+      issues.map((i) => i.title),
+      ['The docs of docs/b.md match the code'],
+    )
   })
 
-  test('opens at most ten issues in a run', () => {
-    const many = Array.from({ length: 15 }, (_, i) => finding(`docs/p${i}.md`, 1, 'wrong'))
-    assert.equal(issuesFrom(many, [], 1).length, maxIssues)
+  test('leaves out an unbuilt finding that an open issue covers at another line, whatever its case and spacing', () => {
+    const open = ['<!-- docs-audit code docs/a.md unbuilt the code does x. -->']
+    const moved = finding('docs/a.md', 9, 'unbuilt', { statement: '  The   CODE does X.  ' })
+    assert.deepEqual(issuesFrom([moved], open, 1), { issues: [], leftOut: [] })
+  })
+
+  test('makes one test issue from two equal untested lists on different lines of one run', () => {
+    const same = { statement: 'The list has no test.' }
+    const { issues } = issuesFrom(
+      [finding('docs/b.md', 7, 'untested-list', same), finding('docs/b.md', 9, 'untested-list', same)],
+      [],
+      1,
+    )
+    assert.equal(issues.length, 1)
+  })
+
+  test('opens at most ten issues, code and test fixes first, and returns the findings past the cap as leftOut', () => {
+    const found = [
+      finding('docs/u1.md', 1, 'unbuilt'),
+      finding('docs/u2.md', 2, 'unbuilt'),
+      finding('docs/t1.md', 3, 'untested-list'),
+      finding('docs/t2.md', 4, 'untested-list'),
+      ...Array.from({ length: 15 }, (_, i) => finding(`docs/p${i}.md`, 1, 'wrong')),
+    ]
+    const { issues, leftOut } = issuesFrom(found, [], 1)
+    assert.deepEqual(
+      issues.map((i) => i.title),
+      [
+        'The code follows the rule at docs/u1.md:1',
+        'The code follows the rule at docs/u2.md:2',
+        'A test compares the list at docs/t1.md:3 with the code',
+        'A test compares the list at docs/t2.md:4 with the code',
+        ...Array.from({ length: 6 }, (_, i) => `The docs of docs/p${i}.md match the code`),
+      ],
+    )
+    assert.equal(issues.length, maxIssues)
+    assert.deepEqual(leftOut, found.slice(-9))
   })
 })
