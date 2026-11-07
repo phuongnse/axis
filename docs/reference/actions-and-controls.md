@@ -43,6 +43,8 @@ widget names a role, never an Ant Design button type.
 - **The platform picks the icons.** Configuration names no icon, except a site's navigation entry,
   which names one from Axis's own list, see [navigation icons](shell.md#navigation-icons). So the
   platform gives an icon only to an action whose meaning it knows.
+- **A tooltip names the control,** with no "…", as Filter and Columns, because the "…" belongs to a button
+  whose words show and that opens a dialog, such as New entity….
 - **A tooltip goes with the pointer**. A click on an icon-only button closes its
   tooltip until the pointer comes back, and focus that a click or a closing dialog gives the button
   opens none. Keyboard focus still shows it.
@@ -78,6 +80,26 @@ setting on the shared `ConfigProvider` carries them, so no widget keeps its own 
   such as a danger button, whose white text needs it.
 - **A label is above its input, everywhere** _(planned for M31)_, as the form widget has it, never
   beside it.
+- **One field for the platform's screens** _(planned for M31)_. `AxisField` draws every field of Studio
+  and the console: its label, its help and its input, as a group that its help describes.
+  `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
+  a few ways, each with its help, and `AxisFieldGroup` a titled group of fields.
+- **Every field has help** _(planned for M31)_. In an application builder help is not optional. `AxisField`
+  requires `help`, see [platform field help](frontend.md#platform-field-help). An application's own forms
+  keep `help` optional, as their author decides.
+- **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
+  its own.
+- **One field to a row** _(planned for M31)_. Two fields share a row only when they truly belong together,
+  such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width.
+- **Every required field is marked** _(planned for M31)_. A platform field follows the form widget's
+  [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
+  required, such as New resource. Only the sign-in page marks none, as everyone knows both its fields are
+  needed. A field never says "(optional)".
+- **A field is checked on click** _(planned for M31)_. A finish button is never disabled because the
+  input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
+  click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
+  focuses the first. A message goes once the field is put right. A button is disabled only while its
+  action runs. This holds for every form and dialog, as it does for the form widget's Save.
 
 ## Tab bars
 
@@ -100,7 +122,7 @@ These rules hold for every word the SPA shows. How a text is worded is in [UI wr
 - **No value is a dash.** A table cell with no value shows the muted em dash, and a form or a detail
   shows "Not set", see the [empty values](frontend.md#shown-values). It never shows nothing, which
   cannot tell "not given" from "not loaded", and never N/A, which says "does not apply" and does not
-  translate.
+  translate. A No is a value, so it reads No, never a dash.
 
 ## Tables
 
@@ -114,7 +136,25 @@ be kept right.
 - **Toolbar.** One toolbar holds for every table: the view controls, search and filters on the left,
   and Refresh, the secondary actions such as Import and Export, and the main action last on the right.
   Their places and looks are fixed, and whether a table has each depends on what it needs, so a short
-  list has no search.
+  list has no search. An action on the page as a whole, such as New entity… on a kind's list, sits on the
+  [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
+  actions its author configures.
+- **Every control in one table** _(planned for M31)_. `AxisTable` has every control below, and each view
+  turns on what it needs. Search, filter, sort, page and columns live in the address.
+- **Sort** _(planned for M31)_. A column sorts from its header when its values have an order a person uses:
+  names, people, statuses, dates and numbers. Long text, files, lists and actions do not. A header only
+  sorts, as there is one place to filter.
+- **Search** _(planned for M31)_. A column is searchable when it says so, through `searchText`, as a field
+  marked `searchable` is in the record API, and search looks in all of them. The box says Search.
+- **Filter** _(planned for M31)_. Filter is an icon button that carries the count of conditions in force, and
+  opens a builder of conditions in groups of All or Any, with no limit on depth. Every column can be
+  filtered on, and conditions follow the kind of value, text, enum, number or date, each with empty and
+  not empty. Apply puts it in force, and a condition with no value is left out. A chip stands for each
+  condition and group, with Clear all.
+- **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
+  orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
+  still searched and filtered on. The platform keeps each person's choice.
+- **Saved views** _(planned for M31)_. A person saves a table's search, filter and sort as a view.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free
   text share the width left in equal parts, and their text wraps. A table with no free text gives the
@@ -130,8 +170,15 @@ be kept right.
   has no Edit icon, see [opening things](#opening-things).
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
-- **Paging and scrolling.** A long table pages, and one narrower than its columns' content scrolls
-  sideways rather than squeezing them.
+- **Paging.** A long table pages.
+- **How many** _(planned for M31)_. A paged table says what it shows of how many, as "1–20 of 143".
+- **Too little room** _(planned for M31)_. A table measures its own width, as it changes. Its text columns
+  narrow to 160 px first. Then columns move under their row one at a time, from the right or by a column's
+  `priority`, `low` first and `high` last, as "Title: value" on the row's own surface, with no line between
+  the row and them. The identifying column never moves. A moved cell with no value is left out, while a
+  column that fits still shows its dash. Only when what stays does not fit does the table scroll sideways,
+  with the first column fixed. So the data stays in sight, and every table gains with no setting, as SAP
+  Fiori's pop-in has it.
 - **Bulk actions** _(planned for M31)_. Selecting rows is for bulk actions alone: a table shows
   checkboxes only when it has a bulk action, and a selection shows an "N selected" bar that holds them.
   An action on one row stays on the row.
@@ -166,6 +213,9 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
+- **A dialog holds only what it edits** _(planned for M31)_. A table may show what its row's dialog does not
+  edit, as long as the cell leads to where it is edited, so each thing is seen in one place and edited
+  in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,
   and the mask behind sets it apart from the page.
 
@@ -194,13 +244,12 @@ A list takes one of three orders, chosen by what the list is.
   fields and navigation stay as written, and the author moves them, because sorting them would change
   their meaning.
 - **Records in time are newest first,** such as releases, activations and history.
-- **A set sorts by name.** Modules, packages, relaxed points, Uses and Used by and the changes sort by
+- **A set sorts by name.** Modules, packages, relaxed points, Used by and the changes sort by
   the name a person reads, with the page language's collation, so Đ follows D in Vietnamese. A list
   that mixes kinds groups them first in the sidebar's order, then by name. Relaxed points sort by
   module, then by point.
 - **Sorting is for display only.** The file keeps its order, so adding a module adds one line to its
-  diff. Studio's small tables have no sort by column, as their order is already the one to expect. The
-  `table` widget keeps its own rules.
+  diff. A table that lets a person sort follows [sort](#tables). The `table` widget keeps its own rules.
 
 ## Undo rather than confirm
 

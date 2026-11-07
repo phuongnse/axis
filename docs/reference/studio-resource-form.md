@@ -1,8 +1,7 @@
 # Studio resource form
 
 This page describes the form that edits one Studio resource: its sections and fields, its labels and
-lists, the controls that choose what Axis knows, its references, its Danger zone, its save bar and its
-JSON view. The form is the standard for every resource without a designer of its own: the
+lists, the controls that choose what Axis knows, what uses the resource, its save bar and its JSON view. The form is the standard for every resource without a designer of its own: the
 application, role, policy, rule, event, trigger, sequence, data source, migration and webhook. The
 schema part of the editors that have a designer follows it too. How Studio is laid out around the form
 is in [Studio workspace](studio-workspace.md), and what each editor and designer does is in
@@ -15,14 +14,17 @@ _(planned for M31)_
 The form puts a resource's root properties in sections, so that an author reads them in groups that
 each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
 heading and a line that says what it holds. The application's Settings, for example, has General
-(name, title, description and time zone), Modules, Packages and File storage. A property that no
-section names goes to a last section with no heading.
+(name, title, description and time zone), Modules, Packages and File storage, then the
+[auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section names goes to a
+last section with no heading.
 
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
-- **One rhythm.** The sections, the panels after them and the Danger zone are `spacing-md` apart.
+- **One rhythm.** The sections are `spacing-md` apart.
+- **Shared parts.** Every Studio form is built from the same sections and
+  [`AxisField`](actions-and-controls.md#fields), and a form does not lay its fields out on its own.
 
 ## Fields
 
@@ -31,7 +33,8 @@ _(planned for M31)_
 Every field is named in words. Its label and its optional help are the texts
 `shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as the form
 widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between the label
-and the input. A property's raw name, such as `textKey`, never shows.
+and the input. Every field has its help, see [platform field help](frontend.md#platform-field-help). A
+property's raw name, such as `textKey`, never shows.
 
 The file's identity is hidden: `id`, `kind` and `formatVersion` are not shown, while `name` is, with
 its help. A group's fields sit in from the group's label, behind a rule in `borderSubtle`, so they read
@@ -47,8 +50,11 @@ away instead.
 
 - **Translations….** The translate icon sits inside the box at its end, so the box keeps the width and
   height of every field. It opens every language of the label in a medium dialog, where Done keeps the
-  texts and Cancel puts them back. A muted line under the box names the languages the label lacks, such
-  as "Missing in Vietnamese". The text resources' table translates many labels at once.
+  texts and Cancel puts them back. The text resources' table translates many labels at once.
+- **Not translated.** Once a text has words in the author's language, a muted line under the box says
+  which languages lack it, so an empty optional text such as a help says nothing. It names up to two, as
+  "Not translated into Vietnamese", and counts more, as "Not translated into 3 languages", so it stays one
+  short line, and Translations lists them all.
 - **The key is Studio's own.** Studio makes it from the resource and the path, and never shows it.
 - **One Save.** The texts are part of the resource's one Save, which writes the label's texts first, so
   a resource never names a key with no text. There is no Write texts button.
@@ -62,8 +68,8 @@ kind shows its label, such as a module or a package by the label of its manifest
 
 - **A cell shows content, never a bare count.** A nested list or map shows what it holds in words. A
   module's roles are one line for each slot, such as "Budget approver: Department manager", and a slot
-  that no role plays reads "Not mapped" in `warningText`. A module's relaxed points show as the
-  Off-standard tag.
+  that no role plays reads "Not mapped" in `warningText`. A module's relaxed points show as
+  [relaxed points in Settings](#relaxed-points-in-settings) says.
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
   left out, while the dialog keeps every field. Short columns of a fixed form, such as a version range
   or a tag, are as wide as their content.
@@ -100,42 +106,31 @@ activation will refuse it.
 
 _(planned for M31)_
 
-Settings lists a module's relaxed points read-only, in words, from
-[`GET .../relaxed`](#studio-api). Each links to its contract page and shows its reason and a line that
-says where to relax or undo it. A relax is a decision that needs the point's context, which the
-[contract page](module-contracts.md#in-studio) shows, and each thing is edited in one place.
+The Modules table's Relaxed points cell lists each of a module's relaxed points in two lines, from
+[`GET .../relaxed`](#studio-api): its name as a link to it on its contract's page, then its reason. Its
+kind is left to the contract's page, to keep the cell short. The Modules section's line says that a point
+is relaxed or undone on its contract's page. A relax is a decision that needs the point's context, which
+the [contract page](module-contracts.md#in-studio) shows, so Add module and Edit module hold only Module,
+Version, Roles and Connectors, as [a dialog holds only what it edits](actions-and-controls.md#dialogs).
 
-## References
-
-_(planned for M31)_
-
-Uses and Used by are two panels after the form and before the Danger zone, so an author sees what the
-resource depends on and what depends on it. Each has [the change list's](studio-workspace.md#change-list)
-three columns:
-
-1. The other resource by its label, as the link that opens it. A Used by entry opens it at the path of
-   the reference.
-2. Its kind.
-3. How the one uses the other, in words, such as "Grants to it", with one text for each relation of the
-   compiler.
-
-No file, path or relation code shows, and modules and packages show by their labels.
-
-- **Once each.** The same resource used the same way shows once. With none, the panel says so. Entries
-  do not expand: the link opens the resource, whose page has its own lists.
-- **Uses leaves out what the form shows.** Each kind declares the references that its form already
-  shows: every kind its labels' texts, and the application its modules and packages. A panel with
-  nothing left is left out.
-- **Used by only where it can apply.** The application is the one kind that nothing can refer to, so it
-  has no Used by and its Settings ends at File storage and then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). Every other kind keeps both panels.
-
-## Danger zone
+## Used by
 
 _(planned for M31)_
 
-Delete… is the last section of a resource's page, framed in `dangerText`, with a line that says what
-deleting does, so the one destructive action stands apart from every edit. Its dialog still asks. The
-application has no Danger zone.
+What uses a resource is a tab of its own, Used by, beside Design, Form and JSON, opened when it is needed,
+before a rename or a delete. A kind nothing can use, the application, has no such tab. What a resource uses
+is shown by its own editor, and deleting it breaks nothing it uses, so it has no list of its own, see
+[D141](../decisions/d141-the-reference-index-and-what-uses-a-resource.md).
+
+The tab is the [standard table](actions-and-controls.md#tables), flat, with search and the kind filter:
+
+1. Name: the other resource by its label, as the link that opens it at the path of the reference.
+2. Kind, as wide as its content.
+3. How it is used, in words, such as "Grants to it", with one text for each relation of the compiler.
+
+No file, path or relation code shows, and modules and packages show by their labels. It sorts by kind in
+the sidebar's order, then by name. The same resource used the same way shows once. With none, the table
+says so.
 
 ## Save bar
 
@@ -204,3 +199,20 @@ release routes are in [release page](studio-workspace.md#release-page).
 - `GET /api/studio/apps/{application}/relaxed` answers `{ items }`, the relax entries of the
   application's folder, each as in the [release history](authoring.md#release-history), with the id of
   its contract, `contractId`. Its words come from the installed module version that the folder pins.
+
+### Resource activity
+
+_(planned for M31)_
+
+`GET .../resource-activity` answers `{ items }`, one for each resource of the folder and of the modules the
+application uses. It is a route of its own, so the resource list stays free of the database. Studio's
+[kind lists](studio.md#kind-lists-and-module-resources) read it.
+
+- **`status`** is `new`, `changed` or `published`, against the live release. A file the release does not
+  hold is new, and with no live release every file is. A file it holds that no longer loads is changed. A
+  module's resource changes with a new module version or a layer.
+- **`titles` and `descriptions`** go with a module's resource: its label and description by locale, from
+  the module's own texts.
+- **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a resource and when, with the version
+  the write left, and a module's layer write counts too. The route answers them only while the file still
+  has that version, so a file changed in git shows the dash rather than the wrong person.

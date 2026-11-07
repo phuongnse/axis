@@ -454,6 +454,10 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
 The SPA routes on the client with `react-router` v7. The server answers every other path with the SPA, so each address
 below answers `200`.
 
+- **A data router** _(planned for M31)_. The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward
+  with [Leave without saving?](studio.md#editor), and `<ScrollRestoration>` returns a person to where they were on a
+  long page.
+
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `/`                                    | the [platform home page](shell.md#platform-home-page): signed in, the launcher of the person's applications and tools, and with nobody signed in, sign-in at once with no screen drawn first, except at the addresses of [the sign-in card](shell.md#the-sign-in-card)                                                                                                                                                                                              |
@@ -528,6 +532,9 @@ label. A child collection and a `references` field have no column.
 - **Identifying column.** The column that names a row is the entity's `displayField` when the table shows it, and
   otherwise the first column. For a data source it is the first column. It comes first. With a `navigate` row action it
   is the link that opens the row, see [opening a row](#opening-a-row).
+- **`priority`** _(planned for M31)_. A `table` widget may name a column's `priority`, `high` or `low`, in its
+  file, for what moves under its row first when a table has
+  [too little room](actions-and-controls.md#tables). A `table` widget has no column chooser.
 - **Layout.** Text, reference and file columns are free text, which shares the width left and wraps. Every other
   column, an enum too, fits its content and does not wrap, see [tables](actions-and-controls.md#tables). Every cell
   and the actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit
@@ -849,6 +856,21 @@ narrow one.
   widget, so the page never does.
 - **The shell header** folds the navigation and the language and theme menu into a Menu panel, see
   [layout](shell.md#layout).
+
+## Platform field help
+
+_(planned for M31)_
+
+Every field of the platform's own screens has help text, enforced three ways, because in an application
+builder help is not optional.
+
+- **`AxisField` requires `help`,** so a screen cannot leave it out.
+- **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
+  that are not fields, such as `modules.addTitle`, move out of it.
+- **Every editor draws its labels through `AxisField`,** those that draw their own today included, such as
+  the connector, process and page editors.
+
+An application's own forms keep `help` optional, as their author decides.
 
 ## Studio
 

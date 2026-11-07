@@ -47,7 +47,7 @@ it has no `assembly`. This example uses an illustrative package, `asset-maps`:
   [versions and pinning](extension-packages.md#versions-and-pinning). A host whose SDK does not meet the range leaves
   the package version out and logs a load diagnostic, as for a broken manifest.
 - **`properties`** are the typed properties that a page sets. A property may be `required`. `entity`, `dataSource` and
-  `page` values are references, so the [Uses and Used by lists](studio.md#references) show them.
+  `page` values are references, so the [Used by tab](studio.md#references) shows them.
 
 | Type         | Value on the page        | Checked at compile                                                 |
 | ------------ | ------------------------ | ------------------------------------------------------------------ |

@@ -26,6 +26,14 @@ opens the same view.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
   `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
   `&view=policies` the [policy matrix](#policy-matrix).
+- **A field** _(planned for M31)_. `&field=<name>` opens a field's
+  [drawer](entity-designer.md#field-drawer) on an entity's page.
+- **Back is the browser's** _(planned for M31)_. Studio has no Back or Next of its own and no breadcrumb.
+  Every view has its own address and each move is a history entry, except that a search replaces its
+  entry, so the browser's Back and Forward step through it, and `<ScrollRestoration>` returns the author
+  to where they were on a long page. A second Back would be one concern with two mechanisms. Where the
+  author is comes from the sidebar's marked entry, which also leads up to the list, and the
+  [page heading](studio-workspace.md#page-heading).
 
 ## New application
 
@@ -49,6 +57,8 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   author can type to narrow it. The dialog then asks for a name, or for a locale when the kind is
   `text`. A `409`, when the id or the file exists, or a `400`, when the name or the locale is refused,
   shows under the field and keeps the dialog open.
+- **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
+  stays on, and a click [checks the fields](actions-and-controls.md#fields).
 - **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's schema,
   with an id from `crypto.randomUUID()`. A reference the author must still choose is an empty string,
   so it shows as a diagnostic. A new `site` gets the kebab-case name as its `path`, by the rule of file
@@ -71,9 +81,25 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
 A kind's sidebar entry opens its list, see [workspace](studio-workspace.md#workspace), and picking a
 resource opens it alone, under its [name](studio-workspace.md#names), with its editor below.
 
-For each kind a module may hold, a Module group under the kind's list shows the resources of the
-modules that the application uses, by `<module>/<name>`, from the application's
-[names](authoring.md#names). A group shows only when it has a resource. A module resource opens in its
+- **One list for every kind** _(planned for M31)_. A kind's list is the
+  [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
+  Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
+  no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
+  fields or references, a file name, or a count that leads nowhere.
+- **A module's resources** _(planned for M31)_. The resources of the modules that the application uses
+  are in the same list, from the application's [names](authoring.md#names), named without the
+  `<module>/` prefix and with a neutral tag of the module's label beside the name. There is no Module
+  column. A kind with no label in its format, such as a policy, keeps its name. A module's resource has a
+  status, as a new module version or a layer changes it.
+- **Status** _(planned for M31)_. New, Changed or Published, from the
+  [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
+  fails it says Unavailable.
+- **Its controls** _(planned for M31)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
+  Name, Status, in the order New, Changed, Published, Last modified by and Last modified at. It searches
+  the name, the description, the module and the status, and filters on its columns in the browser, so the
+  module, a tag and not a column, is not a filter.
+
+A module resource opens in its
 kind's editor with the application's layer applied, as
 [customization layers in Studio](customization-layers.md#in-studio) describes. A module contract opens
 in its contract editor, with Relax and Undo relax, as
@@ -106,6 +132,9 @@ what changed.
   keys stay as they are.
 - **The form's layout** _(planned for M31)_. The sections, field names, labels, lists, JSON view and
   save bar of every form follow [Studio resource form](studio-resource-form.md).
+- **A description** _(planned for M31)_. Every kind that may have a
+  [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
+  shows it after the name and the label.
 - **The JSON view** shows the draft as text, and a valid edit there updates the form. Invalid JSON
   shows an error and turns Save off.
 - **Save** sends only the changes, as a JSON Patch with the version the editor loaded in `If-Match`,
@@ -113,34 +142,39 @@ what changed.
   the same length is compared item by item. Clearing an optional value removes its key. After a save
   the editor carries on from the new version.
 - **A stale version** is a `409`. The editor keeps the author's draft on screen and offers Reload,
-  which reads the resource again and drops the draft. Opening another resource also drops an unsaved
-  draft, without a warning.
+  which reads the resource again and drops the draft.
+- **Leave without saving** _(planned for M31)_. One guard around the shell asks "Leave without saving?", with
+  Stay and Leave, before a link in the shell is followed and before a move that the workspace starts by
+  itself, such as opening a reference or a problem. It guards Back and Forward too, through the
+  [data router](frontend.md#routing). An editor counts itself in through `useUnsavedChanges`, which
+  `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
+  join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
+  asked about.
 
 ## References
 
-Each resource lists the resources it uses and those that use it, from the
-[references routes](authoring.md#references), so an author sees what a change touches. How the two
-lists show is in [references](studio-resource-form.md#references).
+Each resource shows what uses it, from the [references routes](authoring.md#references), so an author
+sees what a change or a delete touches. How it shows is in [Used by](studio-resource-form.md#used-by).
 
-- **Opening an entry.** A Uses entry opens the other resource at its top. A Used by entry opens it at
-  the path of the reference: the path goes into the address, and the editor scrolls to the form field
-  for that path, with nothing highlighted. A path that the form cannot show, such as one inside a map,
-  opens the JSON view. A module or a package entry opens nothing.
-- **Counts can be stale.** The lists and the `usedBy` counts load with the open resource, and a save
+- **Opening an entry.** A Used by entry opens the other resource at the path of the reference: the path
+  goes into the address, and the editor scrolls to the form field for that path, with nothing
+  highlighted. A path that the form cannot show, such as one inside a map, opens the JSON view. A module
+  or a package entry opens nothing.
+- **Counts can be stale.** The list and the `usedBy` counts load with the open resource, and a save
   does not reload them, so a count can be out of date until the page reloads. The names, and so the
   counts that labels show, load again after a save and after a text write.
-- **Lists, not a graph.** Uses and Used by stay lists. The process graph on a process's Design tab is
-  the only drawn graph.
+- **A list, not a graph.** Used by stays a list. The process graph on a process's Design tab is the only
+  drawn graph.
 
 ## Delete
 
 Delete removes a resource's file, and asks first, because other resources may use it.
 
-- **In the Danger zone** _(planned for M31)_. Delete… sits in the resource's
-  [Danger zone](studio-resource-form.md#danger-zone).
+- **In a "…" menu** _(planned for M31)_. Delete… is in a "…" menu at the right of the resource's
+  [heading](studio-workspace.md#page-heading), so no tab shows it apart from the others.
 - **It asks.** Delete always opens a confirm dialog, which warns and names the count when the
-  resource's `usedBy` count is above 0. The author can still confirm. The application manifest has no
-  Delete.
+  resource's `usedBy` count is above 0, with "See what uses it", which opens the Used by tab. The author
+  can still confirm. The application manifest has no Delete.
 - **It checks the version.** The delete sends the loaded version in `If-Match`. A stale version shows
   the conflict message, and nothing is deleted.
 - **After a delete,** the resource leaves its list, and the Problems panel shows the diagnostics that
@@ -241,7 +275,7 @@ gone and then loads its data again.
   answer, or answers `502`, `503` or `504`. The Vite dev proxy answers `502` while the server is down.
 - **Waiting.** Studio then calls `GET /api/me` with a back-off of 0.5, 1, 2 and then 4 seconds, with
   no limit, until the server answers with any other status. Then the resources, the diagnostics, the
-  names, the open resource and its Uses and Used by lists load again, and the message goes away.
+  names, the open resource and its Used by list load again, and the message goes away.
 - **The draft stays.** An unsaved draft stays on screen with the version it was based on, so when the
   file changed meanwhile the next save gets a `409`. Studio does not resend a save that got no answer,
   so the author clicks Save again.
@@ -257,6 +291,12 @@ picks what exists.
 - **The select** is searchable, ignoring letter case. A module process, page or policy shows as
   `<module id>/<name>`, so a site's navigation can pick a module page and a `startProcess` action a
   module process.
+- **A choice shows its label** _(planned for M31)_. `ReferencePicker` names each choice by its label, from
+  `labelKey` in the [names](authoring.md#names), as the tables do. The name shows only instead of a missing
+  label, and in `textMuted` after the label of options that share one. The search finds either, and the
+  file keeps the name. Columns, parameters and operations have no label in their format, so they show
+  their name. Every picker takes this, the slot pickers of the [resource form](studio-resource-form.md)
+  among them.
 - **Parts of a resource.** A field or step part lists the fields of the entity, or the steps of the
   process, that the draft names. A parameter or column part lists those of the data source that the
   draft names, and an operation part the operations of the connector it names. An outcome part lists the
@@ -296,6 +336,10 @@ A label is an object whose only property is `textKey`. Studio edits its texts in
   answered, and the names and the release history load again.
 - **A shared key.** A label whose key other labels use says how many, from `usedBy` in the names
   answer, so the author knows that the edit changes them too.
+- **One language rule** _(planned for M31)_. A label shows in the author's language, else in `en`, as a
+  resource's title does, so a table and a picker never name one resource two ways. The label editor's own
+  rule, a box in the author's language or else the application's first, is about which language is
+  edited, and stays.
 
 ## Expression editor
 
@@ -305,7 +349,7 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
 
 - **Checking.** The editor checks its text once when it first draws, and 300 ms after each keystroke it
   sends the text to the [expression check route](authoring.md#expression-check), and shows only the
-  latest answer. It underlines the range from `start` to `end` and shows the error code and message
+  latest answer. It underlines the range from `start` to `end` and shows the message and error code
   under the editor, or the result `type` when there is no error. From its first draw or a keystroke
   until the answer to its latest text arrives or the check fails, and while its code loads, the editor
   has `aria-busy="true"`. Tests wait on this busy state before they click on the Form tab, see
@@ -315,6 +359,33 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
+- **What the place needs** _(planned for M31)_. A line under the box says what the place needs, as "Needs to
+  give yes or no", until the expression gives a type, then "Gives yes or no", in the words the designer
+  names types by. A validation, a condition or a filter needs a boolean, and a computed field or a
+  default the field's type.
+- **An error in words** _(planned for M31)_. An error reads first in words, with its code after it, small. An
+  empty expression is not sent to be checked. The box wraps long lines and grows with them.
+- **A function's signature** _(planned for M31)_. Inside a call, a line shows the function's signature, with the
+  parameter at the cursor in bold, and what it does.
+- **Expand** _(planned for M31)_. An icon beside the box opens the expression in a large dialog, with a panel of
+  three tabs, Fields, Operators and Functions, and every rule allowed there. A click inserts the name at
+  the cursor. A search looks in all three and lists what it finds best first: a name that is the words,
+  then one that starts with them, then one that holds them, then one whose description does.
+- **Completion that explains** _(planned for M31)_. Completion names each choice: a field by its label and type,
+  and a rule or a function by its signature, with what it does and an example beside the list.
+- **Completion knows where the cursor stands** _(planned for M31)_. After a value it offers the operators that
+  value's type takes, the comparisons first, and after a clause that already compares, only `and` and
+  `or`. Inside quotes after an enum field it offers that field's values in their order and closes the
+  quote. Elsewhere it offers the fields, the values, `not`, the rules and the functions, those that give
+  the type the place needs first. It opens by itself after a space that follows a value and after a
+  quote that follows an enum field.
+- **The language's own words** _(planned for M31)_. Completion and the panel offer the comparisons, `is null`,
+  `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values `true`, `false`, `null`,
+  `'text'` and `date('…')`, each with what it does and an example. A code editor stays the one way to
+  write an expression, because an expression gives a value of any type, not only yes or no.
+- **Only what the place allows** _(planned for M31)_. The server answers
+  [the scope of a place](authoring.md#expression-scope), so the client keeps no list of functions: no
+  aggregate in a default, and no `now()`, `today()` or `toDate()` in a computed field (`AXC0086`).
 - **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in scope, and the arrow keys
   and Enter pick one. The names come from the [names route](authoring.md#names), loaded with the
   application and again after a save, a delete and a reconnect. When they do not load, the list offers

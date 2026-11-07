@@ -10,7 +10,8 @@ writes and diagnostics, and the publishing routes. The page and form metadata ro
 [module resource saves](module-resource-saves.md).
 
 A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch
-no database. Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers
+no database, except the [release](#release-history) and [resource activity](studio-resource-form.md#resource-activity) routes,
+which read the releases. Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers
 and the expression completion, [text writes](#text-writes) the label texts, and the
 [expression check](#expression-check) the expression editor.
 
@@ -60,6 +61,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `POST /api/studio/apps`                                                             | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](authoring-applications.md#creating-an-application)                                                                                                                                                                                                                                                                                          |
 | `GET /api/studio/templates`                                                         | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, built-in templates first, then the others, each group sorted by `id`. Each title and description comes in both `en` and `vi`, and the SPA picks the locale. The route checks the session, the author role and Studio, as every read route does, and does not need `Studio:ApplicationsPath`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources`                                      | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`, each with `id`, `kind`, `name`, `file`, `version`, `usedBy`, `titles` and `locale`. `titles` is the resource's label text by locale: the `label` of an entity, role, identity provider or the manifest, or the `title` of a page or site, read from the text resources. A locale whose text resource has no text for the key is left out, and `titles` is empty for any other kind. `locale` is the locale of a text resource, else `null`                        |
+| `GET /api/studio/apps/{application}/resource-activity`                              | `200` with `{ items }` _(planned for M31)_, see [Resource activity](studio-resource-form.md#resource-activity) |
 | `GET /api/studio/apps/{application}/resources/{id}`                                 | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}`                | `200` with `{ id, kind, name, file, version, content, layer, marks, removed }`, see [module resources](#module-resources)                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `PUT /api/studio/apps/{application}/modules/{module}/resources/{id}`                | `200` with `{ file, version, diagnostics }`, and an `ETag` header when the save writes a layer. The body is the edited module resource whole, as `application/json`, with `If-Match` of the layer's version or `If-None-Match: *` when the resource has no layer. See [module resource saves](module-resource-saves.md)                                                                                                                                                                                                                                         |
@@ -81,6 +83,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
 | `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes)                                                                                                                                                                                                                                                                                                                                                                                          |
 | `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `POST /api/studio/apps/{application}/expressions/scope`                             | `200` with `{ type, fields, functions }` _(planned for M31)_, see [Expression scope](#expression-scope) |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`  | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [a module page](draft-page-metadata.md#a-module-page)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ widget, diagnostics }` for a draft form of the module version that the application pins. The body is the whole edited form as `application/json`, see [a module form draft](draft-page-metadata.md#a-module-form-draft)                                                                                                                                                                                                                                                                                                                           |
@@ -102,6 +105,14 @@ case. A file is a resource only when it is a JSON object with a UUID `id` and a 
 other files are left out of the list and cannot be read. When two files share an `id`, the first in
 path order is the resource. `usedBy` is the number of entries in the resource's `usedBy` list, see
 [References](#references).
+
+### Descriptions
+
+_(planned for M31)_
+
+`GET .../resources` also answers `descriptions` with each item: the resource's
+[`description`](resource-files.md#resource-file-shape) text by locale, read as `titles` is, and empty when
+it has none.
 
 ### The application list
 
@@ -392,6 +403,12 @@ again after a save, a delete and a reconnect. The answer is:
   for a process with a subject. A step that is not a task has `outcomes: []`.
 - **Page `parameters`** are the parameters the page declares, in file order. `required` is false when
   the file leaves it out.
+- **`labelKey`** _(planned for M31)_. Each name that has a label or title in its format also has the text key
+  of that label, `labelKey`, or null: an entity, a field, a process, a step, a data source, a rule, a
+  connector, an event, a role, a page, a policy and the module resources. Columns, parameters and operations
+  have none. A module's key resolves too, as `texts` holds the module texts merged into the application's.
+- **`unique`** _(planned for M31)_. Each field of `entities` says whether it is unique, for a matched
+  reference's [Find by](entity-designer.md#field-drawer).
 - **`locales`** are the locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the number of `label text`
   edges in the [reference index](configuration.md#reference-index).
@@ -430,6 +447,20 @@ only. The body is `{ texts: { <locale>: <text> } }`.
 - **Answer.** `200` with the new versions and the folder's [diagnostics](#diagnostics), or `503` when
   the lock cannot be taken, and then nothing is written.
 
+## Expression scope
+
+_(planned for M31)_
+
+`POST .../expressions/scope` answers what a place in a resource offers, so Studio's
+[expression editor](studio.md#expression-editor) keeps no list of its own. The body is
+`{ resourceId, path, draft }`, as for the [expression check](#expression-check). The answer is
+`{ type, fields, functions }`:
+
+- **`type`** is the type the place needs, or null when any will do.
+- **`fields`** are the fields in scope at the place, each with its `name`, `labelKey` and `type`.
+- **`functions`** are those allowed at the place, from the compiler's list of functions, each with its
+  parameters, result, group, example and what it does, in the request's language.
+
 ## Expression check
 
 `POST .../expressions/check` checks one expression without saving it, so Studio's expression editor
@@ -442,6 +473,9 @@ can show errors as the author types. The body is `{ resourceId, path, expression
   string, which the text replaces, or at a property the saved object lacks, which the text adds, so an
   optional expression that the author has just added, such as a form field's `requiredWhen`, is
   checked before the first save. A place inside an object that the saved resource lacks is not found.
+- **The draft** _(planned for M31)_. The body may also carry `draft`, the resource as the author has it, which
+  the server uses in place of the saved one, so a validation not yet saved gets an answer rather than a
+  `400`.
 - **Where it works.** In every place the compile checks an expression: computed fields, validations,
   rules, data source filters, process conditions and values, policy filters, migration values,
   endpoint values, trigger conditions and form conditions.

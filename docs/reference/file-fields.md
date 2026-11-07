@@ -196,4 +196,4 @@ file URL of its own.
   - A task page uses the same form, so it shows the Upload button too. Task completion attaches no
     file, so saving a newly uploaded file there is refused with the server's message on the field.
   - A save while an upload runs sends the value from before the upload.
-- **Studio.** The [entity designer](entity-designer.md#field-settings) edits `maxSize` and `accept`.
+- **Studio.** The [entity designer](entity-designer.md#field-drawer) edits `maxSize` and `accept`.

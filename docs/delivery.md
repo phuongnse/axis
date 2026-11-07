@@ -313,7 +313,7 @@ change, a design review and a sync are in the
   the review can go on from any machine, and is never merged. No push to a branch starts CI, as
   [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)
   agrees. A prototype is never merged, and it never gets `/nexkit review`, because it changes the widgets
-  without their tests. Before the review's docs change, the branch's last commit gets a
+  without their tests. When the review ends, the branch's last commit gets a
   `design-review/<yyyy-mm-dd>-<topic>` tag with the same date and topic, which is pushed and never
   deleted, so the links to the prototype never break. A tag starts no CI run. The branch is then
   deleted, locally and on GitHub.
