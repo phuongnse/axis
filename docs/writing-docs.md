@@ -142,6 +142,22 @@ For example, not "**The row stays.** The application row stays in place, as the 
 and only the sidebar's entries scroll under it." but "The application row and the band stay in place
 while the page scrolls. Only the sidebar's entries scroll, under the row."
 
+### Pages a person reads to understand Axis
+
+Some pages are read from start to end by a person who wants to understand Axis, rather than searched
+by someone who changes the code. They are the repository [README](../README.md), the
+[product brief](product-brief.md), [architecture](architecture.md), [knowledge](domain/knowledge.md)
+and any how-to guide or tutorial. They follow the rules above and these five:
+
+- **Say what and why first.** A reader who starts at the top needs the purpose before the detail.
+- **Give an example before the rule.** A reader grasps a rule sooner after seeing one case of it.
+- **Use everyday words.** A newcomer follows the page without a glossary open beside it.
+- **Define a term where it first appears.** A term used before its definition stops a reader who reads straight through.
+- **Link a decision at the end of a section, not in its sentences.** A link in the middle of a sentence breaks the thread of a reader who reads from start to end.
+
+Reference pages, the concepts page and decisions keep their own rules, as
+[reference pages](#reference-pages) and [decisions](#decisions) state them.
+
 ## Structure
 
 The docs are split so that a reader, or an agent, reads only what a change needs, and so that two
@@ -151,9 +167,10 @@ pull requests rarely edit the same lines.
   which says why and how the parts fit, such as the architecture, the knowledge and the decisions; a
   how-to guide, the steps of one task for one reader; or a tutorial, a guided first project. These
   are the kinds of Diátaxis, and a page does not mix them.
-- **One file for each topic.** [docs/README.md](README.md) lists every file with what it holds and
-  when to read it, grouped by the area that a reader works in, and a new file gets its row in the
-  same change. The grouping is in the map: files do not move into folders by area. A new topic that needs more than a few sections starts in
+- **One file for each topic.** [docs/README.md](README.md) opens with a reading path by what the
+  reader wants: to understand Axis, build an application, run Axis or work on Axis. Then it lists every
+  file with what it holds and when to read it, grouped by the area that a reader works in, and a new
+  file gets its row in the same change. The grouping is in the map: files do not move into folders by area. A new topic that needs more than a few sections starts in
   a file of its own, and a table that many changes add rows to lives in a file of its own.
 - **Small files.** A doc under `docs/` stays at or under 1,000 lines, and a change that grows a doc
   past 900 lines splits it, so that two changes that each add a few lines both still pass. The split
