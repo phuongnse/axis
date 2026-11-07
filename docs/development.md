@@ -164,8 +164,8 @@ runs Playwright in Chromium. It:
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
-- makes a throwaway TLS certificate for the run, which the https server of the tenant create spec and
-  of the two cell specs use on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
+- makes a throwaway TLS certificate for the run, which the https server of each spec that runs `tenant create`
+  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec;
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](reference/widget-previews.md).
 
