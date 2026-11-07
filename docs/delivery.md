@@ -69,10 +69,13 @@ that holds it.
 - **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
   makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
   issue to stop work on it without closing it.
-- **Autopilot takes the docs audit's issues,** because its [`trusted_workflows`][nexkit-workflow-issues] setting lists
-  `docs-audit.yml`. NexKit checks that the issue came from a run of that workflow on `main` that NexKit
-  or a writer started. An issue that any other workflow or a person without write access opens waits
-  until the owner reads it and comments `/nexkit trust` on it.
+- **Autopilot takes only trusted issues.** An issue is trusted when a person with write access opens
+  it, or when NexKit's App opens it: for a failure of CI on `main`, a flaky test, a Dependabot advisory
+  or a part of a split. The docs audit's issues are trusted too, because autopilot's
+  [`trusted_workflows`][nexkit-workflow-issues] setting lists `docs-audit.yml`. NexKit checks that the
+  issue came from a run of that workflow on `main` that a schedule, a push, a writer or NexKit started,
+  never a pull request. Any other issue waits until a writer reads it and comments
+  [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
   because its [`dependabot`][nexkit-dependabot] setting is `high`, as
   [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
@@ -232,9 +235,9 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
 - **Labels.** It gets at least one label, and every repository label whose description on GitHub fits
   its content. There is no fixed list, because the owner adds and removes labels.
-- **Who opens it.** The owner or the local agent opens it, because autopilot takes only issues opened
-  by someone with write access or by the docs audit. It marks the issue *blocked by* what it must wait for, by the rules
-  under [Decisions](#decisions).
+- **Who opens it.** The owner or the local agent opens it. Which issues autopilot takes is in
+  [how issues run](#how-issues-run). The issue marks what it must wait for with *blocked by*, by the
+  rules under [Decisions](#decisions).
 - **Design.** It may link a Design artifact as a picture, while the docs stay the source of
   behaviour.
 - **Exceptions.** Changes whose purpose is to edit paths NexKit may not change are hand-made pull
