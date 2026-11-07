@@ -227,7 +227,9 @@ every pull request, the tests, and an audit every hundred merges, as
    under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
    job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes, and a
-   finding that the cap leaves out is reported again by its page's next run. The skill gives the details.
+   finding that the cap leaves out is reported again by its page's next run. A docs fix that holds a
+   *wrong* finding is labelled `bug`, so it runs before the milestones' features: a wrong page misleads
+   every agent that reads it. The skill gives the details.
 9. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
    added only once the whole tree passes it: there are no baselines and no lists of exceptions.
    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in

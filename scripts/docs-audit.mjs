@@ -169,7 +169,7 @@ export function issuesFrom(findings, openBodies, runId) {
   for (const [page, list] of byPage) {
     add('docs', page, list, {
       title: `The docs of ${page} match the code`,
-      labels: ['documentation'],
+      labels: list.some((f) => f.kind === 'wrong') ? ['documentation', 'bug'] : ['documentation'],
       body: body(
         `The docs audit read ${link(page)} against the code and found statements to fix, as ` +
           `[how the docs stay correct](${repository}/blob/main/docs/writing-docs.md#how-the-docs-stay-correct) says.\n\n` +
