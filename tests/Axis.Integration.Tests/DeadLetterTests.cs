@@ -226,9 +226,10 @@ public sealed class DeadLetterTests(EventDeliveryFixture fixture) : IClassFixtur
         Assert.Contains(delivery.EventId.ToString(), warning, StringComparison.Ordinal);
         Assert.Contains("event.deliver", warning, StringComparison.Ordinal);
 
-        var measurement = Assert.Single(measurements);
+        // The meter is process-wide, so a dead letter that a test of another collection creates for its own tenant is
+        // counted here too. Only this tenant's measurement is the one under test.
+        var measurement = Assert.Single(measurements, point => point.Tags.GetValueOrDefault(AxisTelemetry.TenantTag) is "a");
         Assert.Equal(1L, measurement.Value);
-        Assert.Equal("a", measurement.Tags[AxisTelemetry.TenantTag]);
         Assert.Equal("event.deliver", measurement.Tags[AxisTelemetry.WorkItemKindTag]);
 
         Assert.DoesNotContain(ratio, lastError, StringComparison.Ordinal);

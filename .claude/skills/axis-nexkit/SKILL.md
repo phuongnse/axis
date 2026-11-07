@@ -74,7 +74,9 @@ marks between issues, in NexKit's `request` skill.
    *blocked by* marks: the journey waits for every other issue of its
    milestone, and the sweep for the journey too, also those opened later. A
    `bug` issue goes first, as [how issues run](../../../docs/delivery.md#how-issues-run)
-   says.
+   says. A follow-up is an issue from the start, blocked by the work it waits
+   for: [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
+   gives the rule.
 
 ## Breaking down a milestone
 
