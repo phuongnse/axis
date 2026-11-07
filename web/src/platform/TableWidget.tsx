@@ -42,6 +42,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { isVisible } from './visibleWhen'
 import { setOwn } from './ownProperty'
 
@@ -159,6 +160,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
@@ -699,6 +701,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           {confirming !== null && (
             <Modal
               open
+              width={size.dialog.small}
               title={t('shell.table.deleteConfirm')}
               okText={t('shell.table.delete')}
               okButtonProps={{ danger: true }}

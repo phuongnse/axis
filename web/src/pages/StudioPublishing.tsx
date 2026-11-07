@@ -21,6 +21,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { StudioBand } from './StudioBand'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -105,6 +106,7 @@ export function StudioPublishing({
   children?: ReactNode | ((history: StudioReleases | 'failed' | undefined) => ReactNode)
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
@@ -337,6 +339,7 @@ export function StudioPublishing({
       </Flex>
       <Modal
         open={dialogOpen}
+        width={size.dialog.medium}
         title={t('shell.studio.publish.title')}
         okText={t('shell.studio.publish.confirm')}
         cancelText={t('shell.studio.cancel')}

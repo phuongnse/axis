@@ -4,6 +4,7 @@ import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type Stu
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 
 /** What the server refused, as the text key to show under the name. */
@@ -30,6 +31,7 @@ export function StudioNewApplication({
   onOpenChange?: (open: boolean) => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [ownOpen, setOwnOpen] = useState(false)
@@ -111,6 +113,7 @@ export function StudioNewApplication({
       )}
       <Modal
         open={open}
+        width={size.dialog.medium}
         title={t('shell.studio.newApplication.title')}
         okText={t('shell.studio.newApplication.create')}
         cancelText={t('shell.studio.cancel')}

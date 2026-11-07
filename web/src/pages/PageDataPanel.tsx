@@ -4,6 +4,7 @@ import { useContext } from 'react'
 import { bindingTypes, paletteLimit, type DataBinding } from '../platform/pageWidgets'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { paletteReasons } from './pagePaletteSupport'
 
 /**
@@ -92,11 +93,12 @@ export function BindingChoice({
   onCancel: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const names = useContext(StudioNamesContext)
   return (
     <Modal
       open={binding !== undefined}
-      centered
+      width={size.dialog.medium}
       title={binding === undefined ? '' : `${t('shell.studio.data.bind')} ${binding.name}`}
       footer={<Button onClick={onCancel}>{t('shell.studio.data.cancel')}</Button>}
       onCancel={onCancel}

@@ -4,6 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { requestCellTenantHost, type CellHostRequest } from '../platform/cell'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
 
 interface RecordRow {
@@ -26,6 +27,7 @@ interface CellTenantHostDialogProps {
  */
 export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantHostDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { locale } = usePlatform().current
   const inputId = useId()
   const [host, setHost] = useState('')
@@ -74,8 +76,7 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
     <Modal
       open
       data-testid="cell-tenant-host-dialog"
-      // Wide enough for the record table, so it does not scroll sideways.
-      width={880}
+      width={size.dialog.large}
       title={t('shell.cell.tenant.addHostTitle').replace('{tenant}', tenant)}
       okText={t('shell.cell.tenant.addHostOk')}
       okButtonProps={{ disabled: host.trim() === '' }}

@@ -189,7 +189,7 @@ export function StudioEditor({
   publisher?: boolean
 }) {
   const t = useText()
-  const { type } = useDesignTokens()
+  const { size, type } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -1004,6 +1004,7 @@ export function StudioEditor({
       )}
       <Modal
         open={deleteOpen}
+        width={size.dialog.small}
         title={t('shell.studio.deleteConfirm')}
         okText={t('shell.studio.delete')}
         okButtonProps={{ danger: true }}

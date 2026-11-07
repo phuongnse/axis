@@ -16,6 +16,7 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 
 /** The Live tag of the release that runs, in the release list and on the release page's heading. */
@@ -93,6 +94,7 @@ export function StudioActivateDialog({
   onCancel: () => void
 }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<{ release: number; value: StudioReleaseBlocker[] | 'failed' }>()
   const known = blockers === undefined ? undefined : { release, value: blockers }
@@ -135,6 +137,7 @@ export function StudioActivateDialog({
   return (
     <Modal
       open={release !== null}
+      width={size.dialog.small}
       title={title}
       okText={t('shell.studio.activate.confirm')}
       okButtonProps={{ disabled: loading }}

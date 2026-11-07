@@ -11,6 +11,7 @@ import {
 } from './imports'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 /** How long the dialog waits between two checks of an import. */
 const pollDelay = 1000
@@ -39,6 +40,7 @@ interface ImportDialogProps {
  */
 export function ImportDialog({ importsPath, fields, onClose, onCommitted }: ImportDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [file, setFile] = useState<File | null>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [importId, setImportId] = useState<string | null>(null)
@@ -202,6 +204,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
   return (
     <Modal
       open
+      width={size.dialog.large}
       title={t('shell.table.importTitle')}
       onCancel={onClose}
       destroyOnHidden

@@ -1,6 +1,7 @@
 import { Alert, Button, Drawer, Flex, Modal, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { changeUserRole, fetchUserRoles, type RoleChange, type UserListItem, type UserRoles } from '../platform/users'
 
 /** One role of a section: given or not, and declared by the active release or not. */
@@ -42,6 +43,7 @@ export function UserRolesDrawer({ user, onClose }: { user: UserListItem | null; 
 
 function UserRolesPanel({ user }: { user: UserListItem }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [roles, setRoles] = useState<UserRoles>()
   const [problem, setProblem] = useState<Problem>()
   const [pending, setPending] = useState<Pending | null>(null)
@@ -130,6 +132,7 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
       </Flex>
       <Modal
         open={pending !== null}
+        width={size.dialog.small}
         title={pending && t(pending.give ? 'shell.users.roles.confirmGive' : 'shell.users.roles.confirmRemove')}
         okText={pending && t(pending.give ? 'shell.users.roles.give' : 'shell.users.roles.remove')}
         cancelText={t('shell.users.roles.cancel')}
