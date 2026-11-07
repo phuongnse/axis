@@ -79,8 +79,8 @@ Read these in order to understand Axis from the outside in:
 
 1. **[What Axis is and why](docs/product-brief.md):** who it serves, how it runs and the goals it
    holds itself to.
-2. **[How Axis works](docs/architecture.md):** the parts of the platform and how a request moves
-   through them.
+2. **[How Axis works](docs/how-axis-works.md):** a walk through the platform, from an application's
+   configuration to the people who use it.
 3. **[The words Axis uses](docs/domain/concepts.md):** what an entity, a process, a release and a
    tenant are.
 4. **[Where it is going](docs/roadmap.md):** what is built and what comes next.

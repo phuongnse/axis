@@ -16,6 +16,7 @@ Each kind of content has one home. Write a fact in its home and link to it from 
 | What Axis is, who it serves, the proving samples               | [Product brief](product-brief.md)                                                                                     |
 | The vocabulary                                                 | [Concepts](domain/concepts.md)                                                                                        |
 | How the parts fit together, and the pitfalls the design avoids | [Architecture](architecture.md) and [Knowledge](domain/knowledge.md)                                                  |
+| A first walk through the platform for a newcomer               | [How Axis works](how-axis-works.md)                                                                                   |
 | A choice between real alternatives, with its reasons           | A [decision](#decisions)                                                                                              |
 | How Axis behaves: configuration, APIs, screens, commands       | A [reference page](#reference-pages)                                                                                  |
 | How the work is done                                           | [Delivery](delivery.md), [Development](development.md) and this page                                                  |
@@ -146,8 +147,8 @@ while the page scrolls. Only the sidebar's entries scroll, under the row."
 
 Some pages are read from start to end by a person who wants to understand Axis, rather than searched
 by someone who changes the code. They are the repository [README](../README.md), the
-[product brief](product-brief.md), [architecture](architecture.md), [knowledge](domain/knowledge.md)
-and any how-to guide or tutorial. They follow the rules above and these five:
+[product brief](product-brief.md), [how Axis works](how-axis-works.md), [architecture](architecture.md),
+[knowledge](domain/knowledge.md) and any how-to guide or tutorial. They follow the rules above and these five:
 
 - **Say what and why first.** A reader who starts at the top needs the purpose before the detail.
 - **Give an example before the rule.** A reader grasps a rule sooner after seeing one case of it.
@@ -214,6 +215,7 @@ reads their diff and an agent can read and change them.
 | The data model of a store | `erDiagram` | The reference page of that store |
 | An installation | `flowchart` | The page of that installation |
 | A threat model's data flows | `flowchart` | Its threat model page, see the [method](reference/threat-model-method.md) |
+| A walk through the platform, one part at a time, at the level of what a person does | `flowchart` or `sequenceDiagram` | [How Axis works](how-axis-works.md) |
 
 - **Next to its text.** A diagram sits in the section that it illustrates, and the text says the same
   thing in words, so a reader who cannot see the diagram loses nothing.
