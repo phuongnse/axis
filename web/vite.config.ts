@@ -45,7 +45,7 @@ export default defineConfig({
     // Form tests type through many fields. With one worker per test file they come close to the
     // 5 second default on a busy machine.
     testTimeout: 15000,
-    // A worker holds about 1 GB, so one per core swaps when the local stack runs. See docs/development.md#unit-tests.
-    maxWorkers: vitestWorkers(os.freemem()),
+    // The worker count rule: docs/development.md#unit-tests
+    maxWorkers: vitestWorkers(os.freemem(), os.availableParallelism()),
   },
 })
