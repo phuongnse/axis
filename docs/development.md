@@ -164,6 +164,8 @@ runs Playwright in Chromium. It:
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
+- starts the control plane with its databases `axis_controlplane` and `axis_directory`, see
+  [the E2E stack](testing.md#the-e2e-stack);
 - makes a throwaway TLS certificate for the run, which the https server of the tenant create spec and
   of the two cell specs use on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
@@ -414,6 +416,7 @@ Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run wri
 | `e2e-journey-server.log`    | The E2E journey server       |
 | `e2e-publisher.log`         | The E2E publisher            |
 | `e2e-purchasing.log`        | The purchasing system stub   |
+| `e2e-controlplane.log`      | The E2E control plane        |
 
 `scripts/test-report.mjs` then prints a summary per suite and the failed tests with their
 `file:line`. On GitHub Actions the summary goes to the job summary, and each failed test becomes an
