@@ -159,13 +159,11 @@ are off, so no edit in the form overwrites the JSON being typed.
 
 ## JSON view
 
-_(planned for M31)_
+The JSON view is a CodeMirror editor with JSON highlighting and line numbers.
 
-The JSON view is a CodeMirror editor with JSON highlighting and line numbers. Two checks run as an
-author types, each marked in the gutter and underlined where it is: a syntax error, "This is not valid
-JSON here.", and every place where the content breaks the kind's schema, in words, such as "Add
-version.".
-
+- **Checks as the author types** _(planned for M31)_. Two checks run as an author types, each marked
+  in the gutter and underlined where it is: a syntax error, "This is not valid JSON here.", and every
+  place where the content breaks the kind's schema, in words, such as "Add version.".
 - **Its look.** Its border is a field's, `border` with `radius-base`, and the gutter stays inside it.
   Its text keeps `spacing-sm` from the border.
 - **Its height.** It reaches down to `spacing-md` above the footer, or above the save bar while that
@@ -178,7 +176,7 @@ version.".
 
 | Action   | What it does                                                                                                                                                                                                                                                                                                                                                                  |
 | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Problems | "2 problems", a text button in `dangerText`, shows only while there are any, and moves to the next one.                                                                                                                                                                                                                                                                       |
+| Problems | "2 problems", a text button in `dangerText`, shows only while there are any, and moves to the next one. _(planned for M31)_                                                                                                                                                                                                                                                   |
 | Find     | An icon, also Ctrl+F or Cmd+F, opens a bar at the top of the view, because the browser's own find cannot see the lines a code editor has not drawn. It counts the matches, as "1 of 22", from where it opened. Enter and Shift+Enter move between them, and Escape closes it and goes back to the text. Each match has a thin outline and the one in focus the selected tint. |
 | Format   | An icon that lays the JSON out again. It is off while the text is not JSON.                                                                                                                                                                                                                                                                                                   |
 | Copy     | An icon that copies the whole text and says so.                                                                                                                                                                                                                                                                                                                               |

@@ -1,9 +1,12 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
+import { openSearchPanel, search, searchKeymap } from '@codemirror/search'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from 'react'
+import { selectedItemTint } from '../platform/antTheme'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
+import { findPanel, type FindTexts } from './jsonFindPanel'
 import { jsonLanguage } from './jsonLanguage'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
 
@@ -20,20 +23,31 @@ export interface JsonViewProps {
    * absent, nothing follows the view.
    */
   boundary?: RefObject<HTMLElement | null>
+  /** The texts of the find bar. */
+  findTexts: FindTexts
+  ref?: Ref<JsonViewHandle>
+}
+
+/** What the owner of a JSON view can ask it to do. */
+export interface JsonViewHandle {
+  /** Opens the find bar, or focuses its field when it is open. */
+  openFind(): void
+  /** Replaces the whole text as an author's edit, so `onChange` reports it. */
+  replace(text: string): void
 }
 
 /** A code editor for a resource's JSON, with line numbers, that fills the window down to the shell footer. */
-export default function JsonView({ label, value, onChange, boundary }: JsonViewProps) {
+export default function JsonView({ label, value, onChange, boundary, findTexts, ref }: JsonViewProps) {
   const { mode } = useThemeMode()
   const tokens = useDesignTokens()
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [height, setHeight] = useState(minHeight)
-  const latest = useRef({ onChange, value, theme: jsonTheme(tokens, mode), themeCompartment })
+  const latest = useRef({ onChange, value, findTexts, theme: jsonTheme(tokens, mode), themeCompartment })
 
   useEffect(() => {
-    latest.current = { onChange, value, theme: jsonTheme(tokens, mode), themeCompartment }
+    latest.current = { onChange, value, findTexts, theme: jsonTheme(tokens, mode), themeCompartment }
   })
 
   useEffect(() => {
@@ -46,7 +60,13 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
           lineNumbers(),
           jsonLanguage,
           history(),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          search({ top: true, createPanel: findPanel(() => latest.current.findTexts) }),
+          // Go to line opens a dialog with CodeMirror's own English text, so the view leaves it out.
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            ...searchKeymap.filter((binding) => binding.key !== 'Mod-Alt-g'),
+          ]),
           initial.themeCompartment.of(initial.theme),
           EditorView.contentAttributes.of({ 'aria-label': label }),
           EditorView.updateListener.of((update) => {
@@ -78,6 +98,20 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
       })
     }
   }, [value])
+
+  useImperativeHandle(ref, () => ({
+    openFind() {
+      if (viewRef.current) {
+        openSearchPanel(viewRef.current)
+      }
+    },
+    replace(text) {
+      const view = viewRef.current
+      if (view && view.state.doc.toString() !== text) {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, userEvent: 'input.format' })
+      }
+    },
+  }))
 
   const gap = tokens.spacing.md
   const fit = () => {
@@ -115,7 +149,7 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
 }
 
 const jsonTheme = sharedTheme((tokens, mode) => {
-  const { colour, spacing } = tokens
+  const { colour, spacing, radius, type } = tokens
   return [
     codeEditorTheme(tokens, mode),
     EditorView.theme({
@@ -130,6 +164,27 @@ const jsonTheme = sharedTheme((tokens, mode) => {
         borderInlineEnd: `1px solid ${colour.borderSubtle}`,
       },
       '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px` },
+      '.cm-panels': { backgroundColor: colour.surface, color: colour.text },
+      '.cm-panels-top': { borderBottom: `1px solid ${colour.borderSubtle}` },
+      '.cm-findBar': {
+        display: 'flex',
+        alignItems: 'center',
+        gap: `${spacing.xs}px`,
+        padding: `${spacing.xs}px ${spacing.sm}px`,
+      },
+      '.cm-findBar input': {
+        backgroundColor: colour.surface,
+        color: colour.text,
+        border: `1px solid ${colour.border}`,
+        borderRadius: `${radius.base}px`,
+        fontFamily: type.codeFontFamily,
+        fontSize: 'inherit',
+        padding: `2px ${spacing.xs}px`,
+      },
+      '.cm-findBar input:focus': { outline: `2px solid ${colour.focusRing}` },
+      '.cm-findCount': { color: colour.textMuted },
+      '.cm-searchMatch': { backgroundColor: 'transparent', outline: `1px solid ${colour.border}` },
+      '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: selectedItemTint(mode) },
     }),
   ]
 })
