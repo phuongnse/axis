@@ -27,6 +27,21 @@ The console calls routes under `/api/console/`. Each needs a session (`401`) and
 (`403`, also for everyone when `Console:OperatorRole` has no value), and every write needs the CSRF
 header, as the other session routes do. They are checked on the server whatever the page shows.
 
+| Route                                                     | What it does                                                              |
+| --------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `GET /api/console/tenant`                                 | Answers the tenant of the host and its active applications                |
+| `GET /api/console/failed-work`                            | Lists one page of the failed work of the tenant, newest first             |
+| `GET /api/console/webhook-deliveries`                     | Lists one page of the tenant's webhook deliveries, newest first           |
+| `GET /api/console/instances/{id}`                         | Answers one instance of the tenant, in the process inspection shape       |
+| `POST /api/console/instances/{id}/retry`                  | Runs the retry command of an instance on its active release               |
+| `POST /api/console/instances/{id}/cancel`                 | Runs the cancel command of an instance on its active release              |
+| `POST /api/console/instances/{id}/calls/{callId}/resolve` | Runs the resolve command of a call of an instance                         |
+| `GET /api/console/applications/{id}/publishing`           | Answers one application's release history and publish requests, read-only |
+| `GET /api/console/dead-letters`                           | Lists one page of the tenant's dead letters, newest first                 |
+| `GET /api/console/schedules`                              | Lists the schedule triggers of the active release of each application     |
+| `POST /api/console/dead-letters/{id}/redeliver`           | Redelivers an open dead letter                                            |
+| `POST /api/console/dead-letters/{id}/discard`             | Discards an open dead letter                                              |
+
 - **`GET /api/console/tenant`.** Answers the tenant of the host: `id`, `status` and
   `applications`. Each application has its `id`, `name`, `releaseId` (the active release),
   `releaseNumber` and `releaseLabel` (the number and label of that release in the application's
