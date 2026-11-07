@@ -258,8 +258,15 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         using var output = new StringWriter();
         var runner = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease);
 
-        // MinIO at times fails a request. A step that throws releases the job, and the publisher claims it again in the next round, up to three claims.
-        for (var round = 1; round <= 3; round++)
+        await RunRoundsAsync(runner, job, output);
+
+        return (job, output.ToString());
+    }
+
+    // MinIO at times fails a request. A step that throws releases the job, and the publisher claims it again in the next round, up to three claims.
+    private async Task RunRoundsAsync(ProvisioningJobs runner, Guid job, TextWriter output, int rounds = 3)
+    {
+        for (var round = 1; round <= rounds; round++)
         {
             Assert.True(await runner.RunNextAsync(output, CancellationToken));
             if (await StateAsync(job) != "running")
@@ -267,8 +274,6 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
                 break;
             }
         }
-
-        return (job, output.ToString());
     }
 
     [Fact]
@@ -307,6 +312,8 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var first = 1;
+        var jobB = Guid.Empty;
+        var failedB = 0;
         var kinds = Kinds(
             JobSetting<CellBackupStorage>.Of(storage),
             CellDefaults(),
@@ -320,15 +327,22 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
                         await gate.Task.WaitAsync(cancellationToken);
                     }
 
+                    // The throw stands in for a MinIO request that fails, as it does at times in CI.
+                    if (job == jobB && Interlocked.Exchange(ref failedB, 1) == 0)
+                    {
+                        throw new AmazonS3Exception("The upload failed.");
+                    }
+
                     return await step.RunAsync(job, tenant, input, cancellationToken);
                 },
             });
         var jobA = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
-        var jobB = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
+        jobB = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
         using var outputA = new StringWriter();
         using var outputB = new StringWriter();
 
-        var runnerA = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(outputA, CancellationToken);
+        var runnerJobsA = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease);
+        var runnerA = runnerJobsA.RunNextAsync(outputA, CancellationToken);
         await started.Task.WaitAsync(TimeSpan.FromSeconds(30), CancellationToken);
 
         Assert.Equal(1, await LeaseCountAsync(fixture.TenantId));
@@ -337,11 +351,22 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
 
         gate.SetResult();
         Assert.True(await runnerA);
-        Assert.Equal("succeeded", await StateAsync(jobA));
+        if (await StateAsync(jobA) == "running")
+        {
+            await RunRoundsAsync(runnerJobsA, jobA, outputA, rounds: 2);
+        }
+
+        Assert.True(await StateAsync(jobA) == "succeeded", outputA.ToString());
         Assert.Equal(0, await LeaseCountAsync(fixture.TenantId));
 
-        Assert.True(await new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(outputB, CancellationToken));
-        Assert.Equal("succeeded", await StateAsync(jobB));
+        await RunRoundsAsync(new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease), jobB, outputB);
+
+        var output = outputB.ToString();
+        var failed = output.IndexOf($"{fixture.TenantId} export failed: AmazonS3Exception", StringComparison.Ordinal);
+        var released = output.IndexOf("job released", StringComparison.Ordinal);
+        var done = output.IndexOf($"{fixture.TenantId} export ok", StringComparison.Ordinal);
+        Assert.True(failed >= 0 && released > failed && done > released, output);
+        Assert.True(await StateAsync(jobB) == "succeeded", output);
         Assert.Equal(new[] { $"exports/{fixture.TenantId}/{jobA:D}.zip", $"exports/{fixture.TenantId}/{jobB:D}.zip" }.Order(StringComparer.Ordinal), await KeysAsync(s3, bucket));
     }
 
