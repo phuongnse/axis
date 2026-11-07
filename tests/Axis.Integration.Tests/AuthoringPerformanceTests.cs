@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// An application of typical size keeps the M8 authoring work fast: its compile with the reference
+/// An application of typical size keeps the authoring work fast: its compile with the reference
 /// index, the share of the compile time that the index adds, the Studio diagnostics and patch answers,
 /// the where-used answers, and the compile of an application that declares three modules.
 /// </summary>

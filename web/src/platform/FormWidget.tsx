@@ -33,7 +33,10 @@ interface FormWidgetProps {
 
 type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
 
-/** The footer of a form the user cannot save: it has no solid button, so no action is a text button (D128). */
+/**
+ * The footer of a form the user cannot save: it has no solid button, so no action is a text button, see
+ * docs/reference/actions-and-controls.md#buttons.
+ */
 function FooterRow({ children }: { children: ReactNode }) {
   return <Flex gap="small">{children}</Flex>
 }
@@ -282,7 +285,8 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <Alert data-testid="form-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
 
-  // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined (D128).
+  // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined.
+  // See docs/reference/actions-and-controls.md#buttons.
   const Row = !steps.last || canSave ? AxisActionRow : FooterRow
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>

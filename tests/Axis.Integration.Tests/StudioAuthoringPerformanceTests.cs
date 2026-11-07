@@ -14,7 +14,7 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The M11 Studio features stay fast at realistic sizes: the names of a typical application, 20 rule patches in one
+/// The Studio features stay fast at realistic sizes: the names of a typical application, 20 rule patches in one
 /// <c>changes</c> call, an application created from a template of 300 files, and a <c>test</c> request of 20
 /// scenarios run by a real publisher. All tests are in one class, so xUnit runs them one after another and they do
 /// not compete for CPU. The class runs after every parallel collection, so <see cref="PublisherTestRequestTests"/>,
