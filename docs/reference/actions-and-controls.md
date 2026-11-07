@@ -84,9 +84,7 @@ setting on the shared `ConfigProvider` carries them, so no widget keeps its own 
   and the console: its label, its help and its input, as a group that its help describes.
   `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
   a few ways, each with its help, and `AxisFieldGroup` a titled group of fields.
-- **Every field has help** _(planned for M31)_. In an application builder help is not optional. `AxisField`
-  requires `help`, see [platform field help](frontend.md#platform-field-help). An application's own forms
-  keep `help` optional, as their author decides.
+- **Every field has help** _(planned for M31)_, as [platform field help](frontend.md#platform-field-help) says.
 - **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
   its own.
 - **One field to a row** _(planned for M31)_. Two fields share a row only when they truly belong together,

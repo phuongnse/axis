@@ -23,8 +23,8 @@ last section with no heading.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
 - **One rhythm.** The sections are `spacing-md` apart.
-- **Shared parts.** Every Studio form is built from the same sections and
-  [`AxisField`](actions-and-controls.md#fields), and a form does not lay its fields out on its own.
+- **Shared parts.** Every Studio form is built from these sections, with its fields as
+  [fields](actions-and-controls.md#fields) says.
 
 ## Fields
 
