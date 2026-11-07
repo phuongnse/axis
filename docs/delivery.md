@@ -352,6 +352,10 @@ issues, pull requests and sub-issues.
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
   code, test scenarios, the realm file and the
   [development users table](reference/security.md#development-users).
+- Write a closing keyword before an issue number only when the pull request closes that issue.
+  GitHub reads `close #12`, `fixes #12` or `resolves #12` as closing it even in a negation such as
+  "does not close #12", and the merge then closes the issue with its work undone. To say that a
+  pull request leaves an issue open, write "#12 stays open".
 - Name a branch or a tag by what it holds:
 
   | Branch or tag                         | What it holds                                              | Who names it   |
