@@ -7,7 +7,7 @@ Docker Compose and the E2E run, and CI runs its scenarios. Milestones and their 
 
 ## What Axis is
 
-Axis is a general-purpose low-code platform for building and running business applications of any
+Axis is an enterprise application platform for building and running business applications of any
 domain through configuration. An application is a set of typed resources:
 
 - entities and fields
@@ -22,7 +22,7 @@ domain through configuration. An application is a set of typed resources:
 Axis validates these resources, compiles them into an immutable **release** and runs the release on
 shared engines. Publishing an application, or changing one, never needs a platform source change or
 an application-specific build, and no domain gets platform code, as
-[D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) explains.
+[D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) explains.
 
 When a requirement cannot be expressed in configuration, it is written as an **extension package**:
 versioned, tested C# code that adds typed operations under explicit capability limits. The package is

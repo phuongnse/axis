@@ -1,6 +1,6 @@
 # Axis agent instructions
 
-Axis is a general-purpose low-code platform. An application is configuration: Axis validates it,
+Axis is an enterprise application platform. An application is configuration: Axis validates it,
 publishes it as an immutable release and runs it on shared engines. The backend is C# on .NET 10,
 the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 

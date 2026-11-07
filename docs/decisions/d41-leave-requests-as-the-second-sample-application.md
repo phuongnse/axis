@@ -31,4 +31,4 @@ Its data, flow, security, pages and scenarios are in the
 
 - Reuse of the engines and of a module is proven without a package or a connector.
 - The sample proves nothing about other shapes of application, which the later samples cover, see
-  [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
+  [D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md).

@@ -103,10 +103,10 @@ first such customer.
 
 ## Direction
 
-[D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) records the
+[D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) records the
 direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) the customers it serves first.
 
-- **A general-purpose low-code platform.** An author creates, configures, tests,
+- **An enterprise application platform for any domain.** An author creates, configures, tests,
   publishes and runs an application through Studio, without editing JSON or
   code.
 - **Small businesses first.** Individuals and small and medium businesses have no IT team and

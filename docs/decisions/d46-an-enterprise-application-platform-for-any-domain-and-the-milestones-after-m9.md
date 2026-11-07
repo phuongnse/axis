@@ -1,4 +1,4 @@
-# D46. A general-purpose low-code platform and the milestones after M9
+# D46. An enterprise application platform for any domain and the milestones after M9
 
 Status: **Agreed**
 
@@ -11,9 +11,9 @@ platform that suits one shape, or one domain such as ERP, is not general.
 
 ## Decision
 
-- **Axis is a general-purpose low-code platform.** People build applications of any business domain
-  on it. An author creates, configures, tests, publishes and runs an application through Studio,
-  without editing JSON or code.
+- **Axis is an enterprise application platform for any domain.** People build applications of any
+  business domain on it. An author creates, configures, tests, publishes and runs an application
+  through Studio, without editing JSON or code.
 - **Files stay the source of truth,** as [D5](d5-configuration-is-authored-as-files-first.md) says.
   Studio and every designer write the same resources through the authoring API.
 - **No domain gets platform code.** Samples only prove the platform. Built-in modules serve real

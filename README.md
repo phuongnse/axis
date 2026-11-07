@@ -1,6 +1,6 @@
 # Axis
 
-Axis is a general-purpose low-code platform. Organizations build complete
+Axis is an enterprise application platform. Organizations build complete
 business applications on it by configuring them: data models, queries, rules,
 processes, sites, pages, widgets, security policies and text. Axis validates
 the configuration, publishes it as an immutable release, then runs it on

@@ -57,7 +57,7 @@ the files agree, title and status included.
 | [D43](decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) | Tenant provisioning and migrations across tenant databases | **Agreed** |
 | [D44](decisions/d44-packaging-for-on-premises-and-cloud-installation.md) | Packaging for on-premises and cloud installation | **Agreed** |
 | [D45](decisions/d45-tenant-backup-and-restore.md) | Tenant backup and restore | **Agreed** |
-| [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) | A general-purpose low-code platform and the milestones after M9 | **Agreed** |
+| [D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) | An enterprise application platform for any domain and the milestones after M9 | **Agreed** |
 | [D47](decisions/d47-publishing-from-studio.md) | Publishing from Studio | **Agreed** |
 | [D48](decisions/d48-preview-tenants.md) | Preview tenants | **Agreed** |
 | [D49](decisions/d49-several-server-replicas-behind-a-tls-proxy.md) | Several server replicas behind a TLS proxy | **Agreed** |
