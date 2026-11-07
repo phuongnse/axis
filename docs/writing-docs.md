@@ -72,8 +72,8 @@ it change. It never holds progress, dates, names or issue numbers.
 - **A new decision that changes an agreed one replaces it whole.** It restates the parts that still
   hold, so the old file is never half valid. In the same change the old file is deleted, its row in
   the index names the decision, or decisions, that superseded it, as `Superseded by Dn`, with a link to
-  its last text in git, and every reference page and
-  link follows the new decision. A number is never used again.
+  its last text in git, and every reference page, link and citation in the code follows the new decision,
+  as [references in the code](#references-in-the-code) says. A number is never used again.
 
 ## Reference pages
 
@@ -105,6 +105,19 @@ says what is built.
 A planned rule describes the agreed result. It does not also describe what Axis does until then: the
 issue that builds it knows the starting point. The docs sweep of the milestone removes the marker, or
 moves it to a later milestone when the work moved.
+
+## References in the code
+
+Comments in the code point at places that still hold, so a reader can find the rule and its reason.
+
+- **A comment that says what the code must do links the reference section that states the rule,** as
+  `docs/reference/<page>.md#<section>`. The section holds the rule, so the comment stays true when the rule changes.
+- **A comment that says why a choice was made cites the decision in force,** as `D<n>`. A superseded decision is
+  not cited. Its successor is cited instead, or the reference section that holds the rule. A decision file may name
+  the decisions it replaces.
+- **The code names no milestone, issue or pull request.** Those are progress and history, which change as work moves.
+- [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks the decisions, the sections and the milestones that the
+  code and the docs cite.
 
 ## Style
 
@@ -239,5 +252,7 @@ every pull request, the tests, and an audit every hundred merges, as
      decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size limits, the
      [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
-     realm. It runs one module per rule under `scripts/lib/docs/`, each with its own test.
+     realm. It also checks the decisions that the code and the docs cite, the sections the code links and
+     the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
+     module per rule under `scripts/lib/docs/`, each with its own test.
    - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.

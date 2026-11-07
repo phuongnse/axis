@@ -59,7 +59,10 @@ export const radiusTokens = { base: 6 }
  */
 export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40, dialog: { small: 400, medium: 560, large: 880 } }
 
-/** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
+/**
+ * The one layout breakpoint, see docs/reference/frontend.md#narrow-width. Below it is narrow width. A page cannot change
+ * it: media queries read no CSS property.
+ */
 export const breakpointTokens = { narrowWidth: 992 }
 
 export type ColourName = keyof typeof colourTokens

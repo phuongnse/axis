@@ -45,7 +45,7 @@ export function slugify(heading) {
 }
 
 /** Calls visit(line, lineNumber) for every line of the Markdown text outside code fences. */
-function forEachProseLine(markdown, visit) {
+export function forEachProseLine(markdown, visit) {
   let fence
   markdown.split(/\r?\n/).forEach((line, index) => {
     const marker = fencePattern.exec(line)?.[1]

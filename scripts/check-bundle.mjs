@@ -67,7 +67,7 @@ export function checkBundle(spaDirectory, budget) {
   if (mainBytes > limit) {
     problems.push(
       `The main bundle is ${kilobytes(mainBytes)} gzipped, ${kilobytes(mainBytes - limit)} over its budget of ${kilobytes(limit)} ` +
-        `(${kilobytes(budget.mainBaselineBytes)} before M12 plus ${kilobytes(budget.allowedGrowthBytes)}).`,
+        `(${kilobytes(budget.mainBaselineBytes)} baseline plus ${kilobytes(budget.allowedGrowthBytes)} growth).`,
     )
   }
   if (chartFiles.length === 0) {

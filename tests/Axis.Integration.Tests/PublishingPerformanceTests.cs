@@ -20,7 +20,7 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The M10 features stay fast at realistic sizes: a publish request of a typical application against
+/// Publishing stays fast at realistic sizes: a publish request of a typical application against
 /// <c>axis-admin activate</c> on the same folder, the release history route with 500 activations, 200 Studio patches
 /// through two server instances, and 1,000 session checks against the shared key ring. All tests are in one class, so
 /// xUnit runs them one after another and they do not compete for CPU.
