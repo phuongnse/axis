@@ -34,7 +34,7 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   or command verifies. Its text names the concepts it touches. See
   [the life of an issue](docs/delivery.md#the-life-of-an-issue).
 - Build in vertical slices. Every behaviour change needs a test, and a removal needs none, see
-  [testing](docs/architecture.md#testing): real PostgreSQL through Testcontainers for storage and
+  [testing](docs/testing.md): real PostgreSQL through Testcontainers for storage and
   engine behaviour, Playwright for UI journeys. Test denied access as well as allowed access.
 - Keep AGENTS.md to rules, not details: a rule takes at most five lines and links the doc that holds the rest.
 - One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a

@@ -225,7 +225,7 @@ Its `PurchaseRequestApprovedWebhook` also needs the `PurchaseRequestApprovedWebh
 `PurchaseRequestApprovedWebhookSecret` bindings, see
 [Webhook resource](outbound-webhooks.md#webhook-resource). Development, Docker Compose,
 `scripts/dev.sh` and the E2E run point them at the
-[purchasing system stub](../architecture.md#purchasing-system-stub).
+[purchasing system stub](../testing.md#purchasing-system-stub).
 
 ### OAuth2 auth
 
