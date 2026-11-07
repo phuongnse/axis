@@ -62,8 +62,10 @@ The rules are in
 marks between issues, in NexKit's `request` skill.
 
 1. Read the doc sections the issue implements. Write the behaviour, by role,
-   with 2–5 acceptance criteria, and name the concepts it touches in the
-   terms of [concepts.md](../../../docs/domain/concepts.md).
+   with 2–5 acceptance criteria that the review can verify, as
+   [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
+   says, and name the concepts it touches in the terms of
+   [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
    fits.
 3. Create it in the milestone that delivers it:
