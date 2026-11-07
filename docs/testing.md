@@ -22,8 +22,11 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   select a class of the UI library. `scripts/lint.sh` fails when a file under `tests/` names a class
   that starts with `ant-`.
 - **Exact names.** A string name or text passed to `getByRole`, `getByLabel`, `getByText` or
-  `getByTitle` comes with `exact: true`, and only a regular expression matches part of a name.
-  `scripts/lint.sh` fails on a call that breaks this.
+  `getByTitle` comes with `exact: true`, and only a pattern matches part of a name: a regular
+  expression, `new RegExp(...)`, `fieldLabel(...)` or a `const` that holds one. The oxlint rule
+  `axis/exact-locators` of Axis's plugin enforces this on `tests/e2e`, and `scripts/lint.sh` runs it. A
+  name or options that the rule cannot see, such as a function parameter, need `exact: true` where
+  the call shows it.
 - **Selects.** Specs pick select options only through the helpers in `tests/e2e/select.ts`. The
   helpers never click an option, because a click can land without choosing it when the open list is
   placed again between the mouse going down and up. They type the option into an editable select,
@@ -39,7 +42,7 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   `tests/e2e/dialogs.ts`. A dialog zooms in when it opens, and a click during the zoom is lost, so
   `waitForDialog` returns the dialog once it is fully opaque and its opening animation has ended.
   `confirmDialog` waits the same way before it clicks its button, and retries until the dialog
-  closes. `scripts/lint.sh` fails when a file under `tests/e2e/specs/` calls `getByRole('dialog')`
+  closes. The same rule fails when a file under `tests/e2e/specs/` calls `getByRole('dialog')`
   itself.
 - **Elapsed time.** Only `*PerformanceTests` classes may assert on elapsed time, because they run
   alone. Other tests prove a bound with a count, such as the steps used or the nodes inlined, and show

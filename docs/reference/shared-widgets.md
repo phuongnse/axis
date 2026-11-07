@@ -44,7 +44,7 @@ Each common job has one shared widget or helper:
 
 Oxlint in `npm run lint --prefix web`, which `scripts/lint.sh` runs, fails on each way round a shared
 widget. The plugin rules are in `web/lint/axis-plugin.mjs` and are on in `web/.oxlintrc.json`. Test
-files are not checked.
+files are not checked. The plugin's rule for the end-to-end tests is on in `tests/e2e/.oxlintrc.json`.
 
 - **`axis/no-antd-button`** refuses a `<Button>` imported from `antd`. `AxisButton.tsx` is the one
   file that may use it.

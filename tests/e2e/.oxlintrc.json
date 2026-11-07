@@ -1,0 +1,11 @@
+{
+  "$schema": "../../web/node_modules/oxlint/configuration_schema.json",
+  "categories": { "correctness": "off" },
+  "jsPlugins": ["../../web/lint/axis-plugin.mjs"],
+  "ignorePatterns": ["node_modules/**", "playwright-report/**", "test-results/**"],
+  "rules": { "axis/exact-locators": ["error", { "allowDialogLookup": true }] },
+  "overrides": [
+    // Specs reach a dialog through waitForDialog and confirmDialog, see docs/testing.md#rules-for-tests.
+    { "files": ["specs/**"], "rules": { "axis/exact-locators": "error" } }
+  ]
+}

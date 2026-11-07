@@ -175,6 +175,129 @@ describe('axis/no-antd-button', () => {
   })
 })
 
+describe('axis/exact-locators', () => {
+  const rules = { 'axis/exact-locators': 'error' }
+  const reported = (source, options = rules) => lint(source, { rules: options, extension: 'ts' })
+  const rule = 'axis(exact-locators)'
+
+  it('reports a string name without exact: true, also with exact: false or a flag', () => {
+    const source = [
+      "page.getByRole('button', { name: 'Save' })",
+      "page.getByRole('button', { name: 'Save', exact: false })",
+      "page.getByRole('button', { name: 'Save', exact: flag })",
+      "page.getByRole('button', { name: 'Save', exact: true, ...more })",
+      'page.getByRole("button", { name })',
+      'page.getByRole("row", { name: `Row ${id}` })',
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([1, 2, 3, 4, 5, 6].map((line) => `${rule}:${line}`))
+  })
+
+  it('reports a string text without exact: true for getByLabel, getByText and getByTitle', () => {
+    const source = [
+      "page.getByText('x')",
+      'page.getByLabel(label)',
+      "page.getByLabel('x', { exact: false })",
+      "page.getByTitle('x')",
+      'page.getByText(`Row ${f(a, b)}`)',
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([1, 2, 3, 4, 5].map((line) => `${rule}:${line}`))
+  })
+
+  it('reports a multi-line call on the line of the call', () => {
+    const source = ['await page', "  .getByRole('button', {", "    name: 'Save',", '  })', ''].join('\n')
+    expect(reported(source)).toEqual([`${rule}:2`])
+  })
+
+  it('reports options and names it cannot see', () => {
+    const source = [
+      "function a(options) { page.getByRole('button', options) }",
+      "const o = { name: 'Save' }\npage.getByRole('button', o)",
+      "const name = 'Save'\npage.getByRole('button', { name })",
+      "const t = 'x'\npage.getByText(t, { exact: true, ...more })",
+      "page.getByRole('button', { ...more })",
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([`${rule}:1`, `${rule}:3`, `${rule}:5`, `${rule}:7`, `${rule}:8`])
+  })
+
+  it('allows exact: true, patterns, and getByRole with no name', () => {
+    const source = [
+      "page.getByRole('button', { name: 'Save', exact: true })",
+      'page.getByRole("button", { name: /Save/i })',
+      "page.getByRole('row', { name: new RegExp(title, 'i') })",
+      'page.getByLabel(fieldLabel(label))',
+      "page.getByRole('row')",
+      "page.getByRole('row', { exact: true })",
+      "page.getByTitle('x', { exact: true })",
+      "page.getByText('x', { 'exact': true })",
+      'page.getByText(/Save/i)',
+      'getByText(new RegExp(title))',
+      'page.getByRole("row", { name: `Row ${id}`, exact: true })',
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([])
+  })
+
+  it('follows a const to a pattern or to options with exact: true', () => {
+    const source = [
+      "const r = /don't/\npage.getByRole('button', { name: r })",
+      "const o = { name: 'Save', exact: true }\npage.getByRole('button', o)",
+      "const p = new RegExp(title, 'i')\npage.getByText(p)",
+      'function a() {\n  const label = fieldLabel(x)\n  page.getByLabel(label)\n}',
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([])
+  })
+
+  it('does not report a call named in a comment or a string, or another method', () => {
+    const source = [
+      "// page.getByRole('button', { name: 'z' })",
+      'const s = "page.getByText(\'x\')"',
+      "const t = `getByLabel('w')`",
+      "page.getByRoleX('x')",
+      "page.getByPlaceholder('x')",
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([])
+  })
+
+  it('reports a dialog lookup with any quotes, and not a button named dialog', () => {
+    const source = [
+      "page.getByRole('dialog')",
+      'page.getByRole("dialog")',
+      'page.getByRole(`dialog`)',
+      "page.getByRole('dialog', { name: 'X', exact: true })",
+      "page.getByRole('button', { name: 'dialog', exact: true })",
+      '',
+    ].join('\n')
+    expect(reported(source)).toEqual([1, 2, 3, 4].map((line) => `${rule}:${line}`))
+  })
+
+  it('allows a dialog lookup with allowDialogLookup', () => {
+    const source = "page.getByRole('dialog')\npage.getByRole('dialog', { name: 'X', exact: true })\n"
+    expect(reported(source, { 'axis/exact-locators': ['error', { allowDialogLookup: true }] })).toEqual([])
+  })
+
+  it('reports a dialog lookup under tests/e2e/specs only, with the config of tests/e2e', () => {
+    const source = "export const a = (page) => page.getByRole('dialog', { name: 'X', exact: true })\n"
+    const copy = path.join(folder, 'e2e')
+    mkdirSync(path.join(copy, 'specs'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    // The copy sits outside tests/e2e, so the plugin is named by its path.
+    writeFileSync(configFile, JSON.stringify(readConfig(path.join(webRoot, '../tests/e2e/.oxlintrc.json'))))
+    writeFileSync(path.join(copy, 'specs/a.spec.ts'), source)
+    writeFileSync(path.join(copy, 'helper.ts'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('specs/a.spec.ts')).toEqual([rule])
+    expect(run('helper.ts')).toEqual([])
+  })
+})
+
 describe('the rules of web/.oxlintrc.json', () => {
   const realConfig = readConfig(path.join(webRoot, '.oxlintrc.json'))
 

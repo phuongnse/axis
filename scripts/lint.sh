@@ -13,8 +13,8 @@ if git grep -nE --untracked '(^|[^[:alnum:]_-])ant-[[:alnum:]]' -- tests; then
   exit 1
 fi
 
-# Specs match accessible names and texts exactly. Only a regular expression matches part of one.
-node scripts/check-locators.mjs
+# Specs match accessible names and texts exactly, and only a pattern matches part of one. The axis/exact-locators rule checks this.
+npx --prefix web oxlint --deny-warnings --report-unused-disable-directives -c tests/e2e/.oxlintrc.json tests/e2e
 
 # The SPA's raw HTML, prototype pollution and shared widget rules run in oxlint above. A disable comment never turns off a
 # security rule or every rule at once: a security rule's exception is an overrides entry in web/.oxlintrc.json.
