@@ -104,7 +104,7 @@ lists the instances of the process, whatever release they are pinned to.
   [sensitive](roles-and-policies.md#sensitive-fields) in the active release or in the release the
   instance is pinned to. `releaseNumber` is the number of the release the
   instance is pinned to in the application's
-  [release history](storage.md#release-history), such as `3`, a JSON number, so
+  [release history](publish-request-storage.md#release-history), such as `3`, a JSON number, so
   the widget writes no API text of its own. It is `null` only for a release
   with no row in the release history. Both come from the one query that reads the page.
 

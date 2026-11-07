@@ -31,7 +31,7 @@ problems can still fail activation.
 
 The detail is in [publishing](../reference/authoring.md#publishing), the
 [publisher](../reference/administration.md#publisher),
-[publish requests and release history](../reference/storage.md#publish-requests-and-release-history)
+[publish requests and release history](../reference/publish-request-storage.md#publish-requests-and-release-history)
 and the [Studio settings](../reference/host-settings.md#studio-settings).
 
 ## Consequences

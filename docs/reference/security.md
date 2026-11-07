@@ -21,6 +21,40 @@ Sign-in uses the OIDC authorization code flow with PKCE. The server is the confi
 exchanges the code for tokens, reads the claims from the ID token and keeps no token after that, as
 [D9](../decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) requires.
 
+The diagram shows the flow, and the numbered steps say the same in words:
+
+1. The browser opens `/api/auth/sign-in?returnUrl=`, and the server redirects it to the identity provider
+   with a PKCE challenge and `max_age`.
+2. The person logs in at the identity provider, which redirects the browser to `/api/auth/callback` with a code.
+3. The server exchanges the code and the verifier for tokens, as the confidential client, and checks the
+   `aud`, `azp` and `auth_time` claims of the ID token.
+4. The server writes a sign-in audit record and the user's profile, and inserts the `axis.sessions` row,
+   keyed by the hash of the session id.
+5. The server sets the `__Host-Axis.Session` cookie and redirects the browser to `returnUrl`.
+6. Later requests send the cookie, and the server reads the row.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Server as Axis.Server
+    participant IdP as Identity provider
+    participant TenantDb as Tenant database
+
+    Browser->>Server: GET /api/auth/sign-in?returnUrl=
+    Server-->>Browser: Redirect with the PKCE challenge and max_age
+    Browser->>IdP: Log in
+    IdP-->>Browser: Redirect to /api/auth/callback with the code
+    Browser->>Server: GET /api/auth/callback
+    Server->>IdP: Exchange the code and the verifier for tokens
+    IdP-->>Server: ID token
+    Server->>Server: Check aud, azp and auth_time
+    Server->>TenantDb: Write the sign-in audit record and the user profile
+    Server->>TenantDb: Insert the axis.sessions row, keyed by the hash of the session id
+    Server-->>Browser: Set the __Host-Axis.Session cookie and redirect to returnUrl
+    Browser->>Server: A later request sends the cookie
+    Server->>TenantDb: Read the axis.sessions row
+```
+
 - **The request.** The identity provider returns the code in the query string. The request asks for
   the `openid`, `profile` and `email` scopes and carries `max_age` set to 8 hours, the session's
   absolute lifetime, so the identity provider asks a person whose login there is older to log in

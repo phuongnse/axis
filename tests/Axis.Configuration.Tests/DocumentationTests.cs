@@ -100,6 +100,24 @@ public sealed class DocumentationTests
     }
 
     [Fact]
+    public void System_tables_diagram_matches_the_foreign_keys_of_ConfigurationDbContext()
+    {
+        var drawn = ErDiagramRelationships("System tables");
+        using var context = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql("Host=unused").Options);
+        var tables = context.Model.GetEntityTypes().Select(type => type.GetTableName()!).ToList();
+        var foreignKeys = context.Model.GetEntityTypes()
+            .SelectMany(type => type.GetForeignKeys())
+            .Select(key => (Principal: key.PrincipalEntityType.GetTableName()!, Dependent: key.DeclaringEntityType.GetTableName()!))
+            .ToList();
+        var drawnTables = drawn.SelectMany(relationship => new[] { relationship.Principal, relationship.Dependent }).Distinct().ToList();
+
+        Assert.True(!drawnTables.Except(tables).Any(), $"Not a table of ConfigurationDbContext: {string.Join(", ", drawnTables.Except(tables))}.");
+        Assert.True(!drawn.Except(foreignKeys).Any(), $"Drawn in docs/reference/storage.md but not a foreign key: {string.Join(", ", drawn.Except(foreignKeys))}.");
+        var missing = foreignKeys.Where(key => drawnTables.Contains(key.Principal) && drawnTables.Contains(key.Dependent)).Except(drawn).ToList();
+        Assert.True(missing.Count == 0, $"Foreign keys between drawn tables missing from the diagram in docs/reference/storage.md: {string.Join(", ", missing)}.");
+    }
+
+    [Fact]
     public void Function_table_matches_ExpressionFunctions()
     {
         // The aggregates table has other columns, so it is not matched.
@@ -225,6 +243,22 @@ public sealed class DocumentationTests
 
     private static IEnumerable<string> DocsFiles() =>
         Directory.EnumerateFiles(Path.Combine(AppContext.BaseDirectory, "Docs"), "*.md", SearchOption.AllDirectories);
+
+    // The relationships of the one erDiagram under a '## ' heading of storage.md, as (principal table, dependent table).
+    private static List<(string Principal, string Dependent)> ErDiagramRelationships(string heading)
+    {
+        var storage = DocsFiles().Single(file => file.EndsWith(Path.Combine("reference", "storage.md"), StringComparison.Ordinal));
+        var lines = File.ReadAllLines(storage);
+        var start = Array.IndexOf(lines, $"## {heading}");
+        Assert.True(start >= 0, $"Expected a '## {heading}' heading in docs/reference/storage.md.");
+        var section = string.Join('\n', lines.Skip(start + 1).TakeWhile(line => !line.StartsWith("## ", StringComparison.Ordinal)));
+        var diagrams = Regex.Matches(section, @"```mermaid\n(.*?)```", RegexOptions.Singleline).Select(match => match.Groups[1].Value).ToList();
+
+        Assert.True(diagrams.Count == 1 && diagrams[0].TrimStart().StartsWith("erDiagram", StringComparison.Ordinal), $"Expected one erDiagram under '## {heading}' in docs/reference/storage.md, found {diagrams.Count} mermaid block(s).");
+        return Regex.Matches(diagrams[0], @"^\s*([a-z_]+)\s+[|}][o|](?:--|\.\.)[o|][|{]\s+([a-z_]+)\s*:", RegexOptions.Multiline)
+            .Select(match => (Principal: match.Groups[1].Value, Dependent: match.Groups[2].Value))
+            .ToList();
+    }
 
     private static bool IsHeadingAtOrAbove(string line, int level)
     {

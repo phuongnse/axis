@@ -38,7 +38,7 @@ goes live through [`Axis.Admin activate`](administration.md#activate) or the
   the last start, the folder compiles to a new release pinned to it, and that release is activated.
   A release that pins a module also holds the module's files.
 - **Release history.** Each activation adds a row with the actor `startup` to the
-  [release history](storage.md#release-history), unless the release is already the active one, so a
+  [release history](publish-request-storage.md#release-history), unless the release is already the active one, so a
   restart that finds the same release adds nothing.
 - **Before listening.** The step runs before any hosted service starts, so the server accepts no
   request until every tenant is done.

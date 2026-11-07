@@ -35,6 +35,44 @@ lives in exactly one cell.
   which is opened as any new cell is.
 - **No moves.** Axis does not move a tenant between cells or between regions.
 
+The diagram shows one cell and the connections that the Helm chart configures. The DNS zone, the
+ingress, cert-manager and the object storage come from the cluster and the cloud provider, not from
+the chart. The chart renders the workloads, the wildcard certificate when `cell.certificate.enabled`
+is set, and the backup CronJob only when `backup.bucket` is set, see
+[installation](installation.md#in-the-cloud).
+
+```mermaid
+flowchart LR
+    browsers["Browsers"]
+    dns["DNS zone of the region, wildcard record"]
+    subgraph cell ["Cell vn-1"]
+        ingress["Ingress with the wildcard certificate"]
+        server["axis-server replicas"]
+        worker["axis-worker"]
+        publisher["axis-admin publisher"]
+        identity["Axis identity provider"]
+        identitydb[("Identity provider database")]
+        pgb["PgBouncer, transaction mode"]
+        pg[("Managed PostgreSQL")]
+        backup["Cell backup CronJob"]
+        storage[("Object storage")]
+    end
+    browsers -->|"tenant host"| dns
+    dns -->|"wildcard record"| ingress
+    ingress -->|"HTTPS"| server
+    server -->|"sign-in"| identity
+    publisher -->|"admin client"| identity
+    identity --> identitydb
+    server -->|"tenant runtime connections"| pgb
+    worker -->|"tenant runtime connections"| pgb
+    pgb --> pg
+    server -->|"platform database"| pg
+    worker -->|"platform database"| pg
+    publisher -->|"schema role, direct"| pg
+    backup -->|"reads, direct"| pg
+    backup -->|"archives"| storage
+```
+
 ## Hosts and certificates
 
 Each tenant gets a subdomain of its region's domain, and may add a host of its own once it proves
