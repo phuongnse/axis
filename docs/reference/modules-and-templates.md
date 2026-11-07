@@ -518,7 +518,7 @@ slot maps to, read-only and tagged with the module, without an Open policy link.
 
 An application template is an application folder with a `template.json` manifest, from which Studio
 creates a new application by copying it, see
-[creating an application](authoring.md#creating-an-application). The manifest is `template.json` at the
+[creating an application](authoring-applications.md#creating-an-application). The manifest is `template.json` at the
 root of the folder:
 
 ```json

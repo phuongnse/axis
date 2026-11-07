@@ -23,7 +23,7 @@ Studio shows its test controls. Their defaults, environment variables and behavi
 | Setting                   | What it decides in the API                                                                                                               | With no value                                                   |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | `Studio:Folders`          | The application folders that Studio edits                                                                                                | Studio edits only the applications of `Studio:ApplicationsPath` |
-| `Studio:ApplicationsPath` | The folder where Studio [creates applications](#creating-an-application), whose application subfolders Studio also lists                 | Studio cannot create an application                             |
+| `Studio:ApplicationsPath` | The folder where Studio [creates applications](authoring-applications.md#creating-an-application), whose application subfolders Studio also lists                 | Studio cannot create an application                             |
 | `Studio:AuthorRole`       | The roles claim value that may use the API. Application policies play no part, because an author edits them                              | Nobody may author                                               |
 | `Studio:PublisherRole`    | The roles claim value that may `publish`, `activate` and change [application settings](#application-settings), on top of the author role | Nobody may publish or activate a release                        |
 | `Studio:Tests`            | Whether Studio shows its test controls                                                                                                   | Off                                                             |
@@ -57,7 +57,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | Method and path                                                                     | Response                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/studio/apps`                                                              | `200` with `{ "items": [{ "name", "titles", "descriptions" }] }`, see [the application list](#the-application-list)                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| `POST /api/studio/apps`                                                             | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](#creating-an-application)                                                                                                                                                                                                                                                                                          |
+| `POST /api/studio/apps`                                                             | `201` with `{ name, diagnostics }` and a `Location: /api/studio/apps/{name}/resources` header. The body is `{ "name": "...", "template": "<template id>" }` as `application/json`, and `template` is optional. See [Creating an application](authoring-applications.md#creating-an-application)                                                                                                                                                                                                                                                                                          |
 | `GET /api/studio/templates`                                                         | `200` with `{ "items": [{ id, version, builtIn, title: { en, vi }, description: { en, vi }, diagnostics }] }`, one item for the newest installed version of each application template, built-in templates first, then the others, each group sorted by `id`. Each title and description comes in both `en` and `vi`, and the SPA picks the locale. The route checks the session, the author role and Studio, as every read route does, and does not need `Studio:ApplicationsPath`. See [application templates](modules-and-templates.md#application-templates) |
 | `GET /api/studio/apps/{application}/resources`                                      | `200` with `{ "items": [...] }`, one item for every resource of the folder, sorted by `file`, each with `id`, `kind`, `name`, `file`, `version`, `usedBy`, `titles` and `locale`. `titles` is the resource's label text by locale: the `label` of an entity, role, identity provider or the manifest, or the `title` of a page or site, read from the text resources. A locale whose text resource has no text for the key is left out, and `titles` is empty for any other kind. `locale` is the locale of a text resource, else `null`                        |
 | `GET /api/studio/apps/{application}/resources/{id}`                                 | `200` with `{ id, kind, name, file, version, content }` and an `ETag` header                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -237,7 +237,7 @@ list above, except where it says so.
   see [Application settings](#application-settings). A `GET` is a read, so it has no CSRF check.
 - **Page metadata.** Checks 1, 2, 3, 5 and 8, then those of
   [draft page metadata](draft-page-metadata.md#order-of-checks).
-- **Creating an application.** Its own list, see [Creating an application](#creating-an-application).
+- **Creating an application.** Its own list, see [Creating an application](authoring-applications.md#creating-an-application).
 - **Changes.** Checks 1, 2, 3 and 5, then the list in [Changes](#changes).
 - **Revisions.** Its own list, see [revisions in the authoring API](authoring-revisions.md#order-of-checks).
 
@@ -500,13 +500,8 @@ A create writes a new file whose path comes from the resource, so no request can
 the folder.
 
 - **Kind folders.** A new file goes in the kind's plural folder, as in
-  `samples/apps/purchase-requests`, and a missing kind folder is created: `entity` in `entities`,
-  `site` in `sites`, `page` in `pages`, `text` in `texts`, `seed` in `seeds`, `dataSource` in
-  `data-sources`, `rule` in `rules`, `sequence` in `sequences`, `process` in `processes`, `form` in
-  `forms`, `role` in `roles`, `policy` in `policies`, `connector` in `connectors`, `event` in `events`,
-  `endpoint` in `endpoints`, `trigger` in `triggers`, `webhook` in `webhooks`, `migration` in
-  `migrations`, `scenario` in `scenarios` and `identityProvider` in `identity-providers`. The `kind` is
-  matched with its letter case.
+  `samples/apps/purchase-requests`, and a missing kind folder is created. The table after this list
+  gives the folder of each kind. The `kind` is matched with its letter case.
 - **File names.** The file name is the kebab-case `name`, such as `entities/purchase-request.json`. A
   role's file name is its name as it is, such as `roles/department-manager.json`. A `text` resource is
   named after its locale in lower case, such as `texts/en.json` and `texts/pt-br.json`. A patch that
@@ -524,50 +519,28 @@ the folder.
 - **No overwrite.** A create whose `id` is in use, or whose target file exists, is `409`. A create
   never replaces a file, even when another process writes the folder.
 
-## Creating an application
-
-`POST /api/studio/apps` creates a new application folder in `Studio:ApplicationsPath`, or in a cell in
-[the tenant's folder](host-settings.md#studio-settings), blank or from an installed
-[application template](modules-and-templates.md#application-templates). The body is
-`{ "name": "...", "template": "<template id>" }`, and without the optional `template` the application
-is blank.
-
-The route has its own order of checks, and the first failure is the response:
-
-1. The CSRF header `X-Axis-Csrf: 1`, `403`.
-   A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused next, before the session.
-2. The session, `401`.
-3. In a cell, the tenant over its storage quota, `403` with `reason` `quota-exceeded`, see
-   [refusals](tenant-quotas.md#refusals).
-4. The author role, `403`.
-5. `Studio:ApplicationsPath` not set, `403`, titled "Studio cannot create applications here."
-6. In a cell, the tenant at its applications quota, `403` with `reason` `quota-exceeded`.
-7. A body that is not `application/json`, `415`.
-8. A bad body, `400`. That is:
-   - a body that is not a JSON object, or that has a key other than `name` and `template`;
-   - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60 characters;
-   - a `name` whose [kebab-case](#new-files) form is longer than 60 characters, or is a reserved site
-     path: `api`, `health`, `assets`, `studio`, `account`, `users` or `licences`;
-   - a `template` that is not a string.
-9. An unknown template, `404`: an `id` that no installed template has.
-10. A write lock that cannot be taken, `503`, see [Versions](#versions).
-11. A name already used, ignoring letter case, by an application that Studio lists, or a target folder
-    that already exists, `409`.
-
-What it writes:
-
-- **Atomic.** The whole folder is written to a hidden temporary folder, `.<kebab>-<random>`, inside
-  `Studio:ApplicationsPath`, and then renamed to the kebab-case name, so a reader never sees half an
-  application. The write lock is the folder write lock of [Versions](#versions), keyed by
-  `Studio:ApplicationsPath`. A temporary folder starts with `.`, so the application list skips it.
-- **Blank.** Without a `template`, the folder holds the smallest application that compiles with no
-  error, see [blank application](modules-and-templates.md#blank-application).
-- **From a template.** With a `template`, the server uses the newest installed version, copies its
-  files and changes the ids, the name and the site path, see
-  [application templates](modules-and-templates.md#application-templates). The answer has the
-  template's diagnostics, so a template that does not compile gives a copy that does not compile.
-- **Never an activation.** As for every write, the author [publishes](#publishing) the new
-  application. The diagnostics in the answer are the folder's, as for [Diagnostics](#diagnostics).
+| Kind               | Folder               |
+| ------------------ | -------------------- |
+| `entity`           | `entities`           |
+| `site`             | `sites`              |
+| `page`             | `pages`              |
+| `text`             | `texts`              |
+| `seed`             | `seeds`              |
+| `dataSource`       | `data-sources`       |
+| `rule`             | `rules`              |
+| `sequence`         | `sequences`          |
+| `process`          | `processes`          |
+| `form`             | `forms`              |
+| `role`             | `roles`              |
+| `policy`           | `policies`           |
+| `connector`        | `connectors`         |
+| `event`            | `events`             |
+| `endpoint`         | `endpoints`          |
+| `trigger`          | `triggers`           |
+| `webhook`          | `webhooks`           |
+| `migration`        | `migrations`         |
+| `scenario`         | `scenarios`          |
+| `identityProvider` | `identity-providers` |
 
 ## Changes
 

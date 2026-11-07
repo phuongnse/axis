@@ -41,6 +41,9 @@ internal static partial class StudioFileNames
     /// <summary>The kinds that a create accepts: every resource kind except the manifest.</summary>
     internal static IEnumerable<string> Kinds => _folders.Keys;
 
+    /// <summary>The folder of each kind that a create accepts, such as <c>entities</c> for <c>entity</c>.</summary>
+    internal static IReadOnlyDictionary<string, string> Folders => _folders;
+
     /// <summary>
     /// The path of the new file, such as <c>entities/cost-centre.json</c>, with <paramref name="id"/> set to the
     /// resource's id. When the content cannot form a safe path, it is null and <paramref name="problem"/> is a
