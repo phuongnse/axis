@@ -166,8 +166,13 @@ pull requests rarely edit the same lines.
   detail. The file holds at most 800 words and has no line limit, and a rule, a bullet with its
   continuation lines, holds at most 60 words, because every session reads the whole file and a long
   line dodges a line count. `CLAUDE.md` only
-  imports it. A skill's `SKILL.md` stays at or under 250 lines. A skill does not describe an external
-  tool's behaviour that the tool's own docs cover at the version the repository pins.
+  imports it.
+- **Short skills.** A skill under `.claude/skills/` holds the steps of one role's workflow and links
+  the rules it applies, which live in `docs/`. Its `description` says what it does, when to use it and
+  when not to. `SKILL.md` routes to the parts of the workflow. A part that few runs need is a file of
+  its own in the skill's folder that `SKILL.md` links, so a run reads it only when it needs it.
+  `SKILL.md` holds at most 1,000 words, counted as AGENTS.md's are. A skill does not describe an
+  external tool's behaviour that the tool's own docs cover at the version the repository pins.
 - **Stable links.** Link to a file, or to a heading in it, never to text that changes with status.
   Renaming or moving a heading changes its anchor, so the same change fixes every link to it.
 - **The architecture page follows arc42.** [Architecture](architecture.md) holds, in this order,
@@ -243,8 +248,8 @@ every pull request, the tests, and an audit every hundred merges, as
    header, wherever it moves. Without such a test, the doc names the file that holds the list rather
    than copying it. The review refuses a new list without its test.
 8. **An audit reads the docs against the code every hundred merges.** The docs audit workflow reads a
-   quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every skill
-   under `.claude/skills/` and AGENTS.md. It reads them as the
+   quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every Markdown file of a
+   skill under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
    job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes, and a
    finding that the cap leaves out is reported again by its page's next run. A docs fix that holds a

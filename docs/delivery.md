@@ -330,7 +330,7 @@ change, a design review and a sync are in the
   server code. What a screen needs from an API is a fixture in the prototype and a contract in the
   review's docs change, and NexKit builds it. When `main` changes code the prototype touches, the
   session merges `main` into the branch and never rebases it, and `main` stays the standard for
-  behaviour.
+  behaviour and the prototype the standard for its look.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact

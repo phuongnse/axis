@@ -31,6 +31,8 @@ before(() => {
       '[reference]: missing-reference.md',
     ].join('\n'),
   )
+  mkdirSync(path.join(root, '.claude/skills/x'), { recursive: true })
+  writeFileSync(path.join(root, '.claude/skills/x/workflow.md'), '[gone](../../../missing-skill.md)\n')
   writeFileSync(path.join(root, 'b.md'), '# B\n\n## D15. Presentation model — Agreed\n')
   mkdirSync(path.join(root, 'node_modules/x'), { recursive: true })
   writeFileSync(path.join(root, 'node_modules/x/README.md'), '[broken](gone.md)\n')
@@ -70,7 +72,8 @@ describe('CLI', () => {
       /^a\.md:5: broken link 'b\.md#no-such-heading': anchor '#no-such-heading' not found in b\.md$/m,
     )
     assert.match(result.stderr, /^a\.md:12: broken link 'missing-reference\.md': file not found$/m)
-    assert.equal(result.stderr.trim().split('\n').length, 3)
+    assert.match(result.stderr, /^\.claude\/skills\/x\/workflow\.md:1: broken link '[^']*missing-skill\.md': file not found$/m)
+    assert.equal(result.stderr.trim().split('\n').length, 4)
   })
 
   test('ignores code, external links and installed packages', () => {
