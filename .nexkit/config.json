@@ -297,7 +297,8 @@
       "nexkit:ci",
       "nexkit:dependabot",
       "bug",
-      "nexkit:flaky"
+      "nexkit:flaky",
+      "process"
     ],
     "labels": {
       "journey": {

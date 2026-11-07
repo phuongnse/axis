@@ -1,5 +1,6 @@
 import { Alert, Button, Flex, Input, Modal, Result, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
@@ -19,7 +20,6 @@ import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantExportSection } from './TenantExportSection'
 import { TenantUsageSection } from './TenantUsageSection'
-import { UserRolesDrawer } from './UserRolesDrawer'
 
 const pageSize = 20
 
@@ -52,8 +52,8 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
 
 /**
  * The tenant's users for an administrator: a table that is searched by name or email and paged by the
- * server. A search starts on Enter or on the search button and goes back to page 1. Clicking a row opens a side panel
- * with the person's roles. The Invite button opens the form that invites a person. An invited account has a Resend
+ * server. A search starts on Enter or on the search button and goes back to page 1. The display name is a link to the
+ * person's page, which shows their roles. The Invite button opens the form that invites a person. An invited account has a Resend
  * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
  * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data and Usage sections.
@@ -68,7 +68,6 @@ export function UsersPage() {
   const [list, setList] = useState<UserList>()
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
   const [loadFailed, setLoadFailed] = useState(false)
-  const [selected, setSelected] = useState<UserListItem | null>(null)
   const [inviting, setInviting] = useState(false)
   const [pending, setPending] = useState<{ command: Command; user: UserListItem } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -150,7 +149,6 @@ export function UsersPage() {
             emptyText={t('shell.users.empty')}
             pagination={{ current: page, pageSize, total: list.totalCount }}
             onChange={(pagination) => setPage(pagination.current ?? 1)}
-            rowAttributes={(row) => ({ onClick: () => setSelected(row), style: { cursor: 'pointer' } })}
             toolbar={{
               view: (
                 <Input.Search
@@ -185,7 +183,12 @@ export function UsersPage() {
               </>
             }
             columns={[
-              { key: 'displayName', kind: 'freeText', title: t('shell.users.displayName'), dataIndex: 'displayName' },
+              {
+                key: 'displayName',
+                kind: 'freeText',
+                title: t('shell.users.displayName'),
+                render: (_value, row) => <Link to={`/users/${encodeURIComponent(row.id)}`}>{row.displayName}</Link>,
+              },
               { key: 'email', kind: 'freeText', title: t('shell.users.email'), render: (_value, row) => row.email },
               {
                 key: 'provider',
@@ -246,7 +249,6 @@ export function UsersPage() {
           <TenantUsageSection />
         </>
       )}
-      <UserRolesDrawer user={selected} onClose={() => setSelected(null)} />
       {inviting && (
         <InviteUserModal
           onClose={() => setInviting(false)}

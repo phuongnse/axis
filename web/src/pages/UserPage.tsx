@@ -1,8 +1,13 @@
-import { Alert, Button, Drawer, Flex, Modal, Tag, Typography } from 'antd'
+import { Alert, Flex, Modal, Result, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
+import { useParams } from 'react-router'
+import { AxisButton } from '../platform/AxisButton'
+import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { changeUserRole, fetchUserRoles, type RoleChange, type UserListItem, type UserRoles } from '../platform/users'
+import { changeUserRole, fetchUserRoles, type RoleChange, type UserRoles } from '../platform/users'
+import { usePlatform } from './context'
+import { NotFoundPage } from './NotFoundPage'
 
 /** One role of a section: given or not, and declared by the active release or not. */
 interface RoleRow {
@@ -29,37 +34,35 @@ interface Pending {
 type Problem = 'forbidden' | 'conflict' | 'loadFailed' | 'changeFailed'
 
 /**
- * The side panel of one user: the roles given to the person and the roles that can be given, one section for each
- * active application and one for the platform. A role the active release no longer declares is tagged. Give and
- * Remove ask for a confirmation, then call the role routes and load the roles again. A refusal shows its reason.
+ * The page of one user, opened from the name on the users page. Its title is the person's display name, with the email
+ * under it. Below are the roles given to the person and the roles that can be given, one section for each active
+ * application and one for the platform. A role the active release no longer declares is tagged. Give and Remove ask for
+ * a confirmation, then call the role routes and load the roles again. A refusal shows its reason. The page loads
+ * everything from the roles route, so a reload or a shared link shows it. A person without user administration sees that
+ * the page is for administrators, and an unknown user shows the not-found page.
  */
-export function UserRolesDrawer({ user, onClose }: { user: UserListItem | null; onClose: () => void }) {
-  return (
-    <Drawer open={user !== null} title={user?.displayName} size={480} onClose={onClose} data-testid="user-roles">
-      {user && <UserRolesPanel key={user.id} user={user} />}
-    </Drawer>
-  )
-}
-
-function UserRolesPanel({ user }: { user: UserListItem }) {
+export function UserPage() {
   const t = useText()
-  const { size } = useDesignTokens()
+  const platform = usePlatform()
+  const { colour, size } = useDesignTokens()
+  const { id = '' } = useParams()
   const [roles, setRoles] = useState<UserRoles>()
+  const [refusal, setRefusal] = useState<'forbidden' | 'notFound'>()
   const [problem, setProblem] = useState<Problem>()
   const [pending, setPending] = useState<Pending | null>(null)
   const [busy, setBusy] = useState(false)
   // Counts the changes, so each one loads the roles again.
   const [changes, setChanges] = useState(0)
-  const userId = user.id
 
   useEffect(() => {
     const controller = new AbortController()
-    fetchUserRoles(userId, controller.signal).then(
+    fetchUserRoles(id, controller.signal).then(
       (result) => {
         if (result.kind === 'ok') {
+          setRefusal(undefined)
           setRoles(result.roles)
         } else {
-          setProblem('loadFailed')
+          setRefusal(result.kind)
         }
       },
       (error: unknown) => {
@@ -70,7 +73,7 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
       },
     )
     return () => controller.abort()
-  }, [userId, changes])
+  }, [id, changes])
 
   async function confirm() {
     if (!pending) {
@@ -83,7 +86,7 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
     setBusy(true)
     setProblem(undefined)
     try {
-      const result = await changeUserRole(user.id, pending.give, change)
+      const result = await changeUserRole(id, pending.give, change)
       if (result !== 'ok') {
         setProblem(result)
       }
@@ -97,39 +100,63 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
     setChanges((count) => count + 1)
   }
 
+  if (refusal === 'notFound') {
+    return <NotFoundPage />
+  }
+
   const sections = roles ? sectionsOf(roles, t('shell.users.roles.platform')) : []
 
   return (
-    <>
-      <Flex vertical gap="middle">
-        {problem && <Alert data-testid="user-roles-problem" type="error" title={t(`shell.users.roles.${problem}`)} />}
-        {sections.map((section) => (
-          <section key={section.key} data-testid="user-roles-section" aria-label={section.title}>
-            <Typography.Title level={5}>{section.title}</Typography.Title>
-            <Flex vertical gap="small">
-              {section.rows.map((row) => (
-                <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
-                  <Flex align="center" gap="small">
-                    <Typography.Text>{row.role}</Typography.Text>
-                    {row.given && <Tag color="green">{t('shell.users.roles.given')}</Tag>}
-                    {!row.declared && <Tag color="orange">{t('shell.users.roles.notDeclared')}</Tag>}
+    <PageLayout
+      title={roles?.displayName ?? t('shell.users.title')}
+      breadcrumb={[
+        { label: t(platform.site.titleKey), to: '/' },
+        { label: t('shell.users.title'), to: '/users' },
+        { label: roles?.displayName ?? id },
+      ]}
+    >
+      {refusal === 'forbidden' && (
+        <div data-testid="users-forbidden">
+          <Result status="403" title={t('shell.users.forbidden')} />
+        </div>
+      )}
+      {!refusal && (
+        <Flex vertical gap="middle" data-testid="user-roles">
+          {roles && (
+            <Typography.Text data-testid="user-email">
+              {t('shell.users.email')}: {roles.email ?? t('shell.value.notSet')}
+            </Typography.Text>
+          )}
+          {problem && <Alert data-testid="user-roles-problem" type="error" title={t(`shell.users.roles.${problem}`)} />}
+          {sections.map((section) => (
+            <section key={section.key} data-testid="user-roles-section" aria-label={section.title}>
+              <Typography.Title level={5}>{section.title}</Typography.Title>
+              <Flex vertical gap="small">
+                {section.rows.map((row) => (
+                  <Flex key={row.role} align="center" justify="space-between" gap="small" data-testid="user-role">
+                    <Flex align="center" gap="small">
+                      <Typography.Text>{row.role}</Typography.Text>
+                      {row.given && <Tag style={{ color: colour.successText }}>{t('shell.users.roles.given')}</Tag>}
+                      {!row.declared && (
+                        <Tag style={{ color: colour.warningText }}>{t('shell.users.roles.notDeclared')}</Tag>
+                      )}
+                    </Flex>
+                    {(row.given || row.declared) && (
+                      <AxisButton
+                        role={row.given ? 'destructive' : 'secondary'}
+                        disabled={busy}
+                        onClick={() => setPending({ give: !row.given, section, role: row.role })}
+                      >
+                        {t(row.given ? 'shell.users.roles.remove' : 'shell.users.roles.give')}
+                      </AxisButton>
+                    )}
                   </Flex>
-                  {(row.given || row.declared) && (
-                    <Button
-                      size="small"
-                      danger={row.given}
-                      disabled={busy}
-                      onClick={() => setPending({ give: !row.given, section, role: row.role })}
-                    >
-                      {t(row.given ? 'shell.users.roles.remove' : 'shell.users.roles.give')}
-                    </Button>
-                  )}
-                </Flex>
-              ))}
-            </Flex>
-          </section>
-        ))}
-      </Flex>
+                ))}
+              </Flex>
+            </section>
+          ))}
+        </Flex>
+      )}
       <Modal
         open={pending !== null}
         width={size.dialog.small}
@@ -149,12 +176,12 @@ function UserRolesPanel({ user }: { user: UserListItem }) {
               {t('shell.users.roles.place')}: {pending.section.title}
             </Typography.Text>
             <Typography.Text>
-              {t('shell.users.roles.person')}: {user.displayName}
+              {t('shell.users.roles.person')}: {roles?.displayName}
             </Typography.Text>
           </Flex>
         )}
       </Modal>
-    </>
+    </PageLayout>
   )
 }
 

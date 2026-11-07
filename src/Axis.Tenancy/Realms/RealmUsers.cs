@@ -111,7 +111,9 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         return new RealmUserState(
             userId,
             user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
-            await ProviderAliasAsync(token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users", userId, cancellationToken));
+            await ProviderAliasAsync(token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users", userId, cancellationToken),
+            DisplayNameOf(user),
+            Text(user, "email"));
     }
 
     /// <summary>
@@ -142,12 +144,18 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
             locale = chosen;
         }
 
-        var name = string.Join(' ', new[] { Text(user, "firstName"), Text(user, "lastName") }.Where(part => part is not null));
         return new RealmUserContact(
             user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
             Text(user, "email"),
-            name.Length > 0 ? name : Text(user, "username") ?? "",
+            DisplayNameOf(user),
             locale);
+    }
+
+    /// <summary>The first and last name of a user representation, or the username when it has neither.</summary>
+    private static string DisplayNameOf(JsonElement user)
+    {
+        var name = string.Join(' ', new[] { Text(user, "firstName"), Text(user, "lastName") }.Where(part => part is not null));
+        return name.Length > 0 ? name : Text(user, "username") ?? "";
     }
 
     /// <summary>Disables or enables the user. It reads the full representation and writes it back, because a partial update can clear fields.</summary>
@@ -448,8 +456,11 @@ public sealed record RealmUser(
 /// <summary>The contact details of one realm user. <c>Locale</c> is the language the user chose, or <c>null</c> when none.</summary>
 public sealed record RealmUserContact(bool Enabled, string? Email, string DisplayName, string? Locale);
 
-/// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
-public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);
+/// <summary>
+/// The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.
+/// <c>DisplayName</c> is the first and last name, or the username when the user has neither, and <c>Email</c> is <c>null</c> when the user has none.
+/// </summary>
+public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias, string DisplayName, string? Email);
 
 /// <summary>One authenticator app of a realm account: the credential id, its label and when it was added.</summary>
 public sealed record RealmAuthenticator(string Id, string? Label, DateTimeOffset? CreatedAt);

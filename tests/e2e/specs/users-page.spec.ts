@@ -140,7 +140,7 @@ test.describe("roles of a user", () => {
     });
   });
 
-  test("an administrator opens a user, gives an application role after a confirmation and removes it again", async ({
+  test("an administrator opens the page of a user from the list, gives an application role after a confirmation and removes it again", async ({
     page,
   }) => {
     await useSession(page, "administrator");
@@ -150,12 +150,14 @@ test.describe("roles of a user", () => {
       .getByRole("searchbox", { name: "Search by name or email", exact: true })
       .fill("auditor@axis.local");
     await page.keyboard.press("Enter");
-    await main.getByRole("row").filter({ hasText: "Auditor User" }).click();
+    await main.getByRole("link", { name: "Auditor User", exact: true }).click();
+    await expect(page).toHaveURL(/\/users\/auditor$/);
 
     const panel = page.getByTestId("user-roles");
     await expect(
-      panel.getByText("Auditor User", { exact: true }),
+      main.getByRole("heading", { name: "Auditor User", exact: true }),
     ).toBeVisible();
+    await expect(panel).toContainText("auditor@axis.local");
     const section = panel.getByRole("region", {
       name: "LeaveRequests",
       exact: true,
@@ -172,6 +174,8 @@ test.describe("roles of a user", () => {
     await expect(giveDialog).toContainText("In: LeaveRequests");
     await giveDialog.getByRole("button", { name: "Give", exact: true }).click();
     await expect(role.getByText("Given", { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(role.getByText("Given", { exact: true })).toBeVisible();
 
     await role.getByRole("button", { name: "Remove", exact: true }).click();
     const removeDialog = await waitForDialog(page, "Remove this role?");
@@ -183,6 +187,18 @@ test.describe("roles of a user", () => {
       role.getByRole("button", { name: "Give", exact: true }),
     ).toBeVisible();
   });
+});
+
+test("a person without user administration is refused at the page of a user", async ({
+  page,
+}) => {
+  await useSession(page, "author");
+  await page.goto("/users/auditor");
+
+  await expect(
+    page.getByText("This page is for administrators.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId("user-roles")).toHaveCount(0);
 });
 
 test.describe("invitations", () => {

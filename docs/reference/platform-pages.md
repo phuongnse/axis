@@ -58,7 +58,7 @@ labels, and never shows a field marked `sensitive` or record data. Its texts are
 The page lists the tenant's users from `GET /api/users`, 20 to a page, and fetches each page from the
 server.
 
-- **Columns.** Each row has the display name, the email, how the person signs in (the provider's alias
+- **Columns.** Each row has the display name, which links to [the user's page](#a-users-roles), the email, how the person signs in (the provider's alias
   as the [list route](user-administration.md#read-routes) sends it, or "Account"), the status as a tag
   (`invited`, `active` or `disabled`) and the last sign-in.
 - **Search.** A search box filters by name or email. A search starts on Enter or on the search button
@@ -109,8 +109,11 @@ A person's roles, from `GET /api/users/{id}/roles`, show in one section for each
 one for the platform, where the administrator gives and removes them. Their texts are
 `shell.users.roles.*`.
 
-- **A page of its own** _(planned for M31)_. Clicking a row opens the user as a page of its own, as
-  [opening things](actions-and-controls.md#opening-things) says, which holds these sections.
+- **A page of its own.** The platform route `/users/{id}` is the user's page, as
+  [opening things](actions-and-controls.md#opening-things) says, and holds these sections. Its title is the
+  display name, with the email under it, or "Not set" when the person has none. It loads the name, the email and
+  the roles from the roles route, so a reload or a shared link shows it. A `403` shows that the page is for
+  administrators, and a `404` shows the not-found page.
 - **Tags.** Each role shows the "Given" tag when the person has it. A given role that is not declared
   any more has a "Not declared" tag, and its section lists it even when its application is not active.
 - **Give and Remove.** A Give or Remove button asks for confirmation, names the role, the place and the

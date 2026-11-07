@@ -252,6 +252,8 @@ test.describe('the author builds the asset management application with Studio on
   // The migration kind has no sidebar entry without a migration. Deleting the last migration removes the entry,
   // so the list is reopened only while one is left.
   async function deleteMigrations(page: Page) {
+    // The sidebar loads the new migration after the save, so the entry is given a moment to appear.
+    await expect.poll(() => hasKind(page, 'migration'), { timeout: 5_000 }).toBe(true).catch(() => undefined)
     if (!(await hasKind(page, 'migration'))) {
       return
     }

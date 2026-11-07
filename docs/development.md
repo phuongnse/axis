@@ -266,6 +266,8 @@ Axis keeps its third-party packages current, and sets how fast a vulnerable one 
   `dotnet list package --include-transitive` lists the transitive ones, which the scan reads too.
 - `web/package-lock.json` and `tests/e2e/package-lock.json` pin every npm package.
 - `global.json` pins the .NET SDK.
+- `KeycloakFixture.Image` pins the identity provider image to an exact version. Every other Keycloak
+  image reference names the same image, and `scripts/keycloak-image.test.mjs` checks this.
 
 **Sources.** Packages come from nuget.org and the npm registry, `registry.npmjs.org`, and nowhere
 else. The repository has no `nuget.config` and no `.npmrc`, so no other source is set. A change

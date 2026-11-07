@@ -62,12 +62,15 @@ export interface GivableApplication {
 
 /** A person's given roles and the roles that can be given, as served by `GET /api/users/{id}/roles`. */
 export interface UserRoles {
+  displayName: string
+  /** The person's email, or `null` when they have none. */
+  email: string | null
   given: GivenRole[]
   applications: GivableApplication[]
   platformRoles: string[]
 }
 
-/** The answer of the roles route: the roles, or the refusal that the panel shows. */
+/** The answer of the roles route: the roles, or the refusal that the page shows. */
 export type UserRolesResult = { kind: 'ok'; roles: UserRoles } | { kind: 'forbidden' } | { kind: 'notFound' }
 
 /** Loads a person's given roles and the roles that can be given. */

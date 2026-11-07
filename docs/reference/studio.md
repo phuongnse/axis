@@ -301,7 +301,7 @@ A label is an object whose only property is `textKey`. Studio edits its texts in
 
 A string property that the schema marks with `x-axis-expression` is a code editor that highlights the
 [expression grammar](expressions.md#grammar), checks the text as the author types and completes names.
-It is CodeMirror 6, in a chunk that loads only when Studio first shows an expression.
+It is CodeMirror 6, in a chunk that loads only when Studio first shows an expression or the JSON view.
 
 - **Checking.** 300 ms after the last keystroke, the editor sends the text to the
   [expression check route](authoring.md#expression-check), and shows only the latest answer. It
