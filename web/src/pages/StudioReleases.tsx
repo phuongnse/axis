@@ -22,6 +22,7 @@ import { PlatformContext } from './context'
 /** The Live tag of the release that runs, in the release list and on the release page's heading. */
 export function StudioLiveTag() {
   const t = useText()
+  // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
   return <Tag color="success">{t('shell.studio.releases.live')}</Tag>
 }
 

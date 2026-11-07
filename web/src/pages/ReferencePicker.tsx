@@ -29,6 +29,7 @@ export function ReferencePicker({
             value: current,
             label: (
               <span data-testid="studio-reference-unknown">
+                {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
                 {current} <Tag color="warning">{t('shell.studio.unknownName')}</Tag>
               </span>
             ),

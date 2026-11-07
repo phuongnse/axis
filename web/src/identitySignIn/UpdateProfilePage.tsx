@@ -58,6 +58,7 @@ export function UpdateProfilePage({ context }: { context: UpdateProfileContext }
             />
           </Form.Item>
         ))}
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button ref={submitRef} type="primary" htmlType="submit" block>
           {texts.submit}
         </Button>

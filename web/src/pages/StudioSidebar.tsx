@@ -78,6 +78,7 @@ export function StudioSidebar({
             },
           }}
         >
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             type="text"
             block

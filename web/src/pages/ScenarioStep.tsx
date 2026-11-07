@@ -125,12 +125,14 @@ export function KeyValueRows({
             value={literalText(values[key])}
             onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
           />
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}>
             {t('shell.studio.scenario.remove')}
           </Button>
         </Flex>
       ))}
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => onChange(`${pointer}/${freshKey(values, prefix)}`, '')}>{addLabel}</Button>
       </div>
     </Flex>
@@ -507,12 +509,15 @@ export function ScenarioStep({
         title={`${t('shell.studio.scenario.step')} ${index + 1}`}
         extra={
           <Flex gap="small">
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button disabled={index === 0} onClick={() => swap(index - 1)}>
               {t('shell.studio.scenario.moveUp')}
             </Button>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button disabled={index === steps.length - 1} onClick={() => swap(index + 1)}>
               {t('shell.studio.scenario.moveDown')}
             </Button>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
           </Flex>
         }

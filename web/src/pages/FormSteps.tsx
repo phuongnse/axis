@@ -119,12 +119,15 @@ export function FormSteps({
                   />
                 </div>
                 <Flex gap="small">
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button disabled={index === 0} onClick={() => move(index, index - 1)}>
                     {t('shell.studio.formSteps.moveUp')}
                   </Button>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button disabled={index === list.length - 1} onClick={() => move(index, index + 1)}>
                     {t('shell.studio.formSteps.moveDown')}
                   </Button>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button onClick={() => remove(index)}>{t('shell.studio.formSteps.removeStep')}</Button>
                 </Flex>
               </Flex>
@@ -132,6 +135,7 @@ export function FormSteps({
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={add}>{t('shell.studio.formSteps.addStep')}</Button>
         </div>
       </Flex>

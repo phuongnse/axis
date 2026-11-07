@@ -36,6 +36,7 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
           invalid={Boolean(error)}
         />
         <input ref={submitRef} type="hidden" name="login" value="Sign In" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.verify}
         </Button>
@@ -44,6 +45,7 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
         {tryAnotherWay && (
           <form method="post" action={loginAction}>
             <input type="hidden" name="tryAnotherWay" value="on" />
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button type="link" htmlType="submit">
               {texts.tryAnotherWay}
             </Button>

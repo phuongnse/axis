@@ -117,6 +117,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           return (
             <Space size="small">
               <Link to={`${taskPath}/${task.id}`}>{label}</Link>
+              {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
               {task.claimedBy !== null && <Tag color="blue">{t('shell.tasks.claimedByYou')}</Tag>}
             </Space>
           )
@@ -136,6 +137,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
           task.dueAt === null ? null : (
             <Space size="small">
               {formatValue(dueAtField, task.dueAt, {}, { locale, text: t })}
+              {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
               {task.overdue && <Tag color="error">{t('shell.tasks.overdue')}</Tag>}
             </Space>
           ),

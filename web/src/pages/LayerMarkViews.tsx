@@ -47,6 +47,7 @@ export function LayerMarkTag({
 function ResetElement({ layer, list, name }: { layer: DesignerLayer; list: string; name: string }) {
   const t = useText()
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       size="small"
       aria-label={`${t('shell.studio.module.resetElement')} ${name}`}

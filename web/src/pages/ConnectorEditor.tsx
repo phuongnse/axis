@@ -177,6 +177,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
             />
           ))}
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange('/operations', [...operations, { name: '', method: 'POST', path: '/' }])}>
               {t('shell.studio.connector.addOperation')}
             </Button>
@@ -267,6 +268,7 @@ function Operation({
           onChange={onChange}
         />
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button danger onClick={() => onChange(pointer, undefined)}>
             {t('shell.studio.connector.removeOperation')}
           </Button>
@@ -381,6 +383,7 @@ function FieldRows({
                     />
                   </div>
                 )}
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(rowPointer, undefined)}>
                   {t('shell.studio.connector.removeField')}
                 </Button>
@@ -392,6 +395,7 @@ function FieldRows({
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>{addText}</Button>
         </div>
       </Flex>
@@ -448,6 +452,7 @@ function NestedFields({
                   {t('shell.studio.connector.required')}
                 </Checkbox>
               </div>
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.connector.removeField')}</Button>
             </Flex>
             {isStructured(field.type) && (
@@ -462,6 +467,7 @@ function NestedFields({
         )
       })}
       <div>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
           {t('shell.studio.connector.addNestedField')}
         </Button>

@@ -75,6 +75,7 @@ export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCar
               {t('shell.home.signedOut.message')}
             </Typography.Paragraph>
           )}
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button type="primary" block onClick={() => onSignIn()}>
             {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
           </Button>

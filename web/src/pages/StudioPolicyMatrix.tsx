@@ -171,6 +171,7 @@ function MatrixCell({
 }) {
   const t = useText()
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       type={selected ? 'primary' : 'text'}
       size="small"
@@ -186,6 +187,7 @@ function MatrixCell({
           </Tag>
         ))}
         {cell.missingEntityRead !== null && (
+          // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
           <Tag color="warning" style={{ marginInlineEnd: 0 }} data-testid="studio-matrix-missing-read">
             {t('shell.studio.matrix.missingEntityRead')} {cell.missingEntityRead}
           </Tag>
@@ -260,9 +262,11 @@ function ReadOnlyGrant({
             {action}
           </Tag>
         ))}
+        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
         {grant.shared && <Tag color="processing">{t('shell.studio.matrix.shared')}</Tag>}
         {grant.module !== null && <Tag>{grant.module}</Tag>}
         {grant.shared && grant.module === null && (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button type="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
             {t('shell.studio.matrix.openPolicy')}
           </Button>
@@ -465,10 +469,12 @@ function OwnGrants({
                 onChange={(ticked) => setActions(index, ticked)}
               />
               {unaccepted.map((action) => (
+                // oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token.
                 <Tag key={action} color="warning" style={{ marginInlineEnd: 0 }}>
                   {t('shell.studio.matrix.unacceptedAction')} {action}
                 </Tag>
               ))}
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button size="small" disabled={grants.length === 1} onClick={() => edit(`/grants/${index}`, undefined)}>
                 {t('shell.studio.matrix.removeGrant')}
               </Button>
@@ -510,9 +516,11 @@ function OwnGrants({
         )
       })}
       <Flex gap="small" wrap>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button onClick={() => edit('/grants', [...grants, newGrant(target, grants)])}>
           {t('shell.studio.matrix.addGrant')}
         </Button>
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" disabled={!changed || incomplete || saving || reconnecting} onClick={save}>
           {t('shell.studio.matrix.save')}
         </Button>
@@ -526,6 +534,7 @@ function OwnGrants({
           type="warning"
           showIcon
           title={t('shell.studio.matrix.conflict')}
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           action={<Button onClick={reload}>{t('shell.studio.matrix.reload')}</Button>}
         />
       )}

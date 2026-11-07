@@ -25,6 +25,7 @@ export function SamlPostPage({ context }: { context: SamlPostContext }) {
         {samlRequest !== undefined && <input type="hidden" name="SAMLRequest" value={samlRequest} />}
         {samlResponse !== undefined && <input type="hidden" name="SAMLResponse" value={samlResponse} />}
         {relayState !== undefined && <input type="hidden" name="RelayState" value={relayState} />}
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.continue}
         </Button>

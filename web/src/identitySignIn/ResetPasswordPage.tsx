@@ -37,6 +37,7 @@ export function ResetPasswordPage({ context }: { context: ResetPasswordContext }
         </Form.Item>
         {/* No name, so the field posts nothing. It only gives onFinish the form. */}
         <input ref={submitRef} type="hidden" />
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>
           {texts.sendLink}
         </Button>

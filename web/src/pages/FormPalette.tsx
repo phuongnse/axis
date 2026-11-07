@@ -78,9 +78,11 @@ export function FormPalette({
           </Flex>
         )}
         <Flex gap="small" wrap>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button data-testid="studio-form-add-section" onClick={() => apply(addSection(draft, selected, keys))}>
             {t('shell.studio.design.addSection')}
           </Button>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button data-testid="studio-form-add-step" onClick={() => apply(addStep(draft, keys))}>
             {t('shell.studio.design.addStep')}
           </Button>
@@ -113,6 +115,7 @@ function PaletteField({
     disabled,
   })
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       ref={setNodeRef}
       onPointerDown={listeners?.onPointerDown as PointerEventHandler<HTMLElement> | undefined}

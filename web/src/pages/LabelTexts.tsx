@@ -108,6 +108,7 @@ export function LabelTexts({ pointer, value, onChange }: { pointer: string; valu
         <Alert data-testid="studio-label-write-error" type="error" title={t('shell.studio.writeTextsFailed')} />
       )}
       <Flex gap="small" align="center">
+        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button disabled={writing || reconnecting || key === '' || key.includes('/')} onClick={write}>
           {t('shell.studio.writeTexts')}
         </Button>

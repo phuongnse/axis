@@ -22,6 +22,7 @@ export function SignInPromptDialog({ open }: { open: boolean }) {
       keyboard={false}
       mask={{ closable: false }}
       footer={
+        // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
         <Button type="primary" onClick={() => startSignIn()}>
           {t('shell.account.signIn')}
         </Button>

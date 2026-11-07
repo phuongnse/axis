@@ -257,6 +257,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                     options={names?.roles.map((declared) => declared.name) ?? []}
                     onChange={(next) => changeRoleRow(position, claim, next ?? '')}
                   />
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button
                     onClick={() =>
                       writeRoleValues(
@@ -271,6 +272,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                 </Flex>
               ))}
               <div>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={addRoleRow}>{t('shell.studio.identityProvider.addRole')}</Button>
               </div>
               {Object.keys(roleValues).length === 0 && (
@@ -292,6 +294,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
                 value={text(level)}
                 onChange={(event) => onChange(`/acr/${index}`, event.target.value)}
               />
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
               <Button
                 onClick={() =>
                   onChange('/acr', acr.length > 1 ? acr.filter((_, position) => position !== index) : undefined)
@@ -302,6 +305,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
             </Flex>
           ))}
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange('/acr', [...acr, ''])}>{t('shell.studio.identityProvider.addAcr')}</Button>
           </div>
         </Flex>

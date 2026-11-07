@@ -32,6 +32,7 @@ export function SiteSignIn({
               options={providers}
               onChange={(next) => onChange(`/signIn/${index}`, next ?? '')}
             />
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button
               onClick={() => {
                 const rest = entries.filter((_, position) => position !== index)
@@ -43,6 +44,7 @@ export function SiteSignIn({
           </Flex>
         ))}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange('/signIn', [...entries, ''])}>{t('shell.studio.site.addProvider')}</Button>
         </div>
         {entries.length === 0 && (

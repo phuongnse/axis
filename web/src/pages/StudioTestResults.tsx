@@ -66,6 +66,7 @@ function ScenarioRow({
   const content = (
     <Flex vertical align="flex-start">
       <span>
+        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
         <Tag color={failed ? 'error' : 'success'}>
           {t(failed ? 'shell.studio.tests.failed' : 'shell.studio.tests.passed')}
         </Tag>
@@ -82,6 +83,7 @@ function ScenarioRow({
     return <div style={{ padding: '4px 15px' }}>{content}</div>
   }
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       type="text"
       style={{ height: 'auto', textAlign: 'left' }}

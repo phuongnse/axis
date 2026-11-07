@@ -277,6 +277,7 @@ function RowActions({ actions, fold }: { actions: AxisRowAction[] | null; fold: 
             {...action.attributes}
           />
         ) : (
+          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           <Button
             key={action.key}
             type="text"

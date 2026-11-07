@@ -245,6 +245,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
           }}
           onRemove={() => pick(null)}
         >
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button>{t('shell.table.importChoose')}</Button>
         </Upload>
         <div aria-live="polite" data-testid="import-status">

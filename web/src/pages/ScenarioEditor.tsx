@@ -106,6 +106,7 @@ function StubCard({
             />
           )}
           <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
           </div>
         </Flex>
@@ -176,12 +177,14 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
                   options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
                   onChange={(next: string[]) => onChange(pointer, next)}
                 />
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
               </Flex>
             </Field>
           )
         })}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange(`/users/${freshKey(users, 'user')}`, [])}>
             {t('shell.studio.scenario.addUser')}
           </Button>
@@ -193,6 +196,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
           <StubCard key={index} pointer={`/stubs/${index}`} stub={isObject(stub) ? stub : {}} onChange={onChange} />
         ))}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             onClick={() => onChange('/stubs', [...stubs, { connector: { name: '', operation: '' }, output: {} }])}
           >
@@ -206,6 +210,7 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
           <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
         ))}
         <div>
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button onClick={() => onChange('/steps', [...steps, { type: 'advanceTime', by: 'PT1H' }])}>
             {t('shell.studio.scenario.addStep')}
           </Button>

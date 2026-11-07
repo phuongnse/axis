@@ -29,6 +29,7 @@ function PaletteType({ entry, onInsert }: { entry: PaletteEntry; onInsert: () =>
   const t = useText()
   const { setNodeRef, listeners } = useDraggable({ id: `process-palette:${entry.key}`, data: { entry } })
   return (
+    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button ref={setNodeRef} {...listeners} data-testid={`studio-process-palette-${entry.key}`} onClick={onInsert}>
       {entryLabel(entry, t('shell.studio.process.packageOperation'))}
     </Button>

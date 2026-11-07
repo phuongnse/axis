@@ -95,12 +95,14 @@ export function AccountPage() {
         <>
           <Flex vertical gap="small" align="flex-start">
             <Typography.Title level={5}>{t('shell.account.password.title')}</Typography.Title>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => assignLocation(accountActionUrl('/account', 'UPDATE_PASSWORD'))}>
               {t('shell.account.password.change')}
             </Button>
           </Flex>
           <Flex vertical gap="small" align="flex-start">
             <Typography.Title level={5}>{t('shell.account.authenticators.title')}</Typography.Title>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
             <Button onClick={() => assignLocation(accountActionUrl('/account', 'CONFIGURE_TOTP'))}>
               {t('shell.account.authenticators.add')}
             </Button>
@@ -127,6 +129,7 @@ export function AccountPage() {
                   kind: 'fixed',
                   title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
                   render: (_value, authenticator) => (
+                    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                     <Button
                       size="small"
                       disabled={authenticators.authenticators.length <= 1}
@@ -154,6 +157,7 @@ export function AccountPage() {
           showIcon
           title={t('shell.account.sessions.reauthenticate')}
           action={
+            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button size="small" onClick={() => assignLocation(reauthenticateUrl('/account'))}>
               {t('shell.account.sessions.signInAgain')}
             </Button>
@@ -162,6 +166,7 @@ export function AccountPage() {
       )}
       {sessions && (
         <Flex vertical gap="small" align="flex-start">
+          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button
             disabled={!endAllowed || sessions.sessions.every((session) => session.current)}
             onClick={() => end(endOtherSessions)}
@@ -194,6 +199,7 @@ export function AccountPage() {
                   session.current ? (
                     <Tag>{t('shell.account.sessions.current')}</Tag>
                   ) : (
+                    // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                     <Button size="small" disabled={!endAllowed} onClick={() => end(() => endSession(session.id))}>
                       {t('shell.account.sessions.end')}
                     </Button>
