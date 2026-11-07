@@ -293,7 +293,23 @@
     "trusted_workflows": [
       "docs-audit.yml"
     ],
-    "last_in_milestone_label": "last-in-milestone",
+    "priority": [
+      "nexkit:ci",
+      "nexkit:dependabot",
+      "bug",
+      "nexkit:flaky"
+    ],
+    "labels": {
+      "journey": {
+        "wave": 1
+      },
+      "docs-sweep": {
+        "wave": 2
+      },
+      "on-hold": {
+        "hold": true
+      }
+    },
     "dependabot": "high"
   },
   "evidence": {

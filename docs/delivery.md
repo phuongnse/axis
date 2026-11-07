@@ -56,6 +56,14 @@ that holds it.
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
   same milestone or across milestones. A `bug` issue for CI on `main`, an issue for a Dependabot
   advisory and an issue of the docs audit are in no milestone.
+- **Bugs go first.** Autopilot's [`priority`][nexkit-labels] setting lists the labels whose issues
+  start before the others, in this order: `nexkit:ci` for a failure of CI on `main`,
+  `nexkit:dependabot` for an advisory, `bug`, and `nexkit:flaky` for a flaky test. NexKit labels the
+  issues it opens. A `bug` issue that a person opens goes first too, with or without a milestone, so a
+  broken `main` never waits behind a milestone's features.
+- **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
+  makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
+  issue to stop work on it without closing it.
 - **Autopilot takes the docs audit's issues,** because its [`trusted_workflows`][nexkit-workflow-issues] setting lists
   `docs-audit.yml`. NexKit checks that the issue came from a run of that workflow on `main` that NexKit
   or a writer started. An issue that any other workflow or a person without write access opens waits
@@ -69,9 +77,11 @@ that holds it.
   the answers on the issue and can change one with a comment before `/nexkit go`, or with
   `/nexkit fix` on the pull request.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
-  [`request` skill][nexkit-request]. The milestone's docs sweep carries the `last-in-milestone` label,
-  which autopilot's `last_in_milestone_label` setting names, so it starts only once every other issue
-  of its milestone is closed, also those opened later, with no *blocked by* marks. Autopilot's `max_parallel` setting caps how
+  [`request` skill][nexkit-request]. A milestone ends in two waves, which the `labels` setting gives to
+  two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
+  milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
+  journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
+  mark. Autopilot's `max_parallel` setting caps how
   many issues run at once, as
   [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) agrees, so
   that their rounds of checks fit in the runner jobs that GitHub Free runs at once.
@@ -99,7 +109,7 @@ that holds it.
   make a pull request that touches a security check, its exceptions or the authentication default
   need the owner's review, as
   [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
-  agrees. NexKit cannot merge it, so it waits, and the owner approves and merges it. The owner checks
+  agrees. NexKit cannot merge it until the owner approves it, and then NexKit merges it. The owner checks
   one thing: whether the change accepts a risk, adds an exception or loosens a check, and why. The
   other checks need no person: Axis's review checklist refuses a change that adds an exception to a
   check or loosens one, so NexKit mentions the owner only when a change does.
@@ -247,8 +257,8 @@ A milestone goes from a readiness check to its close in five steps.
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
 4. **Docs sweep.** Before the owner closes the milestone, one issue in it checks the docs and fixes
-   what the milestone made stale. It carries the `last-in-milestone` label, so it runs once every
-   other issue of the milestone is closed. It leaves what other milestones are still building to their own sweeps. It checks at
+   what the milestone made stale. It carries the `docs-sweep` label, so it runs once every
+   other issue of the milestone is closed, the journey included. It leaves what other milestones are still building to their own sweeps. It checks at
    least:
    - the roadmap status of this milestone and the next one;
    - the **From** column of [concepts.md](domain/concepts.md) for every concept listed for this
@@ -377,3 +387,4 @@ issues, pull requests and sub-issues.
 [nexkit-dependabot]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#dependabot-advisories
 [nexkit-person-review]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#reviewing-your-own-pull-requests
 [nexkit-branches]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md#stages
+[nexkit-labels]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
