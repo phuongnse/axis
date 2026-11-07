@@ -107,7 +107,7 @@ describe('FormPalette', () => {
     expect(sections[0].fields).toHaveLength(1)
     expect(screen.queryByTestId('studio-form-palette-notes')).toBeNull()
     expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent(
-      'Inserted notes · details · position 2',
+      'Inserted notes, details, position 2',
     )
   })
 
@@ -145,7 +145,7 @@ describe('FormPalette', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Remove field' }))
 
     expect(paletteButtons()).toContain('Status')
-    expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent('Removed status · details')
+    expect(screen.getByTestId('studio-form-palette-announcement')).toHaveTextContent('Removed status, details')
   })
 
   it('adds the first step with every section, then an empty one', async () => {

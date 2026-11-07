@@ -296,7 +296,7 @@ describe('StudioModuleEditor', () => {
     expect(screen.getByTestId('studio-module-reset-all')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-entity-designer')).toBeNull()
     expect(
-      await screen.findByRole('button', { name: 'submit · operation · Added' }, { timeout: 5000 }),
+      await screen.findByRole('button', { name: 'submit, operation, Added' }, { timeout: 5000 }),
     ).toBeInTheDocument()
   })
 

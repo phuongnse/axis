@@ -97,7 +97,7 @@ function DiagnosticRow({
       </span>
       <Typography.Text type="secondary">
         {diagnostic.file}
-        {diagnostic.path !== '' && ` · ${t('shell.studio.path')}: ${diagnostic.path}`}
+        {diagnostic.path !== '' && `, ${t('shell.studio.path')}: ${diagnostic.path}`}
       </Typography.Text>
     </Flex>
   )

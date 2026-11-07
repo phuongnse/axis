@@ -930,7 +930,7 @@ describe('StudioEditor for a process', () => {
     await editJson(JSON.stringify(withExtraStep, null, 2))
     await userEvent.click(screen.getByRole('tab', { name: 'Design' }))
 
-    expect(await screen.findByTestId('studio-graph-node-11', {}, slow)).toHaveAccessibleName('notify · end')
+    expect(await screen.findByTestId('studio-graph-node-11', {}, slow)).toHaveAccessibleName('notify, end')
     expect(requests(fetchMock, 'PATCH')).toBe(0)
   })
 
@@ -959,7 +959,7 @@ describe('StudioEditor for a process', () => {
         await userEvent.tab()
         const node = screen.getByTestId(`studio-graph-node-${index}`)
         expect(node).toHaveFocus()
-        expect(node).toHaveAccessibleName(`${step.name} · ${step.type}`)
+        expect(node).toHaveAccessibleName(`${step.name}, ${step.type}`)
         await userEvent.keyboard('{Enter}')
         expect(
           within(screen.getByTestId('studio-process-design')).getByTestId(`studio-step-${index}`),
@@ -1016,12 +1016,12 @@ describe('StudioEditor for a process', () => {
     fireEvent.click(await screen.findByTestId('studio-graph-node-0', {}, slow))
     const edge = () => screen.getByTestId('rf__edge-/steps/0/next')
     const oldTarget = processContent.steps.findIndex((step) => step.name === processContent.steps[0].next)
-    const oldName = `submit to ${processContent.steps[oldTarget].name} · next`
+    const oldName = `submit to ${processContent.steps[oldTarget].name}, next`
     expect(edge()).toHaveAccessibleName(oldName)
 
     const panel = within(screen.getByTestId('studio-process-design'))
     await chooseOption('done', panel.getByTestId('studio-field-/steps/0/next'))
-    expect(edge()).toHaveAccessibleName('submit to done · next')
+    expect(edge()).toHaveAccessibleName('submit to done, next')
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(edge()).toHaveAccessibleName(oldName)
@@ -1032,7 +1032,7 @@ describe('StudioEditor for a process', () => {
     renderResource(processItem)
 
     const node = await screen.findByTestId('studio-graph-node-10', {}, slow)
-    expect(node).toHaveAccessibleName('done · end')
+    expect(node).toHaveAccessibleName('done, end')
     for (const source of [7, 8, 9]) {
       expect(screen.getByTestId(`rf__edge-/steps/${source}/next`)).toBeInTheDocument()
     }
@@ -1065,7 +1065,7 @@ describe('StudioEditor for a process', () => {
 
     const edge = await screen.findByTestId('rf__edge-/steps/2/otherwise', {}, slow)
     expect(edge).toHaveAttribute('tabindex', '0')
-    expect(edge).toHaveAccessibleName('financeCheck to markApproved · otherwise')
+    expect(edge).toHaveAccessibleName('financeCheck to markApproved, otherwise')
     act(() => edge.focus())
     await userEvent.keyboard('{Enter}')
 
@@ -1097,7 +1097,7 @@ describe('StudioEditor for a process', () => {
     expect(screen.queryByTestId('rf__edge-/steps/1/outcomes/0')).not.toBeInTheDocument()
     expect(screen.getByTestId('rf__edge-/steps/1/outcomes/1')).toBeInTheDocument()
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent(
-      'Removed transition managerApproval to financeCheck · approve',
+      'Removed transition managerApproval to financeCheck, approve',
     )
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
     expect(screen.getByTestId('rf__edge-/steps/1/outcomes/0')).toBeInTheDocument()
@@ -1114,8 +1114,8 @@ describe('StudioEditor for a process', () => {
     expect(design.queryByRole('button', { name: 'Remove transition' })).not.toBeInTheDocument()
     await userEvent.keyboard('{Delete}')
 
-    expect(screen.queryByRole('button', { name: 'markRejected · operation' })).not.toBeInTheDocument()
-    expect(screen.getByTestId('studio-graph-node-9')).toHaveAccessibleName('done · end')
+    expect(screen.queryByRole('button', { name: 'markRejected, operation' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('studio-graph-node-9')).toHaveAccessibleName('done, end')
     expect(design.getByTestId('studio-process-announcement')).toHaveTextContent('Removed step markRejected')
   })
 
@@ -1139,7 +1139,7 @@ describe('StudioEditor for a process', () => {
     const marked = await screen.findByTestId('studio-graph-node-1', {}, slow)
     expect(marked).toHaveAttribute('data-marked', 'true')
     expect(marked).toHaveAccessibleName(
-      `${processContent.steps[1].name} · ${processContent.steps[1].type} · has diagnostics`,
+      `${processContent.steps[1].name}, ${processContent.steps[1].type}, has diagnostics`,
     )
     const other = screen.getByTestId('studio-graph-node-0')
     expect(other).not.toHaveAttribute('data-marked')
@@ -1392,7 +1392,7 @@ describe('StudioEditor for a page', () => {
     await openFormTab()
 
     expect(await screen.findByTestId('studio-page-editor', {}, slow)).toBeInTheDocument()
-    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form · PurchaseRequest')
+    expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form, PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/actions/0/process')).toBeInTheDocument()
   })
 

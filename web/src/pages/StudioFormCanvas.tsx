@@ -317,7 +317,7 @@ function StepSwitchEntry({
       onClick={onClick}
       style={{ outline: isOver ? `2px solid ${colour.primary}` : undefined, borderRadius: radius.base }}
     >
-      {step.marked ? `${t(step.titleKey)} · ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
+      {step.marked ? `${t(step.titleKey)}, ${t('shell.studio.design.hasDiagnostics')}` : t(step.titleKey)}
     </span>
   )
 }
@@ -367,7 +367,7 @@ function FormElementFrame({
       data-form-frame=""
       data-path={path}
       data-marked={marked ? 'true' : undefined}
-      aria-label={marked ? `${name} · ${t('shell.studio.design.hasDiagnostics')}` : name}
+      aria-label={marked ? `${name}, ${t('shell.studio.design.hasDiagnostics')}` : name}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {

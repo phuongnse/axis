@@ -165,9 +165,11 @@ export function StudioHistory({
               description={
                 <Flex vertical>
                   {outcome.revisions.map((blocker) => (
-                    <Typography.Text key={blocker.id} data-testid="studio-history-blocker" data-id={blocker.id}>
-                      {[blocker.summary, revisionAuthor(blocker, t), time(blocker.time)].join(' · ')}
-                    </Typography.Text>
+                    <Flex key={blocker.id} vertical data-testid="studio-history-blocker" data-id={blocker.id}>
+                      <Typography.Text>{blocker.summary}</Typography.Text>
+                      <Typography.Text>{revisionAuthor(blocker, t)}</Typography.Text>
+                      <Typography.Text>{time(blocker.time)}</Typography.Text>
+                    </Flex>
                   ))}
                 </Flex>
               }
@@ -274,9 +276,9 @@ export function StudioRevisionPage({
     locale: null,
   }))
   const byKey = new Map(loaded.resources.map((resource) => [`${resource.change}:${resource.file}`, resource]))
-  const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)]
-    .filter((part) => part !== null)
-    .join(' · ')
+  const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
+    (part): part is string => part !== null,
+  )
   const block = (testId: string, title: string, text: string | null) => (
     <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
       <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>

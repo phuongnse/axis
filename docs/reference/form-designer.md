@@ -62,7 +62,7 @@ form, and a drop never copies one.
   "Removed" with the field and its section. A field with no name is named by its pointer, such as
   `/sections/0/fields/0`. One Undo puts the field back. Conditions that name the removed field are not
   rewritten, and the diagnostics flag them.
-- **The announcement joins with a comma** _(planned for M31)_. The field and its section join as peers,
+- **The announcement joins with a comma**. The field and its section join as peers,
   as in "Removed priority, Section 2", see [text](actions-and-controls.md#text).
 
 ## Layout outline

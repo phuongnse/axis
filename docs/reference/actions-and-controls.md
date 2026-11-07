@@ -107,8 +107,6 @@ the label reads as a gap too wide.
 
 ## Text
 
-_(planned for M31)_
-
 These rules hold for every word the SPA shows. How a text is worded is in [UI writing](ui-writing.md).
 
 - **No technical name.** What the UI shows is a text, never an internal code, a resource's file or a

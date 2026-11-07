@@ -168,7 +168,7 @@ test.describe('Studio on a copy of its own', () => {
     await page
       .getByTestId('studio-used-by')
       .getByTestId('studio-reference')
-      .filter({ hasText: 'entities/purchase-request.json · Path: /fields/4/target' })
+      .filter({ hasText: 'entities/purchase-request.json, Path: /fields/4/target' })
       .getByRole('button', { name: 'PurchaseRequest', exact: true })
       .click()
 
@@ -199,7 +199,7 @@ test.describe('Studio on a copy of its own', () => {
         page
           .getByTestId('studio-uses')
           .getByTestId('studio-reference')
-          .filter({ hasText: 'pages/requests-by-department.json · Path: /widgets/0/dataSource' })
+          .filter({ hasText: 'pages/requests-by-department.json, Path: /widgets/0/dataSource' })
           .getByRole('button', { name: 'PurchaseRequestList', exact: true }),
       ).toBeVisible()
     } finally {
@@ -611,7 +611,7 @@ test.describe('Studio on a copy of its own', () => {
     const graph = page.getByTestId('studio-process-graph')
     await expect(graph.locator('[data-testid^="studio-graph-node-"]')).toHaveCount(steps.length)
     for (const [index, step] of steps.entries()) {
-      await expect(page.getByTestId(`studio-graph-node-${index}`)).toHaveAccessibleName(`${step.name} · ${step.type}`)
+      await expect(page.getByTestId(`studio-graph-node-${index}`)).toHaveAccessibleName(`${step.name}, ${step.type}`)
     }
     const edges = graph.locator('[data-testid^="rf__edge-"]')
     await expect(edges).toHaveCount(expected.length)
@@ -619,7 +619,7 @@ test.describe('Studio on a copy of its own', () => {
     expect(ids.sort()).toEqual(expected.map((transitionPath) => `rf__edge-${transitionPath}`).sort())
 
     const design = page.getByTestId('studio-process-design')
-    await page.getByRole('button', { name: 'financeApproval · task', exact: true }).click()
+    await page.getByRole('button', { name: 'financeApproval, task', exact: true }).click()
     await expect(design.getByTestId('studio-step-3')).toBeVisible()
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
 

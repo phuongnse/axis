@@ -502,8 +502,8 @@ edits the same draft on a canvas.
   so a wrong one shows as a diagnostic after the save.
 - **Unknown keys.** A key the editor does not show, on the page or on a widget, is saved unchanged,
   also when the widget moves.
-- **Parts in words** _(planned for M31)_. A widget's row, a canvas frame's name and a page parameter's
-  row join their parts without a middle dot, as [text](actions-and-controls.md#text) says.
+- **Parts in words**. A widget's row, a canvas frame's name and a page parameter's row join their parts with a
+  comma, as in "table, PurchaseRequestList", see [text](actions-and-controls.md#text).
 
 ### KPI and chart panels
 

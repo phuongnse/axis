@@ -1714,7 +1714,7 @@ describe('TableWidget import', () => {
     await chooseAndCheck()
 
     const status = await screen.findByTestId('import-status')
-    await waitFor(() => expect(status).toHaveTextContent('Row 2 · Title: Required.'))
+    await waitFor(() => expect(status).toHaveTextContent('Row 2, Title: Required.'))
     expect(status).toHaveTextContent('Row 3: Wrong number of cells.')
     expect(status).toHaveTextContent('Column 3: Unknown field.')
     expect(status).toHaveTextContent('File: No header.')

@@ -32,10 +32,10 @@ import type { StudioNames } from './studio'
 
 describe('widgetSummary', () => {
   it('names the type and the first name the widget binds', () => {
-    expect(widgetSummary({ type: 'table', dataSource: 'PurchaseRequestList' })).toBe('table · PurchaseRequestList')
-    expect(widgetSummary({ type: 'form', entity: 'PurchaseRequest' })).toBe('form · PurchaseRequest')
-    expect(widgetSummary({ type: 'form', form: 'RequestForm' })).toBe('form · RequestForm')
-    expect(widgetSummary({ type: 'processInspector', process: 'Approval' })).toBe('processInspector · Approval')
+    expect(widgetSummary({ type: 'table', dataSource: 'PurchaseRequestList' })).toBe('table, PurchaseRequestList')
+    expect(widgetSummary({ type: 'form', entity: 'PurchaseRequest' })).toBe('form, PurchaseRequest')
+    expect(widgetSummary({ type: 'form', form: 'RequestForm' })).toBe('form, RequestForm')
+    expect(widgetSummary({ type: 'processInspector', process: 'Approval' })).toBe('processInspector, Approval')
   })
 
   it('shows only the type when nothing is bound', () => {
