@@ -21,7 +21,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
-import { StudioActivateDialog, StudioLiveTag } from './StudioReleases'
+import { StudioActivateDialog, StudioLiveTag, StudioReleaseBlockers } from './StudioReleases'
 import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
 
@@ -45,7 +45,8 @@ interface PartRow {
 /**
  * The page of one release, at `&view=release&release=N`: the heading "Release N" with the Live and Off-standard tags,
  * and Activate… on its right for a publisher (`canActivate`) when the release is not live, which asks for the same
- * confirmation as the release list and calls `onActivate` with the release's id. Under it, in order, come the facts
+ * confirmation as the release list and calls `onActivate` with the release's id. A release with blockers cannot replace
+ * the live one: a sentence and each blocking module's line follow the heading, and Activate… is off. Under it, in order, come the facts
  * (Label, Status, Published, Published by and Note), the relaxed points in words grouped by module, the changes under
  * a title that names the release they compare with, the modules and packages the release pins, and every activation of
  * the release. The facts and the activations come from `history`, and the rest from the release route, which loads
@@ -140,6 +141,8 @@ export function StudioReleasePage({
         onActivate={() => setConfirming(true)}
       />
       <StudioActivateDialog
+        application={application}
+        blockers={current.blockers}
         release={confirming ? current.number : null}
         liveNumber={history.active?.number}
         onConfirm={() => {
@@ -236,12 +239,24 @@ function ReleaseContent({
         actions={
           canActivate &&
           !release.live && (
-            <AxisButton role="secondary" data-testid="studio-release-activate" disabled={busy} onClick={onActivate}>
+            <AxisButton
+              role="secondary"
+              data-testid="studio-release-activate"
+              disabled={busy || release.blockers.length > 0}
+              onClick={onActivate}
+            >
               {t('shell.studio.activate.button')}
             </AxisButton>
           )
         }
       />
+      {!release.live && release.blockers.length > 0 && history.active && (
+        <StudioReleaseBlockers
+          release={release.number}
+          liveNumber={history.active.number}
+          blockers={release.blockers}
+        />
+      )}
       <Descriptions
         column={1}
         items={[

@@ -625,6 +625,9 @@ test.describe('the active release of the purchase request sample changes', () =>
       await first.getByRole('button', { name: `Activate release ${number}`, exact: true }).click()
       const dialog = await waitForDialog(page)
       await expect(dialog).toContainText(`Release ${number} replaces live release`)
+      await expect((await waitForDialog(page)).getByRole('button', { name: 'Activate', exact: true })).toBeEnabled({
+        timeout: 15_000,
+      })
       await confirmDialog(page, 'Activate')
 
       await expect(status).toContainText('Activated', { timeout: 60_000 })
@@ -713,6 +716,9 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       const earlier = page.locator('[data-testid="studio-release-row"][data-number="1"]')
       await earlier.getByRole('button', { name: 'Activate release 1', exact: true }).click()
+      await expect((await waitForDialog(page)).getByRole('button', { name: 'Activate', exact: true })).toBeEnabled({
+        timeout: 15_000,
+      })
       await confirmDialog(page, 'Activate')
 
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'failed', {
@@ -821,6 +827,9 @@ test.describe('the active release of the purchase request sample changes', () =>
         .first()
         .getByRole('button', { name: `Activate release ${before.number}`, exact: true })
         .click()
+      await expect((await waitForDialog(page)).getByRole('button', { name: 'Activate', exact: true })).toBeEnabled({
+        timeout: 15_000,
+      })
       await confirmDialog(page, 'Activate')
       await expect(status).toContainText('Activated', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')

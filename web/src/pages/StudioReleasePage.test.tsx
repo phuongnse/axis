@@ -307,6 +307,38 @@ describe('StudioReleasePage', () => {
     expect(await screen.findByRole('button', { name: 'Activate…' })).toBeDisabled()
   })
 
+  it('says a release with blockers cannot replace the live one, lists each blocker and turns Activate… off', async () => {
+    answer({
+      ...release,
+      blockers: [
+        { module: 'a', label: 'Assets', liveVersion: '1.2.0', version: null },
+        { module: 'b', label: 'Budgets', liveVersion: '2.0.0', version: '1.0.0' },
+      ],
+    })
+    renderPage()
+
+    const blockers = await screen.findByTestId('studio-release-blockers')
+    expect(blockers).toHaveTextContent('Release 3 cannot replace release 4')
+    expect(
+      within(blockers)
+        .getAllByTestId('studio-release-blocker')
+        .map((line) => line.textContent),
+    ).toEqual([
+      'Assets: the live release has 1.2.0, and this release lacks it',
+      'Budgets: the live release has 2.0.0, and 1.0.0 lacks some of its entities or fields',
+    ])
+    expect(screen.getByRole('button', { name: 'Activate…' })).toBeDisabled()
+  })
+
+  it('shows no blockers for a release without any', async () => {
+    answer(release)
+    renderPage()
+
+    await screen.findByRole('heading', { name: 'Release 3' })
+    expect(screen.queryByTestId('studio-release-blockers')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Activate…' })).toBeEnabled()
+  })
+
   it('has no Activate… for the live release or for a person who cannot publish', async () => {
     answer({ ...release, number: 4, previous: 3, previousIsLive: false, live: true })
     renderPage({ number: '4' })

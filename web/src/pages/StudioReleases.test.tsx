@@ -1,10 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
-import type { StudioReleaseItem, StudioReleases } from '../platform/studio'
+import type { StudioRelease, StudioReleaseBlocker, StudioReleaseItem, StudioReleases } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioReleasesList } from './StudioReleases'
 
@@ -64,7 +64,33 @@ function renderList(overrides: { history?: StudioReleases; canActivate?: boolean
   return onActivate
 }
 
-afterEach(() => localStorage.clear())
+function release(number: number, blockers: StudioReleaseBlocker[] = []): StudioRelease {
+  return {
+    number,
+    previous: 2,
+    previousIsLive: true,
+    live: false,
+    changes: [],
+    partChanges: [],
+    modules: [],
+    packages: [],
+    blockers,
+  }
+}
+
+function answer(body: StudioRelease | number) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      typeof body === 'number' ? new Response(null, { status: body }) : new Response(JSON.stringify(body)),
+    ),
+  )
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+  localStorage.clear()
+})
 
 describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
@@ -195,6 +221,7 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('names the release that replaces the live one and activates it on confirmation', async () => {
+    answer(release(1))
     const user = userEvent.setup()
     const onActivate = renderList()
 
@@ -202,11 +229,12 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
 
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Activate release 1?')
-    expect(within(dialog).getByTestId('studio-activate-release')).toHaveTextContent(
+    expect(await within(dialog).findByTestId('studio-activate-release')).toHaveTextContent(
       'Release 1 replaces live release 2.',
     )
     expect(onActivate).not.toHaveBeenCalled()
 
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Activate' })).toBeEnabled())
     await user.click(within(dialog).getByRole('button', { name: 'Activate' }))
 
     expect(onActivate).toHaveBeenCalledTimes(1)
@@ -214,14 +242,81 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
   })
 
   it('does not activate when the dialog is cancelled', async () => {
+    answer(release(3))
     const user = userEvent.setup()
     const onActivate = renderList()
 
     await user.click(screen.getByRole('button', { name: 'Activate release 3' }))
     const dialog = await screen.findByRole('dialog')
-    expect(dialog).toHaveTextContent('Release 3 replaces live release 2.')
+    expect(await within(dialog).findByText('Release 3 replaces live release 2.')).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(onActivate).not.toHaveBeenCalled()
+  })
+
+  it('titles the dialog with the cannot-replace sentence, lists the blockers and offers Close alone', async () => {
+    answer(
+      release(1, [
+        { module: 'a', label: 'Assets', liveVersion: '1.2.0', version: null },
+        { module: 'b', label: 'Budgets', liveVersion: '2.0.0', version: '1.0.0' },
+      ]),
+    )
+    const user = userEvent.setup()
+    const onActivate = renderList()
+
+    await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByText('Release 1 cannot replace release 2')).toBeInTheDocument()
+    const lines = within(dialog).getAllByTestId('studio-release-blocker')
+    expect(lines.map((line) => line.textContent)).toEqual([
+      'Assets: the live release has 1.2.0, and this release lacks it',
+      'Budgets: the live release has 2.0.0, and 1.0.0 lacks some of its entities or fields',
+    ])
+    expect(within(dialog).queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument()
+    expect(within(dialog).queryByTestId('studio-activate-release')).not.toBeInTheDocument()
+    const footer = dialog.querySelector('.ant-modal-footer') as HTMLElement
+    expect(
+      within(footer)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['Close'])
+
+    await user.click(within(footer).getByRole('button', { name: 'Close' }))
+
+    expect(onActivate).not.toHaveBeenCalled()
+  })
+
+  it('turns Activate off with a spinner while the release loads', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    )
+    const user = userEvent.setup()
+    renderList()
+
+    await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'Activate' })).toBeDisabled()
+    expect(dialog.querySelector('.ant-spin')).not.toBeNull()
+    expect(within(dialog).queryByTestId('studio-activate-release')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the replaces sentence and Activate when the release does not load', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    answer(500)
+    const user = userEvent.setup()
+    const onActivate = renderList()
+
+    await user.click(screen.getByRole('button', { name: 'Activate release 1' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(await within(dialog).findByTestId('studio-activate-release')).toHaveTextContent(
+      'Release 1 replaces live release 2.',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Activate' }))
+
+    expect(onActivate).toHaveBeenCalledTimes(1)
   })
 })
