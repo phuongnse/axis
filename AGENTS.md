@@ -40,7 +40,9 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a
   shared widget, see [shared widgets](docs/reference/shared-widgets.md).
 - Write each locale of a screen's text for its purpose, not as a translation of the English, and name concepts by the
-  [glossary](docs/reference/ui-glossary.json). See [UI writing](docs/reference/ui-writing.md).
+  [glossary](docs/reference/ui-glossary.json). A new term goes in the
+  [proposed glossary](docs/reference/ui-glossary-proposed.json) and the owner moves it to the approved one, see
+  [UI writing](docs/reference/ui-writing.md#the-glossary).
 - No application-specific code in the platform. Sample applications live under `samples/apps/`,
   extension packages under `samples/packages/`, modules under `samples/modules/` and templates
   under `samples/templates/`.

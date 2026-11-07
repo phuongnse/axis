@@ -4,8 +4,9 @@ This page says how the words of Axis's own screens are written: Studio, the oper
 pages and the platform's messages. It covers the platform texts in `src/Axis.Presentation/Texts/<locale>.json`, in every locale, and
 every person or agent that adds or changes one. An application's own texts belong to its author, who may follow it.
 
-The terms each locale uses are in the [glossary](ui-glossary.json). This page says how to write; the glossary says which
-word names which concept.
+The terms each locale uses are in the [glossary](ui-glossary.json), and the terms that wait for the owner are in the
+[proposed glossary](ui-glossary-proposed.json). This page says how to write; the glossary says which word names which
+concept.
 
 ## Principles
 
@@ -19,7 +20,8 @@ These principles hold in every language.
 - **A setting by what it means.** Name a setting by what it is to the person, not by the English word for it: what
   people see as a field's name is its display name, and what a field holds is its data type.
 - **One term for one concept.** Use the glossary's term. Never bring in a synonym, and never change an approved term in
-  passing: a change of term is a change of the glossary, which the owner approves, and then of every text that uses it.
+  passing: a change of term is proposed in the proposed glossary, which the owner approves, and then made in every text
+  that uses it.
 - **Direct verbs for actions.** A button or a menu item says what it does, with a verb first where the language allows:
   Save, Create, Delete, Restore, Export data. A dialog's finish button repeats the verb of its title: "Delete the role?"
   ends with Delete, not OK.
@@ -86,14 +88,19 @@ A text that holds a value reads as a whole sentence in every locale.
 ## The glossary
 
 [`ui-glossary.json`](ui-glossary.json) lists each concept of [concepts.md](../domain/concepts.md) that a screen names,
-and the verbs of the common actions, with the term of each locale. A term has a `status`:
+and the verbs of the common actions, with the term of each locale. It holds the `approved` terms, and the owner reviews
+every change to it. [`ui-glossary-proposed.json`](ui-glossary-proposed.json) holds the terms that wait for the owner,
+with the same fields. A term has a `status`:
 
-- `approved`: the term to use;
-- `proposed`: suggested, waiting for the owner;
-- `decide`: the owner chooses among the `options` before any text changes.
+- `approved`: the term to use, in `ui-glossary.json`;
+- `proposed`: suggested, waiting for the owner, in `ui-glossary-proposed.json`;
+- `decide`: the owner chooses among the `options` before any text changes, in `ui-glossary-proposed.json`.
 
-`keep` lists what no locale translates, by group: `names` for names and acronyms, and `integration` for the closed list
-of integration and operations terms.
+A new term, or a change of term, goes in `ui-glossary-proposed.json`, which needs no owner review. The owner approves
+it by moving it to `ui-glossary.json` with the status `approved`.
+
+`keep`, in `ui-glossary.json`, lists what no locale translates, by group: `names` for names and acronyms, and
+`integration` for the closed list of integration and operations terms.
 
 The glossary and this page are conventions. They hold by being followed when a text is written and reviewed: the
 glossary says which word to use for a concept, and lists no words to avoid, as no list of wrong words is ever complete.
@@ -159,7 +166,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
 A test checks the rules that a test can decide, and no list of words. It fails when:
 
 - a key is missing in a locale, or a placeholder of the English text is missing or added in another locale;
-- a text in another locale is the same as the English one, unless the glossary's `keep` allows it.
+- a text in another locale is the same as the English one, unless the glossary's `keep` allows it;
+- a concept is in both glossary files, or a term is in the glossary file that does not match its `status`.
 
 `tests/Axis.Server.Tests/TextCatalogTests.cs` runs these checks in `scripts/test.sh`. A word of a text passes when a
 one- or two-word `keep` entry names it, ignoring case. The keys that broke a rule before the check are listed by
@@ -171,7 +179,7 @@ from it, and a new break fails.
 A change to a platform text takes these steps:
 
 1. Read the key's place on the screen and its purpose, then write every locale of the change from that purpose.
-2. A concept with no term yet, or a term to change, is added to the glossary as `proposed` in the same change, for the
-   owner to approve.
+2. A concept with no term yet, or a term to change, is added to `ui-glossary-proposed.json` as `proposed` in the same
+   change, for the owner to approve by moving it to `ui-glossary.json`.
 3. A change that rewrites many texts of one locale goes area by area, with the owner reviewing the first area before
    the rest follow.
