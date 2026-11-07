@@ -41,10 +41,10 @@ import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
 import { IdentityProviderEditor } from './IdentityProviderEditor'
-import type { JsonViewHandle } from './JsonView'
 import { emptyHistory, endStep, recordStep, redoStep, undoStep, type DraftSnapshot } from './draftHistory'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import type { JsonViewHandle } from './JsonView'
 import { LabelTextsContext } from './labelTextsContext'
 import { PageEditor } from './PageEditor'
 import { ProcessEditor } from './ProcessEditor'
@@ -192,7 +192,7 @@ export function StudioEditor({
   publisher?: boolean
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { size, colour } = useDesignTokens()
   const names = useContext(StudioNamesContext) ?? null
   const { generation, reconnecting, lost } = useStudioConnection()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -207,6 +207,8 @@ export function StudioEditor({
   const [jsonText, setJsonText] = useState<string | null>(null)
   const [jsonInvalid, setJsonInvalid] = useState(false)
   const shownJson = jsonText ?? JSON.stringify(draft, null, 2)
+  // The problems that the JSON view marks, syntax errors and schema breaks.
+  const [jsonProblems, setJsonProblems] = useState(0)
   const [conflict, setConflict] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -799,6 +801,17 @@ export function StudioEditor({
             tabBarExtraContent={
               tab === 'json' ? (
                 <AxisActionRow align="center">
+                  {jsonProblems > 0 && (
+                    <AxisButton
+                      role="plain"
+                      style={{ color: colour.dangerText }}
+                      onClick={() => jsonViewRef.current?.nextProblem()}
+                    >
+                      {jsonProblems === 1
+                        ? t('shell.studio.jsonView.problem')
+                        : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
+                    </AxisButton>
+                  )}
                   <AxisButton
                     role="icon"
                     nameKey="shell.studio.json.find"
@@ -814,7 +827,7 @@ export function StudioEditor({
                   />
                   <AxisButton role="icon" nameKey="shell.studio.json.copy" icon={<CopyOutlined />} onClick={copy} />
                 </AxisActionRow>
-              ) : null
+              ) : undefined
             }
             items={[
               // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
@@ -971,25 +984,22 @@ export function StudioEditor({
                 key: 'json',
                 label: t('shell.studio.json'),
                 children: (
-                  <Flex vertical gap="small">
-                    <Suspense fallback={null}>
-                      <LazyJsonView
-                        label={t('shell.studio.json')}
-                        value={shownJson}
-                        onChange={changeJson}
-                        boundary={rootRef}
-                        ref={jsonViewRef}
-                        findTexts={{
-                          field: t('shell.studio.json.findField'),
-                          count: t('shell.studio.json.findCount'),
-                          none: t('shell.studio.json.findNone'),
-                        }}
-                      />
-                    </Suspense>
-                    {jsonInvalid && (
-                      <Alert data-testid="studio-json-error" type="error" title={t('shell.studio.invalidJson')} />
-                    )}
-                  </Flex>
+                  <Suspense fallback={null}>
+                    <LazyJsonView
+                      ref={jsonViewRef}
+                      label={t('shell.studio.json')}
+                      value={shownJson}
+                      onChange={changeJson}
+                      boundary={rootRef}
+                      kind={item.kind}
+                      onProblems={setJsonProblems}
+                      findTexts={{
+                        field: t('shell.studio.json.findField'),
+                        count: t('shell.studio.json.findCount'),
+                        none: t('shell.studio.json.findNone'),
+                      }}
+                    />
+                  </Suspense>
                 ),
               },
             ]}

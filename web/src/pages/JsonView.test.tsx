@@ -3,6 +3,8 @@ import { EditorView } from '@codemirror/view'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { createRef } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import JsonView, { type JsonViewHandle } from './JsonView'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
@@ -13,7 +15,9 @@ function renderView(value: string, onChange = vi.fn()) {
   const handle = createRef<JsonViewHandle>()
   const view = (text: string) => (
     <ThemeModeProvider>
-      <JsonView label="JSON" value={text} onChange={onChange} findTexts={findTexts} ref={handle} />
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <JsonView label="JSON" value={text} onChange={onChange} findTexts={findTexts} ref={handle} />
+      </TextProvider>
     </ThemeModeProvider>
   )
   const { rerender } = render(view(value))

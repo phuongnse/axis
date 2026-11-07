@@ -1,3 +1,4 @@
+import { forEachDiagnostic, type Diagnostic } from '@codemirror/lint'
 import { EditorView } from '@codemirror/view'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -1620,10 +1621,12 @@ describe('StudioEditor for a page', () => {
       await screen.findByTestId('studio-page-editor', {}, slow)
       await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
       await editJson('{')
-      expect(screen.getByTestId('studio-json-error')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      expect(await screen.findByRole('button', { name: '1 problem' })).toBeInTheDocument()
 
       await userEvent.click(undoButton())
-      expect(screen.queryByTestId('studio-json-error')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+      await waitFor(() => expect(screen.queryByRole('button', { name: '1 problem' })).not.toBeInTheDocument())
     })
 
     it('keeps the history after a save, and the next save sends the patch that reverts the edit', async () => {
@@ -2272,5 +2275,97 @@ describe('StudioEditor JSON view actions', () => {
 
     expect(await screen.findByText('The JSON could not be copied.')).toBeInTheDocument()
     warn.mockRestore()
+  })
+})
+
+describe('StudioEditor problems in the JSON view', () => {
+  const roleItem: StudioResourceItem = {
+    id: '33333333-3333-4333-8333-333333333333',
+    kind: 'role',
+    name: 'approver',
+    file: 'roles/approver.json',
+    version: 'r1',
+    usedBy: 0,
+  }
+  const roleContent = {
+    id: roleItem.id,
+    kind: 'role',
+    name: 'approver',
+    formatVersion: 1,
+    label: { textKey: 'roles.approver' },
+  }
+
+  async function openJsonTab() {
+    stubResource(roleItem, roleContent)
+    renderResource(roleItem)
+    await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
+    await jsonView()
+  }
+
+  /** The problems the view marks, in text order. */
+  function marked(view: EditorView): (Diagnostic & { from: number; to: number })[] {
+    const found: (Diagnostic & { from: number; to: number })[] = []
+    forEachDiagnostic(view.state, (diagnostic, from, to) => found.push({ ...diagnostic, from, to }))
+    return found.sort((a, b) => a.from - b.from)
+  }
+
+  const problemButton = (name: string) => screen.findByRole('button', { name }, slow)
+
+  it('counts a syntax error and marks it in words, and shows no count once the text is fixed', async () => {
+    await openJsonTab()
+    expect(screen.queryByRole('button', { name: /problem/ })).not.toBeInTheDocument()
+
+    await editJson('{')
+    await problemButton('1 problem')
+    expect(marked(await jsonView()).map((diagnostic) => diagnostic.message)).toEqual(['This is not valid JSON here.'])
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+
+    await editJson(JSON.stringify(roleContent, null, 2))
+    await waitFor(() => expect(screen.queryByRole('button', { name: /problem/ })).not.toBeInTheDocument())
+  })
+
+  it('counts a missing required property and words it as an addition', async () => {
+    await openJsonTab()
+    const { label: _label, ...withoutLabel } = roleContent
+
+    await editJson(JSON.stringify(withoutLabel, null, 2))
+
+    await problemButton('1 problem')
+    const [problem] = marked(await jsonView())
+    expect(problem.message).toBe('Add label.')
+    // The object has no key, so its opening brace is marked.
+    expect([problem.from, problem.to]).toEqual([0, 1])
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('selects each problem in turn when the count is clicked, and wraps to the first', async () => {
+    await openJsonTab()
+
+    await editJson(JSON.stringify({ ...roleContent, name: 5, formatVersion: 2 }, null, 2))
+
+    await userEvent.click(await problemButton('2 problems'))
+    const view = await jsonView()
+    const [first, second] = marked(view)
+    expect(first.message).toBe('This must be of type string.')
+    expect(second.message).toBe('Use 1 here.')
+    expect(view.state.selection.main).toMatchObject({ from: first.from, to: first.to })
+
+    await userEvent.click(screen.getByRole('button', { name: '2 problems' }))
+    expect(view.state.selection.main).toMatchObject({ from: second.from, to: second.to })
+
+    await userEvent.click(screen.getByRole('button', { name: '2 problems' }))
+    expect(view.state.selection.main).toMatchObject({ from: first.from, to: first.to })
+  })
+
+  it('shows the count on the JSON tab only', async () => {
+    await openJsonTab()
+    await editJson('{')
+    await problemButton('1 problem')
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+    expect(screen.queryByRole('button', { name: /problem/ })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
+    await problemButton('1 problem')
   })
 })

@@ -2,6 +2,7 @@ import react from '@vitejs/plugin-react'
 import os from 'node:os'
 import type { ProxyOptions } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { schemaValidators } from './schemaValidators.ts'
 import { vitestWorkers } from './vitestWorkers.ts'
 
 const serverUrl = process.env.AXIS_SERVER_URL ?? 'http://localhost:5206'
@@ -16,7 +17,7 @@ function answerBadGateway(proxy: Parameters<NonNullable<ProxyOptions['configure'
 }
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [schemaValidators(), react()],
   build: {
     // The server hosts the built SPA from its web root.
     outDir: '../src/Axis.Server/wwwroot',
