@@ -382,8 +382,10 @@ sessions.MapTenantExportEndpoints();
 sessions.MapTenantUsageEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
-// so a wrong method on a real route still answers 405.
-sessions.MapFallback("/api/{**path}", () => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No API route matches this path."))
+// so a wrong method on a real route still answers 405. It is a request delegate, because the Request Delegate Generator
+// maps a fallback lambda without its pattern, so the route would catch page paths.
+sessions.MapFallback("/api/{**path}", context =>
+        Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No API route matches this path.").ExecuteAsync(context))
     .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();

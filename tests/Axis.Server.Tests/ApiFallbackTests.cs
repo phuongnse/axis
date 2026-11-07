@@ -57,6 +57,17 @@ public sealed class ApiFallbackTests : IAsyncLifetime
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
     }
 
+    [Fact]
+    public async Task A_signed_in_caller_still_gets_the_page()
+    {
+        using var client = Factory().CreateClient().SignedInAs("author");
+
+        var response = await client.GetAsync(new Uri("/some/page", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+    }
+
     public ValueTask InitializeAsync()
     {
         Directory.CreateDirectory(Path.Combine(_contentRoot, "wwwroot"));
