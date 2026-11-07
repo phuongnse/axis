@@ -66,7 +66,12 @@ opens, as
 [D68](../../../docs/decisions/d68-issues-of-several-milestones-run-at-once.md)
 says. Autopilot takes them all the same.
 
-1. For one CI failure, open one issue.
+1. For a CI failure on `main`, open an issue only when NexKit could not.
+   NexKit's sweep opens a `nexkit:ci` issue for each failure by itself. Open
+   one only when no open issue, `nexkit:ci` or other, names that failure, and
+   the logs of the NexKit sweep that the failed run started show that it could
+   not check the workflow or could not open the issue. Say in the issue why
+   NexKit did not open it, such as GitHub refusing the body as too long.
 2. For links of open issues that point nowhere, run
    `node scripts/check-issue-links.mjs` on `main`. It skips an open issue that
    an open issue blocks, and checks it once its blockers close. For each link it
