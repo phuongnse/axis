@@ -1,8 +1,21 @@
 # Documentation
 
 This is the map of the Axis docs. Each topic has one home, and other docs link to it rather than
-repeat it. Find the area you work in, then the page, then read only the sections you need. What goes in
-which doc, how to write it and how the docs stay correct is in [writing the docs](writing-docs.md).
+repeat it. Start from the reading path below by what you want, then find the page in the tables of its
+area and read only the sections you need. What goes in which doc, how to write it and how the docs
+stay correct is in [writing the docs](writing-docs.md).
+
+## Where to start
+
+Find what you want to do in the first column. The second column names the first page to read, and the
+third names what to read next.
+
+| You want to          | Start with                                | Then                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Understand Axis      | [Product brief](product-brief.md)         | [Architecture](architecture.md), [Concepts](domain/concepts.md), [Knowledge](domain/knowledge.md) and [Roadmap](roadmap.md)                                                                                             |
+| Build an application | [Concepts](domain/concepts.md)            | [Studio](reference/studio.md), [Configuration pipeline](reference/configuration.md), [Resource files](reference/resource-files.md) and the groups [Authoring](#authoring) and [Studio and screens](#studio-and-screens) |
+| Run Axis             | [Installation](reference/installation.md) | [Host settings](reference/host-settings.md), [Administration](reference/administration.md) and the groups [Operations and installation](#operations-and-installation) and [Axis SaaS](#axis-saas)                       |
+| Work on Axis         | [AGENTS.md](../AGENTS.md)                 | [Development](development.md), [Delivery](delivery.md), [Testing](testing.md) and [Writing the docs](writing-docs.md)                                                                                                   |
 
 ## Product and design
 
