@@ -15,9 +15,10 @@ table.
 
 - **A module is a versioned folder of resources** with a manifest, `module.json`, that gives its id,
   SemVer version and label. It holds entities, data sources, rules, sequences, forms, events, texts
-  and seeds, and the processes, pages, policies, triggers and scenarios that
-  [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) and
-  [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) add. It never holds roles, and
+  and seeds, and the processes, pages, policies, triggers, scenarios and contracts that
+  [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md),
+  [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) and
+  [D121](d121-how-a-module-contract-is-declared-and-checked.md) add. It never holds roles, and
   it may depend on other modules, as D89 says.
 - **Installed, declared and pinned like packages.** Modules are installed per installation.
   `application.json` declares each module it uses with a version range of the forms that
