@@ -14,7 +14,8 @@ customer cannot check that an image is the one Axis built.
 - **CI runs `scripts/scan.sh`** on its triggers and once a week. A red scan on `main` opens NexKit's
   `bug` issue for CI on `main`, like any failing check.
 - **Dependabot alerts, no Dependabot pull requests.** NexKit's autopilot opens a NexKit issue for each
-  high or critical alert that no open issue covers. A time frame starts on the alert's date.
+  advisory of a high or critical alert that no open issue covers. A time frame starts on the alert's
+  date.
 - **Images are scanned.** CI scans the Axis images and the pinned identity provider image with Trivy,
   under the dependency scan's rules.
 - **Released images are signed.** A release workflow publishes each image with a CycloneDX SBOM,
