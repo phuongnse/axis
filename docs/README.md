@@ -10,25 +10,33 @@ stay correct is in [writing the docs](writing-docs.md).
 Find what you want to do in the first column. The second column names the first page to read, and the
 third names what to read next.
 
-| You want to          | Start with                                | Then                                                                                                                                                                                                                    |
-| -------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Understand Axis      | [Product brief](product-brief.md)         | [How Axis works](how-axis-works.md), [Architecture](architecture.md), [Concepts](domain/concepts.md), [Knowledge](domain/knowledge.md) and [Roadmap](roadmap.md)                                                       |
-| Build an application | [Concepts](domain/concepts.md)            | [Studio](reference/studio.md), [Configuration pipeline](reference/configuration.md), [Resource files](reference/resource-files.md) and the groups [Authoring](#authoring) and [Studio and screens](#studio-and-screens) |
-| Run Axis             | [Installation](reference/installation.md) | [Host settings](reference/host-settings.md), [Administration](reference/administration.md) and the groups [Operations and installation](#operations-and-installation) and [Axis SaaS](#axis-saas)                       |
-| Work on Axis         | [AGENTS.md](../AGENTS.md)                 | [Development](development.md), [Delivery](delivery.md), [Testing](testing.md) and [Writing the docs](writing-docs.md)                                                                                                   |
+| You want to          | Start with                                | Then                                                                                                                                                                                                                                                                                      |
+| -------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Understand Axis      | [Product brief](product-brief.md)         | [How Axis works](how-axis-works.md), [Architecture](architecture.md), [Concepts](domain/concepts.md), [Knowledge](domain/knowledge.md) and [Roadmap](roadmap.md)                                                                                                                          |
+| Build an application | [Concepts](domain/concepts.md)            | The [first application tutorial](tutorials/first-application.md), [Studio](reference/studio.md), [Configuration pipeline](reference/configuration.md), [Resource files](reference/resource-files.md) and the groups [Authoring](#authoring) and [Studio and screens](#studio-and-screens) |
+| Run Axis             | [Installation](reference/installation.md) | [Host settings](reference/host-settings.md), [Administration](reference/administration.md) and the groups [Operations and installation](#operations-and-installation) and [Axis SaaS](#axis-saas)                                                                                         |
+| Work on Axis         | [AGENTS.md](../AGENTS.md)                 | [Development](development.md), [Delivery](delivery.md), [Testing](testing.md) and [Writing the docs](writing-docs.md)                                                                                                                                                                     |
 
 ## Product and design
 
 | Doc                                       | What it holds                                                             | Read it when                                                |
 | ----------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | [Product brief](product-brief.md)         | What Axis is, who uses it, the proving samples                            | You do product or architecture work                         |
-| [How Axis works](how-axis-works.md)      | A walk through the platform with diagrams, one part at a time             | You are new to Axis and want the whole picture first        |
+| [How Axis works](how-axis-works.md)       | A walk through the platform with diagrams, one part at a time             | You are new to Axis and want the whole picture first        |
 | [Roadmap](roadmap.md)                     | Milestones in their phases, what each delivers and its status             | You need the current milestone or a milestone's scope       |
 | [Decisions](decisions.md)                 | The index of decisions, each in its own file under `decisions/`           | A change touches a design choice; read only those decisions |
 | [Concepts](domain/concepts.md)            | The vocabulary and what each resource does                                | You name anything in code, APIs, UI or issues               |
 | [Knowledge](domain/knowledge.md)          | What business applications need and the pitfalls to avoid                 | You change configuration, execution, storage or security    |
 | [Architecture](architecture.md)           | Context, containers, runtime and deployment, tenancy, security, telemetry | You add a module or host, or change how they fit together   |
 | [Repository layout](repository-layout.md) | The folders of the repository and the rules that modules follow           | You add a project, a folder or a module                     |
+
+## Tutorials
+
+A tutorial is a guided first project. Its steps are checked by a journey test, so they stay true.
+
+| Doc                                                 | What it holds                                                                        | Read it when                               |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------ |
+| [First application](tutorials/first-application.md) | Building, checking, publishing and using a small application in Studio, step by step | You build your first application in Studio |
 
 ## Reference
 

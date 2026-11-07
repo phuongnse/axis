@@ -139,6 +139,7 @@ The Studio specs use these folders:
 | `studio-new-application`, `studio-page-containers` and `studio-page-parameters`                                                                              | A temporary `Studio:ApplicationsPath`                                                                                        |
 | `studio-entity-migrations` and `purchase-request-release`                                                                                                     | Folders under the test's output path                                                                                         |
 | `service-desk-journey`, `asset-management-journey`, `approvals-application-journey` and `journey-tenant`                                                      | Each its own application under the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`                     |
+| `first-application-tutorial`                                                                                                                                  | Each its own application under the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`                     |
 
 **Activating another folder.** A spec can activate another folder during the run, to test releases.
 The helper `tests/e2e/activate.ts` starts the built server once more on a spare port, with the same
@@ -238,6 +239,12 @@ file holds its steps. This section says what each proves and what it must not do
   scenarios, and the release history must show release 1 as the one active row. On the
   `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
   the requester opening it from the bell, and the lead's bell has no row for that ticket.
+- **`first-application-tutorial.spec.ts`** runs the steps of the
+  [first application tutorial](tutorials/first-application.md) on the journey tenant, one test for
+  each step. The author builds the application in Studio, from the texts and roles to the process,
+  pages, site and policies, then validates and publishes it. An employee submits an expense, and a
+  department manager approves it. The manager has only read grants, so the test also checks that the
+  manager's expense list has no New button.
 - **`module-contract-journey.spec.ts`** creates a blank application that pins the built-in module
   `organization` and the sample module `department-budgets`, through the Studio API. The publish
   succeeds and the release is not off-standard. A process step that approves a budget is refused by
