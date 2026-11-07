@@ -50,11 +50,12 @@ public sealed partial class RouteTableDocTests
             "",
             "| Route | What it does |",
             "| ----- | ------------ |",
-            "| `GET /api/z/` _(planned for later)_ | Not mapped yet. |",
+            "| `GET /api/planned` _(planned for later)_ | Not mapped yet. |",
+            "| `GET /api/z/` | Trailing slash is dropped. |",
             "| Create application | Plain text. |",
         ];
 
-        string[] expected = ["GET /api/x/{}", "POST /api/y"];
+        string[] expected = ["GET /api/x/{}", "POST /api/y", "GET /api/z"];
         Assert.Equal(expected, DocumentedRoutes(lines).Select(route => route.Route).ToArray());
     }
 
