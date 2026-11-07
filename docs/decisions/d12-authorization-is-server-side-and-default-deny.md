@@ -18,4 +18,6 @@ The detail is in [authorization](../reference/security.md#authorization).
 
 ## Consequences
 
-Every route must call the policy module itself.
+Every route that serves an application to its users must call the policy module itself. The
+authoring API checks the Studio roles instead, see
+[authentication and authorization](../architecture.md#authentication-and-authorization).
