@@ -1,9 +1,14 @@
 using System.Net.Http;
+using System.Net.Sockets;
+using Amazon.S3;
 using Amazon.S3.Model;
 
 namespace Axis.Integration.Tests;
 
-/// <summary>The helper that reads an object back from MinIO reads it again when MinIO ends the response early, and fails when every attempt does.</summary>
+/// <summary>
+/// The helpers that read an object from MinIO and upload one to it start again when MinIO drops a connection, and fail when every attempt does.
+/// An upload that fails with any other S3 error fails at once.
+/// </summary>
 public sealed class MinioFixtureTests
 {
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -38,6 +43,99 @@ public sealed class MinioFixtureTests
                 calls++;
                 return Task.FromResult(new GetObjectResponse { ResponseStream = new CutShortStream(3) });
             },
+            CancellationToken));
+
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public async Task An_upload_whose_connection_is_dropped_once_stores_the_whole_object()
+    {
+        byte[] bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        var calls = 0;
+        using var stored = new MemoryStream();
+
+        await MinioFixture.UploadWholeAsync(
+            async (request, token) =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    await request.InputStream.ReadExactlyAsync(new byte[3], token);
+                    throw new AmazonS3Exception("Client disconnected before response was ready") { ErrorCode = "ClientDisconnected" };
+                }
+
+                await request.InputStream.CopyToAsync(stored, token);
+            },
+            "bucket",
+            "key",
+            bytes,
+            CancellationToken);
+
+        Assert.Equal(bytes, stored.ToArray());
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task An_upload_whose_connection_is_reset_is_sent_again()
+    {
+        byte[] bytes = [1, 2, 3, 4, 5, 6, 7, 8];
+        var calls = 0;
+        using var stored = new MemoryStream();
+
+        await MinioFixture.UploadWholeAsync(
+            async (request, token) =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset));
+                }
+
+                await request.InputStream.CopyToAsync(stored, token);
+            },
+            "bucket",
+            "key",
+            bytes,
+            CancellationToken);
+
+        Assert.Equal(bytes, stored.ToArray());
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task An_upload_failing_with_another_S3_error_fails_after_one_attempt()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => MinioFixture.UploadWholeAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new AmazonS3Exception("The specified bucket does not exist") { ErrorCode = "NoSuchBucket" };
+            },
+            "bucket",
+            "key",
+            [1, 2, 3],
+            CancellationToken));
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task An_upload_whose_connection_is_dropped_every_time_fails_after_three_attempts()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<IOException>(() => MinioFixture.UploadWholeAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset));
+            },
+            "bucket",
+            "key",
+            [1, 2, 3],
             CancellationToken));
 
         Assert.Equal(3, calls);

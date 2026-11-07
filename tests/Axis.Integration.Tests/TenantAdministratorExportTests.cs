@@ -50,11 +50,8 @@ public sealed class TenantAdministratorExportTests(PostgreSqlFixture database, K
         var bytes = RandomNumberGenerator.GetBytes(256);
         await ExecuteAsync($"UPDATE platform.jobs SET state = 'succeeded', finished_at = now() WHERE id = '{id:D}'");
         using (var s3 = _storage.NewClient())
-        using (var content = new MemoryStream(bytes))
         {
-            await s3.PutObjectAsync(
-                new PutObjectRequest { BucketName = _storage.Bucket, Key = TenantExports.Key("a", id), InputStream = content },
-                CancellationToken);
+            await MinioFixture.UploadObjectAsync(s3, _storage.Bucket, TenantExports.Key("a", id), bytes, CancellationToken);
         }
 
         using var read = await client.GetAsync(new Uri($"/api/tenant/exports/{id:D}", UriKind.Relative), CancellationToken);
