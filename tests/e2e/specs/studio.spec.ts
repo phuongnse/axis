@@ -7,7 +7,7 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openFormTab, openKind, openProblems } from '../studio-resources'
+import { openFormTab, openKind, openProblems, openTab } from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -165,22 +165,24 @@ test.describe('Studio on a copy of its own', () => {
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${supplier.id}`)
+    await openTab(page, 'Used by')
     await page
       .getByTestId('studio-used-by')
-      .getByTestId('studio-reference')
-      .filter({ hasText: 'entities/purchase-request.json, Path: /fields/4/target' })
-      .getByRole('button', { name: 'PurchaseRequest', exact: true })
+      .getByRole('link', { name: 'Purchase request', exact: true })
       .click()
 
-    await expect(page).toHaveURL(new RegExp(`resource=${entity.id}`))
+    await expect(page).toHaveURL(new RegExp(`resource=${entity.id}&path=`))
     await expect(page.getByTestId('studio-resource-details')).toContainText('entities/purchase-request.json')
   })
 
-  test('an author picks a data source of a page from the names and the Uses list shows it', async ({ page }) => {
+  test('an author picks a data source of a page from the names and the data source lists the page as used by', async ({
+    page,
+  }) => {
     await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
-    const { items } = (await list.json()) as { items: { id: string; file: string }[] }
+    const { items } = (await list.json()) as { items: { id: string; file: string; kind: string; name: string }[] }
     const pageResource = items.find((item) => item.file === 'pages/requests-by-department.json')!
+    const dataSource = items.find((item) => item.kind === 'dataSource' && item.name === 'PurchaseRequestList')!
     const file = path.join(copy, 'pages/requests-by-department.json')
     const original = await readFile(file, 'utf8')
 
@@ -194,13 +196,12 @@ test.describe('Studio on a copy of its own', () => {
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 
-      await page.reload()
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${dataSource.id}`)
+      await openTab(page, 'Used by')
       await expect(
         page
-          .getByTestId('studio-uses')
-          .getByTestId('studio-reference')
-          .filter({ hasText: 'pages/requests-by-department.json, Path: /widgets/0/dataSource' })
-          .getByRole('button', { name: 'PurchaseRequestList', exact: true }),
+          .getByTestId('studio-used-by')
+          .getByRole('link', { name: 'Purchase request totals by department', exact: true }),
       ).toBeVisible()
     } finally {
       await writeFile(file, original)

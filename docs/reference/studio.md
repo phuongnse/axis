@@ -155,16 +155,15 @@ what changed.
 
 ## References
 
-Each resource shows what uses it, from the [references routes](authoring.md#references), so an author
-sees what a change or a delete touches. How it shows is in [Used by](studio-resource-form.md#used-by).
+Each resource but the application has a Used by tab, from the [references routes](authoring.md#references),
+so an author sees what a change or a delete touches. How it shows is in [Used by](studio-resource-form.md#used-by).
 
 - **Opening an entry.** A Used by entry opens the other resource at the path of the reference: the path
   goes into the address, and the editor scrolls to the form field for that path, with nothing
-  highlighted. A path that the form cannot show, such as one inside a map, opens the JSON view. A module
-  or a package entry opens nothing.
-- **Counts can be stale.** The list and the `usedBy` counts load with the open resource, and a save
-  does not reload them, so a count can be out of date until the page reloads. The names, and so the
-  counts that labels show, load again after a save and after a text write.
+  highlighted. A path that the form cannot show, such as one inside a map, opens the JSON view.
+- **Counts can be stale.** The Used by list loads when its tab opens, and the `usedBy` counts load with
+  the resources. A save does not reload either, so a count or the list can be out of date until the page
+  reloads. The names, and so the counts that labels show, load again after a save and after a text write.
 - **A list, not a graph.** Used by stays a list. The process graph on a process's Design tab is the only
   drawn graph.
 
@@ -175,8 +174,7 @@ Delete removes a resource's file, and asks first, because other resources may us
 - **In a "…" menu** _(planned for M31)_. Delete… is in a "…" menu at the right of the resource's
   [heading](studio-workspace.md#page-heading), so no tab shows it apart from the others.
 - **It asks.** Delete always opens a confirm dialog, which warns and names the count when the
-  resource's `usedBy` count is above 0, with "See what uses it", which opens the Used by tab. The author
-  can still confirm. The application manifest has no Delete.
+  resource's `usedBy` count is above 0. The author can still confirm. The application manifest has no Delete.
 - **It checks the version.** The delete sends the loaded version in `If-Match`. A stale version shows
   the conflict message, and nothing is deleted.
 - **After a delete,** the resource leaves its list, and the Problems panel shows the diagnostics that

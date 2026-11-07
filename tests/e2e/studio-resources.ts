@@ -93,7 +93,7 @@ export async function openNewApplication(page: Page) {
  * tab. The layout can shift just before or during the click, as the web font arrives or as the release history above
  * the editor loads, and a click that lands during the shift can miss.
  */
-export async function openTab(page: Page, name: 'Design' | 'Form' | 'JSON') {
+export async function openTab(page: Page, name: 'Design' | 'Form' | 'JSON' | 'Used by') {
   const tab = page.getByRole('tab', { name, exact: true })
   await page.evaluate(() => document.fonts.ready)
   await expect(async () => {

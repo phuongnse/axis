@@ -6,7 +6,6 @@ import type {
   StudioReleases,
   StudioResource,
   StudioResourceItem,
-  StudioResourceReferences,
 } from '../platform/studio'
 import { application, locale } from './fixtures'
 
@@ -136,18 +135,6 @@ function names(folder: Folder): StudioNames {
   } satisfies StudioNames
 }
 
-const references = {
-  uses: [
-    {
-      relation: 'label',
-      file: 'application.json',
-      path: '/label/textKey',
-      node: { type: 'text', key: 'application.title' },
-    },
-  ],
-  usedBy: [],
-} satisfies StudioResourceReferences
-
 const releases = {
   active: { releaseId: '7c1d0000-0000-4000-8000-000000000002', number: 2, contentHash: 'c2' },
   folderContentHash: 'c3',
@@ -192,7 +179,6 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/diagnostics`]: () => ({ diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     [`${folderPath}/names`]: () => names(folder),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
-    [`${folderPath}/resources/${manifestId}/references`]: () => references,
     [`${folderPath}/releases`]: () => releases,
     [`${folderPath}/settings`]: () => settings,
   }

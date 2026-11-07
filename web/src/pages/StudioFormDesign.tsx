@@ -18,8 +18,7 @@ import { dropOnForm } from './formPaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 import { StudioFormCanvas } from './StudioFormCanvas'
 import type { DesignerLayer } from './LayerMarkViews'
-import { type FormUse, StudioFormUsedOn } from './StudioFormUsedOn'
-import type { OpenResource } from './StudioReferences'
+import { type FormUse, type OpenResource, StudioFormUsedOn } from './StudioFormUsedOn'
 
 /**
  * The Design tab of a form: the list of its uses (a module form has none), the canvas, and beside the canvas the field palette, the layout

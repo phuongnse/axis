@@ -13,7 +13,6 @@ import {
   folderDiffers,
   groupByKind,
   moduleResources,
-  sortReferences,
   previewSiteUrl,
   putStudioTexts,
   releaseList,
@@ -25,8 +24,6 @@ import {
   studioAppDescription,
   studioAppTitle,
   undoStudioRevision,
-  type StudioReference,
-  type StudioReferenceNode,
   type StudioReleaseChange,
   type StudioRevision,
   type StudioReleaseItem,
@@ -712,48 +709,5 @@ describe('revisionAuthor and revisionClient', () => {
     expect(revisionClient(revision({ client: 'studio' }), t)).toBe('Studio')
     expect(revisionClient(revision({ client: null }), t)).toBeNull()
     expect(revisionClient(revision({ client: 'claude-desktop' }), t)).toBe('claude-desktop')
-  })
-})
-
-const referenceEntry = (node: StudioReferenceNode): StudioReference => ({
-  relation: 'uses',
-  file: 'f.json',
-  path: '/p',
-  node,
-})
-const referenceResource = (kind: string, name: string): StudioReferenceNode => ({
-  type: 'resource',
-  id: `${kind}-${name}`,
-  kind,
-  name,
-  file: `${kind}/${name}.json`,
-})
-
-describe('sortReferences', () => {
-  it('groups resources in the sidebar kind order, then modules and packages, and sorts each group by name', () => {
-    const entries = [
-      referenceEntry({ type: 'package', id: 'pdf' }),
-      referenceEntry({ type: 'module', id: 'organization' }),
-      referenceEntry(referenceResource('page', 'Home')),
-      referenceEntry({ type: 'text', key: 'common.save' }),
-      referenceEntry(referenceResource('entity', 'Đơn hàng')),
-      referenceEntry({ type: 'module', id: 'audit' }),
-      referenceEntry(referenceResource('entity', 'Dự án')),
-    ]
-
-    const sorted = sortReferences(entries, 'vi')
-
-    expect(
-      sorted.map((reference) => (reference.node.type === 'resource' ? reference.node.name : reference.node)),
-    ).toEqual([
-      'Dự án',
-      'Đơn hàng',
-      'Home',
-      { type: 'text', key: 'common.save' },
-      { type: 'module', id: 'audit' },
-      { type: 'module', id: 'organization' },
-      { type: 'package', id: 'pdf' },
-    ])
-    expect(entries[0].node).toEqual({ type: 'package', id: 'pdf' })
   })
 })
