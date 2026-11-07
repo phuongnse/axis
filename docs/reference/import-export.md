@@ -25,10 +25,12 @@ write grants.
 An export writes the rows of a data source or an entity list to a file, with the same checks, order
 and hidden fields as the route it mirrors.
 
-| Method and path                                                    | Response            |
-| ------------------------------------------------------------------ | ------------------- |
-| `GET /api/apps/{app}/data-sources/{dataSource}/export?format=`     | `200` with the file |
-| `GET /api/apps/{app}/entities/{entity}/records/export?format=`     | `200` with the file |
+| Route                                                                   | Response                                                                              |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/data-sources/{dataSource}/export?format=`          | `200` with the file                                                                   |
+| `GET /api/apps/{app}/entities/{entity}/records/export?format=`          | `200` with the file                                                                   |
+| `GET /api/apps/{app}/data-sources/{module}/{dataSource}/export?format=` | `200` with the file of a module data source, see [endpoint](data-sources.md#endpoint) |
+| `GET /api/apps/{app}/entities/{module}/{entity}/records/export?format=` | `200` with the file of a module entity, see [routes](record-api.md#routes)            |
 
 - **Query.** Each route takes the query of its rows or list route, such as parameters, `sort` and
   `search`, without `page` and `pageSize`. `format` is `csv` or `xlsx`. A missing or unknown
@@ -81,11 +83,14 @@ An import creates or updates the records of one entity from a file in three step
 the file, the worker checks every row in a dry run, and the user commits the checked import, which
 the worker writes in one transaction.
 
-| Method and path                                                  | Response                                      |
-| ---------------------------------------------------------------- | --------------------------------------------- |
-| `POST /api/apps/{app}/entities/{entity}/imports`                 | `202` with the import and a `Location` header |
-| `GET /api/apps/{app}/entities/{entity}/imports/{id}`             | `200` with the import's state and errors      |
-| `POST /api/apps/{app}/entities/{entity}/imports/{id}/commit`     | `202`                                         |
+| Route                                                                 | Response                                                                                          |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `POST /api/apps/{app}/entities/{entity}/imports`                      | `202` with the import and a `Location` header                                                     |
+| `GET /api/apps/{app}/entities/{entity}/imports/{id}`                  | `200` with the import's state and errors                                                          |
+| `POST /api/apps/{app}/entities/{entity}/imports/{id}/commit`          | `202`                                                                                             |
+| `POST /api/apps/{app}/entities/{module}/{entity}/imports`             | `202` with the import of a module entity, see [routes](record-api.md#routes)                      |
+| `GET /api/apps/{app}/entities/{module}/{entity}/imports/{id}`         | `200` with the import's state and errors, for a module entity, see [routes](record-api.md#routes) |
+| `POST /api/apps/{app}/entities/{module}/{entity}/imports/{id}/commit` | `202` for a module entity, see [routes](record-api.md#routes)                                     |
 
 ### Upload
 

@@ -274,11 +274,12 @@ The fields that may not be sorted, grouped or filtered:
 
 ## Endpoint
 
-One read-only route returns a page of a data source's rows:
+One read-only route, in two forms, returns a page of a data source's rows:
 
-| Method and path                                                                     | Response                    |
-| ----------------------------------------------------------------------------------- | --------------------------- |
-| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=` | `200` with one page of rows |
+| Route                                                                                       | Response                                                                              |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `GET /api/apps/{app}/data-sources/{dataSource}/rows?page=&pageSize=&sort=&search=`          | `200` with one page of rows                                                           |
+| `GET /api/apps/{app}/data-sources/{module}/{dataSource}/rows?page=&pageSize=&sort=&search=` | `200` with one page of rows of a module data source, see [the module form](#endpoint) |
 
 Only `GET` is routed. `{app}` is the name of an active release, and `{dataSource}` a data source in
 that release. Both match ignoring letter case, as in the record API.

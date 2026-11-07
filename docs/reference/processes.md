@@ -331,6 +331,11 @@ Each code is in the [diagnostic code table](diagnostic-codes.md).
 
 ## Start endpoint
 
+| Route                                                         | What it does                                                                                              |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `POST /api/apps/{app}/processes/{process}/instances`          | Starts an instance of a process, see [start endpoint](#start-endpoint)                                    |
+| `POST /api/apps/{app}/processes/{module}/{process}/instances` | Starts an instance of a module process, see [module processes](modules-and-templates.md#module-processes) |
+
 The start endpoint creates an instance for one subject record. A process without a subject takes
 [parameters instead](#a-process-without-a-subject):
 

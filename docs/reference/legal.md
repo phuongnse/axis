@@ -44,6 +44,10 @@ The legal line closes every page with the copyright and the legal links.
 
 Axis lists the licence of everything it ships on a page that anyone can open.
 
+| Route               | What it does                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `GET /api/licences` | The server-side licence file, for a signed-in person, see [open source licences](#open-source-licences) |
+
 - **`/licences` lists what Axis ships.** The page opens without signing in. It first names Axis's licence, the AGPL,
   with its text and a link to Axis's source, which the AGPL requires Axis to offer every person who uses it over a
   network. Then it lists every npm package of the SPA and every NuGet package of the server, the

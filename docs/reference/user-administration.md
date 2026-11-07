@@ -61,6 +61,13 @@ In a tenant of a cell, the users page also shows two sections, see
 Four routes read users, their roles and the tenant's usage. When the identity provider fails, each users route answers
 `502` with a fixed title, and the server's log names the step and the status code, never a body or a secret.
 
+| Route                        | What it does                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
+| `GET /api/users`             | Lists the tenant's users, see [the list route](#read-routes)                            |
+| `GET /api/users/{id}/roles`  | Reads a user's roles, see [the roles route](#read-routes)                               |
+| `GET /api/me/authenticators` | Reads the signed-in user's authenticators, see [the authenticators route](#read-routes) |
+| `GET /api/tenant/usage`      | Reads the tenant's quotas and usage, see [the usage route](#read-routes)                |
+
 - **The list route.** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm
   to an administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50, and a value
   outside these answers `400`. A service account is not listed. The route answers `401` with nobody signed in, `403`

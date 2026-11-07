@@ -15,6 +15,11 @@ the [instance list](#instance-list) lists the instances of a process and the
 [service account](security.md#service-accounts) with a bearer token. A bad token is a `401` with
 `WWW-Authenticate: Bearer`. Both routes only read, and they write no audit record.
 
+| Route                                                    | What it does                                                          |
+| -------------------------------------------------------- | --------------------------------------------------------------------- |
+| `GET /api/apps/{app}/processes/{process}/instances`      | Lists the instances of a process, see [instance list](#instance-list) |
+| `GET /api/apps/{app}/processes/{process}/instances/{id}` | Reads one instance, see [instance detail](#instance-detail)           |
+
 ### Who may inspect
 
 A `process` grant takes the action `inspect`, next to `start`, as
@@ -455,6 +460,12 @@ settles a connector or package call whose outcome is `unknown`. Each is an audit
 own grant, a required reason and one transaction. The [instance detail](#instance-detail) lists the
 commands the user may take, and the [process inspector widget](process-inspector-widget.md) shows
 Cancel, Retry and Resolve.
+
+| Route                                                                            | What it does                                                     |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `POST /api/apps/{app}/processes/{process}/instances/{id}/retry`                  | Runs a failed instance again, see [retry](#retry)                |
+| `POST /api/apps/{app}/processes/{process}/instances/{id}/cancel`                 | Stops a running or waiting instance, see [cancel](#cancel)       |
+| `POST /api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve` | Settles a call whose outcome is unknown, see [resolve](#resolve) |
 
 Two more commands, **redeliver** and **discard**, act on a dead letter of the
 process with the same `retry` grant, a required reason and an audit record, see

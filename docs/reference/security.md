@@ -128,6 +128,14 @@ and checks the block. The worker reads the same `Tenants` section but signs nobo
 
 These routes start and end a sign-in, and let a person see and end their own sessions.
 
+| Route                          | What it does                                                                       |
+| ------------------------------ | ---------------------------------------------------------------------------------- |
+| `GET /api/auth/sign-in`        | Starts a sign-in with the identity provider, see [sign-in routes](#sign-in-routes) |
+| `POST /api/auth/sign-out`      | Ends the session, see [sign-in routes](#sign-in-routes)                            |
+| `GET /api/me/sessions`         | Lists the person's own sessions, see [sign-in routes](#sign-in-routes)             |
+| `DELETE /api/me/sessions/{id}` | Ends one of the person's sessions, see [sign-in routes](#sign-in-routes)           |
+| `DELETE /api/me/sessions`      | Ends the person's other sessions, see [sign-in routes](#sign-in-routes)            |
+
 - **`GET /api/auth/sign-in?returnUrl=`** redirects to the tenant's identity provider.
   - `returnUrl` must start with a single `/`. A value that does not, or that starts with `//` or `/\`,
     is a `400` problem details response. A missing `returnUrl` means `/`.
@@ -286,6 +294,10 @@ browser holds only a cookie with a random session id.
 
 A session carries the person's roles, and `GET /api/me` tells the SPA who is signed in and which
 platform tools they may open.
+
+| Route         | What it does                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `GET /api/me` | Tells the SPA who is signed in, see [roles and the current user](#roles-and-the-current-user) |
 
 - **Roles.** The roles come from the roles claim at sign-in and are kept in the session row, so a role
   change at the identity provider applies at the next sign-in. Each application's roles also come from

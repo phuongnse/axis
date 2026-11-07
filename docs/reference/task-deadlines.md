@@ -122,12 +122,12 @@ time, and nothing is stored. A completed, cancelled or expired task is never ove
 ## Claim and release
 
 A user who holds a task's role may claim it, so that the other holders of the role stop working on
-it:
+it.
 
-```http
-POST /api/apps/{app}/tasks/{id}/claim
-POST /api/apps/{app}/tasks/{id}/release
-```
+| Route                                     | What it does                                                          |
+| ----------------------------------------- | --------------------------------------------------------------------- |
+| `POST /api/apps/{app}/tasks/{id}/claim`   | Claims an open role task, see [claim and release](#claim-and-release) |
+| `POST /api/apps/{app}/tasks/{id}/release` | Releases a claim, see [claim and release](#claim-and-release)         |
 
 - **Claim.** A user who holds the task's role may claim an open role task. The task stores
   `claimed_by` and `claimed_at`. Then only the claimer may complete it, and it leaves the lists of
@@ -149,6 +149,11 @@ POST /api/apps/{app}/tasks/{id}/release
   the instance.
 
 ## Reassign
+
+| Route                                      | What it does                                                    |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| `POST /api/apps/{app}/tasks/{id}/reassign` | Gives a task to another user or role, see [reassign](#reassign) |
+| `GET /api/apps/{app}/users`                | Lists the users to pick from, see [reassign](#reassign)         |
 
 A user with the `reassign` grant may give a task to another user or role, with a reason:
 

@@ -594,10 +594,16 @@ The worker logs each dead letter at Warning level with its kind and target ids, 
 
 A process's dead letters are listed, redelivered and discarded through these routes:
 
+| Route                                                                  | What it does                                               |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `GET /api/apps/{app}/processes/{process}/dead-letters`                 | Lists the dead letters of a process, see [routes](#routes) |
+| `POST /api/apps/{app}/processes/{process}/dead-letters/{id}/redeliver` | Redelivers a dead letter, see [routes](#routes)            |
+| `POST /api/apps/{app}/processes/{process}/dead-letters/{id}/discard`   | Discards a dead letter, see [routes](#routes)              |
+
+A redeliver request carries a reason:
+
 ```http
-GET /api/apps/{app}/processes/{process}/dead-letters?state=open
 POST /api/apps/{app}/processes/{process}/dead-letters/{id}/redeliver
-POST /api/apps/{app}/processes/{process}/dead-letters/{id}/discard
 Content-Type: application/json
 
 { "reason": "The supplier system is back." }

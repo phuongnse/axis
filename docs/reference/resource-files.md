@@ -512,6 +512,12 @@ rather than when the table is created, and a value outside the range is `AXC0013
   field (404), a `create` or `update` grant covering the field (403). It lists 20 profiles at most
   whose display name or email contains `search`, or with `id` only that one, as
   `{ "items": [{ "id", "displayName" }] }`.
+
+  | Route                                                                 | What it does                                                                                              |
+  | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+  | `GET /api/apps/{app}/entities/{entity}/fields/{field}/users`          | Lists profiles for the field's user picker, see [entity field types](#entity-field-types-and-constraints) |
+  | `GET /api/apps/{app}/entities/{module}/{entity}/fields/{field}/users` | Lists profiles for a module entity's field, see [entity field types](#entity-field-types-and-constraints) |
+
 - **`sensitive`** is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum`
   and `money`, and defaults to `false`. `true` on a `reference`, `references` or `file` field is
   `AXC0308` at `/fields/{i}/sensitive`, and on the `displayField` at `/displayField`, and on a
