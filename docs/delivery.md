@@ -145,8 +145,10 @@ that holds it.
   workflow names each of these workflows, so the end of a run on `main` starts a NexKit sweep.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
   start. On any other branch a newer push stops the older run.
-- **CI runs its jobs in parallel:** the lint and unit tests, the smoke tests, three shards of the
-  integration tests and three shards of the E2E tests, so a run takes as long as its slowest job.
+- **CI's jobs come from [NexKit's checks](#nexkits-checks):** each check, or `group` of checks, in
+  `.nexkit/config.json` is one parallel job that runs the check's commands with its timeout and
+  uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
+  slowest job, and adding, removing or resharding a check changes CI with it.
 
 ### NexKit's checks
 
@@ -155,9 +157,8 @@ that holds it.
   one each. A check round then takes about as long as its slowest job, instead of all of them in a
   row. A check gets a job of its own when sharing one made that job the slowest, and the integration
   and E2E suites are split into shards because one job for either came close to the check's
-  30-minute limit. The checks `e2e-1` to `e2e-3` and `integration-1` to `integration-3` run the same
-  commands as the CI workflow's E2E and integration shards, so NexKit matches a failed check with the
-  shard that failed on `main`.
+  30-minute limit. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
+  NexKit matches a failed check with the CI job that failed on `main`.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
 - **NexKit reads CI's evidence.** Its [`evidence`][nexkit-evidence] setting names the test result
