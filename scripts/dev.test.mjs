@@ -1,6 +1,7 @@
 // Smoke test for scripts/dev.sh. Needs Docker with the compose plugin, the .NET SDK, Node and
-// npm. It runs the script in a temporary copy of the repository, with its own Compose project
-// and free ports, so it works on a fresh clone and cannot clash with a running dev session.
+// npm. It runs the script in a temporary copy of the repository, with its own Compose project,
+// whose services the cases share, and free ports, so it works on a fresh clone and cannot clash
+// with a running dev session.
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
@@ -19,7 +20,7 @@ const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis
 let copy
 let scratch
 let env
-let ports
+const ports = {}
 const running = []
 
 const handedOut = new Set()
@@ -53,19 +54,21 @@ function isAlive(pid) {
   }
 }
 
-// Picked right before each run: a port picked earlier can be taken by another process before the run binds it.
-async function pickPorts() {
-  ports = {
-    postgres: await freePort(),
-    keycloak: await freePort(),
-    purchasing: await freePort(),
-    mailpitSmtp: await freePort(),
-    mailpitWeb: await freePort(),
-    server: await freePort(),
-    web: await freePort(),
-    workerHealth: await freePort(),
-    agentHealth: await freePort(),
-  }
+// Compose keeps these ports bound for the whole run, so they are picked once, before the first case.
+async function pickServicePorts() {
+  ports.postgres = await freePort()
+  ports.keycloak = await freePort()
+  ports.purchasing = await freePort()
+  ports.mailpitSmtp = await freePort()
+  ports.mailpitWeb = await freePort()
+}
+
+// A port picked earlier can be taken by another process before the app binds it, so each start picks its own.
+async function pickAppPorts() {
+  ports.server = await freePort()
+  ports.web = await freePort()
+  ports.workerHealth = await freePort()
+  ports.agentHealth = await freePort()
   env = {
     ...process.env,
     COMPOSE_PROJECT_NAME: project,
@@ -82,9 +85,9 @@ async function pickPorts() {
   }
 }
 
-/** Starts scripts/dev.sh in the copy with fresh ports and collects its output. */
+/** Starts scripts/dev.sh in the copy with fresh app ports and collects its output. */
 async function startDev(extraEnv = {}) {
-  await pickPorts()
+  await pickAppPorts()
   const child = spawn('bash', ['scripts/dev.sh'], {
     cwd: copy,
     env: { ...env, ...extraEnv },
@@ -92,6 +95,13 @@ async function startDev(extraEnv = {}) {
     detached: true,
   })
   return track(child)
+}
+
+/** A copy of the purchase requests sample in the scratch folder, so that a case can edit it. */
+function copyPurchaseRequests(name) {
+  const dir = path.join(scratch, name)
+  fs.cpSync(path.join(repoRoot, 'samples/apps/purchase-requests'), dir, { recursive: true })
+  return dir
 }
 
 /** Collects the output and the exit of a child, and remembers it for the final cleanup. */
@@ -240,6 +250,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       recursive: true,
       filter: (source) => !excluded.has(path.basename(source)),
     })
+    await pickServicePorts()
   })
 
   after(() => {
@@ -254,8 +265,22 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     if (scratch) fs.rmSync(scratch, { recursive: true, force: true })
   })
 
-  it('installs the SPA packages, serves the app through Vite, starts the worker, the publisher and the agent host and stops cleanly on SIGINT', async () => {
-    const run = await startDev()
+  it('installs the SPA packages, serves the app, restarts only the server when application configuration changes, keeps running through an edit that hot reload cannot apply and stops cleanly on SIGINT', async () => {
+    const appCopy = copyPurchaseRequests('app-copy')
+    const texts = path.join(appCopy, 'texts/en.json')
+    const file = path.join(copy, 'src/Axis.Server/Health/DatabaseHealthCheck.cs')
+    const original = fs.readFileSync(file, 'utf8')
+    // The preview tenant activates the same sample on each start, so only the main tenant's lines count.
+    const activations = () =>
+      run.stdout.split('\n').filter((line) => /Activated application PurchaseRequests .* for tenant default\.$/.test(line.trimEnd())).length
+    // The worker logs the same line for its health address, so only the server's lines count.
+    const listening = () => run.stdout.split('\n').filter((line) => /\[server\].*Now listening on/.test(line)).length
+    const workerPids = () =>
+      runProcs(run.child.pid)
+        .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
+        .map((p) => p.pid)
+
+    const run = await startDev({ ActivateOnStartup__0: appCopy })
     await waitReady(run)
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
 
@@ -320,14 +345,14 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
     // The worker answers ready only once it has found every tenant migrated, so it also waits for the preview tenant.
     await waitForOutput(run, /\[worker\] .*Tenant default-preview is ready for work/)
-    const listening = run.stdout.search(/\[server\].*Now listening on/)
-    assert.ok(listening >= 0, run.stdout)
-    assert.ok(run.stdout.indexOf('[worker]') > listening, `Worker output before the server listened:\n${run.stdout}`)
+    const listeningAt = run.stdout.search(/\[server\].*Now listening on/)
+    assert.ok(listeningAt >= 0, run.stdout)
+    assert.ok(run.stdout.indexOf('[worker]') > listeningAt, `Worker output before the server listened:\n${run.stdout}`)
 
     // The publisher starts after the server has migrated, and finds the tenant database migrated at once.
     await waitForOutput(run, /\[publisher\] .*default ready/)
     assert.ok(
-      run.stdout.search(/\[publisher\]/) > listening,
+      run.stdout.search(/\[publisher\]/) > listeningAt,
       `Publisher output before the server listened:\n${run.stdout}`,
     )
 
@@ -372,27 +397,80 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       assert.ok(workerEnv.includes('Email__Smtp__UseTls=false'), 'The worker has no Email__Smtp__UseTls=false')
     }
 
-    interrupt(run)
-    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
-    await sleep(500)
-    for (const p of procs) assert.equal(isAlive(p.pid), false, `Still running: ${p.command}`)
+    // A configuration edit restarts only the server, so the worker keeps its process.
+    const activationsBefore = activations()
+    assert.equal(activationsBefore, 1, run.stdout)
+    const workersBefore = workerPids()
+    assert.ok(workersBefore.length > 0, `No worker process in:\n${JSON.stringify(runProcs(run.child.pid))}`)
 
-    const services = execFileSync('docker', ['compose', '-p', project, 'ps', '--status', 'running', '--services'], {
-      cwd: copy,
-      encoding: 'utf8',
-    })
-    assert.match(services, /postgres/)
-    assert.match(services, /keycloak/)
-    assert.match(services, /purchasing/)
-    assert.match(services, /mailpit/)
+    const content = JSON.parse(fs.readFileSync(texts, 'utf8'))
+    content.texts['site.title'] = 'Purchasing, edited'
+    fs.writeFileSync(texts, JSON.stringify(content, null, 2))
+
+    const activationDeadline = Date.now() + 300_000
+    while (activations() <= activationsBefore && Date.now() < activationDeadline) {
+      assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
+      await sleep(1000)
+    }
+    assert.equal(activations(), activationsBefore + 1, `The server did not activate again.\n${run.stdout}\n${run.stderr}`)
+    assert.match(run.stdout, /\[dev\] Application configuration changed/)
+    assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
+    await waitReady(run)
+
+    const workersAfter = workerPids()
+    assert.deepEqual(workersAfter, workersBefore)
+    for (const pid of workersAfter) assert.equal(isAlive(pid), true, `The worker ${pid} stopped`)
+
+    // Making a sealed class unsealed is a rude edit: dotnet watch stops the app, builds and
+    // starts it again. It prints "Exited" on the way, which must not end the session. The file is
+    // restored only after dev.sh has stopped, because a second edit would restart the server again.
+    const listeningBefore = listening()
+    try {
+      fs.writeFileSync(file, original.replace('internal sealed class', 'internal class'))
+
+      const restartDeadline = Date.now() + 300_000
+      while (listening() <= listeningBefore && Date.now() < restartDeadline) {
+        assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
+        await sleep(1000)
+      }
+      assert.equal(listening(), listeningBefore + 1, `The server did not restart.\n${run.stdout}\n${run.stderr}`)
+      assert.match(run.stdout, /Restart is needed/)
+      assert.match(run.stdout, /\[server\] dotnet watch .* Exited/)
+      assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
+      await waitReady(run)
+
+      const beforeStop = runProcs(run.child.pid)
+      interrupt(run)
+      assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
+      await sleep(500)
+      for (const p of beforeStop) assert.equal(isAlive(p.pid), false, `Still running: ${p.command}`)
+
+      const services = execFileSync('docker', ['compose', '-p', project, 'ps', '--status', 'running', '--services'], {
+        cwd: copy,
+        encoding: 'utf8',
+      })
+      assert.match(services, /postgres/)
+      assert.match(services, /keycloak/)
+      assert.match(services, /purchasing/)
+      assert.match(services, /mailpit/)
+    } finally {
+      fs.writeFileSync(file, original)
+    }
   })
 
-  it('skips the install on the second run', async () => {
-    const run = await startDev()
+  it('skips the install on the second run and stops when a configuration edit does not activate', async () => {
+    const appCopy = copyPurchaseRequests('second-run-app')
+    const texts = path.join(appCopy, 'texts/en.json')
+    const run = await startDev({ ActivateOnStartup__0: appCopy })
     await waitReady(run)
     assert.doesNotMatch(run.stdout, /Installing SPA packages/)
-    interrupt(run)
-    await exitsWithin(run, 60_000)
+
+    // A configuration that does not activate stops the script, as it does at startup.
+    fs.writeFileSync(texts, '{')
+    assert.notEqual(await exitsWithin(run, 300_000), 0)
+    assert.match(run.stdout, /\[dev\] The server exited/)
+    await sleep(500)
+    assert.deepEqual(leftoverProcs(), [])
   })
 
   it('stops everything when SIGINT arrives while the worker starts', async () => {
@@ -419,81 +497,6 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       copyProcs().filter((p) => processPattern.test(p.command)),
       [],
     )
-  })
-
-  it('keeps running when an edit that hot reload cannot apply restarts the server', async () => {
-    // Making a sealed class unsealed is a rude edit: dotnet watch stops the app, builds and
-    // starts it again. It prints "Exited" on the way, which must not end the session.
-    const file = path.join(copy, 'src/Axis.Server/Health/DatabaseHealthCheck.cs')
-    const original = fs.readFileSync(file, 'utf8')
-    // The worker logs the same line for its health address.
-    const listening = () => run.stdout.split('\n').filter((line) => /\[server\].*Now listening on/.test(line)).length
-    const run = await startDev()
-    try {
-      await waitReady(run)
-      assert.equal(listening(), 1)
-      fs.writeFileSync(file, original.replace('internal sealed class', 'internal class'))
-
-      const deadline = Date.now() + 300_000
-      while (listening() < 2 && Date.now() < deadline) {
-        assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
-        await sleep(1000)
-      }
-      assert.equal(listening(), 2, `The server did not restart.\n${run.stdout}\n${run.stderr}`)
-      assert.match(run.stdout, /Restart is needed/)
-      assert.match(run.stdout, /\[server\] dotnet watch .* Exited/)
-      assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
-      await waitReady(run)
-    } finally {
-      fs.writeFileSync(file, original)
-    }
-    interrupt(run)
-    assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
-  })
-
-  it('restarts only the server when application configuration changes', async () => {
-    const appCopy = path.join(scratch, 'app-copy')
-    fs.cpSync(path.join(repoRoot, 'samples/apps/purchase-requests'), appCopy, { recursive: true })
-    const texts = path.join(appCopy, 'texts/en.json')
-    // The preview tenant activates the same sample on each start, so only the main tenant's lines count.
-    const activations = () =>
-      run.stdout.split('\n').filter((line) => /Activated application PurchaseRequests .* for tenant default\.$/.test(line.trimEnd())).length
-    const workerPids = () =>
-      runProcs(run.child.pid)
-        .filter((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
-        .map((p) => p.pid)
-
-    const run = await startDev({ ActivateOnStartup__0: appCopy })
-    await waitReady(run)
-    await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)
-    assert.equal(activations(), 1, run.stdout)
-    const workersBefore = workerPids()
-    assert.ok(workersBefore.length > 0, `No worker process in:\n${JSON.stringify(runProcs(run.child.pid))}`)
-
-    const content = JSON.parse(fs.readFileSync(texts, 'utf8'))
-    content.texts['site.title'] = 'Purchasing, edited'
-    fs.writeFileSync(texts, JSON.stringify(content, null, 2))
-
-    const deadline = Date.now() + 300_000
-    while (activations() < 2 && Date.now() < deadline) {
-      assert.equal(run.exitCode, undefined, `dev.sh exited during the restart.\n${run.stdout}\n${run.stderr}`)
-      await sleep(1000)
-    }
-    assert.equal(activations(), 2, `The server did not activate again.\n${run.stdout}\n${run.stderr}`)
-    assert.match(run.stdout, /\[dev\] Application configuration changed/)
-    assert.doesNotMatch(run.stdout, /\[dev\] The server exited/)
-    await waitReady(run)
-
-    const workersAfter = workerPids()
-    assert.deepEqual(workersAfter, workersBefore)
-    for (const pid of workersAfter) assert.equal(isAlive(pid), true, `The worker ${pid} stopped`)
-
-    // A configuration that does not activate stops the script, as it does at startup.
-    fs.writeFileSync(texts, '{')
-    assert.notEqual(await exitsWithin(run, 300_000), 0)
-    assert.match(run.stdout, /\[dev\] The server exited/)
-    await sleep(500)
-    assert.deepEqual(leftoverProcs(), [])
   })
 
   it('exits non-zero and stops the SPA when the server exits on its own', async () => {
