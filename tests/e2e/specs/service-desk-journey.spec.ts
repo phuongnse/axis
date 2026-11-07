@@ -9,7 +9,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { addMapping, createResource, openFormTab, openKind } from '../studio-resources'
+import { addMapping, createResource, grantIn, openFormTab, openKind, writeLabel } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -127,21 +127,6 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
   }
 
-  async function writeLabel(scope: Page | Locator, field: string, key: string, en: string) {
-    const label = scope.getByTestId(field).getByTestId('studio-label')
-    const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
-    const english = label.getByRole('textbox', { name: 'en', exact: true })
-    // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
-    // or got its names later starts over, so the key is typed again until the text shows.
-    await expect(async () => {
-      await keyBox.fill('')
-      await keyBox.fill(key)
-      await expect(english).toHaveValue(en, { timeout: 2_000 })
-    }).toPass({ timeout: 20_000 })
-    await label.getByRole('button', { name: 'Write texts', exact: true }).click()
-    await expect(label.getByTestId('studio-label-written')).toBeVisible()
-  }
-
   async function openDesign(page: Page) {
     await page.getByRole('tab', { name: 'Design', exact: true }).click()
   }
@@ -149,40 +134,6 @@ test.describe('the author builds the service desk with Studio only', () => {
   /** The canvas frame of the widget at `pointer`. */
   function frame(page: Page, pointer: string) {
     return page.locator(`[data-testid="studio-canvas-widget"][data-path="${pointer}"]`)
-  }
-
-  async function grantIn(
-    page: Page,
-    role: string,
-    kind: string,
-    target: string,
-    grants: { actions: string[]; filter?: string; fields?: string[] }[],
-  ) {
-    const cell = page.getByTestId(`studio-matrix-cell-${role}-${kind}-${target}`)
-    await cell.click()
-    for (const [index, grant] of grants.entries()) {
-      await page.getByRole('button', { name: 'Add grant', exact: true }).click()
-      const own = page.getByTestId('studio-matrix-own-grant').nth(index)
-      for (const action of grant.actions) {
-        // The matrix ticks the box a moment after the click, which check() would report as no change.
-        const box = own.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: action, exact: true })
-        await box.click()
-        await expect(box).toBeChecked()
-      }
-      if (grant.filter !== undefined) {
-        await expect(own.locator('.cm-editor')).toBeVisible()
-        await own.getByRole('textbox', { name: 'Record filter', exact: true }).fill(grant.filter)
-      }
-      if (grant.fields !== undefined) {
-        await pickOptions(own.getByRole('combobox'), grant.fields)
-      }
-    }
-    await page.getByTestId('studio-matrix-own-grants').getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
-    // The matrix loads again after a save. A cell clicked before that could lose its new draft.
-    for (const action of grants.flatMap((grant) => grant.actions)) {
-      await expect(cell).toContainText(action)
-    }
   }
 
   async function texts(locale: string) {
