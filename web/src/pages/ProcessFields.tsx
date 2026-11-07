@@ -29,7 +29,7 @@ export function Expression({
   const check = useContext(ExpressionCheckContext)
 
   return check ? (
-    <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
+    <Suspense fallback={<Input aria-label={name} value={value} readOnly aria-busy="true" />}>
       <LazyExpressionEditor
         application={check.application}
         resourceId={check.resourceId}

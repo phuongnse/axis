@@ -396,7 +396,7 @@ function ConditionBox({
     <div data-testid={`studio-field-${path}`}>
       <div>{name}</div>
       {check && (
-        <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
+        <Suspense fallback={<Input aria-label={name} value={value} readOnly aria-busy="true" />}>
           <LazyExpressionEditor
             key={path}
             application={check.application}

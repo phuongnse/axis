@@ -85,6 +85,70 @@ describe('ExpressionEditor checks', () => {
     )
   })
 
+  function root() {
+    return screen.getByRole('textbox', { name: 'expression' }).closest('[aria-busy]')!
+  }
+
+  /** Stubs the check route so that each answer waits until the test resolves it. */
+  function holdChecks() {
+    const answers: ((response: Response) => void)[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            answers.push(resolve)
+          }),
+      ),
+    )
+    return answers
+  }
+
+  it('is busy until its first check answers', async () => {
+    const answers = holdChecks()
+    renderEditor('title > 5')
+    expect(root()).toHaveAttribute('aria-busy', 'true')
+
+    await waitFor(() => expect(answers).toHaveLength(1))
+    expect(root()).toHaveAttribute('aria-busy', 'true')
+    answers[0](json({ type: 'boolean', diagnostics: [] }))
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+  })
+
+  it('is busy again after an edit until the next answer', async () => {
+    const answers = holdChecks()
+    renderEditor('title > 5')
+    await waitFor(() => expect(answers).toHaveLength(1))
+    answers[0](json({ type: 'boolean', diagnostics: [] }))
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+
+    act(() => editTo('x'))
+    expect(root()).toHaveAttribute('aria-busy', 'true')
+    await waitFor(() => expect(answers).toHaveLength(2))
+    expect(root()).toHaveAttribute('aria-busy', 'true')
+    answers[1](json({ type: 'text', diagnostics: [] }))
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+  })
+
+  it('is not busy after a check answers 400', async () => {
+    const answers = holdChecks()
+    renderEditor('title > 5')
+    await waitFor(() => expect(answers).toHaveLength(1))
+    answers[0](json({ title: 'The path holds no expression.' }, 400))
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+  })
+
+  it('is not busy when a check cannot reach the server', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+    renderEditor('title > 5')
+    await waitFor(() => expect(root()).toHaveAttribute('aria-busy', 'false'))
+  })
+
   it('sends one check after five edits inside 300 ms, carrying the latest text', async () => {
     vi.useFakeTimers()
     try {

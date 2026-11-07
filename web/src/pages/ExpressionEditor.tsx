@@ -59,6 +59,7 @@ export default function ExpressionEditor({
   const viewRef = useRef<EditorView | null>(null)
   const [themeCompartment] = useState(() => new Compartment())
   const [result, setResult] = useState<Result>({ type: null, error: null })
+  const [checking, setChecking] = useState(true)
   const latest = useRef({ onChange, required, options, value, theme: expressionTheme(tokens, mode), themeCompartment })
 
   useEffect(() => {
@@ -75,15 +76,24 @@ export default function ExpressionEditor({
       const text = view.state.doc.toString()
       if (text === '' && !latest.current.required) {
         show(view, { type: null, diagnostics: [] })
+        setChecking(false)
         return
       }
       checkStudioExpression(application, resourceId, path, text, controller.signal).then(
         (answer) => {
-          if (answer !== null && id === counter && !controller.signal.aborted) {
+          if (id !== counter || controller.signal.aborted) {
+            return
+          }
+          if (answer !== null) {
             show(view, answer)
           }
+          setChecking(false)
         },
-        () => {},
+        () => {
+          if (id === counter && !controller.signal.aborted) {
+            setChecking(false)
+          }
+        },
       )
     }
 
@@ -105,6 +115,7 @@ export default function ExpressionEditor({
               return
             }
             counter++
+            setChecking(true)
             clearTimeout(timer)
             if (!update.transactions.some((transaction) => transaction.annotation(external))) {
               const text = update.state.doc.toString()
@@ -121,6 +132,7 @@ export default function ExpressionEditor({
     return () => {
       clearTimeout(timer)
       controller.abort()
+      setChecking(true)
       view.destroy()
       viewRef.current = null
     }
@@ -141,7 +153,7 @@ export default function ExpressionEditor({
   }, [value])
 
   return (
-    <div>
+    <div aria-busy={checking}>
       <div ref={hostRef} />
       {result.error !== null && (
         <div>

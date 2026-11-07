@@ -109,7 +109,7 @@ export function MappingRows({
                       />
                     )
                   ) : check ? (
-                    <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly />}>
+                    <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly aria-busy="true" />}>
                       <LazyExpressionEditor
                         application={check.application}
                         resourceId={check.resourceId}

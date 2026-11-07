@@ -477,7 +477,11 @@ function OwnGrants({
               <>
                 <div>
                   <Typography.Text type="secondary">{t('shell.studio.matrix.filter')}</Typography.Text>
-                  <Suspense fallback={<Input aria-label={t('shell.studio.matrix.filter')} value={filter} readOnly />}>
+                  <Suspense
+                    fallback={
+                      <Input aria-label={t('shell.studio.matrix.filter')} value={filter} readOnly aria-busy="true" />
+                    }
+                  >
                     <LazyExpressionEditor
                       application={application}
                       resourceId={String(draft.id)}

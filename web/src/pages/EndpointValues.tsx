@@ -79,7 +79,14 @@ export function EndpointValues({
               <div style={{ flex: 1, minWidth: 240 }}>
                 {check ? (
                   <Suspense
-                    fallback={<Input aria-label={t('shell.studio.endpoint.expression')} value={text} readOnly />}
+                    fallback={
+                      <Input
+                        aria-label={t('shell.studio.endpoint.expression')}
+                        value={text}
+                        readOnly
+                        aria-busy="true"
+                      />
+                    }
                   >
                     <LazyExpressionEditor
                       application={check.application}

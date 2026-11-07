@@ -167,7 +167,7 @@ function SchemaNode({
   } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
     const text = typeof value === 'string' ? value : ''
     input = (
-      <Suspense fallback={<Input aria-label={name} value={text} readOnly />}>
+      <Suspense fallback={<Input aria-label={name} value={text} readOnly aria-busy="true" />}>
         <LazyExpressionEditor
           application={check.application}
           resourceId={check.resourceId}
