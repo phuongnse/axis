@@ -9,12 +9,20 @@ tenant, so they stay true to what Studio does. Each step is one test with the sa
 
 ## Before you start
 
-You need Axis running and a sign-in with the **author** role, which builds and publishes applications.
-The application uses three roles, and each one does a different job:
+Start Axis with `scripts/dev.sh`, as [hot reload with scripts/dev.sh](../development.md#hot-reload-with-scriptsdevsh)
+describes. Studio then runs at http://localhost:5173/studio.
 
-- **author** builds the application and publishes it.
+Sign in as a user who holds the **author** role, which builds the application. Publishing also needs the
+**publisher** role, which is set by `Studio:PublisherRole` and is not a role of the application. A
+development user with both roles can build and publish. To sign in as a person with another role, use a
+development user that holds that role. The [development users](../reference/security.md#development-users)
+table lists them, and [the axis realm](../development.md#the-axis-realm) gives the password and the
+sign-in code.
+
+The application has two roles, and each one does a different job:
+
 - **employee** drafts an expense and submits it.
-- **department manager** reviews the submitted expense and approves it.
+- **department-manager** reviews the submitted expense and approves it.
 
 A role is a named group of people that the application's policies refer to. Words like entity, process
 and data source are defined in [Concepts](../domain/concepts.md). The short version used here:
@@ -58,13 +66,15 @@ A role only gives a name to a group of people. What each role may do is set late
 
 Create an entity named `Expense` and give it the label `expense.label`. Then set its fields:
 
-1. The first field is `name`, which Studio adds with the entity. Give it the label `expense.name`.
+1. The first field is `name`, which Studio adds with the entity. Tick **Required**, and give it the label
+   `expense.name`. The display field must be required, or Validate reports an error.
 2. Add a field `amount` of type `decimal`, with the label `expense.amount`.
 3. Add a field `status` of type `enum`. Its values are `draft`, `submitted`, `approved` and `rejected`.
    Set its default to `'draft'`, so a new expense starts as a draft. Give it the label `expense.status`.
 
-Set the display field to `name`, so a row in a list shows the expense's name. Choose **Save**. The save
-reports no error.
+Set the display field to `name`, so a row in a list shows the expense's name. Choose **Save**. Studio asks
+what to do with the empty values of `name`, because it is now required. The expense has no records yet,
+so choose **Leave nulls**. The page shows **Saved**, and the entity has no error.
 
 An enum is a field that takes one of a fixed list of values. The default is an expression, and the
 quotes make it a text value.
