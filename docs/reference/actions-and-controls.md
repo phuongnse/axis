@@ -190,8 +190,6 @@ one.
 
 ## List order
 
-_(planned for M31)_
-
 A list takes one of three orders, chosen by what the list is.
 
 - **An order the author gives keeps it.** Process steps, wizard steps, a table's columns, a form's

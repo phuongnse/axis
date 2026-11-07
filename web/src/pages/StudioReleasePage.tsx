@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
+import { sortByName } from '../platform/listOrder'
 import { ReleaseOffStandard } from '../platform/ReleaseOffStandard'
 import {
   changeRows,
@@ -212,10 +213,15 @@ function ReleaseContent({
     { key: 'until', kind: 'fixed', title: t('shell.studio.release.until'), render: (_, row) => row.until },
   ]
 
-  const parts: PartRow[] = [
-    ...release.modules.map((part) => partRow('module', part)),
-    ...release.packages.map((part) => partRow('package', part)),
-  ]
+  const parts = sortByName(
+    [
+      ...release.modules.map((part) => partRow('module', part)),
+      ...release.packages.map((part) => partRow('package', part)),
+    ],
+    (row) => row.name,
+    locale,
+    (row) => (row.type === 'module' ? 0 : 1),
+  )
   const partColumns: AxisColumn<PartRow>[] = [
     { key: 'name', kind: 'freeText', title: t('shell.studio.release.name'), render: (_, row) => row.name },
     {
@@ -234,7 +240,7 @@ function ReleaseContent({
         tags={
           <>
             {release.live && <StudioLiveTag />}
-            <ReleaseOffStandard tagOnly relaxed={first.relaxed} />
+            <ReleaseOffStandard tagOnly relaxed={first.relaxed} locale={locale} />
           </>
         }
         actions={
@@ -363,16 +369,18 @@ function RelaxedPoints({ relaxed, locale }: { relaxed: StudioRelaxedPoint[]; loc
     const module = point.moduleTitle ?? point.module
     groups.set(module, [...(groups.get(module) ?? []), point])
   }
+  const pointLabel = (point: StudioRelaxedPoint) =>
+    point.titles?.[locale] ??
+    (point.point.endsWith('ceiling/others') ? t('shell.studio.release.relaxed.others') : point.point)
+  const sortedGroups = sortByName([...groups], ([module]) => module, locale)
   return (
     <Flex vertical gap={spacing.md}>
-      {[...groups].map(([module, points]) => (
+      {sortedGroups.map(([module, points]) => (
         <Flex key={module} vertical gap={spacing.sm}>
           <Typography.Text strong>{module}</Typography.Text>
-          {points.map((point) => {
+          {sortByName(points, pointLabel, locale).map((point) => {
             const entity = point.entityTitles?.[locale] ?? point.point.split('/')[0]
-            const label =
-              point.titles?.[locale] ??
-              (point.point.endsWith('ceiling/others') ? t('shell.studio.release.relaxed.others') : point.point)
+            const label = pointLabel(point)
             const kind =
               point.part === null ? entity : t(`shell.studio.release.part.${point.part}`).replace('{entity}', entity)
             return (

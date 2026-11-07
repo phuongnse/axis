@@ -58,6 +58,18 @@ export function kindSingular(kind: string, t: (key: string) => string): string {
   return byKind.has(kind) ? t(`shell.studio.nav.kindOne.${kind}`) : kind
 }
 
+/**
+ * Where a kind sorts among mixed kinds in the sidebar's order: the application's own manifest before every kind, a
+ * kind that Studio names at its place in `studioKinds`, and any other kind after them.
+ */
+export function sidebarRank(kind: string | null): number {
+  if (kind === 'application') {
+    return -1
+  }
+  const index = studioKinds.findIndex((entry) => entry.kind === kind)
+  return index === -1 ? studioKinds.length : index
+}
+
 /** The sidebar group of a kind, or `other` when the kind has no name. */
 export function kindGroup(kind: string): KindGroup {
   return byKind.get(kind)?.group ?? 'other'
