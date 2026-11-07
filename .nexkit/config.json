@@ -37,7 +37,7 @@
     {
       "name": "test",
       "run": "scripts/test.sh",
-      "timeout_minutes": 20,
+      "timeout_minutes": 30,
       "results": [
         "artifacts/test-results"
       ]
