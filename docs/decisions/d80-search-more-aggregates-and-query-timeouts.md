@@ -19,10 +19,12 @@ user needs.
   optional `filter`, and a `groupBy` entry on a date or date-time field takes a `day`, `week`,
   `month` or `year` bucket in the [application time zone](d75-the-application-time-zone.md).
   Expressions add `avg(list, item)`.
-- **Every statement runs under a timeout.** Interactive reads, exports, writes, worker items and
+- **Heavy statements run under a timeout.** Interactive reads, exports, writes, worker items and
   activation each run with `SET LOCAL statement_timeout` from a setting of their own. Each default
   is about 30 times the p95 objective of its group in the [SLOs](d82-performance-slos-and-load-tests.md),
-  so it stops only a runaway statement.
+  so it stops only a runaway statement. Some reads have no timeout: form state, task, process
+  inspection and site list reads, and the bytes of a [file download](../reference/file-fields.md#download),
+  which streams with no statement limit. See [data settings](../reference/host-settings.md#data-settings).
 - **A timeout is a fixed `503`.** Its title tells the client to try again and names no query, and a
   write that timed out wrote nothing. The server logs the source and the duration, never a value,
   and counts timeouts in a metric. When only a list's count times out, the list still answers, with
