@@ -20,8 +20,10 @@ declares a process, and a host that runs its steps away from the request thread.
 - **Each step is one transaction** with its business writes, the instance's state and revision, its
   history, its audit records and the next work item.
 - **Workers claim work with leases and fencing.**
-- **A failing step fails the instance,** and only an operator retries it
-  ([D35](d35-operator-retry-cancel-and-resolve.md)).
+- **A step that still fails after the retries its own policy allows fails the instance,** and only
+  an operator retries it ([D35](d35-operator-retry-cancel-and-resolve.md)). A connector call
+  ([D25](d25-connectors-deployment-bindings-and-secrets.md)) and a package operation
+  ([D28](d28-extension-packages.md)) take that policy from their step.
 
 The detail is in [processes](../reference/processes.md) and
 [process execution](../reference/process-execution.md#execution).
