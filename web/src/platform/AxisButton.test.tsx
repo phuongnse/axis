@@ -8,6 +8,7 @@ import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
+import { withAntdStyles } from '../test/antdStyles'
 
 const texts = { 'test.add': 'Add a row' }
 const catalogs = [{ texts, fallbackTexts: texts }]
@@ -76,16 +77,20 @@ describe('the icon-only button', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
   })
 
-  it('closes its tooltip on click and keeps it closed while the pointer stays on it', async () => {
-    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
-    const button = screen.getByRole('button', { name: 'Add a row' })
-    await userEvent.hover(button)
-    await screen.findByRole('tooltip')
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    await userEvent.click(button)
-    await pause(150)
+    it('closes its tooltip on click and keeps it closed while the pointer stays on it', async () => {
+      renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />)
+      const button = screen.getByRole('button', { name: 'Add a row' })
+      await userEvent.hover(button)
+      await screen.findByRole('tooltip')
 
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+      await userEvent.click(button)
+      await pause(150)
+
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
   })
 
   it('opens no tooltip on focus that a script gives', async () => {

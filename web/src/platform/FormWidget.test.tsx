@@ -14,6 +14,7 @@ import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
 import { hostileMarkup } from '../test/hostile'
+import { withAntdStyles } from '../test/antdStyles'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -619,14 +620,18 @@ describe('FormWidget', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose…')
   })
 
-  it('names Clear on keyboard focus', async () => {
-    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
-    renderForm(noteId)
-    await screen.findByLabelText('Category')
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    await tabTo(screen.getByRole('button', { name: 'Clear' }))
+    it('names Clear on keyboard focus', async () => {
+      stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+      renderForm(noteId)
+      await screen.findByLabelText('Category')
 
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear')
+      await tabTo(screen.getByRole('button', { name: 'Clear' }))
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear')
+    })
   })
 
   it('shows the history of a saved record below the form', async () => {
@@ -718,19 +723,23 @@ describe('FormWidget', () => {
     })
   })
 
-  it('sets a field error 4px under its input in 14/20 text, with the field gap below it', async () => {
-    stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
-    renderForm(null, noteWidget, 'light')
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    it('sets a field error 4px under its input in 14/20 text, with the field gap below it', async () => {
+      stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
+      renderForm(null, noteWidget, 'light')
 
-    const message = await screen.findByTestId('field-error-title')
-    const explain = message.closest('.ant-form-item-explain')
-    const item = message.closest('.ant-form-item')
-    expect(explain).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
-    expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe(
-      `${designTokensFor('light').spacing.lg}px`,
-    )
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      const message = await screen.findByTestId('field-error-title')
+      const explain = message.closest('.ant-form-item-explain')
+      const item = message.closest('.ant-form-item')
+      expect(explain).toHaveStyle({ marginTop: '4px', fontSize: '14px', lineHeight: '20px' })
+      expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe(
+        `${designTokensFor('light').spacing.lg}px`,
+      )
+    })
   })
 
   it('shows field errors under their field and other errors above the form', async () => {
