@@ -17,9 +17,9 @@ time zone, while a date or a local year does.
   the transaction's start time. The interpreter and the SQL translation give the same value.
 - **Not in computed fields.** A computed field's value is stored and would go stale, so `now()` in
   a computed field is a compile error.
-- **Time zones come from the application.** Everything that needs a time zone, such as today's date
-  or the local year of a sequence, follows the application's time zone of
-  [D75](d75-the-application-time-zone.md).
+- **Local dates come from the application.** Today's date and the local year of a sequence follow
+  the application's time zone of [D75](d75-the-application-time-zone.md). A schedule trigger that
+  names its own time zone runs in it, as [D26](d26-events-and-triggers.md) agrees.
 
 Which transaction each kind of expression uses is in
 [functions](../reference/expressions.md#functions).
