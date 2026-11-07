@@ -314,7 +314,7 @@ page, All tickets and the lead's dashboard. Its texts are in `en` and `vi`.
 ### Built through Studio
 
 The main Playwright journey proves that Studio alone builds a whole application. Its steps are in
-[testing](architecture.md#testing).
+[testing](testing.md).
 
 - It starts from a blank application in Studio and builds the whole application, the two-step form,
   the dashboard, the ticket detail page, the time zone, the automations and their texts included.
