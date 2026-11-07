@@ -173,6 +173,24 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
           entityTitles: null,
           titles: null,
         },
+        {
+          module: 'audit',
+          point: 'Entry/fields/note',
+          reason: 'Pilot',
+          moduleTitle: null,
+          part: null,
+          entityTitles: null,
+          titles: null,
+        },
+        {
+          module: 'department-budgets',
+          point: 'Budget/fields/limit',
+          reason: 'Limit',
+          moduleTitle: null,
+          part: null,
+          entityTitles: null,
+          titles: null,
+        },
       ],
     })
     renderList({ history: { ...history, items: [history.items[0], relaxed] } })
@@ -181,10 +199,12 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(rows.map((row) => row.getAttribute('data-off-standard'))).toEqual(['true', null])
     const releaseCell = within(rows[0]).getAllByRole('cell')[0]
     expect(within(releaseCell).getByTestId('release-off-standard')).toHaveTextContent('Off-standard')
-    const point = within(releaseCell).getByTestId('release-relaxed-point')
-    expect(point).toHaveTextContent('department-budgets')
-    expect(point).toHaveTextContent('Budget/transitions/approve')
-    expect(point).toHaveTextContent('Approvers decide alone')
+    const points = within(releaseCell).getAllByTestId('release-relaxed-point')
+    expect(points.map((point) => point.textContent)).toEqual([
+      'audit Entry/fields/note: Pilot',
+      'department-budgets Budget/fields/limit: Limit',
+      'department-budgets Budget/transitions/approve: Approvers decide alone',
+    ])
     expect(within(rows[1]).queryByTestId('release-off-standard')).not.toBeInTheDocument()
     expect(within(rows[1]).queryByTestId('release-relaxed-point')).not.toBeInTheDocument()
   })

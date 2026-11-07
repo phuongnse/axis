@@ -13,6 +13,7 @@ import {
   folderDiffers,
   groupByKind,
   moduleResources,
+  sortReferences,
   previewSiteUrl,
   putStudioTexts,
   releaseList,
@@ -24,6 +25,8 @@ import {
   studioAppDescription,
   studioAppTitle,
   undoStudioRevision,
+  type StudioReference,
+  type StudioReferenceNode,
   type StudioReleaseChange,
   type StudioRevision,
   type StudioReleaseItem,
@@ -269,18 +272,21 @@ describe('filterResources', () => {
 
 describe('groupByKind', () => {
   it('makes one group per kind, sorted by kind, with the items sorted by name or file', () => {
-    const groups = groupByKind(items)
+    const groups = groupByKind(items, 'en')
 
     expect(groups.map((group) => group.kind)).toEqual(['application', 'entity', 'form'])
     expect(groups[1].items.map((item) => item.name)).toEqual(['Department', 'PurchaseRequest'])
   })
 
   it('sorts an item without a name by its file', () => {
-    const groups = groupByKind([
-      resource('1', 'entity', null, 'entities/b.json'),
-      resource('2', 'entity', 'zeta', 'entities/a.json'),
-      resource('3', 'entity', null, 'entities/a.json'),
-    ])
+    const groups = groupByKind(
+      [
+        resource('1', 'entity', null, 'entities/b.json'),
+        resource('2', 'entity', 'zeta', 'entities/a.json'),
+        resource('3', 'entity', null, 'entities/a.json'),
+      ],
+      'en',
+    )
 
     expect(groups[0].items.map((item) => item.id)).toEqual(['3', '1', '2'])
   })
@@ -288,14 +294,29 @@ describe('groupByKind', () => {
   it('sorts the items by the shown name when it is given', () => {
     const groups = groupByKind(
       [resource('1', 'entity', 'A', 'entities/a.json'), resource('2', 'entity', 'B', 'entities/b.json')],
+      'en',
       (item) => (item.id === '1' ? 'Zeta' : 'Alpha'),
     )
 
     expect(groups[0].items.map((item) => item.id)).toEqual(['2', '1'])
   })
 
+  it('sorts the shown names in the locale, so Đ follows D in Vietnamese', () => {
+    const groups = groupByKind(
+      [
+        resource('1', 'entity', 'Đơn hàng', 'entities/1.json'),
+        resource('2', 'entity', 'Dự án', 'entities/2.json'),
+        resource('3', 'entity', 'Bảng', 'entities/3.json'),
+      ],
+      'vi',
+      (item) => item.name ?? '',
+    )
+
+    expect(groups[0].items.map((item) => item.name)).toEqual(['Bảng', 'Dự án', 'Đơn hàng'])
+  })
+
   it('returns no group for no resources', () => {
-    expect(groupByKind([])).toEqual([])
+    expect(groupByKind([], 'en')).toEqual([])
   })
 })
 
@@ -328,7 +349,7 @@ describe('moduleResources', () => {
   ) as unknown as StudioNames
 
   it('returns one group for each module kind, in the order of the kind list, with the module id', () => {
-    const groups = moduleResources(names, '')
+    const groups = moduleResources(names, '', 'en')
 
     expect(groups.map((group) => group.kind)).toEqual([...moduleKinds])
     expect(groups.flatMap((group) => group.items)).toEqual(
@@ -337,24 +358,36 @@ describe('moduleResources', () => {
   })
 
   it('leaves out the application own resources', () => {
-    const ids = moduleResources(names, '').flatMap((group) => group.items.map((item) => item.id))
+    const ids = moduleResources(names, '', 'en').flatMap((group) => group.items.map((item) => item.id))
 
     expect(ids).toHaveLength(moduleKinds.length)
     expect(ids.filter((id) => id.startsWith('own-'))).toEqual([])
   })
 
   it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {
-    expect(moduleResources(names, '  CHECKLISTS/PROCESS ').map((group) => group.items.map((item) => item.id))).toEqual([
-      ['checklists-process'],
-    ])
-    expect(moduleResources(names, 'CHECKLISTS-POLICY').map((group) => group.kind)).toEqual(['policy'])
-    expect(moduleResources(names, ' CHECKLISTS-SEED ').map((group) => group.kind)).toEqual(['seed'])
-    expect(moduleResources(names, 'checklists/scenario').map((group) => group.kind)).toEqual(['scenario'])
-    expect(moduleResources(names, 'nothing')).toEqual([])
+    expect(
+      moduleResources(names, '  CHECKLISTS/PROCESS ', 'en').map((group) => group.items.map((item) => item.id)),
+    ).toEqual([['checklists-process']])
+    expect(moduleResources(names, 'CHECKLISTS-POLICY', 'en').map((group) => group.kind)).toEqual(['policy'])
+    expect(moduleResources(names, ' CHECKLISTS-SEED ', 'en').map((group) => group.kind)).toEqual(['seed'])
+    expect(moduleResources(names, 'checklists/scenario', 'en').map((group) => group.kind)).toEqual(['scenario'])
+    expect(moduleResources(names, 'nothing', 'en')).toEqual([])
+  })
+
+  it('sorts the items of a group by name in the locale', () => {
+    const entity = (id: string, name: string) => ({ id, name: `checklists/${name}`, module: 'checklists' })
+    const unsorted = {
+      ...names,
+      entities: [entity('3', 'Đơn hàng'), entity('2', 'Dự án'), entity('1', 'Bảng')],
+    } as unknown as StudioNames
+
+    const groups = moduleResources(unsorted, '', 'vi')
+
+    expect(groups.find((group) => group.kind === 'entity')?.items.map((item) => item.id)).toEqual(['1', '2', '3'])
   })
 
   it('returns no group before the names are loaded', () => {
-    expect(moduleResources(null, '')).toEqual([])
+    expect(moduleResources(null, '', 'en')).toEqual([])
   })
 })
 
@@ -483,6 +516,21 @@ describe('changeRows', () => {
 
     expect(rows.map((row) => row.name)).toEqual(['Alpha', 'Beta', 'Alpha'])
     expect(rows.map((row) => row.kind)).toEqual(['entity', 'entity', 'page'])
+  })
+
+  it('orders Vietnamese names in one kind with D before Đ, and Settings first', () => {
+    const rows = changeRows(
+      [
+        change({ path: 'entities/dong.json', change: 'added' }),
+        change({ path: 'entities/du.json', change: 'added' }),
+        change({ path: 'application.json', change: 'changed', kind: 'application' }),
+      ],
+      [resource('1', 'entity', 'Đơn hàng', 'entities/dong.json'), resource('2', 'entity', 'Dự án', 'entities/du.json')],
+      'vi',
+      t,
+    )
+
+    expect(rows.map((row) => row.name)).toEqual(['Settings', 'Dự án', 'Đơn hàng'])
   })
 
   it('links an added or changed row to its resource and takes its kind from the resource', () => {
@@ -664,5 +712,48 @@ describe('revisionAuthor and revisionClient', () => {
     expect(revisionClient(revision({ client: 'studio' }), t)).toBe('Studio')
     expect(revisionClient(revision({ client: null }), t)).toBeNull()
     expect(revisionClient(revision({ client: 'claude-desktop' }), t)).toBe('claude-desktop')
+  })
+})
+
+const referenceEntry = (node: StudioReferenceNode): StudioReference => ({
+  relation: 'uses',
+  file: 'f.json',
+  path: '/p',
+  node,
+})
+const referenceResource = (kind: string, name: string): StudioReferenceNode => ({
+  type: 'resource',
+  id: `${kind}-${name}`,
+  kind,
+  name,
+  file: `${kind}/${name}.json`,
+})
+
+describe('sortReferences', () => {
+  it('groups resources in the sidebar kind order, then modules and packages, and sorts each group by name', () => {
+    const entries = [
+      referenceEntry({ type: 'package', id: 'pdf' }),
+      referenceEntry({ type: 'module', id: 'organization' }),
+      referenceEntry(referenceResource('page', 'Home')),
+      referenceEntry({ type: 'text', key: 'common.save' }),
+      referenceEntry(referenceResource('entity', 'Đơn hàng')),
+      referenceEntry({ type: 'module', id: 'audit' }),
+      referenceEntry(referenceResource('entity', 'Dự án')),
+    ]
+
+    const sorted = sortReferences(entries, 'vi')
+
+    expect(
+      sorted.map((reference) => (reference.node.type === 'resource' ? reference.node.name : reference.node)),
+    ).toEqual([
+      'Dự án',
+      'Đơn hàng',
+      'Home',
+      { type: 'text', key: 'common.save' },
+      { type: 'module', id: 'audit' },
+      { type: 'module', id: 'organization' },
+      { type: 'package', id: 'pdf' },
+    ])
+    expect(entries[0].node).toEqual({ type: 'package', id: 'pdf' })
   })
 })

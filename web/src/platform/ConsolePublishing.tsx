@@ -129,7 +129,8 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
         key: 'relaxed',
         kind: 'freeText',
         title: t('shell.console.publishing.relaxed'),
-        render: (_value, row) => (row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} /> : null),
+        render: (_value, row) =>
+          row.offStandard ? <ReleaseOffStandard relaxed={row.relaxed} locale={locale} /> : null,
       },
     ],
     [activeRow, locale, t],

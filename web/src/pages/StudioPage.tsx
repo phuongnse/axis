@@ -383,10 +383,12 @@ function StudioWorkspace() {
     () =>
       kind === null
         ? []
-        : groupByKind(resources, (item) => resourceTitle(item, locale, t)).filter((group) => group.kind === kind),
+        : groupByKind(resources, locale, (item) => resourceTitle(item, locale, t)).filter(
+            (group) => group.kind === kind,
+          ),
     [resources, kind, locale, t],
   )
-  const allModuleGroups = useMemo(() => moduleResources(names, ''), [names])
+  const allModuleGroups = useMemo(() => moduleResources(names, '', locale), [names, locale])
   const moduleGroups = useMemo(
     () => (kind === null ? [] : allModuleGroups.filter((group) => group.kind === kind)),
     [allModuleGroups, kind],

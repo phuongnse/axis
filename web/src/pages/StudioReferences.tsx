@@ -1,15 +1,17 @@
 import { Alert, Button, Flex, Tag, Typography } from 'antd'
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import {
   fetchResourceReferences,
   fetchTextReferences,
   ServerUnreachableError,
+  sortReferences,
   type StudioReference,
   type StudioReferenceNode,
   type StudioResourceReferences,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
+import { PlatformContext } from './context'
 
 type Direction = 'uses' | 'usedBy'
 
@@ -82,12 +84,13 @@ function ReferenceList({
   onOpen: OpenResource
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   if (entries.length === 0) {
     return <Typography.Text type="secondary">{t('shell.studio.noReferences')}</Typography.Text>
   }
   return (
     <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-      {entries.map((entry, index) => (
+      {sortReferences(entries, locale).map((entry, index) => (
         <ReferenceEntry key={index} entry={entry} direction={direction} application={application} onOpen={onOpen} />
       ))}
     </ul>
