@@ -24,9 +24,9 @@ grow when an author starts something new.
   never sees half an application. Creating an application never activates it: the author publishes
   it, as [D47](d47-publishing-from-studio.md) says.
 - **A new resource starts from its kind's starter.** A starter is the smallest content that passes
-  the kind's schema. It lives in the SPA, next to the schemas the SPA bundles, and the server's
-  create route stays as it is. A reference the author must still choose is left empty, so it shows
-  as a diagnostic.
+  the kind's schema except at the references the author must still choose. It lives in the SPA,
+  next to the schemas the SPA bundles, and the server's create route stays as it is. A reference
+  the author must still choose is left empty, so it shows as a diagnostic.
 
 The detail is in [creating an application](../reference/authoring-applications.md#creating-an-application),
 [application templates](../reference/modules-and-templates.md#application-templates), the
