@@ -35,9 +35,9 @@ Four actors take part in the work, and each has its own part.
   in those paths, and opens their pull requests. It never approves or merges, and it hands the owner only
   what the owner alone can decide.
 - **The docs audit** is the `docs-audit.yml` workflow, which follows the
-  [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs
-  against the code every hundred merges and opens a NexKit issue for each group of findings that no open
-  issue covers, code and test fixes first and at most ten a run, as
+  [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs,
+  the skills and AGENTS.md against the code every hundred merges and opens a NexKit issue for each group
+  of findings that no open issue covers, code and test fixes first and at most ten a run, as
   [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees and the
   skill says. It changes no file itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read

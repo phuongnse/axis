@@ -22,17 +22,36 @@ const finding = (page, line, kind, extra = {}) => ({
 })
 
 describe('pagesFor', () => {
-  const files = ['docs/b.md', 'docs/a.md', 'docs/reference/c.md', 'docs/d.md', 'docs/e.md', 'docs/x.json', 'README.md']
+  const files = [
+    'docs/a.md',
+    'docs/b.md',
+    'docs/reference/c.md',
+    '.claude/skills/x/SKILL.md',
+    'AGENTS.md',
+    'README.md',
+    'docs/x.json',
+    '.claude/settings.json',
+    'src/notes.md',
+  ]
+  const kept = ['.claude/skills/x/SKILL.md', 'AGENTS.md', 'docs/a.md', 'docs/b.md', 'docs/reference/c.md']
 
-  test('takes every fourth Markdown page under docs, in order, by the run number', () => {
-    assert.deepEqual(pagesFor(files, 0), ['docs/a.md', 'docs/reference/c.md'])
-    assert.deepEqual(pagesFor(files, 1), ['docs/b.md'])
-    assert.deepEqual(pagesFor(files, 5), ['docs/b.md'])
+  test('takes every fourth page of docs and the skills, and AGENTS.md, in order, by the run number', () => {
+    assert.deepEqual(pagesFor(files, 0), ['.claude/skills/x/SKILL.md', 'docs/reference/c.md'])
+    assert.deepEqual(pagesFor(files, 1), ['AGENTS.md'])
+    assert.deepEqual(pagesFor(files, 2), ['docs/a.md'])
+    assert.deepEqual(pagesFor(files, 5), ['AGENTS.md'])
   })
 
-  test('reads every page once in four runs', () => {
+  test('reads every kept page once in four runs, a skill and AGENTS.md among them', () => {
     const all = Array.from({ length: shares }, (_, run) => pagesFor(files, run)).flat().sort()
-    assert.deepEqual(all, ['docs/a.md', 'docs/b.md', 'docs/d.md', 'docs/e.md', 'docs/reference/c.md'])
+    assert.deepEqual(all, [...kept].sort())
+  })
+
+  test('reads a skill and AGENTS.md in exactly one of four runs', () => {
+    for (const page of ['.claude/skills/x/SKILL.md', 'AGENTS.md']) {
+      const runs = Array.from({ length: shares }, (_, run) => pagesFor(files, run)).filter((pages) => pages.includes(page))
+      assert.equal(runs.length, 1, page)
+    }
   })
 })
 

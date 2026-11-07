@@ -1,6 +1,6 @@
 ---
 name: axis-docs-audit
-description: How the docs audit reads Axis's docs against the code. The docs-audit.yml workflow follows it every hundred merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for the hourly driver, which uses axis-nexkit-routine, and not for agents inside the NexKit pipeline.
+description: How the docs audit reads Axis's docs, skills and AGENTS.md against the code. The docs-audit.yml workflow follows it every hundred merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for the hourly driver, which uses axis-nexkit-routine, and not for agents inside the NexKit pipeline.
 ---
 
 # Axis's docs audit
@@ -13,8 +13,9 @@ This skill says how to read a page. The audit changes no file.
 
 `scripts/docs-audit.mjs` does the steps that need no judgement, and the workflow runs it:
 
-1. `pages <run number>` picks the run's pages: every `*.md` that git tracks under `docs/`, in order,
-   whose index modulo 4 equals the run number modulo 4, so every page is read once in four runs.
+1. `pages <run number>` picks the run's pages: every `*.md` that git tracks under `docs/` and
+   `.claude/skills/`, plus `AGENTS.md`, in order, whose index modulo 4 equals the run number modulo 4,
+   so every page is read once in four runs.
 2. `read <run number>` splits those pages into groups of about eight. It asks Claude Code once per group,
    at most four at a time, with the tools `Read`, `Grep` and `Glob` only and no GitHub token. Each
    answer follows [reading a page](#reading-a-page) for its group and gives the findings in the script's
@@ -32,7 +33,12 @@ reports the findings to the owner instead.
 
 For each page, compare every statement that the repository can confirm with the code: the server under
 `src/`, the SPA under `web/src/`, `scripts/`, `deploy/`, `.github/`, `.nexkit/`, the schemas and the tests.
-The code, not another doc, is the evidence.
+The code, not another doc, is the evidence, except for a skill or AGENTS.md as the next paragraph says.
+
+For a skill or AGENTS.md, check each command, path, script, setting and step against the repository: that
+the script, flag, file or folder exists and does what the text says. Check it against the docs it links too.
+A statement that a linked doc contradicts is `wrong`, and that doc's file and line are the evidence. A rule
+the file restates instead of linking to its home is `standard`.
 
 Report each finding with the page and line, the statement, the evidence (file and line), and one kind:
 

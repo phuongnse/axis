@@ -63,9 +63,11 @@ export const findingsSchema = {
   },
 }
 
-/** Returns the pages of one run: every Markdown file under docs/, in order, whose index modulo the shares equals the run's. */
+const audited = /^(?:docs|\.claude\/skills)\/.*\.md$|^AGENTS\.md$/
+
+/** Returns the pages of one run: every Markdown file under docs/ or .claude/skills/ and AGENTS.md, in order, whose index modulo the shares equals the run's. */
 export function pagesFor(files, run) {
-  return files.filter((file) => /^docs\/.*\.md$/.test(file)).sort().filter((_, i) => i % shares === run % shares)
+  return files.filter((file) => audited.test(file)).sort().filter((_, i) => i % shares === run % shares)
 }
 
 /** Returns the findings from Claude Code's JSON answer, taking its structured output or else the JSON in its result. */
@@ -224,8 +226,8 @@ function runAsync(command, args, options) {
   })
 }
 
-function trackedDocs() {
-  return run('git', ['ls-files', 'docs'], { cwd: root }).split('\n').filter(Boolean)
+function trackedPages() {
+  return run('git', ['ls-files', 'docs', '.claude/skills', 'AGENTS.md'], { cwd: root }).split('\n').filter(Boolean)
 }
 
 function promptFor(pages) {
@@ -279,7 +281,7 @@ export async function readGroups(groups, ask) {
 }
 
 async function read(runNumber) {
-  return readGroups(groupsOf(pagesFor(trackedDocs(), runNumber)), (pages) =>
+  return readGroups(groupsOf(pagesFor(trackedPages(), runNumber)), (pages) =>
     runAsync(process.env.CLAUDE ?? 'claude', claudeArgs(pages), { cwd: root }),
   )
 }
@@ -304,7 +306,7 @@ function file(findingsFile, runId) {
 
 async function main([command, ...args]) {
   if (command === 'pages') {
-    console.log(pagesFor(trackedDocs(), Number(args[0])).join('\n'))
+    console.log(pagesFor(trackedPages(), Number(args[0])).join('\n'))
   } else if (command === 'read') {
     console.log(JSON.stringify(await read(Number(args[0])), null, 2))
   } else if (command === 'file') {

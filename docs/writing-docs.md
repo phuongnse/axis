@@ -223,7 +223,8 @@ every pull request, the tests, and an audit every hundred merges, as
    header, wherever it moves. Without such a test, the doc names the file that holds the list rather
    than copying it. The review refuses a new list without its test.
 8. **An audit reads the docs against the code every hundred merges.** The docs audit workflow reads a
-   quarter of the pages each run, in turn, as the
+   quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every skill
+   under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
    job with no model opens at most ten NexKit issues a run, code and test fixes before docs fixes, and a
    finding that the cap leaves out is reported again by its page's next run. The skill gives the details.
