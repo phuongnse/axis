@@ -23,8 +23,11 @@ request on request, with the same scripts that CI runs, and sets the statuses th
   once every 32 and the performance workflow once every 62. NexKit counts the commits on `main` since
   a workflow's latest run there. 32 and 62 are not multiples of 5, so the three seldom start at the
   same merge.
-- **No push to `main` starts them, and none has a schedule.** A push trigger for `main` would run them
-  after every merge as well. Each runs on demand.
+- **No push to `main` starts them, and CI's only schedule is its weekly scan.** A push trigger for
+  `main` would run them after every merge as well. Each runs on demand. The weekly run covers the
+  dependency and image scans alone, as
+  [D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees, because a
+  new advisory can appear while nothing merges.
 - **NexKit checks every branch, and CI runs on `main` alone.** NexKit's checks run on its own pull
   requests in each round and on a person's pull request at `/nexkit review`, so no push to a branch
   starts CI. A pull request that changes CI's own workflow file runs CI, so the change is tried before
