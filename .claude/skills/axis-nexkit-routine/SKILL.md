@@ -29,7 +29,8 @@ repository, this skill makes it.
   NexKit, the plan, the issue or `docs/` recommends or supports. Answer from
   the plan, the issue, `docs/` and [decisions.md](../../../docs/decisions.md).
   Where the `drive` skill or NexKit's troubleshooting says to ask a person,
-  take NexKit's recommendation instead. Notify only for the cases in the
+  take NexKit's recommendation instead, except for the cases under
+  [Hand to the owner](#hand-to-the-owner). Notify only for the cases in the
   `drive` skill's Notify list and under [Hand to the owner](#hand-to-the-owner).
 - **Never approve or merge,** and never change a decision's status.
 - **Push only** the hand merges below, on the pull request's own branch, and
@@ -81,7 +82,12 @@ skill lists, only for:
   with no basis in the plan, the issue or `docs/`;
 - a NexKit pull request that NexKit did not merge because its issue was
   closed (`merge_issue_closed`), for the owner to merge or close;
-- a hand-made pull request that is ready for the owner's merge.
+- a hand-made pull request that is ready for the owner's merge;
+- a run that stopped twice on a result that does not fit the schema: a
+  stronger model for that stage is a change to the profiles in
+  `.nexkit/config.json`, which the owner makes in a hand-made pull request;
+- a note from the implement agent that says the issue needs no change: leave
+  the pull request and the issue open, and name the note in the notification.
 
 ## Timing
 

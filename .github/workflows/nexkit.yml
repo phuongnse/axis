@@ -64,10 +64,10 @@ jobs:
     # pull request, so they never replace a command that waits.
     concurrency:
       group: nexkit-${{ (github.event_name == 'milestone' || (github.event_name == 'issues' && github.event.action != 'closed')) && 'autopilot' || (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') && format('approved-{0}', github.event.pull_request.number) || github.event.issue.number || github.event.pull_request.number || inputs.number || github.event_name }}
-    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v6.2.0
+    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v6.3.0
     with:
       nexkit_repository: phuongnse/nexkit
-      nexkit_ref: v6.2.0
+      nexkit_ref: v6.3.0
     # The pipeline passes each job only the secrets .nexkit/config.json names for it (its
     # stages' agents, or the App's), so it can read them by those names.
     secrets: inherit
