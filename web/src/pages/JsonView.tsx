@@ -2,9 +2,8 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { Annotation, Compartment, EditorState, Transaction } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import type { DesignTokens } from '../platform/designTokens'
-import { useDesignTokens, useThemeMode, type ThemeMode } from '../platform/themeMode'
-import { codeEditorTheme } from './codeEditorTheme'
+import { useDesignTokens, useThemeMode } from '../platform/themeMode'
+import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { jsonLanguage } from './jsonLanguage'
 import { jsonViewHeight, minHeight } from './jsonViewHeight'
 
@@ -115,7 +114,7 @@ export default function JsonView({ label, value, onChange, boundary }: JsonViewP
   return <div ref={hostRef} style={{ height }} />
 }
 
-function jsonTheme(tokens: DesignTokens, mode: ThemeMode) {
+const jsonTheme = sharedTheme((tokens, mode) => {
   const { colour, spacing } = tokens
   return [
     codeEditorTheme(tokens, mode),
@@ -133,4 +132,4 @@ function jsonTheme(tokens: DesignTokens, mode: ThemeMode) {
       '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.sm}px` },
     }),
   ]
-}
+})

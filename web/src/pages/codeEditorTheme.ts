@@ -16,8 +16,28 @@ export function codeHighlightStyle(colour: DesignTokens['colour']): HighlightSty
   ])
 }
 
+/**
+ * Builds a theme once for a set of tokens and a mode, so every editor shares it. Each theme adds its style rules to the
+ * page, and the more rules there are, the slower every style lookup is.
+ */
+export function sharedTheme(build: (tokens: DesignTokens, mode: ThemeMode) => Extension) {
+  const built = new WeakMap<DesignTokens, Map<ThemeMode, Extension>>()
+  return (tokens: DesignTokens, mode: ThemeMode): Extension => {
+    const modes = built.get(tokens) ?? new Map<ThemeMode, Extension>()
+    built.set(tokens, modes)
+    let theme = modes.get(mode)
+    if (!theme) {
+      theme = build(tokens, mode)
+      modes.set(mode, theme)
+    }
+    return theme
+  }
+}
+
 /** The look of a code editor, as a field's border and the token colours, shared by every code editor in Studio. */
-export function codeEditorTheme({ colour, radius, type }: DesignTokens, mode: ThemeMode): Extension {
+export const codeEditorTheme = sharedTheme(buildCodeEditorTheme)
+
+function buildCodeEditorTheme({ colour, radius, type }: DesignTokens, mode: ThemeMode): Extension {
   return [
     EditorView.theme(
       {

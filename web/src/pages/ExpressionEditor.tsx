@@ -6,15 +6,14 @@ import {
 } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
-import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state'
+import { Annotation, Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { checkStudioExpression, type ExpressionCheck } from '../platform/studio'
 import { useText } from '../platform/texts'
-import type { DesignTokens } from '../platform/designTokens'
-import { useDesignTokens, useThemeMode, type ThemeMode } from '../platform/themeMode'
-import { codeEditorTheme } from './codeEditorTheme'
+import { useDesignTokens, useThemeMode } from '../platform/themeMode'
+import { codeEditorTheme, sharedTheme } from './codeEditorTheme'
 import { expressionLanguage } from './expressionLanguage'
 import type { ScopeOption } from './expressionScope'
 
@@ -205,6 +204,7 @@ function toCompletion(option: ScopeOption): Completion {
   }
 }
 
-function expressionTheme(tokens: DesignTokens, mode: ThemeMode): Extension {
-  return [codeEditorTheme(tokens, mode), EditorView.theme({ '.cm-content': { padding: '4px 0' } })]
-}
+const expressionTheme = sharedTheme((tokens, mode) => [
+  codeEditorTheme(tokens, mode),
+  EditorView.theme({ '.cm-content': { padding: '4px 0' } }),
+])
