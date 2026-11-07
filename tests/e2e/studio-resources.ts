@@ -119,9 +119,25 @@ export async function jsonViewText(json: Locator): Promise<string> {
 }
 
 /**
- * Selects the Form tab of the open resource. Under D65 and D66 a page or a form opens on its Design tab, so a spec that
- * uses the fields of its Form tab selects Form first. It does no harm when Form is selected.
+ * Selects the Form tab of the open resource, then waits until no expression editor of the resource is loading or
+ * checking. Under D65 and D66 a page or a form opens on its Design tab, so a spec that uses the fields of its Form tab
+ * selects Form first. It does no harm when Form is selected.
  */
 export async function openFormTab(page: Page) {
   await openTab(page, 'Form')
+  await waitForExpressions(page)
+}
+
+/**
+ * Waits until no expression editor of the open resource is loading or waiting for its check. A check's answer adds a
+ * line under its editor and moves what is below, so a click during it can miss.
+ */
+export async function waitForExpressions(page: Page) {
+  await expect(page.getByTestId('studio-editor').locator('[aria-busy="true"]')).toHaveCount(0)
+}
+
+/** Clicks Add mapping in `scope` once the expression editors are still. */
+export async function addMapping(scope: Locator) {
+  await waitForExpressions(scope.page())
+  await scope.getByRole('button', { name: 'Add mapping', exact: true }).click()
 }
