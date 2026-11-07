@@ -151,3 +151,4 @@ the files agree, title and status included.
 | [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md) | Authentication by default, and the owner guards the security checks alone | **Agreed** |
 | [D138](decisions/d138-the-docs-follow-arc42-c4-diagrams-in-mermaid-and-four-kinds-of-page.md) | The docs follow arc42, C4 diagrams in Mermaid and four kinds of page | **Agreed** |
 | [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) | CI runs on main alone, and NexKit checks every branch | **Agreed** |
+| [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) | A new screen is designed first, on a short prototype with fixtures | **Agreed** |

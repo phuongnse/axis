@@ -86,6 +86,10 @@ as [D117](../../../docs/decisions/d117-small-businesses-first-and-the-milestones
 agrees, and write no issue of a later phase unless the owner asks. On *ready*:
 
 - Create the milestone's issues as in [Writing an issue](#writing-an-issue).
+- Find the new screens and new ways of interacting. For each group, open one
+  design issue with the `on-hold` label and mark the issues that build them
+  *blocked by* it, as
+  [Design changes](../../../docs/delivery.md#design-changes) says.
 - Check that each risky concept the **From** column of
   [concepts.md](../../../docs/domain/concepts.md) lists for the new milestone
   falls under `hard` by its consequence, and that work the platform has not
