@@ -56,11 +56,14 @@ that holds it.
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
   same milestone or across milestones. A `bug` issue for CI on `main`, an issue for a Dependabot
   advisory and an issue of the docs audit are in no milestone.
-- **Bugs go first.** Autopilot's [`priority`][nexkit-labels] setting lists the labels whose issues
-  start before the others, in this order: `nexkit:ci` for a failure of CI on `main`,
-  `nexkit:dependabot` for an advisory, `bug`, and `nexkit:flaky` for a flaky test. NexKit labels the
-  issues it opens. A `bug` issue that a person opens goes first too, with or without a milestone, so a
-  broken `main` never waits behind a milestone's features.
+- **Bugs go first, then the work on how Axis is built.** Autopilot's [`priority`][nexkit-labels]
+  setting lists the labels whose issues start before the others, in this order: `nexkit:ci` for a
+  failure of CI on `main`, `nexkit:dependabot` for an advisory, `bug`, `nexkit:flaky` for a flaky
+  test, and `process`. NexKit labels the issues it opens. A `bug` issue that a person opens goes
+  first too, with or without a milestone, so a broken `main` never waits behind a milestone's
+  features. A `process` issue improves how Axis is built: the docs standard, the checks, CI, the
+  delivery workflow or the agent instructions. It goes before the milestones' features, because every
+  later issue is built with what it changes.
 - **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
   makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
   issue to stop work on it without closing it.
