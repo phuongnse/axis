@@ -9,7 +9,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource, openFormTab, openKind } from '../studio-resources'
+import { addMapping, createResource, openFormTab, openKind } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -795,7 +795,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await writeLabel(page, `studio-field-${pointer}/message/body`, spec.body, en[spec.body])
       const values = page.getByTestId(`studio-field-${pointer}/message/values`)
       for (const [placeholder, expression] of spec.values) {
-        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await addMapping(values)
         await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
         const value = page.getByTestId(`studio-field-${pointer}/message/values/${placeholder}`)
         await expect(value.locator('.cm-editor')).toBeVisible()
@@ -1285,7 +1285,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await writeLabel(page, 'studio-field-/steps/0/message/body', step.body, en[step.body])
       const values = page.getByTestId('studio-field-/steps/0/message/values')
       for (const [placeholder, expression] of step.values) {
-        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await addMapping(values)
         await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
         const value = page.getByTestId(`studio-field-/steps/0/message/values/${placeholder}`)
         await expect(value.locator('.cm-editor')).toBeVisible()

@@ -10,7 +10,7 @@ import { assetManagement, journeyApplications, journeyURL } from '../server-sett
 import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
-import { createResource, hasKind, jsonViewText, openFormTab, openKind, openTab } from '../studio-resources'
+import { addMapping, createResource, hasKind, jsonViewText, openFormTab, openKind, openTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -1120,7 +1120,7 @@ test.describe('the author builds the asset management application with Studio on
       ['name', 'name'],
       ['warrantyEnd', 'warrantyEnd'],
     ]) {
-      await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+      await addMapping(values)
       await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
       const value = page.getByTestId(`studio-field-/steps/0/message/values/${placeholder}`)
       await expect(value.locator('.cm-editor')).toBeVisible()
