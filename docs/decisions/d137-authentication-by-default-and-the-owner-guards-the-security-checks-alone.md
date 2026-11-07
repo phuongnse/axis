@@ -4,9 +4,10 @@ Status: **Agreed**
 
 ## Context
 
-Each route calls the policy module itself, and nothing refuses a route that forgets to. The same kind
-of AI model writes and reviews the code, so the review shares the writer's blind spots, and the
-easiest way to turn a red check green is to add an exception to it.
+Each route that serves an application to its users calls the policy module itself, and nothing
+refuses one that forgets to. The same kind of AI model writes and reviews the code, so the review
+shares the writer's blind spots, and the easiest way to turn a red check green is to add an
+exception to it.
 
 Autopilot merges NexKit's pull requests by itself, and a pull request that needs the owner's review
 waits until the owner reads it. Most changes to a check tighten it, such as a baseline that goes down
