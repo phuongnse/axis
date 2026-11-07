@@ -51,8 +51,9 @@ flowchart LR
     API --> Files["Application folder files"]
 ```
 
-The author uses Studio, Studio calls the authoring API, and the API writes the folder's files. Each
-step keeps the same contracts as the files, so the result is always valid configuration.
+The author uses Studio, Studio calls the authoring API, and the API writes the folder's files. Studio
+writes the same files a person could write by hand, so it can save a mistake. The check before
+publishing reports each problem it finds, and a folder with an error gets no release.
 
 The detail is in [Studio](reference/studio.md) and [the authoring API](reference/authoring.md).
 [D5](decisions/d5-configuration-is-authored-as-files-first.md) says the visual editor writes the
