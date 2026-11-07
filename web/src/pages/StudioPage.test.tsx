@@ -521,8 +521,8 @@ describe('StudioPage', () => {
     const panel = await openProblems()
     expect(within(panel).getByText('AXC0101')).toBeInTheDocument()
     expect(within(panel).getByText('The field type is unknown.')).toBeInTheDocument()
-    expect(within(panel).getByText(/entities\/purchase-request\.json · Path: \/fields\/0\/type/)).toBeInTheDocument()
-    expect(within(panel).getByText(/application\.json · Path: \/description/)).toBeInTheDocument()
+    expect(within(panel).getByText(/entities\/purchase-request\.json, Path: \/fields\/0\/type/)).toBeInTheDocument()
+    expect(within(panel).getByText(/application\.json, Path: \/description/)).toBeInTheDocument()
   })
 
   it('selects the resource of a clicked diagnostic and shows its file', async () => {
@@ -915,7 +915,7 @@ describe('StudioPage', () => {
     const [department, label] = within(uses).getAllByTestId('studio-reference')
     expect(department).toHaveTextContent('field target')
     expect(department).toHaveTextContent('Department')
-    expect(department).toHaveTextContent('entities/purchase-request.json · Path: /fields/3/target')
+    expect(department).toHaveTextContent('entities/purchase-request.json, Path: /fields/3/target')
     expect(label).toHaveTextContent('label text')
     expect(label).toHaveTextContent('purchaseRequest.label')
     expect(within(screen.getByTestId('studio-used-by')).getByText('None.')).toBeInTheDocument()

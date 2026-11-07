@@ -197,7 +197,7 @@ Every add, move and remove has a keyboard way, and a hidden live region says wha
   transition menu also names its branch or outcome. A move names the step now before the moved step, such
   as "Step financeCheck moved after submit", and a step moved to the first place in `steps` says "Step
   financeCheck moved to the start". That place is the top of the list, not the process's `start` step.
-- **Parts of a name join with a comma** _(planned for M31)_. A node's name and type, an edge's steps and
+- **Parts of a name join with a comma**. A node's name and type, an edge's steps and
   its branch or outcome, and a transition menu's choice join as peers, as in "financeCheck to
   markApproved, otherwise" and "managerApproval, approve now goes to done", see
   [text](actions-and-controls.md#text).

@@ -7,8 +7,8 @@ import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
- * The slim footer across the bottom of every site. At the start it holds the copyright, with the server's version
- * for a signed-in person only. At the end it holds the legal line: Privacy and Terms when `legal` gives their
+ * The slim footer across the bottom of every site. At the start it holds the copyright and, for a signed-in person
+ * only, the server's version beside it. At the end it holds the legal line: Privacy and Terms when `legal` gives their
  * addresses, and Licences always.
  */
 export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
@@ -28,7 +28,7 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
     return () => controller.abort()
   }, [])
 
-  const copyright = `© ${year} Axis${version != null ? ` · v${version}` : ''}`
+  const copyright = `© ${year} Axis`
 
   return (
     <Layout.Footer
@@ -41,6 +41,7 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
     >
       <LegalLine
         copyright={copyright}
+        version={version != null ? `v${version}` : undefined}
         links={{
           privacyUrl: legal?.privacyUrl ?? undefined,
           termsUrl: legal?.termsUrl ?? undefined,

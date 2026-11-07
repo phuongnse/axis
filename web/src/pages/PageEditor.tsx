@@ -395,7 +395,7 @@ function WidgetRow({
     const name = partLabel(list.part)
     if (name !== undefined && list.part.kind === 'column' && Array.isArray(container?.columns)) {
       const column = container.columns[list.part.index]
-      return isContent(column) && typeof column.width === 'number' ? `${name} · ${column.width}` : name
+      return isContent(column) && typeof column.width === 'number' ? `${name}, ${column.width}` : name
     }
     return name
   }
@@ -813,7 +813,7 @@ function ParameterBindings({
           )
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
-              <Typography.Text type="secondary">{`${parameter.name} · ${parameter.type}`}</Typography.Text>
+              <Typography.Text type="secondary">{`${parameter.name}, ${parameter.type}`}</Typography.Text>
               <ReferencePicker
                 name={parameter.name}
                 value={typeof current === 'string' ? current : undefined}
@@ -1504,7 +1504,7 @@ function ParameterExpressions({
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
               <Typography.Text type="secondary">
-                {`${parameter.name} · ${parameter.type}${parameter.required ? ` · ${t('shell.studio.page.parameterRequired').toLowerCase()}` : ''}`}
+                {`${parameter.name}, ${parameter.type}${parameter.required ? `, ${t('shell.studio.page.parameterRequired').toLowerCase()}` : ''}`}
               </Typography.Text>
               {expression(rowPointer, typeof current === 'string' ? current : '')}
             </div>

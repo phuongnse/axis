@@ -368,7 +368,7 @@ function CanvasWidgetFrame({
       data-path={path}
       data-marked={marked ? 'true' : undefined}
       data-drop-over={droppable.isOver ? 'true' : undefined}
-      aria-label={marked ? `${label} · ${t('shell.studio.design.hasDiagnostics')}` : label}
+      aria-label={marked ? `${label}, ${t('shell.studio.design.hasDiagnostics')}` : label}
       aria-current={selected ? 'true' : undefined}
       tabIndex={path === undefined ? undefined : 0}
       onKeyDown={(event) => {

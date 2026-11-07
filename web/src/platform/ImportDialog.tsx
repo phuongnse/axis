@@ -179,7 +179,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
   const describe = (error: ImportError): string => {
     switch (error.kind) {
       case 'field':
-        return `${t('shell.table.importRow')} ${error.row} · ${label(error.field)}: ${error.message}`
+        return `${t('shell.table.importRow')} ${error.row}, ${label(error.field)}: ${error.message}`
       case 'row':
         return `${t('shell.table.importRow')} ${error.row}: ${error.message}`
       case 'column':

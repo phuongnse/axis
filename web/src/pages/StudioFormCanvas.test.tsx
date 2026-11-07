@@ -347,18 +347,18 @@ describe('the Design tab of a form', () => {
     const canvas = await openDesign()
     const steps = await screen.findByTestId('studio-form-steps', {}, slow)
     await waitFor(
-      () => expect(within(steps).getByText(/Describe the problem · has diagnostics/)).toBeInTheDocument(),
+      () => expect(within(steps).getByText(/Describe the problem, has diagnostics/)).toBeInTheDocument(),
       slow,
     )
     expect(within(steps).getByText(/Describe the problem/)).toHaveAttribute('data-marked', 'true')
     expect(within(steps).getByText('Add details')).not.toHaveAttribute('data-marked')
 
     await userEvent.click(within(steps).getByText('Add details'))
-    const field = await within(canvas).findByRole('group', { name: 'resolution · has diagnostics' }, slow)
+    const field = await within(canvas).findByRole('group', { name: 'resolution, has diagnostics' }, slow)
     expect(field).toHaveAttribute('data-marked', 'true')
     expect(field).toHaveAttribute('data-path', '/sections/1/fields/1')
     expect(within(canvas).getByRole('group', { name: 'status' })).not.toHaveAttribute('data-marked')
-    expect(within(canvas).getByRole('group', { name: 'The details · has diagnostics' })).toHaveAttribute(
+    expect(within(canvas).getByRole('group', { name: 'The details, has diagnostics' })).toHaveAttribute(
       'data-marked',
       'true',
     )

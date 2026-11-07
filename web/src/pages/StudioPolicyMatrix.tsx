@@ -87,9 +87,7 @@ export function StudioPolicyMatrixTable({
       title: (
         <Flex vertical>
           <span>{item.name}</span>
-          <Typography.Text type="secondary">
-            {item.module ? `${item.kind} · ${item.module}` : item.kind}
-          </Typography.Text>
+          <Typography.Text type="secondary">{item.module ? `${item.kind}, ${item.module}` : item.kind}</Typography.Text>
         </Flex>
       ),
       render: (_: unknown, row: StudioMatrixRole) => (
@@ -221,7 +219,7 @@ function GrantPanel({
   return (
     <section data-testid="studio-matrix-grants">
       <Typography.Title level={5}>
-        {t('shell.studio.matrix.grants')} {role.name} · {target.name}
+        {t('shell.studio.matrix.grants')} {role.name}, {target.name}
       </Typography.Title>
       {!role.editable && cell.grants.length === 0 && (
         <Typography.Text type="secondary">{t('shell.studio.matrix.noGrants')}</Typography.Text>

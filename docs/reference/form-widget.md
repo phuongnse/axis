@@ -317,7 +317,7 @@ A new record has no history panel.
   outcome, then the step. An entry whose details name none of them has no summary. Outcome and step
   names show as declared, such as `approve`. Comments and other field values are never shown, because
   audit records never hold them.
-- **Summary lines** _(planned for M31)_. In the summary the field labels are joined by commas, and the
+- **Summary lines**. In the summary the field labels are joined by commas, and the
   task outcome and the step each take a line of their own, never joined by a separator, see
   [text](actions-and-controls.md#text).
 - **Open instance.** An entry whose `inspectPath` is not `null` links to the instance page of the first

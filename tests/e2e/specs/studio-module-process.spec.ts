@@ -96,10 +96,10 @@ test.describe("Studio edits a module process as a layer", () => {
       page.getByRole("note", { name: "Changed check", exact: true }),
     ).toBeVisible();
     await expect(page.getByTestId("studio-graph-node-2")).toHaveAccessibleName(
-      "end1 · end · Added",
+      "end1, end, Added",
     );
     await expect(page.getByTestId("studio-graph-node-0")).toHaveAccessibleName(
-      /· Changed$/,
+      /, Changed$/,
     );
     await expect(
       page.locator('[data-testid^="studio-graph-node-"]'),

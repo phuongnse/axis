@@ -56,5 +56,5 @@ export function landedText(
 ): string {
   const path = widgetLists(widgets).find((item) => item.pointer === list)?.path ?? []
   const label = [t('shell.studio.page.pageList'), ...path.flatMap((step) => stepLabels(step, partLabel))].join(' › ')
-  return `${t(verbKey)} ${type} · ${label} · ${t('shell.studio.palette.position')} ${index + 1}`
+  return `${t(verbKey)} ${type}, ${label}, ${t('shell.studio.palette.position')} ${index + 1}`
 }

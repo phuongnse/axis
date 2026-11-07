@@ -58,14 +58,14 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
   const t = useText()
   const { colour, radius } = useDesignTokens()
   const mark = data.layerMark === undefined ? undefined : t(`shell.studio.module.${data.layerMark}`)
-  const label = `${data.name} · ${data.type}${mark === undefined ? '' : ` · ${mark}`}`
+  const label = `${data.name}, ${data.type}${mark === undefined ? '' : `, ${mark}`}`
   return (
     <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
       <button
         type="button"
         data-testid={`studio-graph-node-${data.index}`}
-        aria-label={data.marked ? `${label} · ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
+        aria-label={data.marked ? `${label}, ${t('shell.studio.processGraph.hasDiagnostics')}` : label}
         aria-current={data.current ? 'true' : undefined}
         data-marked={data.marked ? 'true' : undefined}
         style={{

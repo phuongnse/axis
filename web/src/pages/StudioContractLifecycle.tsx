@@ -105,13 +105,13 @@ export default function StudioContractLifecycle({ states, edges }: { states: Con
           (edge) => states.some((state) => state.name === edge.from) && states.some((state) => state.name === edge.to),
         )
         .map((edge): Edge => {
-          const label = `${edge.name} · ${edge.guard ? guard : noGuard}`
+          const label = `${edge.name}, ${edge.guard ? guard : noGuard}`
           return {
             id: edge.id,
             source: edge.from,
             target: edge.to,
             label,
-            ariaLabel: `${edge.from} ${to} ${edge.to} · ${label}`,
+            ariaLabel: `${edge.from} ${to} ${edge.to}, ${label}`,
             style: { stroke: colour.textMuted },
             markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
             labelStyle: { fill: colour.text },

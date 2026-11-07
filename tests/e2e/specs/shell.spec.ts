@@ -257,12 +257,13 @@ test('the footer shows the version only to a signed-in person', async ({ page })
   const footer = page.getByRole('contentinfo')
   await expect(footer).toContainText(`© ${year} Axis`)
   await expect(footer).not.toContainText('Server status')
-  await expect(footer).not.toContainText(' · v')
+  await expect(footer.getByText(/^v\S+$/)).toHaveCount(0)
 
   await useSession(page, 'requester')
   await page.goto('/')
 
-  await expect(page.getByRole('contentinfo')).toContainText(new RegExp(`© ${year} Axis · v\\S+`))
+  await expect(footer).toContainText(`© ${year} Axis`)
+  await expect(footer.getByText(/^v\S+$/)).toHaveCount(1)
 })
 
 test('the footer ends with the Legal landmark that holds a Licences link', async ({ page }) => {

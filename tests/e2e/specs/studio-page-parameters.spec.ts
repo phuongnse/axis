@@ -200,7 +200,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await pick(page, `${action}/page`, "DepartmentDetail");
     await writeTexts(page, `${action}/label`, "Details", "Chi tiết");
     const parameter = page.getByTestId(`${action}/parameters/department`);
-    await expect(parameter).toContainText("department · reference · required");
+    await expect(parameter).toContainText("department, reference, required");
     await parameter.getByRole("textbox").fill("id");
     await save(page);
 

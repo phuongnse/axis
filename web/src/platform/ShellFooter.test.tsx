@@ -63,7 +63,9 @@ describe('the shell footer', () => {
     vi.mocked(fetchAboutVersion).mockResolvedValue('1.2.3')
     renderFooter()
 
-    expect(await screen.findByText(`© ${year} Axis · v1.2.3`)).toBeInTheDocument()
+    const version = await screen.findByText('v1.2.3')
+    expect(version).toBeInTheDocument()
+    expect(version.parentElement).toBe(screen.getByText(`© ${year} Axis`).parentElement)
   })
 
   it('shows no version when nobody is signed in', async () => {
@@ -71,6 +73,6 @@ describe('the shell footer', () => {
 
     expect(await screen.findByText(`© ${year} Axis`)).toBeInTheDocument()
     expect(fetchAboutVersion).toHaveBeenCalled()
-    expect(screen.queryByText(/· v/)).toBeNull()
+    expect(screen.queryByText(/^v\d/)).toBeNull()
   })
 })

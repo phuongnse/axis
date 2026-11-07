@@ -1,5 +1,5 @@
 import { Flex, Progress, Tag, Typography } from 'antd'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { TenantUsageDayTable } from '../platform/TenantUsageDayTable'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -44,16 +44,15 @@ export function TenantUsageSection() {
   function quotaRow(key: string, { limit, used }: TenantQuotaUse) {
     const name = t(`shell.users.usage.quota.${key}`)
     const atLimit = limit !== null && used !== null && used >= limit
-    let detail: ReactNode
+    let lines: string[]
     if (limit === null) {
-      detail =
-        used === null ? t('shell.users.usage.noLimit') : `${t('shell.users.usage.noLimit')} · ${amount(key, used)}`
+      lines = used === null ? [t('shell.users.usage.noLimit')] : [t('shell.users.usage.noLimit'), amount(key, used)]
     } else if (used === null) {
-      detail = amount(key, limit)
+      lines = [amount(key, limit)]
     } else {
-      detail = t('shell.users.usage.usedOfLimit')
-        .replace('{used}', amount(key, used))
-        .replace('{limit}', amount(key, limit))
+      lines = [
+        t('shell.users.usage.usedOfLimit').replace('{used}', amount(key, used)).replace('{limit}', amount(key, limit)),
+      ]
     }
     return (
       <Flex key={key} vertical gap="small" data-testid={`tenant-usage-quota-${key}`}>
@@ -62,7 +61,11 @@ export function TenantUsageSection() {
           <Progress percent={atLimit ? 100 : (used / limit) * 100} showInfo={false} aria-label={name} />
         )}
         <Flex gap="small" align="center" wrap>
-          <Typography.Text>{detail}</Typography.Text>
+          <Flex vertical>
+            {lines.map((line, index) => (
+              <Typography.Text key={index}>{line}</Typography.Text>
+            ))}
+          </Flex>
           {atLimit && (
             <Tag
               variant="outlined"

@@ -158,7 +158,7 @@ export default function StudioProcessDesign({
     onChange(edit.pointer, edit.value)
     setPending(null)
     setAnnouncement(
-      `${nameOf(source)}${label ? ` · ${label}` : ''} ${t('shell.studio.process.nowGoesTo')} ${nameOf(target)}`,
+      `${nameOf(source)}${label ? `, ${label}` : ''} ${t('shell.studio.process.nowGoesTo')} ${nameOf(target)}`,
     )
   }
 

@@ -47,11 +47,11 @@ export function actionKeyOf(pointer: string): string | undefined {
 /** The properties of a widget that name what it shows, in the order the summary prefers them. */
 const summaryKeys = ['entity', 'dataSource', 'form', 'process']
 
-/** A widget's type and the first name it binds, such as `table · PurchaseRequestList`. */
+/** A widget's type and the first name it binds, such as `table, PurchaseRequestList`. */
 export function widgetSummary(widget: Record<string, unknown>): string {
   const type = typeof widget.type === 'string' ? widget.type : ''
   const name = summaryKeys.map((key) => widget[key]).find((value) => typeof value === 'string' && value !== '')
-  return [type, name].filter((part) => typeof part === 'string' && part !== '').join(' · ')
+  return [type, name].filter((part) => typeof part === 'string' && part !== '').join(', ')
 }
 
 /**

@@ -41,7 +41,7 @@ export function insertField(
   onChange(`/sections/${place.section}/fields`, [...fields.slice(0, index), { field: name }, ...fields.slice(index)])
   onSelect(`/sections/${place.section}/fields/${index}`)
   onAnnounce(
-    `${t('shell.studio.palette.inserted')} ${name} · ${sectionLabel(t, draft, place.section)} · ${t('shell.studio.palette.position')} ${index + 1}`,
+    `${t('shell.studio.palette.inserted')} ${name}, ${sectionLabel(t, draft, place.section)}, ${t('shell.studio.palette.position')} ${index + 1}`,
   )
 }
 
@@ -68,7 +68,7 @@ export function moveFieldTo(
   onChange('/sections', result.sections)
   onSelect(`/sections/${section}/fields/${index}`)
   onAnnounce(
-    `${t('shell.studio.palette.moved')} ${name} · ${sectionLabel(t, draft, section)} · ${t('shell.studio.palette.position')} ${index + 1}`,
+    `${t('shell.studio.palette.moved')} ${name}, ${sectionLabel(t, draft, section)}, ${t('shell.studio.palette.position')} ${index + 1}`,
   )
 }
 
@@ -101,7 +101,7 @@ export function removeField(
     fields.filter((_, index) => index !== place.index),
   )
   onSelect(`/sections/${place.section}`)
-  onAnnounce(`${t('shell.studio.design.removed')} ${name} · ${sectionLabel(t, draft, place.section)}`)
+  onAnnounce(`${t('shell.studio.design.removed')} ${name}, ${sectionLabel(t, draft, place.section)}`)
 }
 
 /**
@@ -128,14 +128,14 @@ export function moveSectionTo(
   const named = step === undefined || !Array.isArray(step.sections) ? [] : (step.sections as unknown[])
   const position = step === undefined ? result.index : named.findIndex((name) => name === label)
   const where =
-    to.step === null ? '' : ` · ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`}`
+    to.step === null ? '' : `, ${typeof textKey === 'string' && textKey !== '' ? t(textKey) : `/steps/${to.step}`}`
   onChange('/sections', result.sections)
   if (result.steps !== undefined) {
     onChange('/steps', result.steps)
   }
   onSelect(`/sections/${result.index}`)
   onAnnounce(
-    `${t('shell.studio.palette.moved')} ${label}${where} · ${t('shell.studio.palette.position')} ${position + 1}`,
+    `${t('shell.studio.palette.moved')} ${label}${where}, ${t('shell.studio.palette.position')} ${position + 1}`,
   )
 }
 
