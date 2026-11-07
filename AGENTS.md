@@ -13,50 +13,46 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - [Concepts](docs/domain/concepts.md) is the vocabulary. Use its terms in code, APIs and UI.
 - [Knowledge](docs/domain/knowledge.md) says why the design rules exist. Check it before you change
   configuration, execution, storage or security behaviour.
-- [Development](docs/development.md) covers running Axis locally, ports and test data: the four
-  samples (purchase requests, leave requests, the service desk and asset management), the realm users for each
-  sample's roles in the [development users table](docs/reference/security.md#development-users),
-  the built-in applications in `artifacts/templates`, the `Studio:ApplicationsPath` folder where Studio
-  creates applications, and the `axis_scenario` role that runs Studio's test scenarios.
+- [Development](docs/development.md) covers running Axis locally, the ports, the samples and their
+  development users, and the test data.
 
 ## Working rules
 
+### Docs and decisions
+
 - Use English for code, comments, configuration, commit messages, issues and docs. The owner may
   write in Vietnamese.
-- Docs are the source of truth. An issue links the doc section it implements and does not copy it.
-  A plan and a pull request have a `Docs:` line naming the sections they change, or why none. A change
-  fixes every doc statement it makes false, removes the planned marker of what it builds and greps the
-  docs for each name it renames or removes. Follow [how the docs stay correct](docs/writing-docs.md#how-the-docs-stay-correct);
-  a review checks the docs diff against the code diff.
-- A comment in the code links the reference section that holds its rule or cites a decision in force,
-  and names no milestone, see [references in the code](docs/writing-docs.md#references-in-the-code).
+- Docs are the source of truth, and an issue links the doc section it implements rather than copying
+  it. A change keeps every doc true, as [how the docs stay correct](docs/writing-docs.md#how-the-docs-stay-correct) says.
 - Keep the decision status words exact: **Agreed** means agreed and **Proposed** means still open.
   Never present a proposal as agreed.
-- One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test
-  or command verifies. Its text names the concepts it touches. See
-  [the life of an issue](docs/delivery.md#the-life-of-an-issue).
-- Build in vertical slices. Every behaviour change needs a test, and a removal needs none, see
-  [testing](docs/testing.md): real PostgreSQL through Testcontainers for storage and
-  engine behaviour, Playwright for UI journeys. Test denied access as well as allowed access.
-- Keep AGENTS.md to rules, not details: a rule takes at most five lines and links the doc that holds the rest.
-- One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a
-  shared widget, see [shared widgets](docs/reference/shared-widgets.md).
-- Write each locale of a screen's text for its purpose, not as a translation of the English, and name concepts by the
-  [glossary](docs/reference/ui-glossary.json). A new term goes in the
-  [proposed glossary](docs/reference/ui-glossary-proposed.json) and the owner moves it to the approved one, see
-  [UI writing](docs/reference/ui-writing.md#the-glossary).
-- No application-specific code in the platform. Sample applications live under `samples/apps/`,
-  extension packages under `samples/packages/`, modules under `samples/modules/` and templates
-  under `samples/templates/`.
-  Built-in modules live under `modules/` and built-in applications under `applications/`, see
-  [D102](docs/decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+- A comment in the code links the reference section that holds its rule, or cites a decision in force.
+- Write each locale of a screen's text for its purpose, not as a translation, and name concepts by the
+  [glossary](docs/reference/ui-glossary.json), see [UI writing](docs/reference/ui-writing.md#the-glossary).
+- AGENTS.md holds only what [short agent instructions](docs/writing-docs.md#structure) allow.
+
+### Code
+
+- One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork
+  or work round a [shared widget](docs/reference/shared-widgets.md).
+- No application-specific code in the platform. Samples, modules and templates live where
+  [repository layout](docs/repository-layout.md#repository-layout) shows.
 - Never commit secrets, tokens, local logs or machine snapshots.
-- On GitHub, follow [writing on GitHub](docs/delivery.md#writing-on-github). Name the role that
-  acts, never a development user.
+
+### Tests
+
+- Build in vertical slices. Every behaviour change needs a test, and a removal needs none, see
+  [testing](docs/testing.md#rules-for-tests). Test denied access as well as allowed access.
+
+### GitHub and NexKit
+
+- One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test or
+  command verifies. Its text names the concepts it touches, see
+  [the life of an issue](docs/delivery.md#the-life-of-an-issue).
+- On GitHub, follow [writing on GitHub](docs/delivery.md#writing-on-github). Name the role that acts,
+  never a development user.
 - All work goes through NexKit, see [delivery](docs/delivery.md). Changes in paths NexKit may not
   change, and the docs change that ends a design review, are hand-made pull requests.
-- When merging `main` brings a decision with the number yours uses, keep `main`'s and move yours
-  to the next free number, with its row in `docs/decisions.md` and every link to it.
 
 ## Commands
 

@@ -7,6 +7,7 @@
 // Prints one line per problem on stderr as file:line and exits 1 when there is any.
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkAgents } from './lib/docs/agents.mjs'
 import { checkAsvs } from './lib/docs/asvs.mjs'
 import { checkDecisions } from './lib/docs/decisions.mjs'
 import { checkCodeReferences } from './lib/docs/code-references.mjs'
@@ -21,6 +22,7 @@ const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 
 export const rules = [
   checkSizes,
+  checkAgents,
   checkDocsMap,
   checkAsvs,
   checkThreatTables,
@@ -47,7 +49,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the decisions, sections and milestones the code cites and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the decisions, sections and milestones the code cites and the doc and skill sizes, the AGENTS.md word limits and the scripts it names are in order.')
   return 0
 }
 

@@ -74,6 +74,9 @@ it change. It never holds progress, dates, names or issue numbers.
   the index names the decision, or decisions, that superseded it, as `Superseded by Dn`, with a link to
   its last text in git, and every reference page, link and citation in the code follows the new decision,
   as [references in the code](#references-in-the-code) says. A number is never used again.
+- **A branch that clashes with a decision on `main` renumbers its own.** When `main` brings a decision
+  with the number the branch uses, the branch keeps `main`'s and moves its own to the next free number,
+  with its row in [the index](decisions.md) and every link to it.
 
 ## Reference pages
 
@@ -158,9 +161,13 @@ pull requests rarely edit the same lines.
   base for "grows" is the `NEXKIT_BASE_SHA` commit when NexKit sets it, else the merge base with
   `origin/main`.
 - **Short agent instructions.** [AGENTS.md](../AGENTS.md) holds only where to look, the working rules
-  and the commands, in at most 100 lines, and `CLAUDE.md` only imports it. A skill's `SKILL.md` stays
-  at or under 250 lines. A skill does not describe an external tool's behaviour that the tool's own
-  docs cover at the version the repository pins.
+  and the commands. A line belongs in it only when almost every session needs it, an agent would get
+  it wrong without it, and it is a sentence that links the doc holding its detail, not a copy of that
+  detail. The file holds at most 800 words and has no line limit, and a rule, a bullet with its
+  continuation lines, holds at most 60 words, because every session reads the whole file and a long
+  line dodges a line count. `CLAUDE.md` only
+  imports it. A skill's `SKILL.md` stays at or under 250 lines. A skill does not describe an external
+  tool's behaviour that the tool's own docs cover at the version the repository pins.
 - **Stable links.** Link to a file, or to a heading in it, never to text that changes with status.
   Renaming or moving a heading changes its anchor, so the same change fixes every link to it.
 - **The architecture page follows arc42.** [Architecture](architecture.md) holds, in this order,
@@ -249,8 +256,8 @@ every pull request, the tests, and an audit every hundred merges, as
      the repository.
    - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
      doc, that the decisions index matches the decision files and that a superseded row names a live
-     decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size limits, the
-     [ASVS](reference/asvs.md#requirements) and threat model tables, and the
+     decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
+     limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
      [development users](reference/security.md#development-users) table against the development
      realm. It also checks the decisions that the code and the docs cite, the sections the code links and
      the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one

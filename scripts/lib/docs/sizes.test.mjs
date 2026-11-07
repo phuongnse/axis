@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
-import { checkSizes, maxAgentsLines, maxAgentsRuleLines, maxDocLines, maxGrownDocLines, maxSkillLines } from './sizes.mjs'
+import { checkSizes, maxDocLines, maxGrownDocLines, maxSkillLines } from './sizes.mjs'
 import { useTempRoot } from './testing.mjs'
 
 const fixture = useTempRoot()
@@ -14,23 +14,12 @@ describe('sizes', () => {
     write('docs/reference/guide.md', '# Guide\n')
   })
 
-  test('reports a doc and AGENTS.md over their size limits', () => {
+  test('reports a doc over its size limit', () => {
     write('docs/reference/guide.md', '# Guide\n' + 'line\n'.repeat(maxDocLines))
-    write('AGENTS.md', 'line\n'.repeat(maxAgentsLines + 1))
 
     const found = messages()
-    assert.equal(found.length, 2)
+    assert.equal(found.length, 1)
     assert.match(found[0], /^docs\/reference\/guide\.md:1001: 1001 lines, over the limit of 1000/)
-    assert.match(found[1], /^AGENTS\.md:101: 101 lines, over the limit of 100/)
-  })
-
-  test('reports a rule of AGENTS.md that runs over its lines, and passes one at the limit', () => {
-    const rule = (count) => '- A rule.\n' + '  more\n'.repeat(count - 1)
-    write('AGENTS.md', `# Agents\n\n${rule(maxAgentsRuleLines)}\n${rule(maxAgentsRuleLines + 1)}`)
-
-    assert.deepEqual(messages(), [
-      `AGENTS.md:${3 + maxAgentsRuleLines + 1}: a rule of ${maxAgentsRuleLines + 1} lines, over the limit of ${maxAgentsRuleLines}: keep the rule short and link the doc that holds the detail`,
-    ])
   })
 
   test('reports a doc over 1,000 lines once, with or without a base', () => {
