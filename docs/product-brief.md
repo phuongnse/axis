@@ -1,14 +1,30 @@
 # Axis product brief
 
-This page says what Axis is, who it serves, how it runs and which goals it holds itself to. It ends
-with the four sample applications that prove the platform. Each sample runs under `scripts/dev.sh`,
-Docker Compose and the E2E run, and CI runs its scenarios. Milestones and their status are in the
-[roadmap](roadmap.md), and the vocabulary is in [concepts](domain/concepts.md).
+This page explains what Axis is for, who it serves, how it runs and which goals it holds itself to.
+It ends with four sample business applications that prove the platform. Milestones and their status
+are in the [roadmap](roadmap.md), and the vocabulary is in [concepts](domain/concepts.md).
+
+## What Axis is for
+
+Many businesses run their approvals, requests and registers on spreadsheets and email. No
+off-the-shelf product fits that work exactly, and custom software costs a lot to build and to change
+each time the work changes.
+
+For example, a purchase request above a set amount may need a second approval. Changing a rule like
+that means waiting for a developer, or handling it by hand.
+
+Axis lets a business build that software itself. The business describes it as configuration, which is
+a set of files that hold the application's data, pages, rules and approvals. An **application** is one
+such business app, such as purchase requests. An **author** is the person who builds it, such as an
+office manager. The author describes the application in Studio, Axis's visual editor, and Axis checks
+the description. Axis then publishes it as a **release**, a fixed copy that never changes, and runs
+that release for the people who use it.
 
 ## What Axis is
 
-Axis is an enterprise application platform for building and running business applications of any
-domain through configuration. An application is a set of typed resources:
+This section says what an application is made of and how Axis runs it. Axis is an enterprise
+application platform for building and running business applications of any domain through
+configuration. An application is a set of resources, each with a fixed type:
 
 - entities and fields
 - data sources
@@ -19,35 +35,34 @@ domain through configuration. An application is a set of typed resources:
 - policies
 - text resources
 
-Axis validates these resources, compiles them into an immutable **release** and runs the release on
-shared engines. Publishing an application, or changing one, never needs a platform source change or
-an application-specific build, and no domain gets platform code, as
-[D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) explains.
+Axis checks these resources, compiles them into an immutable **release** and runs the release on
+shared engines. Publishing an application, or changing one, never needs a change to Axis's source code
+or a build made for that application. The platform holds no code for any one domain.
 
-When a requirement cannot be expressed in configuration, it is written as an **extension package**:
-versioned, tested C# code that adds typed operations under explicit capability limits. The package is
-built and deployed on its own, apart from the configuration, see
-[D7](decisions/d7-custom-code-lives-in-extension-packages.md).
+When a requirement cannot be expressed as configuration, it is written as an **extension package**. An
+extension package is versioned, tested C# code that adds typed operations within the capabilities it
+declares. The package is built and deployed on its own, apart from the configuration.
 
 An author creates, configures, tests, publishes and runs an application through Studio, without
-editing JSON or code. The files stay the source of truth, see
-[D5](decisions/d5-configuration-is-authored-as-files-first.md).
+editing JSON or code. The files stay the source of truth, the master copy of the application.
 
-Axis ships built-in modules: standard processes, such as approvals, that a business builds its
-application from instead of starting from scratch. A business changes any part of a module in a layer
-of its own application, while the module's contract, bound to its data, holds on every write. The
-reasons are in
-[D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md), and the modules in
-[built-in modules](reference/built-in-modules.md).
+Axis ships built-in **modules**. A module is a standard business process, such as approvals, that a
+business builds its application from instead of starting from scratch. A business changes any part of
+a module in a layer of its own application. The module's contract, bound to its data, still holds on
+every write. The modules are listed in [built-in modules](reference/built-in-modules.md).
 
 - **A service desk and an asset register** _(planned for M30)_. They join the built-in modules, each
   with a built-in application that uses it.
 
+The reasons are in [D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md),
+[D7](decisions/d7-custom-code-lives-in-extension-packages.md),
+[D5](decisions/d5-configuration-is-authored-as-files-first.md) and
+[D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+
 ## Who Axis serves first
 
 Axis serves individuals and small and medium businesses first, and large organizations, banks and
-government later. The roadmap's phases follow this order, and the reasons are in
-[D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md).
+government later. The roadmap's phases follow this order.
 
 The first customers are an individual, or a small or medium business, that runs its internal work on
 Axis, such as approvals, requests and registers. They have no IT team and no operations team: a
@@ -59,28 +74,33 @@ They need:
 - **Axis as a service** _(planned for M31)_, with nothing to install.
 - **Sign-up and a trial** _(planned for M33)_, so they try Axis before they pay.
 - **Paying online** _(planned for M34)_.
-- **Their data kept safe** as Vietnam's personal data rules ask, see
-  [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- **Their data kept safe** as Vietnam's personal data rules ask.
 
 What sets Axis apart for them is that they change a standard process anywhere, keep its upgrades,
 and its core rules still hold on every write.
 
 - **Changes described in words** _(planned for M35)_. An author describes a change in words, and an
-  agent makes it under the same rules, see [D119](decisions/d119-ai-authoring-in-studio.md).
+  agent makes it under the same rules.
 - **What large organizations, banks and government ask for** _(planned for M32)_. Conformance runs,
   signed images and alert rules for their own operations teams.
 
+The reasons are in [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md),
+[D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
+[D119](decisions/d119-ai-authoring-in-studio.md).
+
 ## Ways to run Axis
 
-The same software runs in three ways, as
-[D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) explains.
+The same software runs in three ways.
 
-- **SaaS, shared** _(planned for M31)_. Many customers share a cell, a full installation in a region
-  that Axis runs. Each tenant keeps its own database, realm, files, Studio applications and quotas.
-  This is how small businesses and individuals use Axis.
+- **SaaS, shared** _(planned for M31)_. Many customers share a cell, which is one full installation of
+  Axis in a region that Axis runs. Each tenant, one customer's own space in the cell, keeps its own
+  database, sign-in realm, files, Studio applications and quotas. Quotas are its limits on storage,
+  users and applications. This is how small businesses and individuals use Axis.
 - **SaaS, dedicated** _(planned for M31)_. One customer has a cell of its own that Axis runs.
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
+
+The reasons are in [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
 
 ## Who uses it
 
@@ -101,15 +121,15 @@ These are the qualities that Axis aims for in everything it builds.
 1. **Complete applications through configuration.** Data, behaviour, UI and security are configured
    and enforced by the platform.
 2. **Reliable execution.** Accepted work is never silently lost. Running processes survive restarts
-   and keep the version they started on. Protected business effects, such as one purchase order per
+   and keep the version they started on. Effects that must not repeat, such as one purchase order per
    approved request, happen once.
-3. **Secure by default.** Authorization is server-side and default-deny, at resource, record, field
-   and action level. Configuration can never bypass it.
+3. **Secure by default.** The server checks every access and denies it unless a rule allows it, at
+   resource, record, field and action level. Configuration can never bypass these checks.
 4. **Visible execution.** Authorized users can see where a process is, what it did, with which
    inputs and outputs, and why it failed or is waiting.
 5. **Fast enough at realistic sizes.** Large applications, see
    [typical application size](domain/knowledge.md#typical-application-size), stay responsive to
-   author and to use. Every query and expression has a bounded cost.
+   author and to use. Every query and expression has a fixed upper limit on its cost.
 6. **Author-friendly.** Resources are readable files with stable identities, so people and AI agents
    can review, diff and edit them. Studio edits the same files through the same contracts.
 
@@ -121,9 +141,23 @@ extension points.
 - **Formal security certification.** Axis offers the FAPI 2.0 profile and tracks ASVS 5.0 Level 2.
   The conformance run and the ASVS sign-off, for large and regulated customers, are in a later phase
   of the [roadmap](roadmap.md#milestones).
-- **Custom UI widgets.** They come in phase 2, after the visual designers, see
-  [D8](decisions/d8-custom-ui-widgets-are-packaged-react-components.md).
+- **Custom UI widgets.** They come in phase 2, after the visual designers.
 - **Migrating live business data between installations.**
+
+The reasons are in [D8](decisions/d8-custom-ui-widgets-are-packaged-react-components.md).
+
+## The sample applications
+
+Four sample applications prove the platform. Each one is a complete business application built only as
+configuration, and each proves a different part of Axis. Each sample runs under `scripts/dev.sh`,
+Docker Compose and the E2E run, and CI runs its scenarios.
+
+| Sample                                         | What it proves                                                                                                    | Folder                            |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| [Purchase requests](#first-application-purchase-requests) | The whole platform: approvals, a call to another system and the extension points                       | `samples/apps/purchase-requests/` |
+| [Leave requests](#second-application-leave-requests)     | That the platform is reused with no platform code change                                                  | `samples/apps/leave-requests/`    |
+| [Service desk](#third-application-service-desk)           | That Studio alone builds a whole application, of a different shape                                        | `samples/apps/service-desk/`      |
+| [Asset management](#fourth-application-asset-management) | Data modeling: files, money, labelled enum values, many-to-many, references from child rows, import and export | `samples/apps/asset-management/`  |
 
 ## First application: purchase requests
 
@@ -158,8 +192,8 @@ application lives as configuration in `samples/apps/purchase-requests/` and is n
 
 The Purchasing site allows two sign-ins: accounts, and the organization's own identity provider,
 `company`. A person in that provider's `employees` group signs in through "Continue with Example
-Company" and gets the `employee` role. In development the `company` realm plays the organization's
-provider, see [the development realm](development.md#development-realm-and-users).
+Company" and gets the `employee` role. The development setup is in
+[the development realm](development.md#development-realm-and-users).
 
 ### Scenarios the application must pass
 
@@ -176,8 +210,7 @@ provider, see [the development realm](development.md#development-realm-and-users
 
 ### Extensibility
 
-Purchase requests prove the extensibility milestones, one step each, as
-[D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) explains.
+Purchase requests prove the extensibility milestones, one step each.
 
 1. **Modules.** The application declares the `department-budgets` module, which depends on the
    `organization` module, and maps its approver slot to the manager role.
@@ -189,20 +222,20 @@ Purchase requests prove the extensibility milestones, one step each, as
 5. **A webhook.** A signed webhook announces the approval, and a receiver that fails leaves a dead
    letter. The platform operator redelivers the dead letter from the console and sees it delivered.
 
+The reasons are in [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md).
+
 ## Second application: leave requests
 
 Leave requests are the second proving sample, smaller than the first and of the same shape. They
-show that the platform is reused with no platform code change, as
-[D41](decisions/d41-leave-requests-as-the-second-sample-application.md) explains. The application
-lives as configuration in `samples/apps/leave-requests/` and is not platform code.
+show that the platform is reused with no platform code change. The application lives as configuration
+in `samples/apps/leave-requests/` and is not platform code.
 
 ### Data
 
 - **Leave request**: number (sequence `LR-{yyyy}-{n:5}`), title, employee, department, leave type
   (`annual`, `sick` or `unpaid`), first day, last day, days (computed), reason, status and decision
-  comment. The title is required and is the display field, which labels the request in task lists.
-  The number cannot be the display field, because a sequence number cannot be required, and nor can
-  the reason, because it is `sensitive` and so stored encrypted.
+  comment. The title is required and is the display field, which labels the request in task lists,
+  see [resource files](reference/resource-files.md).
 - Days are calendar days, counting both ends: `daysBetween(firstDay, lastDay) + 1`. Weekends and
   holidays are not left out.
 - **Department**: comes from the built-in `organization` module, see
@@ -235,12 +268,14 @@ My leave requests, the request form and My tasks, in a site at path `leave`.
 - One Playwright journey: an employee submits, a department manager approves, and the employee sees
   the request approved.
 
+The reasons are in [D41](decisions/d41-leave-requests-as-the-second-sample-application.md).
+
 ## Third application: service desk
 
 The service desk is a sample of a different shape from the first two, and a Playwright journey builds
 it only through Studio. It lives as configuration in `samples/apps/service-desk/` and is not
-platform code. It is thin on purpose: it has no SLA calendars or business hours. The reasons are in
-[D56](decisions/d56-a-service-desk-as-the-third-sample-application.md).
+platform code. It is thin on purpose: it has no SLA (service level agreement) calendars or business
+hours.
 
 ### Data
 
@@ -327,13 +362,14 @@ The main Playwright journey proves that Studio alone builds a whole application.
 
 Another Playwright journey uses the sample at phone width.
 
+The reasons are in [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md).
+
 ## Fourth application: asset management
 
 Asset management is a register of the company's assets with a dashboard, of a shape none of the
 first three has. It proves the data modeling: files, money, labelled enum values, many-to-many,
 references from child rows, import and export. It lives as configuration in
-`samples/apps/asset-management/` and is not platform code. The reasons are in
-[D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
+`samples/apps/asset-management/` and is not platform code.
 
 ### Data
 
@@ -368,8 +404,7 @@ references from child rows, import and export. It lives as configuration in
 ### Pages
 
 The asset register, the asset form, the asset detail page and the dashboard, in a site at path
-`asset-management`. The path `assets` is reserved, because the SPA serves its bundle there. Texts are
-in `en` and `vi`.
+`asset-management`. Texts are in `en` and `vi`.
 
 - The dashboard has asset value by location in each currency, assets by status, and a KPI of
   warranties that end within 30 days.
@@ -396,3 +431,5 @@ compares it with the committed folder, runs its scenarios from Studio and publis
 JSON view for one scenario only, because the scenario editor cannot add a child-collection value. On
 the site, the asset manager registers an asset with an attachment and imports assets, and the
 auditor exports the register.
+
+The reasons are in [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).

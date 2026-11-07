@@ -153,7 +153,8 @@ A site belongs to one application, and its `path` and locales are checked here.
 - **Path.** A site's `path` is lower-case letters, digits and hyphens, starting with a letter. A
   path reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users` and
   `licences`), or one that an earlier site of the application already uses in path order, is
-  `AXC0024` at `/path`. A reserved path is not also checked for duplicates.
+  `AXC0024` at `/path`. A reserved path is not also checked for duplicates. `assets` is reserved
+  because the SPA serves its files under `/assets/`.
 - **Locales.** The `default` and `fallback` locales must be in `available`, and every available
   locale needs a `text` resource, ignoring letter case, otherwise it is `AXC0025`.
 - **Navigation.** A navigation entry must name a loaded page (`AXC0023`). Its optional `icon` must be
