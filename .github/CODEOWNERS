@@ -12,6 +12,8 @@
 /scripts/lib/accepted-findings.mjs @phuongnse
 /scripts/check-raw-html.mjs @phuongnse
 /scripts/check-prototype-pollution.mjs @phuongnse
+/web/.oxlintrc.json @phuongnse
+/web/lint/axis-plugin.mjs @phuongnse
 
 # The approved terms of Axis's screens. A pull request that changes one needs the owner's review, see
 # docs/reference/ui-writing.md#the-glossary.
