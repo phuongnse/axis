@@ -51,7 +51,7 @@ jobs:
           node-version: 24
       # Restores the caches that .nexkit/config.json names and, on main, saves them for NexKit's
       # runs, which only restore. It comes before Setup, so the key files are as committed.
-      - uses: phuongnse/nexkit/cache@d5c3ec8241873d8f23bc5edd27a5de66595b8e07 # v6.1.0
+      - uses: phuongnse/nexkit/cache@9d69a672107666985716d2e6cdbe2fa36c26787c # v6.2.0
         with:
           base: main
       - name: Setup
