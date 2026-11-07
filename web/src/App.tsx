@@ -17,6 +17,7 @@ import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from 
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
 import { StudioPage } from './pages/StudioPage'
+import { UserPage } from './pages/UserPage'
 import { UsersPage } from './pages/UsersPage'
 import { readStoredLocale } from './platform/locale'
 import { SignInPrompt } from './platform/SignInPrompt'
@@ -162,6 +163,14 @@ function PlatformRoutes() {
         element={
           <PlatformShellRoute>
             <UsersPage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="users/:id"
+        element={
+          <PlatformShellRoute>
+            <UserPage />
           </PlatformShellRoute>
         }
       />

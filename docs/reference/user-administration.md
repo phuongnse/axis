@@ -76,8 +76,9 @@ Four routes read users, their roles and the tenant's usage. When the identity pr
   | `status`         | `disabled` when the realm user is disabled, `invited` when the user has no `axis.user_profiles` row, and `active` otherwise |
   | `lastSignedInAt` | From the `axis.user_profiles` row, and `null` without it                                                                    |
 
-- **The roles route.** `GET /api/users/{id}/roles` answers `{ given, applications, platformRoles }` to an
+- **The roles route.** `GET /api/users/{id}/roles` answers `{ displayName, email, given, applications, platformRoles }` to an
   administrator.
+  - `displayName` and `email` are as in the list route, and `email` is `null` when the person has none.
   - `given` holds the person's given roles, each as `{ applicationId, role, declared }`, with a `null` `applicationId`
     for a platform role. `declared` is `false` for an application role that the application's active release does not
     declare, and for a role of an application that has no active release. A platform role is declared when it is one

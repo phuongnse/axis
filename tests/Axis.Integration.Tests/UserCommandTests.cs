@@ -30,7 +30,7 @@ namespace Axis.Integration.Tests;
 /// and the person's live session uses the change at its next request. That application, <c>Roles</c>, declares the role
 /// <c>buyer</c> and a policy that lets it read notes. The same routes give and remove a platform role, which needs a login in the
 /// last 5 minutes, and an administrator cannot remove their own administrator role.
-/// <c>GET /api/users/{id}/roles</c> lists the given roles and marks one that the active release does not declare.
+/// <c>GET /api/users/{id}/roles</c> answers the person's name and email, lists the given roles and marks one that the active release does not declare.
 /// The tenant is served at localhost.
 /// </summary>
 public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -299,7 +299,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
     }
 
     [Fact]
-    public async Task The_roles_route_lists_given_roles_marks_an_undeclared_one_and_lists_what_can_be_given()
+    public async Task The_roles_route_answers_the_name_and_email_lists_given_roles_marks_an_undeclared_one_and_lists_what_can_be_given()
     {
         var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
         var otherApplication = Guid.NewGuid();
@@ -315,6 +315,8 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        Assert.Equal("Pat Example", body.GetProperty("displayName").GetString());
+        Assert.Equal("pat@example.test", body.GetProperty("email").GetString());
         var given = body.GetProperty("given").EnumerateArray()
             .Select(row => (
                 Application: row.GetProperty("applicationId").ValueKind == JsonValueKind.Null ? (Guid?)null : row.GetProperty("applicationId").GetGuid(),

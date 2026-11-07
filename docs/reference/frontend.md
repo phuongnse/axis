@@ -468,8 +468,8 @@ below answers `200`.
 
 - **The home page's cards.** `/?signIn=failed`, `/?signIn=declined` and `/?signedOut` show a card in place of
   sign-in, see [the sign-in card](shell.md#the-sign-in-card).
-- **Reserved paths.** The sessions screen at `/account` and the users page at `/users` are platform routes beside
-  `/studio`, before the site route, so `account`, `users` and `licences` are reserved site paths. See
+- **Reserved paths.** The sessions screen at `/account` and the users page at `/users` with a user's page at
+  `/users/{id}` are platform routes beside `/studio`, before the site route, so `account`, `users` and `licences` are reserved site paths. See
   [platform pages](platform-pages.md).
 - **One owner for each part of the address.** A page holds at most one `table` and at most one `form`, `taskInbox` or
   `processInspector`, and the compiler checks this. `?search=&page=&pageSize=&sort=` and the data source parameter
