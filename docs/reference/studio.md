@@ -30,7 +30,7 @@ opens the same view.
 ## New application
 
 New application… creates an application folder, blank or from a template, as
-[creating an application](authoring.md#creating-an-application) describes. Where its button shows is
+[creating an application](authoring-applications.md#creating-an-application) describes. Where its button shows is
 in [applications](studio-workspace.md#applications) and [workspace](studio-workspace.md#workspace).
 
 The dialog asks for a name and checks it with the API's rule before it sends anything. It offers Blank

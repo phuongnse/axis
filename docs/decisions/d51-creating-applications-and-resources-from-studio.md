@@ -28,7 +28,7 @@ grow when an author starts something new.
   create route stays as it is. A reference the author must still choose is left empty, so it shows
   as a diagnostic.
 
-The detail is in [creating an application](../reference/authoring.md#creating-an-application),
+The detail is in [creating an application](../reference/authoring-applications.md#creating-an-application),
 [application templates](../reference/modules-and-templates.md#application-templates), the
 [Studio settings](../reference/host-settings.md#studio-settings) and
 [Studio](../reference/studio.md).
