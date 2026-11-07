@@ -7,7 +7,7 @@ Status: **Agreed**
 The data modeling milestone adds files, money, labelled enum values, many-to-many, references from
 child rows, import and export, and dashboards. The existing samples are two approvals and a service
 desk, and none of them has the shape of a register.
-[D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) named asset management
+[D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) named asset management
 as the sample for it.
 
 ## Decision

@@ -43,7 +43,7 @@ The detail is in [custom widgets](../reference/custom-widgets.md) and
 - A custom widget gets the theme, overlays, focus and screen readers of the standard widgets.
 - A custom widget is trusted code that can act as the user without asking.
 - The SDK's contract can change while the platform keeps one format
-  ([D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)).
+  ([D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md)).
 
 ## Alternatives
 

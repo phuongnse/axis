@@ -5,7 +5,7 @@ Status: **Agreed**
 ## Context
 
 Authoring without JSON needs proof that an author can build a whole application through Studio, and
-[D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) asks each milestone
+[D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) asks each milestone
 from then on to extend a sample of a new shape. Purchase requests and leave requests are both a
 request then an approval.
 

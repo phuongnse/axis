@@ -6,7 +6,7 @@ Status: **Agreed**
 
 The extensibility milestones extend the platform's reach into code and operations: modules with a
 dependency, custom widgets, connectors with OAuth2, packages out of process, webhooks and the
-operator console. [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) asks
+operator console. [D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) asks
 each milestone to extend a sample of a new shape, but these milestones add no new kind of
 application. Their journey needs packages that the operator installs and modules that are not edited
 in Studio, see

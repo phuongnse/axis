@@ -36,7 +36,7 @@ provider on a portal. Platform pages need a sign-in before any application exist
   and enable people, reset an authenticator, and give roles, each change audited.
 - **Always through the realm.** A tenant's `Oidc` block points at its realm. No tenant has to move
   from a provider outside Axis, because Axis keeps one format until its first production release
-  ([D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)).
+  ([D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md)).
 
 The detail is in [Axis's identity provider](../reference/identity-provider.md) and
 [user administration](../reference/user-administration.md).

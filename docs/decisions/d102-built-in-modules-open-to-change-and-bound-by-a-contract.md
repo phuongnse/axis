@@ -62,7 +62,7 @@ of the platform still hold.
   for the HR modules. `samples/` then keeps only fixtures for platform features that no built-in
   module uses.
 - **One format until the first production release.** Until then the one-format rule of
-  [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) holds, and a format
+  [D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) holds, and a format
   change updates the built-in modules in the same change. From then on each resource kind has a
   format version, and Axis ships converters that rewrite older module, application and layer files,
   so the engines hold no compatibility code. No production release comes before the layers.

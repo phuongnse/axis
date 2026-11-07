@@ -4,7 +4,7 @@ Status: **Agreed**
 
 ## Context
 
-[D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) asks that an author can
+[D46](d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md) asks that an author can
 try a change before publishing it. A tenant's data is live and its bindings point at real systems, so
 the author needs a place with its own data and bindings.
 
