@@ -51,8 +51,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
   [the life of an issue](docs/delivery.md#the-life-of-an-issue).
 - On GitHub, follow [writing on GitHub](docs/delivery.md#writing-on-github). Name the role that acts,
   never a development user.
-- All work goes through NexKit, see [delivery](docs/delivery.md). Changes in paths NexKit may not
-  change, and the docs change that ends a design review, are hand-made pull requests.
+- All work goes through NexKit, see [delivery](docs/delivery.md). Only changes in paths NexKit may
+  not change are [hand-made pull requests](docs/delivery.md#hand-made-pull-requests).
 
 ## Commands
 

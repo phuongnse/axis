@@ -228,8 +228,8 @@ every pull request, the tests, and an audit every hundred merges, as
 2. **A changed decision is a new decision,** which replaces the old one as
    [Decisions](#decisions) says.
 3. **A design review writes reference pages.** The docs change that ends a
-   [design review](delivery.md#design-changes) rewrites the rules it agreed where they live: the
-   Studio pages, the [shared widgets](reference/shared-widgets.md),
+   [design review](delivery.md#design-changes), which NexKit writes, rewrites the rules it agreed where
+   they live: the Studio pages, the [shared widgets](reference/shared-widgets.md),
    [UI writing](reference/ui-writing.md). It adds a decision only for a choice between real
    alternatives.
 4. **Status lives in the roadmap and on GitHub.** The roadmap records what each milestone delivers and

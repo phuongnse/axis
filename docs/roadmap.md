@@ -139,6 +139,5 @@ direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-mil
   check of [D68](decisions/d68-issues-of-several-milestones-run-at-once.md).
   Only the milestones of the current phase are broken down, unless the owner
   asks for another, see [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md).
-  The decisions and doc sections a milestone lacks are written first, in the owner's
-  local session, as [the life of a milestone](delivery.md#the-life-of-a-milestone)
-  describes.
+  The decisions and doc sections a milestone lacks are written first, as NexKit docs
+  issues, as [the life of a milestone](delivery.md#the-life-of-a-milestone) describes.
