@@ -1,6 +1,6 @@
 import { theme } from 'antd'
 import { describe, expect, it } from 'vitest'
-import { antConfigFor, antThemeFor, fieldRules, tableTheme } from './antTheme'
+import { antConfigFor, antThemeFor, fieldRules, selectedItemTint, tableTheme } from './antTheme'
 import {
   colourTokens,
   designTokensFor,
@@ -91,6 +91,11 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
       colorPrimary: colour.primaryText,
       colorPrimaryHover: colour.primaryText,
     })
+  })
+
+  it('draws a selected menu item in primaryText on the selected tint', () => {
+    expect(config.components?.Dropdown).toMatchObject({ colorPrimary: colour.primaryText })
+    expect(token.controlItemBgActive).toBe(selectedItemTint(mode))
   })
 
   it('draws a dialog on surface in its content, header and footer', () => {
@@ -273,6 +278,16 @@ describe('theme values', () => {
       })
       .map(([file]) => file)
     expect(unsized).toEqual([])
+  })
+
+  it("puts every form's label above its input", () => {
+    const beside = Object.entries(sources)
+      .filter(([, text]) => {
+        const forms = text.match(/<Form[\s>]/g)?.length ?? 0
+        return forms !== (text.match(/\blayout="vertical"/g)?.length ?? 0)
+      })
+      .map(([file]) => file)
+    expect(beside).toEqual([])
   })
 
   it('keeps theme values in the token file and the mapping only', () => {

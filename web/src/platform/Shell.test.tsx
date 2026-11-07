@@ -8,7 +8,6 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
-import { designTokensFor } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
 import { ShellNavigation } from './ShellNavigation'
@@ -324,17 +323,17 @@ describe('PreferencesMenu', () => {
     expect(onLocaleChange).toHaveBeenCalledExactlyOnceWith('vi')
   })
 
-  it('draws the current language and theme in primaryText on the selected tint, with a divider between the groups', async () => {
+  it('marks the current language and theme as selected, with a divider between the groups', async () => {
     localStorage.setItem('axis.themeMode', 'light')
     renderPreferences()
 
     const menu = within(await openMenu())
-    const { colour } = designTokensFor('light')
+    const selected = 'ant-dropdown-menu-item-selected'
 
-    expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveStyle({ color: colour.primaryText })
-    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveStyle({ color: colour.primaryText })
-    expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).not.toHaveStyle({ color: colour.primaryText })
-    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).not.toHaveStyle({ color: colour.primaryText })
+    expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveClass(selected)
+    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveClass(selected)
+    expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).not.toHaveClass(selected)
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).not.toHaveClass(selected)
     expect(menu.getAllByRole('separator')).toHaveLength(1)
   })
 

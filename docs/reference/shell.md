@@ -133,8 +133,8 @@ theme.
 - **Language and theme.** An icon button with a settings gear, named "Language and theme", opens one
   menu with the site's languages and the themes, for signed-in people and for nobody signed in alike. A
   divider separates the languages from the themes. The current language and theme are drawn selected,
-  in `primaryText` on a `primary` tint, not only marked for assistive technology. At narrow width the
-  button sits in the Menu panel, see [layout](#layout).
+  [as a marked choice](actions-and-controls.md#menus) is, not only marked for assistive technology. At
+  narrow width the button sits in the Menu panel, see [layout](#layout).
 - **Themes.** The themes are System, Light and Dark. System is the default when the browser holds no
   choice, and follows the operating system's light or dark setting, changing at once when it changes.
   Light and Dark keep their mode. The choice is kept in `localStorage` under `axis.themeMode`, as

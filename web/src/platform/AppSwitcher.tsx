@@ -1,14 +1,12 @@
 import { AppstoreOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps } from 'antd'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
 import { fetchSites, siteTitle, type SiteListItem } from './site'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
-import { useDesignTokens, useThemeMode } from './themeMode'
 
 /** Whether the page address is the address of a site or a tool, or lies inside it. */
 function isCurrent(address: string, pathname: string): boolean {
@@ -26,12 +24,6 @@ function isCurrent(address: string, pathname: string): boolean {
 export function AppSwitcher({ locale }: { locale: string }) {
   const t = useText()
   const { pathname } = useLocation()
-  const { colour } = useDesignTokens()
-  const { mode } = useThemeMode()
-  const selected = useMemo<CSSProperties>(
-    () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
-    [colour, mode],
-  )
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
   const [sites, setSites] = useState<SiteListItem[]>([])
 
@@ -58,26 +50,30 @@ export function AppSwitcher({ locale }: { locale: string }) {
     return null
   }
 
-  const entry = (address: string, text: string) => {
+  const selectedKeys: string[] = []
+  const entry = (key: string, address: string, text: string) => {
     const current = isCurrent(address, pathname)
+    if (current) {
+      selectedKeys.push(key)
+    }
     return {
+      key,
       label: (
         <Link to={address} aria-current={current ? 'page' : undefined}>
           {text}
         </Link>
       ),
-      style: current ? selected : undefined,
     }
   }
   const tools: NonNullable<MenuProps['items']> = []
   if (user.studio) {
-    tools.push({ key: 'studio', ...entry('/studio', t('shell.appSwitcher.studio')) })
+    tools.push(entry('studio', '/studio', t('shell.appSwitcher.studio')))
   }
   if (user.console) {
-    tools.push({ key: 'console', ...entry('/console', t('shell.appSwitcher.console')) })
+    tools.push(entry('console', '/console', t('shell.appSwitcher.console')))
   }
   if (user.users) {
-    tools.push({ key: 'users', ...entry('/users', t('shell.appSwitcher.users')) })
+    tools.push(entry('users', '/users', t('shell.appSwitcher.users')))
   }
   if (user.billingUrl) {
     // An outside link, so it is never the current page.
@@ -89,10 +85,7 @@ export function AppSwitcher({ locale }: { locale: string }) {
       type: 'group',
       key: 'sites',
       label: t('shell.appSwitcher.sites'),
-      children: sites.map((site) => ({
-        key: `site:${site.path}`,
-        ...entry(siteAddress(site.path), siteTitle(site, locale)),
-      })),
+      children: sites.map((site) => entry(`site:${site.path}`, siteAddress(site.path), siteTitle(site, locale))),
     })
   }
   if (tools.length > 0) {
@@ -101,7 +94,7 @@ export function AppSwitcher({ locale }: { locale: string }) {
   const label = t('shell.appSwitcher.label')
 
   return (
-    <Dropdown trigger={['click']} menu={{ items, 'aria-label': label }}>
+    <Dropdown trigger={['click']} menu={{ items, selectable: true, selectedKeys, 'aria-label': label }}>
       <AxisButton role="icon" nameKey="shell.appSwitcher.label" icon={<AppstoreOutlined />} />
     </Dropdown>
   )

@@ -56,30 +56,31 @@ choices.
 
 - **Selected and current states.** The selected tab, the active menu entry and the current page of a
   pagination use `primaryText`, and destructive menu entries use `dangerText`.
-- **A marked choice on the selected tint** _(planned for M31)_. A menu that marks a choice, such as the
-  open application in Studio's application menu, draws it in `primaryText` on the selected tint, never
-  in Ant Design's selected colour, which is hard to read in dark mode.
+- **A marked choice on the selected tint.** A menu that marks a choice, such as the open application in
+  Studio's application menu, draws it in `primaryText` on the selected tint, never in Ant Design's
+  selected colour, which is hard to read in dark mode. The theme draws Ant Design's selected menu item
+  this way, so a menu marks its choice by selecting it.
 - **A text trigger ends in a caret.** A button with text that opens a menu, such as the account button
   and Studio's application switcher, ends in a caret, which `AxisButton`'s `caret` option draws. An
   icon-only trigger has none.
-- **Actions come after the choices** _(planned for M31)_. In a menu that holds both, such as the
+- **Actions come after the choices.** In a menu that holds both, such as the
   application menu, the choices come first and an action, such as New application…, follows them.
 
 ## Fields
 
-These rules hold for every Ant Design form in the SPA and in the identity provider's pages. One
-setting on the shared `ConfigProvider` carries them, so no widget keeps its own copy.
+These rules hold for every Ant Design form in the SPA and in the identity provider's pages. The shared
+`ConfigProvider` carries the field look, so no widget keeps its own copy, and a Vitest check holds the layout.
 
 - **A field's error keeps the gap.** The message sits just under its control, and the field keeps its
-  own gap below the message: `spacing-lg` in a form, none in a table cell or an inline form.
+  own gap below the message: `spacing-lg` in a form, none in a table cell.
 - **A box sits on its label's first line.** A checkbox or a radio keeps its box level with the first
   line of its label, so a label that wraps leaves the box at the top.
 - **An error border keeps 3:1.** An input, number input, select, date picker, mentions, cascader or
   tree select with an error, and an unticked checkbox or radio in a field with an error, take
   `dangerText` for their border, the colour of the field's message. The `danger` fill stays for fills
   such as a danger button, whose white text needs it.
-- **A label is above its input, everywhere** _(planned for M31)_, as the form widget has it, never
-  beside it.
+- **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
+  names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
 - **One field for the platform's screens** _(planned for M31)_. `AxisField` draws every field of Studio
   and the console: its label, its help and its input, as a group that its help describes.
   `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
