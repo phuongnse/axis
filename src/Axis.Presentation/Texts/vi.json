@@ -411,6 +411,8 @@
   "shell.table.search": "Tìm kiếm",
   "shell.table.refresh": "Làm mới",
   "shell.table.rowActions": "Thao tác",
+  "shell.table.selected": "Đã chọn {count}",
+  "shell.table.selectRow": "Chọn dòng",
   "shell.table.delete": "Xóa",
   "shell.table.deleteConfirm": "Xóa bản ghi này? Không thể hoàn tác.",
   "shell.table.deleted": "Đã xóa bản ghi.",

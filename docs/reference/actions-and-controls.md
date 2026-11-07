@@ -175,9 +175,9 @@ be kept right.
   column that fits still shows its dash. Only when what stays does not fit does the table scroll sideways,
   with the first column fixed. So the data stays in sight, and every table gains with no setting, as SAP
   Fiori's pop-in has it.
-- **Bulk actions** _(planned for M31)_. Selecting rows is for bulk actions alone: a table shows
-  checkboxes only when it has a bulk action, and a selection shows an "N selected" bar that holds them.
-  An action on one row stays on the row.
+- **Bulk actions**. Selecting rows is for bulk actions alone: a table shows checkboxes only when it has a
+  bulk action. Selecting rows of the page shows an "N selected" bar above the rows that holds the bulk
+  actions, and running one clears the selection. An action on one row stays on the row.
 
 ## Opening things
 
