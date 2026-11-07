@@ -1178,7 +1178,14 @@ export const siteTexts: Record<string, string> = {
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about', '/api/notifications'] as const
+export const fixtureScopes = [
+  `${apiPath}/`,
+  '/api/studio/',
+  '/api/sites',
+  '/api/me',
+  '/api/about',
+  '/api/notifications',
+] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own

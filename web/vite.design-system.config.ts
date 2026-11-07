@@ -20,6 +20,27 @@ function dropRouteModuleImport(): Plugin {
   }
 }
 
+// The bundle is one file, so the style sheets of the libraries it imports, such as React Flow's, become a style element
+// that the script adds to the page, in place of a CSS file next to it.
+function inlineStyleSheets(): Plugin {
+  return {
+    name: 'inline-style-sheets',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      const sheets = Object.values(bundle).filter((file) => file.type === 'asset' && file.fileName.endsWith('.css'))
+      const entry = Object.values(bundle).find((file) => file.type === 'chunk' && file.isEntry)
+      if (sheets.length === 0 || entry?.type !== 'chunk') {
+        return
+      }
+      const css = sheets.map((sheet) => String(sheet.type === 'asset' ? sheet.source : '')).join('\n')
+      for (const sheet of sheets) {
+        delete bundle[sheet.fileName]
+      }
+      entry.code = `(function(){var style=document.createElement('style');style.textContent=${JSON.stringify(css)};document.head.appendChild(style)})();\n${entry.code}`
+    },
+  }
+}
+
 // A script that a page inlines must not hold `</script` or `<!--`. Escaping them in a string or a
 // regular expression keeps its meaning.
 function escapeScriptEndings(): Plugin {
@@ -70,7 +91,7 @@ export default defineConfig(({ command }) =>
     // Library mode does not replace this, and React and Ant Design read it. The dev server runs React in
     // development mode.
     define: command === 'build' ? { 'process.env.NODE_ENV': JSON.stringify('production') } : {},
-    plugins: [dropRouteModuleImport(), escapeScriptEndings(), serveBundleFromSource()],
+    plugins: [dropRouteModuleImport(), inlineStyleSheets(), escapeScriptEndings(), serveBundleFromSource()],
     server: { port: 5174, strictPort: true },
     build: {
       outDir: '../artifacts/design-system',

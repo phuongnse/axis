@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { cardGroups, cardName } from './cardOrder'
 import { fixtureScopes, routes } from './fixtures'
-import { previews } from './previews'
+import { previews, stateSlug } from './previews'
 
 function hasEmptyState(name: string): boolean {
   return ['taskInbox', 'detail', 'kpi'].includes(name) || name.startsWith('chart-')
@@ -44,7 +46,7 @@ describe('design-system previews', () => {
     expect(states.map(({ caption }) => caption)).toEqual(['Editable', 'Read-only', 'Required, help text and error'])
   })
 
-  test('the card groups are the seven agreed groups and list every preview once', () => {
+  test('the card groups are the eight agreed groups and list every preview once', () => {
     expect(cardGroups.map(({ name }) => name)).toEqual([
       'Field inputs',
       'Data widgets',
@@ -53,6 +55,7 @@ describe('design-system previews', () => {
       'Containers',
       'Shared states',
       'Shell',
+      'Studio',
     ])
     const listed = cardGroups.flatMap(({ previews: group }) => group)
     expect(new Set(listed).size).toBe(listed.length)
@@ -91,7 +94,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 25 names of the Design System artifact, in group order', () => {
+  test('the cards have the 26 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -118,7 +121,65 @@ describe('design-system previews', () => {
       'Shell',
       'SignIn',
       'IdentitySignIn',
+      'Studio',
     ])
+  })
+
+  test('the studio preview has its seven states, each with a slug of its own and a frame', () => {
+    const states = previews.studio
+
+    expect(states.map(({ caption }) => caption)).toEqual([
+      'Typical',
+      'Empty',
+      'Loading',
+      'Failed',
+      'Many rows',
+      'Long names',
+      'Access denied',
+    ])
+    expect(states.map(({ caption }) => stateSlug(caption))).toEqual([
+      'typical',
+      'empty',
+      'loading',
+      'failed',
+      'many-rows',
+      'long-names',
+      'access-denied',
+    ])
+    for (const { frameHeight, fixtures } of states) {
+      expect(frameHeight).toBeGreaterThan(0)
+      expect(Object.keys(fixtures ?? {})).toContain('/api/studio/apps')
+    }
+  })
+
+  test("a state's shared fixture paths are scoped and in no route of the shared routes or of a state", () => {
+    const stateOwn = Object.values(previews).flatMap((states) =>
+      states.flatMap((state) => Object.keys(state.routes ?? {})),
+    )
+    const paths = Object.values(previews).flatMap((states) =>
+      states.flatMap((state) => Object.keys(state.fixtures ?? {})),
+    )
+
+    expect(paths.length).toBeGreaterThan(0)
+    for (const path of paths) {
+      expect(Object.keys(routes)).not.toContain(path)
+      expect(stateOwn).not.toContain(path)
+      expect(fixtureScopes.some((scope) => path.startsWith(scope))).toBe(true)
+    }
+  })
+
+  test('the card groups are the groups of the cards table in widget-previews.md', () => {
+    // Vitest runs from the web folder, as `npm test --prefix web` does.
+    const doc = readFileSync(join(process.cwd(), '../docs/reference/widget-previews.md'), 'utf8')
+    const section = doc.split(/^## /m).find((part) => part.startsWith('The cards\n'))
+    expect(section).toBeDefined()
+    const rows = section!
+      .split('\n')
+      .filter((line) => line.startsWith('|'))
+      .slice(2)
+    const documented = rows.map((row) => row.split('|')[1].trim())
+
+    expect(documented).toEqual(cardGroups.map(({ name }) => name))
   })
 
   test("a state's own fixture paths are scoped and repeat no shared path or other state's path", () => {

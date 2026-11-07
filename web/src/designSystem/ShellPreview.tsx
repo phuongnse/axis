@@ -6,6 +6,7 @@ import { PageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
 import { PlatformShellRoute } from '../pages/PlatformShellRoute'
 import { SiteRoute } from '../pages/SiteRoute'
+import { StudioPage } from '../pages/StudioPage'
 import { locale, platformSite } from './fixtures'
 
 const platform: Platform = {
@@ -16,7 +17,7 @@ const platform: Platform = {
   development: true,
 }
 
-/** The shell's own routes over the fixtures: the platform home page, and the pages of an application site. */
+/** The shell's own routes over the fixtures: the platform home page, Studio, and the pages of an application site. */
 export function ShellPreview() {
   return (
     <PlatformContext.Provider value={platform}>
@@ -26,6 +27,14 @@ export function ShellPreview() {
           element={
             <PlatformShellRoute>
               <HomePage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route
+          path="studio"
+          element={
+            <PlatformShellRoute>
+              <StudioPage />
             </PlatformShellRoute>
           }
         />

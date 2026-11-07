@@ -1,10 +1,10 @@
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, Segmented } from 'antd'
 import { StrictMode, useState, type CSSProperties, type ReactNode } from 'react'
 import { MemoryRouter } from 'react-router'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
 import { PageTheme } from './PageTheme'
-import { catalogs, type PreviewState } from './previews'
+import { catalogs, chooseFixtures, stateSlug, type PreviewState } from './previews'
 
 function Canvas({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
@@ -60,6 +60,38 @@ function Figure({ state }: { state: PreviewState }) {
   )
 }
 
+/**
+ * The states of a preview that answers the same paths in each of them, one at a time under a Fixtures control. The
+ * `state` query of the page, a state's caption in kebab case, picks the first one shown, else the first state does.
+ */
+function Chooser({ states }: { states: readonly PreviewState[] }) {
+  const { colour, spacing } = useDesignTokens()
+  const [state, setState] = useState(() => {
+    const slug = new URLSearchParams(window.location.search).get('state')
+    const first = states.find((candidate) => stateSlug(candidate.caption) === slug) ?? states[0]
+    chooseFixtures(first)
+    return first
+  })
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+        <span style={{ color: colour.textMuted }}>Fixtures</span>
+        <Segmented
+          aria-label="Fixtures"
+          options={states.map(({ caption }) => caption)}
+          value={state.caption}
+          onChange={(caption) => {
+            const next = states.find((candidate) => candidate.caption === caption)!
+            chooseFixtures(next)
+            setState(next)
+          }}
+        />
+      </div>
+      <Figure key={state.caption} state={state} />
+    </>
+  )
+}
+
 /** What the bundle mounts for a preview: each state of the widget under its caption on a canvas, in the mode of the page. */
 export function Preview({ states }: { states: readonly PreviewState[] }) {
   return (
@@ -67,9 +99,11 @@ export function Preview({ states }: { states: readonly PreviewState[] }) {
       <PageTheme>
         <TextProvider catalogs={catalogs} development>
           <Canvas>
-            {states.map((state) => (
-              <Figure key={state.caption} state={state} />
-            ))}
+            {states.some((state) => state.fixtures) ? (
+              <Chooser states={states} />
+            ) : (
+              states.map((state) => <Figure key={state.caption} state={state} />)
+            )}
           </Canvas>
         </TextProvider>
       </PageTheme>

@@ -17,6 +17,7 @@
     <script type="module">
       // The harness of the bundle: it mounts the previews the way the Design System artifact does.
       // ?preview=<name> mounts one preview and no query mounts all. ?mode=dark|light sets data-theme.
+      // &state=<slug> opens a preview that shows one state at a time on that state, which the bundle reads itself.
       const params = new URLSearchParams(window.location.search)
       document.documentElement.dataset.theme = params.get('mode') === 'dark' ? 'dark' : 'light'
       const host = document.getElementById('previews')
