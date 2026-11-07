@@ -182,12 +182,13 @@ Read by people who change sign-in, authorization, keys, headers or the threat mo
 
 Read by people who change how Axis stores data.
 
-| Doc                                                                            | What it holds                                                                         | Read it when                                                |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| [Storage](reference/storage.md)                                                | Physical names, column types, database roles, schema planning, audit, release history | You change physical names, column types or database roles   |
-| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                                      | You change how child tables or computed columns are stored  |
-| [Process tables](reference/process-tables.md)                                  | The tables that `Axis.Processes` owns                                                 | You change the tables that Axis.Processes owns              |
-| [Authoring request storage](reference/authoring-request-storage.md)            | The tables of authoring requests and their steps                                      | You change the tables of authoring requests and their steps |
+| Doc                                                                            | What it holds                                                                               | Read it when                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [Storage](reference/storage.md)                                                | Physical names, column types, database roles, schema planning, audit                        | You change physical names, column types or database roles        |
+| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                                            | You change how child tables or computed columns are stored       |
+| [Process tables](reference/process-tables.md)                                  | The tables that `Axis.Processes` owns                                                       | You change the tables that Axis.Processes owns                   |
+| [Authoring request storage](reference/authoring-request-storage.md)            | The tables of authoring requests and their steps                                            | You change the tables of authoring requests and their steps      |
+| [Publish request storage](reference/publish-request-storage.md)                | The tables of publish requests and the release history, and the audit records of publishing | You change the tables of publish requests or the release history |
 
 ## Working on Axis
 

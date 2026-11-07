@@ -365,7 +365,7 @@ It uses the same compile diagnostics, extension packages, modules, recompute lim
    tenant fails with a message to run `migrate` first, and nothing else runs for it.
 2. `compile`: compile the folder against the tenant database and store its release.
 3. `activate`: activate the release. This adds a row with the actor `operator` to the
-   [release history](storage.md#release-history), unless the release is already the active one.
+   [release history](publish-request-storage.md#release-history), unless the release is already the active one.
    After the activation has committed, the step brings the tenant's realm in step with the tenant's
    applications: it adds, changes and removes the realm's `site-` clients and `oidc-` and `saml-`
    providers, and writes the realm's mail server from the tenant's mail settings or the host's `Email`
@@ -545,7 +545,7 @@ tenant's schema role unless it says otherwise.
    in [activate](#activate). The compile reads the snapshot's files, never the application folder on
    any disk. A snapshot that cannot be read, because it is not an array of
    `{ file, version, content }` or names a file twice, fails at `compile` and stores no release.
-   Activation adds a row to the [release history](storage.md#release-history) with the requesting
+   Activation adds a row to the [release history](publish-request-storage.md#release-history) with the requesting
    user, the label, the note and the request id, unless the release is already active.
 5. For `validate`: the step `validate`, the only one after `version` and `contracts`. It runs the
    `compile` and every check of `activate` against the tenant inside one transaction, then rolls the
@@ -565,7 +565,7 @@ tenant's schema role unless it says otherwise.
    - The `activate` step then runs every activation check, so a migration that was applied after the
      release and is missing from it is `AXC0174`, and a field that the release lacks but the tables
      hold is `AXC0015`. A refused `activate` request changes nothing. The activation adds a row to the
-     [release history](storage.md#release-history) with the requesting user and the request id, no
+     [release history](publish-request-storage.md#release-history) with the requesting user and the request id, no
      label and no note, unless the release is already active. The step then updates the tenant's
      realm to match the activated release.
    - `seed` then sets the schedule triggers and the seed records of that release, and `indexes`

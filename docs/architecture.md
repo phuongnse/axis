@@ -355,6 +355,42 @@ both tenant sources. Its settings are in
 #### Request resolution
 
 The server finds the tenant of each request from its host, before static files and endpoints run.
+The diagram shows the order of these checks for a request on a tenant host. The list below says the
+same in words.
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant Middleware as TenantResolutionMiddleware
+    participant Resolver as TenantResolver
+    participant Catalog as ITenantCatalog
+    participant Endpoint as Endpoints and static files
+    Browser->>Middleware: Request
+    alt Path under /health
+        Middleware->>Endpoint: Next, host not resolved
+    else Path under /api/cell
+        Middleware-->>Browser: 404 No API route matches this path.
+    else Any other path
+        Middleware->>Resolver: TryResolve(host)
+        Resolver->>Catalog: FindByHost(host)
+        Catalog-->>Resolver: Tenant entry or none
+        Resolver-->>Middleware: Tenant or none
+        alt Tenant found
+            Middleware->>Endpoint: Next, with tenant and TenantId log scope
+            Endpoint-->>Browser: Response
+        else No tenant found
+            Middleware->>Resolver: IsUnavailable(host)
+            Resolver->>Catalog: IsUnavailableHost(host)
+            Catalog-->>Resolver: true or false
+            Resolver-->>Middleware: true or false
+            alt Host of a tenant not served
+                Middleware-->>Browser: 503 This tenant is not available.
+            else Unknown host
+                Middleware-->>Browser: 404 No tenant is configured for this host.
+            end
+        end
+    end
+```
 
 - **Host matching.** Middleware in `Axis.Server` matches `Request.Host.Host` against the configured
   hosts, ignoring letter case and the port, so `A.Example.TEST:8443` matches `a.example.test`.
@@ -366,6 +402,8 @@ The server finds the tenant of each request from its host, before static files a
   or host. This covers API and SPA paths alike.
 - **Health exemption.** Paths under `/health` are not resolved, so `/health/live` and
   `/health/ready` answer for any host.
+- **Provisioning API.** The `/api/cell` branch above applies on a tenant host. See
+  [provisioning API](reference/tenant-lifecycle.md) for where the API is served.
 - **Tenant not available.** Under `Tenancy:Source=directory`, a host of a tenant that is not served
   answers `503`, as the [tenant directory](#tenant-directory) table says.
 - **Log scope.** While a resolved request runs, the logging scope carries `TenantId` with the tenant

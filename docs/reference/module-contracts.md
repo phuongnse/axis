@@ -458,7 +458,7 @@ A release whose application has at least one relax entry is off-standard, so the
 release history see which promises of a module the business turned off, and why.
 
 - **What the release keeps.** The release keeps the list of relaxed points with their reasons, and the
-  [release history](storage.md#release-history) shows it. The Studio release history route answers
+  [release history](publish-request-storage.md#release-history) shows it. The Studio release history route answers
   `offStandard` and `relaxed` for each release, read from the `application.json` stored with it, see
   [release history](authoring.md#release-history).
 - **Where it shows.** Studio's [releases](studio-workspace.md#releases) show the Off-standard tag beside

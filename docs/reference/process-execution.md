@@ -79,6 +79,28 @@ Each `process.step` item runs the current step of its instance in one transactio
    below says.
 7. It inserts the next work item, as the table below says.
 
+The diagram shows the steps of the list above, with the claim and the commit that the runner makes around them.
+
+```mermaid
+sequenceDiagram
+    participant Runner as WorkItemRunner
+    participant Handler as ProcessStepHandler
+    participant TenantDb as Tenant database
+
+    Runner->>TenantDb: Claim the due process.step item with FOR UPDATE SKIP LOCKED, a lease and a claim token
+    Runner->>TenantDb: Open one transaction
+    Runner->>Handler: Run the item
+    Handler->>TenantDb: Load the instance
+    Handler->>TenantDb: Read the pinned release
+    Handler->>TenantDb: Read the subject record under its locks
+    Handler->>Handler: Evaluate the step
+    Handler->>TenantDb: Set the state at the loaded revision
+    Handler->>TenantDb: Store the step's writes, its history and its audit records
+    Handler->>TenantDb: Insert the next work item
+    Runner->>TenantDb: Delete the item while its claim token is current
+    Runner->>TenantDb: Commit only if the item was deleted
+```
+
 | Step                  | Evaluates on the record                                                                                                                                                                                                                                                                                                                            | Instance afterwards                                                     | Audit records                                                                                                                                                                                                 | Next work item                                                                                                     |
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Decision              | Its branches in order, taking the first `when` that is true. A `when` that gives `null` counts as false. When no branch is true, it takes `otherwise`                                                                                                                                                                                              | `running` on the next step                                              | `process.stepCompleted` with details `{ "step", "next" }`                                                                                                                                                     | The next step's                                                                                                    |

@@ -124,6 +124,45 @@ secret or key.
 - **The images.** Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
+The diagram shows the services of the example and the PostgreSQL server that they connect to. The
+bullets above name the services, and [TLS proxy and a second replica](#tls-proxy-and-a-second-replica)
+says how the proxy routes requests. The example has no PgBouncer.
+
+```mermaid
+flowchart LR
+    browsers["Browsers"]
+    admins["Operator"]
+    subgraph compose ["Docker Compose on one machine"]
+        proxy["proxy, Caddy on AXIS_HTTPS_PORT"]
+        server["server"]
+        server2["server-2, replicas profile"]
+        identity["identity, Keycloak"]
+        worker["worker"]
+        publisher["publisher"]
+        admin["admin, only when asked"]
+    end
+    subgraph pg ["PostgreSQL, runs elsewhere"]
+        platformdb[("Platform database")]
+        tenantdb[("Tenant databases")]
+        identitydb[("Identity provider database")]
+    end
+    browsers -->|"HTTPS"| proxy
+    admins -.->|"docker compose run"| admin
+    proxy -->|"identity host"| identity
+    proxy -->|"other hosts"| server
+    proxy -->|"other hosts"| server2
+    server -->|"platform connection"| platformdb
+    server2 -->|"platform connection"| platformdb
+    server -->|"tenant runtime connections"| tenantdb
+    server2 -->|"tenant runtime connections"| tenantdb
+    worker -->|"platform connection"| platformdb
+    worker -->|"tenant runtime connections"| tenantdb
+    publisher -->|"schema connection"| platformdb
+    publisher -->|"schema role"| tenantdb
+    identity -->|"KC_DB_URL"| identitydb
+    admin -.->|"admin connection"| platformdb
+```
+
 ### Database roles
 
 Before the first start, create these database roles and the platform database on the PostgreSQL
