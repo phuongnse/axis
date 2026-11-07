@@ -13,7 +13,7 @@ import { setAt } from '../platform/jsonPatch'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
 import { loadKindSchema } from '../platform/studioSchemas'
-import { chooseOption } from '../test/antd'
+import { chooseOption, selectRoot } from '../test/antd'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
@@ -1585,6 +1585,36 @@ describe('StudioEditor for a page', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Undo removal' }))
 
       expect(await screen.findByTestId('studio-widget-/widgets/1')).toHaveTextContent('table')
+    })
+
+    it('shows no removal notice when Move to puts a widget into a container', async () => {
+      const inColumns = {
+        ...pageContent,
+        widgets: [
+          {
+            type: 'columns',
+            columns: [
+              { width: 6, widgets: [] },
+              { width: 6, widgets: [] },
+            ],
+          },
+          { type: 'taskInbox' },
+        ],
+      }
+      stubResource(pageItem, inColumns)
+      renderResource(pageItem, pageNames)
+      await openFormTab()
+
+      await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
+      const picker = within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('combobox', {
+        name: 'Move to',
+      })
+      await chooseOption('Page › columns 1 › Column 1', selectRoot(picker))
+
+      expect(await screen.findByTestId('studio-widget-/widgets/0/columns/0/widgets/0')).toHaveTextContent('taskInbox')
+      expect(screen.getByTestId('studio-save-bar')).toBeInTheDocument()
+      expect(screen.queryByText('Row removed.')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Undo removal' })).not.toBeInTheDocument()
     })
 
     it('undoes and redoes a move of a widget', async () => {

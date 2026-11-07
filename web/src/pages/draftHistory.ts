@@ -74,6 +74,8 @@ export function redoStep(
  * The item that setting `pointer` to `value` removes from `before`, or `null` when it removes none. An item is removed
  * when `value` is `undefined` and the pointer names a held index of an array, or when the list at the pointer
  * becomes one item shorter. In the shorter list it is the first item that differs by reference, or else the last.
+ * A shorter list whose items all live on, such as a widget dragged into a section, is a move and removes nothing: the
+ * new value holds as many values, at any depth, as the old one.
  */
 export function removedItem(before: unknown, pointer: string, value: unknown): { item: unknown } | null {
   const old = getAt(before, pointer)
@@ -86,7 +88,17 @@ export function removedItem(before: unknown, pointer: string, value: unknown): {
   }
   if (Array.isArray(old) && Array.isArray(value) && value.length === old.length - 1) {
     const at = old.findIndex((item, index) => index >= value.length || item !== value[index])
-    return { item: old[at === -1 ? old.length - 1 : at] }
+    return nodeCount(value) < nodeCount(old) ? { item: old[at === -1 ? old.length - 1 : at] } : null
   }
   return null
+}
+
+/** The number of values in `value`, itself and every value nested in it. */
+function nodeCount(value: unknown): number {
+  const children = Array.isArray(value)
+    ? value
+    : value !== null && typeof value === 'object'
+      ? Object.values(value)
+      : []
+  return children.reduce<number>((count, child) => count + nodeCount(child), 1)
 }

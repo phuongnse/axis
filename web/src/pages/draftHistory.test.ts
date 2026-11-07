@@ -120,6 +120,19 @@ describe('removedItem', () => {
     expect(removedItem(before, '/rows/1', undefined)).toEqual({ item: b })
   })
 
+  it('returns null when the item moves into another item of the list', () => {
+    const section = { name: 's', widgets: [] as unknown[] }
+    const rows = { rows: [a, section] }
+    const moved = [{ ...section, widgets: [structuredClone(a)] }]
+    expect(removedItem(rows, '/rows', moved)).toBeNull()
+  })
+
+  it('returns the item when an equal copy of it remains elsewhere', () => {
+    const copy = { name: 'a' }
+    const rows = { rows: [a, copy] }
+    expect(removedItem(rows, '/rows', [copy])).toEqual({ item: a })
+  })
+
   it('returns null for an edit that removes nothing', () => {
     expect(removedItem(before, '/rows', [a, b, c, a])).toBeNull()
     expect(removedItem(before, '/rows', [a])).toBeNull()
