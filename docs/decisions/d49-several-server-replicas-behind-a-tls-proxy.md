@@ -13,8 +13,9 @@ Studio folder could both accept a write with the same version.
 
 - **A shared key ring in the platform database.** The data protection keys live in a platform table
   that every replica reads, encrypted with the installation key as the tenant secrets of
-  [D42](d42-tenant-directory-in-the-platform-database.md) are. The server's read-only platform role
-  may insert keys and nothing more.
+  [D42](d42-tenant-directory-in-the-platform-database.md) are. This decision adds `INSERT` on
+  `platform.data_protection_keys` to the server's read-only platform role. The role's full set of
+  grants is in [the platform database](../reference/storage.md#platform-database).
 - **The platform tables exist under both tenant sources,** so keys and locks have one code path.
 - **No proxy is trusted until it is named.** The server reads the forwarded headers of one hop and
   only from the proxies its settings name.
@@ -31,8 +32,9 @@ The steps are in [several server replicas](../reference/several-server-replicas.
 ## Consequences
 
 - Sessions survive a restart and work on every replica, with no writable root file system.
-- A read-only platform role gains one insert grant, and development databases hold the platform
-  tables.
+- The read-only platform role gains an insert grant on the key table. The
+  [platform database](../reference/storage.md#platform-database) lists all its grants. Development
+  databases hold the platform tables.
 - An operator must name every proxy, a local one included.
 - In Kubernetes, Studio needs a `ReadWriteMany` storage class.
 
