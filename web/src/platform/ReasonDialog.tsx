@@ -2,6 +2,7 @@ import { Alert, Flex, Form, Input, Modal } from 'antd'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 const reasonMaxLength = 500
 
@@ -22,6 +23,7 @@ interface ReasonDialogProps {
  */
 export function ReasonDialog({ title, onSend, onClose, onChanged, children }: ReasonDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<{ reason: string }>()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
@@ -49,6 +51,7 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
   return (
     <Modal
       open
+      width={size.dialog.small}
       title={title}
       okText={t('shell.inspector.commands.send')}
       cancelText={t('shell.inspector.commands.close')}

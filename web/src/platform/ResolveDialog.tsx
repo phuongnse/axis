@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
 import { buildResolveBody } from './recordBody'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 interface ResolveDialogProps {
   call: InstanceCall
@@ -38,6 +39,7 @@ function pointerName(token: string): string {
  */
 export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClose, onChanged }: ResolveDialogProps) {
   const t = useText()
+  const { size } = useDesignTokens()
   const [form] = Form.useForm<ResolveValues>()
   const outcome = Form.useWatch('outcome', form)
   const [sending, setSending] = useState(false)
@@ -86,6 +88,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
   return (
     <Modal
       open
+      width={size.dialog.medium}
       title={t('shell.inspector.commands.resolve')}
       okText={t('shell.inspector.commands.send')}
       cancelText={t('shell.inspector.commands.close')}

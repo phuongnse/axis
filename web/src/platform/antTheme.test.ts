@@ -93,6 +93,14 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     })
   })
 
+  it('draws a dialog on surface in its content, header and footer', () => {
+    expect(config.components?.Modal).toMatchObject({
+      contentBg: colour.surface,
+      headerBg: colour.surface,
+      footerBg: colour.surface,
+    })
+  })
+
   it('draws keyboard focus as a solid 2px focusRing', () => {
     expect(token.colorPrimaryBorder).toBe(colour.focusRing)
     expect(token.controlOutline).toBe(colour.focusRing)
@@ -253,6 +261,18 @@ describe('theme values', () => {
 
   it('finds the sources', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(50)
+  })
+
+  it('takes the width of every dialog from a dialog size token', () => {
+    const dialogs = Object.values(sources).reduce((total, text) => total + (text.match(/<Modal\b/g)?.length ?? 0), 0)
+    expect(dialogs).toBeGreaterThan(0)
+    const unsized = Object.entries(sources)
+      .filter(([, text]) => {
+        const sized = text.match(/\bwidth=\{[^}\n]*\bdialog\.(small|medium|large)\b/g)?.length ?? 0
+        return (text.match(/<Modal\b/g)?.length ?? 0) !== sized
+      })
+      .map(([file]) => file)
+    expect(unsized).toEqual([])
   })
 
   it('keeps theme values in the token file and the mapping only', () => {

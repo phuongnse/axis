@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import {
   fetchUsers,
   resendInvitation,
@@ -59,6 +60,7 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  */
 export function UsersPage() {
   const t = useText()
+  const { size } = useDesignTokens()
   const platform = usePlatform()
   const { locale } = platform.current
   const [search, setSearch] = useState('')
@@ -258,6 +260,7 @@ export function UsersPage() {
       )}
       <Modal
         open={pending !== null}
+        width={size.dialog.small}
         title={pending && t(`shell.users.${pending.command}.confirm`)}
         okText={pending && t(`shell.users.${pending.command}.ok`)}
         cancelText={t('shell.users.roles.cancel')}

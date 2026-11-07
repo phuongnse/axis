@@ -44,7 +44,7 @@ export async function dragTo(page: Page, designer: string, source: Locator, targ
     const same = box === last
     last = box
     expect(same).toBe(true)
-  }).toPass({ intervals: [100] })
+  }).toPass({ intervals: [100], timeout: 30_000 })
   const height = await page.evaluate(() => window.innerHeight)
   const reach = (await target.boundingBox())!
   const reachY = reach.y + reach.height * fraction

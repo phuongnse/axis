@@ -4,6 +4,7 @@ import { CellJobTable } from '../platform/CellJobTable'
 import { createCellTenant, type CellJob, type CellTenantRequest } from '../platform/cell'
 import { newIdempotencyKey } from '../platform/processes'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { useFollowCellJob } from '../platform/useFollowCellJob'
 import { usePlatform } from './context'
 import { useCellConsole } from './cellConsoleContext'
@@ -22,6 +23,7 @@ const idPattern = /^[a-z0-9-]{1,50}$/
  */
 export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => void; onEnded: () => void }) {
   const t = useText()
+  const { size } = useDesignTokens()
   const { locale } = usePlatform().current
   const { onRefused } = useCellConsole()
   const [form] = Form.useForm<CellTenantRequest>()
@@ -84,7 +86,7 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
   return (
     <Modal
       open
-      width={job ? 900 : undefined}
+      width={job ? size.dialog.large : size.dialog.medium}
       data-testid="cell-create"
       title={t('shell.cell.create.title')}
       okText={t('shell.cell.create.ok')}

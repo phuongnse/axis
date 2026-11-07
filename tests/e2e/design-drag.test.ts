@@ -44,6 +44,9 @@ function draggablePage({ moves, marks }: { moves: boolean; marks: boolean }) {
 `;
 }
 
+// Node's test runner has no timeout by default, so a call that never returns would hold the whole check.
+const testTimeout = 120_000;
+
 let browser: Browser;
 
 before(async () => {
@@ -60,7 +63,7 @@ async function openPage(options: { moves: boolean; marks: boolean }): Promise<Pa
   return page;
 }
 
-test("dragTo releases the mouse over the target after it moved during the drag", async () => {
+test("dragTo releases the mouse over the target after it moved during the drag", { timeout: testTimeout }, async () => {
   const page = await openPage({ moves: true, marks: true });
   try {
     await dragTo(page, "studio-page-design", page.locator("#source"), page.locator("#target"));
@@ -71,7 +74,7 @@ test("dragTo releases the mouse over the target after it moved during the drag",
   }
 });
 
-test("dragTo rejects when the target never gets data-drop-over", async () => {
+test("dragTo rejects when the target never gets data-drop-over", { timeout: testTimeout }, async () => {
   const page = await openPage({ moves: false, marks: false });
   try {
     await assert.rejects(dragTo(page, "studio-page-design", page.locator("#source"), page.locator("#target")));
@@ -113,7 +116,7 @@ const scrollingPage = `
 </script>
 `;
 
-test("dragTo scrolls a target in the bottom fifth away from the edge before it aims", async () => {
+test("dragTo scrolls a target in the bottom fifth away from the edge before it aims", { timeout: testTimeout }, async () => {
   const page = await browser.newPage();
   try {
     await page.setContent(scrollingPage);

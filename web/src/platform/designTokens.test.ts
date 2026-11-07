@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   colourTokens,
@@ -152,12 +154,33 @@ describe('tokens with page values', () => {
 })
 
 describe('size tokens', () => {
-  it('are the shell bar, the small control and the table row', () => {
-    expect(sizeTokens).toEqual({ bar: 48, smallControl: 24, tableRow: 40 })
+  it('are the shell bar, the small control, the table row and the dialog widths', () => {
+    expect(sizeTokens).toEqual({
+      bar: 48,
+      smallControl: 24,
+      tableRow: 40,
+      dialog: { small: 400, medium: 560, large: 880 },
+    })
   })
 
   it.each(['light', 'dark'] as const)('are returned for %s mode', (mode) => {
-    expect(designTokensFor(mode).size).toEqual({ bar: 48, smallControl: 24, tableRow: 40 })
+    expect(designTokensFor(mode).size).toEqual(sizeTokens)
+  })
+
+  it('are listed in the frontend doc with the same names and pixel values', () => {
+    // Vitest runs from the web folder, as `npm test --prefix web` does.
+    const doc = readFileSync(join(process.cwd(), '../docs/reference/frontend.md'), 'utf8').replace(/\s+/g, ' ')
+    const bullet = (label: string) => new RegExp(`- \\*\\*${label}\\.\\*\\*(.+?)(?= - \\*\\*|$)`).exec(doc)?.[1] ?? ''
+    const names = [...bullet('Sizes').matchAll(/`(\w+)`/g)].map((match) => match[1])
+    const dialogSizes = Object.fromEntries(
+      [...bullet('Dialog sizes').matchAll(/`(\w+)` \((\d+) px\)/g)].map((match) => [match[1], Number(match[2])]),
+    )
+
+    const numeric = Object.keys(sizeTokens).filter(
+      (name) => typeof sizeTokens[name as keyof typeof sizeTokens] === 'number',
+    )
+    expect(names.sort()).toEqual(numeric.sort())
+    expect(dialogSizes).toEqual(sizeTokens.dialog)
   })
 
   it('are not changed by a page', () => {

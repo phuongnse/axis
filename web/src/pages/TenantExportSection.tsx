@@ -4,6 +4,7 @@ import { AxisButton } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { saveFile } from '../platform/exports'
 import { useText } from '../platform/texts'
+import { useDesignTokens } from '../platform/themeMode'
 import { downloadTenantExport, readTenantExport, startTenantExport, type TenantExport } from '../platform/tenantExports'
 import { usePlatform } from './context'
 
@@ -44,6 +45,7 @@ function remember(id: string | null): void {
  */
 export function TenantExportSection() {
   const t = useText()
+  const { size } = useDesignTokens()
   const { locale } = usePlatform().current
   const headingId = useId()
   const [enabled, setEnabled] = useState(false)
@@ -198,6 +200,7 @@ export function TenantExportSection() {
       </Flex>
       <Modal
         open={confirming}
+        width={size.dialog.small}
         title={t('shell.users.export.confirm')}
         okText={t('shell.users.export.ok')}
         cancelText={t('shell.users.roles.cancel')}
