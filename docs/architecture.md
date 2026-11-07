@@ -60,7 +60,9 @@ flowchart LR
   client and the cookie session. The record API, the data source endpoint, the process start
   endpoint, the task API and the site endpoints require a session. It also hosts Studio's
   [authoring API](reference/authoring.md), which works on the application folders that
-  `Studio:Folders` lists and needs a session and the author role. Validating, publishing and rolling
+  `Studio:Folders` lists and under `Studio:ApplicationsPath`, and needs a session and the author role.
+  Routes that publish also need `Studio:PublisherRole`, see
+  [authoring API settings](reference/authoring.md#settings). Validating, publishing and rolling
   back store a publish request in the tenant database over the runtime role, so the server never
   activates a release in its own process, see [D47](decisions/d47-publishing-from-studio.md).
 - **Axis.Worker** runs durable work: the steps of process instances, connector and package calls,
@@ -169,7 +171,10 @@ Axis ships as production images, as
 - `axis-server` and `axis-worker` run the hosts. They hold no sample and no development setting.
 - `axis-admin` runs `Axis.Admin` and the publisher, `axis-admin publisher`, and holds the
   PostgreSQL 18 client tools.
-- `deploy/compose/` and `deploy/helm/axis/` install them on one machine and on Kubernetes.
+- `axis-controlplane` runs `Axis.ControlPlane`. It is not part of an installation, and
+  `deploy/helm/axis-controlplane/` installs it, see [control plane](reference/control-plane.md#image-and-chart).
+- `deploy/compose/` and `deploy/helm/axis/` install the three installation images on one machine and
+  on Kubernetes.
 
 The steps, every setting and the upgrade order are in the
 [installation guide](reference/installation.md).
@@ -216,11 +221,13 @@ startup activation, and there is no fallback to one connection string. The worke
 The server's `ConnectionStrings:PlatformSchema` serves the platform migrations and the quotas write of
 the provisioning API, see [tenancy settings](reference/host-settings.md#tenancy-settings).
 
-The development settings, Docker Compose, `scripts/dev.sh` and the E2E server pass `axis_schema` in
-`SchemaConnectionString` and `ConnectionStrings:PlatformSchema`, and `axis_runtime` in the other
-settings. `appsettings.Development.json` maps `localhost` to the tenant `default` on the Compose
-database, and `preview.localhost` to its preview tenant `default-preview` on the `axis_preview`
-database. The E2E server maps `127.0.0.1` to a tenant on the E2E database and `localhost` to its
+The development settings, Docker Compose, `scripts/dev.sh` and the E2E server give the main tenant
+`default` `axis_schema` in `SchemaConnectionString` and `ConnectionStrings:PlatformSchema`, and
+`axis_runtime` in the other settings. The preview tenant `default-preview` uses its own
+`axis_preview_schema` and `axis_preview_runtime` roles on the `axis_preview` database, see
+[database roles](reference/storage.md#database-roles). `appsettings.Development.json` maps
+`localhost` to the tenant `default` on the Compose database, and `preview.localhost` to its preview
+tenant `default-preview` on the `axis_preview` database. The E2E server maps `127.0.0.1` to a tenant on the E2E database and `localhost` to its
 preview tenant, and the E2E run maps `127.0.0.2` to the journey tenant on a server of its own, see
 [the E2E stack](testing.md#the-e2e-stack). The `Platform` connection string is separate, and the readiness
 check uses it.
@@ -231,6 +238,11 @@ Startup fails with an `InvalidOperationException` that names every problem when:
 - a tenant id contains anything other than lowercase letters, digits and hyphens;
 - a tenant has no hosts, or a host entry that is blank or only whitespace;
 - a tenant has no connection string, or one that is only whitespace;
+- a tenant's site hosts break the rules of [tenancy settings](reference/host-settings.md#tenancy-settings);
+- a tenant's legal links break the rules of [legal settings](reference/legal.md#legal-settings);
+- a tenant's `Realm` block or `Oidc:UsersClientSecret` breaks the rules of
+  [tenant realm](reference/host-settings.md#tenant-realm);
+- a tenant's `Email` block is invalid, see [mail settings](reference/notifications.md#mail-settings);
 - the same host is listed under two tenants, compared ignoring letter case;
 - in the server, a tenant has no `SchemaConnectionString`, or one that is only whitespace, even when
   no application folder is activated at startup;
@@ -242,7 +254,7 @@ Startup fails with an `InvalidOperationException` that names every problem when:
   tenant and the binding, never the value;
 - the preview tenant rules of [preview tenants](reference/host-settings.md#preview-tenants) are
   broken: `PreviewOf` names a tenant that is not configured or is itself a preview tenant, two
-  tenants name the same main tenant, or a preview tenant has its own `Oidc` block.
+  tenants name the same main tenant, or a preview tenant has its own `Oidc`, `Realm` or `Legal` block.
 
 A tenant holds its deployment bindings under `Bindings`, keyed by name and matched ignoring letter
 case. A release names a binding and never holds its value, and the server and the worker must hold
@@ -416,8 +428,10 @@ A tenant's database is reached only through the current tenant.
 - `ITenantConnectionFactory` opens connections to the current tenant's database only. Without a
   tenant context it throws `InvalidOperationException`.
 - There is one `NpgsqlDataSource` per tenant, created on first use and disposed with the host.
-- **Through PgBouncer** _(planned for M31)_. In a [cell](reference/cells.md#connections) the hosts
-  reach the tenant databases through PgBouncer.
+- **Through PgBouncer.** In a [cell](reference/cells.md#connections) the server and the worker reach
+  tenant databases with the runtime role through PgBouncer, at `Cell:RuntimeDatabaseHost` and
+  `Cell:RuntimeDatabasePort`. The schema role, the publisher, the worker's `LISTEN` connection and the
+  platform connections connect to PostgreSQL directly.
 - The current tenant is held per asynchronous flow (`AsyncLocal`), so concurrent requests never see
   each other's tenant.
 - In the server, a request scope holds one tenant connection, opened on first use and disposed with
@@ -458,8 +472,9 @@ server against the application's policies. The detail is in [security](reference
     task shows, and the site endpoints call it to shape navigation and page metadata.
     `GET /api/me`, `GET /api/site`, `GET /api/texts/{locale}` and the `/api/auth` endpoints carry no
     application content and call no policy. Worker steps run as `system`, outside policies.
-  - The [authoring API](reference/authoring.md) checks `Studio:AuthorRole`, an installation-level
-    role outside application policies, and calls no policy. An author can change every policy of an
+  - The [authoring API](reference/authoring.md) checks `Studio:AuthorRole`, and
+    `Studio:PublisherRole` for the routes that publish. Both are installation-level roles outside
+    application policies, and the API calls no policy. An author can change every policy of an
     application, so a policy cannot guard authoring. See
     [Studio settings](reference/host-settings.md#studio-settings).
   - Record filters from policies limit every record list and single-record check of the record API,
