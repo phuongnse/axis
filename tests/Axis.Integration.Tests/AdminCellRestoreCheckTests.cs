@@ -129,7 +129,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: cell)).Exit);
         var bad = Path.Combine(folder.Path, "bad.axisbak");
         var table = RaiseOneCount(file, bad, await UnwrapAsync(scenario, source, cellKey), out var archived);
-        await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = bad }, CancellationToken);
+        await MinioFixture.UploadObjectAsync(s3, bucket, $"{source}/{Today()}.axisbak", await File.ReadAllBytesAsync(bad, CancellationToken), CancellationToken);
         var scratch = ScratchId();
 
         using var gauge = new GaugeCapture(source);
@@ -161,7 +161,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.axisbak");
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: cell)).Exit);
-        await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = file }, CancellationToken);
+        await MinioFixture.UploadObjectAsync(s3, bucket, $"{source}/{Today()}.axisbak", await File.ReadAllBytesAsync(file, CancellationToken), CancellationToken);
         var scratch = ScratchId();
 
         using var gauge = new GaugeCapture(source);
@@ -184,9 +184,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         using var studio = new TemporaryFolder();
         WriteCellKey();
         var bucket = await NewBucketAsync(s3);
-        await s3.PutObjectAsync(
-            new PutObjectRequest { BucketName = bucket, Key = $"t-0000/{Today()}.axisbak", ContentBody = "archive" },
-            CancellationToken);
+        await MinioFixture.UploadObjectAsync(s3, bucket, $"t-0000/{Today()}.axisbak", "archive"u8.ToArray(), CancellationToken);
         var cell = new Dictionary<string, string?>(CellSettings(bucket, studio)) { ["Cell:InternalDomain"] = null };
 
         var result = await scenario.RunAsync(["cell", "restore-check"], path: _tools.PathSetting, identityProvider: _handler, extra: cell);
@@ -361,7 +359,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         var file = Path.Combine(folder.Path, "backup.axisbak");
         var backup = new Dictionary<string, string?>(cell) { ["IdentityProvider:DatabaseConnectionString"] = await keycloak.CredentialsConnectionStringAsync() };
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", source, "--out", file], path: _tools.PathSetting, identityProvider: _handler, extra: backup)).Exit);
-        await s3.PutObjectAsync(new PutObjectRequest { BucketName = bucket, Key = $"{source}/{Today()}.axisbak", FilePath = file }, CancellationToken);
+        await MinioFixture.UploadObjectAsync(s3, bucket, $"{source}/{Today()}.axisbak", await File.ReadAllBytesAsync(file, CancellationToken), CancellationToken);
     }
 
     private byte[] WriteCellKey()

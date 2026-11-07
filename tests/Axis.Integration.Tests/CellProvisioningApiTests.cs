@@ -1683,10 +1683,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         if (_exportStorage is { } storage)
         {
             using var s3 = storage.NewClient();
-            using var content = new MemoryStream(bytes);
-            await s3.PutObjectAsync(
-                new PutObjectRequest { BucketName = storage.Bucket, Key = TenantExports.Key(tenant, id), InputStream = content },
-                CancellationToken);
+            await MinioFixture.UploadObjectAsync(s3, storage.Bucket, TenantExports.Key(tenant, id), bytes, CancellationToken);
         }
 
         return (id, bytes);

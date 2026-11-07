@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using System.Security.Cryptography;
 using Amazon.Runtime;
 using Amazon.S3;
@@ -66,7 +67,7 @@ public sealed class MinioFixture : IAsyncLifetime
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
 
-    /// <summary>The whole object. MinIO at times ends a response early, so a body cut short is read again from the start, up to three times.</summary>
+    /// <summary>The whole object. When MinIO drops a connection or ends a response early, the read starts again from the start, up to three times.</summary>
     public static Task<byte[]> ReadObjectAsync(IAmazonS3 s3, string bucket, string key, CancellationToken cancellationToken) =>
         ReadWholeAsync(token => s3.GetObjectAsync(bucket, key, token), cancellationToken);
 
@@ -81,10 +82,43 @@ public sealed class MinioFixture : IAsyncLifetime
                 await response.ResponseStream.CopyToAsync(memory, cancellationToken);
                 return memory.ToArray();
             }
-            catch (Exception exception) when (attempt < 3 && exception is IOException or HttpRequestException)
+            catch (Exception exception) when (attempt < 3 && IsDroppedConnection(exception))
             {
             }
         }
+    }
+
+    /// <summary>Stores the whole object. When MinIO drops a connection during the upload, the upload starts again from the first byte, up to three times.</summary>
+    public static Task UploadObjectAsync(IAmazonS3 s3, string bucket, string key, byte[] bytes, CancellationToken cancellationToken) =>
+        UploadWholeAsync((request, token) => s3.PutObjectAsync(request, token), bucket, key, bytes, cancellationToken);
+
+    internal static async Task UploadWholeAsync(Func<PutObjectRequest, CancellationToken, Task> put, string bucket, string key, byte[] bytes, CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            using var content = new MemoryStream(bytes);
+            try
+            {
+                await put(new PutObjectRequest { BucketName = bucket, Key = key, InputStream = content }, cancellationToken);
+                return;
+            }
+            catch (Exception exception) when (attempt < 3 && IsDroppedConnection(exception))
+            {
+            }
+        }
+    }
+
+    internal static bool IsDroppedConnection(Exception exception)
+    {
+        for (var current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is IOException or HttpRequestException or SocketException or AmazonS3Exception { ErrorCode: "ClientDisconnected" })
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>A client of the service, with path-style addressing.</summary>
