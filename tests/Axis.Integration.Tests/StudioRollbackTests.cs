@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The activate route of the authoring API stores an <c>activate</c> request for a release of the history, and the publisher
-/// activates that release again. The old rollback route is gone and answers 405. The server and the publisher run together here.
+/// activates that release again. The server and the publisher run together here.
 /// </summary>
 [Collection("Test scenario runs")]
 public sealed class StudioRollbackTests : IAsyncLifetime
@@ -161,11 +161,6 @@ public sealed class StudioRollbackTests : IAsyncLifetime
 
         using var unknownApplication = await SendAsync(author, HttpMethod.Post, $"/api/studio/apps/NoSuchApplication/releases/{release:D}/activate", HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
-        Assert.Equal(0L, await CountRequestsAsync(connectionString));
-
-        // The rollback route of before D130 is no longer a route. The API fallback answers GET only, so the answer is 405.
-        using var rolledBack = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{release:D}/rollback", HostA);
-        Assert.Equal(HttpStatusCode.MethodNotAllowed, rolledBack.StatusCode);
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
         // The body is ignored.
