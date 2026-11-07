@@ -402,8 +402,8 @@ sequenceDiagram
   or host. This covers API and SPA paths alike.
 - **Health exemption.** Paths under `/health` are not resolved, so `/health/live` and
   `/health/ready` answer for any host.
-- **Provisioning API.** A tenant host answers `404` for every path under `/api/cell`, before any
-  sign-in work.
+- **Provisioning API.** The `/api/cell` branch above applies on a tenant host. See
+  [provisioning API](reference/tenant-lifecycle.md) for where the API is served.
 - **Tenant not available.** Under `Tenancy:Source=directory`, a host of a tenant that is not served
   answers `503`, as the [tenant directory](#tenant-directory) table says.
 - **Log scope.** While a resolved request runs, the logging scope carries `TenantId` with the tenant
