@@ -411,6 +411,8 @@
   "shell.table.search": "Search",
   "shell.table.refresh": "Refresh",
   "shell.table.rowActions": "Actions",
+  "shell.table.selected": "{count} selected",
+  "shell.table.selectRow": "Select row",
   "shell.table.delete": "Delete",
   "shell.table.deleteConfirm": "Delete this record? This cannot be undone.",
   "shell.table.deleted": "The record was deleted.",

@@ -20,6 +20,9 @@ interface Row {
 const texts = {
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
+  'shell.table.selected': '{count} selected',
+  'shell.table.selectRow': 'Select row',
+  'row.archive': 'Archive',
   'row.delete': 'Delete',
   'row.open': 'Open',
   'row.close': 'Close',
@@ -326,6 +329,58 @@ describe('AxisTable', () => {
         expect(within(row).getAllByRole('button')).toHaveLength(1)
         expect(within(row).getByRole('button', { name: 'Actions' })).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('bulk actions', () => {
+    const archive = (onClick = vi.fn()) => ({ key: 'archive', labelKey: 'row.archive', onClick })
+
+    it('shows no checkboxes without a bulk action', () => {
+      renderTable()
+      expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    })
+
+    it('shows no checkboxes with row actions alone', () => {
+      renderTable({ rowActions: { configured: 1, actions: () => [deleteAction] } })
+      expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
+    })
+
+    it('shows no bar until a row is selected', () => {
+      renderTable({ bulkActions: [archive()] })
+
+      expect(screen.getAllByRole('checkbox', { name: 'Select row' })).toHaveLength(rows.length)
+      expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument()
+    })
+
+    it('counts the selected rows, runs the action on them and clears the selection', async () => {
+      const user = userEvent.setup()
+      const onClick = vi.fn()
+      renderTable({ bulkActions: [archive(onClick)] })
+
+      const bodyRows = screen.getAllByRole('row').slice(1)
+      await user.click(within(bodyRows[0]).getByRole('checkbox'))
+      await user.click(within(bodyRows[1]).getByRole('checkbox'))
+      expect(screen.getByText('2 selected')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Archive' }))
+
+      expect(onClick).toHaveBeenCalledWith([rows[0], rows[1]])
+      expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+    })
+
+    it('keeps a row action in its row, and the bar holds the bulk action only', async () => {
+      const user = userEvent.setup()
+      renderTable({ rowActions: { configured: 1, actions: () => [deleteAction] }, bulkActions: [archive()] })
+
+      const bodyRows = screen.getAllByRole('row').slice(1)
+      await user.click(within(bodyRows[0]).getByRole('checkbox'))
+
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      expect(within(bodyRows[0]).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+      const bar = screen.getByText('1 selected').parentElement as HTMLElement
+      expect(within(bar).getAllByRole('button')).toHaveLength(1)
+      expect(within(bar).getByRole('button', { name: 'Archive' })).toBeInTheDocument()
     })
   })
 

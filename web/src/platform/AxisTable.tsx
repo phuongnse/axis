@@ -1,6 +1,6 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Dropdown, Flex, Table, type TableColumnType, type TableProps } from 'antd'
-import type { CSSProperties, HTMLAttributes, ReactNode } from 'react'
+import { useState, type CSSProperties, type HTMLAttributes, type Key, type ReactNode } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
@@ -48,6 +48,15 @@ export interface AxisRowAction {
   attributes?: object
 }
 
+/** An action on the selected rows, see docs/reference/actions-and-controls.md#tables. It is a text button. */
+export interface AxisBulkAction<T> {
+  key: string
+  /** The text key of its name. */
+  labelKey: string
+  destructive?: boolean
+  onClick: (rows: T[]) => void
+}
+
 /**
  * The toolbar of every table, see docs/reference/actions-and-controls.md#tables. The view controls, such as search, sit
  * on the left. On the right come Refresh, the secondary actions such as Import and Export, and the main action last.
@@ -82,6 +91,11 @@ export interface AxisTableProps<T> {
    * layout. `actions` gives the ones a row shows, or `null` for none.
    */
   rowActions?: { configured: number; actions: (row: T) => AxisRowAction[] | null }
+  /**
+   * The actions on the selected rows. Rows show checkboxes, and a selection shows the "N selected" bar, only when the
+   * table has one.
+   */
+  bulkActions?: AxisBulkAction<T>[]
   /** Whether a row is a group row: its empty cells stay blank instead of showing the em dash. */
   blankRow?: (row: T) => boolean
   /** Attributes for the row's element, such as test ids and data attributes. */
@@ -108,7 +122,7 @@ const foldFrom = 3
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
  * order, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
- * from three on or below 992 px, the paging, sideways scrolling when the page is narrower than the columns, and the em
+ * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
 export function AxisTable<T extends object>({
@@ -123,11 +137,13 @@ export function AxisTable<T extends object>({
   below,
   failure,
   rowActions,
+  bulkActions,
   blankRow,
   rowAttributes,
   testId,
 }: AxisTableProps<T>) {
   const t = useText()
+  const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
   const freeTexts = columns.filter((column) => column.kind === 'freeText').length
@@ -178,6 +194,9 @@ export function AxisTable<T extends object>({
     })
   }
 
+  const bulk = (bulkActions?.length ?? 0) > 0
+  // Only the rows that show count, so the count and the action's rows match what the person sees.
+  const selected = bulk ? (dataSource ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
   const hasToolbar =
     toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
@@ -207,33 +226,62 @@ export function AxisTable<T extends object>({
       )}
       {below}
       {failure ?? (
-        <ConfigProvider theme={tableTheme(tokens)}>
-          <Table<T>
-            rowKey={rowKey}
-            columns={antColumns}
-            // Where the page is narrower than the columns' content, the table scrolls sideways.
-            scroll={{ x: 'max-content' }}
-            dataSource={dataSource as T[] | undefined}
-            loading={loading}
-            locale={{ emptyText: <EmptyState text={emptyText} /> }}
-            pagination={
-              pagination
-                ? {
-                    current: pagination.current,
-                    pageSize: pagination.pageSize,
-                    total: pagination.total,
-                    showSizeChanger: picker,
-                    hideOnSinglePage: !picker,
-                    itemRender: markCurrentPage(pagination.current),
-                    ...(picker ? { pageSizeOptions: sizes } : {}),
-                  }
-                : false
-            }
-            onRow={rowAttributes}
-            onChange={onChange}
-            styles={{ header: { row }, body: { row } }}
-          />
-        </ConfigProvider>
+        <>
+          {bulk && selected.length > 0 && (
+            <Flex align="center" gap="small">
+              <span>{t('shell.table.selected').replace('{count}', String(selected.length))}</span>
+              {bulkActions?.map((action) => (
+                <AxisButton
+                  key={action.key}
+                  role={action.destructive ? 'destructive' : 'secondary'}
+                  size="small"
+                  onClick={() => {
+                    action.onClick(selected)
+                    setSelectedKeys([])
+                  }}
+                >
+                  {t(action.labelKey)}
+                </AxisButton>
+              ))}
+            </Flex>
+          )}
+          <ConfigProvider theme={tableTheme(tokens)}>
+            <Table<T>
+              rowKey={rowKey}
+              rowSelection={
+                bulk
+                  ? {
+                      selectedRowKeys: selected.map(rowKey),
+                      onChange: (keys) => setSelectedKeys(keys),
+                      getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
+                    }
+                  : undefined
+              }
+              columns={antColumns}
+              // Where the page is narrower than the columns' content, the table scrolls sideways.
+              scroll={{ x: 'max-content' }}
+              dataSource={dataSource as T[] | undefined}
+              loading={loading}
+              locale={{ emptyText: <EmptyState text={emptyText} /> }}
+              pagination={
+                pagination
+                  ? {
+                      current: pagination.current,
+                      pageSize: pagination.pageSize,
+                      total: pagination.total,
+                      showSizeChanger: picker,
+                      hideOnSinglePage: !picker,
+                      itemRender: markCurrentPage(pagination.current),
+                      ...(picker ? { pageSizeOptions: sizes } : {}),
+                    }
+                  : false
+              }
+              onRow={rowAttributes}
+              onChange={onChange}
+              styles={{ header: { row }, body: { row } }}
+            />
+          </ConfigProvider>
+        </>
       )}
     </Flex>
   )
