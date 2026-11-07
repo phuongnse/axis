@@ -678,15 +678,15 @@ panel, its undo and its drag and drop.
   width, where the columns stack to full width and tables use their narrow layout, even in a wide
   browser window. The choice goes back to desktop when the author returns to the Design tab. The live
   site keeps its own rule, the window's width.
-- **Undo.** Undo and redo buttons, beside Save, and Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS, cover
+- **Undo.** Undo and Redo on the [save bar](studio-resource-form.md#save-bar), and Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS, cover
   every edit of the draft in the three tabs of a page, a form and a process. The history is kept in
   memory, up to 100 steps, and a reload, also one after a reconnect, a conflict reload or opening
   another resource clears it, while a save keeps it. A step ends when the author edits another property
   or leaves the box, and a pick in a dropdown, a button action and a move are always a step of their
-  own. The buttons are off when there is nothing to undo or redo, and while a save
+  own. The icons are off when there is nothing to undo or redo, and while a save
   runs. The keys also work when nothing has focus, but not when the focus is outside the editor, and
   Studio's undo replaces the browser's own inside the editor's boxes.
-- **Undo for every kind** _(planned for M31)_. Every kind's draft has undo and redo, on the
+- **Undo for every kind.** Every kind's draft has undo and redo, on the
   [save bar](studio-resource-form.md#save-bar).
 - **Custom widgets** _(planned for M22)_. The palette offers custom widgets, as
   [custom widgets](custom-widgets.md#designer-palette) describes.

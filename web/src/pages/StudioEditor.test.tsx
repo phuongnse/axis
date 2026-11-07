@@ -126,30 +126,28 @@ describe('StudioEditor for a seed', () => {
     stub(seedContent('order', [{ id: 'a', values: { code: 'X1', size: 3 } }]))
     renderEditor()
     const size = await screen.findByRole('textbox', { name: 'size' }, slow)
-    const save = screen.getByRole('button', { name: 'Save' })
-    expect(save).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
 
     await userEvent.clear(size)
     await userEvent.type(size, 'abc')
     expect(size).toHaveAttribute('aria-invalid', 'true')
-    expect(save).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
 
     await userEvent.clear(size)
     await userEvent.type(size, '12')
     expect(size).toHaveAttribute('aria-invalid', 'false')
-    expect(save).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
   })
 
   it('turns Save off for a loaded string "5" in an integer field, also for a change made elsewhere', async () => {
     stub(seedContent('Order', [{ id: 'a', values: { code: 'X1', size: '5' } }]))
     renderEditor()
     const code = await screen.findByRole('textbox', { name: 'code' }, slow)
-    const save = screen.getByRole('button', { name: 'Save' })
 
     await userEvent.type(code, '2')
 
     expect(screen.getByRole('textbox', { name: 'size' })).toHaveAttribute('aria-invalid', 'true')
-    expect(save).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
   })
 
   it('turns Save off for a wrong value typed in the JSON view', async () => {
@@ -1252,7 +1250,7 @@ describe('StudioEditor for a text resource', () => {
     const puts = calls(fetchMock, 'PUT')
     expect(puts).toHaveLength(1)
     expect(JSON.parse(puts[0][1].body as string)).toEqual({ texts: { en: 'A', vi: 'B' } })
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
 
     const greeting = within(added[1]).getByRole('textbox', { name: 'en' })
     await userEvent.clear(greeting)
@@ -1309,7 +1307,7 @@ describe('StudioEditor for a label', () => {
     expect(key).toHaveValue('pages.myTasks.title')
     await userEvent.type(screen.getByRole('textbox', { name: 'en' }), 'My tasks')
     await userEvent.type(screen.getByRole('textbox', { name: 'vi' }), 'Việc của tôi')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Write texts' }))
 
     await screen.findByTestId('studio-label-written')
@@ -1352,7 +1350,7 @@ describe('StudioEditor for a label', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Write texts' }))
 
     expect(await screen.findByTestId('studio-label-write-error')).toHaveTextContent('The texts could not be written.')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     expect(sentTexts(fetchMock)).toHaveLength(1)
   })
 })
@@ -1507,14 +1505,13 @@ describe('StudioEditor for a page', () => {
       widgets: [{ type: 'taskInbox' }, { type: 'table', dataSource: 'PurchaseRequestList' }],
     }
 
-    it('starts with Undo and Redo off', async () => {
+    it('shows no save bar on a clean draft', async () => {
       stubResource(pageItem, pageContent)
       renderResource(pageItem, pageNames)
       await openFormTab()
 
       await screen.findByTestId('studio-page-editor', {}, slow)
-      expect(undoButton()).toBeDisabled()
-      expect(redoButton()).toBeDisabled()
+      expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     })
 
     it('undoes and redoes the typing in one box as one step', async () => {
@@ -1569,6 +1566,25 @@ describe('StudioEditor for a page', () => {
       expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('PurchaseRequestList')
       await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}')
       expect(screen.getByTestId('studio-field-/widgets/1/dataSource')).toHaveTextContent('SupplierList')
+    })
+
+    it('removes a widget without asking and shows a notice whose Undo restores it', async () => {
+      stubResource(pageItem, tableAndInbox)
+      renderResource(pageItem, pageNames)
+      await openFormTab()
+
+      await screen.findByTestId('studio-widget-/widgets/1', {}, slow)
+      await userEvent.click(
+        within(screen.getByTestId('studio-widget-row-/widgets/1')).getByRole('button', { name: 'Remove widget' }),
+      )
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('studio-widget-/widgets/1')).not.toBeInTheDocument()
+      expect(await screen.findByText('Row removed.')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Undo removal' }))
+
+      expect(await screen.findByTestId('studio-widget-/widgets/1')).toHaveTextContent('table')
     })
 
     it('undoes and redoes a move of a widget', async () => {
@@ -1638,10 +1654,9 @@ describe('StudioEditor for a page', () => {
       await userEvent.type(name, 'abc')
       await userEvent.click(screen.getByRole('button', { name: 'Save' }))
       await screen.findByTestId('studio-saved')
-      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-      expect(undoButton()).toBeEnabled()
+      expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
 
-      await userEvent.click(undoButton())
+      await userEvent.keyboard('{Control>}z{/Control}')
       expect(name).toHaveValue('MyTasks')
       expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
       await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -1670,8 +1685,7 @@ describe('StudioEditor for a page', () => {
 
       await waitFor(() => expect(screen.queryByTestId('studio-conflict')).not.toBeInTheDocument())
       expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('MyTasks')
-      expect(undoButton()).toBeDisabled()
-      expect(redoButton()).toBeDisabled()
+      expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     })
 
     it('leaves the keys to the browser when the focus is outside the editor', async () => {
@@ -1975,7 +1989,7 @@ describe('StudioEditor for an entity', () => {
     expect(
       screen.getAllByRole('textbox', { name: 'Field name' }).map((box) => (box as HTMLInputElement).value),
     ).toEqual(['total', 'code', 'note'])
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
   })
 
   it('saves one patch and no changes call for a field added in the same session and then renamed', async () => {
@@ -2225,7 +2239,7 @@ describe('StudioEditor JSON view actions', () => {
     expect(await screen.findByRole('textbox', { name: 'Find in JSON' })).toBeInTheDocument()
   })
 
-  it('formats compact JSON on two-space indents and keeps Save off when the data is the same', async () => {
+  it('formats compact JSON on two-space indents and shows no save bar when the data is the same', async () => {
     stub(content)
     renderEditor()
     await openJsonTab()
@@ -2236,7 +2250,7 @@ describe('StudioEditor JSON view actions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Format' }))
 
     expect(await jsonText()).toBe(JSON.stringify(loaded, null, 2))
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
   })
 
   it('turns Format off while the text is not JSON', async () => {
@@ -2367,5 +2381,76 @@ describe('StudioEditor problems in the JSON view', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'JSON' }))
     await problemButton('1 problem')
+  })
+
+  describe('and the save bar', () => {
+    const bar = () => screen.getByTestId('studio-save-bar')
+    const nameBox = () => within(screen.getByTestId('studio-field-/name')).getByRole('textbox')
+
+    it('shows the bar for JSON that does not parse, with Undo and Discard on and Save off', async () => {
+      await openJsonTab()
+      expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
+
+      await editJson('{')
+
+      expect(await screen.findByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
+      expect(within(bar()).getByRole('button', { name: 'Undo' })).toBeEnabled()
+      expect(within(bar()).getByRole('button', { name: 'Discard' })).toBeEnabled()
+      expect(within(bar()).getByRole('button', { name: 'Save' })).toBeDisabled()
+    })
+
+    it('reads "No unsaved changes" after an edit and Undo, with Redo on and no Discard', async () => {
+      stubResource(roleItem, roleContent)
+      renderResource(roleItem)
+      await screen.findByTestId('studio-field-/name', {}, slow)
+      await userEvent.type(nameBox(), 'x')
+      expect(bar()).toHaveTextContent('Unsaved changes')
+
+      await userEvent.click(within(bar()).getByRole('button', { name: 'Undo' }))
+
+      expect(bar()).toHaveTextContent('No unsaved changes')
+      expect(within(bar()).getByRole('button', { name: 'Redo' })).toBeEnabled()
+      expect(within(bar()).queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument()
+      expect(within(bar()).getByRole('button', { name: 'Save' })).toBeDisabled()
+    })
+
+    it('turns the form read-only under a warning while the JSON has an error, and editable once it is fixed', async () => {
+      await openJsonTab()
+      await editJson('{')
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+      const warning = await screen.findByTestId('studio-form-read-only')
+      expect(warning).toHaveTextContent('The JSON has an error')
+      expect(nameBox()).toBeDisabled()
+
+      await userEvent.click(within(warning).getByRole('button', { name: 'Go to JSON' }))
+      await editJson(JSON.stringify(roleContent, null, 2))
+      await userEvent.click(screen.getByRole('tab', { name: 'Form' }))
+
+      expect(screen.queryByTestId('studio-form-read-only')).not.toBeInTheDocument()
+      expect(nameBox()).toBeEnabled()
+    })
+
+    it('brings the bar for a field edit, Undo restores the field, and a confirmed Discard restores the loaded data', async () => {
+      stubResource(roleItem, roleContent)
+      renderResource(roleItem)
+      await screen.findByTestId('studio-field-/name', {}, slow)
+      const name = nameBox()
+
+      await userEvent.type(name, 'x')
+      expect(name).toHaveValue('approverx')
+      expect(bar()).toBeInTheDocument()
+      await userEvent.click(within(bar()).getByRole('button', { name: 'Undo' }))
+      expect(name).toHaveValue('approver')
+
+      await userEvent.type(name, 'y')
+      await userEvent.click(within(bar()).getByRole('button', { name: 'Discard' }))
+      const dialog = await screen.findByRole('dialog')
+      expect(dialog).toHaveTextContent('Discard all unsaved changes?')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Discard' }))
+
+      await waitFor(() => expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument())
+      expect(nameBox()).toHaveValue('approver')
+    })
   })
 })

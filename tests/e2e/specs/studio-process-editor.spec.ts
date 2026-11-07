@@ -344,7 +344,8 @@ test.describe("Studio edits a process in the process editor", () => {
       );
 
       await page.getByRole("tab", { name: "Design", exact: true }).click();
-      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      // The save bar is gone after a save, so Undo is the key.
+      await page.keyboard.press("Control+Z");
       // The save marked steps by the saved file's numbers, so the restored node may carry another node's mark.
       await expect(
         page.getByTestId(`studio-graph-node-${removed}`),

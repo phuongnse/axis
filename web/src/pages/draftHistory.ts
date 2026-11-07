@@ -1,3 +1,5 @@
+import { getAt } from '../platform/jsonPatch'
+
 /** The draft and the text of the JSON view at one moment. `jsonText` is `null` while the view shows the draft. */
 export interface DraftSnapshot {
   draft: Record<string, unknown>
@@ -66,4 +68,25 @@ export function redoStep(
     history: { past: [...history.past, current], future: history.future.slice(0, -1), step: null },
     snapshot,
   }
+}
+
+/**
+ * The item that setting `pointer` to `value` removes from `before`, or `null` when it removes none. An item is removed
+ * when `value` is `undefined` and the pointer names a held index of an array, or when the list at the pointer
+ * becomes one item shorter. In the shorter list it is the first item that differs by reference, or else the last.
+ */
+export function removedItem(before: unknown, pointer: string, value: unknown): { item: unknown } | null {
+  const old = getAt(before, pointer)
+  if (value === undefined) {
+    const parent = getAt(before, pointer.slice(0, pointer.lastIndexOf('/')))
+    const index = Number(pointer.slice(pointer.lastIndexOf('/') + 1))
+    return Array.isArray(parent) && Number.isInteger(index) && index >= 0 && index < parent.length
+      ? { item: parent[index] }
+      : null
+  }
+  if (Array.isArray(old) && Array.isArray(value) && value.length === old.length - 1) {
+    const at = old.findIndex((item, index) => index >= value.length || item !== value[index])
+    return { item: old[at === -1 ? old.length - 1 : at] }
+  }
+  return null
 }

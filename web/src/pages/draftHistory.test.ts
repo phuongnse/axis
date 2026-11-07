@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { emptyHistory, endStep, historyLimit, recordStep, redoStep, undoStep, type DraftSnapshot } from './draftHistory'
+import {
+  emptyHistory,
+  endStep,
+  historyLimit,
+  recordStep,
+  redoStep,
+  removedItem,
+  undoStep,
+  type DraftSnapshot,
+} from './draftHistory'
 
 function snapshot(n: number): DraftSnapshot {
   return { draft: { n }, jsonText: null }
@@ -89,5 +98,33 @@ describe('draftHistory', () => {
     history = recordStep(history, { draft: before.draft, jsonText: null }, null)
 
     expect(history.past).toEqual([before])
+  })
+})
+
+describe('removedItem', () => {
+  const a = { name: 'a' }
+  const b = { name: 'b' }
+  const c = { name: 'c' }
+  const before = { rows: [a, b, c], title: 'T' }
+
+  it('returns the item of a list that is one item shorter, the first that differs', () => {
+    expect(removedItem(before, '/rows', [a, c])).toEqual({ item: b })
+    expect(removedItem(before, '/rows', [b, c])).toEqual({ item: a })
+  })
+
+  it('returns the last item when the shorter list keeps the others', () => {
+    expect(removedItem(before, '/rows', [a, b])).toEqual({ item: c })
+  })
+
+  it('returns the item of an array index that is cleared', () => {
+    expect(removedItem(before, '/rows/1', undefined)).toEqual({ item: b })
+  })
+
+  it('returns null for an edit that removes nothing', () => {
+    expect(removedItem(before, '/rows', [a, b, c, a])).toBeNull()
+    expect(removedItem(before, '/rows', [a])).toBeNull()
+    expect(removedItem(before, '/rows/5', undefined)).toBeNull()
+    expect(removedItem(before, '/title', undefined)).toBeNull()
+    expect(removedItem(before, '/title', 'U')).toBeNull()
   })
 })
