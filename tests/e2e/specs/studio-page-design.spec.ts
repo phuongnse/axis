@@ -373,7 +373,8 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
         .poll(async () => JSON.parse(await readFile(file, "utf8")).widgets)
         .toHaveLength(original.widgets.length + 1);
 
-      await page.getByRole("button", { name: "Undo", exact: true }).click();
+      // The save bar is gone after a save, so Undo is the key.
+      await page.keyboard.press("Control+Z");
       await expect(save).toBeEnabled();
       await save.click();
 

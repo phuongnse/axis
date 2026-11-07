@@ -166,8 +166,8 @@ runs Playwright in Chromium. It:
   and the publisher serve too;
 - starts the control plane with its databases `axis_controlplane` and `axis_directory`, see
   [the E2E stack](testing.md#the-e2e-stack);
-- makes a throwaway TLS certificate for the run, which the https server of the tenant create spec and
-  of the two cell specs use on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283);
+- makes a throwaway TLS certificate for the run, which the https server of each spec that runs `tenant create`
+  uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec;
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
   [widget previews](reference/widget-previews.md).
 

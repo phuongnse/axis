@@ -56,8 +56,9 @@ away instead.
   "Not translated into Vietnamese", and counts more, as "Not translated into 3 languages", so it stays one
   short line, and Translations lists them all.
 - **The key is Studio's own.** Studio makes it from the resource and the path, and never shows it.
-- **One Save.** The texts are part of the resource's one Save, which writes the label's texts first, so
-  a resource never names a key with no text. There is no Write texts button.
+- **One Save.** The texts are part of the resource's one Save and its history, so Undo steps through a
+  label's texts too. Save writes the label's texts first, so a resource never names a key with no text.
+  There is no Write texts button.
 
 ## Lists of objects
 
@@ -134,8 +135,6 @@ says so.
 
 ## Save bar
 
-_(planned for M31)_
-
 The save bar holds what acts on the whole draft. While there is something to save, it stays at the foot
 of the window across the content, drawn over the footer: "Unsaved changes" on the left, Undo and Redo as
 icons, then Discard and Save on the right. With nothing to save it is not drawn.
@@ -149,8 +148,6 @@ icons, then Discard and Save on the right. With nothing to save it is not drawn.
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
 
 ## Form and JSON
-
-_(planned for M31)_
 
 Form and JSON are two tabs of one draft, so a change in either shows in the other at once, and Undo,
 Redo, Discard and Save act on both. While the JSON has an error, the form is read-only: it shows the

@@ -250,15 +250,13 @@ A list takes one of three orders, chosen by what the list is.
 
 ## Undo rather than confirm
 
-_(planned for M31)_
-
 Whether an action asks first follows from whether a person can take it back.
 
 - **What can be taken back is undone, not confirmed.** Removing a row changes only the draft, so it
   asks nothing. A notice names it, such as "Organization removed.", with Undo, for ten seconds.
 - **Every editor keeps a history.** Undo and Redo, icons in the
   [save bar](studio-resource-form.md#save-bar) with Ctrl+Z and Ctrl+Shift+Z, step through every change
-  of the draft, a label's texts among them, on every resource kind.
+  of the draft, on every resource kind.
 - **What cannot be taken back is confirmed.** Discard drops every unsaved change at once and no Undo
   brings them back, so a small dialog asks "Discard all unsaved changes?" with a red Discard. Deleting
   a resource keeps its dialog.
