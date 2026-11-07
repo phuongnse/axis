@@ -59,8 +59,9 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   shows under the field and keeps the dialog open.
 - **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
   stays on, and a click [checks the fields](actions-and-controls.md#fields).
-- **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's schema,
-  with an id from `crypto.randomUUID()`. A reference the author must still choose is an empty string,
+- **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's
+  schema except at the references the author must still choose, with an id from
+  `crypto.randomUUID()`. A reference the author must still choose is an empty string,
   so it shows as a diagnostic. A new `site` gets the kebab-case name as its `path`, by the rule of file
   names, because a path is a value and not a reference. A new `identityProvider` starts with type
   `accounts`, in `identity-providers/<name>.json`. A new trigger starts with an empty `event`, and
