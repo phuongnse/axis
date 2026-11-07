@@ -24,7 +24,7 @@ as it checks other references.
 - **One format.** A table opens and creates records only through navigate actions.
 - **Checked when compiled.** The compiler checks each target page, parameter and value type, and
   indexes each target as a `navigate page` relation
-  ([D39](d39-reference-index-and-where-a-resource-is-used.md)). A required parameter missing from the
+  ([D141](d141-the-reference-index-and-what-uses-a-resource.md)). A required parameter missing from the
   URL, or malformed, shows the not-found page.
 - **Policies shape the actions.** Page metadata leaves out an action whose target page, or a field on
   whose path, the user may not read, and the server still checks every request

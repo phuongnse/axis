@@ -29,6 +29,12 @@ Each common job has one shared widget or helper:
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
+| A field of a platform screen                   | `AxisField`, with `AxisCheckboxField`, `AxisChoiceField`, `AxisFieldRow` and `AxisFieldGroup` _(planned for M31)_ |
+| A row of actions                               | `AxisActionRow`                                                                                        |
+| A text in the author's language                | `textIn`, else `en` _(planned for M31)_                                                                |
+| The address of a Studio resource               | `studioResourceAddress` _(planned for M31)_                                                            |
+| Asking before unsaved changes are left         | `useUnsavedChanges`, which `SaveBar` calls _(planned for M31)_                                         |
+| An expression in an editor                     | `ExpressionEditor`, through `ExpressionField` _(planned for M31)_                                      |
 | Words                                          | `useText`                                                                                              |
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |

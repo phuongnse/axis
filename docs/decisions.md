@@ -50,7 +50,7 @@ the files agree, title and status included.
 | [D36](decisions/d36-correlated-logs-metrics-and-traces.md) | Correlated logs, metrics and traces | **Agreed** |
 | [D37](decisions/d37-health-checks-for-the-server-and-the-worker.md) | Health checks for the server and the worker | **Agreed** |
 | [D38](decisions/d38-studio-edits-application-folders-through-an-authoring-api.md) | Studio edits application folders through an authoring API | **Agreed** |
-| [D39](decisions/d39-reference-index-and-where-a-resource-is-used.md) | Reference index and where a resource is used | **Agreed** |
+| D39 | Reference index and where a resource is used | Superseded by [D141](decisions/d141-the-reference-index-and-what-uses-a-resource.md), [last text](https://github.com/phuongnse/axis/blob/eeeb537b826a17c87c517b1f2b4060abfe0fde60/docs/decisions/d39-reference-index-and-where-a-resource-is-used.md) |
 | [D40](decisions/d40-reusable-modules.md) | Reusable modules | **Agreed** |
 | [D41](decisions/d41-leave-requests-as-the-second-sample-application.md) | Leave requests as the second sample application | **Agreed** |
 | [D42](decisions/d42-tenant-directory-in-the-platform-database.md) | Tenant directory in the platform database | **Agreed** |
@@ -152,3 +152,4 @@ the files agree, title and status included.
 | [D138](decisions/d138-the-docs-follow-arc42-c4-diagrams-in-mermaid-and-four-kinds-of-page.md) | The docs follow arc42, C4 diagrams in Mermaid and four kinds of page | **Agreed** |
 | [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) | CI runs on main alone, and NexKit checks every branch | **Agreed** |
 | [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) | A new screen is designed first, on a short prototype with fixtures | **Agreed** |
+| [D141](decisions/d141-the-reference-index-and-what-uses-a-resource.md) | The reference index, and what uses a resource | **Agreed** |

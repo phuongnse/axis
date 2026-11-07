@@ -26,7 +26,7 @@ reaches all of them.
   and a drop never copies one, so no field shows twice. Adding the first step names every unnamed
   section and puts them all into it. The property panel keeps the rules of D62.
 - **The author sees how far an edit reaches.** The Design tab lists the pages and process steps that
-  use the form, from the [reference index](d39-reference-index-and-where-a-resource-is-used.md).
+  use the form, from the [reference index](d141-the-reference-index-and-what-uses-a-resource.md).
 
 The screen is in the [form designer](../reference/form-designer.md) and the route in
 [draft page metadata](../reference/draft-page-metadata.md).

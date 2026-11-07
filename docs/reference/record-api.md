@@ -163,6 +163,9 @@ A list takes a page, a page size, a sort and a search text in its query.
   order. The name matches exactly, so letter case matters. A `child-collection`
   or `sensitive` field is not a valid `sort`, nor is a field the user may not
   read, as for an unknown field.
+- **`filter`** _(planned for M31)_. Keeps only the records that match the conditions of a
+  [table's filter](actions-and-controls.md#tables), in groups of All or Any. It refuses a field the user
+  may not read, as `sort` does.
 - **`search`.** Keeps only the records where the display field or any
   `searchable` field the user may read contains the text, ignoring letter
   case. Both sides go through PostgreSQL `lower()`, so case folding follows the

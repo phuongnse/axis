@@ -213,7 +213,7 @@ save or a request, not on every edit.
 
 A module process, such as `checklists/ChecklistReview`, opens in this designer with the application's
 [customization layer](customization-layers.md#in-studio) applied, through the module editor that module
-entities use. It shows only the Design view, with no Form tab, JSON tab, Undo, Delete, Uses or Used by.
+entities use. It shows only the Design view, with no Form tab, JSON tab, Undo, Delete or Used by.
 
 - **Marks.** A step that the layer added or changed is marked Added or Changed on its graph node, in the
   node's accessible name and on its panel, which also has Reset to module. A change inside a branch,
