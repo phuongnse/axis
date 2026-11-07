@@ -438,14 +438,12 @@ describe('StudioPage', () => {
   it('sends only the changed value, with the loaded version', async () => {
     const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const save = await screen.findByRole('button', { name: 'Save' })
-    expect(save).toBeDisabled()
-
-    const maxLength = within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     await userEvent.clear(maxLength)
     await userEvent.type(maxLength, '250')
-    expect(save).toBeEnabled()
-    await userEvent.click(save)
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
     const patches = fetchMock.mock.calls.filter(([, init]) => init?.method === 'PATCH')
@@ -455,7 +453,7 @@ describe('StudioPage', () => {
     const headers = new Headers(init!.headers)
     expect(headers.get('If-Match')).toBe('"b"')
     expect(headers.get('Content-Type')).toBe('application/json-patch+json')
-    expect(save).toBeDisabled()
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
   })
 
   it('shows the diagnostics of the save answer in place of the loaded ones', async () => {
@@ -1129,7 +1127,7 @@ describe('StudioPage', () => {
     stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${manifestId}`)
 
-    await screen.findByRole('button', { name: 'Save' })
+    await screen.findByTestId('studio-editor')
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 
