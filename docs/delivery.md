@@ -327,13 +327,18 @@ change, a design review and a sync are in the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
   differs from the repository.
-- **A review ends in one docs change.** When the owner has agreed the changes, one hand-made docs
-  pull request rewrites the rules where they live, in the reference pages, configuration and APIs
-  included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct) says. It adds a decision
-  only for a choice between real alternatives. Once it is merged, the issues that are waiting build
+- **A review writes its rules in the docs as they are agreed.** Each review has a design issue and
+  a docs branch. The docs branch takes each rule the owner agrees, where it lives, and the design issue
+  holds the review's state and what the build must do beyond the docs. No other file keeps them.
+- **A review ends in one docs change.** When the owner has agreed the changes, the docs branch is one
+  hand-made docs pull request, which rewrites the rules where they live, in the reference pages,
+  configuration and APIs included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct)
+  says. It adds a decision only for a choice between real alternatives. Once it is merged, the issues
+  that are waiting build
   the screens: they link the docs and the prototype's tag, and closing the design issue starts them.
   A review of a screen that is already built has no such issues, so one NexKit issue builds all of it
-  and links the docs, the artifact and the tag. NexKit splits it if it needs to, not the owner.
+  and links the docs, the artifact and the tag, and the design issue closes. NexKit splits it if it
+  needs to, not the owner.
 - **A sync follows the repository.** After a merged change to the tokens or a widget, or whenever the
   owner asks, the session renders the previews again with `scripts/design-system.sh`, reads the
   tokens from `web/src/platform/designTokens.ts`, and publishes both to the same artifact. It keeps
