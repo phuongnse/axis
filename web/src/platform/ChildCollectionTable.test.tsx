@@ -10,6 +10,7 @@ import type { FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import type { ThemeMode } from './themeMode'
+import { withAntdStyles } from '../test/antdStyles'
 
 const texts = {
   'test.lines': 'Lines',
@@ -128,14 +129,18 @@ describe('the add and remove buttons of a child collection', () => {
 })
 
 describe('the cells of a child collection', () => {
-  it('shows a cell message as a left-aligned block 4px under its input, with no gap below', () => {
-    renderIn('light', <Harness initial={oneRow} errors={{ '0/quantity': ['Bad'] }} />)
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    const message = screen.getByTestId('field-error-lines-0-quantity')
-    expect(message).toHaveStyle({ display: 'block', textAlign: 'left' })
-    expect(message.closest('.ant-form-item-explain')).toHaveStyle({ marginTop: '4px' })
-    const item = message.closest('.ant-form-item')
-    expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
+    it('shows a cell message as a left-aligned block 4px under its input, with no gap below', () => {
+      renderIn('light', <Harness initial={oneRow} errors={{ '0/quantity': ['Bad'] }} />)
+
+      const message = screen.getByTestId('field-error-lines-0-quantity')
+      expect(message).toHaveStyle({ display: 'block', textAlign: 'left' })
+      expect(message.closest('.ant-form-item-explain')).toHaveStyle({ marginTop: '4px' })
+      const item = message.closest('.ant-form-item')
+      expect(item && getComputedStyle(item).getPropertyValue('--ant-form-item-margin-bottom')).toBe('0px')
+    })
   })
 
   it('lines up the cells of a row at the top', () => {

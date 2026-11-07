@@ -3,6 +3,7 @@ import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, expect, vi } from 'vitest'
 import { resetSignInNeeded } from '../platform/signInNeeded'
 import { recordAntdDeprecation, takeAntdDeprecations } from './antdDeprecations'
+import { installStyleSwitch } from './antdStyles'
 
 // Ant Design 6 keeps deprecated props in its types, so only its runtime warning shows them. Record it to fail the test.
 const consoleError = console.error.bind(console)
@@ -26,6 +27,9 @@ afterAll(() => {
   vi.useRealTimers()
   return new Promise((resolve) => setTimeout(resolve, 500))
 })
+
+// Ant Design's styles stay out of jsdom until a test calls withAntdStyles(), see docs/development.md#unit-tests.
+installStyleSwitch()
 
 // jsdom does not implement matchMedia, which Ant Design and the theme provider use.
 Object.defineProperty(window, 'matchMedia', {

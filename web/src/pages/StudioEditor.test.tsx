@@ -16,6 +16,7 @@ import { chooseOption } from '../test/antd'
 import { editJson, jsonText, jsonView } from '../test/jsonView'
 import { buildProcessGraph } from './processGraph'
 import { StudioEditor } from './StudioEditor'
+import { withAntdStyles } from '../test/antdStyles'
 
 const folder = '/api/studio/apps/Shop'
 const seedId = '46e28f6b-ce3b-4a17-829e-92fb3a5930ad'
@@ -2159,22 +2160,26 @@ describe('StudioEditor for an entity', () => {
 })
 
 describe.each(['light', 'dark'] as const)('The JSON view in %s mode', (mode) => {
-  it('draws each kind of token in its token colour', async () => {
-    localStorage.setItem('axis.themeMode', mode)
-    stubResource(pageItem, { ...pageContent, count: 5, visible: true, owner: null })
-    renderResource(pageItem, pageNames)
-    await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
-    const view = await jsonView()
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    const span = (text: string) =>
-      within(view.contentDOM)
-        .getAllByText(text, { selector: 'span' })
-        .find((element) => element.className !== '')!
-    expect(span('"name"')).toHaveStyle({ color: colourTokens.primaryText[mode] })
-    expect(span('"MyTasks"')).toHaveStyle({ color: colourTokens.text[mode] })
-    expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
-    expect(span('true')).toHaveStyle({ color: colourTokens.warningText[mode] })
-    expect(span('null')).toHaveStyle({ color: colourTokens.warningText[mode] })
-    expect(span(':')).toHaveStyle({ color: colourTokens.textMuted[mode] })
+    it('draws each kind of token in its token colour', async () => {
+      localStorage.setItem('axis.themeMode', mode)
+      stubResource(pageItem, { ...pageContent, count: 5, visible: true, owner: null })
+      renderResource(pageItem, pageNames)
+      await userEvent.click(await screen.findByRole('tab', { name: 'JSON' }, slow))
+      const view = await jsonView()
+
+      const span = (text: string) =>
+        within(view.contentDOM)
+          .getAllByText(text, { selector: 'span' })
+          .find((element) => element.className !== '')!
+      expect(span('"name"')).toHaveStyle({ color: colourTokens.primaryText[mode] })
+      expect(span('"MyTasks"')).toHaveStyle({ color: colourTokens.text[mode] })
+      expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
+      expect(span('true')).toHaveStyle({ color: colourTokens.warningText[mode] })
+      expect(span('null')).toHaveStyle({ color: colourTokens.warningText[mode] })
+      expect(span(':')).toHaveStyle({ color: colourTokens.textMuted[mode] })
+    })
   })
 })

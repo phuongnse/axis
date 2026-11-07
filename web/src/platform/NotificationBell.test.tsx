@@ -9,6 +9,7 @@ import { NotificationBell } from './NotificationBell'
 import { notificationAddress, type NotificationItem, type NotificationPage } from './notifications'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
+import { withAntdStyles } from '../test/antdStyles'
 
 const path = '/api/apps/E2eApp/notifications'
 const noteId = '5b0f6c3e-83f1-4b0e-9d6c-0a0e1f9a7a11'
@@ -156,17 +157,21 @@ describe('NotificationBell', () => {
     expect(posts(fetchMock)).toEqual([{ url: `${path}/read-all`, csrf: '1' }])
   })
 
-  it('opens the page of a row with its parameters and marks it read', async () => {
-    const fetchMock = stubServer(() => json(page([withPage], 1)))
-    renderBell()
-    const user = userEvent.setup()
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
-    await user.click(await screen.findByRole('button', { name: /Note ready/ }))
+    it('opens the page of a row with its parameters and marks it read', async () => {
+      const fetchMock = stubServer(() => json(page([withPage], 1)))
+      renderBell()
+      const user = userEvent.setup()
 
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
-    expect(posts(fetchMock)).toEqual([{ url: `${path}/${withPage.id}/read`, csrf: '1' }])
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
+      await user.click(await screen.findByRole('button', { name: /Note ready/ }))
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
+      expect(posts(fetchMock)).toEqual([{ url: `${path}/${withPage.id}/read`, csrf: '1' }])
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    })
   })
 
   it('only marks a row without a page read', async () => {
