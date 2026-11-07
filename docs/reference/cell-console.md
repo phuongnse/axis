@@ -91,15 +91,14 @@ actions of the Tenant view.
   step with its state, and the error of a failed job or step.
 - **Tenants.** One row per tenant, with a search by id and host, a filter by status and a Create tenant button
   that opens the dialog of [creating a tenant](#actions). The search and the filter run in the browser. A row shows:
-  - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`), the application and
-    the hosts;
+  - the id, the status (`active`, `readOnly`, `suspended`, `provisioning` or `deleting`) and the hosts;
   - the counts of failed instances, calls with an unknown outcome and open dead letters, with a dash for a
     tenant that the worker has not counted yet;
   - the usage: the newest storage sample, the users, the applications and the emails sent today, each against
     its quota, with a dash while a count is missing, see [the tenant list](tenant-lifecycle.md#routes);
   - the time of the newest daily archive, marked when it is more than 26 hours old, with a dash for a tenant
     that has no archive.
-- **Tenant.** One tenant's status, application and hosts, its quotas with the rows that override the cell's
+- **Tenant.** One tenant's status and hosts, its quotas with the rows that override the cell's
   defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, see [the tenant read](tenant-lifecycle.md#routes).
@@ -108,6 +107,8 @@ actions of the Tenant view.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation
     that names the tenant, a Download button once an export has succeeded, and a Set quotas and an Add a host
     button, each with a dialog that names the tenant, see [actions](#actions).
+- **Application** _(planned for M31)_. A row of the Tenants view and the Tenant view show the tenant's
+  application, as the [tenant reads](tenant-lifecycle.md#routes) answer it.
 
 ## Actions
 
