@@ -43,7 +43,11 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
     private readonly HttpClient _identityProvider = AdminCommands.IdentityProviderClient(null);
 
     // A tenant made by tenant create has a realm, and the stub that answers in its place is not reached here. The fixture's tenant is made to be one without.
-    public async ValueTask InitializeAsync() => await fixture.Scenario.ForgetRealmUsersAsync(fixture.TenantId);
+    public async ValueTask InitializeAsync()
+    {
+        await FailLeftJobsAsync();
+        await fixture.Scenario.ForgetRealmUsersAsync(fixture.TenantId);
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -336,6 +340,27 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         Assert.Contains($"{fixture.TenantId} export ok", output.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_job_left_claimable_by_an_earlier_test_is_failed_before_the_next_export_so_the_runner_claims_that_export()
+    {
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+        var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
+        var failing = Kinds(JobSetting<CellBackupStorage>.Of(storage), wrap: step => step with { RunAsync = (_, _, _, _) => throw new InvalidOperationException("left") });
+        var left = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, failing, "export", fixture.TenantId, "operator-1", null, null, CancellationToken);
+        using var leftOutput = new StringWriter();
+        Assert.True(await new ProvisioningJobs(fixture.Scenario.Platform, failing, _lease).RunNextAsync(leftOutput, CancellationToken));
+        Assert.Equal("running", await StateAsync(left));
+
+        await FailLeftJobsAsync();
+        var (job, output) = await RunExportAsync(fixture.TenantId, bucket);
+
+        Assert.Contains($"{fixture.TenantId} export ok", output);
+        Assert.Equal("succeeded", await StateAsync(job));
+        Assert.Equal("failed", await StateAsync(left));
+        Assert.Equal([$"exports/{fixture.TenantId}/{job:D}.zip"], await KeysAsync(s3, bucket));
+    }
+
     // A Studio folder with two applications of the tenant, a customization and an application of another tenant.
     private static TemporaryFolder StudioFolder(string tenant) =>
         new TemporaryFolder()
@@ -414,6 +439,20 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
         {
             ["export"] = wrap is null ? steps : [.. steps.Select(wrap)],
         };
+    }
+
+    // A job that an earlier test left queued or running would be claimed before this test's job, as the runner claims the oldest. A lease it left would make the export wait.
+    private async Task FailLeftJobsAsync()
+    {
+        await using var connection = new NpgsqlConnection(fixture.Scenario.Platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE platform.jobs SET state = 'failed', finished_at = clock_timestamp(), error = 'An earlier test left the job.' WHERE state IN ('queued', 'running');
+            DELETE FROM platform.tenant_leases;
+            """,
+            connection);
+        await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
     private async Task<long> LeaseCountAsync(string tenantId)
