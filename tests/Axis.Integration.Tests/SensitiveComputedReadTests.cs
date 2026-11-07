@@ -30,7 +30,7 @@ public sealed class SensitiveComputedReadTests(DataDatabaseFixture database) : I
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    private RecordCipher Cipher()
+    private SensitiveValues Values()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -38,13 +38,15 @@ public sealed class SensitiveComputedReadTests(DataDatabaseFixture database) : I
                 [$"Tenants:{_tenant}:DataKeys:1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
             })
             .Build();
-        return new RecordCipher(new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(configuration))), _tenant);
+        return new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(configuration)));
     }
+
+    private RecordCipher Cipher(SensitiveValues values) => new(values, _tenant);
 
     [Fact]
     public async Task A_pending_read_computes_a_record_that_holds_sensitive_values_and_a_sensitive_computed_field_reads_back_plain()
     {
-        var cipher = Cipher();
+        var cipher = Cipher(Values());
         using var folder = Folder(amount: "quantity * 2", tag: "concat(title, 'A')");
         var first = await CompileAsync(folder);
         await ActivateAsync(first, limit: 10);
@@ -98,9 +100,50 @@ public sealed class SensitiveComputedReadTests(DataDatabaseFixture database) : I
     }
 
     [Fact]
+    public async Task Activation_recomputes_inline_a_record_that_holds_sensitive_values_with_the_cipher()
+    {
+        var values = Values();
+        var cipher = Cipher(values);
+        using var folder = Folder(amount: "quantity * 2", tag: "concat(title, 'A')");
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first, limit: 10, values);
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        Assert.True(first.Model!.TryGetEntity("Order", out var firstOrder));
+        var created = await RecordCommand.CreateAsync(
+            connection,
+            _tenant,
+            first.Model,
+            first.Release!.Id,
+            firstOrder,
+            new RecordActor("requester", ["clerk"]),
+            Body("""{ "values": { "title": "Order", "note": "Secret note", "lines": [{ "quantity": 1, "memo": "First memo" }, { "quantity": 2, "memo": "Second memo" }] } }"""),
+            null,
+            cipher,
+            NullLoggerFactory.Instance,
+            CancellationToken);
+        Assert.Equal(RecordCommandOutcome.Written, created.Outcome);
+
+        folder.With("entities/line.json", LineFile("quantity * 3")).With("entities/order.json", OrderFile("concat(title, 'B')"));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second, limit: 10, values);
+        Assert.Equal(0L, await CountPendingAsync());
+
+        Assert.True(second.Model!.TryGetEntity("Order", out var order));
+        var record = await RecordQueries.GetAsync(connection, second.Model, order, created.Record!.Id, cipher, CancellationToken);
+        Assert.NotNull(record);
+        Assert.Equal("OrderB", record.Values["tag"]!.GetValue<string>());
+        Assert.Equal("Secret note", record.Values["note"]!.GetValue<string>());
+        var lines = record.Values["lines"]!.AsArray();
+        Assert.Equal([3L, 6L], lines.Select(line => line!["amount"]!.GetValue<long>()));
+        Assert.Equal(["First memo", "Second memo"], lines.Select(line => line!["memo"]!.GetValue<string>()));
+        Assert.Equal(9L, record.Values["total"]!.GetValue<long>());
+    }
+
+    [Fact]
     public async Task A_record_set_reads_the_sensitive_value_of_a_references_target_in_plain_text()
     {
-        var cipher = Cipher();
+        var cipher = Cipher(Values());
         using var folder = Folder(amount: "quantity * 2", tag: "concat(title, 'A')");
         var compiled = await CompileAsync(folder);
         await ActivateAsync(compiled, limit: 10);
@@ -191,14 +234,20 @@ public sealed class SensitiveComputedReadTests(DataDatabaseFixture database) : I
         return compiled;
     }
 
-    private async Task ActivateAsync(ReleaseCompilationResult compiled, int limit)
+    private async Task ActivateAsync(ReleaseCompilationResult compiled, int limit, SensitiveValues? values = null)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var result = await ReleaseActivator.ActivateAsync(
-            compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None(_tenant), OpenInstanceCounter.Instance, limit, CancellationToken);
+            compiled,
+            new ActiveReleaseStore(configuration),
+            data,
+            ActivationBindings.None(_tenant) with { Sensitive = values },
+            OpenInstanceCounter.Instance,
+            limit,
+            CancellationToken);
         Assert.Empty(result.Diagnostics);
     }
 
