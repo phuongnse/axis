@@ -57,7 +57,8 @@ are under "Several changes are a design review" in Design changes.
 ### Start
 
 1. Take the review's design issue, or agree a short topic with the owner, such
-   as `field-look`. A review covers one screen or one group of screens. If an
+   as `field-look`, and open a design issue with the `on-hold` label for it. A
+   review covers one screen or one group of screens. If an
    earlier review's issues have not built what it touches, say so and stop: the
    review waits for them. Create the prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
@@ -66,18 +67,20 @@ are under "Several changes are a design review" in Design changes.
    never only in a temporary folder. Never open a pull request from it, and
    never give it a NexKit branch name. No push to a branch starts CI, and the
    prototype never gets `/nexkit review`, because it is never merged.
-2. Keep the owner's rules, in English, in `design-review.md` at the root
-   of the branch, so the review can go on from another machine. Its first
-   lines say that the review follows this skill, so a session that opens the
-   branch finds it.
+2. Create the review's docs branch from `main`, `docs/<topic>-review`, and push
+   it. The review's rules go there as they are agreed.
+3. Link both branches on the design issue, and keep its state there: what is
+   done, what waits for the owner and what comes next, so the review can go on
+   from another machine.
 
 ### Each change
 
 Take one change at a time, and do not start the next until the owner has
 seen this one. Build only what the design needs to be seen and agreed: no test
-changes, no server changes, and logic goes in `design-review.md` for the docs
-change. What the screen needs from an API is a fixture here and a contract in
-the docs. What you find outside the review's topic becomes an issue.
+changes and no server changes. What the screen needs from an API is a fixture
+here and a contract in the docs. What the build must do that the docs do not
+say is a comment on the design issue. What you find outside the review's topic
+becomes an issue.
 
 1. Restate the change in Axis terms: the tokens, the widgets and the
    previews it touches, by their names in
@@ -102,9 +105,9 @@ the docs. What you find outside the review's topic becomes an issue.
    so the branch history lists the review's changes in order. Push the branch.
 7. Tell the owner what changed and which preview to open, and ask for a verdict.
    The owner looks at the previews; take no screenshots for them. Keep, change
-   or drop the change as they say. Write down each rule they agree, in English
-   as all committed text is, in `design-review.md` for the docs change at the
-   end, then commit and push it.
+   or drop the change as they say. Write each rule they agree where it lives in
+   the docs, on the docs branch, in English as all committed text is, and push
+   it. Bring the design issue's state up to date.
 
 The artifact does not change during a review. It is published once, at the end.
 
@@ -140,15 +143,15 @@ A check passes only when the card behaves as it will in the artifact.
 ### End
 
 0. Audit the prototype for one concern with two mechanisms: have an agent read `web/src` and the server for copies, forks
-   and second ways to the same result, and put what it finds in `design-review.md`, so the issue merges each into the
-   shared one. The rule is in [AGENTS.md](../../../AGENTS.md#working-rules).
-1. When the owner has agreed every change, write one docs change on its own
-   branch from `main` that rewrites each agreed rule where it lives, in the
-   reference pages, and deletes what it replaces. Write what a screen needs from
-   an API as a contract there. Add a decision only for a choice between real
-   alternatives, never one that lists the review's rules.
-   Follow [writing the docs](../../../docs/writing-docs.md), and mark what is
-   not built yet. Open it as a hand-made pull request for the owner to merge.
+   and second ways to the same result, and put what it finds in a comment on the design issue, so the build merges each
+   into the shared one. The rule is in [AGENTS.md](../../../AGENTS.md#working-rules).
+1. When the owner has agreed every change, read the docs branch through: it
+   holds each agreed rule where it lives, in the reference pages, and deletes
+   what it replaces, with what a screen needs from an API as a contract. Add a
+   decision only for a choice between real alternatives, never one that lists
+   the review's rules. Follow [writing the docs](../../../docs/writing-docs.md),
+   and mark what is not built yet. Open it as a hand-made pull request for the
+   owner to merge.
 2. Tag the prototype's last commit and push the tag, so
    NexKit's agents can read it and no link to it ever breaks:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and
@@ -162,12 +165,14 @@ A check passes only when the card behaves as it will in the artifact.
    design/<yyyy-mm-dd>-<topic>`.
 3. Once the docs pull request is merged, so links point at `main`, hand over to
    the build, as [Design changes](../../../docs/delivery.md#design-changes) says:
-   - With a design issue, correct each waiting issue so it links the docs and
-     the tag, then close the design issue, which starts them.
-   - Without one, write one NexKit issue that builds the whole review, as
+   - With issues that wait for the design issue, correct each so it links the
+     docs and the tag, and takes the build's comments on the design issue.
+   - Without any, write one NexKit issue that builds the whole review, as
      [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It links
-     the docs sections, the artifact and the tag, and names the tokens, widgets
-     and previews it changes. Do not split it: NexKit splits it if it needs to.
+     the docs sections, the artifact and the tag, names the tokens, widgets and
+     previews it changes, and takes those comments. Do not split it: NexKit
+     splits it if it needs to.
+   - Then close the design issue, which starts the issues that wait for it.
 4. After the build is merged, publish the artifact as [A sync](#a-sync) says,
    with no need to ask when every difference comes from what merged. The sync
    keeps the card order and names, which `scripts/design-system.sh` writes as
