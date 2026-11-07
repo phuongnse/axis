@@ -250,15 +250,52 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
 
     private const string TenantStatusMessage = "the tenant is still provisioning. Finish tenant create first.";
 
-    private async Task<(Guid Job, string Output)> RunExportAsync(string tenantId, string bucket, string? studio = null)
+    private async Task<(Guid Job, string Output)> RunExportAsync(string tenantId, string bucket, string? studio = null, Func<JobStep, JobStep>? wrap = null)
     {
         var storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
-        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage), studio: studio);
+        var kinds = Kinds(JobSetting<CellBackupStorage>.Of(storage), wrap: wrap, studio: studio);
         var job = await ProvisioningJobs.QueueAsync(fixture.Scenario.Platform, kinds, "export", tenantId, "operator-1", null, null, CancellationToken);
         using var output = new StringWriter();
+        var runner = new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease);
 
-        Assert.True(await new ProvisioningJobs(fixture.Scenario.Platform, kinds, _lease).RunNextAsync(output, CancellationToken));
+        // MinIO at times fails a request. A step that throws releases the job, and the publisher claims it again in the next round, up to three claims.
+        for (var round = 1; round <= 3; round++)
+        {
+            Assert.True(await runner.RunNextAsync(output, CancellationToken));
+            if (await StateAsync(job) != "running")
+            {
+                break;
+            }
+        }
+
         return (job, output.ToString());
+    }
+
+    [Fact]
+    public async Task An_export_whose_first_upload_fails_is_claimed_again_and_stores_the_zip()
+    {
+        using var s3 = minio.NewClient();
+        var bucket = await NewBucketAsync(s3);
+        var first = 1;
+
+        var (job, output) = await RunExportAsync(
+            fixture.TenantId,
+            bucket,
+            wrap: step => step.Name != "export"
+                ? step
+                : step with
+                {
+                    RunAsync = (id, tenant, input, cancellationToken) => Interlocked.Exchange(ref first, 0) == 1
+                        ? throw new AmazonS3Exception("The upload failed.")
+                        : step.RunAsync(id, tenant, input, cancellationToken),
+                });
+
+        var failed = output.IndexOf($"{fixture.TenantId} export failed: AmazonS3Exception", StringComparison.Ordinal);
+        var released = output.IndexOf("job released", StringComparison.Ordinal);
+        var done = output.IndexOf($"{fixture.TenantId} export ok", StringComparison.Ordinal);
+        Assert.True(failed >= 0 && released > failed && done > released, output);
+        Assert.Equal("succeeded", await StateAsync(job));
+        Assert.Equal([$"exports/{fixture.TenantId}/{job:D}.zip"], await KeysAsync(s3, bucket));
     }
 
     [Fact]
