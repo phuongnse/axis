@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react'
+import os from 'node:os'
 import type { ProxyOptions } from 'vite'
 import { defineConfig } from 'vitest/config'
+import { vitestWorkers } from './vitestWorkers.ts'
 
 const serverUrl = process.env.AXIS_SERVER_URL ?? 'http://localhost:5206'
 
@@ -43,5 +45,7 @@ export default defineConfig({
     // Form tests type through many fields. With one worker per test file they come close to the
     // 5 second default on a busy machine.
     testTimeout: 15000,
+    // A worker holds about 1 GB, so one per core swaps when the local stack runs. See docs/development.md#unit-tests.
+    maxWorkers: vitestWorkers(os.freemem()),
   },
 })

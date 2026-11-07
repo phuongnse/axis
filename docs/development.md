@@ -119,6 +119,11 @@ file and compares it with the routes the server maps. It fails when a route is m
 document or the document lists a route the server does not map, and it names each endpoint left out
 on purpose with a reason.
 
+When Vitest starts, it runs one worker for each GiB of free memory above 1 GiB, from 2 to 6. The number comes
+from `vitestWorkers` in `web/vitestWorkers.ts`, which `web/vite.config.ts` calls with the free memory. A worker
+holds about 1 GB, so one worker per core swaps on a machine that also runs the local stack, and the tests then
+time out. A `--maxWorkers` flag on the command line overrides the number.
+
 Vitest runs without the CSS of the `<style>` elements in the document head, which holds Ant Design's styles, because
 jsdom matches every rule on each query. A test that checks a style calls `withAntdStyles()` from
 `web/src/test/antdStyles.ts` at file scope or in a `describe`.

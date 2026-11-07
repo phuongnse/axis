@@ -23,6 +23,8 @@
     "vite.config.ts",
     "vite.design-system.config.ts",
     "vite.keycloak-theme.config.ts",
-    "vite.sign-up.config.ts"
+    "vite.sign-up.config.ts",
+    "vitestWorkers.ts",
+    "vitestWorkers.test.ts"
   ]
 }
