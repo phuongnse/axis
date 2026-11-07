@@ -24,50 +24,41 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  # The checks run as eight parallel jobs, so the run takes as long as its slowest job, not all of them.
-  # The integration tests and Playwright are each split into three shards, each a job of its own. Each
-  # shard's step runs the command of NexKit's check for that shard, such as
-  # AXIS_E2E_SHARD=2/3 scripts/e2e.sh or AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh, so NexKit
-  # matches a pull request's failing e2e-2 or integration-2 check with a failed shard 2/3 here.
+  # Reads the checks of .nexkit/config.json and lists one matrix entry per check, or per group of
+  # checks, with its commands, timeout and result folders. The matrix is built here, in a protected
+  # path, so no script an agent may change decides what CI runs.
+  matrix:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: read
+        run: |
+          matrix=$(jq -c '
+            reduce .checks[] as $c ([]; ($c.group // $c.name) as $n
+              | if any(.[]; .name == $n) then map(if .name == $n then .checks += [$c] else . end)
+                else . + [{name: $n, checks: [$c]}] end)
+            | {include: map({
+                name,
+                checks: [.checks[] | {name, run, timeout_minutes}],
+                timeout_minutes: (([.checks[].timeout_minutes] | add) + 15),
+                results: ([.checks[] | .results // [] | .[]] | unique | join("\n"))})}' .nexkit/config.json)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  # CI runs one job per check or group of .nexkit/config.json, which the matrix job reads, so a failed
+  # NexKit check and the CI job of the same name run the same command.
   checks:
     if: github.event_name != 'schedule'
+    needs: matrix
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - suite: unit
-            name: Lint and unit tests
-            artifact: test-results-unit
-          - suite: integration
-            name: Integration tests 1/3
-            shard: 1/3
-            artifact: test-results-integration-1
-          - suite: integration
-            name: Integration tests 2/3
-            shard: 2/3
-            artifact: test-results-integration-2
-          - suite: integration
-            name: Integration tests 3/3
-            shard: 3/3
-            artifact: test-results-integration-3
-          - suite: smoke
-            name: Smoke tests
-            artifact: test-results-smoke
-          - suite: e2e
-            name: End-to-end tests 1/3
-            shard: 1/3
-            artifact: test-results-e2e-1
-          - suite: e2e
-            name: End-to-end tests 2/3
-            shard: 2/3
-            artifact: test-results-e2e-2
-          - suite: e2e
-            name: End-to-end tests 3/3
-            shard: 3/3
-            artifact: test-results-e2e-3
+      matrix: ${{ fromJSON(needs.matrix.outputs.matrix) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The runner image has .NET SDKs, and NexKit's checks use them as they are. When one matches
@@ -101,34 +92,25 @@ jobs:
       - uses: phuongnse/nexkit/cache@83dd6a80bb0d55515e1e8e2063e855b898cac9a1 # v6.3.0
       - name: Setup
         run: scripts/setup.sh
-      - name: Build
-        id: build
-        run: scripts/build.sh
-      # Every check of the job runs once the build succeeds, so one run shows all results.
-      - name: Lint
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'unit' }}
-        run: scripts/lint.sh
-      - name: Unit tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'unit' }}
-        run: scripts/test.sh
-      - name: Integration tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'integration' }}
-        run: AXIS_INTEGRATION_SHARD=${{ matrix.shard }} scripts/integration.sh
-      - name: Smoke tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'smoke' }}
-        run: scripts/smoke.sh
-      - name: End-to-end tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'e2e' }}
-        run: AXIS_E2E_SHARD=${{ matrix.shard }} scripts/e2e.sh
+      # Each check of the entry runs in turn, stopped at its own timeout_minutes. A failed check
+      # still lets the next one run, and the job then fails.
+      - name: Checks
+        env:
+          CHECKS: ${{ toJSON(matrix.checks) }}
+        run: |
+          status=0
+          while IFS=$'\t' read -r name minutes command; do
+            echo "::group::$name: $command"
+            timeout "${minutes}m" bash -c "$command" </dev/null || { echo "::error::Check $name failed"; status=1; }
+            echo "::endgroup::"
+          done < <(jq -r '.[] | [.name, .timeout_minutes, .run] | @tsv' <<<"$CHECKS")
+          exit $status
       - name: Upload test results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.results != '' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            artifacts
-            tests/e2e/playwright-report
-            tests/e2e/test-results
+          name: test-results-${{ matrix.name }}
+          path: ${{ matrix.results }}
           if-no-files-found: ignore
           retention-days: 14
 

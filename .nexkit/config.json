@@ -323,7 +323,7 @@
       "test-results-integration-3",
       "test-results-performance",
       "test-results-smoke",
-      "test-results-unit"
+      "test-results-test"
     ]
   },
   "notify": [
