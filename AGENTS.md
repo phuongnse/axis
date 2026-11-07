@@ -33,9 +33,9 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - One issue is one behaviour that fits one agent session, with 2–5 acceptance criteria that a test
   or command verifies. Its text names the concepts it touches. See
   [the life of an issue](docs/delivery.md#the-life-of-an-issue).
-- Build in vertical slices. Every behaviour change needs a test: real PostgreSQL through
-  Testcontainers for storage and engine behaviour, Playwright for UI journeys. Test denied access as
-  well as allowed access.
+- Build in vertical slices. Every behaviour change needs a test, and a removal needs none, see
+  [testing](docs/architecture.md#testing): real PostgreSQL through Testcontainers for storage and
+  engine behaviour, Playwright for UI journeys. Test denied access as well as allowed access.
 - Keep AGENTS.md to rules, not details: a rule takes at most five lines and links the doc that holds the rest.
 - One concern has one mechanism. Search for what already does the job and extend it. Never copy, fork or work round a
   shared widget, see [shared widgets](docs/reference/shared-widgets.md).

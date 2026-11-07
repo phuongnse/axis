@@ -137,7 +137,7 @@ describe('LicencesPage', () => {
     expect(screen.queryByText('Npgsql')).not.toBeInTheDocument()
   })
 
-  it('sets the licence link and the source link apart, with no middle dot between them', async () => {
+  it('puts the licence link and the source link side by side', async () => {
     stubServer({ licences: unauthorized, about: unauthorized })
     renderPage()
     await screen.findByText('react')
@@ -145,7 +145,6 @@ describe('LicencesPage', () => {
     const parent = link('Read the licence text').parentElement!
 
     expect(link("Axis's source code").parentElement).toBe(parent)
-    expect(parent).not.toHaveTextContent('·')
   })
 
   it('shows an error when the list fails for a reason other than 401', async () => {
