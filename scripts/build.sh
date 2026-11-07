@@ -5,7 +5,7 @@
 # files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the sign-up page into the
 # control plane's web root and checks it and its fonts, then builds the .NET solution,
 # which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
-# applications in artifacts/templates.
+# applications in artifacts/templates. Then writes the server's OpenAPI document to artifacts/openapi.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -55,3 +55,5 @@ test -f artifacts/modules/organization/1.0.0/module.json
 test -f artifacts/modules/approvals/1.0.0/module.json
 bash scripts/lib/install-sample-templates.sh
 test -d artifacts/templates
+dotnet run --project tests/Axis.OpenApiDocument -c Release --no-build -- artifacts/openapi/axis-server.json
+test -f artifacts/openapi/axis-server.json

@@ -41,6 +41,7 @@ tests/
   Axis.<Module>.Tests/    unit tests per module
   Axis.Integration.Tests/ PostgreSQL and Keycloak (Testcontainers) and API integration tests
   Axis.LoadData/          generator of the load test's typical-size application with seeds
+  Axis.OpenApiDocument/   console that writes the server's OpenAPI document with the unit tests' host settings
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
   packages/               test-only extension package, built as three versions; covers the
                           capability limits

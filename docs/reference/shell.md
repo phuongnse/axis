@@ -310,7 +310,7 @@ re-authentication that Axis asks for every 8 hours.
 
 The design system shows the shell, the sign-in screens and Studio in cards of their own, so a change
 to the frame shows in every state. How previews work is in
-[widget previews](../development.md#widget-previews).
+[widget previews](widget-previews.md).
 
 - **The Shell group** is the seventh group of cards, after Shared states, with three previews:
 

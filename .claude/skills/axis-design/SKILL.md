@@ -15,7 +15,7 @@ This runbook gives the steps and commands, so follow its links for the rules.
 - **Token names and the widget list** are in the
   [frontend reference](../../../docs/reference/frontend.md) under "Design
   tokens and previews". The preview names are in
-  [Widget previews](../../../docs/development.md#widget-previews).
+  [Widget previews](../../../docs/reference/widget-previews.md).
 
 ## A requested change
 

@@ -22,7 +22,7 @@ edit, and the docs must stay the source of behaviour.
 
 The flow is in [design changes](../delivery.md#design-changes), the token file in
 [frontend](../reference/frontend.md) and the previews in
-[widget previews](../development.md#widget-previews).
+[widget previews](../reference/widget-previews.md).
 
 ## Consequences
 
