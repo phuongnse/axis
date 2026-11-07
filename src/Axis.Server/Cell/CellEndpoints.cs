@@ -196,8 +196,7 @@ internal static partial class CellEndpoints
             .WithMetadata(CellOperatorRoute.Instance)
             .AllowAnonymous();
         auth.MapGet("/sign-in", SignInAsync).WithRateLimit(Partition.SignIn);
-        // The cast makes the handler a route handler, whose result is written, and not a RequestDelegate.
-        auth.MapPost("/sign-out", (Delegate)SignOutAsync);
+        auth.MapPost("/sign-out", SignOutAsync);
     }
 
     private static IResult GetSession(ClaimsPrincipal user) =>
@@ -227,7 +226,8 @@ internal static partial class CellEndpoints
         return Results.Challenge(new AuthenticationProperties { RedirectUri = returnUrl }, [CellConsoleSignIn.Scheme]);
     }
 
-    private static async Task<IResult> SignOutAsync(HttpContext httpContext)
+    // A ValueTask result cannot bind as a RequestDelegate, so the endpoint stays a route handler whose result is written.
+    private static async ValueTask<IResult> SignOutAsync(HttpContext httpContext)
     {
         await httpContext.SignOutAsync(CellOperatorSession.Scheme);
         return Results.NoContent();

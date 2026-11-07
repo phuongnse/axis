@@ -55,6 +55,38 @@ public sealed partial class AuthorizationRouteTests
     }
 
     [Fact]
+    public async Task Every_open_route_answers_an_anonymous_request()
+    {
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient(new() { AllowAutoRedirect = false });
+
+        var routes = Routes(factory)
+            .Where(route => route.Metadata.GetMetadata<IAllowAnonymous>() is not null)
+            .SelectMany(route => Names(route).Select(name => (Name: name, Route: route)))
+            .ToList();
+        Assert.NotEmpty(routes);
+
+        var refused = new List<string>();
+        foreach (var (name, route) in routes)
+        {
+            var method = name[..name.IndexOf(' ', StringComparison.Ordinal)];
+            var path = ParameterPattern().Replace(route.RoutePattern.RawText ?? string.Empty, "x");
+            path = path.StartsWith('/') ? path : "/" + path;
+            using var request = new HttpRequestMessage(new HttpMethod(method == "*" ? "GET" : method), path);
+            request.Headers.Add("X-Axis-Csrf", "1");
+
+            using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                refused.Add($"{name} -> {(int)response.StatusCode}");
+            }
+        }
+
+        Assert.True(refused.Count == 0, string.Join(Environment.NewLine, refused));
+    }
+
+    [Fact]
     public async Task Every_other_route_refuses_a_request_without_a_session_or_a_token()
     {
         await using var factory = CreateFactory();
