@@ -12,6 +12,7 @@ import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
 import ExpressionEditor from './ExpressionEditor'
 import type { ScopeOption } from './expressionScope'
+import { withAntdStyles } from '../test/antdStyles'
 
 const resourceId = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
 const checkPath = `/api/studio/apps/PurchaseRequests/expressions/check`
@@ -316,19 +317,23 @@ describe.each(['light', 'dark'] as const)('ExpressionEditor in %s mode', (mode) 
     expect(screen.getByRole('button', { name: 'Next' })).toHaveFocus()
   })
 
-  it('draws its tokens in the token colours, with none of the default highlight colours', async () => {
-    renderEditor('title > 5 and true')
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    const span = (text: string) => screen.getByText(text, { selector: '.cm-line span' })
-    expect(span('title')).toHaveStyle({ color: colourTokens.primaryText[mode] })
-    expect(span('>')).toHaveStyle({ color: colourTokens.textMuted[mode] })
-    expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
-    expect(span('and')).toHaveStyle({ color: colourTokens.warningText[mode] })
-    const defaults = [defaultHighlightStyle.style([tags.keyword]), defaultHighlightStyle.style([tags.number])]
-    for (const element of document.querySelectorAll('.cm-line span')) {
-      for (const name of defaults) {
-        expect(element).not.toHaveClass(name!)
+    it('draws its tokens in the token colours, with none of the default highlight colours', async () => {
+      renderEditor('title > 5 and true')
+
+      const span = (text: string) => screen.getByText(text, { selector: '.cm-line span' })
+      expect(span('title')).toHaveStyle({ color: colourTokens.primaryText[mode] })
+      expect(span('>')).toHaveStyle({ color: colourTokens.textMuted[mode] })
+      expect(span('5')).toHaveStyle({ color: colourTokens.infoText[mode] })
+      expect(span('and')).toHaveStyle({ color: colourTokens.warningText[mode] })
+      const defaults = [defaultHighlightStyle.style([tags.keyword]), defaultHighlightStyle.style([tags.number])]
+      for (const element of document.querySelectorAll('.cm-line span')) {
+        for (const name of defaults) {
+          expect(element).not.toHaveClass(name!)
+        }
       }
-    }
+    })
   })
 })

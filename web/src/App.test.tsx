@@ -21,6 +21,7 @@ import type {
 } from './platform/site'
 import { setHostSite } from './platform/siteLinks'
 import { ThemeModeProvider } from './platform/theme'
+import { withAntdStyles } from './test/antdStyles'
 
 vi.mock('./platform/navigation')
 
@@ -632,23 +633,27 @@ describe('App', () => {
     expect(screen.queryByRole('heading', { name: 'Tools' })).not.toBeInTheDocument()
   })
 
-  it('shows the description of an application and of a site in muted text, and the title alone without one', async () => {
-    stubServer()
+  describe('with antd styles', () => {
+    withAntdStyles()
 
-    renderApp()
+    it('shows the description of an application and of a site in muted text, and the title alone without one', async () => {
+      stubServer()
 
-    const desk = await screen.findByRole('region', { name: 'Service desk' })
-    const { colour } = designTokensFor('light')
-    expect(within(desk).getByText('Handles support requests.')).toHaveStyle({ color: colour.textMuted })
-    expect(within(desk).getByText('Work the queue.')).toHaveStyle({ color: colour.textMuted })
-    expect(within(desk).getByText('Staff desk')).toHaveStyle({ color: colour.primaryText })
-    const customers = within(desk).getByRole('link', { name: 'Customer portal' })
-    expect(customers.textContent).toBe('CCustomer portal')
-    expect(customers).toHaveStyle({ alignItems: 'center' })
-    const notes = screen.getByRole('region', { name: 'E2E notes' })
-    expect(within(notes).getByTestId('application-card-header')).toHaveTextContent(/^EE2E notes$/)
-    expect(within(notes).getByTestId('application-card-header')).toHaveStyle({ alignItems: 'center' })
-    expect(within(notes).getByRole('link')).toHaveTextContent(/^EE2E notes$/)
+      renderApp()
+
+      const desk = await screen.findByRole('region', { name: 'Service desk' })
+      const { colour } = designTokensFor('light')
+      expect(within(desk).getByText('Handles support requests.')).toHaveStyle({ color: colour.textMuted })
+      expect(within(desk).getByText('Work the queue.')).toHaveStyle({ color: colour.textMuted })
+      expect(within(desk).getByText('Staff desk')).toHaveStyle({ color: colour.primaryText })
+      const customers = within(desk).getByRole('link', { name: 'Customer portal' })
+      expect(customers.textContent).toBe('CCustomer portal')
+      expect(customers).toHaveStyle({ alignItems: 'center' })
+      const notes = screen.getByRole('region', { name: 'E2E notes' })
+      expect(within(notes).getByTestId('application-card-header')).toHaveTextContent(/^EE2E notes$/)
+      expect(within(notes).getByTestId('application-card-header')).toHaveStyle({ alignItems: 'center' })
+      expect(within(notes).getByRole('link')).toHaveTextContent(/^EE2E notes$/)
+    })
   })
 
   it('gives every home grid up to three auto-fit columns, and one column at narrow width', async () => {

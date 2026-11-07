@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { beforeEach, describe, test } from 'node:test'
-import { checkSizes, maxDocLines, maxGrownDocLines, maxSkillLines } from './sizes.mjs'
+import { checkSizes, maxDocLines, maxGrownDocLines, maxSkillWords } from './sizes.mjs'
 import { useTempRoot } from './testing.mjs'
 
 const fixture = useTempRoot()
@@ -60,17 +60,24 @@ describe('sizes', () => {
     assert.match(found[0], /^docs\/reference\/guide\.md:901: 901 lines, up from 0/)
   })
 
-  test('passes on a skill at its size limit', () => {
-    write('.claude/skills/runbook/SKILL.md', 'line\n'.repeat(maxSkillLines))
+  test('passes on a skill at its word limit', () => {
+    write('.claude/skills/runbook/SKILL.md', 'word\n'.repeat(maxSkillWords))
 
     assert.deepEqual(messages(), [])
   })
 
-  test('reports a skill over its size limit', () => {
-    write('.claude/skills/runbook/SKILL.md', 'line\n'.repeat(maxSkillLines + 1))
+  test('reports a skill over its word limit', () => {
+    write('.claude/skills/runbook/SKILL.md', 'word\n'.repeat(maxSkillWords + 1))
 
     assert.deepEqual(messages(), [
-      '.claude/skills/runbook/SKILL.md:251: 251 lines, over the limit of 250: link the rules in docs/ instead of restating them',
+      '.claude/skills/runbook/SKILL.md:1: 1001 words, over the limit of 1000: link the rules in docs/ and move a workflow few runs need to a file of its own',
     ])
+  })
+
+  test('ignores the size of a workflow file beside a skill', () => {
+    write('.claude/skills/runbook/SKILL.md', 'A short skill.\n')
+    write('.claude/skills/runbook/workflow.md', 'word\n'.repeat(2 * maxSkillWords))
+
+    assert.deepEqual(messages(), [])
   })
 })

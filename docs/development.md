@@ -119,6 +119,10 @@ file and compares it with the routes the server maps. It fails when a route is m
 document or the document lists a route the server does not map, and it names each endpoint left out
 on purpose with a reason.
 
+Vitest runs without the CSS of the `<style>` elements in the document head, which holds Ant Design's styles, because
+jsdom matches every rule on each query. A test that checks a style calls `withAntdStyles()` from
+`web/src/test/antdStyles.ts` at file scope or in a `describe`.
+
 ### Integration tests
 
 `scripts/integration.sh` builds the Keycloak theme, then runs the .NET tests against real PostgreSQL

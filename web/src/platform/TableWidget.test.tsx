@@ -20,6 +20,7 @@ import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
 import { narrowWidthQuery } from './useNarrowWidth'
+import { withAntdStyles } from '../test/antdStyles'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -1142,26 +1143,34 @@ describe('TableWidget', () => {
       expect(within(row).queryByRole('link')).not.toBeInTheDocument()
     })
 
-    it('draws the delete icon in dangerText and names it on keyboard focus in dark mode', async () => {
-      stubRecords()
-      renderWidgetInDark({ ...noteWidget, rowActions: [remove] })
+    describe('with antd styles', () => {
+      withAntdStyles()
 
-      const row = await screen.findByRole('row', { name: /Buy paper/ })
-      const button = within(row).getByRole('button', { name: 'Delete note' })
-      expect(button).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
-      await tabTo(button)
+      it('draws the delete icon in dangerText and names it on keyboard focus in dark mode', async () => {
+        stubRecords()
+        renderWidgetInDark({ ...noteWidget, rowActions: [remove] })
 
-      expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete note')
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+        const button = within(row).getByRole('button', { name: 'Delete note' })
+        expect(button).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+        await tabTo(button)
+
+        expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete note')
+      })
     })
 
-    it('names the Actions menu on keyboard focus', async () => {
-      stubRecords()
-      renderWidget('', { ...noteWidget, rowActions: [open, close, edit, remove] })
+    describe('with antd styles', () => {
+      withAntdStyles()
 
-      const row = await screen.findByRole('row', { name: /Buy paper/ })
-      await tabTo(within(row).getByRole('button', { name: 'Actions' }))
+      it('names the Actions menu on keyboard focus', async () => {
+        stubRecords()
+        renderWidget('', { ...noteWidget, rowActions: [open, close, edit, remove] })
 
-      expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
+        const row = await screen.findByRole('row', { name: /Buy paper/ })
+        await tabTo(within(row).getByRole('button', { name: 'Actions' }))
+
+        expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
+      })
     })
 
     it('folds three or more other actions into one Actions menu with the delete marked danger', async () => {
