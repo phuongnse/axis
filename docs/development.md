@@ -730,7 +730,9 @@ Docker, .NET and Node, and works on a fresh clone.
 7. It installs the built-in applications, `applications/*`, and any sample template under
    `samples/templates/*`, into `artifacts/templates/<id>/<version>/`, and creates that folder even when
    there are none. The Development and E2E settings of the server point `Templates:Path` there. The
-   production images and `deploy/` set no `Templates:Path`, so they list no template.
+   production images, the Compose example and the Helm chart's server set no `Templates:Path`,
+   so Studio lists no template there. In a cell the chart sets it on the publisher for the create job,
+   see [the publisher in a cell](reference/installation.md#the-publisher-in-a-cell).
 8. It builds the agent host, `src/Axis.Agent`, before the server starts, and runs the built `Axis.Agent.dll`
    at once, not under `dotnet watch`. With no `Ai` settings it runs idle, and it serves its health
    endpoints at `http://127.0.0.1:5209`, see [health checks](reference/health-checks.md#agent-host).
