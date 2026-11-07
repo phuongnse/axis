@@ -241,3 +241,9 @@ sizes only, never a record value, a file name or a user name.
   in the users page's "Usage" section, see [platform pages](platform-pages.md#export-data-and-usage).
 - **The billing portal's usage** _(planned for M33)_. The [billing portal](billing-portal.md#pages) shows the tenant's
   quotas and usage to its owner.
+
+A tenant's administrator reads the usage through one route of the tenant's own host.
+
+| Route                   | What it does                                              |
+| ----------------------- | --------------------------------------------------------- |
+| `GET /api/tenant/usage` | Answers `{ quotas, days }`, see [the usage route](#usage) |

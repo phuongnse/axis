@@ -67,14 +67,14 @@ An author sends, lists, reads, approves, changes and drops requests through the 
 routes. The shared answers are in [responses](authoring.md#responses). The routes never accept a
 request, which belongs to [accepting](#accepting).
 
-| Route                                       | What it does                                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `POST /authoring-requests`                  | Stores a request in `planning` and answers `202` with it and a `Location` for the read route            |
-| `GET /authoring-requests`                   | Lists the newest 100 requests of the application, newest first                                          |
-| `GET /authoring-requests/{id}`              | Reads one request with its steps in order                                                               |
-| `POST /authoring-requests/{id}/approve`     | Moves a request from `awaitingApproval` to `working`                                                    |
-| `POST /authoring-requests/{id}/change-plan` | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step |
-| `POST /authoring-requests/{id}/drop`        | Moves a request to `dropped` from any state but `accepted` and `dropped`                                |
+| Route                                                                     | What it does                                                                                            |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `POST /api/studio/apps/{application}/authoring-requests`                  | Stores a request in `planning` and answers `202` with it and a `Location` for the read route            |
+| `GET /api/studio/apps/{application}/authoring-requests`                   | Lists the newest 100 requests of the application, newest first                                          |
+| `GET /api/studio/apps/{application}/authoring-requests/{id}`              | Reads one request with its steps in order                                                               |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/approve`     | Moves a request from `awaitingApproval` to `working`                                                    |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan` | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`        | Moves a request to `dropped` from any state but `accepted` and `dropped`                                |
 
 - **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
   tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),

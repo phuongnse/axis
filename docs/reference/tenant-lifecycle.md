@@ -266,11 +266,15 @@ extension, such as `scan_2.pdf`. The paths under `applications/` are copied as t
 A tenant administrator exports their own tenant from the application, with the same job and the same
 ZIP as the provisioning API, so that a business can take its data without asking the operator.
 
+| Route                                | What it does                                                        |
+| ------------------------------------ | ------------------------------------------------------------------- |
+| `POST /api/tenant/exports`           | Starts an export of the tenant, see the start below                 |
+| `GET /api/tenant/exports/{exportId}` | Answers the export or its ZIP, as the [exports route](#routes) does |
+
 - **Who.** A person who holds the [administrator role](user-administration.md#the-administrator-role).
   The users page's [Export data section](platform-pages.md#export-data-and-usage) starts and follows it.
-- **Routes.** `POST /api/tenant/exports` on the tenant's host starts it, and
-  `GET /api/tenant/exports/{exportId}` answers it and its download, for 7 days. They are platform
-  routes, in the session partition, with the CSRF header on the `POST`.
+- **Routes.** Both are platform routes on the tenant's host, in the session partition, with the CSRF
+  header on the `POST`. An export can be read and downloaded for 7 days.
 - **Checks.** In this order: no session answers `401`, no administrator role `403`, and a tenant that
   is not a cell tenant, or is a preview tenant, `404`.
 - **Start.** A new start queues the `export` job with the administrator as actor and answers `202`. While
