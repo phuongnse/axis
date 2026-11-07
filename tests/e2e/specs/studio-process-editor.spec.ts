@@ -8,7 +8,12 @@ import { dragTo, scrollBelowHeader } from "../design-drag";
 import { pickAction, pickOption } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { jsonViewText, openFormTab, openProblems } from "../studio-resources";
+import {
+  addMapping,
+  jsonViewText,
+  openFormTab,
+  openProblems,
+} from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -749,9 +754,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const values = page.getByTestId(
         `studio-field-/steps/${added}/message/values`,
       );
-      await values
-        .getByRole("button", { name: "Add mapping", exact: true })
-        .click();
+      await addMapping(values);
       await values
         .getByRole("textbox", { name: "Placeholder", exact: true })
         .fill("number");
@@ -855,15 +858,9 @@ test.describe("Studio edits a process in the process editor", () => {
         name: "Deadline after",
         exact: true,
       });
-      // A click on the button can be lost while the form re-renders, so it is repeated until the field shows.
-      await expect(async () => {
-        if (!(await after.isVisible())) {
-          await deadline
-            .getByRole("button", { name: "Add deadline", exact: true })
-            .click({ timeout: 2_000 });
-        }
-        await expect(after).toBeVisible({ timeout: 2_000 });
-      }).toPass({ timeout: 20_000 });
+      await deadline
+        .getByRole("button", { name: "Add deadline", exact: true })
+        .click();
       await after.fill("P5D");
       await pick(page, `/steps/${index}/deadline/next`, "markRejected");
 
@@ -969,9 +966,7 @@ test.describe("Studio edits a process in the process editor", () => {
       );
       await openFormTab(page);
       const input = page.getByTestId(`studio-field-/steps/${index}/input`);
-      await input
-        .getByRole("button", { name: "Add mapping", exact: true })
-        .click();
+      await addMapping(input);
       await page
         .getByTestId(`studio-field-/steps/${index}/input/`)
         .getByRole("textbox", { name: "Input name", exact: true })
@@ -988,9 +983,7 @@ test.describe("Studio edits a process in the process editor", () => {
         `studio-field-/steps/${index}/input/lines/fields`,
       );
       for (const name of ["description", "quantity", "unitPrice", "amount"]) {
-        await nested
-          .getByRole("button", { name: "Add mapping", exact: true })
-          .click();
+        await addMapping(nested);
         await page
           .getByTestId(`studio-field-/steps/${index}/input/lines/fields/`)
           .getByRole("textbox", { name: "Nested field", exact: true })
