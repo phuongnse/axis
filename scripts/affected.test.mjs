@@ -16,9 +16,12 @@ import { after, before, describe, test } from "node:test";
 import {
   changedPaths,
   decideSafe,
-  matches,
-  safeSuites,
+  isSafe,
+  readConfig,
+  safeLists,
   sinceCommit,
+  suiteScripts,
+  unaffected,
 } from "./lib/affected.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,8 +32,11 @@ const smoke = ["dev-script", "compose", "images", "onprem"];
 
 describe("decideSafe", () => {
   const runs = (name, paths, base = "abc") =>
-    decideSafe({ base, matchers: safeSuites[name], listChanged: () => paths })
-      .run;
+    decideSafe({
+      base,
+      lists: safeLists(name, readConfig()),
+      listChanged: () => paths,
+    }).run;
 
   test("skips integration when a change is only under web/src", () => {
     assert.equal(runs("integration", ["web/src/App.tsx"]), false);
@@ -50,6 +56,18 @@ describe("decideSafe", () => {
         true,
         other,
       );
+    }
+  });
+
+  test("runs integration when a change touches the Keycloak theme or the Vite configs its script builds it with", () => {
+    for (const filePath of [
+      "web/keycloak-theme/login.ftl",
+      "web/keycloak-theme/login-otp.ftl",
+      "web/keycloak-theme/login-config-totp.ftl",
+      "web/vite.config.ts",
+      "web/vite.keycloak-theme.config.ts",
+    ]) {
+      assert.equal(runs("integration", [filePath]), true, filePath);
     }
   });
 
@@ -78,23 +96,23 @@ describe("decideSafe", () => {
     const listError = () => {
       throw new Error("bad revision");
     };
-    assert.ok(smoke.every((name) => Object.hasOwn(safeSuites, name)));
-    for (const name of Object.keys(safeSuites)) {
-      const matchers = safeSuites[name];
+    assert.ok(smoke.every((name) => Object.hasOwn(suiteScripts, name)));
+    for (const name of Object.keys(suiteScripts)) {
+      const lists = safeLists(name, readConfig());
       assert.equal(
-        decideSafe({ base: undefined, matchers, listChanged: unreachable }).run,
+        decideSafe({ base: undefined, lists, listChanged: unreachable }).run,
         true,
       );
       assert.equal(
-        decideSafe({ base: "", matchers, listChanged: unreachable }).run,
+        decideSafe({ base: "", lists, listChanged: unreachable }).run,
         true,
       );
       assert.equal(
-        decideSafe({ base: "abc", matchers, listChanged: listError }).run,
+        decideSafe({ base: "abc", lists, listChanged: listError }).run,
         true,
       );
       assert.equal(
-        decideSafe({ base: "abc", matchers, listChanged: () => [] }).run,
+        decideSafe({ base: "abc", lists, listChanged: () => [] }).run,
         true,
       );
     }
@@ -128,7 +146,7 @@ describe("decideSafe", () => {
       ".nexkit/config.json",
       "docs/delivery.md",
     ];
-    for (const name of Object.keys(safeSuites))
+    for (const name of Object.keys(suiteScripts))
       assert.equal(runs(name, paths), false, name);
   });
 
@@ -181,119 +199,77 @@ describe("sinceCommit", () => {
   });
 });
 
-// NexKit skips a whole check before its job starts when every changed path is in the check's
-// `unaffected_by` (NexKit's nexkit/globs.py). The scripts skip each suite inside the job by the safe
-// lists above. Both must agree, or one would skip what the other runs.
-describe("the unaffected_by lists in .nexkit/config.json", () => {
-  // A NexKit glob: `*` and `?` stay in a segment, and `**`, a whole segment, crosses folders.
-  const globRegExp = (pattern) => {
-    const segments = pattern.split("/");
-    const source = segments
-      .map((segment, index) => {
-        const last = index === segments.length - 1;
-        if (segment === "**") return last ? ".*" : "(?:[^/]+/)*";
-        const text = segment
-          .replace(/[.+^${}()|\\]/g, "\\$&")
-          .replace(/\*/g, "[^/]*")
-          .replace(/\?/g, "[^/]");
-        return last ? text : `${text}/`;
-      })
-      .join("");
-    return new RegExp(`^${source}$`);
-  };
-  // The last pattern that matches a path decides, and a `!` pattern takes the path back out.
-  const unaffected = (filePath, patterns) =>
-    patterns.reduce((listed, pattern) => {
-      const negated = pattern.startsWith("!");
-      return globRegExp(negated ? pattern.slice(1) : pattern).test(filePath)
-        ? !negated
-        : listed;
-    }, false);
-
-  const config = JSON.parse(
-    readFileSync(path.join(root, ".nexkit/config.json"), "utf8"),
-  );
-  // The suites each check runs. A check skips only when all of them would.
-  const suitesOf = {
-    smoke,
-    "integration-1": ["integration"],
-    "integration-2": ["integration"],
-    "integration-3": ["integration"],
-    "e2e-1": ["playwright"],
-    "e2e-2": ["playwright"],
-    "e2e-3": ["playwright"],
-  };
-  const samples = [
-    "README.md",
-    "docs/delivery.md",
-    "docs/decisions/d105.md",
-    "samples/apps/purchase-requests/README.md",
-    ".github/workflows/ci.yml",
-    ".nexkit/config.json",
-    "tests/e2e/specs/form.spec.ts",
-    "tests/e2e/spec-durations.json",
-    "web/src/App.tsx",
-    "web/package.json",
-    "web/package-lock.json",
-    "web/keycloak-theme/login.ftl",
-    "web/keycloak-theme/messages/messages_en.properties",
-    "web/vite.config.ts",
-    "web/vite.keycloak-theme.config.ts",
-    "src/Axis.Server/Program.cs",
-    "scripts/integration.sh",
-    "scripts/lib/affected.mjs",
-    "samples/apps/purchase-requests/application.json",
-    "compose.yaml",
-  ];
-
-  test("only the checks that run suites with a safe list have one", () => {
-    const listed = config.checks
-      .filter((check) => check.unaffected_by)
-      .map((check) => check.name);
-    assert.deepEqual(listed.sort(), Object.keys(suitesOf).sort());
+describe("unaffected", () => {
+  test("a ** glob crosses folders", () => {
+    assert.equal(unaffected("README.md", ["**/*.md"]), true);
+    assert.equal(unaffected("samples/apps/x/README.md", ["**/*.md"]), true);
+    assert.equal(unaffected("docs/a/b.md", ["docs/**"]), true);
   });
 
-  for (const [name, suites] of Object.entries(suitesOf)) {
-    test(`${name} skips exactly the paths its suites' safe lists skip`, () => {
-      const patterns = config.checks.find(
-        (check) => check.name === name,
-      ).unaffected_by;
-      for (const filePath of samples) {
-        const scripts = suites.every((suite) =>
-          matches(filePath, safeSuites[suite]),
-        );
-        assert.equal(unaffected(filePath, patterns), scripts, filePath);
-      }
-    });
-  }
+  test("a glob does not match a path that only shares a prefix", () => {
+    assert.equal(unaffected("docs-old/x.txt", ["docs/**"]), false);
+    assert.equal(unaffected("docs/a/b.md", ["docs/*"]), false);
+  });
 
-  test("the integration tests read the Keycloak theme that their script builds from web/", () => {
-    const theme = [
-      "web/keycloak-theme/login.ftl",
-      "web/keycloak-theme/login-otp.ftl",
-      "web/keycloak-theme/login-config-totp.ftl",
-      "web/vite.config.ts",
-      "web/vite.keycloak-theme.config.ts",
-    ];
-    for (const filePath of theme) {
-      assert.equal(matches(filePath, safeSuites.integration), false, filePath);
-    }
-    assert.equal(matches("web/src/App.tsx", safeSuites.integration), true);
+  test("a later ! pattern takes a path back out", () => {
+    const patterns = ["web/**", "!web/package.json"];
+    assert.equal(unaffected("web/src/App.tsx", patterns), true);
+    assert.equal(unaffected("web/package.json", patterns), false);
+  });
+
+  test("a path in no list is not unaffected", () => {
+    assert.equal(
+      unaffected("src/Axis.Server/Program.cs", ["docs/**", "**/*.md"]),
+      false,
+    );
   });
 });
 
-describe("matches", () => {
-  const matchers = ["docs/", "Dockerfile", /\.md$/];
+describe("safeLists", () => {
+  const config = {
+    checks: [
+      { name: "build", run: "scripts/build.sh" },
+      {
+        name: "e2e-1",
+        run: "AXIS_E2E_SHARD=1/3 scripts/e2e.sh",
+        unaffected_by: ["docs/**", "web/**"],
+      },
+      {
+        name: "e2e-2",
+        run: "AXIS_E2E_SHARD=2/3 scripts/e2e.sh",
+        unaffected_by: ["docs/**"],
+      },
+      { name: "integration", run: "scripts/integration.sh" },
+    ],
+  };
 
-  test("matches a directory prefix, an exact path and a RegExp", () => {
-    assert.equal(matches("docs/delivery.md", matchers), true);
-    assert.equal(matches("Dockerfile", matchers), true);
-    assert.equal(matches("samples/apps/x/README.md", matchers), true);
+  test("lists the unaffected_by of each check that runs the suite's script", () => {
+    assert.deepEqual(safeLists("playwright", config), [
+      ["docs/**", "web/**"],
+      ["docs/**"],
+    ]);
   });
 
-  test("does not match a path that only shares a prefix or an exact name", () => {
-    assert.equal(matches("docs-old/x.txt", matchers), false);
-    assert.equal(matches("Dockerfile.dev", matchers), false);
+  test("skips only the paths every listing check lists", () => {
+    const lists = safeLists("playwright", config);
+    assert.equal(isSafe("docs/x.md", lists), true);
+    assert.equal(isSafe("web/x.ts", lists), false);
+  });
+
+  test("a check without unaffected_by makes nothing safe", () => {
+    const lists = safeLists("integration", config);
+    assert.deepEqual(lists, [[]]);
+    assert.equal(isSafe("docs/x.md", lists), false);
+  });
+
+  test("a suite that no check runs has no list and runs", () => {
+    const lists = safeLists("compose", config);
+    assert.deepEqual(lists, []);
+    assert.equal(isSafe("docs/x.md", lists), false);
+    assert.equal(
+      decideSafe({ base: "abc", lists, listChanged: () => ["docs/x.md"] }).run,
+      true,
+    );
   });
 });
 
@@ -331,7 +307,7 @@ describe("changedPaths", () => {
     assert.equal(
       decideSafe({
         base: "HEAD",
-        matchers: safeSuites.compose,
+        lists: safeLists("compose", readConfig()),
         listChanged: (base) => changedPaths(base, dir),
       }).run,
       true,

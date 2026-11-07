@@ -53,6 +53,7 @@ function runE2e(shard, args = []) {
       'scripts/e2e.sh',
       'scripts/lib/test-results.sh',
       'scripts/lib/affected.mjs',
+      '.nexkit/config.json',
       'scripts/lib/e2e-shard.mjs',
       'scripts/test-report.mjs',
     ]) {

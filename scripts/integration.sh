@@ -4,8 +4,8 @@
 # The Keycloak theme is built first, because the tests' Keycloak loads it.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
-# on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
-# scripts/smoke.sh.
+# in the `unaffected_by` lists of .nexkit/config.json, which scripts/lib/affected.mjs reads. The smoke
+# test of scripts/dev.sh runs in scripts/smoke.sh.
 # The control plane has an integration suite of its own, Axis.ControlPlane.Integration.Tests. It is built
 # first and then runs in the background beside Axis.Integration.Tests, and it is skipped with it. Its output
 # is printed when Axis.Integration.Tests ends. The split counts its seconds toward shard 1.
