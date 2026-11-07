@@ -1,6 +1,6 @@
 # Design review 2026-11-04-entities: the owner's rules
 
-This is an open design review. Work here follows the `axis-design` skill: one change at a time, only what the design needs,
+This design review has ended. Work here follows the `axis-design` skill: one change at a time, only what the design needs,
 no test changes on this branch, and logic left to the review's issue.
 
 Topic: Studio's Entities page.
@@ -15,35 +15,15 @@ In a merge of `main`, `main` is the standard for behaviour and the prototype for
 never keeps the prototype's logic over `main`'s. What the prototype's files lose is brought back (see "Lost in merges").
 After a merge, run the type check, lint, and the tests of the shared widgets, and write the merge down below.
 
-## State and how to continue
+## State
 
-Last updated 2026-11-05 (merged `main` at 7d171005; one action row; one language rule for labels). The review is open; the
-owner is reviewing it one step at a time.
+The review ended on 2026-11-07, when the owner agreed step 2, the field drawer, as it stands here. `main` was last merged at
+102b96d3, and the audit below ran before the last changes of 2026-11-05.
 
-- **Done:** the kind lists (one table, standard table steps 1 to 3, a table with too little room); the band (too little
-  room, its actions); the entity designer's sections, `AxisField` with required help, the required mark, the Publish
-  dialog's fields, the relaxed points in the Modules table, step 2, the field drawer in groups with the rules at the field;
-  "A picker names by the label" for every `ReferencePicker`; and New resource, checked on click with every required field
-  marked.
-- **Waiting:** the owner's verdict on step 2, the field drawer.
-- **Next, in order:**
-  1. Step 3: Add field opens a choice of type first, a grid of the types, each with an icon and one line, then the drawer.
-  2. Step 4: the entity's Validations section as `AxisField` boxes like the drawer's rules, with a Field column or label,
-     and Indexes the same way.
-  3. "A picker names by the label", left: the multi-choice of fields in Indexes.
-  4. Then the review's End, as the `axis-design` skill says: one docs change, the tag, one NexKit issue.
-- **To pick it up on another machine:**
-  - `git fetch && git switch design/2026-11-04-entities`, then `scripts/setup.sh` once and `scripts/dev.sh`.
-  - A Keycloak container made before #2794 refuses the realm sync (`axis-fapi`, "DPoP token is disabled") and the server
-    stops at start: run `docker compose up -d --force-recreate keycloak` once.
-  - A change to `src/Axis.Presentation/Texts/*.json` needs a restart of `scripts/dev.sh`: `dotnet watch` does not embed it
-    again.
-  - Studio's development user is `author`, password `axis`, and a code from the `otp` secret of `author` in
-    `samples/keycloak/axis-realm.json`.
-  - To see a relaxed point, relax one on a contract's page; it rewrites the sample's `application.json`, which is never
-    committed: `git checkout samples/apps/purchase-requests/application.json` afterwards.
-  - The text files have some duplicate keys from an earlier merge, such as `shell.licences.axis`; edit them as lines, as a
-    JSON round trip drops the duplicates.
+- **Left for a new review:** step 3, a choice of type on Add field; step 4, the entity's Validations and Indexes as
+  `AxisField` boxes, with a Field column or label; and the multi-choice of fields in Indexes, for "A picker names by the
+  label". They are in the design issue #3264.
+- **Left for a new review:** "Next, agreed" under "Writing an expression, step 1".
 
 ## Agreed changes
 
