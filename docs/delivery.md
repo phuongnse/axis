@@ -188,8 +188,8 @@ that holds it.
 
 - **Everything goes through NexKit, except changes in paths NexKit may not change.** NexKit's
   `protected_paths` setting names those paths. Such changes are hand-made pull requests on any branch
-  name, for example a NexKit version bump. Hand-made pull requests are only for those paths and for
-  the docs change that ends a design review, so a design change is never one, see
+  name, for example a NexKit version bump. Hand-made pull requests are only for those paths. A design
+  change and the docs change that ends a design review are NexKit issues, see
   [design changes](#design-changes). Work that waits for one follows [follow-ups](#the-life-of-an-issue).
   The owner or the hourly driver opens them, and the owner merges them.
 - **NexKit checks and reviews them on request.** Whoever pushes to one comments
@@ -262,12 +262,12 @@ A milestone goes from a readiness check to its close in five steps.
    or *not ready*, naming what has to exist first. It gives this verdict for that milestone and the
    other planned ones of the current phase of the [roadmap](roadmap.md#milestones), because the
    roadmap lets them change order. A milestone of a later phase is checked only when the owner asks.
-   A milestone that is not ready first gets the decisions and doc sections it lacks. That work needs
-   no NexKit, so it can go on while other milestones run.
+   A milestone that is not ready first gets the decisions and doc sections it lacks, as NexKit docs
+   issues, which run while other milestones run.
 2. **Break it down.** On a *ready* verdict, the local agent breaks the milestone into issues, as the
    [roadmap](roadmap.md#how-work-is-planned) describes, and checks the [profiles](#profiles) against
    the new milestone's concepts and the models available, and sets the milestone's roadmap status to
-   In progress, in a hand-made docs change. Profile fixes are hand-made pull requests. The issues of
+   In progress, in a NexKit issue. Profile fixes are hand-made pull requests. The issues of
    new screens wait for a design issue, see [design changes](#design-changes).
 3. **Deliver the issues.** Each one follows the life of an issue above. Autopilot runs every ready
    issue of every milestone at once.
@@ -311,8 +311,8 @@ change, a design review and a sync are in the
   [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) agrees. A
   new screen or a new way of interacting gets a design review before it is built. A screen made of
   agreed patterns needs none. Each group of new screens has one design issue with the `on-hold`
-  label, so NexKit never starts it, and the issues that build those screens are *blocked by* it. The
-  open design issues are the queue of reviews.
+  label, so NexKit does not start it until the review ends, and the issues that build those screens are
+  *blocked by* it. The open design issues are the queue of reviews.
 - **Several changes are a design review.** When the owner reviews the design in words, one change at
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
@@ -328,25 +328,29 @@ change, a design review and a sync are in the
 - **A prototype starts from `main` and changes only the SPA.** It never starts from another review's
   tag: a screen that an earlier review's issues have not built yet waits for them. It changes no
   server code. What a screen needs from an API is a fixture in the prototype and a contract in the
-  review's docs change, and NexKit builds it. When `main` changes code the prototype touches, the
-  session merges `main` into the branch and never rebases it, and `main` stays the standard for
-  behaviour and the prototype the standard for its look.
+  review's rule comments on the design issue, and NexKit builds it. When `main` changes code the
+  prototype touches, the session merges `main` into the branch and never rebases it, and `main` stays
+  the standard for behaviour and the prototype the standard for its look.
 - **The design runs ahead of the repository only by open issues.** While a design issue is open, the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
   differs from the repository.
-- **A review writes its rules in the docs as they are agreed.** Each review has a design issue and
-  a docs branch. The docs branch takes each rule the owner agrees, where it lives, and the design issue
-  holds the review's state and what the build must do beyond the docs. No other file keeps them.
-- **A review ends in one docs change.** When the owner has agreed the changes, the docs branch is one
-  hand-made docs pull request, which rewrites the rules where they live, in the reference pages,
-  configuration and APIs included, as [writing the docs](writing-docs.md#how-the-docs-stay-correct)
-  says. It adds a decision only for a choice between real alternatives. Once it is merged, the issues
-  that are waiting build
-  the screens: they link the docs and the prototype's tag, and closing the design issue starts them.
-  A review of a screen that is already built has no such issues, so one NexKit issue builds all of it
-  and links the docs, the artifact and the tag, and the design issue closes. NexKit splits it if it
-  needs to, not the owner.
+- **A review's agreed rules are comments on its design issue.** The session writes each rule the owner
+  agrees as its own English comment. The comment names the doc page where the rule lives and any API
+  contract the screen needs. A changed rule is a new comment that links the one it replaces. The issue
+  also holds the review's state and what the build must do beyond the docs. There is no docs branch,
+  and no other file holds these rules.
+- **A review ends when the design issue's `on-hold` label comes off.** Before that, the session tags the
+  prototype and comments the tag on each issue that waits for the design issue. A screen that is already
+  built has no such issue, so the session first writes one build issue *blocked by* the design issue.
+  Then it removes the label.
+- **NexKit writes the docs change once the label is removed.** It plans the design issue like any
+  issue and writes each rule where it lives, marked as planned, as
+  [writing the docs](writing-docs.md#planned-work) says. The rules
+  go in the reference pages, configuration and APIs included. It adds a decision only for a choice
+  between real alternatives. Its pull request closes the design issue, which starts the issues that
+  wait for it. Those issues build the screens, link the docs and the tag, and remove the planned markers
+  they build. NexKit splits an issue if it needs to.
 - **A sync follows the repository.** After a merged change to the tokens or a widget, or whenever the
   owner asks, the session renders the previews again with `scripts/design-system.sh`, reads the
   tokens from `web/src/platform/designTokens.ts`, and publishes both to the same artifact. It keeps
@@ -386,7 +390,6 @@ issues, pull requests and sub-issues.
   | ------------------------------------- | ---------------------------------------------------------- | -------------- |
   | `nexkit/issue-<number>`               | A NexKit issue's work                                      | NexKit         |
   | `claude/<words>`                      | A Claude session in the cloud                              | The session    |
-  | `docs/<topic>`                        | A hand-made docs change                                    | A person       |
   | `ops/<topic>`                         | A change in a path NexKit may not change, such as a NexKit upgrade | A person |
   | `design/<yyyy-mm-dd>-<topic>`         | A design review's prototype                                | The local session |
   | `design-review/<yyyy-mm-dd>-<topic>`  | The tag on a prototype's last commit, same date and topic  | The local session |

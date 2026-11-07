@@ -46,16 +46,17 @@ bullets after it in Design changes.
 ### Start
 
 1. Take the review's design issue, or agree a short topic with the owner, such
-   as `field-look`, and open a design issue with the `on-hold` label for it. If
-   an earlier review's issues have not built what it touches, say so and stop.
+   as `field-look`, and open a design issue with the `on-hold` label for it. Its
+   body says the review ends in a docs change that NexKit writes from the rule
+   comments, and that a comment naming the one it replaces supersedes it. If an
+   earlier review's issues have not built what it touches, say so and stop.
 2. Create the prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
    `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
-   `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch. It gets no pull request, no CI and no
-   `/nexkit review`, as Design changes says.
-3. Create the review's docs branch from `main`, `docs/<topic>-review`, and
-   push it. The review's rules go there as they are agreed.
-4. Link both branches on the design issue, and keep its state there: what is
+   `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch.
+   It gets no pull request, no CI and no `/nexkit review`, as Design changes
+   says.
+3. Link the branch on the design issue, and keep its state there: what is
    done, what waits for the owner and what comes next.
 
 ### Each change
@@ -80,9 +81,10 @@ design issue. What you find outside the review's topic becomes an issue.
 5. Check every changed card as [checking-a-card.md](checking-a-card.md) says.
 6. Commit the change with a message that says what it shows. Push the branch.
 7. Tell the owner what changed and which preview to open, and ask for a
-   verdict. Keep, change or drop the change as they say. Write each rule they
-   agree where it lives in the docs, on the docs branch, and push it. Bring the
-   design issue's state up to date.
+   verdict. Keep, change or drop the change as they say. Comment each rule they
+   agree on the design issue, as [Design changes](../../../docs/delivery.md#design-changes)
+   says, with `gh issue comment <n> --body-file <file>`. Then bring the design
+   issue's state up to date.
 
 When `main` has changed code the prototype touches, follow
 [merging-main.md](merging-main.md) before the next change.
