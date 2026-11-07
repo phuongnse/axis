@@ -12,7 +12,7 @@ background work that outlives a request, and may later need to run parts of itse
 - **One codebase with explicit module boundaries.**
 - **A few hosts run the same modules.** The server serves the API, the BFF and the SPA, and the
   worker runs the background work. The other hosts are in the
-  [architecture overview](../architecture.md#overview).
+  [architecture overview](../architecture.md#building-blocks).
 - **No message broker and no microservices.** The hosts share work through the databases.
 
 ## Consequences
