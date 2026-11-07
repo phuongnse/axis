@@ -62,8 +62,8 @@ are under "Several changes are a design review" in Design changes.
    `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
    `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch,
    never only in a temporary folder. Never open a pull request from it, and
-   never give it a NexKit branch name. CI leaves `design/` branches out, so a
-   push starts no run.
+   never give it a NexKit branch name. No push to a branch starts CI, and the
+   prototype never gets `/nexkit review`, because it is never merged.
 2. Keep the owner's rules, in English, in `design-review.md` at the root
    of the branch, so the review can go on from another machine. Its first
    lines say that the review follows this skill, so a session that opens the
@@ -168,8 +168,8 @@ A check passes only when the card behaves as it will in the artifact.
 2. Before the issue, tag the prototype's last commit and push the tag, so
    NexKit's agents can read it and no link to it ever breaks:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and
-   `git push origin design-review/<yyyy-mm-dd>-<topic>`. CI and CodeQL start only on
-   branch pushes, so the tag starts no run; check with `gh run list`. The
+   `git push origin design-review/<yyyy-mm-dd>-<topic>`. No push to a branch other than
+   `main` starts a workflow, so the tag starts no run; check with `gh run list`. The
    issue links the tag's comparison with the commit the branch
    started from, `compare/<base>...design-review/<yyyy-mm-dd>-<topic>`, where
    `<base>` is `git merge-base design/<yyyy-mm-dd>-<topic> main`, so the diff stays the

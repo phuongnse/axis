@@ -9,8 +9,8 @@ import { fileURLToPath } from 'node:url'
 //   node scripts/docs-audit.mjs read <run>         asks Claude Code once per group of about eight pages, at most
 //                                                  four at a time, with read-only tools, and prints the findings
 //   node scripts/docs-audit.mjs file <findings> <run id>
-//                                                  opens a NexKit issue for each group of findings
-//                                                  that no open issue covers, at most ten
+//                                                  opens a NexKit issue for each group of findings that no open
+//                                                  issue covers: code and test fixes first, at most ten, the rest printed
 //
 // The read command holds no GitHub token and the file command runs no model, so a page that tries
 // to steer the model cannot write to the repository. CLAUDE and GH name the commands, so the tests
@@ -90,6 +90,9 @@ function resultJson(answer) {
 }
 
 const marker = (group, key) => `<!-- docs-audit ${group} ${key} -->`
+// A run of hyphens is shortened so that a statement cannot close the HTML comment of its marker.
+export const findingKey = (f) =>
+  `${f.page} ${f.kind} ${f.statement.replace(/\s+/g, ' ').trim().toLowerCase().replace(/-{2,}/g, '-')}`
 const link = (file, line) => `[${file}${line ? `:${line}` : ''}](${repository}/blob/main/${file}${line ? `#L${line}` : ''})`
 
 function evidence(finding) {
@@ -114,45 +117,26 @@ function body(text, group, key, runId, criteria) {
   ].join('\n')
 }
 
-/** Groups the findings into issues, leaves out those an open issue already covers, and keeps at most ten. */
+const codeKinds = ['unbuilt', 'untested-list']
+
+/**
+ * Groups the findings into issues: code and test fixes first, then docs pages. Leaves out what an open issue
+ * or an earlier issue of this run covers, keeps at most ten, and returns the findings past the cap as leftOut.
+ */
 export function issuesFrom(findings, openBodies, runId) {
-  const covered = (group, key) => openBodies.some((b) => b.includes(marker(group, key)))
-  const issues = []
-  const byPage = new Map()
-  for (const f of findings) {
-    if (docsKinds.has(f.kind)) {
-      if (!byPage.has(f.page)) byPage.set(f.page, [])
-      byPage.get(f.page).push(f)
-    }
+  const built = new Set()
+  const covered = (group, key) =>
+    built.has(`${group} ${key}`) || openBodies.some((b) => b.includes(marker(group, key)))
+  const candidates = []
+  const add = (group, key, found, issue) => {
+    if (covered(group, key)) return
+    built.add(`${group} ${key}`)
+    candidates.push({ found, issue })
   }
-  for (const [page, list] of byPage) {
-    if (covered('docs', page)) continue
-    issues.push({
-      title: `The docs of ${page} match the code`,
-      labels: ['documentation'],
-      body: body(
-        `The docs audit read ${link(page)} against the code and found statements to fix, as ` +
-          `[how the docs stay correct](${repository}/blob/main/docs/writing-docs.md#how-the-docs-stay-correct) says.\n\n` +
-          'Concepts: the ones the page names.',
-        'docs',
-        page,
-        runId,
-        [
-          ...list.map(
-            (f) =>
-              `${kindNames[f.kind]}. ${link(f.page, f.line)}: ${f.statement} Evidence: ${evidence(f)}.` +
-              (f.recommendation ? ` Recommended: ${f.recommendation}` : ''),
-          ),
-          '`node scripts/check-docs.mjs` and `node scripts/check-links.mjs` pass.',
-        ],
-      ),
-    })
-  }
-  for (const f of findings.filter((f) => !docsKinds.has(f.kind))) {
-    const key = `${f.page}:${f.line}`
+  for (const f of codeKinds.flatMap((kind) => findings.filter((x) => x.kind === kind))) {
     const group = f.kind === 'unbuilt' ? 'code' : 'test'
-    if (covered(group, key)) continue
-    issues.push({
+    const key = findingKey(f)
+    add(group, key, [f], {
       title:
         f.kind === 'unbuilt'
           ? `The code follows the rule at ${f.page}:${f.line}`
@@ -173,7 +157,39 @@ export function issuesFrom(findings, openBodies, runId) {
       ),
     })
   }
-  return issues.slice(0, maxIssues)
+  const byPage = new Map()
+  for (const f of findings) {
+    if (docsKinds.has(f.kind)) {
+      if (!byPage.has(f.page)) byPage.set(f.page, [])
+      byPage.get(f.page).push(f)
+    }
+  }
+  for (const [page, list] of byPage) {
+    add('docs', page, list, {
+      title: `The docs of ${page} match the code`,
+      labels: ['documentation'],
+      body: body(
+        `The docs audit read ${link(page)} against the code and found statements to fix, as ` +
+          `[how the docs stay correct](${repository}/blob/main/docs/writing-docs.md#how-the-docs-stay-correct) says.\n\n` +
+          'Concepts: the ones the page names.',
+        'docs',
+        page,
+        runId,
+        [
+          ...list.map(
+            (f) =>
+              `${kindNames[f.kind]}. ${link(f.page, f.line)}: ${f.statement} Evidence: ${evidence(f)}.` +
+              (f.recommendation ? ` Recommended: ${f.recommendation}` : ''),
+          ),
+          '`node scripts/check-docs.mjs` and `node scripts/check-links.mjs` pass.',
+        ],
+      ),
+    })
+  }
+  return {
+    issues: candidates.slice(0, maxIssues).map((c) => c.issue),
+    leftOut: candidates.slice(maxIssues).flatMap((c) => c.found),
+  }
 }
 
 function failure(command, args, stdout, stderr) {
@@ -272,11 +288,16 @@ function file(findingsFile, runId) {
   const findings = JSON.parse(readFileSync(findingsFile, 'utf8'))
   const gh = process.env.GH ?? 'gh'
   const open = JSON.parse(run(gh, ['issue', 'list', '--state', 'open', '--limit', '1000', '--json', 'body']))
-  const issues = issuesFrom(findings, open.map((i) => i.body ?? ''), runId)
+  const { issues, leftOut } = issuesFrom(findings, open.map((i) => i.body ?? ''), runId)
   for (const issue of issues) {
     const args = ['issue', 'create', '--title', issue.title, '--body', issue.body]
     for (const label of issue.labels) args.push('--label', label)
     process.stdout.write(run(gh, args))
+  }
+  for (const f of leftOut) {
+    console.log(
+      `Left out by the cap of ${maxIssues}, the next run of the page reports it again: ${f.page}:${f.line} ${f.kind}: ${f.statement}`,
+    )
   }
   return issues.length
 }
