@@ -15,8 +15,9 @@ public static class AgentServiceCollectionExtensions
     /// <c>Ai:ReviewBinding</c>. With no <c>Ai:DefaultBinding</c> it starts idle, because AI authoring is off: it reads no tenant setting
     /// and no secret. With one, it reads its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
-    /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. It has no health
-    /// check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
+    /// requests it claims with a lease, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
+    /// registered. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
@@ -24,6 +25,7 @@ public static class AgentServiceCollectionExtensions
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, or <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none outside Development and Testing.
+    /// Also two registered <see cref="IAuthoringStep"/> work on one state, or one works on a state that needs no work.
     /// The message names the setting and never a connection value.
     /// </exception>
     public static IServiceCollection AddAxisAgent(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -44,6 +46,9 @@ public static class AgentServiceCollectionExtensions
             services.AddTenancy(catalog);
             services.AddSingleton(catalog);
             services.AddSingleton<AuthoringRequestStore>();
+            services.TryAddSingleton(AuthoringLoopOptions.Default);
+            services.AddSingleton<AuthoringSteps>();
+            services.AddSingleton<AuthoringRequestRunner>();
         }
 
         services.TryAddSingleton(TimeProvider.System);

@@ -20,7 +20,7 @@ no shortcut of its own.
   resources, and never reads a record.
 - **Its own state.** It reads its tenants as the worker does, see [AI settings](host-settings.md#ai-settings),
   and reads the request tables below in each tenant database with the tenant's runtime role. It refuses a
-  tenant whose role can change the schema. _(Writing them is planned for M35.)_
+  tenant whose role can change the schema. It writes claims, steps and tokens there with the same role.
 - **Models** _(planned for M35)_. It calls a model through an adapter, by the binding the request uses, see
   [model bindings](model-bindings.md).
 
@@ -49,13 +49,17 @@ loses no work.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
   summary, outcome, tokens and times. A step's full model messages are kept for 30 days for the author
   and the audit, then deleted. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
-- **Claimed with a lease** _(planned for M35)_. The agent host claims a request whose state needs work, as the publisher
+- **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
-  claimable after the lease.
-- **Resuming** _(planned for M35)_. Each finished step is committed before the next starts, and after a restart the next
-  host resumes at the last finished step. A model call that was in flight is made again, and its
-  tokens count again.
+  claimable after the lease. The host claims only a state whose step it has. Every write after the
+  claim is fenced by `claimed_by`, which is new for each claim, so a host that lost its claim, or
+  whose request was dropped, changes nothing and stops working on that request.
+- **Resuming.** Each finished step is committed with the request's next state before the next
+  starts, and a commit that keeps the claim also extends the lease. After a restart the next host resumes at the last finished step. It closes the step
+  that never finished with the outcome `interrupted`, which keeps its tokens, and runs that step
+  again as a new step. A step's tokens are written to its row and to the request as soon as its
+  call ends. A model call that was in flight is made again, and its tokens count again.
 - **Fair use** _(planned for M35)_. The agent host takes the requests of the tenants of a cell in turn, as the worker
   shares its time, so one tenant's long request does not hold back another's.
 

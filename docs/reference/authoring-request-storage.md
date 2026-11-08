@@ -19,4 +19,6 @@ when the author approves, changes the plan or drops it. The agent host writes th
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
   (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `started_at` (`timestamptz`) and
-  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step.
+  `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A step that
+  never finished has the `outcome` `interrupted` once a later host closes it, see
+  [resuming](authoring-requests.md#durable-requests).
