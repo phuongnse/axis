@@ -612,7 +612,7 @@ internal static class StudioWrites
         $"{verb} {resource.Kind} {resource.Name ?? resource.File}";
 
     // "Change layer {module}/{name}" for a saved layer and "Reset layer {module}/{name}" for a deleted one.
-    private static string LayerSummary(string moduleId, string name, JsonObject? changes) =>
+    internal static string LayerSummary(string moduleId, string name, JsonObject? changes) =>
         $"{(changes is null ? "Reset" : "Change")} layer {moduleId}/{name}";
 
     private static string? StringValue(JsonObject content, string name) =>

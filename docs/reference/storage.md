@@ -771,10 +771,11 @@ Besides the record and process actions, these actions write audit records. A `pu
   `application_id` is set, `details` is `{ "requestId" }`, and the other ids are null. Each commits
   with the row it changes.
 
-- **MCP tool actions.** A successful `create_draft`, `write_resource` or `delete_resource` call of the
+- **MCP tool actions.** A successful `create_draft`, `write_resource`, `write_layer` or `delete_resource` call of the
   [MCP server](mcp-server.md#tools) writes `mcp.toolCalled`, with the person as `actor`. The
   `application_id` is set, and `entity_id`, `record_id` and `process_instance_id` are null. The `details`
-  are `{ "tool", "clientId", "draftId", "resourceId" }`, with a null `resourceId` for `create_draft`. They
+  are `{ "tool", "clientId", "draftId", "resourceId" }`, with a null `resourceId` for `create_draft`. For `write_layer` it is the id of the module resource the
+  call edited, also when the edit leaves no layer. They
   hold no content, name or path. The record commits after the draft's write, and a refused call writes none.
 
 ### Sequence counters

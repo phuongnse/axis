@@ -50,6 +50,7 @@ internal static partial class McpServer
     private const string CreateDraftTool = "create_draft";
     private const string WriteResourceTool = "write_resource";
     private const string DeleteResourceTool = "delete_resource";
+    private const string WriteLayerTool = "write_layer";
     private const string CheckExpressionTool = "check_expression";
     private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
@@ -69,6 +70,8 @@ internal static partial class McpServer
     private static readonly ToolProperty _pathInput = new("path", "The JSON Pointer of the string in the resource that holds the expression, such as /condition.", true);
     private static readonly ToolProperty _expressionInput = new("expression", "The expression text to check at the path.", true);
     private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
+    private static readonly ToolProperty _layerContentInput = new(
+        "content", "The edited module resource whole, a JSON object, as read_module_resource answers its content.", true, "object");
 
     private static readonly ToolDefinition[] _definitions =
     [
@@ -110,6 +113,12 @@ internal static partial class McpServer
             DeleteResourceTool,
             "Removes one resource from your draft by its id, and answers the draft's diagnostics. The manifest cannot be removed.",
             [_applicationInput, _writeDraftInput, _idInput]),
+        new(
+            WriteLayerTool,
+            "Writes, in your draft, the customization layer that holds only the difference between the edited module resource and the pinned module version. "
+            + "An edit with no difference removes the layer the draft has for that resource. Answers the layer's file and version, "
+            + "both null when no layer is left, and the draft's diagnostics.",
+            [_applicationInput, _writeDraftInput, _moduleInput, _idInput, _layerContentInput]),
         new(
             CheckExpressionTool,
             "Checks an expression at a path of one resource of your draft, in the draft's context, and answers its type and diagnostics. Writes nothing.",
@@ -346,6 +355,14 @@ internal static partial class McpServer
                 context, arguments[_applicationInput.Name], arguments[_writeDraftInput.Name], arguments[_contentInput.Name], ct),
             DeleteResourceTool => await McpWriteTools.DeleteResourceAsync(
                 context, arguments[_applicationInput.Name], arguments[_writeDraftInput.Name], arguments[_idInput.Name], ct),
+            WriteLayerTool => await McpWriteTools.WriteLayerAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments[_moduleInput.Name],
+                arguments[_idInput.Name],
+                arguments[_layerContentInput.Name],
+                ct),
             CheckExpressionTool => await McpWriteTools.CheckExpressionAsync(
                 context,
                 arguments[_applicationInput.Name],
