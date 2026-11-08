@@ -175,6 +175,8 @@ Delete removes a resource's file, and asks first, because other resources may us
   [heading](studio-workspace.md#page-heading), so no tab shows it apart from the others.
 - **It asks.** Delete always opens a confirm dialog, which warns and names the count when the
   resource's `usedBy` count is above 0. The author can still confirm. The application manifest has no Delete.
+- **A link to Used by** _(planned for M31)_. The dialog for a resource with uses also offers "See what
+  uses it", which opens the Used by tab.
 - **It checks the version.** The delete sends the loaded version in `If-Match`. A stale version shows
   the conflict message, and nothing is deleted.
 - **After a delete,** the resource leaves its list, and the Problems panel shows the diagnostics that
