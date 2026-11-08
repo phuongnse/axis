@@ -203,7 +203,7 @@ public sealed class AdminTenantRealmMailTests(KeycloakFixture keycloak, MailpitF
         using var browser = new HttpClient(browserHandler);
         var authorize = new Uri(
             _baseAddress,
-            $"realms/{realm}/protocol/openid-connect/auth?client_id={ClientId}&response_type=code&scope=openid&redirect_uri={Uri.EscapeDataString(RedirectUri)}");
+            $"realms/{realm}/protocol/openid-connect/auth?client_id={ClientId}&response_type=code&scope=openid&redirect_uri={Uri.EscapeDataString(RedirectUri)}{Pkce.New().Query}");
         var jar = new Dictionary<string, string>();
 
         var (loginHtml, _) = await GetPageAsync(browser, authorize, jar);

@@ -34,6 +34,7 @@ namespace Axis.Tenancy.Realms;
 /// from the identity provider, which another sync of the same realm at the same time can cause, makes the sync read the
 /// realm again and repeat, up to three attempts. It also writes the tenant's legal links on every client of the realm, turns the realm's Terms and Conditions
 /// step on while the tenant has a terms address, and asks every user to accept the terms again when the terms version changes (<see cref="SyncLegalAsync"/>).
+/// It also keeps the realm's <see cref="AuthoringScope"/> client scope in step with the tenant's hosts (<see cref="SyncPlatformAddressesAsync"/>).
 /// </summary>
 public sealed class RealmSync(HttpClient http, Uri baseAddress)
 {
@@ -87,6 +88,16 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
     // The same path as TenantSignIn.CallbackPath in Axis.Server, which this project cannot reference.
     private const string PlatformCallbackPath = "/api/auth/callback";
+
+    // The same path as McpServer.Path in Axis.Server, which this project cannot reference.
+    private const string McpPath = "/mcp";
+
+    /// <summary>The client scope whose audience mappers put the <c>/mcp</c> URL of each tenant host into the access token, and which the MCP server's metadata names.</summary>
+    public const string AuthoringScope = "axis:authoring";
+
+    private const string AuthoringAudiencePrefix = "mcp audience ";
+    private const string AudienceMapper = "oidc-audience-mapper";
+    private const string OfflineAccessScope = "offline_access";
 
     /// <summary>The alias of the first-login flow that <c>TenantRealm</c> makes and every provider names.</summary>
     public const string FirstLoginFlowAlias = "axis first login";
@@ -166,6 +177,12 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// because Keycloak removes the attributes that an update leaves out, and the client secret is not sent. It signs in as
     /// <c>axis-activation</c>, whose <c>manage-clients</c> right covers the client. An error names the step and the status
     /// code, never a response body or a secret.
+    /// <para>
+    /// It also gives the realm the client scope <see cref="AuthoringScope"/>, with one <c>oidc-audience-mapper</c> named
+    /// <c>mcp audience &lt;host&gt;</c> for each host, whose audience is <see cref="AuthoringAudiences"/> of the hosts, and removes the
+    /// mappers with that name prefix whose host is gone. It makes the scope a default optional scope of the realm, so a client made from
+    /// then on can ask for it, and takes <c>offline_access</c> out of them.
+    /// </para>
     /// </summary>
     public async Task SyncPlatformAddressesAsync(
         string realm, string activationSecret, IReadOnlyCollection<string> hosts, CancellationToken cancellationToken)
@@ -204,6 +221,121 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         using var updated = await SendAsync(
             token, HttpMethod.Put, $"{clientsPath}/{platform.GetProperty("id").GetString()}", representation, cancellationToken);
         EnsureSuccess(updated, $"update the client '{RealmClientProfile.PlatformClientId}'");
+
+        await SyncAuthoringScopeAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}", HostsOf(hosts), cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes the realm's <see cref="AuthoringScope"/> hold one audience mapper for each of <paramref name="hosts"/> and no stale one, and
+    /// makes it a default optional scope in place of <c>offline_access</c>. It leaves every mapper whose name does not start with
+    /// <c>mcp audience </c> as it is.
+    /// </summary>
+    private async Task SyncAuthoringScopeAsync(string token, string realmPath, string[] hosts, CancellationToken cancellationToken)
+    {
+        var scopesPath = $"{realmPath}/client-scopes";
+        using var listed = await SendAsync(token, HttpMethod.Get, scopesPath, null, cancellationToken);
+        EnsureSuccess(listed, "list the client scopes");
+        string? scopeId = null;
+        string? offlineId = null;
+        foreach (var scope in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            switch (scope.GetProperty("name").GetString())
+            {
+                case AuthoringScope:
+                    scopeId = scope.GetProperty("id").GetString();
+                    break;
+                case OfflineAccessScope:
+                    offlineId = scope.GetProperty("id").GetString();
+                    break;
+            }
+        }
+
+        if (scopeId is null)
+        {
+            var representation = new Dictionary<string, object?>
+            {
+                ["name"] = AuthoringScope,
+                ["protocol"] = "openid-connect",
+                ["attributes"] = new Dictionary<string, string>
+                {
+                    ["include.in.token.scope"] = "true",
+                    ["display.on.consent.screen"] = "true",
+                },
+            };
+            using var created = await SendAsync(token, HttpMethod.Post, scopesPath, representation, cancellationToken);
+            EnsureSuccess(created, $"create the client scope '{AuthoringScope}'");
+            scopeId = created.Headers.Location?.Segments[^1].TrimEnd('/')
+                ?? throw new InvalidOperationException($"The identity provider step 'find the created client scope '{AuthoringScope}'' found no client scope.");
+        }
+
+        await SyncAuthoringAudiencesAsync(token, $"{scopesPath}/{scopeId}/protocol-mappers/models", hosts, cancellationToken);
+
+        var defaultsPath = $"{realmPath}/default-optional-client-scopes";
+        using var defaults = await SendAsync(token, HttpMethod.Get, defaultsPath, null, cancellationToken);
+        EnsureSuccess(defaults, "list the default optional client scopes");
+        var held = (await defaults.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Select(scope => scope.GetProperty("name").GetString())
+            .ToList();
+        if (!held.Contains(AuthoringScope))
+        {
+            using var added = await SendAsync(token, HttpMethod.Put, $"{defaultsPath}/{scopeId}", null, cancellationToken);
+            EnsureSuccess(added, $"make '{AuthoringScope}' a default optional client scope");
+        }
+
+        if (held.Contains(OfflineAccessScope) && offlineId is not null)
+        {
+            using var removed = await SendAsync(token, HttpMethod.Delete, $"{defaultsPath}/{offlineId}", null, cancellationToken);
+            EnsureSuccess(removed, $"take '{OfflineAccessScope}' out of the default optional client scopes");
+        }
+    }
+
+    private async Task SyncAuthoringAudiencesAsync(string token, string mappersPath, string[] hosts, CancellationToken cancellationToken)
+    {
+        using var listed = await SendAsync(token, HttpMethod.Get, mappersPath, null, cancellationToken);
+        EnsureSuccess(listed, $"list the mappers of the client scope '{AuthoringScope}'");
+        var existing = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var mapper in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            existing.TryAdd(mapper.GetProperty("name").GetString()!, mapper);
+        }
+
+        var wanted = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var host in hosts)
+        {
+            var name = AuthoringAudiencePrefix + host;
+            wanted.Add(name);
+            var config = new Dictionary<string, string>
+            {
+                ["included.custom.audience"] = AuthoringAudience(host),
+                ["access.token.claim"] = "true",
+                ["id.token.claim"] = "false",
+                ["introspection.token.claim"] = "true",
+            };
+            var representation = new Dictionary<string, object?>
+            {
+                ["name"] = name,
+                ["protocol"] = "openid-connect",
+                ["protocolMapper"] = AudienceMapper,
+                ["config"] = config,
+            };
+            if (!existing.TryGetValue(name, out var current))
+            {
+                using var created = await SendAsync(token, HttpMethod.Post, mappersPath, representation, cancellationToken);
+                EnsureSuccess(created, $"create the mapper '{name}' of the client scope '{AuthoringScope}'");
+            }
+            else if (current.GetProperty("protocolMapper").GetString() != AudienceMapper || !ConfigEquals(current, config))
+            {
+                representation["id"] = current.GetProperty("id").GetString();
+                using var updated = await SendAsync(token, HttpMethod.Put, $"{mappersPath}/{representation["id"]}", representation, cancellationToken);
+                EnsureSuccess(updated, $"update the mapper '{name}' of the client scope '{AuthoringScope}'");
+            }
+        }
+
+        foreach (var (name, mapper) in existing.Where(pair => pair.Key.StartsWith(AuthoringAudiencePrefix, StringComparison.Ordinal) && !wanted.Contains(pair.Key)))
+        {
+            using var deleted = await SendAsync(token, HttpMethod.Delete, $"{mappersPath}/{mapper.GetProperty("id").GetString()}", null, cancellationToken);
+            EnsureSuccess(deleted, $"delete the mapper '{name}' of the client scope '{AuthoringScope}'");
+        }
     }
 
     /// <summary>
@@ -375,17 +507,24 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// </summary>
     internal static (string[] RedirectUris, string[] WebOrigins, string[] PostLogoutRedirectUris) PlatformAddresses(IEnumerable<string> hosts)
     {
-        var distinct = hosts
-            .Select(host => host.Trim().ToLowerInvariant())
-            .Where(host => host.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
+        var distinct = HostsOf(hosts);
         return (
             [.. distinct.Select(host => $"https://{host}{PlatformCallbackPath}")],
             [.. distinct.Select(host => $"https://{host}")],
             [.. distinct.Select(host => $"https://{host}/?signedOut")]);
     }
+
+    /// <summary>The audiences of <see cref="AuthoringScope"/>: the <c>/mcp</c> URL of each host, in the order and with the host spelling of <see cref="PlatformAddresses"/>.</summary>
+    internal static string[] AuthoringAudiences(IEnumerable<string> hosts) => [.. HostsOf(hosts).Select(AuthoringAudience)];
+
+    private static string AuthoringAudience(string host) => $"https://{host}{McpPath}";
+
+    private static string[] HostsOf(IEnumerable<string> hosts) => hosts
+        .Select(host => host.Trim().ToLowerInvariant())
+        .Where(host => host.Length > 0)
+        .Distinct(StringComparer.Ordinal)
+        .Order(StringComparer.Ordinal)
+        .ToArray();
 
     private static void Validate(RealmState state)
     {

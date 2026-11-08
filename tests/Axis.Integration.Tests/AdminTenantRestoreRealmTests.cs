@@ -380,9 +380,10 @@ public sealed class AdminTenantRestoreRealmTests(KeycloakFixture keycloak, Postg
         using var handler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
         using var browser = new HttpClient(handler);
         var cookies = new Dictionary<string, string>();
+        var pkce = Pkce.New();
         var authorize = new Uri(
             _baseAddress,
-            $"realms/{realm}/protocol/openid-connect/auth?client_id={SignInClient}&redirect_uri={Uri.EscapeDataString(RedirectUri)}&response_type=code&scope=openid&state=restored");
+            $"realms/{realm}/protocol/openid-connect/auth?client_id={SignInClient}&redirect_uri={Uri.EscapeDataString(RedirectUri)}&response_type=code&scope=openid&state=restored{pkce.Query}");
         var page = await SendWithCookiesAsync(browser, HttpMethod.Get, authorize, null, cookies);
         while (page.StatusCode == HttpStatusCode.Found)
         {
@@ -416,6 +417,7 @@ public sealed class AdminTenantRestoreRealmTests(KeycloakFixture keycloak, Postg
             ["code"] = code,
             ["client_id"] = SignInClient,
             ["redirect_uri"] = RedirectUri,
+            ["code_verifier"] = pkce.Verifier,
         });
         using var exchanged = await browser.PostAsync(new Uri(_baseAddress, $"realms/{realm}/protocol/openid-connect/token"), form, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, exchanged.StatusCode);

@@ -1,5 +1,6 @@
 import type {
   StudioApplication,
+  StudioCatalog,
   StudioDiagnostic,
   StudioNameEntity,
   StudioNames,
@@ -169,6 +170,23 @@ const releases = {
   changes: [{ path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null }],
 } satisfies StudioReleases
 
+const catalog = {
+  modules: [
+    {
+      id: 'organization',
+      label: 'Organization',
+      versions: ['1.2.0', '1.0.0'],
+      roles: [{ name: 'admin', titles: { [locale]: 'Administrator' } }],
+      connectors: [],
+    },
+  ],
+  packages: [],
+  timeZones: [
+    { id: 'Asia/Ho_Chi_Minh', offset: 420 },
+    { id: 'Europe/Paris', offset: 60 },
+  ],
+} satisfies StudioCatalog
+
 const settings = { autoAccept: false } satisfies { autoAccept: boolean }
 
 /** The routes of the open application, with the state's own applications, resources and names. */
@@ -178,6 +196,7 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/resources`]: () => ({ items: items(folder) }) satisfies { items: StudioResourceItem[] },
     [`${folderPath}/diagnostics`]: () => ({ diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     [`${folderPath}/names`]: () => names(folder),
+    '/api/studio/catalog': () => catalog,
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
     [`${folderPath}/releases`]: () => releases,
     [`${folderPath}/settings`]: () => settings,
