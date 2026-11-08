@@ -20,12 +20,6 @@
       "status": "proposed"
     },
     {
-      "concept": "Job",
-      "en": "job",
-      "vi": "tác vụ",
-      "status": "proposed"
-    },
-    {
       "concept": "Platform operator",
       "en": "platform operator",
       "vi": "người vận hành nền tảng",
@@ -47,18 +41,6 @@
       "concept": "Usage",
       "en": "usage",
       "vi": "mức sử dụng",
-      "status": "proposed"
-    },
-    {
-      "concept": "Package",
-      "en": "package",
-      "vi": "gói",
-      "status": "proposed"
-    },
-    {
-      "concept": "Binding",
-      "en": "binding",
-      "vi": "liên kết",
       "status": "proposed"
     },
     {

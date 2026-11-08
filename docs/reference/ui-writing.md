@@ -40,7 +40,9 @@ These principles hold in every language.
     release, are always written in the locale's language, by the glossary. The only exceptions are a closed list of
     integration and operations terms that the people who read them use in that form, such as webhook, endpoint, tenant
     and token. They show only on integration and operator screens, so an author's or a user's screen reads wholly in
-    one language.
+    one language. An author's or a user's screen names no integration or operations concept, such as a tenant or the
+    worker: it says what the person sees, "its database", not "the tenant's database", and "in the background", not
+    "through the worker".
 
   A word joins the closed list only by a change of the glossary. One sentence never names a concept twice, once in each
   language.
@@ -156,6 +158,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
   - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
     reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
+  - A help text says what an empty field does in a sentence of its own that starts "Để trống thì …": "Múi giờ ứng dụng
+    dùng cho ngày giờ. Để trống thì dùng UTC.", not "…, hoặc UTC khi không đặt".
 - **A short label that reads two ways on its own is rewritten.** "Nhãn trường" can read as a school's label; "Tên
   hiển thị" cannot.
 - **An optional field says "không bắt buộc".** A label that marks a field as optional ends with "(không bắt buộc)",
