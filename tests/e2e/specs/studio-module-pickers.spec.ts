@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { pickOption } from "../select";
 import { checklistsModule, e2eApp, moduleApp, modulesPath } from "../server-settings";
 import { useSession } from "../sessions";
-import { openFormTab, openKind } from "../studio-resources";
+import { doneListItem, openFormTab, openKind, openListItem } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -59,10 +59,12 @@ test.describe("Studio's pickers offer the pages and processes of a module", () =
       .getByRole("button", { name: "Module app", exact: true })
       .click();
     await openFormTab(page);
+    await openListItem(page, "/navigation", 0);
     await pickOption(
       page.getByTestId("studio-field-/navigation/0/page").getByRole("combobox"),
       "checklists/Checklists",
     );
+    await doneListItem(page);
     await save(page);
 
     const site = JSON.parse(

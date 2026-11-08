@@ -7,7 +7,7 @@ import { startServer } from '../activate'
 import { openSelect, pickOption } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { openFormTab, openKind, openProblems, openTab } from '../studio-resources'
+import { openFormTab, openKind, openListItem, openProblems, openTab } from '../studio-resources'
 
 // A server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -142,6 +142,7 @@ test.describe('Studio on a copy of its own', () => {
     const before = await readFile(file, 'utf8')
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
+    await openListItem(page, '/grants', 0)
     const field = page.getByTestId('studio-field-/grants/0/filter')
     await expect(field.getByTestId('studio-expression-type')).toContainText('boolean')
     const editor = field.getByRole('textbox')
@@ -221,6 +222,7 @@ test.describe('Studio on a copy of its own', () => {
       .fields.map((field) => field.name)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${policy.id}`)
+    await openListItem(page, '/grants', 1)
     const choices = await openSelect(page.getByTestId('studio-field-/grants/1/fields/0').getByRole('combobox'))
 
     await expect(choices.getByRole('option')).toHaveText(expected)
@@ -394,6 +396,8 @@ test.describe('Studio on a copy of its own', () => {
       content.input[2].target = 'NoSuchEntity'
       await writeFile(file, `${JSON.stringify(content, null, 2)}\n`)
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${endpoint.id}`)
+      // The input is a list of objects, so the unknown reference shows in the dialog of its third row.
+      await openListItem(page, '/input', 2)
       await expect(
         page.getByTestId('studio-field-/input/2/target').getByTestId('studio-reference-unknown'),
       ).toBeVisible()
@@ -406,7 +410,8 @@ test.describe('Studio on a copy of its own', () => {
       await diagnostic.click()
 
       await expect(page).toHaveURL(/path=%2Finput%2F2%2Ftarget/)
-      await expect(page.getByTestId('studio-field-/input/2/target')).toBeInViewport()
+      // A path inside an item of a list lands on the list that holds the item.
+      await expect(page.getByTestId('studio-field-/input')).toBeInViewport()
     } finally {
       await writeFile(file, original)
     }
