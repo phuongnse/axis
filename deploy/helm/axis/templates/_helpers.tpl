@@ -107,18 +107,23 @@ readOnly: true
 {{- end }}
 {{- end }}
 
-{{/* The environment settings that server and worker share. Call with the root context. */}}
-{{- define "axis.hostEnv" -}}
+{{/* The tenancy settings of every host that reads the tenant directory. Call with the root context. */}}
+{{- define "axis.tenancyEnv" -}}
 - name: Tenancy__Source
   value: directory
-- name: Extensions__Path
-  value: /extensions
-- name: Modules__Path
-  value: /modules
 {{- with .Values.tenancy.refreshInterval }}
 - name: Tenancy__RefreshInterval
   value: {{ . | quote }}
 {{- end }}
+{{- end }}
+
+{{/* The environment settings that server and worker share. Call with the root context. */}}
+{{- define "axis.hostEnv" -}}
+{{ include "axis.tenancyEnv" . }}
+- name: Extensions__Path
+  value: /extensions
+- name: Modules__Path
+  value: /modules
 {{- with .Values.cell.id }}
 - name: Cell__Id
   value: {{ . | quote }}

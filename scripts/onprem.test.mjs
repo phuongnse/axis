@@ -54,7 +54,7 @@ const secretFiles = {
   proxy: [],
   identity: ['IdentityProvider__AdminClientSecret', 'KC_DB_PASSWORD', 'KC_DB_URL', 'KC_DB_USERNAME'],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
-  agent: [],
+  agent: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
@@ -228,9 +228,11 @@ describe('the example holds no secret', () => {
     assert.equal(services.publisher.environment?.Studio__Tests, undefined)
   })
 
-  test('the agent host mounts no secret and publishes only its health port on 127.0.0.1', () => {
+  test('the agent host mounts the platform connection and the installation key only, and publishes only its health port on 127.0.0.1', () => {
     const { agent } = render().services
-    assert.deepEqual(agent.secrets ?? [], [])
+    assert.deepEqual((agent.secrets ?? []).map((secret) => secret.source).sort(), ['ConnectionStrings__Platform', 'Platform__SecretKey'])
+    assert.equal(agent.environment.Tenancy__Source, 'directory')
+    assert.equal((agent.secrets ?? []).some((secret) => secret.source === 'ConnectionStrings__PlatformSchema'), false, 'the agent host holds the schema connection string')
     assert.deepEqual(
       (agent.ports ?? []).map((port) => [port.host_ip, port.target]),
       [['127.0.0.1', 5209]],

@@ -10,7 +10,7 @@ An installation runs four hosts, from four production images:
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The server               | `axis-server` | Serves the API, the sites and the SPA.                                                                                                                                                                                                                                     |
 | The worker               | `axis-worker` | Runs background work.                                                                                                                                                                                                                                                      |
-| The agent host           | `axis-agent`  | Runs [AI authoring requests](authoring-requests.md#the-agent-host). It starts idle and needs no secret yet.                                                                                                                                                                |
+| The agent host           | `axis-agent`  | Runs [AI authoring requests](authoring-requests.md#the-agent-host). It starts idle, and with AI authoring on it reads the tenants.                                                                                                                                         |
 | The admin host           | `axis-admin`  | `Axis.Admin`, a command-line tool that a platform operator runs to create tenants, migrate tenant databases and activate releases, see [administration](administration.md).                                                                                                 |
 | The publisher            | `axis-admin`  | `axis-admin publisher`, a long-running command of the admin host that runs the publish requests that Studio stores, see [publisher](administration.md#publisher). It holds the schema role of every active tenant, so it runs apart from the server. It has no HTTP endpoint. |
 
@@ -67,12 +67,12 @@ from a secret store of the platform, never from a committed file.
 
 | Setting | Environment variable | Hosts | Secret | Source |
 | --- | --- | --- | --- | --- |
-| `Tenancy:Source` | `Tenancy__Source` | server, worker | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. |
-| `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker | no | Optional. It defaults to 30 seconds. |
-| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker, publisher | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. The publisher holds it for the Studio write lock only, and starts without it. |
+| `Tenancy:Source` | `Tenancy__Source` | server, worker, agent | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. The agent host reads the settings marked `agent` only with AI authoring on, see [AI settings](host-settings.md#ai-settings). |
+| `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker, agent | no | Optional. It defaults to 30 seconds. |
+| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker, agent, publisher | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. The publisher holds it for the Studio write lock only, and starts without it. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it at start for the platform migrations, and for the unpooled connection that `PUT /api/cell/tenants/{id}/quotas` opens for each write. Revoking or blocking this role stops that route. The worker never gets it. |
-| `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
-| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | yes | Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value, so add the variable or a secret file yourself. |
+| `Platform:SecretKey` | `Platform__SecretKey` | server, worker, agent, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
+| `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, agent, admin | yes | Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value, so add the variable or a secret file yourself. |
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](several-server-replicas.md). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin, publisher (in a cell) | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
@@ -101,7 +101,7 @@ The rules of each setting are in [tenancy settings](host-settings.md#tenancy-set
 - **Tenant settings are not host settings.** A tenant's OIDC settings, database passwords and
   bindings live in the tenant directory, where the secrets are encrypted, see
   [platform database](storage.md#platform-database). No host setting holds them.
-- **The worker needs no schema connection** of any kind, and it gets no
+- **The worker and the agent host need no schema connection** of any kind, and they get no
   `ConnectionStrings:PlatformSchema`.
 
 ## On premises
@@ -123,8 +123,8 @@ secret or key.
   `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
   `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
   than the five-minute lease, so a stop lets the running request finish.
-- **The agent host** runs the `axis-agent` image. It mounts no secret file and no folder, and it
-  publishes only its health port on `127.0.0.1`.
+- **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
+  `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
 - **The images.** Set `AXIS_VERSION` to the tag of the four images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
@@ -162,6 +162,8 @@ flowchart LR
     server2 -->|"tenant runtime connections"| tenantdb
     worker -->|"platform connection"| platformdb
     worker -->|"tenant runtime connections"| tenantdb
+    agent -->|"platform connection"| platformdb
+    agent -->|"tenant runtime connections"| tenantdb
     publisher -->|"schema connection"| platformdb
     publisher -->|"schema role"| tenantdb
     identity -->|"KC_DB_URL"| identitydb
@@ -242,9 +244,9 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
 
 | File | Mounted in |
 | --- | --- |
-| `ConnectionStrings__Platform` | server, worker, publisher |
+| `ConnectionStrings__Platform` | server, worker, agent, publisher |
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
-| `Platform__SecretKey` | server, worker, admin, publisher |
+| `Platform__SecretKey` | server, worker, agent, admin, publisher |
 | `Admin__ConnectionString` | admin |
 | `IdentityProvider__AdminClientSecret` | admin, identity |
 | `IdentityProvider__DatabaseConnectionString` | admin |
@@ -451,7 +453,7 @@ The chart has these objects:
   settings. The server and the identity provider get the forwarded headers settings.
 - **The agent host.** A Deployment with a startup, liveness and readiness probe over plain HTTP on port
   5209, and the chart sets `Health__Urls` to `http://0.0.0.0:5209` so that the kubelet can reach it. It
-  has no Service, mounts no Secret and gets no host setting, so AI authoring stays off.
+  has no Service. It mounts only `platformConnection` and `platformSecretKey`, which it reads with AI authoring on.
 - **The publisher.** A Deployment with one replica that runs the `axis-admin` image with the command
   `publisher`. It uses the `Recreate` strategy, so a rollout never runs two publishers. It has no
   Service, no container port, no probe and no Ingress, because the publisher has no HTTP endpoint. Its
@@ -648,7 +650,7 @@ values schema rejects any field in a reference other than `name` and `key`.
 | --- | --- |
 | Server | `platformConnection`, `platformSchemaConnection` and `platformSecretKey`, and `serverCertificate` read-only at `/server-tls`, which no other pod mounts |
 | Worker | `platformConnection` and `platformSecretKey` |
-| Agent host | none |
+| Agent host | `platformConnection` and `platformSecretKey`, and no other secret |
 | Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
 | Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set, and `platformConnection` when `studio.folders` is set. In a cell also `platformConnection`, `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |

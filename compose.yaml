@@ -154,8 +154,8 @@ services:
       start_period: 360s
       start_interval: 2s
 
-  # The agent host. It needs no database yet and starts idle. The health address http://127.0.0.1:5209 stays
-  # inside the container, so no port is published. The image has bash but no curl.
+  # The agent host. It does no database work while AI authoring is off, which is how it starts here. The health
+  # address http://127.0.0.1:5209 stays inside the container, so no port is published. The image has bash but no curl.
   agent:
     build:
       context: .

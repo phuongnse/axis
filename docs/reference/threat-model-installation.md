@@ -38,9 +38,11 @@ flowchart LR
     Images -->|starts| Agent
     Files -->|read at start| Servers
     Files -->|read at start| Worker
+    Files -->|read at start| Agent
     Proxy -->|HTTPS| Servers
     Servers -->|runtime role| Db
     Worker -->|runtime role| Db
+    Agent -->|runtime role| Db
     Db -->|pg_dump and tenant backup| Backups
 ```
 
@@ -92,7 +94,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | I5 | An image is swapped or changed between the registry and the host. | Images and registry | Tampering | High | **Delegated** | The operator builds the images or pulls them from a registry the operator controls, see [Images](installation.md#images). Signed images are planned for M32, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
 | I6 | An image ships samples, development settings or source control metadata. | Images and registry | Information disclosure | High | **Mitigated** | `scripts/images.test.mjs` (no image holds a sample, a Development settings file or `.git`). |
-| I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server, worker, agent host and control plane start read-only, the agent host with no secret file, and the others with their settings in `/run/secrets`). |
+| I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server, worker, agent host and control plane start read-only, each with its settings in `/run/secrets`, the agent host with the platform connection and the installation key). |
 | I8 | An install keeps running a version with a known vulnerability. | Images and registry | Elevation of privilege | Medium | **Delegated** | The operator upgrades to the latest version, the only one that gets security fixes, see [Upgrade](installation.md#upgrade). |
 
 Spoofing and repudiation do not apply to an image, which is a file that signs no one in and writes no record. Denial of service is covered by the server rows, such as P6.
@@ -128,12 +130,12 @@ Repudiation does not apply here, because the server writes the audit records, se
 
 ### Database and backups
 
-The server and the worker reach tenant databases with the runtime role. Backups hold copies of the databases.
+The server, the worker and the agent host reach tenant databases with the runtime role. Backups hold copies of the databases.
 
 ```mermaid
 flowchart LR
-    subgraph app [Server and worker]
-        Runtime[Server and worker]
+    subgraph app [Server, worker and agent host]
+        Runtime[Server, worker and agent host]
     end
     subgraph database [Database host]
         Db[(Platform and tenant databases)]
@@ -152,6 +154,7 @@ flowchart LR
 | I16 | A backup is stored with the installation key, so a stolen backup yields the stored secrets. | Database and backups | Information disclosure | High | **Delegated** | The operator keeps the installation key apart from the backups, see [What else to back up](administration.md#what-else-to-back-up). |
 | I17 | A failed upgrade or a lost database cannot be restored. | Database and backups | Denial of service | Medium | **Delegated** | The operator backs up the platform and tenant databases before each upgrade, see [Upgrade](installation.md#upgrade). |
 | I18 | A host connects to PostgreSQL without a full certificate check. | Database and backups | Tampering | High | **Mitigated** | `DatabaseTlsStartTests` (a production server stops at start on a connection string without full certificate checks), `AdminDatabaseTlsTests` (an admin command exits with status 2 for such a string). |
+| I23 | The agent host, a new reader of the tenant directory, gets the schema connection or opens a tenant database with a role above the runtime role. | Database and backups | Elevation of privilege | High | **Mitigated** | `AgentTenantsTests` (the agent host opens a tenant database as the runtime role, and refuses a tenant whose role owns the schema, naming the tenant and the role and holding no password), `scripts/helm.test.mjs` (the agent Deployment projects the platform connection and the installation key, and no schema connection) and `scripts/onprem.test.mjs` (the Compose agent mounts the same two files). |
 
 Spoofing, repudiation and elevation of privilege on the database are covered by the server rows, P9, P12 and P13.
 
