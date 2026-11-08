@@ -48,7 +48,7 @@ internal static class McpWriteTools
                 return (null, NoHistory);
         }
 
-        await AuditAsync(context, folder, "create_draft", outcome.Value!.Id, null, ct);
+        await AuditAsync(context, folder, "create_draft", outcome.Value!.Id, null);
         return (new CreatedDraft(outcome.Value.Id, outcome.Value.Start), null);
     }
 
@@ -105,14 +105,15 @@ internal static class McpWriteTools
                 return (null, StudioRevisionEndpoints.NoDraft);
         }
 
+        var written = outcome.Value!;
+        await AuditAsync(context, folder, "write_resource", draft, written.Id);
+
         var (diagnostics, diagnosticsError) = await DiagnosticsAsync(context, folder, draft, ct);
         if (diagnostics is null)
         {
             return (null, diagnosticsError);
         }
 
-        var written = outcome.Value!;
-        await AuditAsync(context, folder, "write_resource", draft, written.Id, ct);
         return (new StudioCreateResponse(written.Id.ToString("D"), written.Kind, written.Name ?? "", written.File, written.Version, diagnostics), null);
     }
 
@@ -149,13 +150,14 @@ internal static class McpWriteTools
                 return (null, StudioEndpoints.NoResource);
         }
 
+        await AuditAsync(context, folder, "delete_resource", draft, resource);
+
         var (diagnostics, diagnosticsError) = await DiagnosticsAsync(context, folder, draft, ct);
         if (diagnostics is null)
         {
             return (null, diagnosticsError);
         }
 
-        await AuditAsync(context, folder, "delete_resource", draft, resource, ct);
         return (new StudioDeleteResponse(diagnostics), null);
     }
 
@@ -198,11 +200,12 @@ internal static class McpWriteTools
             : (StudioDiagnostics.CompileFiles(McpReadTools.Contents(files), context.Packages, context.Modules), null);
     }
 
-    // Appends the one audit record of a successful write call, in its own transaction after the draft's commit. It holds ids
-    // only: never content, a name or a path.
-    private static async Task AuditAsync(
-        McpToolContext context, string folder, string tool, string draft, Guid? resource, CancellationToken ct)
+    // Appends the one audit record of a successful write call, in its own transaction right after the draft's commit. It takes
+    // no cancellation token, so a request that is cancelled after the commit still leaves its record. It holds ids only: never
+    // content, a name or a path.
+    private static async Task AuditAsync(McpToolContext context, string folder, string tool, string draft, Guid? resource)
     {
+        var ct = CancellationToken.None;
         var connection = await context.Database.GetConnectionAsync(ct);
         await using var transaction = await connection.BeginTransactionAsync(ct);
         await AuditRecords.AppendAsync(
