@@ -25,7 +25,8 @@ const app = 'ExpenseClaims'
 const site = 'expense-claims'
 const title = `Zz Expense ${Date.now()}`
 
-// The English text of each key the tutorial uses, which the texts step adds to texts/en.json.
+// The English text of each key the tutorial uses. The texts step adds only the picked keys below to texts/en.json. The
+// other entries are label texts, which each label gets when its text is typed into it.
 const en = {
   'expense.label': 'Expense',
   'expense.name': 'Name',
@@ -46,6 +47,9 @@ const en = {
   'actions.new': 'New',
   'actions.open': 'Open',
 }
+
+// The keys that a field or a task picks in a label. Every other label types its own texts.
+const picked: string[] = ['expense.name', 'expense.amount', 'expense.status', 'task.review', 'task.approve', 'task.reject']
 
 test.describe('the tutorial builds a first application in Studio', () => {
   // Each step builds on the application the one before created, so they run in order.
@@ -124,6 +128,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
 
     const add = page.getByTestId('studio-text-add')
     for (const [key, text] of Object.entries(en)) {
+      if (!picked.includes(key)) continue
       await add.getByRole('textbox', { name: 'New key', exact: true }).fill(key)
       await add.getByRole('textbox', { name: 'en', exact: true }).fill(text)
       // Ant Design adds "loading" to the name while the button is busy.
@@ -144,7 +149,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
       await createResource(page, 'role', name)
       await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
-      await writeLabel(page, 'studio-field-/label', key, en[key])
+      await writeLabel(page, 'studio-field-/label', { en: en[key] })
       await save(page)
       await expectForm(page)
     }
@@ -156,7 +161,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
 
     await createResource(page, 'entity', 'Expense')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'expense.label', en['expense.label'])
+    await writeLabel(page, 'studio-field-/label', { en: en['expense.label'] })
 
     // Row 0 is the starter `name` field, which keeps its name. The display field must be required.
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
@@ -225,7 +230,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
       await pick(page, 'studio-field-/entity', 'Expense')
       await openListItem(page, '/sections', 0)
       await page.getByTestId('studio-field-/sections/0/name').getByRole('textbox').fill('details')
-      await writeLabel(page, 'studio-field-/sections/0/title', sectionKey, en[sectionKey])
+      await writeLabel(page, 'studio-field-/sections/0/title', { en: en[sectionKey] })
       for (const [index, { field, readOnly }] of fields.entries()) {
         if (index > 0) {
           await addListRow(page, '/sections/0/fields')
@@ -297,7 +302,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     const condition = page.getByTestId('studio-field-/startCondition/expression')
     await expect(condition.locator('.cm-editor')).toBeVisible()
     await condition.getByRole('textbox').fill("status == 'draft'")
-    await writeLabel(page, 'studio-field-/startCondition/message', 'expense.cannotSubmit', en['expense.cannotSubmit'])
+    await writeLabel(page, 'studio-field-/startCondition/message', { en: en['expense.cannotSubmit'] })
     await save(page)
     await expectForm(page)
   })
@@ -320,16 +325,16 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await expectForm(page)
 
     await createPage(page, 'ExpenseForm')
-    await writeLabel(page, 'studio-field-/title', 'pages.expenseForm.title', en['pages.expenseForm.title'])
+    await writeLabel(page, 'studio-field-/title', { en: en['pages.expenseForm.title'] })
     await pick(page, 'studio-field-/widgets/0/type', 'form')
     await pick(page, 'studio-field-/widgets/0/form', 'ExpenseEdit')
     await page.getByRole('button', { name: 'Add action', exact: true }).click()
     await pick(page, 'studio-field-/widgets/0/actions/0/process', 'ExpenseApproval')
-    await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', 'expense.submit', en['expense.submit'])
+    await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', { en: en['expense.submit'] })
     await save(page)
 
     await createPage(page, 'Expenses')
-    await writeLabel(page, 'studio-field-/title', 'pages.expenses.title', en['pages.expenses.title'])
+    await writeLabel(page, 'studio-field-/title', { en: en['pages.expenses.title'] })
     await pick(page, 'studio-field-/widgets/0/type', 'table')
     await pick(page, 'studio-field-/widgets/0/dataSource', 'ExpenseList')
     // The toolbar's New opens a new expense. The row's Open opens the expense it shows, by its id.
@@ -343,7 +348,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
         .getByRole('button', { name: 'Add navigate action', exact: true })
         .click()
       await pick(page, `${action}/page`, 'ExpenseForm')
-      await writeLabel(page, `${action}/label`, key, en[key])
+      await writeLabel(page, `${action}/label`, { en: en[key] })
       if (recordInput) {
         await page.getByTestId(`${action}/record`).getByRole('textbox').fill('id')
       }
@@ -356,7 +361,7 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await expectForm(page)
     await addListItem(page, '/navigation')
     await pick(page, 'studio-field-/navigation/1/page', 'Expenses')
-    await writeLabel(page, 'studio-field-/navigation/1/label', 'nav.expenses', en['nav.expenses'])
+    await writeLabel(page, 'studio-field-/navigation/1/label', { en: en['nav.expenses'] })
     await doneListItem(page)
     await save(page)
     await expectForm(page)

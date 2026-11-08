@@ -4,7 +4,7 @@ import { expect, test } from '../test'
 import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
-import { compareApplicationFolders } from '../folder-comparison'
+import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { csrfHeaders } from '../csrf'
@@ -22,6 +22,7 @@ import {
   openKind,
   openListItem,
   openTab,
+  writeLabel,
 } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
@@ -110,19 +111,6 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
   }
 
-  async function writeLabel(scope: Page | Locator, field: string, key: string, en: string) {
-    const label = scope.getByTestId(field).getByTestId('studio-label')
-    const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
-    const english = label.getByRole('textbox', { name: 'en', exact: true })
-    // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
-    // or got its names later starts over, so the key is typed again until the text shows.
-    await expect(async () => {
-      await keyBox.fill('')
-      await keyBox.fill(key)
-      await expect(english).toHaveValue(en, { timeout: 2_000 })
-    }).toPass({ timeout: 20_000 })
-  }
-
   async function grantIn(
     page: Page,
     role: string,
@@ -199,6 +187,13 @@ test.describe('the author builds the asset management application with Studio on
       texts: Record<string, string>
     }
     return texts
+  }
+
+  // The English and Vietnamese texts of a key, which a label takes when its texts are typed into it.
+  async function labelTexts() {
+    const en = await texts('en')
+    const vi = await texts('vi')
+    return (key: string) => ({ en: en[key], vi: vi[key] })
   }
 
   async function sample<T>(file: string): Promise<T> {
@@ -357,9 +352,11 @@ test.describe('the author builds the asset management application with Studio on
 
     const english = await texts('en')
     const vietnamese = await texts('vi')
+    const editorKeys = textEditorKeys(assetManagement)
 
     const add = page.getByTestId('studio-text-add')
     for (const [key, text] of Object.entries(english)) {
+      if (!editorKeys.has(key)) continue
       await add.getByRole('textbox', { name: 'New key', exact: true }).fill(key)
       await add.getByRole('textbox', { name: 'en', exact: true }).fill(text)
       await add.getByRole('textbox', { name: 'vi', exact: true }).fill(vietnamese[key])
@@ -374,7 +371,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     for (const [name, key] of [
       ['asset-manager', 'role.assetManager'],
       ['employee', 'role.employee'],
@@ -384,7 +381,7 @@ test.describe('the author builds the asset management application with Studio on
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
       await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
-      await writeLabel(page, 'studio-field-/label', key, en[key])
+      await writeLabel(page, 'studio-field-/label', text(key))
       await save(page)
       await expectForm(page)
     }
@@ -413,10 +410,10 @@ test.describe('the author builds the asset management application with Studio on
       await useJourneySession(page, 'author')
       await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-      const en = await texts('en')
+      const text = await labelTexts()
       await createResource(page, 'entity', name)
       await expectForm(page)
-      await writeLabel(page, 'studio-field-/label', `${camel}.label`, en[`${camel}.label`])
+      await writeLabel(page, 'studio-field-/label', text(`${camel}.label`))
 
       await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
       await page.getByTestId('studio-field-/fields/0/maxLength').getByRole('spinbutton').fill('100')
@@ -435,13 +432,13 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
 
     // Row 0 is the starter `name` field, which becomes the file. Renaming it with Drop data also skips the convert
     // question for its type change, and the migration is deleted, because the sample has none.
     await createResource(page, 'entity', 'Attachment')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'attachment.label', en['attachment.label'])
+    await writeLabel(page, 'studio-field-/label', text('attachment.label'))
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('file')
     await pick(page, 'studio-field-/fields/0/type', 'file')
     await addTags(page, 'studio-field-/fields/0/accept', ['application/pdf', 'image/*'])
@@ -456,7 +453,7 @@ test.describe('the author builds the asset management application with Studio on
     // the new required date asks a fill, and the new required currency asks a fill too.
     await createResource(page, 'entity', 'MaintenanceEntry')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'maintenance.label', en['maintenance.label'])
+    await writeLabel(page, 'studio-field-/label', text('maintenance.label'))
     await page.getByTestId('studio-field-/fields/0/name').getByRole('textbox').fill('date')
     await pick(page, 'studio-field-/fields/0/type', 'date')
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
@@ -496,10 +493,10 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createResource(page, 'entity', 'Asset')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'asset.label', en['asset.label'])
+    await writeLabel(page, 'studio-field-/label', text('asset.label'))
 
     // Row 0 is the starter `name` field, which stays `name`. The sample orders `number` before it, so the author adds
     // `number` below it and moves it up. Its sequence is AssetNumber.
@@ -626,15 +623,15 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await page
       .getByRole('navigation', { name: 'Menu', exact: true })
       .getByRole('link', { name: 'Settings', exact: true })
       .click()
     await expectForm(page)
     await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
-    await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
-    await writeLabel(page, 'studio-field-/description', 'application.description', en['application.description'])
+    await writeLabel(page, 'studio-field-/label', text('application.title'))
+    await writeLabel(page, 'studio-field-/description', text('application.description'))
     await save(page)
   })
 
@@ -657,7 +654,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     const form = await sample<SampleForm>('forms/asset-edit.json')
     await createResource(page, 'form', 'AssetEdit')
     await openFormTab(page)
@@ -682,7 +679,7 @@ test.describe('the author builds the asset management application with Studio on
       await name.press('Enter')
       await expect(sectionTitle(index)).toHaveText(section.name)
       const titleKey = section.title.textKey
-      await writeLabel(panel, `studio-field-/sections/${index}/title`, titleKey, en[titleKey])
+      await writeLabel(panel, `studio-field-/sections/${index}/title`, text(titleKey))
       for (const [position, field] of section.fields.entries()) {
         const button = panel.getByTestId(`studio-form-palette-${field.field}`)
         if (position === 0) {
@@ -720,9 +717,9 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createPage(page, 'AssetForm')
-    await writeLabel(page, 'studio-field-/title', 'pages.assetForm.title', en['pages.assetForm.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.assetForm.title'))
     await pick(page, 'studio-field-/widgets/0/type', 'form')
     await pick(page, 'studio-field-/widgets/0/form', 'AssetEdit')
     await save(page)
@@ -731,7 +728,7 @@ test.describe('the author builds the asset management application with Studio on
     // because the canvas draws nothing while any file has an error. The starter Home page and its site entry have errors
     // until the author finishes the site.
     await createPage(page, 'AssetDetail')
-    await writeLabel(page, 'studio-field-/title', 'pages.assetDetail.title', en['pages.assetDetail.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.assetDetail.title'))
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
     await page.getByRole('textbox', { name: 'Parameter name', exact: true }).fill('asset')
     await pick(page, 'studio-field-/parameters/0/type', 'reference')
@@ -745,9 +742,9 @@ test.describe('the author builds the asset management application with Studio on
     // The page names load with the application, so AssetForm and AssetDetail are offered below.
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createPage(page, 'Assets')
-    await writeLabel(page, 'studio-field-/title', 'pages.assets.title', en['pages.assets.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.assets.title'))
     await pick(page, 'studio-field-/widgets/0/type', 'table')
     await pick(page, 'studio-field-/widgets/0/entity', 'Asset')
     // The row actions open the asset in its form and show it on the detail page, and a toolbar action starts a new
@@ -763,7 +760,7 @@ test.describe('the author builds the asset management application with Studio on
         .getByRole('button', { name: 'Add navigate action', exact: true })
         .click()
       await pick(page, `${action}/page`, target)
-      await writeLabel(page, `${action}/label`, key, en[key])
+      await writeLabel(page, `${action}/label`, text(key))
       if (kind === 'rowActions') {
         // The record of the form link and the asset parameter of the detail link both take the id of the row.
         const input = parameter ? `${action}/parameters/${parameter}` : `${action}/record`
@@ -773,7 +770,7 @@ test.describe('the author builds the asset management application with Studio on
     await save(page)
 
     await createPage(page, 'Dashboard')
-    await writeLabel(page, 'studio-field-/title', 'pages.dashboard.title', en['pages.dashboard.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.dashboard.title'))
     await save(page)
   })
 
@@ -781,14 +778,16 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button').click()
     await expectForm(page)
 
     await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
-    await writeLabel(page, 'studio-field-/description', 'site.description', en['site.description'])
+    // The starter texts are deleted, so the site's title is typed too. Without it the design canvases stay blank.
+    await writeLabel(page, 'studio-field-/title', text('site.title'))
+    await writeLabel(page, 'studio-field-/description', text('site.description'))
 
     // The starter site has the entry for Home, which the author turns into the first entry.
     const navigation: [page: string, key: string, icon: string][] = [
@@ -798,7 +797,7 @@ test.describe('the author builds the asset management application with Studio on
     for (const [index, [target, key, icon]] of navigation.entries()) {
       await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
       await pick(page, `studio-field-/navigation/${index}/page`, target)
-      await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
+      await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
       await doneListItem(page)
     }
@@ -846,7 +845,7 @@ test.describe('the author builds the asset management application with Studio on
     // The names load with the application, so the new data sources are offered below.
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await openPage(page, 'Dashboard')
     await openDesign(page)
     const panel = page.getByTestId('studio-design-panel')
@@ -878,7 +877,7 @@ test.describe('the author builds the asset management application with Studio on
     await dragOnto('studio-data-dataSource-WarrantiesEndingSoon', list('/widgets/0/columns/0/widgets'))
     await chooseBinding(page, 'kpi')
     await expect(panel.getByTestId(`studio-widget-${kpi}`)).toBeVisible()
-    await writeLabel(panel, `studio-field-${kpi}/label`, 'dashboard.warranties.label', en['dashboard.warranties.label'])
+    await writeLabel(panel, `studio-field-${kpi}/label`, text('dashboard.warranties.label'))
 
     // The chart is a data source with one group field dropped in the second column. The binding picks the category and
     // the measure.
@@ -886,13 +885,8 @@ test.describe('the author builds the asset management application with Studio on
     await dragOnto('studio-data-dataSource-AssetsByStatus', list('/widgets/0/columns/1/widgets'))
     await chooseBinding(page, 'chart')
     await expect(panel.getByTestId(`studio-widget-${chart}`)).toBeVisible()
-    await writeLabel(
-      panel,
-      `studio-field-${chart}/measures/0/label`,
-      'dashboard.byStatus.count',
-      en['dashboard.byStatus.count'],
-    )
-    await writeLabel(panel, `studio-field-${chart}/title`, 'dashboard.byStatus.title', en['dashboard.byStatus.title'])
+    await writeLabel(panel, `studio-field-${chart}/measures/0/label`, text('dashboard.byStatus.count'))
+    await writeLabel(panel, `studio-field-${chart}/title`, text('dashboard.byStatus.title'))
     await save(page)
 
     // After a reload the Design tab draws all three widgets.
@@ -904,12 +898,16 @@ test.describe('the author builds the asset management application with Studio on
     await expect(frame(page, '/widgets/1').getByRole('table')).toBeVisible()
   })
 
-  test('the built folder matches the sample in its six parts', async ({ page }) => {
+  test('the built folder matches the sample apart from its texts', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const files = (await readdir(assetManagement, { recursive: true })).filter(sixParts).sort()
-    expect((await readdir(built, { recursive: true })).filter(sixParts).sort()).toEqual(files)
+    const files = (await readdir(assetManagement, { recursive: true }))
+      .filter((file) => sixParts(file) && !file.startsWith('texts/'))
+      .sort()
+    expect(
+      (await readdir(built, { recursive: true })).filter((file) => sixParts(file) && !file.startsWith('texts/')).sort(),
+    ).toEqual(files)
     await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(0)
     compareApplicationFolders(assetManagement, built, { files, ignorePageElementNames: true, generatedNames: true })
 
@@ -1064,7 +1062,7 @@ test.describe('the author builds the asset management application with Studio on
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
 
     await buildDataSource(page, 'AssetsWithWarrantyEndingSoon', 'data-sources/assets-with-warranty-ending-soon.json')
@@ -1116,7 +1114,7 @@ test.describe('the author builds the asset management application with Studio on
       ['subject', 'asset.warrantyReminder.subject'],
       ['body', 'asset.warrantyReminder.body'],
     ]) {
-      await writeLabel(page, `studio-field-/steps/0/message/${field}`, key, en[key])
+      await writeLabel(page, `studio-field-/steps/0/message/${field}`, text(key))
     }
     const values = page.getByTestId('studio-field-/steps/0/message/values')
     for (const [placeholder, expression] of [

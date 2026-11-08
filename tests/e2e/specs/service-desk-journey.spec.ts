@@ -5,7 +5,7 @@ import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
 import { expectShown, fieldLabel, fieldValue } from '../fields'
-import { compareApplicationFolders } from '../folder-comparison'
+import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
@@ -155,6 +155,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     return texts
   }
 
+  // The English and Vietnamese texts of a key, which a label takes when its texts are typed into it.
+  async function labelTexts() {
+    const en = await texts('en')
+    const vi = await texts('vi')
+    return (key: string) => ({ en: en[key], vi: vi[key] })
+  }
+
   async function sample<T>(file: string): Promise<T> {
     return JSON.parse(await readFile(path.join(serviceDesk, file), 'utf8')) as T
   }
@@ -290,9 +297,11 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     const english = await texts('en')
     const vietnamese = await texts('vi')
+    const editorKeys = textEditorKeys(serviceDesk)
 
     const add = page.getByTestId('studio-text-add')
     for (const [key, text] of Object.entries(english)) {
+      if (!editorKeys.has(key)) continue
       await add.getByRole('textbox', { name: 'New key', exact: true }).fill(key)
       await add.getByRole('textbox', { name: 'en', exact: true }).fill(text)
       await add.getByRole('textbox', { name: 'vi', exact: true }).fill(vietnamese[key])
@@ -307,14 +316,14 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await page
       .getByRole('navigation', { name: 'Menu', exact: true })
       .getByRole('link', { name: 'Settings', exact: true })
       .click()
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
-    await writeLabel(page, 'studio-field-/description', 'application.description', en['application.description'])
+    await writeLabel(page, 'studio-field-/label', text('application.title'))
+    await writeLabel(page, 'studio-field-/description', text('application.description'))
     await save(page)
   })
 
@@ -322,7 +331,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     for (const [name, key] of [
       ['requester', 'role.requester'],
       ['agent', 'role.agent'],
@@ -332,7 +341,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       // The editor of the previous role stays on screen until the new role replaces it, so wait for the file.
       await expect(page.getByTestId('studio-resource-details')).toContainText(`roles/${name}.json`)
       await expectForm(page)
-      await writeLabel(page, 'studio-field-/label', key, en[key])
+      await writeLabel(page, 'studio-field-/label', text(key))
       await save(page)
       await expectForm(page)
     }
@@ -353,10 +362,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createResource(page, 'entity', 'Category')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'category.label', en['category.label'])
+    await writeLabel(page, 'studio-field-/label', text('category.label'))
 
     await page.getByTestId('studio-field-/fields/0/required').getByRole('checkbox').check()
     await page.getByTestId('studio-field-/fields/0/unique').getByRole('checkbox').check()
@@ -410,10 +419,10 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createResource(page, 'entity', 'Ticket')
     await expectForm(page)
-    await writeLabel(page, 'studio-field-/label', 'ticket.label', en['ticket.label'])
+    await writeLabel(page, 'studio-field-/label', text('ticket.label'))
 
     async function addField(index: number, name: string) {
       await page.getByRole('button', { name: 'Add field', exact: true }).click()
@@ -563,7 +572,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     const form = await sample<SampleForm>('forms/ticket-edit.json')
     await createResource(page, 'form', 'TicketEdit')
     await openFormTab(page)
@@ -588,7 +597,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await name.press('Enter')
       await expect(sectionTitle(index)).toHaveText(section.name!)
       const titleKey = section.title.textKey
-      await writeLabel(panel, `studio-field-/sections/${index}/title`, titleKey, en[titleKey])
+      await writeLabel(panel, `studio-field-/sections/${index}/title`, text(titleKey))
       for (const [position, field] of section.fields.entries()) {
         const button = panel.getByTestId(`studio-form-palette-${field.field}`)
         if (position === 0) {
@@ -616,7 +625,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     for (const [index, step] of form.steps!.entries()) {
       await panel.getByTestId('studio-form-add-step').click()
       await expect(outlineRow('studio-outline-step', `/steps/${index}`)).toHaveAttribute('aria-current', 'true')
-      await writeLabel(panel, `studio-field-/steps/${index}/title`, step.title.textKey, en[step.title.textKey])
+      await writeLabel(panel, `studio-field-/steps/${index}/title`, text(step.title.textKey))
     }
     await panel.getByTestId('studio-form-add-section').click()
     await expect(sectionTitle(1)).toBeVisible()
@@ -641,7 +650,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     for (const [name, file] of [
       ['TicketTriage', 'forms/ticket-triage.json'],
       ['TicketResolution', 'forms/ticket-resolution.json'],
@@ -656,7 +665,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         await (sectionIndex === 0 ? openListItem(page, '/sections', 0) : addListItem(page, '/sections'))
         await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name!)
         const titleKey = section.title.textKey
-        await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, titleKey, en[titleKey])
+        await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, text(titleKey))
         for (const [fieldIndex, field] of section.fields.entries()) {
           // A new section starts with no fields. The starter section has its first field already.
           if (sectionIndex > 0 || fieldIndex > 0) {
@@ -681,7 +690,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createResource(page, 'process', 'TicketHandling')
     await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
@@ -742,8 +751,8 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByRole('checkbox', { name: channel, exact: true })
           .check()
       }
-      await writeLabel(page, `studio-field-${pointer}/message/subject`, spec.subject, en[spec.subject])
-      await writeLabel(page, `studio-field-${pointer}/message/body`, spec.body, en[spec.body])
+      await writeLabel(page, `studio-field-${pointer}/message/subject`, text(spec.subject))
+      await writeLabel(page, `studio-field-${pointer}/message/body`, text(spec.body))
       const values = page.getByTestId(`studio-field-${pointer}/message/values`)
       for (const [placeholder, expression] of spec.values) {
         await addMapping(values)
@@ -897,7 +906,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const condition = page.getByTestId('studio-field-/startCondition/expression')
     await expect(condition.locator('.cm-editor')).toBeVisible()
     await condition.getByRole('textbox').fill("status == 'draft'")
-    await writeLabel(page, 'studio-field-/startCondition/message', 'ticket.cannotSubmit', en['ticket.cannotSubmit'])
+    await writeLabel(page, 'studio-field-/startCondition/message', text('ticket.cannotSubmit'))
     await save(page)
     await expectForm(page)
   })
@@ -906,26 +915,26 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createPage(page, 'TicketForm')
-    await writeLabel(page, 'studio-field-/title', 'pages.ticketForm.title', en['pages.ticketForm.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.ticketForm.title'))
     await pick(page, 'studio-field-/widgets/0/type', 'form')
     await pick(page, 'studio-field-/widgets/0/form', 'TicketEdit')
     await page.getByRole('button', { name: 'Add action', exact: true }).click()
     await pick(page, 'studio-field-/widgets/0/actions/0/process', 'TicketHandling')
-    await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', 'ticket.submit', en['ticket.submit'])
+    await writeLabel(page, 'studio-field-/widgets/0/actions/0/label', text('ticket.submit'))
     await save(page)
 
     // The starter widget of a new page is the task inbox, which is what MyTasks needs.
     await createPage(page, 'MyTasks')
-    await writeLabel(page, 'studio-field-/title', 'pages.myTasks.title', en['pages.myTasks.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.myTasks.title'))
     await save(page)
 
     // The detail page takes the ticket as a required parameter. Its detail widget is laid out on the Design tab later,
     // because the canvas draws nothing while any file has an error. The starter Home page and its site entry have errors
     // until the author finishes the site.
     await createPage(page, 'TicketDetail')
-    await writeLabel(page, 'studio-field-/title', 'pages.ticketDetail.title', en['pages.ticketDetail.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.ticketDetail.title'))
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
     await page.getByRole('textbox', { name: 'Parameter name', exact: true }).fill('ticket')
     await pick(page, 'studio-field-/parameters/0/type', 'reference')
@@ -939,13 +948,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The page names load with the application, so TicketForm is offered below.
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     for (const [name, titleKey, list] of [
       ['MyTickets', 'pages.myTickets.title', 'MyTicketList'],
       ['AllTickets', 'pages.allTickets.title', 'AllTicketList'],
     ]) {
       await createPage(page, name)
-      await writeLabel(page, 'studio-field-/title', titleKey, en[titleKey])
+      await writeLabel(page, 'studio-field-/title', text(titleKey))
       await pick(page, 'studio-field-/widgets/0/type', 'table')
       await pick(page, 'studio-field-/widgets/0/dataSource', list)
       // The row actions open the ticket in its form and show it on the detail page, and a toolbar action starts a new
@@ -962,7 +971,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
         await pick(page, `${action}/page`, target)
-        await writeLabel(page, `${action}/label`, key, en[key])
+        await writeLabel(page, `${action}/label`, text(key))
         if (kind === 'rowActions') {
           // The record of the form link and the ticket parameter of the detail link both take the id of the row.
           const input = parameter ? `${action}/parameters/${parameter}` : `${action}/record`
@@ -977,9 +986,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await createPage(page, 'Dashboard')
-    await writeLabel(page, 'studio-field-/title', 'pages.dashboard.title', en['pages.dashboard.title'])
+    await writeLabel(page, 'studio-field-/title', text('pages.dashboard.title'))
     await save(page)
   })
 
@@ -987,14 +996,16 @@ test.describe('the author builds the service desk with Studio only', () => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button').click()
     await expectForm(page)
 
     await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
-    await writeLabel(page, 'studio-field-/description', 'site.description', en['site.description'])
+    // The starter texts are deleted, so the site's title is typed too. Without it the design canvases stay blank.
+    await writeLabel(page, 'studio-field-/title', text('site.title'))
+    await writeLabel(page, 'studio-field-/description', text('site.description'))
 
     // The starter site has the entry for Home, which the author turns into the first entry.
     const navigation: [page: string, key: string, icon: string][] = [
@@ -1006,7 +1017,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     for (const [index, [target, key, icon]] of navigation.entries()) {
       await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
       await pick(page, `studio-field-/navigation/${index}/page`, target)
-      await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
+      await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
       await doneListItem(page)
     }
@@ -1085,7 +1096,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // The names load with the application, so the new data sources and AllTickets are offered below.
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     await openPage(page, 'Dashboard')
     await openDesign(page)
     const panel = page.getByTestId('studio-design-panel')
@@ -1123,7 +1134,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       await dragOnto(`studio-data-dataSource-${tile.dataSource}`, list(tiles))
       await chooseBinding(page, 'kpi')
       await expect(panel.getByTestId(`studio-widget-${base}`)).toBeVisible()
-      await writeLabel(panel, `studio-field-${base}/label`, tile.label, en[tile.label])
+      await writeLabel(panel, `studio-field-${base}/label`, text(tile.label))
       if (tile.show) {
         // The open tile links to the table of every ticket.
         await panel
@@ -1131,7 +1142,7 @@ test.describe('the author builds the service desk with Studio only', () => {
           .getByRole('button', { name: 'Add navigate action', exact: true })
           .click()
         await pick(panel, `studio-field-${base}/navigate/page`, 'AllTickets')
-        await writeLabel(panel, `studio-field-${base}/navigate/label`, tile.show, en[tile.show])
+        await writeLabel(panel, `studio-field-${base}/navigate/label`, text(tile.show))
       }
     }
 
@@ -1141,13 +1152,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     await dragOnto('studio-data-dataSource-OpenTicketsByCategory', list('/widgets/0/columns/1/widgets'))
     await chooseBinding(page, 'chart')
     await expect(panel.getByTestId(`studio-widget-${chart}`)).toBeVisible()
-    await writeLabel(
-      panel,
-      `studio-field-${chart}/measures/0/label`,
-      'dashboard.byCategory.open',
-      en['dashboard.byCategory.open'],
-    )
-    await writeLabel(panel, `studio-field-${chart}/title`, 'dashboard.byCategory.title', en['dashboard.byCategory.title'])
+    await writeLabel(panel, `studio-field-${chart}/measures/0/label`, text('dashboard.byCategory.open'))
+    await writeLabel(panel, `studio-field-${chart}/title`, text('dashboard.byCategory.title'))
+
+    // Typed labels have no texts on the server until Save, and the canvas draws nothing while a file has an error. So the
+    // chart is saved before the table is dragged onto it.
+    await save(page)
+    await expect(frame(page, chart)).toBeVisible()
 
     // A table that is dragged into the chart's column by mistake is one move, and one undo puts it back below the columns.
     await dragTo(page, 'studio-page-design', frame(page, '/widgets/1'), frame(page, chart), 0.75)
@@ -1156,14 +1167,15 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
     await expect(frame(page, '/widgets/0/columns/1/widgets/1')).toHaveCount(0)
     await expect(frame(page, '/widgets/1').getByRole('columnheader', { name: 'Title', exact: true })).toBeVisible()
-    await save(page)
+    // Undo brings back the saved state, so there is nothing to save.
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
   })
 
   test('the author builds the two notify processes and the schedule and delete triggers', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
-    const en = await texts('en')
+    const text = await labelTexts()
     const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
 
     // A new trigger starts as an event trigger, and only picking an event and clearing it removes the key. The sample
@@ -1230,8 +1242,8 @@ test.describe('the author builds the service desk with Studio only', () => {
         .getByTestId('studio-field-/steps/0/channels')
         .getByRole('checkbox', { name: 'In-app', exact: true })
         .check()
-      await writeLabel(page, 'studio-field-/steps/0/message/subject', step.subject, en[step.subject])
-      await writeLabel(page, 'studio-field-/steps/0/message/body', step.body, en[step.body])
+      await writeLabel(page, 'studio-field-/steps/0/message/subject', text(step.subject))
+      await writeLabel(page, 'studio-field-/steps/0/message/body', text(step.body))
       const values = page.getByTestId('studio-field-/steps/0/message/values')
       for (const [placeholder, expression] of step.values) {
         await addMapping(values)

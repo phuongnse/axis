@@ -41,30 +41,28 @@ page says what a template holds.
 
 ## 2. Add the texts
 
-Every label in the application is a text key, so the words on screen can be changed without touching
-the resources that use them. Open the **Text** kind and choose the English file. In the text editor,
-add each key with its English text:
+Every label stores a text key, so the words on screen can be changed without touching the resources
+that use them. When you type a label's text into the label, Studio makes the key for it. A field and a
+task pick their text from a list instead, so their keys are added here first. Open the **Text** kind
+and choose the English file. In the text editor, add each key with its English text:
 
-- `expense.label`, `expense.name`, `expense.amount`, `expense.status`
-- `expense.details`, `expense.review`, `expense.submit`, `expense.cannotSubmit`
-- `role.employee`, `role.departmentManager`, `task.review`, `task.approve`, `task.reject`
-- `pages.expenseForm.title`, `pages.expenses.title`, `nav.expenses`
-- `actions.new`, `actions.open`
+- `expense.name`, `expense.amount` and `expense.status`, the labels of the fields
+- `task.review`, `task.approve` and `task.reject`, the label and outcomes of the review task
 
 Type the key in **New key**, its English text in **en**, and choose **Add key**. The **New key** box
 clears, ready for the next one.
 
 ## 3. Add the roles
 
-Create a role named `employee` and a role named `department-manager`. Each role has a label, and the
-label is a text key: `role.employee` for the first and `role.departmentManager` for the second. Choose
-**Save** after each one.
+Create a role named `employee` and a role named `department-manager`. Each role has a label. Type its
+English text into the label: **Employee** for the first role and **Department manager** for the second.
+Choose **Save** after each one.
 
 A role only gives a name to a group of people. What each role may do is set later, in the policy matrix.
 
 ## 4. Build the Expense entity
 
-Create an entity named `Expense` and give it the label `expense.label`. Then set its fields:
+Create an entity named `Expense` and give it the label **Expense**. Then set its fields:
 
 1. The first field is `name`, which Studio adds with the entity. Tick **Required**, and give it the label
    `expense.name`. The display field must be required, or Validate reports an error.
@@ -84,9 +82,9 @@ quotes make it a text value.
 A form is the screen that shows or edits the fields of one entity. Create two forms for `Expense`.
 
 - **ExpenseEdit** is the form the employee fills in. Its section is named `details` and has the
-  section title `expense.details`. It shows `name` and `amount`, and both can be changed.
+  section title **Details**. It shows `name` and `amount`, and both can be changed.
 - **ExpenseReview** is the form the manager reads. Its section is named `details` and has the section
-  title `expense.review`. It shows `name`, `amount` and `status`, and all three are read-only.
+  title **Review**. It shows `name`, `amount` and `status`, and all three are read-only.
 
 Choose **Save** on each form. The read-only fields matter later: the manager reviews an expense and
 does not change it.
@@ -109,8 +107,8 @@ The task `review` has two outcomes, **Approve** (`task.approve`, to `markApprove
 inbox.
 
 The process starts at `submit`. Its start condition is `status == 'draft'`, and when it is false the
-start fails with the message `expense.cannotSubmit`. So an expense that is already submitted cannot be
-submitted twice.
+start fails with the message **Only a draft expense can be submitted.** So an expense that is already
+submitted cannot be submitted twice.
 
 Every step name exists before the transitions are chosen, because each transition picks from the names
 that exist. Choose **Save** when the process is complete.
@@ -124,14 +122,14 @@ First, a data source named `ExpenseList` for the entity `Expense`, with the fiel
 
 Second, two pages:
 
-- **ExpenseForm**, titled `pages.expenseForm.title`. It holds the form widget `ExpenseEdit` and one
-  action, **Submit** (`expense.submit`), which starts `ExpenseApproval`.
-- **Expenses**, titled `pages.expenses.title`. It holds a table of `ExpenseList`, with one toolbar
-  action **New** (`actions.new`) and one row action **Open** (`actions.open`). Both open `ExpenseForm`.
+- **ExpenseForm**, titled **Expense**. It holds the form widget `ExpenseEdit` and one action,
+  **Submit**, which starts `ExpenseApproval`.
+- **Expenses**, titled **Expenses**. It holds a table of `ExpenseList`, with one toolbar action **New**
+  and one row action **Open**. Both open `ExpenseForm`.
   **Open** passes the row's `id`, so the form shows that expense.
 
 Third, the site. Add a navigation entry for `Expenses` after the entry for the home page, with the label
-`nav.expenses`. Choose **Save**.
+**Expenses**. Choose **Save**.
 
 The table shows what the data source holds, and the form shows what the entity holds. Both are needed:
 the form saves a record, and the list reads it.
