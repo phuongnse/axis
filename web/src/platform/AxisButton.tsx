@@ -1,12 +1,10 @@
 import { DownOutlined } from '@ant-design/icons'
 import { Button, Flex, Tooltip, type ButtonProps, type FlexProps } from 'antd'
 import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react'
+import type { ButtonRole } from './buttonRoles'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { focusFollowsTab } from './tabFocus'
-
-/** The level of an action. Each level has one style, so the same kind of action always looks the same. */
-export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive' | 'plain'
 
 type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
   ref?: Ref<HTMLButtonElement>
@@ -128,7 +126,8 @@ export function AxisActionRow({
  * `joined` draws it as a bordered default button for a control joined to an input. Inside an `AxisActionRow`, `main`,
  * `secondary` and `destructive` are text buttons, `main` in `primaryText` and `destructive` in `dangerText`. `plain` is
  * a borderless text button in the text colour, for header controls such as the account button. `caret` adds a down
- * caret after the text of any text role. The role is not passed on to the DOM.
+ * caret after the text of any text role. `link` is a button drawn as a link, in `primaryText`, for an action that goes to
+ * no address. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
@@ -173,5 +172,14 @@ export function AxisButton(props: AxisButtonProps) {
       return <Button {...body} type={inRow ? 'text' : 'default'} disabled={disabled} style={style} />
     case 'plain':
       return <Button {...body} type="text" disabled={disabled} style={style} />
+    case 'link':
+      return (
+        <Button
+          {...body}
+          type="link"
+          disabled={disabled}
+          style={{ ...tinted(colour.primaryText), paddingInline: 0, ...style }}
+        />
+      )
   }
 }

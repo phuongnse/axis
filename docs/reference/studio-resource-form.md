@@ -72,7 +72,7 @@ kind shows its label, such as a module or a package by the label of its manifest
   left out, while the dialog keeps every field. Short columns of a fixed form, such as a version range
   or a tag, are as wide as their content.
 - **Add… and the row.** Add…, such as Add module…, is the list's main action. The first column is the
-  link that opens the item's dialog, a button drawn as a link because it goes to no address. Each row
+  link that opens the item's dialog, a [button drawn as a link](actions-and-controls.md#buttons) because it goes to no address. Each row
   keeps Remove alone, as an icon, see
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
 - **The dialog edits a copy.** It is `medium` for plain values and `large` for an item that holds a list
