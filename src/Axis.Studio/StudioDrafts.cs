@@ -191,6 +191,46 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             return StudioDraftOutcome<StudioFile>.Of(StudioFolder.Resources([(path, bytes)]).Single());
         }, ct);
 
+    /// <summary>
+    /// Commits the layer of the module resource <paramref name="name"/> of <paramref name="moduleId"/> to the draft, holding
+    /// <paramref name="changes"/>. It replaces the draft's layer for that resource when there is one, and otherwise puts a new
+    /// one at <c>customizations/&lt;module&gt;/&lt;name&gt;.json</c>. Null <paramref name="changes"/> removes the draft's layer,
+    /// or commits nothing when it has none, and answers no file and no version.
+    /// </summary>
+    public Task<StudioDraftOutcome<StudioDraftLayer>> WriteLayerAsync(
+        string id, string moduleId, string name, JsonObject? changes, CancellationToken ct) =>
+        InDraftAsync(id, (git, draft, tip) =>
+        {
+            var existing = StudioWrites.FindLayer(Resources(tip), moduleId, name);
+            var path = existing?.File.File ?? $"customizations/{moduleId}/{name}.json";
+            if (changes is null)
+            {
+                if (existing is not null)
+                {
+                    Remember(git, draft, existing.File.Id);
+                    var removal = TreeDefinition.From(tip.Tree);
+                    removal.Remove(path);
+                    Commit(git, draft, tip, removal, StudioWrites.LayerSummary(moduleId, name, null));
+                }
+
+                return StudioDraftOutcome<StudioDraftLayer>.Of(new StudioDraftLayer(null, null));
+            }
+
+            if (existing is null && tip.Tree[path] is not null)
+            {
+                return StudioDraftOutcome<StudioDraftLayer>.Refused(StudioWriteRefusal.Exists);
+            }
+
+            var layer = existing?.File.Id ?? Guid.NewGuid();
+            Remember(git, draft, layer);
+            var bytes = StudioWrites.Serialize(StudioWrites.LayerObject(layer, existing?.Target ?? $"{moduleId}/{name}", changes));
+            var definition = TreeDefinition.From(tip.Tree);
+            definition.Add(path, CreateBlob(git, bytes), Mode.NonExecutableFile);
+            Commit(git, draft, tip, definition, StudioWrites.LayerSummary(moduleId, name, changes));
+            return StudioDraftOutcome<StudioDraftLayer>.Of(
+                new StudioDraftLayer(path, StudioFolder.Resources([(path, bytes)]).Single().Version));
+        }, ct);
+
     /// <summary>Commits the removal of a resource's file to the draft. The manifest cannot be deleted.</summary>
     public Task<StudioDraftOutcome<bool>> DeleteAsync(string id, Guid resource, CancellationToken ct) =>
         InDraftAsync(id, (git, draft, tip) =>
@@ -550,3 +590,6 @@ internal sealed record StudioDraftDiff(string Start, string Tip, IReadOnlyList<S
 
 /// <summary>A resource a draft used whose version on <c>main</c> has changed: its id and the new version, null when <c>main</c> lacks it.</summary>
 internal sealed record StudioDraftConflict(Guid Id, string? Version);
+
+/// <summary>The layer file a draft write left: its path and version, both null when the write left no layer.</summary>
+internal sealed record StudioDraftLayer(string? File, string? Version);

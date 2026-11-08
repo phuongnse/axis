@@ -22,6 +22,8 @@ interface Installed {
  */
 export function CatalogChoice({
   name,
+  id,
+  'aria-describedby': describedBy,
   installed,
   value,
   item,
@@ -29,6 +31,9 @@ export function CatalogChoice({
   onChange,
 }: {
   name: string
+  /** The id and description that `AxisField` gives its input. */
+  id?: string
+  'aria-describedby'?: string
   installed: Installed[]
   value: string | undefined
   item: Record<string, unknown>
@@ -45,6 +50,8 @@ export function CatalogChoice({
   return (
     <Select
       aria-label={name}
+      id={id}
+      aria-describedby={describedBy}
       showSearch
       optionFilterProp="label"
       virtual={false}
@@ -182,11 +189,16 @@ export function ModuleSlots({
 /** A searchable, clearable choice of the time zones the server knows, in the catalog's order, by offset then id. */
 export function TimeZoneSelect({
   name,
+  id,
+  'aria-describedby': describedBy,
   zones,
   value,
   onChange,
 }: {
   name: string
+  /** The id and description that `AxisField` gives its input. */
+  id?: string
+  'aria-describedby'?: string
   zones: { id: string; offset: number }[]
   value: string | undefined
   onChange: (next: string | undefined) => void
@@ -201,6 +213,8 @@ export function TimeZoneSelect({
   return (
     <Select
       aria-label={name}
+      id={id}
+      aria-describedby={describedBy}
       showSearch
       allowClear
       optionFilterProp="label"
@@ -222,12 +236,17 @@ export function TimeZoneSelect({
  */
 export function BindingSelect({
   name,
+  id,
+  'aria-describedby': describedBy,
   names,
   value,
   noBinding = false,
   onChange,
 }: {
   name: string
+  /** The id and description that `AxisField` gives its input. */
+  id?: string
+  'aria-describedby'?: string
   names: string[]
   /** The saved name, `''` for an entry without a name, and `undefined` when the entry is absent. */
   value: string | undefined
@@ -248,6 +267,8 @@ export function BindingSelect({
     <Flex vertical gap={spacing.xs}>
       <Select
         aria-label={name}
+        id={id}
+        aria-describedby={describedBy}
         showSearch
         optionFilterProp="label"
         virtual={false}

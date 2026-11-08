@@ -410,6 +410,24 @@ describe('CellTenantPage', () => {
     expect(save).toBeDisabled()
   })
 
+  it('keeps Save on with an empty value and checks it on click', async () => {
+    const writes = stubWrites({})
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-set-quotas'))
+    const dialog = await screen.findByRole('dialog')
+    const users = within(dialog).getByRole('spinbutton', { name: 'Users value' })
+    await user.clear(users)
+    const save = within(dialog).getByRole('button', { name: 'Save' })
+    expect(save).toBeEnabled()
+    await user.click(save)
+
+    expect(await within(dialog).findByText('Enter a value.')).toBeInTheDocument()
+    await waitFor(() => expect(users).toHaveFocus())
+    expect(writes).toHaveLength(0)
+  })
+
   it('offers Export for every status but provisioning', async () => {
     stubRoutes(ok({ ...acme, status: 'suspended' }))
     renderPage('/tenants/acme')
@@ -558,8 +576,8 @@ describe('CellTenantPage', () => {
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Add a host to acme')
     const add = within(dialog).getByRole('button', { name: 'Add' })
-    expect(add).toBeDisabled()
-    await user.type(within(dialog).getByLabelText('Host'), 'portal.acme.test')
+    expect(add).toBeEnabled()
+    await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
     await user.click(add)
 
     const records = await within(dialog).findByTestId('cell-tenant-host-records')
@@ -577,6 +595,20 @@ describe('CellTenantPage', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 
+  it('checks the host on click and sends nothing', async () => {
+    const writes = stubWrites({ '/api/cell/tenants/acme/hosts': { status: 201, body: hostRequest } })
+    const user = userEvent.setup()
+    renderPage('/tenants/acme')
+
+    await user.click(await screen.findByTestId('cell-tenant-add-host'))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+    expect(await within(dialog).findByText('Enter a host.')).toBeInTheDocument()
+    await waitFor(() => expect(within(dialog).getByRole('textbox', { name: 'Host' })).toHaveFocus())
+    expect(writes).toHaveLength(0)
+  })
+
   it('keeps the host dialog open with the title of a refusal', async () => {
     stubWrites({
       '/api/cell/tenants/acme/hosts': { status: 409, body: { title: 'Another tenant holds this host.' } },
@@ -586,7 +618,7 @@ describe('CellTenantPage', () => {
 
     await user.click(await screen.findByTestId('cell-tenant-add-host'))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Host'), 'taken.example.com')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'taken.example.com')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
     expect(await screen.findByTestId('cell-tenant-host-error')).toHaveTextContent(
@@ -603,7 +635,7 @@ describe('CellTenantPage', () => {
 
     await user.click(await screen.findByTestId('cell-tenant-add-host'))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Host'), 'portal.acme.test')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Host' }), 'portal.acme.test')
     await user.click(within(dialog).getByRole('button', { name: 'Add' }))
 
     await waitFor(() => expect(onRefused).toHaveBeenCalledWith('forbidden'))

@@ -80,6 +80,11 @@ public sealed class StorageQuotaRouteTests
         // A tenant administrator's export writes only platform rows (a job and an audit record), and a tenant over its
         // quota must still be able to take its data.
         "POST /api/tenant/exports",
+
+        // The tenant's model key is a platform row and no tenant data, so the storage quota does not count it.
+        "DELETE /api/tenant/model-key",
+        "PUT /api/tenant/model-key",
+
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

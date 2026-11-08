@@ -82,10 +82,16 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   such as a danger button, whose white text needs it.
 - **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
   names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
-- **One field for the platform's screens** _(planned for M31)_. `AxisField` draws every field of Studio
-  and the console: its label, its help and its input, as a group that its help describes.
-  `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
-  a few ways, each with its help, and `AxisFieldGroup` a titled group of fields.
+- **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
+  group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
+  Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change
+  handler, and `AxisField` still ties the label to the input and makes the help its description.
+  `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
+  group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
+  field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+- **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
+  a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
+  with its help.
 - **Every field has help** _(planned for M31)_, as [platform field help](frontend.md#platform-field-help) says.
 - **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
   its own.
@@ -99,7 +105,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
   focuses the first. A message goes once the field is put right. A button is disabled only while its
-  action runs. This holds for every form and dialog, as it does for the form widget's Save.
+  action runs. This holds for every form and dialog, as it does for the form widget's Save. A confirmation
+  that asks the user to type a name before a destructive action keeps its button off until the name
+  matches, as [the cell console's Delete](cell-console.md#actions) does.
 
 ## Tab bars
 
@@ -153,13 +161,17 @@ be kept right.
   on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number
   or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
-  them itself, and the filter lives in the address as `filter`, in the shape of
-  [the record API's filter](record-api.md#paging-and-sorting).
-- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, and a table
-  paged on the server sends its filter to the server as the record API's `filter`.
-- **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
-  orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
-  still searched and filtered on. The platform keeps each person's choice.
+  them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
+  filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, a data source
+  table's included.
+- **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
+  opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
+  back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
+  first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
+  the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
+  its first order. A change of columns keeps the page.
+- **Each person's columns** _(planned for M31)_. The platform keeps each person's choice of columns.
 - **Saved views** _(planned for M31)_. A person saves a table's search, filter and sort as a view.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free

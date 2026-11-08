@@ -74,6 +74,9 @@ public sealed class TenantRow
     /// <summary>The SMTP password, stored encrypted. <c>null</c> when the tenant has none.</summary>
     public byte[]? SmtpPassword { get; set; }
 
+    /// <summary>The tenant's own model key, stored encrypted. <c>null</c> when the tenant has none.</summary>
+    public byte[]? ModelKey { get; set; }
+
     /// <summary>The secret of the tenant realm's activation client, stored encrypted. <c>null</c> when the tenant has none, such as a preview tenant.</summary>
     public byte[]? RealmActivationClientSecret { get; set; }
 

@@ -12,6 +12,30 @@
       "en": "Apply",
       "vi": "Áp dụng",
       "status": "proposed"
+    },
+    {
+      "concept": "Action: Reset",
+      "en": "Reset",
+      "vi": "Đặt lại",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Move up",
+      "en": "Move up",
+      "vi": "Chuyển lên",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Move down",
+      "en": "Move down",
+      "vi": "Chuyển xuống",
+      "status": "proposed"
+    },
+    {
+      "concept": "Column",
+      "en": "column",
+      "vi": "cột",
+      "status": "proposed"
     }
   ]
 }

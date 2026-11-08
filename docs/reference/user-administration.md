@@ -25,7 +25,8 @@ like the author and the operator roles.
 The users page lists every user of the tenant and holds the commands an administrator runs on them: invite, resend an
 invitation, disable, enable, reset an account's authenticator, give a role and remove a role. Each command asks for
 confirmation first and writes an [audit record](#audit). What the page shows, and what it says for each answer, is in
-[users page](platform-pages.md#users-page).
+[users page](platform-pages.md#users-page). An administrator also sets the tenant's own model key through
+[its routes](#the-tenants-model-key).
 
 ### The list
 
@@ -167,6 +168,31 @@ A platform role's kind is `author`, `publisher`, `operator` or `administrator`.
   [session lifetimes and re-authentication](security.md#session-lifetimes-and-re-authentication).
 - **Not on oneself.** An administrator cannot disable themselves or remove their own administrator role, so a tenant
   never loses its last administrator from the page.
+
+### The tenant's model key
+
+Where `Ai:AllowTenantKeys` is on, an administrator sets, changes and removes the tenant's own model key, see
+[a tenant's own key](model-bindings.md#a-tenants-own-key). The routes answer to an administrator with a browser session
+only, as the command routes do.
+
+| Route                          | Body                 | Answer                                                           |
+| ------------------------------ | -------------------- | ---------------------------------------------------------------- |
+| `GET /api/tenant/model-key`    | None                 | `200` with `{ "set": true, "ending": "<last four characters>" }` |
+| `PUT /api/tenant/model-key`    | `{ "key": "<key>" }` | `204`                                                            |
+| `DELETE /api/tenant/model-key` | None                 | `204`                                                            |
+
+- **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
+  `Users:AdministratorRole` (`403`), `Ai:AllowTenantKeys` (`403`), then a tenant with a row in the tenant directory that is
+  not a preview tenant (`404`). With the setting off, the routes answer `403` to every caller who has the role. The routes
+  work on any host whose tenant has such a row, in a cell or not.
+- **Set and change.** `PUT` reads the body after the checks. It answers `400` with a fixed title for a body that is
+  missing or malformed and for a blank key. It trims the key and stores it as the tenant secret `model_key`, replacing
+  any key the tenant has. Each change raises the tenant's version, so every host loads the new key at its next refresh.
+- **Remove.** `DELETE` clears the key. Removing a key that is not there answers `204` and changes nothing.
+- **Read.** `GET` answers `set` and `ending`, the last four characters of the key. `ending` is `null` when no key is set
+  and when the key has four characters or fewer, so the answer never holds the whole key. No route answers the key.
+- **Audit.** A set, a change and a remove each write a platform audit record with no key value, see
+  [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
 
 ## Accounts
 

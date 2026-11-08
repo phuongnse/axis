@@ -150,12 +150,10 @@ describe('SchemaForm field texts', () => {
   it('names a role in words, with its help, and shows no raw property name', async () => {
     renderForm((await loadKindSchema('role'))!, { name: 'Approver', label: { textKey: 'roles.approver' } })
 
-    for (const field of ['name', 'label']) {
-      const key = `shell.studio.field.role.${field}`
-      const row = screen.getByTestId(`studio-field-/${field}`)
-      expect(within(row).getByText(english[key])).toBeVisible()
-      expect(within(row).getByText(english[`${key}.help`])).toBeVisible()
-    }
+    const name = 'shell.studio.field.role.name'
+    expect(screen.getByRole('textbox', { name: english[name] })).toHaveAccessibleDescription(english[`${name}.help`])
+    const label = 'shell.studio.field.role.label'
+    expect(screen.getByRole('group', { name: english[label] })).toHaveAccessibleDescription(english[`${label}.help`])
     for (const raw of ['name', 'label', 'textKey']) {
       expect(screen.queryByText(raw)).toBeNull()
     }
@@ -173,9 +171,9 @@ describe('SchemaForm field texts', () => {
     for (const hidden of hiddenRootProperties) {
       expect(screen.queryByTestId(`studio-field-/${hidden}`)).toBeNull()
     }
-    const name = screen.getByTestId('studio-field-/name')
-    expect(within(name).getByText(english['shell.studio.field.role.name'])).toBeVisible()
-    expect(within(name).getByText(english['shell.studio.field.role.name.help'])).toBeVisible()
+    const name = screen.getByRole('textbox', { name: english['shell.studio.field.role.name'] })
+    expect(name).toHaveAccessibleDescription(english['shell.studio.field.role.name.help'])
+    expect(screen.getByText(english['shell.studio.field.role.name.help'])).toBeVisible()
   })
 
   it('keeps a property name as the label of a kind with no field texts', () => {
@@ -184,7 +182,7 @@ describe('SchemaForm field texts', () => {
       { kind: 'example', note: 'Draft' },
     )
 
-    expect(within(screen.getByTestId('studio-field-/note')).getByText('note')).toBeVisible()
+    expect(screen.getByRole('textbox', { name: 'note' })).toBeVisible()
   })
 
   it('names a data source in words, with its help, and shows no raw property name', async () => {
@@ -202,21 +200,24 @@ describe('SchemaForm field texts', () => {
       search: true,
     })
 
-    for (const field of [
-      'name',
-      'entity',
-      'fields',
-      'parameters',
-      'filter',
-      'aggregate',
-      'sort',
-      'pageSize',
-      'search',
-    ]) {
+    const scalars = {
+      name: 'textbox',
+      entity: 'combobox',
+      filter: 'textbox',
+      sort: 'textbox',
+      pageSize: 'spinbutton',
+      search: 'checkbox',
+    }
+    for (const [field, role] of Object.entries(scalars)) {
       const key = `shell.studio.field.dataSource.${field}`
-      const row = screen.getByTestId(`studio-field-/${field}`)
-      expect(within(row).getByText(english[key])).toBeVisible()
-      expect(within(row).getByText(english[`${key}.help`])).toBeVisible()
+      const input = screen.getByRole(role, { name: english[key] })
+      expect(input).toHaveAccessibleDescription(english[`${key}.help`])
+      expect(screen.getByText(english[`${key}.help`])).toBeVisible()
+    }
+    for (const field of ['fields', 'parameters', 'aggregate']) {
+      const key = `shell.studio.field.dataSource.${field}`
+      expect(screen.getByRole('group', { name: english[key] })).toHaveAccessibleDescription(english[`${key}.help`])
+      expect(screen.getByText(english[`${key}.help`])).toBeVisible()
     }
     for (const raw of [
       'entity',
@@ -712,6 +713,18 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(within(dialog).getByText('Compatible updates (1.x)')).toBeVisible()
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     expect(onChange).toHaveBeenCalledWith('/modules', [{ id: 'sales', version: '^1.2.0' }])
+  })
+
+  it('shows the message under each empty required field of a new module on Done, and focuses the first', async () => {
+    const onChange = vi.fn()
+    const dialog = await openAddModule({ name: 'Shop' }, onChange)
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(within(screen.getByTestId('studio-field-/modules/0/id')).getByText('Fill in this field.')).toBeVisible()
+    expect(within(screen.getByTestId('studio-field-/modules/0/version')).getByText('Fill in this field.')).toBeVisible()
+    expect(within(dialog).getByRole('combobox', { name: 'Module' })).toHaveFocus()
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('keeps the version range that a module already has when another module is chosen', async () => {

@@ -1,8 +1,10 @@
-import { Alert, Flex, Input, Modal, Typography } from 'antd'
-import { useId, useState } from 'react'
+import { Alert, Flex, Form, Input, Modal, Typography } from 'antd'
+import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { requestCellTenantHost, type CellHostRequest } from '../platform/cell'
+import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
@@ -22,20 +24,20 @@ interface CellTenantHostDialogProps {
 
 /**
  * The dialog that requests a host of the tenant's own. It asks for the host name and then shows the TXT and CNAME
- * records that the customer must add, with the date the request expires. A refused request keeps the dialog open with
- * the cell's reason.
+ * records that the customer must add, with the date the request expires. Add is on until a request runs. A click with
+ * the host empty shows what is missing under the field, focuses it and sends nothing, see
+ * docs/reference/actions-and-controls.md#fields. A refused request keeps the dialog open with the cell's reason.
  */
 export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantHostDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const { locale } = usePlatform().current
-  const inputId = useId()
-  const [host, setHost] = useState('')
+  const [form] = Form.useForm<{ host: string }>()
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [added, setAdded] = useState<CellHostRequest | null>(null)
 
-  async function add() {
+  async function add(host: string) {
     setSending(true)
     setError(null)
     try {
@@ -79,10 +81,9 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
       width={size.dialog.large}
       title={t('shell.cell.tenant.addHostTitle').replace('{tenant}', tenant)}
       okText={t('shell.cell.tenant.addHostOk')}
-      okButtonProps={{ disabled: host.trim() === '' }}
       cancelText={t('shell.users.roles.cancel')}
       confirmLoading={sending}
-      onOk={() => void add()}
+      onOk={() => form.submit()}
       onCancel={onClose}
       footer={
         added ? (
@@ -108,10 +109,29 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
             </Typography.Text>
           </>
         ) : (
-          <Flex vertical gap="small">
-            <label htmlFor={inputId}>{t('shell.cell.tenant.addHostField')}</label>
-            <Input id={inputId} value={host} onChange={(event) => setHost(event.target.value)} />
-          </Flex>
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={requiredMark}
+            initialValues={{ host: '' }}
+            scrollToFirstError={{ focus: true }}
+            onFinish={({ host }) => void add(host)}
+          >
+            <AxisField
+              name="host"
+              label={t('shell.cell.tenant.addHostField')}
+              help={t('shell.cell.tenant.addHostField.help')}
+              requiredMessage={t('shell.cell.tenant.addHostRequired')}
+            >
+              <Input
+                // The browser also submits a form with one text box on Enter, so this stops it from adding twice.
+                onPressEnter={(event) => {
+                  event.preventDefault()
+                  form.submit()
+                }}
+              />
+            </AxisField>
+          </Form>
         )}
         {error && <Alert data-testid="cell-tenant-host-error" type="error" title={error} />}
       </Flex>

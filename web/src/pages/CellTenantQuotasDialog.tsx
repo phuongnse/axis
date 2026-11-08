@@ -1,9 +1,11 @@
-import { Alert, Flex, InputNumber, Modal, Radio, Typography } from 'antd'
+import { Alert, Flex, Form, InputNumber, Modal, Radio, Typography } from 'antd'
 import { useState } from 'react'
+import { AxisField } from '../platform/AxisField'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
+import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { currentChoice, quotaChanges, type QuotaChoice, type QuotaChoiceKind } from './cellQuotaChoices'
+import { currentChoice, quotaChanges, type QuotaChoice } from './cellQuotaChoices'
 
 interface CellTenantQuotasDialogProps {
   tenant: string
@@ -16,24 +18,23 @@ interface CellTenantQuotasDialogProps {
 
 /**
  * The dialog that sets the quotas of a tenant. Each key takes a value, no limit or the cell's default. Saving sends only
- * the keys that changed, and stays off until one has. A refused request keeps the dialog open with the cell's reason.
+ * the keys that changed, and stays off until a choice differs from the tenant's quotas, an emptied value included. A
+ * click with a chosen value empty shows what is missing under it, focuses it and sends nothing, see
+ * docs/reference/actions-and-controls.md#fields. A refused request keeps the dialog open with the cell's reason.
  */
 export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onClose }: CellTenantQuotasDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
-  const [choices, setChoices] = useState<Record<string, QuotaChoice>>(() =>
+  const [start] = useState<Record<string, QuotaChoice>>(() =>
     Object.fromEntries(Object.entries(quotas).map(([key, quota]) => [key, currentChoice(quota)])),
   )
+  const [form] = Form.useForm<Record<string, QuotaChoice>>()
+  const [choices, setChoices] = useState(start)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const changes = quotaChanges(quotas, choices)
-  const changed = Object.keys(changes.set).length + changes.remove.length > 0
-  const incomplete = Object.values(choices).some((choice) => choice.kind === 'value' && choice.value === null)
-
-  function choose(key: string, choice: Partial<QuotaChoice>) {
-    setChoices((current) => ({ ...current, [key]: { ...current[key]!, ...choice } }))
-  }
+  const changed = Object.keys(quotas).some((key) => differs(choices[key]!, start[key]!))
 
   async function save() {
     setSaving(true)
@@ -63,41 +64,54 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
       data-testid="cell-tenant-quotas-dialog"
       title={t('shell.cell.tenant.setQuotasTitle').replace('{tenant}', tenant)}
       okText={t('shell.cell.tenant.setQuotasOk')}
-      okButtonProps={{ disabled: !changed || incomplete }}
+      okButtonProps={{ disabled: !changed }}
       cancelText={t('shell.users.roles.cancel')}
       confirmLoading={saving}
-      onOk={() => void save()}
+      onOk={() => form.submit()}
       onCancel={onClose}
     >
-      <Flex vertical gap="middle">
-        {Object.keys(quotas).map((key) => {
-          const label = t(`shell.cell.tenant.quota.${key}`)
-          const choice = choices[key]!
-          return (
-            <Flex key={key} vertical gap="small">
-              <Typography.Text strong>{label}</Typography.Text>
-              <Radio.Group
-                aria-label={label}
-                value={choice.kind}
-                onChange={(event) => choose(key, { kind: event.target.value as QuotaChoiceKind })}
-              >
-                <Radio value="value">{t('shell.cell.tenant.quota.choice')}</Radio>
-                <Radio value="none">{t('shell.cell.tenant.quota.noLimit')}</Radio>
-                <Radio value="default">{t('shell.cell.tenant.quota.default')}</Radio>
-              </Radio.Group>
-              <InputNumber
-                aria-label={t('shell.cell.tenant.quota.valueLabel').replace('{quota}', label)}
-                min={0}
-                precision={0}
-                value={choice.value}
-                disabled={choice.kind !== 'value'}
-                onChange={(value) => choose(key, { value })}
-              />
-            </Flex>
-          )
-        })}
-        {error && <Alert data-testid="cell-tenant-quotas-error" type="error" title={error} />}
-      </Flex>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={requiredMark}
+        initialValues={start}
+        scrollToFirstError={{ focus: true }}
+        onValuesChange={(_changed, all) => setChoices(all)}
+        onFinish={() => void save()}
+      >
+        <Flex vertical gap="middle">
+          {Object.keys(quotas).map((key) => {
+            const label = t(`shell.cell.tenant.quota.${key}`)
+            const choice = choices[key]!
+            return (
+              <Flex key={key} vertical gap="small">
+                <Typography.Text strong>{label}</Typography.Text>
+                <Form.Item name={[key, 'kind']} noStyle>
+                  <Radio.Group aria-label={label}>
+                    <Radio value="value">{t('shell.cell.tenant.quota.choice')}</Radio>
+                    <Radio value="none">{t('shell.cell.tenant.quota.noLimit')}</Radio>
+                    <Radio value="default">{t('shell.cell.tenant.quota.default')}</Radio>
+                  </Radio.Group>
+                </Form.Item>
+                <AxisField
+                  name={[key, 'value']}
+                  label={t('shell.cell.tenant.quota.valueLabel').replace('{quota}', label)}
+                  help={t('shell.cell.tenant.quota.valueHelp')}
+                  requiredMessage={choice.kind === 'value' ? t('shell.cell.tenant.quota.valueRequired') : undefined}
+                >
+                  <InputNumber min={0} precision={0} disabled={choice.kind !== 'value'} />
+                </AxisField>
+              </Flex>
+            )
+          })}
+          {error && <Alert data-testid="cell-tenant-quotas-error" type="error" title={error} />}
+        </Flex>
+      </Form>
     </Modal>
   )
+}
+
+/** Whether a choice differs from the starting one: its kind, or for a value its number. */
+function differs(choice: QuotaChoice, start: QuotaChoice): boolean {
+  return choice.kind !== start.kind || (choice.kind === 'value' && choice.value !== start.value)
 }

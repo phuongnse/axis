@@ -21,8 +21,9 @@ last section with no heading.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
 - **One rhythm.** The sections are `spacing-md` apart.
-- **Shared parts.** _(planned for M31)_ Every Studio form is built from these sections, with its fields as
-  [fields](actions-and-controls.md#fields) says.
+- **One shared part.** The section is one shared part that the generic form draws and the typed editors can
+  draw too.
+- **Every Studio form is built from it.** _(planned for M31)_ A typed editor draws its sections through it.
 
 ## Fields
 
@@ -33,6 +34,9 @@ last section with no heading.
   [platform field help](frontend.md#platform-field-help). A property's raw name, such as `textKey`, never
   shows. The `<path>` is the property names from the root joined by dots, with list indices and map keys
   left out, so every item of a list shares one label.
+- **Drawn through the platform's field.** A field that holds one input is drawn through `AxisField`, and
+  an object, a label, a list or a map through `AxisFieldGroup`, as
+  [fields](actions-and-controls.md#fields) says. The label names the input and the help describes it.
 - **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown, while `name` is.
   A module's `name` stays read-only, as [customization layers](customization-layers.md#in-studio) says.
 - **A group's fields sit in.** They sit in from the group's label, behind a rule in `borderSubtle`, so they
@@ -75,7 +79,9 @@ values keeps its rows of inputs.
   and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`,
   which every list of objects in a kind with field texts has. A list without one reads "item", as in
   Add item…. The dialog's fields are the item's fields at their real pointers. Done writes the copy to the
-  list as one step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so
+  list as one step to undo. Done stays on, and a click on it with a required field empty shows what to fill in under
+  each such field and focuses the first, as [fields](actions-and-controls.md#fields) says, and the dialog stays open.
+  Cancel leaves the list as it was, so
   Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
   dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
