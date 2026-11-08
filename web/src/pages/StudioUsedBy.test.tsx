@@ -151,12 +151,38 @@ describe('StudioUsedBy', () => {
     expect(links[1]).toHaveAttribute('href', expect.stringContaining('%2Ffields%2F3%2Ftarget'))
   })
 
-  it('narrows the rows by search and by kind', async () => {
+  it('sorts the rows by the Name header, and by the Kind header in the order of the sidebar', async () => {
+    stubReferences()
+    renderTab()
+
+    const table = await screen.findByTestId('studio-used-by')
+    const labels = () =>
+      within(table)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
+    expect(labels()).toEqual([
+      'PurchaseRequestForm',
+      'Purchase request totals by department',
+      'Purchase request',
+      'Department',
+    ])
+
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Kind' }))
+    expect(labels()[0]).toBe('Department')
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Kind' }))
+    expect(labels()[0]).toBe('PurchaseRequestForm')
+  })
+
+  it('narrows the rows by search, which applies on Enter, and by kind', async () => {
     stubReferences()
     renderTab()
 
     const table = await screen.findByTestId('studio-used-by')
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'totals')
+    expect(within(table).getAllByRole('link')).toHaveLength(4)
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
     expect(
       within(table)
         .getAllByRole('link')
@@ -164,6 +190,7 @@ describe('StudioUsedBy', () => {
     ).toEqual(['Purchase request totals by department'])
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
     await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
     await userEvent.click(await screen.findByRole('option', { name: 'Form' }))
     expect(

@@ -162,6 +162,7 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.table.search': 'Search',
+  'shell.table.range': '{from}–{to} of {total}',
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
   'shell.table.delete': 'Delete',

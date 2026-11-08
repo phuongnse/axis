@@ -1,11 +1,13 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Dropdown, Flex, Table, type TableColumnType, type TableProps } from 'antd'
-import { useState, type CSSProperties, type HTMLAttributes, type Key, type ReactNode } from 'react'
+import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
+import { useContext, useState, type CSSProperties, type HTMLAttributes, type Key, type ReactNode } from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
+import { nameCompare } from './listOrder'
 import { markCurrentPage } from './pagination'
+import type { TableQuery, TableSort } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -28,6 +30,26 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
   key: string
   kind: ColumnKind
   render?: (value: unknown, row: T, index: number) => ReactNode
+  /** The text the search looks in, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
+  searchText?: (row: T) => string
+  /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
+  sortValue?: (row: T) => string | number | null
+}
+
+/**
+ * The view of a table: its search, sort, page and page size, see docs/reference/actions-and-controls.md#tables.
+ * Without a `total`, the table holds all its rows, and AxisTable searches, sorts and pages them itself. With a `total`,
+ * the server has done that work, and `dataSource` is the page.
+ */
+export interface AxisTableView {
+  query: TableQuery
+  onChange: (next: TableQuery) => void
+  /** The page sizes the picker offers. Without any, there is no picker. */
+  pageSizes?: number[]
+  /** How many rows there are in all. */
+  total?: number
+  /** Whether the table has a search box. A table that holds its rows has one also when a column gives `searchText`. */
+  search?: boolean
 }
 
 /**
@@ -77,10 +99,13 @@ export interface AxisTableProps<T> {
   emptyText?: string
   /**
    * The paging. Without it, or with `false`, every row shows and there is no pager. The page-size picker shows only
-   * when `pageSizeOptions` offers sizes, and a pager with no picker hides on a single page.
+   * when `pageSizeOptions` offers sizes, and a pager with no picker hides on a single page. A `view` replaces it.
    */
   pagination?: { current: number; pageSize: number; total: number; pageSizeOptions?: number[] } | false
+  /** Called when the page, page size or sort changes. A `view` replaces it. */
   onChange?: TableProps<T>['onChange']
+  /** The search, sort and paging, kept by the caller, for example in the address with `useTableView`. */
+  view?: AxisTableView
   toolbar?: AxisTableToolbar
   /** What sits between the toolbar and the rows, such as a filter bar, messages and dialogs. */
   below?: ReactNode
@@ -110,6 +135,17 @@ const actionsKey = '$actions'
 /** A width of 1 % makes an auto-layout column as narrow as its content, which `nowrap` keeps on one line. */
 const fitContent = '1%'
 
+function sameSort(a: TableSort | null, b: TableSort | null): boolean {
+  return a?.field === b?.field && a?.descending === b?.descending
+}
+
+/** Compares two sort values: a number by its size, any other by the language's collation. */
+function valueCompare(locale: string): (left: string | number, right: string | number) => number {
+  const compareNames = nameCompare(locale)
+  return (left, right) =>
+    typeof left === 'number' && typeof right === 'number' ? left - right : compareNames(String(left), String(right))
+}
+
 /** The most a free-text value is wide before it wraps, in px, see docs/reference/actions-and-controls.md#tables. */
 const freeTextMaxWidth = 320
 
@@ -133,6 +169,7 @@ export function AxisTable<T extends object>({
   emptyText,
   pagination,
   onChange,
+  view,
   toolbar = {},
   below,
   failure,
@@ -143,6 +180,16 @@ export function AxisTable<T extends object>({
   testId,
 }: AxisTableProps<T>) {
   const t = useText()
+  // The shell sets the locale of Ant Design's ConfigProvider. Outside it, there is none.
+  const locale = useContext(ConfigProvider.ConfigContext).locale?.locale ?? 'en'
+  const query = view?.query
+  const [draft, setDraft] = useState(query?.search ?? '')
+  const [shownSearch, setShownSearch] = useState(query?.search)
+  // A search from the address, such as after the back button, replaces the text in the box.
+  if (shownSearch !== query?.search) {
+    setShownSearch(query?.search)
+    setDraft(query?.search ?? '')
+  }
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
@@ -153,35 +200,44 @@ export function AxisTable<T extends object>({
   const fold = narrow || (rowActions?.configured ?? 0) >= foldFrom
 
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
-  const antColumns: TableColumnType<T>[] = columns.map(({ kind, render, onCell, onHeaderCell, ...column }) => {
-    const freeText = kind === 'freeText'
-    const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
-    const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
-    return {
-      ...column,
-      onHeaderCell: (data, index) => {
-        const own = onHeaderCell?.(data, index)
-        return { ...own, style: { ...sizing, ...own?.style } }
-      },
-      onCell: (row, index) => {
-        const own = onCell?.(row, index)
-        return { ...own, style: { ...sizing, ...own?.style } }
-      },
-      render: (value: unknown, row: T, index: number) => {
-        const shown = render ? render(value, row, index) : value
-        const empty = shown === null || shown === undefined || (!render && shown === '')
-        if (empty) {
-          return blankRow?.(row) ? null : <EmptyDash />
-        }
-        const content = shown as ReactNode
-        return freeText ? (
-          <div style={{ maxWidth: freeTextMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{content}</div>
-        ) : (
-          content
-        )
-      },
-    }
-  })
+  const antColumns: TableColumnType<T>[] = columns.map(
+    ({ kind, render, onCell, onHeaderCell, searchText: _searchText, sortValue, ...column }) => {
+      const freeText = kind === 'freeText'
+      const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
+      const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
+      const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
+      return {
+        ...column,
+        ...(sortable
+          ? {
+              sorter: true,
+              sortOrder: query?.sort?.field === column.key ? (query.sort.descending ? 'descend' : 'ascend') : null,
+            }
+          : {}),
+        onHeaderCell: (data, index) => {
+          const own = onHeaderCell?.(data, index)
+          return { ...own, style: { ...sizing, ...own?.style } }
+        },
+        onCell: (row, index) => {
+          const own = onCell?.(row, index)
+          return { ...own, style: { ...sizing, ...own?.style } }
+        },
+        render: (value: unknown, row: T, index: number) => {
+          const shown = render ? render(value, row, index) : value
+          const empty = shown === null || shown === undefined || (!render && shown === '')
+          if (empty) {
+            return blankRow?.(row) ? null : <EmptyDash />
+          }
+          const content = shown as ReactNode
+          return freeText ? (
+            <div style={{ maxWidth: freeTextMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{content}</div>
+          ) : (
+            content
+          )
+        },
+      }
+    },
+  )
   if (rowActions && rowActions.configured > 0) {
     const cell = { style: { width: fitContent, whiteSpace: 'nowrap', ...line } satisfies CSSProperties }
     antColumns.push({
@@ -194,22 +250,79 @@ export function AxisTable<T extends object>({
     })
   }
 
+  const local = view !== undefined && view.total === undefined
+  const searchColumns = columns.filter((column) => column.searchText !== undefined)
+  const searchable = view !== undefined && (view.search === true || (local && searchColumns.length > 0))
+  let pageRows = dataSource
+  let total = 0
+  let current = 1
+  if (view && query) {
+    if (local) {
+      const rows = held(dataSource ?? [], columns, query, locale)
+      total = rows.length
+      current = Math.min(query.page, Math.max(1, Math.ceil(total / query.pageSize)))
+      pageRows = rows.slice((current - 1) * query.pageSize, current * query.pageSize)
+    } else {
+      total = view.total ?? 0
+      current = query.page
+    }
+  }
+
   const bulk = (bulkActions?.length ?? 0) > 0
   // Only the rows that show count, so the count and the action's rows match what the person sees.
-  const selected = bulk ? (dataSource ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
+  const selected = bulk ? (pageRows ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
   const hasToolbar =
+    searchable ||
     toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
     toolbar.main !== undefined
   const row: CSSProperties = { height: tokens.size.tableRow }
-  const sizes = pagination ? (pagination.pageSizeOptions ?? []) : []
+  const paging = view
+    ? { current, pageSize: query!.pageSize, total, pageSizeOptions: view.pageSizes ?? [] }
+    : pagination || undefined
+  const sizes = paging?.pageSizeOptions ?? []
   const picker = sizes.length > 0
+  const number = new Intl.NumberFormat(locale)
+  // A new sort or page size starts again at page 1.
+  const onViewChange: TableProps<T>['onChange'] = (next, _filters, sorter) => {
+    if (!view || !query) {
+      return
+    }
+    const single = Array.isArray(sorter) ? sorter[0] : sorter
+    const sort = single?.order ? { field: String(single.columnKey), descending: single.order === 'descend' } : null
+    const pageSize = next.pageSize ?? query.pageSize
+    const reset = !sameSort(sort, query.sort) || pageSize !== query.pageSize
+    view.onChange({ ...query, page: reset ? 1 : (next.current ?? 1), pageSize, sort })
+  }
+  // A new search starts again at page 1. An empty text means no search.
+  const onSearch = (value: string) => {
+    if (!view || !query || value === (query.search ?? '')) {
+      return
+    }
+    view.onChange({ ...query, page: 1, search: value || undefined })
+  }
   return (
     <Flex vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
-          {toolbar.view}
+          {(searchable || toolbar.view !== undefined) && (
+            <Flex gap="small" wrap>
+              {searchable && (
+                <Input.Search
+                  allowClear
+                  maxLength={200}
+                  style={{ maxWidth: 320 }}
+                  aria-label={t('shell.table.search')}
+                  placeholder={t('shell.table.search')}
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onSearch={onSearch}
+                />
+              )}
+              {toolbar.view}
+            </Flex>
+          )}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
             {toolbar.onRefresh && (
               <AxisButton
@@ -260,24 +373,29 @@ export function AxisTable<T extends object>({
               columns={antColumns}
               // Where the page is narrower than the columns' content, the table scrolls sideways.
               scroll={{ x: 'max-content' }}
-              dataSource={dataSource as T[] | undefined}
+              dataSource={pageRows as T[] | undefined}
               loading={loading}
               locale={{ emptyText: <EmptyState text={emptyText} /> }}
               pagination={
-                pagination
+                paging
                   ? {
-                      current: pagination.current,
-                      pageSize: pagination.pageSize,
-                      total: pagination.total,
+                      current: paging.current,
+                      pageSize: paging.pageSize,
+                      total: paging.total,
                       showSizeChanger: picker,
                       hideOnSinglePage: !picker,
-                      itemRender: markCurrentPage(pagination.current),
+                      itemRender: markCurrentPage(paging.current),
+                      showTotal: (all, [from, to]) =>
+                        t('shell.table.range')
+                          .replace('{from}', number.format(from))
+                          .replace('{to}', number.format(to))
+                          .replace('{total}', number.format(all)),
                       ...(picker ? { pageSizeOptions: sizes } : {}),
                     }
                   : false
               }
               onRow={rowAttributes}
-              onChange={onChange}
+              onChange={view ? onViewChange : onChange}
               styles={{ header: { row }, body: { row } }}
             />
           </ConfigProvider>
@@ -285,6 +403,33 @@ export function AxisTable<T extends object>({
       )}
     </Flex>
   )
+}
+
+/**
+ * The rows of a table that holds them, searched by the columns that give `searchText`, then sorted by the sorted
+ * column's `sortValue`. The search is case-insensitive and ignores the spaces around it. An empty value comes last.
+ */
+function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: TableQuery, locale: string): T[] {
+  const needle = query.search?.trim().toLocaleLowerCase(locale)
+  const searched = needle
+    ? rows.filter((row) =>
+        columns.some((column) => column.searchText?.(row).toLocaleLowerCase(locale).includes(needle) === true),
+      )
+    : [...rows]
+  const value = columns.find((column) => column.key === query.sort?.field)?.sortValue
+  if (!value || !query.sort) {
+    return searched
+  }
+  const compare = valueCompare(locale)
+  const direction = query.sort.descending ? -1 : 1
+  return searched.sort((left, right) => {
+    const a = value(left)
+    const b = value(right)
+    if (a === null || b === null) {
+      return a === b ? 0 : a === null ? 1 : -1
+    }
+    return direction * compare(a, b)
+  })
 }
 
 /** A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. */
