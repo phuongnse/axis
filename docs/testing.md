@@ -66,6 +66,9 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   `openStudio`, which opens Studio before a publish, each with a limit of 60 seconds. The other
   journeys of that spec write their changed files through the Studio resource API, without the
   browser.
+- **Label texts.** A journey types a label's texts into the label editor, one box per locale, and keeps
+  the key that Studio makes. It types a key into a text resource only for the keys that a label picks
+  from a list, and for keys that no label uses, as [the folder comparison](#the-folder-comparison) lists.
 - **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks
   what the code does now. A guard against a kind of mistake is a lint rule or a check of the current
   rule, such as "every chart import goes through `ChartDrawing`", never a list of removed names.
@@ -240,9 +243,11 @@ file holds its steps. This section says what each proves and what it must not do
   two-step ticket form on the form's Design tab, the forms of the tasks, the `TicketHandling` process
   with its escalations and its notify step, the pages, the site, the notify processes and their
   schedule and delete triggers, the policies in the policy matrix, and the twelve test scenarios in
-  the scenario editor, typing every expression in the expression editor. Each save must report no
-  error diagnostic. At the end the built folder must match `samples/apps/service-desk` with no error
-  diagnostic: only resource ids, seed record ids (paired by position) and key order may differ, and
+  the scenario editor, typing every expression in the expression editor and every label's texts in its
+  label editor. Each save must report no error diagnostic. At the end the built folder must match
+  `samples/apps/service-desk` with no error diagnostic: only resource ids, seed record ids (paired by
+  position), key order and label keys that [the folder comparison](#the-folder-comparison) pairs may
+  differ, and
   the `migrations` folder must be empty, because the sample has none. Run tests must pass all twelve
   scenarios, and the release history must show release 1 as the one active row. On the
   `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
@@ -279,7 +284,8 @@ file holds its steps. This section says what each proves and what it must not do
   opens the JSON view only to write the `AssetWithMaintenanceAndSoftware` scenario, because the
   scenario editor cannot add a value to a child collection. Every migration that a save asks about is
   answered, and the `migrations` folder must be empty at the end. It checks the built folder against
-  `samples/apps/asset-management` in parts as it goes, and at the end the whole folder must match with
+  `samples/apps/asset-management` in parts as it goes, its texts excepted, which are checked at the end
+  as [the folder comparison](#the-folder-comparison) says. At the end the whole folder must match with
   no error diagnostic and Run tests must pass all six scenarios. It publishes release 1. On the
   `asset-management` site the asset manager registers an asset with an attachment, software and a
   maintenance entry, and imports `tests/e2e/fixtures/asset-management-import.csv` with a dry run that
@@ -295,6 +301,26 @@ file holds its steps. This section says what each proves and what it must not do
 A new trigger starts with an empty `event`, see [new resource](reference/studio.md#new-resource). So a
 journey that builds a trigger and must match a sample with no event creates
 a temporary event first, and deletes it once the triggers are saved.
+
+### The folder comparison
+
+The service desk and asset management journeys compare the folder they built with the committed
+sample. `compareApplicationFolders` in `tests/e2e/folder-comparison.ts` throws at the first difference.
+
+- **Files.** Every file of the sample must exist in the built folder, and the reverse, unless the
+  comparison names the files it checks. A named file missing from either folder fails.
+- **Ids and order.** A resource's top-level `id` and the key order are ignored. Seed record ids pair by
+  position, so a scenario's seed reference must match the record at the same place.
+- **Label keys.** A label's text key may differ from the sample's when the sample's key is used at the
+  same place, such as a field's label or a step's label. Each built key pairs with the sample key used
+  at the same place, and one sample key may pair with a new key at each place where it is used.
+- **Texts.** A text resource compares through those pairs. Each built text must equal the sample's text
+  for each locale, and each sample key a label uses must be covered. A text that no label uses, or a
+  sample key that no label uses any more, fails.
+- **Page element names.** A journey may skip the names of page widgets, actions, columns and tabs with
+  `ignorePageElementNames`, because Studio does not name them the way the samples do. With
+  `generatedNames`, a page may hold a generated name such as `table1` that the sample lacks. A different
+  name never passes.
 
 ## Purchasing system stub
 

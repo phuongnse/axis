@@ -14,7 +14,27 @@ export interface CompareOptions {
 
 type Seeds = Map<string, string>;
 
-/** Throws at the first difference. Top-level ids and key order are ignored; seed ids pair by position. */
+interface LabelKeys {
+  /** The sample keys used at the same place as each built key. */
+  pairs: Map<string, Set<string>>;
+  /** The keys that a label of the built folder uses. */
+  built: Set<string>;
+  /** The keys that a label of the sample uses. */
+  sample: Set<string>;
+}
+
+interface Pairings {
+  seeds: Seeds;
+  labels: LabelKeys;
+}
+
+type TextResource = Record<string, unknown> & { texts: Record<string, string> };
+
+/**
+ * Throws at the first difference. Top-level ids and key order are ignored. Seed ids pair by position. A label's text key
+ * may differ from the sample's when the sample's key is used at the same place, and the texts are compared through that
+ * pairing.
+ */
 export function compareApplicationFolders(expected: string, actual: string, options: CompareOptions = {}): void {
   const expectedFiles = listFiles(expected);
   const actualFiles = listFiles(actual);
@@ -38,7 +58,11 @@ export function compareApplicationFolders(expected: string, actual: string, opti
     files = expectedFiles;
   }
 
-  const seeds = pairSeedRecordIds(expected, actual, expectedFiles.filter((file) => actualSet.has(file)));
+  const shared = expectedFiles.filter((file) => actualSet.has(file));
+  const pairings: Pairings = {
+    seeds: pairSeedRecordIds(expected, actual, shared),
+    labels: pairLabelKeys(expected, actual, shared),
+  };
 
   for (const file of files) {
     if (file.endsWith(".json")) {
@@ -50,13 +74,49 @@ export function compareApplicationFolders(expected: string, actual: string, opti
         dropPageElementNames(expectedJson);
         dropPageElementNames(actualJson);
       }
-      compareValue(file, "", expectedJson, actualJson, seeds, options.generatedNames === true && file.startsWith("pages/"));
+      if (isTextResource(expectedJson) && isTextResource(actualJson)) {
+        const { texts: expectedTexts, ...expectedRest } = expectedJson;
+        const { texts: actualTexts, ...actualRest } = actualJson;
+        compareValue(file, "", expectedRest, actualRest, pairings, false);
+        compareTexts(file, expectedTexts, actualTexts, pairings.labels);
+      } else {
+        compareValue(file, "", expectedJson, actualJson, pairings, options.generatedNames === true && file.startsWith("pages/"));
+      }
     } else {
       const expectedText = fs.readFileSync(path.join(expected, file), "utf8");
       const actualText = fs.readFileSync(path.join(actual, file), "utf8");
       if (expectedText !== actualText) fail(file, "", JSON.stringify(expectedText), JSON.stringify(actualText));
     }
   }
+}
+
+/**
+ * The keys that a journey's text step adds to the texts. These are the keys that a journey picks in a label, and the keys
+ * that no label uses. Every other label is typed into its label, which makes the key it uses.
+ */
+export function textEditorKeys(sample: string): Set<string> {
+  const picked = new Set<string>();
+  const used = new Set<string>();
+  const keys = new Set<string>();
+  for (const file of listFiles(sample)) {
+    if (!file.endsWith(".json")) continue;
+    const json = readJson(path.join(sample, file));
+    if (isTextResource(json)) {
+      for (const key of Object.keys(json.texts)) keys.add(key);
+      continue;
+    }
+    for (const [pointer, key] of labelsIn(json)) {
+      used.add(key);
+      if (isPickedLabel(file, pointer)) picked.add(key);
+    }
+  }
+  return new Set([...keys].filter((key) => picked.has(key) || !used.has(key)));
+}
+
+function isPickedLabel(file: string, pointer: string): boolean {
+  if (file.startsWith("entities/")) return pointer.startsWith("/fields/");
+  if (file.startsWith("processes/")) return /^\/steps\/\d+(\/outcomes\/\d+)?\/label\/textKey$/.test(pointer);
+  return false;
 }
 
 function listFiles(root: string): string[] {
@@ -92,6 +152,39 @@ function pairSeedRecordIds(expected: string, actual: string, sharedFiles: string
   return seeds;
 }
 
+function pairLabelKeys(expected: string, actual: string, sharedFiles: string[]): LabelKeys {
+  const labels: LabelKeys = { pairs: new Map(), built: new Set(), sample: new Set() };
+  for (const file of sharedFiles) {
+    if (!file.endsWith(".json")) continue;
+    const expectedLabels = labelsIn(readJson(path.join(expected, file)));
+    const actualLabels = labelsIn(readJson(path.join(actual, file)));
+    for (const [pointer, sampleKey] of expectedLabels) {
+      labels.sample.add(sampleKey);
+      const builtKey = actualLabels.get(pointer);
+      if (builtKey === undefined) continue;
+      const pair = labels.pairs.get(builtKey) ?? new Set<string>();
+      pair.add(sampleKey);
+      labels.pairs.set(builtKey, pair);
+    }
+    for (const builtKey of actualLabels.values()) labels.built.add(builtKey);
+  }
+  return labels;
+}
+
+/** The text key of each label in a file, by the pointer of the key, such as `/steps/0/label/textKey`. */
+function labelsIn(value: unknown, pointer = "", found = new Map<string, string>()): Map<string, string> {
+  if (Array.isArray(value)) {
+    value.forEach((child, index) => labelsIn(child, `${pointer}/${index}`, found));
+  } else if (isObject(value)) {
+    for (const [key, child] of Object.entries(value)) {
+      const childPointer = `${pointer}/${escapePointer(key)}`;
+      if (key === "textKey" && typeof child === "string") found.set(childPointer, child);
+      else labelsIn(child, childPointer, found);
+    }
+  }
+  return found;
+}
+
 function recordId(record: unknown): string | undefined {
   return isObject(record) && typeof record.id === "string" ? record.id : undefined;
 }
@@ -101,7 +194,7 @@ function compareValue(
   pointer: string,
   expected: unknown,
   actual: unknown,
-  seeds: Seeds,
+  pairings: Pairings,
   generatedNames: boolean,
 ): void {
   if (kindOf(expected) !== kindOf(actual)) {
@@ -111,7 +204,7 @@ function compareValue(
   if (Array.isArray(expected) && Array.isArray(actual)) {
     const shared = Math.min(expected.length, actual.length);
     for (let index = 0; index < shared; index++) {
-      compareValue(file, `${pointer}/${index}`, expected[index], actual[index], seeds, generatedNames);
+      compareValue(file, `${pointer}/${index}`, expected[index], actual[index], pairings, generatedNames);
     }
     if (expected.length !== actual.length) {
       fail(file, pointer, `${expected.length} items`, `${actual.length} items`);
@@ -123,7 +216,7 @@ function compareValue(
     for (const key of Object.keys(expected).sort()) {
       const child = `${pointer}/${escapePointer(key)}`;
       if (!Object.hasOwn(actual, key)) fail(file, child, JSON.stringify(expected[key]), "missing");
-      compareValue(file, child, expected[key], actual[key], seeds, generatedNames);
+      compareValue(file, child, expected[key], actual[key], pairings, generatedNames);
     }
     for (const key of Object.keys(actual).sort()) {
       if (!Object.hasOwn(expected, key)) {
@@ -135,13 +228,48 @@ function compareValue(
   }
 
   if (typeof expected === "string" && typeof actual === "string") {
-    if (actual !== (seeds.get(expected) ?? expected)) {
+    if (pointer.endsWith("/textKey") && pairings.labels.pairs.get(actual)?.has(expected)) return;
+    if (actual !== (pairings.seeds.get(expected) ?? expected)) {
       fail(file, pointer, JSON.stringify(expected), JSON.stringify(actual));
     }
     return;
   }
 
   if (expected !== actual) fail(file, pointer, JSON.stringify(expected), JSON.stringify(actual));
+}
+
+function compareTexts(
+  file: string,
+  expected: Record<string, string>,
+  actual: Record<string, string>,
+  labels: LabelKeys,
+): void {
+  const covered = new Set<string>();
+  const builtKeys = new Set([...Object.keys(actual), ...labels.built]);
+  for (const key of [...builtKeys].sort()) {
+    const pointer = `/texts/${escapePointer(key)}`;
+    if (!labels.built.has(key) && labels.sample.has(key)) {
+      fail(file, pointer, "a key that a label uses", "an unused key");
+    }
+    for (const sampleKey of labels.pairs.get(key) ?? [key]) {
+      covered.add(sampleKey);
+      if (!Object.hasOwn(expected, sampleKey)) {
+        fail(file, pointer, `a text for ${sampleKey} in the sample`, describe(actual[key]));
+      }
+      if (actual[key] !== expected[sampleKey]) {
+        fail(file, pointer, JSON.stringify(expected[sampleKey]), describe(actual[key]));
+      }
+    }
+  }
+  for (const sampleKey of Object.keys(expected).sort()) {
+    if (!covered.has(sampleKey)) {
+      fail(file, `/texts/${escapePointer(sampleKey)}`, JSON.stringify(expected[sampleKey]), "missing");
+    }
+  }
+}
+
+function describe(value: unknown): string {
+  return value === undefined ? "missing" : JSON.stringify(value);
 }
 
 function fail(file: string, pointer: string, expected: string, actual: string): never {
@@ -160,6 +288,10 @@ function kindOf(value: unknown): string {
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isTextResource(value: unknown): value is TextResource {
+  return isObject(value) && value.kind === "text" && isObject(value.texts);
 }
 
 function escapePointer(key: string): string {

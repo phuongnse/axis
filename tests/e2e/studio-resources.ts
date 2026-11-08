@@ -152,16 +152,19 @@ export async function addMapping(scope: Locator) {
   await scope.getByRole('button', { name: 'Add mapping', exact: true }).click()
 }
 
-export async function writeLabel(scope: Page | Locator, field: string, key: string, en: string) {
+/**
+ * Types the texts of a label, one per locale, and keeps the key that Studio makes for it. The label editor makes the key
+ * when the first text is typed. An editor that was replaced starts again from the draft, so the texts are typed again
+ * until they show.
+ */
+export async function writeLabel(scope: Page | Locator, field: string, texts: Record<string, string>) {
   const label = scope.getByTestId(field).getByTestId('studio-label')
-  const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
-  const english = label.getByRole('textbox', { name: 'en', exact: true })
-  // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
-  // or got its names later starts over, so the key is typed again until the text shows.
   await expect(async () => {
-    await keyBox.fill('')
-    await keyBox.fill(key)
-    await expect(english).toHaveValue(en, { timeout: 2_000 })
+    for (const [locale, text] of Object.entries(texts)) {
+      const box = label.getByRole('textbox', { name: locale, exact: true })
+      await box.fill(text)
+      await expect(box).toHaveValue(text, { timeout: 2_000 })
+    }
   }).toPass({ timeout: 20_000 })
 }
 

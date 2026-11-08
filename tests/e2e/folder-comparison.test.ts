@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
-import { compareApplicationFolders } from "./folder-comparison.ts";
+import { compareApplicationFolders, textEditorKeys } from "./folder-comparison.ts";
 
 const sample = path.resolve(import.meta.dirname, "../../samples/apps/service-desk");
 const scenario = "scenarios/agent-cannot-act-on-another-agents-ticket.json";
@@ -215,4 +215,89 @@ test("a generated name outside a page is not accepted", () => {
     () => compareApplicationFolders(sample, copy, { generatedNames: true }),
     /scenarios\/agent-cannot-act-on-another-agents-ticket\.json at \/steps\/0\/name/,
   );
+});
+
+function renameRoleAgentLabel(folder: string, locales: string[] = ["en", "vi"]): void {
+  rewriteJson(folder, "roles/agent.json", (role) => {
+    role.label.textKey = "roles.agent.label";
+  });
+  for (const locale of locales) {
+    rewriteJson(folder, `texts/${locale}.json`, (text) => {
+      text.texts["roles.agent.label"] = text.texts["role.agent"];
+      delete text.texts["role.agent"];
+    });
+  }
+}
+
+test("a label key made by Studio matches the sample when its texts match", () => {
+  const copy = copySample();
+  renameRoleAgentLabel(copy);
+  assert.doesNotThrow(() => compareApplicationFolders(sample, copy));
+});
+
+test("a changed text under a label's own key fails naming the text file and the key", () => {
+  const copy = copySample();
+  renameRoleAgentLabel(copy);
+  rewriteJson(copy, "texts/vi.json", (text) => {
+    text.texts["roles.agent.label"] = "Changed";
+  });
+  assert.throws(
+    () => compareApplicationFolders(sample, copy),
+    /texts\/vi\.json at \/texts\/roles\.agent\.label: expected .* got "Changed"/,
+  );
+});
+
+test("a text missing under a label's own key fails naming the text file and the key", () => {
+  const copy = copySample();
+  renameRoleAgentLabel(copy);
+  rewriteJson(copy, "texts/vi.json", (text) => {
+    delete text.texts["roles.agent.label"];
+  });
+  assert.throws(
+    () => compareApplicationFolders(sample, copy),
+    /texts\/vi\.json at \/texts\/roles\.agent\.label: expected .* got missing/,
+  );
+});
+
+test("a sample key that no label uses any more fails", () => {
+  const copy = copySample();
+  renameRoleAgentLabel(copy);
+  for (const locale of ["en", "vi"]) {
+    rewriteJson(copy, `texts/${locale}.json`, (text) => {
+      text.texts["role.agent"] = text.texts["roles.agent.label"];
+    });
+  }
+  assert.throws(
+    () => compareApplicationFolders(sample, copy),
+    /texts\/en\.json at \/texts\/role\.agent: expected a key that a label uses, got an unused key/,
+  );
+});
+
+test("one sample key used at two places may pair with a new key at each place", () => {
+  const copy = copySample();
+  const places = [
+    ["pages/all-tickets.json", "pages.allTickets.open"],
+    ["pages/my-tickets.json", "pages.myTickets.open"],
+  ] as const;
+  for (const [file, key] of places) {
+    rewriteJson(copy, file, (page) => {
+      page.widgets[0].rowActions[0].label.textKey = key;
+    });
+  }
+  for (const locale of ["en", "vi"]) {
+    rewriteJson(copy, `texts/${locale}.json`, (text) => {
+      for (const [, key] of places) text.texts[key] = text.texts["actions.open"];
+      delete text.texts["actions.open"];
+    });
+  }
+  assert.doesNotThrow(() => compareApplicationFolders(sample, copy));
+});
+
+test("a text editor key is one that a journey picks or that no label uses", () => {
+  const keys = textEditorKeys(sample);
+  assert.ok(keys.has("ticket.title"));
+  assert.ok(keys.has("task.assign"));
+  for (const key of ["role.agent", "site.title", "pages.myTickets.title"]) {
+    assert.ok(!keys.has(key), key);
+  }
 });
