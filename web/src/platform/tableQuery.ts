@@ -31,15 +31,31 @@ export interface TableQuery {
   search?: string
   /** The filter in force. Never empty: no filter leaves it out. */
   filter?: FilterGroup
+  /** The keys of the shown columns in order, identifying column first. Never empty: every column in its first order leaves it out. */
+  columns?: string[]
+}
+
+/** The shown keys: the first key first, then the choice's known keys in order, each once. No choice, or none known, shows every key. */
+export function shownColumns(keys: readonly string[], choice?: readonly string[]): string[] {
+  const known = new Set(keys)
+  const kept = [...new Set((choice ?? []).filter((key) => known.has(key)))]
+  return kept.length > 0 ? [keys[0], ...kept.filter((key) => key !== keys[0])] : [...keys]
+}
+
+/** The choice to keep for `shown`, or undefined when it is every key in its first order. */
+export function columnsChoice(keys: readonly string[], shown: readonly string[]): string[] | undefined {
+  return shown.length === keys.length && shown.every((key, index) => key === keys[index]) ? undefined : [...shown]
 }
 
 /**
- * Reads `page`, `pageSize`, `sort`, `search`, `filter` and the values of `parameterNames` from the URL. An invalid value
+ * Reads `page`, `pageSize`, `sort`, `search`, `filter`, `columns` and the values of `parameterNames` from the URL. An invalid value
  * falls back to its default: a `page` that is not a positive integer, a `pageSize` the table does
  * not offer, or a `sort` that names no field or a reference or file field. `fields` are the table's columns.
  * A repeated parameter keeps its first value, and an empty value is left out. `search` is read only
  * when the table is `searchable`, and it is not trimmed. `filter` is read only when the table is `filterable`, and
  * a `filter` that is not valid for `fields` is dropped, see docs/reference/record-api.md#paging-and-sorting.
+ * `columns` is read only when the table has the `columnsControl`, with the first field first and unknown or repeated
+ * names dropped, see docs/reference/actions-and-controls.md#tables.
  */
 export function parseTableQuery(
   params: URLSearchParams,
@@ -48,6 +64,7 @@ export function parseTableQuery(
   parameterNames: readonly string[] = [],
   searchable = false,
   filterable = false,
+  columnsControl = false,
 ): TableQuery {
   const parameters: Record<string, string> = {}
   for (const name of parameterNames) {
@@ -65,6 +82,9 @@ export function parseTableQuery(
         fields.map((field) => field.name),
       )
     : undefined
+  const columnsText = columnsControl ? params.get('columns') : null
+  const names = fields.map((field) => field.name)
+  const columns = columnsText ? columnsChoice(names, shownColumns(names, columnsText.split(','))) : undefined
   const page = params.get('page')
   const pageSize = tablePageSizes(defaultPageSize).find((size) => String(size) === params.get('pageSize'))
   const sort = params.get('sort')
@@ -79,14 +99,15 @@ export function parseTableQuery(
     parameters,
     ...(search ? { search } : {}),
     ...(filter ? { filter } : {}),
+    ...(columns ? { columns } : {}),
   }
 }
 
 /**
  * Writes the table's parameters into a copy of the URL parameters. Other parameters stay first, as
- * they are. The data source parameter values follow, then `search`, `filter`, `page`, `pageSize` and `sort`
- * in that order, and defaults are left out. `parameterNames`, `search` and `filter` are removed first, so a
- * cleared value goes.
+ * they are. The data source parameter values follow, then `search`, `filter`, `page`, `pageSize`, `sort` and `columns`
+ * in that order, and defaults are left out. `parameterNames`, `search`, `filter` and `columns` are removed first, so a
+ * cleared value goes. `columns` is for the address only, so the record query never has it.
  */
 export function writeTableQuery(
   current: URLSearchParams,
@@ -100,11 +121,15 @@ export function writeTableQuery(
   }
   next.delete('search')
   next.delete('filter')
+  next.delete('columns')
   next.delete('page')
   next.delete('pageSize')
   next.delete('sort')
   for (const [name, value] of new URLSearchParams(recordQuery(query, defaultPageSize))) {
     next.append(name, value)
+  }
+  if (query.columns) {
+    next.set('columns', query.columns.join(','))
   }
   return next
 }
