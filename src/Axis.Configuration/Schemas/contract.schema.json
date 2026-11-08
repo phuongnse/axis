@@ -8,6 +8,7 @@
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "contract" },
     "name": { "$ref": "#/$defs/name" },
+    "description": { "$ref": "#/$defs/textReference" },
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/qualifiedName" },
     "lifecycle": {

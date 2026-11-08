@@ -11,6 +11,7 @@
     "formatVersion": { "const": 1 },
     "type": { "type": "string" },
     "label": { "$ref": "#/$defs/textReference" },
+    "description": { "$ref": "#/$defs/textReference" },
     "issuer": { "$ref": "#/$defs/binding" },
     "clientId": { "$ref": "#/$defs/binding" },
     "clientSecret": { "$ref": "#/$defs/binding" },

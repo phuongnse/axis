@@ -36,7 +36,7 @@ depend on its kind. An entity looks like this:
   release on, each resource kind has a format version, and Axis ships converters that rewrite older
   module, application and layer files, so the engines hold no compatibility code.
 - **Labels** always come from text resources.
-- **`description`** _(planned for M31)_. Every kind but `text` and `layer` may have an optional `description`,
+- **`description`.** Every kind but `text` and `layer` may have an optional `description`,
   a text resource like `label`, that says what the resource is for. Its key joins the `AXC0028` check.
 - **`help`.** A field may have `help`, such as
   `{ "name": "title", "type": "text", "help": { "textKey": "purchaseRequest.title.help" } }`: a text

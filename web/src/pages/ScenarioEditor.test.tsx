@@ -288,6 +288,26 @@ afterEach(() => localStorage.clear())
 describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
+  it('shows the description after the name and before now, and writes its key', async () => {
+    const { onChange } = renderEditor({
+      ...scenario([fixtures.advanceTime]),
+      description: { textKey: 'scenarios.approve' },
+    })
+
+    const description = screen.getByTestId('studio-field-/description')
+    const box = within(description).getByRole('textbox', { name: 'Text key' })
+    expect(box).toHaveValue('scenarios.approve')
+    expect(
+      screen.getByTestId('studio-field-/name').compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+    expect(
+      description.compareDocumentPosition(screen.getByTestId('studio-field-/now')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+
+    await userEvent.type(box, 'x')
+    expect(onChange).toHaveBeenLastCalledWith('/description/textKey', 'scenarios.approvex')
+  })
+
   it('renders inside the theme root with its controls visible', () => {
     renderEditor(scenario([fixtures.advanceTime]))
 

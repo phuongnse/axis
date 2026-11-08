@@ -187,6 +187,7 @@ internal static class StudioEndpoints
                 file.Version,
                 usedBy.GetValueOrDefault(file.Id),
                 titles[file.Id].Titles,
+                titles[file.Id].Descriptions,
                 titles[file.Id].Locale))
             .ToList();
         return new StudioResourceListResponse(items);
@@ -1181,8 +1182,8 @@ internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceIt
 /// <summary>
 /// One resource in the list. <c>Version</c> is the lower-case SHA-256 hex of the file's bytes, and <c>UsedBy</c>
 /// is the number of references that point at the resource. <c>Titles</c> is the resource's label or title text by
-/// locale, empty when its kind has none or no text resource gives the key. <c>Locale</c> is the locale of a text
-/// resource, else null.
+/// locale, empty when its kind has none or no text resource gives the key. <c>Descriptions</c> is the resource's
+/// description text by locale, empty when it has none. <c>Locale</c> is the locale of a text resource, else null.
 /// </summary>
 internal sealed record StudioResourceItem(
     string Id,
@@ -1192,6 +1193,7 @@ internal sealed record StudioResourceItem(
     string Version,
     int UsedBy,
     IReadOnlyDictionary<string, string> Titles,
+    IReadOnlyDictionary<string, string> Descriptions,
     string? Locale);
 
 /// <summary>One resource with its JSON content.</summary>

@@ -61,6 +61,8 @@ internal static class ContractChecker
             void CheckLabel(string kind, string name, TextReference? label, string path, bool added) =>
                 CheckPointLabel(moduleId, contract, kind, name, label, path, added, requireLabels, labelTexts, diagnostics);
 
+            ApplicationCompiler.CheckTextKey(contract.Description, contract, "/description", labelTexts, diagnostics);
+
             if (CheckEntity(moduleId, contract, findEntity, ownerOf, unloadedEntityNames, firstFileByEntity, Report) is { } entity)
             {
                 if (contract.Lifecycle is { } lifecycle)

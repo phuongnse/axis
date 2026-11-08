@@ -8,6 +8,7 @@
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "dataSource" },
     "name": { "$ref": "#/$defs/name" },
+    "description": { "$ref": "#/$defs/textReference" },
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/entityName", "x-axis-reference": "entity" },
     "fields": {

@@ -159,6 +159,8 @@ export interface StudioResourceItem {
    * the client created, since the create route does not answer it.
    */
   titles?: Record<string, string>
+  /** The resource's description text by locale. It is empty for a resource with none, and absent on one that the client created. */
+  descriptions?: Record<string, string>
   /** The locale of a text resource, else `null`. Absent on a resource that the client created. */
   locale?: string | null
 }

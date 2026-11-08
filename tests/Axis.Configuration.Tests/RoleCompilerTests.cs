@@ -57,6 +57,29 @@ public sealed class RoleCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void A_description_whose_key_no_locale_has_is_AXC0028()
+    {
+        using var folder = Folder().With("roles/finance.json", RoleWithDescription("role.nope"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTextKey, "roles/finance.json", "/description/textKey"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_description_whose_key_a_locale_has_compiles_into_the_model()
+    {
+        using var folder = Folder().With("roles/finance.json", RoleWithDescription("role.finance"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(new TextReference("role.finance"), Assert.Single(result.Model!.Roles).Description);
+    }
+
     [Theory]
     [InlineData("""{ "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "finance", "formatVersion": 1 }""")]
     [InlineData("""{ "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "Finance", "formatVersion": 1, "label": { "textKey": "role.finance" } }""")]
@@ -87,6 +110,11 @@ public sealed class RoleCompilerTests
 
     private static string Role(string id, string name, string textKey = "role.finance") => $$"""
         { "id": "{{id}}", "kind": "role", "name": "{{name}}", "formatVersion": 1, "label": { "textKey": "{{textKey}}" } }
+        """;
+
+    private static string RoleWithDescription(string textKey) => $$"""
+        { "id": "{{FinanceId}}", "kind": "role", "name": "finance", "formatVersion": 1, "label": { "textKey": "role.finance" },
+          "description": { "textKey": "{{textKey}}" } }
         """;
 
     private static TemporaryFolder Folder() =>

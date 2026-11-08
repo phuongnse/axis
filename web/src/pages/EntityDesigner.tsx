@@ -225,6 +225,10 @@ export function EntityDesigner({
         <div>{t('shell.studio.entity.label')}</div>
         <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
       </div>
+      <div data-testid="studio-field-/description">
+        <div>{t('shell.studio.entity.description')}</div>
+        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+      </div>
       <Picker
         pointer="/displayField"
         label={t('shell.studio.entity.displayField')}

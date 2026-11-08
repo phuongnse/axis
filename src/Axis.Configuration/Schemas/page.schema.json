@@ -10,6 +10,7 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "title": { "$ref": "#/$defs/textReference" },
+    "description": { "$ref": "#/$defs/textReference" },
     "parameters": {
       "type": "array",
       "items": { "$ref": "#/$defs/parameter" }

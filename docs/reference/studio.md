@@ -133,7 +133,7 @@ what changed.
   keys stay as they are.
 - **The form's layout** _(planned for M31)_. The sections, field names, labels, lists and
   save bar of every form follow [Studio resource form](studio-resource-form.md).
-- **A description** _(planned for M31)_. Every kind that may have a
+- **A description.** Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
   shows it after the name and the label.
 - **The JSON view** shows the draft as text, and a valid edit there updates the form. Invalid JSON
@@ -477,7 +477,7 @@ and the JSON view stays as the second view of the same draft. The [page designer
 edits the same draft on a canvas.
 
 - **The page.** The Form tab shows the page's name, its [title](studio-resource-form.md#labels), its
-  [parameters](#page-parameters) and its [widget tree](#widget-tree).
+  [description](#editor), its [parameters](#page-parameters) and its [widget tree](#widget-tree).
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -709,8 +709,8 @@ second view of the same draft. The [process designer](process-designer.md) edits
 graph, with the card of the selected step beside it, and describes the panels of the timer,
 sub-process and wait for event steps and of a task's deadline and escalations.
 
-- **The process.** The Form tab shows the process's name, its subject, its optional start condition and
-  its start step.
+- **The process.** The Form tab shows the process's name, its [description](#editor), its subject, its
+  optional start condition and its start step.
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
   and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
@@ -812,7 +812,7 @@ remove. An empty list removes `signIn`, so the site allows every provider, and t
 
 ## Scenario editor
 
-The scenario editor's Form tab shows the scenario's name and `now`, then its users with their roles,
+The scenario editor's Form tab shows the scenario's name, its [description](#editor) and `now`, then its users with their roles,
 its stubs, and its steps as a list with a panel for each step type, and the JSON view stays as the
 second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 

@@ -8,6 +8,7 @@
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "connector" },
     "name": { "$ref": "#/$defs/name" },
+    "description": { "$ref": "#/$defs/textReference" },
     "formatVersion": { "const": 1 },
     "baseUrl": { "$ref": "#/$defs/binding" },
     "auth": { "$ref": "#/$defs/auth" },
@@ -20,6 +21,14 @@
     }
   },
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
+      }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

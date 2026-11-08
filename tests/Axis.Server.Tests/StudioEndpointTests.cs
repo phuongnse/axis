@@ -96,6 +96,28 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Author_lists_the_description_of_each_resource_by_locale_and_none_as_an_empty_object()
+    {
+        AddDescription(Path.Combine(Folder, EntityFile), "purchaseRequest.description");
+        AddText("en", "purchaseRequest.description", "What a purchase request is for.");
+        AddText("vi", "purchaseRequest.description", "Yêu cầu mua hàng dùng để làm gì.");
+        await using var factory = CreateFactory();
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/resources", UriKind.Relative), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var items = body.RootElement.GetProperty("items").EnumerateArray().ToDictionary(item => item.GetProperty("file").GetString()!);
+        var descriptions = items[EntityFile].GetProperty("descriptions");
+        Assert.Equal("What a purchase request is for.", descriptions.GetProperty("en").GetString());
+        Assert.Equal("Yêu cầu mua hàng dùng để làm gì.", descriptions.GetProperty("vi").GetString());
+        var dataSource = items["data-sources/purchase-request-list.json"].GetProperty("descriptions");
+        Assert.Equal(JsonValueKind.Object, dataSource.ValueKind);
+        Assert.Empty(dataSource.EnumerateObject());
+    }
+
+    [Fact]
     public async Task Author_lists_the_applications_of_the_folders()
     {
         await using var factory = CreateFactory();
@@ -1598,6 +1620,21 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         && entry.GetProperty("path").GetString() == path;
 
     private string IdOf(string file) => JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, file)))!["id"]!.GetValue<string>();
+
+    private static void AddDescription(string path, string textKey)
+    {
+        var resource = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        resource["description"] = new JsonObject { ["textKey"] = textKey };
+        File.WriteAllText(path, resource.ToJsonString());
+    }
+
+    private void AddText(string locale, string key, string text)
+    {
+        var path = Path.Combine(Folder, "texts", $"{locale}.json");
+        var resource = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        resource["texts"]![key] = text;
+        File.WriteAllText(path, resource.ToJsonString());
+    }
 
     private static string Sha256(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
 

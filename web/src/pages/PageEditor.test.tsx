@@ -68,7 +68,10 @@ const names = {
     { id: 'g2', name: 'ReviewForm', parameters: [] },
     { id: 'g3', name: 'EditPage', parameters: [] },
   ],
-  texts: [{ key: 'pages.review.title', texts: { en: 'Review', vi: 'Xem xét' }, usedBy: 1 }],
+  texts: [
+    { key: 'pages.review.title', texts: { en: 'Review', vi: 'Xem xét' }, usedBy: 1 },
+    { key: 'pages.review.description', texts: { en: 'Where requests wait', vi: 'Nơi yêu cầu chờ duyệt' }, usedBy: 1 },
+  ],
 } as unknown as StudioNames
 
 const labelContext = {
@@ -178,6 +181,30 @@ describe('PageEditor page', () => {
     expect(title.getByRole('textbox', { name: 'English' })).toHaveValue('Review')
     expect(title.queryByRole('textbox', { name: 'Vietnamese' })).toBeNull()
     expect(title.queryByRole('textbox', { name: 'Text key' })).toBeNull()
+  })
+
+  it('shows the description after the name and the title and writes its texts', async () => {
+    renderEditor(page(table, { description: { textKey: 'pages.review.description' } }))
+
+    const description = screen.getByTestId('studio-field-/description')
+    const box = within(description).getByRole('textbox', { name: 'English' })
+    expect(box).toHaveValue('Where requests wait')
+    for (const before of ['/name', '/title']) {
+      expect(
+        screen.getByTestId(`studio-field-${before}`).compareDocumentPosition(description) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0)
+    }
+    expect(
+      description.compareDocumentPosition(screen.getByTestId('studio-widget-/widgets/0')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+
+    await userEvent.type(box, '!')
+    expect(labelContext.onTextsChange).toHaveBeenCalledWith('/description', 'pages.review.description', {
+      en: 'Where requests wait!',
+      vi: 'Nơi yêu cầu chờ duyệt',
+    })
   })
 
   it('shows a disabled title box and no key box until the names have loaded', async () => {

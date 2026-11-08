@@ -119,6 +119,10 @@ export function PageEditor({
         <div>{t('shell.studio.page.title')}</div>
         <LabelTexts pointer="/title" value={value.title} onChange={onChange} />
       </div>
+      <div data-testid="studio-field-/description">
+        <div>{t('shell.studio.page.description')}</div>
+        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+      </div>
       <PageParameters value={value.parameters} onChange={onChange} />
       <PageWidgets value={value} selected={selected ?? picked} onSelect={onSelect ?? setPicked} onChange={onChange} />
     </Flex>

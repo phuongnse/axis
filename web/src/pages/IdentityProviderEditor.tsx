@@ -208,6 +208,10 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
           <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
         </div>
       )}
+      <div data-testid="studio-field-/description">
+        <div>{t('shell.studio.identityProvider.description')}</div>
+        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+      </div>
       {(type === 'oidc' || type === 'saml') && (
         <div data-testid="studio-field-/claims">
           <Flex vertical gap="small">
