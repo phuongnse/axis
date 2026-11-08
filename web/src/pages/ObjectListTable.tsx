@@ -1,6 +1,7 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Modal } from 'antd'
+import { Flex, Modal } from 'antd'
 import { useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
 import { setAt } from '../platform/jsonPatch'
@@ -53,6 +54,7 @@ function hasValue(value: unknown): boolean {
  * leaves out a column that is empty on every row, except the first, which opens the row. Add… and the first cell open
  * a dialog that edits a copy of the item, so nothing changes until Done, which writes the copy with one change. Remove
  * writes `undefined` at the item's index. The caller draws the dialog's fields, so the component knows no JSON Schema.
+ * With `addIn`, Add… is drawn into that element and the table has no toolbar row.
  */
 export function ObjectListTable({
   pointer,
@@ -64,6 +66,10 @@ export function ObjectListTable({
   newItem,
   fields,
   onChange,
+  onDone,
+  onCancel,
+  addIn,
+  firstCellMark,
   testId,
 }: {
   /** The JSON Pointer of the list. */
@@ -77,9 +83,17 @@ export function ObjectListTable({
   /** Whether the item holds a list or a map, which takes the large dialog. */
   large: boolean
   newItem: () => Item
-  /** Draws the dialog's fields on the copy. Its `change` takes a pointer relative to the item. */
-  fields: (copy: Item, change: ChangeHandler) => ReactNode
+  /** Draws the dialog's fields on the copy, for the item at `index`, or `items.length` for Add. Its `change` takes a pointer relative to the item. */
+  fields: (copy: Item, change: ChangeHandler, index: number) => ReactNode
   onChange: ChangeHandler
+  /** Called right after Done writes the item, in the same event, so the caller can write what it held for the copy. */
+  onDone?: () => void
+  /** Called when the dialog closes without Done, so the caller can drop what it held for the copy. */
+  onCancel?: () => void
+  /** The element that Add… is drawn into once it exists, in place of the toolbar. `null` is an element not yet drawn. */
+  addIn?: Element | null
+  /** What the first cell of row `index` shows after its link, such as a layer's tag. */
+  firstCellMark?: (index: number) => ReactNode
   testId?: string
 }) {
   const t = useText()
@@ -108,7 +122,18 @@ export function ObjectListTable({
       onChange(`${pointer}/${editing.index}`, editing.copy)
     }
     setEditing(null)
+    onDone?.()
   }
+  const cancel = () => {
+    setEditing(null)
+    onCancel?.()
+  }
+
+  const addButton = (
+    <AxisButton role={addIn === undefined ? 'main' : 'secondary'} onClick={openAdd}>
+      {named(t('shell.studio.list.add'))}
+    </AxisButton>
+  )
 
   const tableColumns: AxisColumn<Row>[] = shown.map((column, at) => ({
     key: column.key,
@@ -119,10 +144,19 @@ export function ObjectListTable({
       const text = content === null || content === undefined || content === '' ? null : content
       const shownText = typeof text === 'object' ? (text as ReactNode) : text === null ? null : String(text)
       if (at > 0) return shownText
-      return (
+      const mark = firstCellMark?.(row.index)
+      const link = (
         <AxisButton role="link" size="small" onClick={() => openEdit(row.index)}>
           {shownText ?? named(t('shell.studio.list.editTitle'))}
         </AxisButton>
+      )
+      return mark ? (
+        <Flex gap="small" align="center" wrap>
+          {link}
+          {mark}
+        </Flex>
+      ) : (
+        link
       )
     },
   }))
@@ -135,13 +169,7 @@ export function ObjectListTable({
         columns={tableColumns}
         dataSource={rows}
         emptyText={t('shell.table.empty')}
-        toolbar={{
-          main: (
-            <AxisButton role="main" onClick={openAdd}>
-              {named(t('shell.studio.list.add'))}
-            </AxisButton>
-          ),
-        }}
+        toolbar={addIn === undefined ? { main: addButton } : {}}
         rowActions={{
           configured: 1,
           actions: (row) => [
@@ -156,6 +184,7 @@ export function ObjectListTable({
           ],
         }}
       />
+      {addIn && createPortal(addButton, addIn)}
       <Modal
         open={editing !== null}
         width={large ? size.dialog.large : size.dialog.medium}
@@ -166,12 +195,15 @@ export function ObjectListTable({
         cancelText={t('shell.studio.cancel')}
         okButtonProps={{ disabled: !complete }}
         onOk={done}
-        onCancel={() => setEditing(null)}
+        onCancel={cancel}
         destroyOnHidden
       >
         {editing &&
-          fields(editing.copy, (relative, next) =>
-            setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
+          fields(
+            editing.copy,
+            (relative, next) =>
+              setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
+            editing.index ?? items.length,
           )}
       </Modal>
     </>

@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { pickOptions } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { openFormTab } from "../studio-resources";
+import { doneListItem, openFormTab, openListItem } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -68,6 +68,7 @@ test.describe("Studio edits form conditions and steps", () => {
       `${server.url}/studio?app=PurchaseRequests&resource=${review.id}`,
     );
     await openFormTab(page);
+    await openListItem(page, "/sections", 1);
     const condition = page.getByTestId(
       "studio-field-/sections/1/fields/0/requiredWhen",
     );
@@ -85,13 +86,16 @@ test.describe("Studio edits form conditions and steps", () => {
     );
 
     await page
-      .getByTestId("studio-field-/sections/0/name")
-      .getByRole("textbox")
-      .fill("request");
-    await page
       .getByTestId("studio-field-/sections/1/name")
       .getByRole("textbox")
       .fill("decision");
+    await doneListItem(page);
+    await openListItem(page, "/sections", 0);
+    await page
+      .getByTestId("studio-field-/sections/0/name")
+      .getByRole("textbox")
+      .fill("request");
+    await doneListItem(page);
 
     const steps = page.getByTestId("studio-field-/steps");
     await steps.getByRole("button", { name: "Add step", exact: true }).click();

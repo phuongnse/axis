@@ -6,7 +6,17 @@ import { fieldLabel } from '../fields'
 import { pickAction, pickOption } from '../select'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource, grantIn, openFormTab, openKind, writeLabel } from '../studio-resources'
+import {
+  addListItem,
+  addListRow,
+  createResource,
+  doneListItem,
+  grantIn,
+  openFormTab,
+  openKind,
+  openListItem,
+  writeLabel,
+} from '../studio-resources'
 
 // Each step is a long Studio session, and the publish waits for the worker.
 test.setTimeout(300_000)
@@ -213,20 +223,19 @@ test.describe('the tutorial builds a first application in Studio', () => {
       await createResource(page, 'form', name)
       await openFormTab(page)
       await pick(page, 'studio-field-/entity', 'Expense')
+      await openListItem(page, '/sections', 0)
       await page.getByTestId('studio-field-/sections/0/name').getByRole('textbox').fill('details')
       await writeLabel(page, 'studio-field-/sections/0/title', sectionKey, en[sectionKey])
       for (const [index, { field, readOnly }] of fields.entries()) {
         if (index > 0) {
-          await page
-            .getByTestId('studio-field-/sections/0/fields')
-            .getByRole('button', { name: 'Add', exact: true })
-            .click()
+          await addListRow(page, '/sections/0/fields')
         }
         await pick(page, `studio-field-/sections/0/fields/${index}/field`, field)
         if (readOnly) {
           await page.getByTestId(`studio-field-/sections/0/fields/${index}/readOnly`).getByRole('checkbox').check()
         }
       }
+      await doneListItem(page)
       await save(page)
       await expectForm(page)
     }
@@ -301,11 +310,11 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await expectForm(page)
     await pick(page, 'studio-field-/entity', 'Expense')
     for (const [index, field] of ['name', 'amount', 'status'].entries()) {
-      if (index > 0) {
-        await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
-      }
+      // The data source starts with its first field, which is opened, and Add… adds each of the others.
+      await (index === 0 ? openListItem(page, '/fields', 0) : addListItem(page, '/fields'))
       await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field)
       await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field)
+      await doneListItem(page)
     }
     await save(page)
     await expectForm(page)
@@ -345,9 +354,10 @@ test.describe('the tutorial builds a first application in Studio', () => {
     await openKind(page, 'site')
     await page.getByTestId('studio-group-site').getByRole('button').click()
     await expectForm(page)
-    await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
+    await addListItem(page, '/navigation')
     await pick(page, 'studio-field-/navigation/1/page', 'Expenses')
     await writeLabel(page, 'studio-field-/navigation/1/label', 'nav.expenses', en['nav.expenses'])
+    await doneListItem(page)
     await save(page)
     await expectForm(page)
   })

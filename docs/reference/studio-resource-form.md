@@ -59,27 +59,38 @@ away instead.
 
 ## Lists of objects
 
-_(planned for M31)_
+A list of objects is a table with one column per property, named by its field text. A list of plain
+values keeps its rows of inputs.
 
-A list of objects is a table with one column per property, named by its field text. A value of a known
-kind shows its label, such as a module or a package by the label of its manifest.
-
-- **A cell shows content, never a bare count.** A nested list or map shows what it holds in words. A
-  module's roles are one line for each slot, such as "Budget approver: Department manager", and a slot
-  that no role plays reads "Not mapped" in `warningText`. A module's relaxed points show as
-  [relaxed points in Settings](#relaxed-points-in-settings) says.
+- **A cell shows content, never a bare count.** A cell shows the value, Yes or No, a label's text, a
+  nested list's items one to a line, or a map's entries as `key: value`. A label shows its text in the
+  application's first language, or in the first language that has text.
 - **Columns.** A column that would be empty on every row, such as Connectors when no module has any, is
-  left out, while the dialog keeps every field. Short columns of a fixed form, such as a version range
-  or a tag, are as wide as their content.
+  left out, while the dialog keeps every field. A column of a boolean, a number or a choice is as wide as
+  its content.
 - **Add… and the row.** Add…, such as Add module…, is the list's main action. The first column is the
   link that opens the item's dialog, a [button drawn as a link](actions-and-controls.md#buttons) because it goes to no address. Each row
   keeps Remove alone, as an icon, see
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
 - **The dialog edits a copy.** It is `medium` for plain values and `large` for an item that holds a list
   or a map. It is titled by the verb that opened it: "Add module", because it adds an installed module
-  and creates none, or "Edit module". Done writes the copy to the list as one step to undo, and waits
-  for the item's required fields. Cancel leaves the list as it was, so Add… adds no row until Done.
-  Inside the dialog a nested list is rows of inputs with Add row, because a dialog never opens another.
+  and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`.
+  The dialog's fields are the item's fields at their real pointers. Done writes the copy to the list as one
+  step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so Add… adds no
+  row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a dialog never
+  opens another.
+- **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
+  writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as
+  they were.
+- **Layer marks.** In a module's resource, a row that the [customization layer](customization-layers.md#in-studio)
+  added or changed shows its tag in the first cell, and the rows the layer removed show below the table.
+- **A known kind's label.** _(planned for M31)_ A value of a known kind shows its label, such as a module
+  or a package by the label of its manifest.
+- **A module's roles.** _(planned for M31)_ A module's roles are one line for each slot, such as "Budget
+  approver: Department manager", and a slot that no role plays reads "Not mapped" in `warningText`.
+- **A module's relaxed points.** _(planned for M31)_ A module's relaxed points show as
+  [relaxed points in Settings](#relaxed-points-in-settings) says.
+- **A version range's column.** _(planned for M31)_ A version range is as wide as its content.
 
 ## Controls that know what they hold
 
