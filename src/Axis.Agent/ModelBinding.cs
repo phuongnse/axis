@@ -3,7 +3,7 @@ namespace Axis.Agent;
 /// <summary>The kind of a model binding, which names the adapter that calls its model.</summary>
 public enum ModelBindingKind
 {
-    /// <summary>Claude through the Anthropic API, Amazon Bedrock or Google Vertex AI.</summary>
+    /// <summary>Claude through the Anthropic API, or any endpoint that speaks its Messages API.</summary>
     Anthropic,
 
     /// <summary>Any endpoint that speaks the OpenAI API.</summary>
