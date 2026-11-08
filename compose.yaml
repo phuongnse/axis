@@ -1,6 +1,6 @@
 # Runs the whole Axis stack from source: PostgreSQL, Keycloak with the development realm at
 # http://localhost:8080, the server with the purchase request and leave request samples, at http://localhost:5206,
-# the worker, the publisher and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
+# the worker, the agent host, the publisher and the purchasing system stub at http://localhost:5207. Sign-in is not wired here
 # yet: the server in its container cannot reach Keycloak at the address the browser uses. For
 # development, scripts/dev.sh starts only PostgreSQL, Keycloak, Mailpit and the purchasing system stub from
 # here and runs the server, the worker, the publisher and the SPA with hot reload.
@@ -152,6 +152,22 @@ services:
       timeout: 5s
       retries: 3
       start_period: 360s
+      start_interval: 2s
+
+  # The agent host. It needs no database yet and starts idle. The health address http://127.0.0.1:5209 stays
+  # inside the container, so no port is published. The image has bash but no curl.
+  agent:
+    build:
+      context: .
+      target: agent
+    environment:
+      DOTNET_ENVIRONMENT: Development
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5209 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
       start_interval: 2s
 
   # Runs the publish requests of Studio for the tenant. It waits until the server has migrated the tenant

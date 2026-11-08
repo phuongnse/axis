@@ -1,13 +1,13 @@
 # Builds Axis from source and runs the server with the purchase request sample. The server is
 # the last stage, so it is the default target. The worker stage runs the worker host with its health
-# endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
+# endpoints, the agent stage runs the agent host, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
 # system stub from tests/Axis.PurchasingStub.
 # The development images hold the built-in modules under modules and the sample modules under samples/modules
 # in /modules, each at the id and version of its module.json. They hold the built-in applications under
 # applications in /templates, each at the id and version of its template.json.
 # For local use: the Development environment and the sample credentials are not for production.
 #
-# The targets axis-server, axis-worker, axis-admin and axis-controlplane are the production images. They run the
+# The targets axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane are the production images. They run the
 # Production environment and hold no sample, sample package, sample module, development realm or
 # credential. Build one with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
 # AXIS_VERSION is the Axis version, which the images carry as the OCI label
@@ -47,7 +47,7 @@ COPY scripts/lib/install-sample-templates.sh scripts/lib/
 COPY applications/ applications/
 RUN bash scripts/lib/install-sample-templates.sh
 
-# The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
+# The server, published with the SPA in its web root, the worker, the agent host, the admin tool and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
@@ -57,6 +57,7 @@ COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -o /app \
     && test -f /app/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -o /worker
+RUN dotnet publish src/Axis.Agent/Axis.Agent.csproj -c Release -o /agent
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -o /admin
 # The sample extension package, installed in /src/artifacts/extensions/payment-references/1.0.0.
 RUN dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj -c Release \
@@ -70,6 +71,13 @@ COPY --from=build /src/artifacts/extensions /extensions
 COPY --from=modules /src/artifacts/modules /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
+
+# The ASP.NET Core base, because the agent host serves its health endpoints. It has bash but no curl.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS agent
+WORKDIR /app
+COPY --from=build /agent .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.Agent.dll"]
 
 # The development publisher, which runs the publish requests of Studio. It needs the sample extension package and
 # module that the purchase request sample declares, so it is not the production axis-admin image, which holds neither.
@@ -109,6 +117,7 @@ COPY --from=web /src/controlplane/src/Axis.ControlPlane/wwwroot controlplane/src
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/server \
     && test -f /out/server/wwwroot/index.html
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/worker
+RUN dotnet publish src/Axis.Agent/Axis.Agent.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/agent
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/admin
 RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane \
     && test -f /out/controlplane/wwwroot/sign-up.html
@@ -138,6 +147,17 @@ COPY --from=production-build /out/worker .
 RUN mkdir /extensions /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
+
+# Production agent host. The ASP.NET Core base serves its health endpoints. It runs as the non-root user of the
+# base image and can run on a read-only root file system. The image holds no extension package or module.
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS axis-agent
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
+ENV DOTNET_ENVIRONMENT=Production
+WORKDIR /app
+COPY --from=production-build /out/agent .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.Agent.dll"]
 
 # Production admin tool, with the PostgreSQL 18 client tools from the PostgreSQL apt repository.
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS axis-admin

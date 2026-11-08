@@ -477,6 +477,7 @@ Docker Compose runs the whole stack from source, with nothing but Docker install
 | Mailpit, SMTP             | `localhost:1025`         | `AXIS_MAILPIT_SMTP_PORT` |
 | Mailpit, web page         | http://localhost:8025    | `AXIS_MAILPIT_WEB_PORT`  |
 | The worker                | none                     |                          |
+| The agent host            | none                     |                          |
 | The publisher             | none                     |                          |
 
 All six ports are published on `127.0.0.1` only. The Keycloak admin console login is `admin` /

@@ -96,7 +96,7 @@ that can make either one Degraded or Unhealthy.
 ## Docker Compose
 
 The development `compose.yaml` at the repository root gives the worker a health check on
-`/health/ready`. It runs inside the container, and Compose does not publish the worker's health port.
-The production Compose example has no container health checks, because the production images hold no
-`curl`. It publishes the worker's health port on `127.0.0.1` only, for probes from the host, see
-[on premises](installation.md#on-premises).
+`/health/ready`, and the agent host one too. They run inside the container, and Compose does not publish
+their health ports. The production Compose example has no container health checks, because the production
+images hold no `curl`. It publishes the worker's and the agent host's health ports on `127.0.0.1` only, for
+probes from the host, see [on premises](installation.md#on-premises).

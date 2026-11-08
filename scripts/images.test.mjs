@@ -1,4 +1,4 @@
-// Smoke test for the production images: builds axis-server, axis-worker, axis-admin and axis-controlplane, checks what they
+// Smoke test for the production images: builds axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, checks what they
 // hold, and runs them read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a
 // certificate from an authority made for the run, and the connection strings set SSL Mode=VerifyFull, which the
 // production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
@@ -14,7 +14,7 @@ import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, ve
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-admin', 'axis-controlplane']
+const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane']
 const suffix = `images-test-${process.pid}`
 const network = `axis-images-${process.pid}`
 const postgres = `axis-images-postgres-${process.pid}`
@@ -143,8 +143,9 @@ test('no image holds samples, development settings or source control metadata', 
       [],
       `${target} holds source control metadata`,
     )
-    // The control plane is no host of the platform: it has no mount point for packages or modules.
-    if (target !== 'axis-controlplane') {
+    // The control plane is no host of the platform and the agent host loads no package or module: neither has a mount
+    // point for them.
+    if (target !== 'axis-controlplane' && target !== 'axis-agent') {
       assert.deepEqual(
         paths.filter((path) => /^(extensions|modules)\/./.test(path)),
         [],
@@ -231,6 +232,10 @@ test('the worker starts read-only with its settings in /run/secrets', { timeout 
     Platform__SecretKey: secretKey,
   })
   await waitLive(startReadOnly('axis-worker', secrets, 5208, ['-e', 'Health__Urls=http://0.0.0.0:5208']))
+})
+
+test('the agent host starts read-only and answers /health/live', { timeout }, async () => {
+  await waitLive(startReadOnly('axis-agent', writeSecrets('agent', {}), 5209, ['-e', 'Health__Urls=http://0.0.0.0:5209']))
 })
 
 test('the control plane starts read-only with its connection string in /run/secrets', { timeout }, async () => {

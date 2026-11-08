@@ -2,10 +2,10 @@
 # PostgreSQL and the source of secrets are external. The chart runs Axis's identity provider.
 
 image:
-  # Registry prefix of the three images, such as "registry.example.com/axis".
+  # Registry prefix of the four images, such as "registry.example.com/axis".
   # Empty uses the repository names as they are.
   registry: ""
-  # The tag of all three images. Empty uses the chart's appVersion.
+  # The tag of all four images. Empty uses the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
   # Names of image pull Secrets, as a list of strings.
@@ -26,6 +26,12 @@ server:
 
 worker:
   repository: axis-worker
+  replicas: 1
+  resources: {}
+
+# The agent host gets no Secret, so AI authoring stays off.
+agent:
+  repository: axis-agent
   replicas: 1
   resources: {}
 
