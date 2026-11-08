@@ -14,18 +14,6 @@
       "status": "proposed"
     },
     {
-      "concept": "Cell",
-      "en": "cell",
-      "vi": "cụm",
-      "status": "proposed"
-    },
-    {
-      "concept": "Job",
-      "en": "job",
-      "vi": "tác vụ",
-      "status": "proposed"
-    },
-    {
       "concept": "Platform operator",
       "en": "platform operator",
       "vi": "người vận hành nền tảng",
@@ -34,7 +22,7 @@
     {
       "concept": "Cell console",
       "en": "cell console",
-      "vi": "bảng điều khiển cụm",
+      "vi": "bảng điều khiển cell",
       "status": "proposed"
     },
     {

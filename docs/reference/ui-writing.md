@@ -127,6 +127,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
   Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
+- **A time names its event, then "lúc".** A column or label that holds the time of an event names the event and ends
+  with "lúc": "Kích hoạt lúc", "Gửi lúc", "Yêu cầu lúc", "Lỗi lúc", "Phát hành lúc". Never "Thời điểm …".
 - **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
   "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"
   is for a real request where English says "please", and is rare.

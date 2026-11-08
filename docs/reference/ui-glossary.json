@@ -27,6 +27,7 @@
       "webhook",
       "endpoint",
       "tenant",
+      "cell",
       "token",
       "API key"
     ],
@@ -70,6 +71,12 @@
       "vi": "cam kết",
       "status": "approved",
       "note": "What a module promises the application."
+    },
+    {
+      "concept": "Relaxed point",
+      "en": "relaxed point",
+      "vi": "điểm nới lỏng",
+      "status": "approved"
     },
     {
       "concept": "Customization layer",
@@ -268,6 +275,26 @@
       "status": "approved"
     },
     {
+      "concept": "Process instance",
+      "en": "process instance",
+      "vi": "lượt chạy",
+      "status": "approved",
+      "note": "One run of a process. Never \"phiên bản\", which is a release."
+    },
+    {
+      "concept": "Job",
+      "en": "job",
+      "vi": "tác vụ",
+      "status": "approved"
+    },
+    {
+      "concept": "Background work",
+      "en": "background work",
+      "vi": "xử lý nền",
+      "status": "approved",
+      "note": "What the worker does: \"Phần xử lý nền\", \"Tác vụ nền đã chạy\". The worker is not named in Vietnamese."
+    },
+    {
       "concept": "Human task",
       "en": "task",
       "vi": "công việc",
@@ -303,6 +330,13 @@
       "en": "webhook",
       "vi": "webhook",
       "status": "approved"
+    },
+    {
+      "concept": "Dead letter",
+      "en": "dead letter",
+      "vi": "thư lỗi",
+      "status": "approved",
+      "note": "A delivery that kept failing: \"Thư lỗi\", status \"Đã vào thư lỗi\"."
     },
     {
       "concept": "Test scenario",
@@ -374,11 +408,39 @@
       "status": "approved"
     },
     {
+      "concept": "Authenticator",
+      "en": "authenticator",
+      "vi": "ứng dụng xác thực",
+      "status": "approved",
+      "note": "The app that gives a person's sign-in code. Never \"trình xác thực\"."
+    },
+    {
       "concept": "Tenant",
       "en": "tenant",
       "vi": "tenant",
       "status": "approved",
       "note": "Kept in English: operators say it."
+    },
+    {
+      "concept": "Cell",
+      "en": "cell",
+      "vi": "cell",
+      "status": "approved",
+      "note": "Kept in English: operators say it."
+    },
+    {
+      "concept": "Host (of a tenant)",
+      "en": "host",
+      "vi": "tên miền",
+      "status": "approved",
+      "note": "A host name, such as acme.example.com. Never \"máy chủ\", which is a server."
+    },
+    {
+      "concept": "Read-only (a tenant's status)",
+      "en": "Read-only",
+      "vi": "Chỉ xem",
+      "status": "approved",
+      "note": "Also \"chế độ chỉ xem\" in a sentence."
     },
     {
       "concept": "Operator console",
@@ -434,6 +496,33 @@
       "concept": "Action: Discard",
       "en": "Discard",
       "vi": "Bỏ thay đổi",
+      "status": "approved"
+    },
+    {
+      "concept": "Action: Discard (a dead letter)",
+      "en": "Discard",
+      "vi": "Bỏ",
+      "status": "approved",
+      "note": "Discards a dead letter. \"Bỏ thay đổi\" is for unsaved changes."
+    },
+    {
+      "concept": "Action: Disable a person",
+      "en": "Disable",
+      "vi": "Khóa",
+      "status": "approved",
+      "note": "Locks a person's account: \"Khóa tài khoản\", status \"Đã khóa\". \"Kích hoạt\" stays for activating a release."
+    },
+    {
+      "concept": "Action: Enable a person",
+      "en": "Enable",
+      "vi": "Mở khóa",
+      "status": "approved",
+      "note": "\"Mở khóa tài khoản\"."
+    },
+    {
+      "concept": "Action: Resolve (an unknown call)",
+      "en": "Resolve",
+      "vi": "Chốt kết quả",
       "status": "approved"
     },
     {
