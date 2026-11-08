@@ -4,10 +4,12 @@ using Axis.Tenancy;
 namespace Axis.Agent;
 
 /// <summary>
-/// The agent host's background service. It has no request loop yet. With AI authoring off it only says so. With it on, it reads
+/// The agent host's background service. With AI authoring off it only says so. With it on, it reads
 /// its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: under the <c>directory</c> source it retries the
 /// first read of the tenant directory every <c>Tenancy:RefreshInterval</c> until it works, and then reads the directory again every
-/// interval. A tenant whose runtime database role fails the <see cref="RuntimeRoleCheck"/> is left out until it passes.
+/// interval. A tenant whose runtime database role fails the <see cref="RuntimeRoleCheck"/> is left out until it passes. Beside the refresh it
+/// runs the work loop of the <see cref="AuthoringRequestRunner"/>, which claims a request only in a state that has a registered step, see
+/// <c>docs/reference/authoring-requests.md#durable-requests</c>.
 /// </summary>
 internal sealed partial class AgentService(
     AiSettings settings,
@@ -15,7 +17,10 @@ internal sealed partial class AgentService(
     ILogger<AgentService> logger,
     BackgroundTenantCatalog? tenants = null,
     TenantConnectionFactory? pools = null,
-    AuthoringRequestStore? store = null) : BackgroundService
+    AuthoringRequestStore? store = null,
+    AuthoringSteps? steps = null,
+    AuthoringRequestRunner? runner = null,
+    AuthoringLoopOptions? loop = null) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,15 +31,37 @@ internal sealed partial class AgentService(
         }
 
         await LoadTenantsAsync(tenants, stoppingToken);
-        if (!tenants.FromDirectorySource)
+        await Task.WhenAll(KeepTenantsFreshAsync(tenants, stoppingToken), WorkAsync(tenants, stoppingToken));
+    }
+
+    private async Task KeepTenantsFreshAsync(BackgroundTenantCatalog catalog, CancellationToken stoppingToken)
+    {
+        if (!catalog.FromDirectorySource)
         {
             return;
         }
 
         while (true)
         {
-            await Task.Delay(tenants.RefreshInterval, time, stoppingToken);
-            await RefreshAsync(tenants, stoppingToken);
+            await Task.Delay(catalog.RefreshInterval, time, stoppingToken);
+            await RefreshAsync(catalog, stoppingToken);
+        }
+    }
+
+    // With no registered step, nothing is claimed and the loop ends at once.
+    private async Task WorkAsync(BackgroundTenantCatalog catalog, CancellationToken stoppingToken)
+    {
+        if (steps is null || runner is null || loop is null || !steps.Any)
+        {
+            return;
+        }
+
+        while (true)
+        {
+            if (!await runner.RunRoundAsync(catalog.Tenants, stoppingToken))
+            {
+                await Task.Delay(loop.PollInterval, time, stoppingToken);
+            }
         }
     }
 
