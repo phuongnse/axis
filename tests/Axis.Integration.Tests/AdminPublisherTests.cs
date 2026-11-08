@@ -640,6 +640,32 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task Publisher_exits_2_for_a_studio_applications_path_that_cannot_be_created_and_names_the_setting_but_not_the_path()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var file = Path.GetTempFileName();
+        try
+        {
+            var path = Path.Combine(file, "apps");
+
+            var result = await scenario.RunAsync(
+                ["publisher"],
+                extra: new Dictionary<string, string?> { ["Tenancy:Source"] = "directory", ["Studio:ApplicationsPath"] = path });
+
+            Assert.Equal(2, result.Exit);
+            Assert.Empty(result.Output);
+            var message = Assert.Single(result.Error);
+            Assert.Contains("Studio:ApplicationsPath", message, StringComparison.Ordinal);
+            Assert.DoesNotContain(path, message, StringComparison.Ordinal);
+            Assert.DoesNotContain(file, message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
     public async Task Under_the_configuration_source_a_tenant_without_a_schema_connection_string_exits_2_and_names_the_setting()
     {
         var schema = await MigratedTenantDatabaseAsync();

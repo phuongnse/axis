@@ -56,7 +56,7 @@ const secretFiles = {
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   agent: [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
-  publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -390,23 +390,27 @@ describe('the TLS proxy', () => {
 })
 
 describe('the Studio folder', () => {
-  test('only the servers mount the Studio folder, read-write, and Studio is off without shell values', () => {
+  test('only the servers and the publisher mount the Studio folder, read-write, and Studio is off without shell values', () => {
     const { services } = render()
     const sources = []
-    for (const name of ['server', 'server-2']) {
+    for (const name of ['server', 'server-2', 'publisher']) {
       const mounts = services[name].volumes.filter((volume) => volume.target === '/studio')
       assert.equal(mounts.length, 1, `${name} mounts /studio ${mounts.length} times`)
       assert.equal(mounts[0].type, 'bind')
       assert.notEqual(mounts[0].read_only, true, `${name} mounts /studio read-only`)
       sources.push(mounts[0].source)
-      for (const key of ['Studio__Folders__0', 'Studio__AuthorRole', 'Studio__PublisherRole']) {
+      const keys = name === 'publisher' ? ['Studio__Folders__0'] : ['Studio__Folders__0', 'Studio__AuthorRole', 'Studio__PublisherRole']
+      for (const key of keys) {
         const value = services[name].environment[key]
         assert.ok(value === null || value === undefined || value === '', `${name} sets ${key}`)
       }
     }
-    assert.equal(sources[0], sources[1])
+    assert.equal(new Set(sources).size, 1, 'the servers and the publisher mount one folder')
     assert.equal(sources[0], join(root, 'deploy/compose/studio'))
-    for (const name of ['worker', 'agent', 'publisher', 'admin', 'proxy', 'identity']) {
+    // The roles decide what a signed-in user may do, and the publisher serves no users.
+    assert.equal(services.publisher.environment.Studio__AuthorRole, undefined)
+    assert.equal(services.publisher.environment.Studio__PublisherRole, undefined)
+    for (const name of ['worker', 'agent', 'admin', 'proxy', 'identity']) {
       assert.equal(
         (services[name].volumes ?? []).some((volume) => volume.target === '/studio'),
         false,

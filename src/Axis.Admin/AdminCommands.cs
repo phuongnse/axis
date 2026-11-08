@@ -8,6 +8,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Templates;
 using Axis.Data;
 using Axis.Data.Records;
+using Axis.Studio;
 using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
@@ -31,6 +32,8 @@ internal static partial class AdminCommands
     public const string AdminSetting = "Admin:ConnectionString";
 
     public const string PlatformSetting = "ConnectionStrings:PlatformSchema";
+
+    public const string RuntimePlatformSetting = "ConnectionStrings:Platform";
 
     public const string InlineRecomputeLimitSetting = "Activation:InlineRecomputeLimit";
 
@@ -157,7 +160,7 @@ internal static partial class AdminCommands
         var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
         if (DatabaseTlsRequirement.Applies(environment))
         {
-            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting, IdentityProviderDatabaseSetting })
+            foreach (var setting in new[] { AdminSetting, PlatformSetting, RuntimePlatformSetting, ScenarioServerSetting, IdentityProviderDatabaseSetting })
             {
                 var problem = DatabaseTlsRequirement.Problem(setting, configuration[setting]);
                 if (problem is not null)
@@ -1304,14 +1307,42 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        // The server's rules for the Studio settings. A message names the setting and never its value.
+        StudioOptions? options = null;
+        try
+        {
+            var loaded = StudioOptions.Load(configuration, Directory.GetCurrentDirectory(), cell);
+            if (loaded.Folders.Count > 0 || loaded.ApplicationsPath is not null)
+            {
+                options = loaded;
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return 2;
+        }
+
+        // The write lock needs the platform connection. Without it the publisher still starts, and holds no lock.
+        var platform = configuration[RuntimePlatformSetting];
+        await using var studioPlatform = options is not null && !string.IsNullOrWhiteSpace(platform)
+            ? NpgsqlDataSource.Create(platform)
+            : null;
+        var studio = options is null
+            ? null
+            : new PublisherStudio(
+                options,
+                studioPlatform is null ? null : new PlatformStudioWriteLock(studioPlatform, NullLogger<PlatformStudioWriteLock>.Instance));
+
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, cell, studio, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, studio, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
         IConfiguration configuration,
         CellOptions cell,
+        PublisherStudio? studio,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1425,7 +1456,8 @@ internal static partial class AdminCommands
                 dnsResolver ?? new DnsClientTxtResolver(),
                 hostCheckInterval,
                 certificates),
-            storage is null ? null : new TenantExportSweep(storage)).RunAsync();
+            storage is null ? null : new TenantExportSweep(storage),
+            studio).RunAsync();
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.
@@ -1502,6 +1534,7 @@ internal static partial class AdminCommands
 
     private static async Task<int> ConfigurationPublisherAsync(
         IConfiguration configuration,
+        PublisherStudio? studio,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1556,7 +1589,8 @@ internal static partial class AdminCommands
             testLimit,
             output,
             error,
-            cancellationToken).RunAsync();
+            cancellationToken,
+            studio: studio).RunAsync();
     }
 
     // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the

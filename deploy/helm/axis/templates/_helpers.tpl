@@ -178,6 +178,22 @@ connects to PostgreSQL directly. Renders nothing when PgBouncer is off. Call wit
 {{- end }}
 {{- end }}
 
+{{/*
+The Studio paths of the server and the publisher, on the volume that both mount at /studio. The write lock is keyed by the full
+path, so the two must see the same one. In a cell it is the applications path, and the folders are the listed ones.
+Call with the root context.
+*/}}
+{{- define "axis.studioEnv" -}}
+{{- if .Values.cell.id }}
+- name: Studio__ApplicationsPath
+  value: /studio
+{{- end }}
+{{- range $i, $folder := .Values.studio.folders }}
+- name: Studio__Folders__{{ $i }}
+  value: {{ printf "/studio/%s" $folder | quote }}
+{{- end }}
+{{- end }}
+
 {{/* The probes of a host. Call with the name of the container port. A port named https is probed over HTTPS. */}}
 {{- define "axis.probes" -}}
 startupProbe:

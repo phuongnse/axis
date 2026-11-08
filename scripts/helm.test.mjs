@@ -126,6 +126,10 @@ describe('the Axis Helm chart', () => {
       'cell.certificate.enabled=false',
       '--set',
       'cell.pgbouncer.enabled=false',
+      '--set',
+      'studio.folders=null',
+      '--set',
+      'studio.persistence=null',
     )
     const publisher = find(output, 'Deployment', 'axis-publisher')
     assert.match(publisher, /replicas: 1\n/)
@@ -145,6 +149,28 @@ describe('the Axis Helm chart', () => {
     for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
       assert.doesNotMatch(service, /component: publisher/)
     }
+  })
+
+  test('outside a cell the publisher mounts the Studio volume read-write and gets the folders and the platform connection when studio.folders is set', () => {
+    const publisher = find(
+      renderOk(
+        '--set',
+        'secrets.scenarioServerConnection.name=',
+        '--set',
+        'cell.id=',
+        '--set',
+        'cell.certificate.enabled=false',
+        '--set',
+        'cell.pgbouncer.enabled=false',
+      ),
+      'Deployment',
+      'axis-publisher',
+    )
+    assert.match(publisher, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
+    assert.match(publisher, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
+    assert.match(publisher, /- name: Studio__Folders__0\n\s+value: "\/studio\/purchase-requests"/)
+    assert.match(publisher, /- key: "ConnectionStrings__Platform"\n\s+path: ConnectionStrings__Platform\n/)
+    assert.doesNotMatch(publisher, /Studio__ApplicationsPath|Studio__AuthorRole|Studio__PublisherRole|Studio__Tests/)
   })
 
   test('the scenario connection is mounted in the publisher only, and only when it is named', () => {
@@ -576,6 +602,7 @@ describe('the Axis Helm chart', () => {
     assert.match(publisher, /- name: IdentityProvider__AdminClientId\n\s+value: axis-admin\n/)
     assert.match(publisher, /- name: Cell__TenantDomain\n\s+value: "vn\.example\.com"\n/)
     assert.match(publisher, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(publisher, /path: ConnectionStrings__Platform\n/)
     assert.match(publisher, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
     assert.match(publisher, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
     assert.match(publisher, /- name: Templates__Path\n\s+value: \/templates\n/)

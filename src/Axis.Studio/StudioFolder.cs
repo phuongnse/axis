@@ -32,11 +32,21 @@ internal static class StudioFolder
 
     /// <summary>
     /// The first listed folder whose manifest <c>name</c> is <paramref name="application"/>, ignoring
-    /// letter case, or null. The manifest is read on every call, so an edited name takes effect at once.
+    /// letter case, or null. The manifest is read on every call, so an edited name takes effect at once. A name that is
+    /// not a plain name, see <see cref="StudioOptions.IsPlainName"/>, finds nothing, even when a manifest carries it.
     /// </summary>
     public static string? Find(StudioOptions options, string application) =>
-        Candidates(options).FirstOrDefault(folder =>
-            string.Equals(ReadName(folder), application, StringComparison.OrdinalIgnoreCase));
+        StudioOptions.IsPlainName(application)
+            ? Candidates(options).FirstOrDefault(folder =>
+                string.Equals(ReadName(folder), application, StringComparison.OrdinalIgnoreCase))
+            : null;
+
+    /// <summary>
+    /// <see cref="Find(StudioOptions, string)"/> in the options of one tenant, see <see cref="StudioOptions.ForTenant"/>.
+    /// Studio and the publisher both find a folder by name through it.
+    /// </summary>
+    public static string? Find(StudioOptions options, string? tenantId, string application) =>
+        Find(options.ForTenant(tenantId), application);
 
     /// <summary>
     /// The manifest <c>name</c> of each listed folder, in list order. A folder without a readable manifest
