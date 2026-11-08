@@ -35,6 +35,8 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// It also gets the token rules of the MCP sign-in (see <c>docs/reference/mcp-server.md#sign-in</c>): access tokens of <see cref="AccessTokenLifespanSeconds"/>
 /// seconds, refresh tokens that work once, and a client policy that refuses an authorization request from a public client that sends no PKCE <c>S256</c> challenge.
 /// The client scope <see cref="RealmSync.AuthoringScope"/> comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, which <see cref="EnsureForTenantAsync"/> calls.
+/// It lets an outside MCP client register itself without a token, under the rules of <c>docs/reference/mcp-server.md#client-registration</c>: the client policy
+/// <see cref="RegistrationPolicy"/> and the realm's anonymous registration policies.
 /// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -62,12 +64,22 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// <summary>The name of the client policy and of its profile that require PKCE of every public client.</summary>
     public const string PublicPkcePolicy = "axis-public-pkce";
 
+    /// <summary>The name of the client policy and of its profile that hold the rules of an anonymous client registration.</summary>
+    public const string RegistrationPolicy = "axis-mcp-registration";
+
     private const string ManagementClientId = "realm-management";
     private const string AccountConsoleClientId = "account-console";
     private const string AccountClientId = "account";
     private const string ManageAccountRole = "manage-account";
     private const string CreateUserIfUnique = "idp-create-user-if-unique";
     private const int ServerErrorAttempts = 3;
+
+    // An anonymous registration may name only these redirect addresses: any https address, and http only on the IPv4 or IPv6 loopback address (RFC 8252).
+    private static readonly string[] _registrationRedirectPatterns =
+    [
+        @"^https://[^\s*]+$",
+        @"^http://(127\.0\.0\.1|\[::1\])(:[0-9]{1,5})?(/[^\s*]*)?$",
+    ];
 
     private static readonly string[] _activationRoles =
     [
@@ -186,6 +198,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         await EnsureRealmAsync(token, realm, realmPath, displayName, smtpServer, cancellationToken);
         await EnsureAuthoringAsync(token, realmPath, cancellationToken);
+        await EnsureRegistrationAsync(token, realmPath, cancellationToken);
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
@@ -333,6 +346,113 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["profiles"] = new[] { PublicPkcePolicy },
         };
         await ReplaceClientPolicyEntryAsync(token, $"{realmPath}/client-policies/policies", "policies", "policy", policy, cancellationToken);
+    }
+
+    /// <summary>
+    /// Lets an outside MCP client register itself at the realm without a token, as a public client that requires consent
+    /// (<c>docs/reference/mcp-server.md#client-registration</c>). The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
+    /// registration writes and never to one that an administrator or Axis writes. Its executors refuse a redirect address that is neither <c>https</c>
+    /// nor <c>http</c> on a loopback address, the implicit flow, the password flow and every client authenticator, which makes a confidential client impossible,
+    /// and they set consent required and the full scope off. The realm's anonymous registration
+    /// policies lose the Trusted Hosts policy, which Keycloak cannot loosen, and a Consent Required policy is added when it is missing. The Allowed Client Scopes
+    /// policy comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, because Keycloak refuses <see cref="RealmSync.AuthoringScope"/> before the scope exists.
+    /// Every other registration policy stays as it is.
+    /// </summary>
+    internal async Task EnsureRegistrationAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var registration = new Dictionary<string, object?>
+        {
+            ["name"] = RegistrationPolicy,
+            ["description"] = "Holds the rules of an anonymous client registration.",
+            ["executors"] = new object[]
+            {
+                // Keycloak accepts an http loopback address only when it accepts every http address, so the pattern executor narrows it.
+                new Dictionary<string, object?>
+                {
+                    ["executor"] = "secure-redirect-uris-enforcer",
+                    ["configuration"] = new Dictionary<string, object?>
+                    {
+                        ["allow-ipv4-loopback-address"] = true,
+                        ["allow-ipv6-loopback-address"] = true,
+                        ["allow-http-scheme"] = true,
+                        ["allow-private-use-uri-scheme"] = false,
+                        ["allow-wildcard-context-path"] = false,
+                    },
+                },
+                new Dictionary<string, object?>
+                {
+                    ["executor"] = "secure-client-uris-pattern",
+                    ["configuration"] = new Dictionary<string, object?>
+                    {
+                        ["client-uri-fields"] = new[] { "redirectUris" },
+                        ["allowed-patterns"] = _registrationRedirectPatterns,
+                    },
+                },
+                Executor("reject-implicit-grant", new Dictionary<string, object?> { ["auto-configure"] = false }),
+                Executor("reject-ropc-grant", new Dictionary<string, object?> { ["auto-configure"] = false }),
+                Executor("consent-required", new Dictionary<string, object?> { ["auto-configure"] = true }),
+                Executor("full-scope-disabled", new Dictionary<string, object?> { ["auto-configure"] = true }),
+                // A public client has no authenticator, so an empty list leaves it alone and refuses a client that has one.
+                Executor("secure-client-authenticator", new Dictionary<string, object?> { ["allowed-client-authenticators"] = Array.Empty<string>() }),
+            },
+        };
+        await ReplaceClientPolicyEntryAsync(token, $"{realmPath}/client-policies/profiles", "profiles", "profile", registration, cancellationToken);
+
+        var registrationPolicy = new Dictionary<string, object?>
+        {
+            ["name"] = RegistrationPolicy,
+            ["description"] = "Applies the registration rules to every client that an anonymous registration writes.",
+            ["enabled"] = true,
+            ["conditions"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["condition"] = "client-updater-context",
+                    ["configuration"] = new Dictionary<string, object?> { ["update-client-source"] = new[] { "ByAnonymous" } },
+                },
+            },
+            ["profiles"] = new[] { RegistrationPolicy },
+        };
+        await ReplaceClientPolicyEntryAsync(token, $"{realmPath}/client-policies/policies", "policies", "policy", registrationPolicy, cancellationToken);
+
+        await EnsureAnonymousRegistrationPoliciesAsync(token, realmPath, cancellationToken);
+
+        static Dictionary<string, object?> Executor(string name, Dictionary<string, object?> configuration) =>
+            new() { ["executor"] = name, ["configuration"] = configuration };
+    }
+
+    private async Task EnsureAnonymousRegistrationPoliciesAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var componentsPath = $"{realmPath}/components";
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{componentsPath}?type={Uri.EscapeDataString(RealmSync.RegistrationPolicyType)}", null, cancellationToken);
+        EnsureSuccess(listed, "read the registration policies");
+        var anonymous = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Where(component => component.TryGetProperty("subType", out var subType) && subType.GetString() == "anonymous").ToList();
+
+        foreach (var trustedHosts in anonymous.Where(component => component.GetProperty("providerId").GetString() == "trusted-hosts"))
+        {
+            using var removed = await SendAsync(token, HttpMethod.Delete, $"{componentsPath}/{trustedHosts.GetProperty("id").GetString()}", null, cancellationToken);
+            EnsureSuccess(removed, "remove the trusted hosts registration policy");
+        }
+
+        if (anonymous.Any(component => component.GetProperty("providerId").GetString() == "consent-required"))
+        {
+            return;
+        }
+
+        using var realm = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
+        EnsureSuccess(realm, "read the realm");
+        var consent = new Dictionary<string, object?>
+        {
+            ["name"] = "Consent Required",
+            ["providerId"] = "consent-required",
+            ["providerType"] = RealmSync.RegistrationPolicyType,
+            ["parentId"] = (await realm.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetString(),
+            ["subType"] = "anonymous",
+            ["config"] = new Dictionary<string, string[]>(),
+        };
+        using var created = await SendAsync(token, HttpMethod.Post, componentsPath, consent, cancellationToken);
+        EnsureSuccess(created, "add the consent required registration policy");
     }
 
     /// <summary>Reads the realm's list of client profiles or policies, replaces the entry named like <paramref name="entry"/> or adds it, and writes the list back.</summary>
