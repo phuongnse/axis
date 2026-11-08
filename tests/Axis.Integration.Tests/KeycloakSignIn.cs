@@ -50,12 +50,13 @@ internal static partial class KeycloakSignIn
 
     /// <summary>
     /// Opens the login page at <paramref name="authorize"/> and posts the password of the development user, as a browser
-    /// would. Returns the response, which holds the code form, and the Cookie header that the browser carries.
+    /// would, or <paramref name="password"/> for a user of another realm. Returns the response, which holds the code form, and the Cookie header that the browser carries.
     /// </summary>
     public static async Task<(HttpResponseMessage Response, string CookieHeader)> SubmitPasswordAsync(
         HttpClient browser,
         Uri authorize,
-        string username)
+        string username,
+        string? password = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var loginPage = await browser.GetAsync(authorize, cancellationToken);
@@ -67,7 +68,7 @@ internal static partial class KeycloakSignIn
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["username"] = username,
-                ["password"] = KeycloakFixture.Password,
+                ["password"] = password ?? KeycloakFixture.Password,
                 ["credentialId"] = "",
             }),
         };
