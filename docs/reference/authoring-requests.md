@@ -145,7 +145,7 @@ only [publishing](authoring.md#publishing) does.
   interleave.
 - **All or nothing.** The publisher checks that every resource the draft read or changed still has the version
   the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
-  contract scenarios on the result, and commits it as a revision, see
+  contract scenarios and the application's test scenarios on the result, and commits it as a revision, see
   [revisions and drafts](revisions-and-drafts.md#accepting-a-draft). So two changes that pass alone
   cannot break the application together, and on any failure nothing is written.
 - **Conflicts.** A resource that changed since the draft recorded it is a conflict, and the accept

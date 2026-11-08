@@ -688,11 +688,12 @@ A request is shown as
 | `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                    |
 | `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate` and a `test` have none                                                                                                                     |
 | `diagnostics`     | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings                                                                                         |
-| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no contract scenario ran. Null for a `rollback`           |
+| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for a `rollback`           |
 
 `scenarios` has one item for each scenario that ran, in file order: for a `test`, the application's
 scenarios, and for a `publish`, a `validate` and an `accept`, the stored results of their
-[contract scenarios](module-contracts.md#contract-scenarios). An item is
+[contract scenarios](module-contracts.md#contract-scenarios). An `accept` lists its contract scenarios
+first and then the application's own scenarios. An item is
 `{ name, resourceId, file, outcome, durationMs, step, path, message }`:
 
 - `outcome` is `passed` or `failed`, and `durationMs` is the time the scenario took.
@@ -726,9 +727,10 @@ What each kind does:
   committed, so the request ends `failed` with `releaseId` set, and the release stays active.
 - **`test`.** The publisher runs the scenarios, see [Test](#test).
 - **`accept`**. The publisher applies a person's draft to the application's folder, see
-  [accepting a draft](revisions-and-drafts.md#accepting-a-draft). It runs the steps of a `validate` on
-  the applied files, and a resource that changed on `main` since the draft read it ends the request
-  `failed` with one `AXC0377` for each such resource.
+  [accepting a draft](revisions-and-drafts.md#accepting-a-draft). It runs the contract scenarios, then
+  the steps of a `validate`, then the application's own test scenarios on the applied files, and a
+  failing one ends the request `failed`. A resource that changed on `main` since the draft read it ends the
+  request `failed` with one `AXC0377` for each such resource.
 - **Order.** For one tenant and application the publisher runs `publish`, `validate`, `activate` and
   `accept` requests one at a time, oldest first, so when two publishes are queued, the newer one ends
   up live. A `test` has a queue of its own.
@@ -817,7 +819,7 @@ stateDiagram-v2
   `failed` with `AXC0215` in place of a fourth claim, so a request that crashes the publisher cannot
   block the queue for good.
 - **Time limit.** A `test` that runs past 10 minutes ends `failed` with `AXC0219`, and so can the
-  contract scenarios of a `publish` or `validate`. A stop of the publisher ends a `test` with
+  contract scenarios of a `publish` or `validate`, and the test scenarios of an `accept`. A stop of the publisher ends a `test` with
   `AXC0220`, see [Test](#test).
 - **Final.** `succeeded` and `failed` are final, and Studio polls `GET .../requests/{id}` until the
   status is one of them.

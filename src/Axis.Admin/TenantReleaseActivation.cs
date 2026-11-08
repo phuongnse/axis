@@ -239,55 +239,72 @@ internal sealed class TenantReleaseActivation(
     {
         var results = new JsonArray();
         var succeeded = await Step(id, "version", () => CheckVersionAsync(schemaVersion))
-            && await Step(id, "test", async () =>
-            {
-                if (scenarioServer is null)
-                {
-                    const string message = "The setting Scenarios:ServerConnectionString is not set, so test scenarios cannot run.";
-                    var missing = new Diagnostic(DiagnosticCodes.ScenarioServerMissing, message, "", "");
-                    diagnostics.Add(missing);
-                    throw new DiagnosticsFailure([missing]);
-                }
-
-                if (files is null)
-                {
-                    throw new InvalidOperationException("The snapshot cannot be read.");
-                }
-
-                var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules);
-                diagnostics.AddRange(compiled.Diagnostics);
-                WriteWarnings(id, compiled.Diagnostics);
-                if (compiled.HasErrors || compiled.Model is null)
-                {
-                    throw new DiagnosticsFailure(compiled.Diagnostics);
-                }
-
-                var scenarios = ApplicationLoader.Load(files).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).Concat(compiled.ModuleScenarios).ToList();
-                if (scenarioNames is not null)
-                {
-                    var names = JsonSerializer.Deserialize<List<string>>(scenarioNames) ?? [];
-                    var known = scenarios.Select(scenario => scenario.Name).ToHashSet(StringComparer.Ordinal);
-                    var unknown = names.Distinct(StringComparer.Ordinal)
-                        .Where(name => !known.Contains(name))
-                        .Select(name => new Diagnostic(DiagnosticCodes.UnknownScenario, $"The scenario '{name}' is not in the application.", "", ""))
-                        .ToList();
-                    if (unknown.Count > 0)
-                    {
-                        diagnostics.AddRange(unknown);
-                        throw new DiagnosticsFailure(unknown);
-                    }
-
-                    scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
-                }
-
-                var failed = await RunScenariosAsync(id, files, scenarios, scenarioServer, packages, modules, diagnostics, results, limit, "test request", stopping);
-                if (failed > 0)
-                {
-                    throw new ScenariosFailure($"{failed} of {scenarios.Count} scenarios failed.");
-                }
-            });
+            && await TestStepAsync(id, scenarioServer, files, scenarioNames, packages, modules, diagnostics, results, limit, stopping);
         return new ScenarioTestRun(succeeded, results);
     }
+
+    /// <summary>
+    /// Runs the <c>test</c> step alone for the tenant <paramref name="id"/>, as <see cref="TestAsync"/> describes it, and adds each
+    /// outcome to <paramref name="results"/>. An accept calls it with the applied files, after its other steps. Returns whether the step passed.
+    /// </summary>
+    public Task<bool> TestStepAsync(
+        string id,
+        string? scenarioServer,
+        IReadOnlyList<ResourceContent>? files,
+        string? scenarioNames,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        List<Diagnostic> diagnostics,
+        JsonArray results,
+        TimeSpan limit,
+        CancellationToken stopping) =>
+        Step(id, "test", async () =>
+        {
+            if (scenarioServer is null)
+            {
+                const string message = "The setting Scenarios:ServerConnectionString is not set, so test scenarios cannot run.";
+                var missing = new Diagnostic(DiagnosticCodes.ScenarioServerMissing, message, "", "");
+                diagnostics.Add(missing);
+                throw new DiagnosticsFailure([missing]);
+            }
+
+            if (files is null)
+            {
+                throw new InvalidOperationException("The snapshot cannot be read.");
+            }
+
+            var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules);
+            diagnostics.AddRange(compiled.Diagnostics);
+            WriteWarnings(id, compiled.Diagnostics);
+            if (compiled.HasErrors || compiled.Model is null)
+            {
+                throw new DiagnosticsFailure(compiled.Diagnostics);
+            }
+
+            var scenarios = ApplicationLoader.Load(files).Scenarios.OrderBy(scenario => scenario.File, StringComparer.Ordinal).Concat(compiled.ModuleScenarios).ToList();
+            if (scenarioNames is not null)
+            {
+                var names = JsonSerializer.Deserialize<List<string>>(scenarioNames) ?? [];
+                var known = scenarios.Select(scenario => scenario.Name).ToHashSet(StringComparer.Ordinal);
+                var unknown = names.Distinct(StringComparer.Ordinal)
+                    .Where(name => !known.Contains(name))
+                    .Select(name => new Diagnostic(DiagnosticCodes.UnknownScenario, $"The scenario '{name}' is not in the application.", "", ""))
+                    .ToList();
+                if (unknown.Count > 0)
+                {
+                    diagnostics.AddRange(unknown);
+                    throw new DiagnosticsFailure(unknown);
+                }
+
+                scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
+            }
+
+            var failed = await RunScenariosAsync(id, files, scenarios, scenarioServer, packages, modules, diagnostics, results, limit, "test request", stopping);
+            if (failed > 0)
+            {
+                throw new ScenariosFailure($"{failed} of {scenarios.Count} scenarios failed.");
+            }
+        });
 
     /// <summary>
     /// Runs the <c>contracts</c> step for the tenant <paramref name="id"/>: the contract scenarios of the pinned modules, each in its
