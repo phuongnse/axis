@@ -388,12 +388,31 @@ internal static class StudioWrites
             return new StudioUndoOutcome(StudioWriteRefusal.Blocked, revert.Blockers, revert.IsStart, null);
         }
 
+        if (await WriteFilesAsync(folder, [.. revert.Files.Select(file => (file.File, file.Bytes))], cancellationToken) is { } refusal)
+        {
+            return StudioUndoOutcome.Refused(refusal);
+        }
+
+        revisions.Record($"Undo {revert.Summary}");
+        var tip = revisions.List() is [{ } latest, ..] ? latest.Id : null;
+        return new StudioUndoOutcome(null, [], false, tip != revert.Tip ? tip : null);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="files"/> to <paramref name="folder"/> as an undo and an accept do: a file with bytes replaces
+    /// the file atomically, and a file with null bytes is deleted. It resolves every path first and answers
+    /// <see cref="StudioWriteRefusal.UnsafePath"/> with nothing written when one leaves the folder. The caller holds the
+    /// write lock.
+    /// </summary>
+    internal static async Task<StudioWriteRefusal?> WriteFilesAsync(
+        string folder, IReadOnlyList<(string File, byte[]? Bytes)> files, CancellationToken cancellationToken)
+    {
         var targets = new List<(string Target, byte[]? Bytes)>();
-        foreach (var (file, bytes) in revert.Files)
+        foreach (var (file, bytes) in files)
         {
             if (Target(folder, file) is not { } target)
             {
-                return StudioUndoOutcome.Refused(StudioWriteRefusal.UnsafePath);
+                return StudioWriteRefusal.UnsafePath;
             }
 
             targets.Add((target, bytes));
@@ -411,9 +430,7 @@ internal static class StudioWrites
             await ReplaceAsync(target, bytes, cancellationToken);
         }
 
-        revisions.Record($"Undo {revert.Summary}");
-        var tip = revisions.List() is [{ } latest, ..] ? latest.Id : null;
-        return new StudioUndoOutcome(null, [], false, tip != revert.Tip ? tip : null);
+        return null;
     }
 
     /// <summary>

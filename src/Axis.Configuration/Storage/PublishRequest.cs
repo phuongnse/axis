@@ -1,7 +1,7 @@
 namespace Axis.Configuration.Storage;
 
 /// <summary>
-/// A request to validate, publish, roll back or test an application, stored by the server and run by the
+/// A request to validate, publish, roll back, test or accept a draft of an application, stored by the server and run by the
 /// publisher. The server only inserts a row. The publisher changes its status and lease.
 /// </summary>
 public sealed class PublishRequest
@@ -11,7 +11,7 @@ public sealed class PublishRequest
     /// <summary>The <c>id</c> of the application manifest.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary><c>validate</c>, <c>publish</c>, <c>activate</c> or <c>test</c>.</summary>
+    /// <summary><c>validate</c>, <c>publish</c>, <c>activate</c>, <c>test</c> or <c>accept</c>.</summary>
     public required string Kind { get; init; }
 
     /// <summary><c>queued</c>, <c>running</c>, <c>succeeded</c> or <c>failed</c>.</summary>
@@ -53,4 +53,13 @@ public sealed class PublishRequest
 
     /// <summary>For a <c>test</c>, the result of each scenario as a JSON array. Null until the request ends.</summary>
     public string? ScenarioResults { get; init; }
+
+    /// <summary>For an <c>accept</c>, the id of the draft to apply. Null for other kinds.</summary>
+    public Guid? DraftId { get; init; }
+
+    /// <summary>For an <c>accept</c>, the application name by which the publisher finds the folder. Null for other kinds.</summary>
+    public string? Folder { get; init; }
+
+    /// <summary>For an <c>accept</c>, the client that asked for it, such as <c>studio</c> or <c>agent</c>. Null for other kinds.</summary>
+    public string? Client { get; init; }
 }

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
@@ -6,19 +7,22 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Audit;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Studio;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>activate</c> and <c>test</c> requests that Studio stores in the tenant
+/// <c>publisher</c>: runs the <c>publish</c>, <c>validate</c>, <c>activate</c>, <c>accept</c> and <c>test</c> requests that Studio stores in the tenant
 /// databases, until it is stopped. Each poll round it claims the oldest queued request of every active tenant that is on this build's schema
 /// version. A <c>publish</c> runs the steps of an activation, compiling from the stored snapshot and never from a folder. A
 /// <c>validate</c> runs the compile and every activation check in a transaction that it rolls back. An <c>activate</c> runs the
@@ -43,7 +47,11 @@ namespace Axis.Admin;
 /// of <c>Scenarios:ServerConnectionString</c> creates, and stores each scenario's outcome on the request. It touches no
 /// tenant database except to store the request's status and results, and writes no audit record and no release id. Without the
 /// setting it fails with <c>AXC0217</c>, and an unknown scenario name fails it with <c>AXC0218</c>.
-/// The first three kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
+/// An <c>accept</c> applies a person's draft to the application's folder, see <see href="docs/reference/revisions-and-drafts.md#accepting-a-draft">accepting a draft</see>.
+/// Holding the folder's write lock throughout, it fails when the draft is not the requester's or a resource the draft read has changed on
+/// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files. Only then does it write the changed files
+/// and commit one revision, and on any failure the folder and <c>main</c> stay as they were. It has no audit record.
+/// The first four kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
 /// own for each application, and run in a second loop of this process, so a long test holds up no publish and a publish holds
 /// up no test. While a request runs,
 /// the publisher renews its lease. A running request whose lease has run out is claimed again, and the third such claim to
@@ -99,7 +107,7 @@ internal sealed class Publisher(
         """
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
-        WHERE kind IN ('publish', 'validate', 'activate', 'test') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
+        WHERE kind IN ('publish', 'validate', 'activate', 'test', 'accept') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
         RETURNING id, application_id, requested_by, kind, release_id, target
         """;
 
@@ -108,7 +116,7 @@ internal sealed class Publisher(
         """
         WITH next AS (
           SELECT r.id FROM axis.publish_requests r
-          WHERE r.kind IN ('publish', 'validate', 'activate', 'test') AND (r.kind = 'test') = @tests
+          WHERE r.kind IN ('publish', 'validate', 'activate', 'test', 'accept') AND (r.kind = 'test') = @tests
             AND (r.status = 'queued'
                  OR (r.status = 'running' AND r.lease_until < clock_timestamp() AND r.claims < @max))
             AND (r.target = 'tenant' OR (r.target = 'preview' AND r.kind = 'publish' AND @preview))
@@ -121,7 +129,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text, p.draft_id, p.folder, p.client
         """;
 
     private const string RenewSql =
@@ -402,7 +410,10 @@ internal sealed class Publisher(
                     await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
                     await reader.IsDBNullAsync(8) ? null : reader.GetGuid(8),
                     reader.GetString(9),
-                    await reader.IsDBNullAsync(10) ? null : reader.GetString(10));
+                    await reader.IsDBNullAsync(10) ? null : reader.GetString(10),
+                    await reader.IsDBNullAsync(11) ? null : reader.GetGuid(11),
+                    await reader.IsDBNullAsync(12) ? null : reader.GetString(12),
+                    await reader.IsDBNullAsync(13) ? null : reader.GetString(13));
             }
         }
 
@@ -511,6 +522,14 @@ internal sealed class Publisher(
             return;
         }
 
+        if (request.Kind == "accept")
+        {
+            var accepted = await AcceptAsync(tenant, connections, request, activation, diagnostics, contractResults);
+            await StopRenewalAsync(renewing, renewal);
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(accepted, null), diagnostics, audit: false, ContractResultsJson(contractResults));
+            return;
+        }
+
         if (request.Kind == "activate")
         {
             using var activateSignals = WorkSignals.Collect();
@@ -560,6 +579,111 @@ internal sealed class Publisher(
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
         await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ContractResultsJson(contractResults));
+    }
+
+    // Applies a person's draft to the application's folder as one revision. The folder's write lock spans every step, so Studio
+    // writes wait and nothing changes between the conflict check, the checks of the applied files and the write. A failure
+    // before the write leaves the folder and main as they were.
+    private async Task<bool> AcceptAsync(
+        PublisherTenant tenant,
+        ITenantConnections connections,
+        ClaimedRequest request,
+        TenantReleaseActivation activation,
+        List<Diagnostic> diagnostics,
+        JsonArray contractResults)
+    {
+        const string notFound = "The draft is not found.";
+        if (Studio?.WriteLock is not { } writeLock
+            || Studio.RevisionsPath(tenant.Id) is not { } revisionsPath
+            || request.DraftId is not { } draftId
+            || request.Folder is not { } application
+            || request.Client is not { } client
+            || Studio.Find(tenant.Id, application) is not { } folder
+            || StudioFolder.ReadManifest(folder)?.Id != request.ApplicationId)
+        {
+            _output.WriteLine($"{tenant.Id} draft failed: {notFound}");
+            return false;
+        }
+
+        if (await StudioWrites.TryTakeAsync(writeLock, folder, CancellationToken.None) is not { } held)
+        {
+            _output.WriteLine($"{tenant.Id} draft failed: The folder's write lock could not be taken.");
+            return false;
+        }
+
+        await using var _ = held;
+
+        // An edit made outside Studio is recorded first, so the accept revision never holds it.
+        var requestedBy = request.RequestedBy;
+        var names = await UserProfiles.FindDisplayNamesAsync(await connections.SchemaConnectionAsync(), [requestedBy], CancellationToken.None);
+        var name = names.TryGetValue(requestedBy, out var displayName) ? displayName : requestedBy;
+        StudioRevisions.For(revisionsPath, folder, requestedBy, name, NullLogger<StudioRevisions>.Instance)!.RecordOutside();
+        var drafts = StudioDrafts.For(revisionsPath, folder, requestedBy, name, writeLock)!;
+
+        var id = draftId.ToString("D");
+        if (drafts.Conflicts(id) is not { Refusal: null, Value: { } conflicts })
+        {
+            _output.WriteLine($"{tenant.Id} draft failed: {notFound}");
+            return false;
+        }
+
+        if (conflicts.Count > 0)
+        {
+            var resources = StudioFolder.List(folder);
+            foreach (var conflict in conflicts)
+            {
+                var file = resources.FirstOrDefault(resource => resource.Id == conflict.Id)?.File ?? "";
+                var message = conflict.Version is null
+                    ? $"The resource {conflict.Id:D} changed on main since the draft read it: main no longer has it."
+                    : $"The resource {conflict.Id:D} changed on main since the draft read it: its version is now {conflict.Version}.";
+                diagnostics.Add(new Diagnostic(DiagnosticCodes.AcceptConflict, message, file, "", conflict.Id));
+                _output.WriteLine($"{tenant.Id} draft failed: {DiagnosticCodes.AcceptConflict} {message}");
+            }
+
+            return false;
+        }
+
+        _output.WriteLine($"{tenant.Id} draft ok");
+
+        var before = StudioFolder.Files(folder);
+        var applied = drafts.Apply(id, before).Value!;
+        var files = applied.Select(file => new ResourceContent(file.File, Encoding.UTF8.GetString(file.Bytes))).ToList();
+        var valid = await activation.ValidateAsync(
+            tenant.Id,
+            tenant.SchemaVersion,
+            connections,
+            tenant.Bindings,
+            configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+            diagnostics,
+            contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
+        if (!valid)
+        {
+            return false;
+        }
+
+        var current = new Dictionary<string, byte[]>(before.Select(file => KeyValuePair.Create(file.File, file.Bytes)), StringComparer.Ordinal);
+        var changes = new List<(string File, byte[]? Bytes)>();
+        foreach (var (file, bytes) in applied)
+        {
+            if (!current.TryGetValue(file, out var existing) || !existing.AsSpan().SequenceEqual(bytes))
+            {
+                changes.Add((file, bytes));
+            }
+        }
+
+        var kept = applied.Select(file => file.File).ToHashSet(StringComparer.Ordinal);
+        changes.AddRange(before.Where(file => !kept.Contains(file.File)).Select(file => (file.File, (byte[]?)null)));
+        if (await StudioWrites.WriteFilesAsync(folder, changes, CancellationToken.None) is { } refusal)
+        {
+            _output.WriteLine($"{tenant.Id} accept failed: The draft's files cannot be written ({refusal}).");
+            return false;
+        }
+
+        var committed = drafts.CommitAccept(id, "Accept draft", requestedBy, name, client, request.Id);
+        _output.WriteLine(committed.Refusal is null
+            ? $"{tenant.Id} accept ok"
+            : $"{tenant.Id} accept failed: The revision cannot be recorded ({committed.Refusal}).");
+        return committed.Refusal is null;
     }
 
     // Sends the wake signal when the activation added a work item due now for the tenant, and only for it: the contract scenarios
@@ -785,5 +909,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames, Guid? DraftId, string? Folder, string? Client);
 }

@@ -4,21 +4,21 @@ This page describes `Axis.Admin`, the command-line host that a platform operator
 tenants, migrate tenant databases, activate releases and run Studio's publish requests, and the
 commands that look after a cell. On this page, "database role" always means the PostgreSQL role.
 
-| Commands                                                                              | Described in                                                                      |
-| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `tenant create`                                                                       | [Tenant create](#tenant-create)                                                   |
-| `tenant backup`, `tenant restore`                                                     | [Tenant backup and restore](tenant-backup-and-restore.md)                         |
-| `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant list`                  | [Tenant status commands](tenant-status-commands.md)                               |
-| `tenant oidc set`, `tenant sign-in set`                                               | [Sign-in settings](tenant-setting-commands.md#sign-in-settings)                   |
-| `tenant binding list`, `tenant binding set` and `tenant binding remove`               | [Deployment bindings](tenant-setting-commands.md#deployment-bindings)             |
-| `tenant host add`, `tenant host remove` and `tenant host move`                        | [Hosts](tenant-setting-commands.md#hosts)                                         |
-| `tenant email set` and `tenant email clear`                                           | [Mail settings](tenant-setting-commands.md#mail-settings)                         |
-| `tenant legal set` and `tenant legal clear`                                           | [Legal links](tenant-setting-commands.md#legal-links)                             |
-| `tenant session end`                                                                  | [Sessions](tenant-setting-commands.md#sessions)                                   |
-| `tenant rotate-passwords`                                                             | [Database passwords](tenant-setting-commands.md#database-passwords)               |
-| `tenant data-key rotate` and `tenant data-key retire`                                 | [Rotating the keys](data-encryption.md#rotating-the-keys)                         |
-| `platform rekey`                                                                      | [Installation key](tenant-setting-commands.md#installation-key)                   |
-| `migrate`, `activate`, `publisher`, `cell operator invite`, `cell operator client add`, `cell backup`, `cell restore-check`, `version` | The sections of this page                                                         |
+| Commands                                                                                                                               | Described in                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `tenant create`                                                                                                                        | [Tenant create](#tenant-create)                                       |
+| `tenant backup`, `tenant restore`                                                                                                      | [Tenant backup and restore](tenant-backup-and-restore.md)             |
+| `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant list`                                                                   | [Tenant status commands](tenant-status-commands.md)                   |
+| `tenant oidc set`, `tenant sign-in set`                                                                                                | [Sign-in settings](tenant-setting-commands.md#sign-in-settings)       |
+| `tenant binding list`, `tenant binding set` and `tenant binding remove`                                                                | [Deployment bindings](tenant-setting-commands.md#deployment-bindings) |
+| `tenant host add`, `tenant host remove` and `tenant host move`                                                                         | [Hosts](tenant-setting-commands.md#hosts)                             |
+| `tenant email set` and `tenant email clear`                                                                                            | [Mail settings](tenant-setting-commands.md#mail-settings)             |
+| `tenant legal set` and `tenant legal clear`                                                                                            | [Legal links](tenant-setting-commands.md#legal-links)                 |
+| `tenant session end`                                                                                                                   | [Sessions](tenant-setting-commands.md#sessions)                       |
+| `tenant rotate-passwords`                                                                                                              | [Database passwords](tenant-setting-commands.md#database-passwords)   |
+| `tenant data-key rotate` and `tenant data-key retire`                                                                                  | [Rotating the keys](data-encryption.md#rotating-the-keys)             |
+| `platform rekey`                                                                                                                       | [Installation key](tenant-setting-commands.md#installation-key)       |
+| `migrate`, `activate`, `publisher`, `cell operator invite`, `cell operator client add`, `cell backup`, `cell restore-check`, `version` | The sections of this page                                             |
 
 `Axis.Admin` is the only host that writes the [tenant directory](../architecture.md#tenant-directory),
 the only one that holds an admin connection to the database server, and the only one that holds the
@@ -34,28 +34,28 @@ server migrates and activates at start, see [startup activation](host-settings.m
 `Axis.Admin` reads its settings from the environment, as the other hosts do. Each command reads only
 the settings it needs, so a routine command needs no admin role and no secret it does not use.
 
-| Setting                                     | Environment variable                         | Meaning |
-| ------------------------------------------- | -------------------------------------------- | ------- |
-| `Admin:ConnectionString`                    | `Admin__ConnectionString`                    | A database role with `CREATEDB` and `CREATEROLE`, not a superuser, on the database server that holds the tenant databases. It creates the tenant databases and roles. Only `tenant create`, `tenant restore`, `tenant rotate-passwords` and `cell restore-check` read it, and `publisher` reads it in a cell for the [create](#create-job) and [purge](#purge-job) jobs. `migrate` needs no admin role. |
-| `ConnectionStrings:PlatformSchema`          | `ConnectionStrings__PlatformSchema`          | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
-| `Platform:SecretKey`                        | `Platform__SecretKey`                        | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
-| `Platform:PreviousSecretKey`                | `Platform__PreviousSecretKey`                | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
+| Setting                                     | Environment variable                         | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Admin:ConnectionString`                    | `Admin__ConnectionString`                    | A database role with `CREATEDB` and `CREATEROLE`, not a superuser, on the database server that holds the tenant databases. It creates the tenant databases and roles. Only `tenant create`, `tenant restore`, `tenant rotate-passwords` and `cell restore-check` read it, and `publisher` reads it in a cell for the [create](#create-job) and [purge](#purge-job) jobs. `migrate` needs no admin role.                                                                                                                                                                                                                                                                                                         |
+| `ConnectionStrings:PlatformSchema`          | `ConnectionStrings__PlatformSchema`          | The role that owns the `platform` schema. The tool writes the tenant directory over it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `Platform:SecretKey`                        | `Platform__SecretKey`                        | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `Platform:PreviousSecretKey`                | `Platform__PreviousSecretKey`                | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key).                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `IdentityProvider:Url`                      | `IdentityProvider__Url`                      | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and `tenant restore` reads it when it is set. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. `cell restore-check` reads and requires it, because its scratch tenant always gets a new realm. |
-| `IdentityProvider:AdminClientId`            | `IdentityProvider__AdminClientId`            | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so do `tenant restore` when it is set and `cell restore-check`. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. |
-| `IdentityProvider:AdminClientSecret`        | `IdentityProvider__AdminClientSecret`        | The secret of that client. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so do `tenant restore` when `IdentityProvider:Url` is set and `cell restore-check`. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. It is never stored and never printed. |
-| `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting. |
-| `Email:*`                                   | `Email__...`                                 | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite`, `cell restore-check` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
-| `Tenants`                                   | `Tenants__<id>__...`                         | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source, see [publisher](#publisher). |
-| `DOTNET_ENVIRONMENT`                        | `DOTNET_ENVIRONMENT`                         | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema`, `ConnectionStrings:Platform`, `Scenarios:ServerConnectionString` or `IdentityProvider:DatabaseConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
-| `Scenarios:ServerConnectionString`          | `Scenarios__ServerConnectionString`          | A database role with `CREATEDB`, not a superuser, that owns no tenant database. `publisher` reads it, to run `test` requests and the contract scenarios of `publish` and `validate` requests. `cell restore-check` reads it, to run the test scenarios of a restored tenant's Studio applications, see [cell restore check](#cell-restore-check). It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request, or a `publish` or `validate` with contract scenarios to run, fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
-| `Extensions:Path`                           | `Extensions__Path`                           | The installed extension packages. Only `activate`, `publisher`, `tenant restore` and `cell restore-check` read it. |
-| `Modules:Path`                              | `Modules__Path`                              | The installed modules. Only `activate`, `publisher` and `cell restore-check` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
-| `Tenancy:Source`                            | `Tenancy__Source`                            | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
-| none                                        | `AXIS_BINDING_SECRET`                        | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
-| none                                        | `AXIS_SMTP_PASSWORD`                         | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it. |
-| none                                        | `AXIS_OIDC_CLIENT_SECRET`                    | The OIDC client secret of a restored tenant that keeps the archive's sign-in. `tenant restore` reads it and needs it only then, because a new realm generates its own client secrets. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
-| none                                        | `AXIS_OIDC_CLIENT_KEY`                       | The client key as a PEM that `tenant oidc set --client-key` adds, read from standard input when the variable is unset. See [sign-in settings](tenant-setting-commands.md#sign-in-settings). |
-| none                                        | `PATH`                                       | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
+| `IdentityProvider:AdminClientId`            | `IdentityProvider__AdminClientId`            | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so do `tenant restore` when it is set and `cell restore-check`. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs.                                                                                                                                                                                                                                                                                          |
+| `IdentityProvider:AdminClientSecret`        | `IdentityProvider__AdminClientSecret`        | The secret of that client. `tenant create` of a main tenant, `cell operator invite` and `cell operator client add` read it, and so do `tenant restore` when `IdentityProvider:Url` is set and `cell restore-check`. In a cell, `publisher` reads it for the [create](#create-job) and [purge](#purge-job) jobs. It is never stored and never printed.                                                                                                                                                                                                                                                                                                                                                           |
+| `IdentityProvider:DatabaseConnectionString` | `IdentityProvider__DatabaseConnectionString` | Optional. A connection string to the identity provider's database, for a role that is read-only and has `SELECT` on Keycloak's `credential` table and no other right. Only `tenant backup` and `cell backup` read it, to put the password hashes and authenticator secrets of a realm's users into `realm.json`, see [tenant backup](tenant-backup-and-restore.md#tenant-backup). A `tenant restore` into a new realm imports that file and needs no such setting. It is never printed. Without it, no archive holds a `realm.json`. A value that is not a connection string exits with code 2, naming the setting.                                                                                             |
+| `Email:*`                                   | `Email__...`                                 | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher`, `cell operator invite`, `cell restore-check` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm.                                                                                                       |
+| `Tenants`                                   | `Tenants__<id>__...`                         | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source, see [publisher](#publisher).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `DOTNET_ENVIRONMENT`                        | `DOTNET_ENVIRONMENT`                         | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema`, `ConnectionStrings:Platform`, `Scenarios:ServerConnectionString` or `IdentityProvider:DatabaseConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`.                                                                                            |
+| `Scenarios:ServerConnectionString`          | `Scenarios__ServerConnectionString`          | A database role with `CREATEDB`, not a superuser, that owns no tenant database. `publisher` reads it, to run `test` requests and the contract scenarios of `publish` and `validate` requests. `cell restore-check` reads it, to run the test scenarios of a restored tenant's Studio applications, see [cell restore check](#cell-restore-check). It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request, or a `publish` or `validate` with contract scenarios to run, fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles).                            |
+| `Extensions:Path`                           | `Extensions__Path`                           | The installed extension packages. Only `activate`, `publisher`, `tenant restore` and `cell restore-check` read it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `Modules:Path`                              | `Modules__Path`                              | The installed modules. Only `activate`, `publisher` and `cell restore-check` read it. `tenant restore` never reads it, because a missing module refuses nothing.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `Tenancy:Source`                            | `Tenancy__Source`                            | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| none                                        | `AXIS_BINDING_SECRET`                        | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| none                                        | `AXIS_SMTP_PASSWORD`                         | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| none                                        | `AXIS_OIDC_CLIENT_SECRET`                    | The OIDC client secret of a restored tenant that keeps the archive's sign-in. `tenant restore` reads it and needs it only then, because a new realm generates its own client secrets. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| none                                        | `AXIS_OIDC_CLIENT_KEY`                       | The client key as a PEM that `tenant oidc set --client-key` adds, read from standard input when the variable is unset. See [sign-in settings](tenant-setting-commands.md#sign-in-settings).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| none                                        | `PATH`                                       | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 A missing or invalid setting exits with code 2 before any tenant work. The message names the setting
 and never holds its value. The commands of the other pages read these:
@@ -111,10 +111,10 @@ that `pg_dump` wrote, because that text can name the database host; to see the c
 hand. A command that does no tenant work, such as a usage error, writes its message to standard
 error.
 
-| Exit code | Meaning                                                                                                                                         |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `0`       | Every tenant succeeded.                                                                                                                         |
-| `1`       | At least one tenant failed. The other tenants still ran.                                                                                        |
+| Exit code | Meaning                                                                                                                                           |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0`       | Every tenant succeeded.                                                                                                                           |
+| `1`       | At least one tenant failed. The other tenants still ran.                                                                                          |
 | `2`       | A usage or settings error before any tenant work: an unknown option, a missing setting, a superuser admin role or an unknown tenant. Nothing ran. |
 
 ## Tenant create
@@ -126,13 +126,13 @@ database. It has two forms:
 - `tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...` creates a
   [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
-| Option                     | Meaning |
-| -------------------------- | ------- |
+| Option                     | Meaning                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `<id>`                     | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens, at most 50 characters. It is also the name of the tenant's realm, so `master`, the identity provider's own admin realm, is refused. The id of a deleted tenant, one with a row in `platform.deleted_tenants`, is refused with exit code 2 at the `entry` step. |
-| `--host <host>`            | A host of the tenant. Repeat it for more hosts. At least one is needed. A host that a tenant deleted less than 90 days ago had is refused with exit code 2, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant). |
-| `--administrator <email>`  | Invites the person with this email as the tenant's first administrator, see [the first administrator](user-administration.md#the-first-administrator). Give it once. The email must be a plain address, such as `name@example.com`. It is a usage error together with `--preview-of`. |
-| `--preview-of <main>`      | Makes the tenant the preview tenant of the main tenant `<main>`. |
-| `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
+| `--host <host>`            | A host of the tenant. Repeat it for more hosts. At least one is needed. A host that a tenant deleted less than 90 days ago had is refused with exit code 2, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant).                                                                                                                                        |
+| `--administrator <email>`  | Invites the person with this email as the tenant's first administrator, see [the first administrator](user-administration.md#the-first-administrator). Give it once. The email must be a plain address, such as `name@example.com`. It is a usage error together with `--preview-of`.                                                                              |
+| `--preview-of <main>`      | Makes the tenant the preview tenant of the main tenant `<main>`.                                                                                                                                                                                                                                                                                                   |
+| `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`.                                                                                                                                                                                                           |
 
 **Realm.** The command creates the tenant's realm in
 [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its three clients,
@@ -273,9 +273,9 @@ code 2.
 `migrate [--tenant <id>] [--parallel <n>]` brings tenant databases to the schema that this build of
 `Axis.Admin` ships. An upgrade runs it before the new hosts start.
 
-| Option           | Meaning                                                                    |
-| ---------------- | -------------------------------------------------------------------------- |
-| `--tenant <id>`  | Migrate this tenant only. Without it, migrate every tenant.                |
+| Option           | Meaning                                                                       |
+| ---------------- | ----------------------------------------------------------------------------- |
+| `--tenant <id>`  | Migrate this tenant only. Without it, migrate every tenant.                   |
 | `--parallel <n>` | Migrate up to `n` tenants at a time. It defaults to 1 and must be at least 1. |
 
 It covers every tenant except `provisioning` ones, in ordinal order of the id, `n` at a time. A
@@ -338,9 +338,9 @@ that is `provisioning`, a `--parallel` below 1 or a missing setting.
 `activate <folder> [--tenant <id>]` compiles an application folder and activates its release. A
 running server serves the new release at its next request, with no restart.
 
-| Option          | Meaning                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `<folder>`      | The application folder. A relative path is resolved against the working directory.                               |
+| Option          | Meaning                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `<folder>`      | The application folder. A relative path is resolved against the working directory.                                |
 | `--tenant <id>` | Activate for this tenant only. It may be `active` or `suspended`. Without it, activate for every `active` tenant. |
 
 It uses the same compile diagnostics, extension packages, modules, recompute limit and seeding as
@@ -411,18 +411,18 @@ runs until it is stopped. It has no HTTP endpoint and listens on no port, so not
 The `axis-admin` image runs it. Both production installs start one, see
 [installation](installation.md), and `scripts/dev.sh`, the Docker Compose file in the repository root
 and the E2E script each start one too. It runs `publish`, `validate`,
-[`activate`](authoring.md#publishing) and `test` requests under both tenancy sources, and `publish`
+[`activate`](authoring.md#publishing), `accept` and `test` requests under both tenancy sources, and `publish`
 requests with the target `preview`, see [preview requests](#preview-requests).
 
 One process runs these loops:
 
-| Loop              | What it does |
-| ----------------- | ------------ |
-| Requests          | Claims and runs `publish`, `validate` and `activate` requests, see [claiming](#claiming). Only this loop reads the tenants again. |
-| Tests             | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring.md#test). |
-| Jobs              | Under `Tenancy:Source=directory`, runs the jobs of `platform.jobs`, see [provisioning API](tenant-lifecycle.md#provisioning-api). It claims each job with a lease, runs one job at a time for each tenant and lets a running job finish when it is stopped. A job that it ends writes one [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. |
-| Host checks       | Checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`, `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names the operator who asked for the host. |
-| Export sweep      | Runs only when the `Cell:ExportStorage` settings are set. Every hour it deletes each ZIP under `exports/` in that bucket that was stored more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant), and writes one line for each deletion. A failed round writes one line, and the next round tries again. |
+| Loop         | What it does                                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Requests     | Claims and runs `publish`, `validate`, `activate` and `accept` requests, see [claiming](#claiming). Only this loop reads the tenants again.                                                                                                                                                                                                                                                      |
+| Tests        | Claims and runs `test` requests, which run an application's [test scenarios](test-scenarios.md) from Studio, see [test](authoring.md#test).                                                                                                                                                                                                                                                      |
+| Jobs         | Under `Tenancy:Source=directory`, runs the jobs of `platform.jobs`, see [provisioning API](tenant-lifecycle.md#provisioning-api). It claims each job with a lease, runs one job at a time for each tenant and lets a running job finish when it is stopped. A job that it ends writes one [platform audit record](tenant-setting-commands.md#platform-audit-records) that names the job's actor. |
+| Host checks  | Checks the pending [host requests](tenant-lifecycle.md#hosts) against DNS every `Cell:HostCheckInterval`, `00:10:00` by default, and adds a verified host to its tenant. It also creates the host's cert-manager `Certificate` when `Cell:HostCertificateIssuer` is set. The record of that add is named `tenant host verify` and names the operator who asked for the host.                     |
+| Export sweep | Runs only when the `Cell:ExportStorage` settings are set. Every hour it deletes each ZIP under `exports/` in that bucket that was stored more than 7 days ago, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant), and writes one line for each deletion. A failed round writes one line, and the next round tries again.                                                          |
 
 The publisher writes no other audit record of its own, except the `tenant purge` record of the
 [purge job](#purge-job) it queues itself: the audit of a publish is the release's own record in the
@@ -481,19 +481,19 @@ publisher. The `directory` source writes neither line.
 ### Claiming
 
 Each poll round, for each served tenant, the requests loop claims the oldest `queued` `publish`,
-`validate` or `activate` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
+`validate`, `activate` or `accept` request with `FOR UPDATE SKIP LOCKED`, and the tests loop does the same for
 `test` requests. A claim sets the request `running`, `claimed_by` to the publisher's own name and
 `lease_until`, and adds 1 to `claims`. A `running` request whose lease has run out is claimed the same
 way.
 
 - **Test requests.** `test` requests form their own queue for each tenant and application. At most
   one runs at a time, oldest first, independent of the other kinds. A `test` does not wait behind a
-  running `publish`, `validate` or `activate`, and none of them waits behind a `test`, so a long test
+  running `publish`, `validate`, `activate` or `accept`, and none of them waits behind a `test`, so a long test
   holds up no publish. The claim that skips an application with a `running` request therefore counts
   only the requests of the same queue.
 - **Target.** A request with target `tenant` is claimed as above. A request with target `preview` is
   claimed only when it is a `publish`, and only when the tenant has no preview tenant, or when the
-  publisher serves that preview tenant. A `validate` or `activate` with target `preview` is never
+  publisher serves that preview tenant. A `validate`, `activate` or `accept` with target `preview` is never
   claimed, and stays `queued`. A preview request that is not claimed does not block the later
   requests of its application.
 - **One at a time.** For one tenant and application it runs one request at a time, oldest first, so
@@ -509,7 +509,7 @@ way.
   request that has been claimed three times and whose lease runs out again ends `failed` with
   `AXC0215`, see the [lifecycle](authoring.md#lifecycle). A `publish` gets a
   `release.publishFailed` audit record with it, an `activate` gets a `release.rollbackFailed` one, and
-  a `validate` gets none.
+  a `validate` and an `accept` get none.
 - **Fencing.** The `claims` count is the fencing token. Renewal and the final update change the
   request only while its status is `running` and `claims` is still the value this publisher claimed.
   A publisher that lost its claim writes a `claim failed` line and no audit record.
@@ -524,8 +524,8 @@ tenant's schema role unless it says otherwise.
 1. `claim`: claim the request, as above. A tenant with nothing to claim writes no line. A claim that
    fails writes `<tenant> claim failed: <message>`, and the publisher goes on with the next tenant.
 2. `version`: check that the tenant's schema version is the one of this build.
-3. `contracts`, for `publish` and `validate` only: run the contract scenarios of every pinned module.
-   The step compiles the snapshot in memory to find them. A snapshot that cannot be read or does not
+3. `contracts`, for `publish`, `validate` and `accept` only: run the contract scenarios of every pinned module.
+   The step compiles the snapshot, or for an `accept` the applied draft, in memory to find them. A snapshot that cannot be read or does not
    compile, and an application whose modules have no contract scenario, run nothing and write no
    `contracts` line, so the next step reports the problem. Otherwise the step fails with `AXC0217`
    when the setting is empty and at least one contract scenario is left to run.
@@ -596,9 +596,29 @@ tenant's schema role unless it says otherwise.
    and the request ends `failed` with `AXC0219`. The scenarios that finished keep their outcomes, and
    those that had not started get none. The step writes `<tenant> test failed: AXC0219 …`. A `test`
    gets no audit record and no release id.
-8. Write the audit record of a `publish` or an `activate`, with the request's final status, then set
+
+8. For `accept`: the steps are `draft`, `version`, `contracts`, `validate` and `accept`, in the order
+   of [accepting a draft](revisions-and-drafts.md#accepting-a-draft), and the publisher holds the
+   folder's write lock from `draft` to `accept`. It reads the folder named by `Studio:Folders` and
+   writes it, so it needs the Studio settings and `ConnectionStrings:Platform`.
+   - `draft` finds the folder, takes the lock, records any outside change and loads the draft as the
+     requester, then checks the draft's versions against `main`. It writes `<tenant> draft ok`. A
+     missing Studio setting or lock setting, an unknown folder, a folder whose manifest `id` is not the
+     request's application, a draft that is not the requester's or does not exist, and a lock that
+     cannot be taken write `<tenant> draft failed: <message>` with no diagnostic code. Each resource
+     that changed on `main` since the draft read it writes
+     `<tenant> draft failed: AXC0377 <message>`, and the step ends the request.
+   - `version`, `contracts` and `validate` are as for a `validate`, and run on the folder's files
+     with the draft applied, in memory. They run the contract scenarios and not the application's own
+     test scenarios, store no release and change nothing.
+   - `accept` writes the changed files to the folder, commits them as one revision and deletes the
+     draft. It writes `<tenant> accept ok`, or `<tenant> accept failed: <message>` when a file cannot
+     be written or the revision cannot be recorded.
+   - An `accept` has no audit record and no release id. A failure before the `accept` step leaves the
+     folder and `main` as they were.
+9. Write the audit record of a `publish` or an `activate`, with the request's final status, then set
    the request `succeeded` or `failed` and store its diagnostics and its release id, in one
-   transaction. A `validate` gets its final status and diagnostics the same way, with no audit record
+   transaction. A `validate` and an `accept` get their final status and diagnostics the same way, with no audit record
    and no release id. The diagnostics are all of them, warnings included, as in the
    [authoring API](authoring.md#diagnostics). A request that fails with an exception rather than
    diagnostics, such as a lost connection, stores only the diagnostics gathered so far, which can be
@@ -642,14 +662,14 @@ because it is stored on the request.
   run until the next activation of the tenant. The publisher calls the identity provider of each
   tenant that has a realm, so it must reach it and trust its certificate.
 - **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the request it is
-  running, then exits. A `publish`, `validate` or `activate` finishes first, and so do the contract
-  scenarios of a `publish` or `validate`. A running `test` request is the exception, because a test
+  running, then exits. A `publish`, `validate`, `activate` or `accept` finishes first, and so do the contract
+  scenarios of a `publish`, `validate` or `accept`. A running `test` request is the exception, because a test
   may run for 10 minutes, which is longer than the stop grace period of both installs: the publisher
   stops it at once, the running scenario fails, its scenario database is dropped, and the request
   ends `failed` with `AXC0220`. The step writes `<tenant> test failed: AXC0220 …`.
 - **A stop mid-request.** It leaves a lease that runs out, and another publisher then claims the
   request again. So the platform's shutdown grace period must be longer than the longest `publish`,
-  `validate` or `activate`, or the request is claimed twice.
+  `validate`, `activate` or `accept`, or the request is claimed twice.
 - **Leftover databases.** A publisher that crashes in the middle of a scenario leaves its
   `axis_scenario_<uuid>` database behind. The publisher does not clean it up, because with several
   publishers none can tell which leftover database is still in use. The operator drops the

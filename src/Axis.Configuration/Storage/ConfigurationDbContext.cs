@@ -203,6 +203,9 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             request.Property(r => r.Diagnostics).HasColumnName("diagnostics").HasColumnType("jsonb");
             request.Property(r => r.ScenarioNames).HasColumnName("scenario_names").HasColumnType("jsonb");
             request.Property(r => r.ScenarioResults).HasColumnName("scenario_results").HasColumnType("jsonb");
+            request.Property(r => r.DraftId).HasColumnName("draft_id").HasColumnType("uuid");
+            request.Property(r => r.Folder).HasColumnName("folder").HasColumnType("text");
+            request.Property(r => r.Client).HasColumnName("client").HasColumnType("text");
             // Serves the publisher's claim of the oldest queued request of an application.
             request.HasIndex(r => new { r.ApplicationId, r.Status, r.RequestedAt, r.Id })
                 .HasDatabaseName("ix_publish_requests_application_id_status_requested_at_id");
