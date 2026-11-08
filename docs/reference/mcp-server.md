@@ -119,16 +119,14 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 
 ## Limits
 
-_(planned for M35)_
+A call to the server is limited in rate.
 
-Tool calls are limited in rate and size, and the agent host's requests count toward a quota.
-
-- **Rate limit.** Tool calls count in the MCP partition, by tenant and client, see
-  [rate limits](headers-and-rate-limits.md#rate-limits). The agent host's calls count there too.
-- **Quota.** Tool calls of outside clients count toward no quota, because the client brings its own
+- **Rate limit.** Every call to `/mcp` counts in the MCP partition, by tenant and client id, see
+  [rate limits](headers-and-rate-limits.md#rate-limits).
+- **Quota.** _(planned for M35)_ Tool calls of outside clients count toward no quota, because the client brings its own
   model. Requests of the agent host count toward `authoringRequests`, see
   [tenant quotas](tenant-quotas.md#quotas).
-- **Size.** A tool input or output is at most 1 MiB. A larger output, such as the diff of a large
+- **Size.** _(planned for M35)_ A tool input or output is at most 1 MiB. A larger output, such as the diff of a large
   draft, is cut into pages that the tool's `cursor` reads.
 
 ## Audit

@@ -15,14 +15,16 @@ internal enum Partition
     Session,
     Bearer,
     Publishing,
+    Mcp,
 }
 
 /// <summary>
 /// How a route is limited, as endpoint metadata. <see cref="Session"/> is the partition for a caller with a session, or
 /// null when the route takes no session. <see cref="Bearer"/> is whether the route takes a bearer token, so a bearer
-/// caller counts as bearer. <see cref="Open"/> is a route with no limit.
+/// caller counts as bearer. <see cref="Open"/> is a route with no limit. <see cref="Mcp"/> is a route whose callers count in
+/// the MCP partition.
 /// </summary>
-internal sealed record RateLimitRoute(Partition? Session, bool Bearer, bool Open = false);
+internal sealed record RateLimitRoute(Partition? Session, bool Bearer, bool Open = false, bool Mcp = false);
 
 /// <summary>
 /// The rate limits of D85. Each replica counts on its own, in memory. The partition follows the route and the kind of
@@ -49,6 +51,11 @@ internal static class RateLimits
         where TBuilder : IEndpointConventionBuilder =>
         builder.WithMetadata(new RateLimitRoute(Session: null, Bearer: true));
 
+    /// <summary>Counts a caller of the MCP server's route in the MCP partition, by tenant and client id.</summary>
+    public static TBuilder WithMcpRateLimit<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder =>
+        builder.WithMetadata(new RateLimitRoute(Session: null, Bearer: false, Mcp: true));
+
     /// <summary>Gives the route no limit.</summary>
     public static TBuilder WithoutRateLimit<TBuilder>(this TBuilder builder)
         where TBuilder : IEndpointConventionBuilder =>
@@ -56,8 +63,9 @@ internal static class RateLimits
 
     /// <summary>
     /// Picks the partition and the count key of a request, or null when the request has no limit. The callback has no
-    /// route and no caller yet, so it counts with sign-in by client address. A caller with a bearer token counts as
-    /// bearer, a session caller by the partition of the route, and a request with neither by tenant and client address.
+    /// route and no caller yet, so it counts with sign-in by client address. A caller of the MCP route counts in the MCP
+    /// partition by client id, or by person when the token has none, and with no token by client address. A caller with
+    /// a bearer token counts as bearer, a session caller by the partition of the route, and a request with neither by tenant and client address.
     /// </summary>
     public static (Partition Partition, string Key)? Choose(HttpContext context, string? tenantId)
     {
@@ -73,6 +81,13 @@ internal static class RateLimits
         }
 
         var tenant = tenantId ?? string.Empty;
+        if (route.Mcp)
+        {
+            return EndpointCaller.Read(context.User) is { } client
+                ? (Partition.Mcp, $"{tenant}|{client.ClientId ?? $"sub:{client.Id}"}")
+                : (Partition.Mcp, $"{tenant}|addr:{address}");
+        }
+
         if (route.Bearer && EndpointCaller.Read(context.User) is { } caller)
         {
             return (Partition.Bearer, $"{tenant}|{caller.Id}");

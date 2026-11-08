@@ -442,10 +442,10 @@ minute for one replica. The rules of the limits are in
 | `RateLimits:Session`    | 1200    | Every other route that takes a session, by tenant and user               |
 | `RateLimits:Bearer`     | 1200    | Requests with a bearer token, by tenant and caller id                    |
 | `RateLimits:Publishing` | 60      | Studio validate, publish, preview, activate and test, by tenant and user |
+| `RateLimits:Mcp`        | 600     | Calls to `/mcp`, by tenant and client id                                 |
 
-- **`RateLimits:Mcp`** _(planned for M35)_. MCP tool calls, by tenant and client, 600 by default.
-- **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`, `RateLimits__Bearer` and
-  `RateLimits__Publishing`.
+- **Environment variables.** `RateLimits__SignIn`, `RateLimits__Session`, `RateLimits__Bearer`,
+  `RateLimits__Publishing` and `RateLimits__Mcp`.
 - **Per replica.** Each replica counts on its own, so the limit an installation sees is the number
   of replicas times the setting.
 - **Bad values.** A value of zero or less, or one that is not a whole number, stops the server's

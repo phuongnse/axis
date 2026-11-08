@@ -393,7 +393,7 @@ sessions.MapFallback("/api/{**path}", context =>
     .WithMetadata(new HttpMethodMetadata([HttpMethods.Get, HttpMethods.Head]));
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();
-app.MapGroup(string.Empty).WithBearerRateLimit().WithMetadata(McpRoute.Instance).MapMcpEndpoints();
+app.MapGroup(string.Empty).WithMcpRateLimit().WithMetadata(McpRoute.Instance).MapMcpEndpoints();
 
 app.Run();
 
