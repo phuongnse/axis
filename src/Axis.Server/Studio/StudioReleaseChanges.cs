@@ -74,7 +74,7 @@ internal static class StudioReleaseChanges
     private static bool IsModuleCopy(string path) => path.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     // The canonical text of a folder file, its raw text when it is not valid JSON, or null for a scenario.
-    private static string? Canonical(string content)
+    internal static string? Canonical(string content)
     {
         try
         {

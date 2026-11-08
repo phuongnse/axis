@@ -510,6 +510,41 @@ namespace Axis.Configuration.Storage.Migrations
                     b.ToTable("release_resources", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Configuration.Storage.ResourceWriteRow", b =>
+                {
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("File")
+                        .HasColumnType("text")
+                        .HasColumnName("file");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_name");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("version");
+
+                    b.Property<DateTimeOffset>("WrittenAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("written_at");
+
+                    b.HasKey("ApplicationId", "File")
+                        .HasName("pk_resource_writes");
+
+                    b.ToTable("resource_writes", "axis");
+                });
+
             modelBuilder.Entity("Axis.Configuration.Storage.ActiveReleaseRow", b =>
                 {
                     b.HasOne("Axis.Configuration.Storage.Release", null)

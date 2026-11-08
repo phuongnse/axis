@@ -129,6 +129,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioCatalogEndpoints();
         endpoints.MapStudioApplicationEndpoints();
         endpoints.MapStudioSettingsEndpoints();
+        endpoints.MapStudioActivityEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -446,7 +447,7 @@ internal static class StudioEndpoints
                 hasIfMatch ? request.Headers.IfMatch.ToString() : null,
                 hasIfNoneMatch,
                 httpContext.RequestAborted);
-            return LayerAnswer(httpContext, folder, packages, modules, outcome);
+            return await LayerAnswerAsync(httpContext, folder, packages, modules, outcome);
         }
     }
 
@@ -472,7 +473,7 @@ internal static class StudioEndpoints
     }
 
     // The answer of a layer write, a save or a reset: the refusal of the write, or the new file and version with the diagnostics.
-    private static IResult LayerAnswer(
+    private static async Task<IResult> LayerAnswerAsync(
         HttpContext httpContext, string folder, PackageCatalog packages, ModuleCatalog modules, StudioLayerOutcome outcome)
     {
         switch (outcome.Refusal)
@@ -488,6 +489,12 @@ internal static class StudioEndpoints
         if (outcome.Version is not null)
         {
             httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        }
+
+        // A reset that leaves no layer wrote no file, so it has no writer to record.
+        if (outcome.File is not null && outcome.Version is not null)
+        {
+            await StudioWriteRecords.RecordAsync(httpContext, folder, [(outcome.File, outcome.Version)]);
         }
 
         return Results.Ok(new StudioModuleSaveResponse(
@@ -591,7 +598,7 @@ internal static class StudioEndpoints
             ifMatch,
             ifNoneMatch: false,
             httpContext.RequestAborted);
-        return LayerAnswer(httpContext, folder, packages, modules, outcome);
+        return await LayerAnswerAsync(httpContext, folder, packages, modules, outcome);
     }
 
     private const string StaleLayer = "The layer has changed since this version, or it exists already. Read it again.";
@@ -764,6 +771,7 @@ internal static class StudioEndpoints
         }
 
         httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        await StudioWriteRecords.RecordAsync(httpContext, folder, [(found.File, outcome.Version!)]);
         return Results.Ok(new StudioPatchResponse(outcome.Version!, StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
@@ -818,6 +826,7 @@ internal static class StudioEndpoints
 
         var location = $"/api/studio/apps/{Uri.EscapeDataString(application)}/resources/{id:D}";
         httpContext.Response.Headers.ETag = $"\"{outcome.Version}\"";
+        await StudioWriteRecords.RecordAsync(httpContext, folder, [(file, outcome.Version!)]);
         return Results.Created(location, new StudioCreateResponse(
             id.ToString("D"),
             (string)content["kind"]!,
@@ -940,6 +949,18 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status409Conflict, "The resource has changed since this version. Read it again.");
         }
 
+        var listed = StudioFolder.List(folder);
+        await StudioWriteRecords.RecordAsync(
+            httpContext,
+            folder,
+            [
+                .. changes
+                    .Select((change, index) => (
+                        File: change is StudioCreateChange create ? create.File : listed.FirstOrDefault(file => file.Id == change.Id)?.File,
+                        Version: outcome.Versions![index]))
+                    .Where(write => write.File is not null)
+                    .Select(write => (write.File!, write.Version)),
+            ]);
         return Results.Ok(new StudioChangesResponse(
             [.. changes.Select((change, index) => new StudioChangeItem(change.Id.ToString("D"), outcome.Versions![index]))],
             StudioDiagnostics.Compile(folder, packages, modules)));
@@ -1079,6 +1100,16 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status400BadRequest, "The file name leads outside the application folder.");
         }
 
+        var written = StudioFolder.List(folder);
+        await StudioWriteRecords.RecordAsync(
+            httpContext,
+            folder,
+            [
+                .. outcome.Resources
+                    .Select(resource => (File: written.FirstOrDefault(file => file.Id.ToString("D") == resource.Id)?.File, resource.Version))
+                    .Where(write => write.File is not null)
+                    .Select(write => (write.File!, write.Version)),
+            ]);
         return Results.Ok(new StudioTextWriteResponse(outcome.Resources, StudioDiagnostics.Compile(folder, packages, modules)));
     }
 
