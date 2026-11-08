@@ -1,16 +1,9 @@
 # UI writing
 
-This page says how the words of Axis's own screens are written: Studio, the operator console, the shell, the sign-in
-pages and the platform's messages. It covers these screen texts, in every locale, and every person or agent that adds or
-changes one:
-
-- the platform texts in `src/Axis.Presentation/Texts/<locale>.json`;
-- the identity provider's messages and emails in `web/keycloak-theme/`;
-- the sign-up page's texts in `web/sign-up/texts.ts`;
-- the control plane's emails in `controlplane/src/Axis.ControlPlane/Emails/`;
-- the texts of the built-in modules and applications under `modules/` and `applications/`, which ship with Axis.
-
-An author's own application's texts, the samples' included, belong to that author, who may follow this page.
+This page says how Axis's own words are written. It covers Axis's screen texts: every text that Axis itself shows or
+sends to a person, in every locale, on its screens, its sign-in and sign-up pages, its emails, and in the built-in
+modules and applications that ship with it. It applies to every person or agent that adds or changes one. An author's
+own texts, the samples' included, belong to that author, who may follow this page.
 
 The terms each locale uses are in the [glossary](ui-glossary.json), and the terms that wait for the owner are in the
 [proposed glossary](ui-glossary-proposed.json). This page says how to write; the glossary says which word names which
