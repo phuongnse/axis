@@ -136,8 +136,9 @@ public sealed class StorageQuotaRouteTests
         "POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/drop",
 
-        // The expression check and the page metadata compile in memory and write nothing.
+        // The expression check, the expression scope and the page metadata compile in memory and write nothing.
         "POST /api/studio/apps/{application}/expressions/check",
+        "POST /api/studio/apps/{application}/expressions/scope",
         "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata",
         "POST /api/studio/apps/{application}/resources/{id}/page-metadata",
     };

@@ -83,7 +83,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
 | `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes)                                                                                                                                                                                                                                                                                                                                                                                          |
 | `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression, draft }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `POST /api/studio/apps/{application}/expressions/scope`                             | `200` with `{ type, fields, functions }` _(planned for M31)_, see [Expression scope](#expression-scope)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `POST /api/studio/apps/{application}/expressions/scope` | `200` with `{ type, fields, functions }`. The body is `application/json`, `{ resourceId, path, draft }`, see [Expression scope](#expression-scope) |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`  | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [a module page](draft-page-metadata.md#a-module-page)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ widget, diagnostics }` for a draft form of the module version that the application pins. The body is the whole edited form as `application/json`, see [a module form draft](draft-page-metadata.md#a-module-form-draft)                                                                                                                                                                                                                                                                                                                           |
@@ -447,17 +447,21 @@ only. The body is `{ texts: { <locale>: <text> } }`.
 
 ## Expression scope
 
-_(planned for M31)_
-
 `POST .../expressions/scope` answers what a place in a resource offers, so Studio's
 [expression editor](studio.md#expression-editor) keeps no list of its own. The body is
-`{ resourceId, path, draft }`, as for the [expression check](#expression-check). The answer is
-`{ type, fields, functions }`:
+`{ resourceId, path, draft }`, and the refusals are those of the [expression check](#expression-check).
+The route writes nothing. The server puts the expression `null` at `path` and compiles the folder in
+memory. `null` fits every type, so the compile always type checks the place. The answer is its own scope:
 
-- **`type`** is the type the place needs, or null when any will do.
-- **`fields`** are the fields in scope at the place, each with its `name`, `labelKey` and `type`.
-- **`functions`** are those allowed at the place, from the compiler's list of functions, each with its
-  parameters, result, group, example and what it does, in the request's language.
+- **`type`** is the type the place needs, as in [Types](expressions.md#types), or null when any will do.
+- **`fields`** are the names in scope, in scope order, as `{ name, labelKey, type }`. `labelKey` is null
+  for a name with no label, such as a parameter. A child collection is not listed.
+- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name }`, by
+  the rules of [functions](expressions.md#functions) and [aggregates](expressions.md#aggregates).
+- **No type check.** A place checked without one, such as a migration value whose field types are not
+  known yet, answers `{ type: null, fields: [], functions: [] }`.
+- **Function details.** _(planned for M31)_ Each function also carries its parameters, result, group,
+  example and description, in the request's language.
 
 ## Expression check
 

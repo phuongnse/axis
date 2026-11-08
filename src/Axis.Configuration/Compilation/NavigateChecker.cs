@@ -105,6 +105,7 @@ internal static class NavigateChecker
 
             var parsed = ExpressionParser.Parse(expression);
             ExpressionType? type = null;
+            ExpressionPlace? place = null;
             ExpressionDiagnostic? problem;
             if (!parsed.Succeeded)
             {
@@ -118,10 +119,11 @@ internal static class NavigateChecker
             {
                 var check = ExpressionTypeChecker.Check(parsed.Expression!, scope, expected);
                 type = check.Type;
+                place = check.Place;
                 problem = check.Diagnostic;
             }
 
-            references.RecordExpression(owner, path, type, problem);
+            references.RecordExpression(owner, path, type, problem, place);
             if (problem is not null)
             {
                 Report(problem.Code, problem.Message, path);
@@ -169,6 +171,7 @@ internal static class NavigateChecker
         var entity = formWidget.Entity ?? (formWidget.Form is { } formName ? findForm(formName)?.Entity : null);
         var parsed = ExpressionParser.Parse(record);
         ExpressionType? type = null;
+        ExpressionPlace? place = null;
         ExpressionDiagnostic? problem;
         if (!parsed.Succeeded)
         {
@@ -182,10 +185,11 @@ internal static class NavigateChecker
         {
             var check = ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionType.Reference(entity));
             type = check.Type;
+            place = check.Place;
             problem = check.Diagnostic;
         }
 
-        references.RecordExpression(page, $"{actionPath}/record", type, problem);
+        references.RecordExpression(page, $"{actionPath}/record", type, problem, place);
         if (problem is null)
         {
             return;
