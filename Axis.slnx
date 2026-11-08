@@ -15,6 +15,7 @@
     <Project Path="src/Axis.Scenarios/Axis.Scenarios.csproj" />
     <Project Path="src/Axis.Scenarios.Runner/Axis.Scenarios.Runner.csproj" />
     <Project Path="src/Axis.Server/Axis.Server.csproj" />
+    <Project Path="src/Axis.Studio/Axis.Studio.csproj" />
     <Project Path="src/Axis.Tenancy/Axis.Tenancy.csproj" />
     <Project Path="src/Axis.Worker/Axis.Worker.csproj" />
   </Folder>

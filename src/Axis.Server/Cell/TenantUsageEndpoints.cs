@@ -3,6 +3,7 @@ using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;

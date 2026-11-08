@@ -1,6 +1,7 @@
 using Axis.Server.Authentication;
 using Axis.Server.Studio;
 using Axis.Server.Users;
+using Axis.Studio;
 using Axis.Tenancy;
 
 namespace Axis.Server.Tests;

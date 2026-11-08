@@ -1,6 +1,7 @@
 using Axis.Tenancy;
+using Microsoft.Extensions.Configuration;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>
 /// The server settings of the authoring API. <c>Studio:Folders</c> lists the application folders

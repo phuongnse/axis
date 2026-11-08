@@ -20,6 +20,8 @@ src/
                           restore, and the publisher
   Axis.Administration/    library behind the Axis.Admin commands, such as the tenant setting commands
                           and the platform audit records
+  Axis.Studio/            library behind Studio's application folders: the folder list and settings, the write
+                          lock, revisions and drafts
   Axis.Scenarios.Runner/  library that runs an application's test scenarios, from a folder or from
                           files in memory; used by Axis.Scenarios and the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner

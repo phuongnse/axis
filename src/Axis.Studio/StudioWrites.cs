@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Templates;
 using Json.Patch;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>What a write did: the file's new version, or the reason it was refused.</summary>
 internal sealed record StudioWriteOutcome(StudioWriteRefusal? Refusal, string? Version)

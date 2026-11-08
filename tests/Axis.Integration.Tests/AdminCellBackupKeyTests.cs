@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
+using Axis.Studio;
 using Axis.Tenancy.Platform;
 using LibGit2Sharp;
 using Microsoft.EntityFrameworkCore;

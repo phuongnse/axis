@@ -3,6 +3,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Studio;
 using Axis.Tenancy;
 
 namespace Axis.Server.Studio;

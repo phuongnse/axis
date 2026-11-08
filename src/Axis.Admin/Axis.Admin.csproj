@@ -19,6 +19,7 @@
     <ProjectReference Include="..\Axis.Data\Axis.Data.csproj" />
     <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />
     <ProjectReference Include="..\Axis.Scenarios.Runner\Axis.Scenarios.Runner.csproj" />
+    <ProjectReference Include="..\Axis.Studio\Axis.Studio.csproj" />
     <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
   </ItemGroup>
 

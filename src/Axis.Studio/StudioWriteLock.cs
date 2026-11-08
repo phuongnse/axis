@@ -1,9 +1,10 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>
 /// The lock that every Studio write and the publish snapshot hold while they read a folder and, for a write, change it.

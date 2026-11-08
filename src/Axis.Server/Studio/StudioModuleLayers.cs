@@ -6,6 +6,7 @@ using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
+using Axis.Studio;
 
 namespace Axis.Server.Studio;
 

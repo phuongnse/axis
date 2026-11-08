@@ -5,6 +5,7 @@ using Axis.Core.Tenancy;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Studio;
+using Axis.Studio;
 using Axis.Tenancy;
 using Microsoft.AspNetCore.Mvc;
 

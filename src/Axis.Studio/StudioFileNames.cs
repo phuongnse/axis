@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Templates;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>
 /// Forms the relative path of a new resource file from its content. Only letters, digits and, for a role,

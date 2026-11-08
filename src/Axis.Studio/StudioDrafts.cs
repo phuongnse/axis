@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using LibGit2Sharp;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>
 /// The drafts of one person on one application folder. A draft is the branch <c>refs/heads/drafts/&lt;id&gt;</c> in the

@@ -7,6 +7,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Server.Tenancy;
+using Axis.Studio;
 
 namespace Axis.Server.Studio;
 

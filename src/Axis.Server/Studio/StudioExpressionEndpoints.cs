@@ -5,6 +5,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Typing;
+using Axis.Studio;
 using Json.Patch;
 using Json.Pointer;
 using Microsoft.Net.Http.Headers;
