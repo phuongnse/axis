@@ -412,6 +412,7 @@
   "shell.table.refresh": "Làm mới",
   "shell.table.rowActions": "Thao tác",
   "shell.table.selected": "Đã chọn {count}",
+  "shell.table.range": "{from}–{to} trong số {total}",
   "shell.table.selectRow": "Chọn dòng",
   "shell.table.delete": "Xóa",
   "shell.table.deleteConfirm": "Xóa bản ghi này? Không thể hoàn tác.",

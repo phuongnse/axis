@@ -563,9 +563,9 @@ right.
 - **When.** An entity table has a search box when the entity's display field is among the fields the user may read,
   that is in the widget's `entity.fields`. A data source table has one when the data source's metadata has
   `"search": true`.
-- **Applying.** The text applies on Enter, on the search button and when the box is cleared, so typing does not
-  request rows and add a history entry for every key. It lives in the URL as `search`. A new search starts again at
-  page 1 and adds a history entry, and paging and sorting keep it.
+- **Applying.** The box applies as [tables](actions-and-controls.md#tables) says, so typing does not request rows
+  for every key. The text lives in the URL as `search`, a new search adds a history entry, and paging and sorting
+  keep it.
 - **The text.** The text is sent to the rows request as typed, without trimming. An empty text means no search, so
   clearing the box removes `search` from the URL. The box takes at most 200 characters, the limit of the rows routes.
 - **No search.** On a table that cannot search, a `search` in the URL is ignored and removed without a history entry,

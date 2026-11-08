@@ -24,6 +24,22 @@ async function startStudio(router: ReturnType<typeof renderGuarded>) {
 }
 
 describe('useUnsavedChanges', () => {
+  it('lets a move that only changes a table view through, and still asks for any other address change', async () => {
+    const router = renderGuarded(<Editor />)
+    await startStudio(router)
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await act(() => router.navigate('/studio?app=A&search=pa&sort=-name&page=2&pageSize=50'))
+    expect(router.state.location.search).toBe('?app=A&search=pa&sort=-name&page=2&pageSize=50')
+    await act(() => router.navigate(-1))
+    await waitFor(() => expect(router.state.location.search).toBe('?app=A'))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+
+    void router.navigate('/studio?app=B&search=pa')
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?app=A')
+  })
+
   it('asks "Leave without saving?" before a link while an editor is counted in, and Stay keeps the address', async () => {
     const router = renderGuarded(<Editor counted />)
 

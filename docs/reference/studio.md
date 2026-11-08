@@ -152,6 +152,8 @@ what changed.
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
+  A move that only changes the `search`, `sort`, `page` or `pageSize` of a [table](actions-and-controls.md#tables)
+  is not asked about either, because the editor stays on screen.
 
 ## References
 
