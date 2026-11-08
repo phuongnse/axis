@@ -90,6 +90,10 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
   sentence that links it, but never restates its detail.
 - **Give the reason** when a reader would ask why, in a sentence next to the rule. A longer argument
   is a decision, which the page links.
+- **State a rule's scope by kind.** A rule says what it covers by what those things are, such as
+  "every text that Axis shows or sends to a person", never by a list of the folders, files, pages or
+  cases that hold them today. A new one then falls under the rule without a change, where a list
+  would leave it out until someone remembers to add it.
 - **Leave values to the code.** Name the token (`bar`), not its value (48 px), and name the file that
   holds a list rather than copying it. A page that lists what the code defines, such as the
   [diagnostic codes](reference/diagnostic-codes.md), has a test that compares the two, see

@@ -14,16 +14,18 @@ namespace Axis.Server.Studio;
 
 /// <summary>
 /// <c>POST /api/studio/apps/{application}/expressions/check</c> checks one expression where it would stand. The body is
-/// <c>{ resourceId, path, expression }</c>: the resource's id, the JSON Pointer of a string in it, and the text to try.
-/// It puts the text into a copy of the saved resource and compiles the folder in memory, so the answer is the compile's
-/// own and nothing is written or locked. It answers <c>{ type, diagnostics }</c>. A diagnostic has the compile's
-/// <c>code</c> and <c>message</c> and a character range, <c>start</c> and <c>end</c>, as UTF-16 offsets into the
+/// <c>{ resourceId, path, expression, draft }</c>: the resource's id, the JSON Pointer of a string in it, the text to try,
+/// and optionally the resource as the author has it. The path is evaluated in the draft when one is given, and in the
+/// saved resource otherwise. The text goes into a copy of that resource and the folder compiles in memory, so the answer
+/// is the compile's own and nothing is written or locked. It answers <c>{ type, diagnostics }</c>. A diagnostic has the
+/// compile's <c>code</c> and <c>message</c> and a character range, <c>start</c> and <c>end</c>, as UTF-16 offsets into the
 /// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic. The checks run in the order of the
 /// rest of the authoring API: session (401), author role (403), application (404), then 415 for a content type other than
-/// <c>application/json</c>, 400 for a body that is not an expression check, 404 for a resource id the application does
-/// not have, and 400 for a path that holds no expression. A path holds no expression when it points at neither a string
-/// nor a missing property of an object the saved resource has, so a condition not yet saved is checked in place. It also
-/// holds none when the compile checks no expression there, as when another problem in the resource skips the check.
+/// <c>application/json</c>, 400 for a body that is not an expression check or a <c>draft</c> that is not an object, 404 for a
+/// resource id the application does not have, and 400 for a path that holds no expression. A path holds no expression when
+/// it points at neither a string nor a missing property of an object the resource has, so a condition not yet saved is
+/// checked in place. It also holds none when the compile checks no expression there, as when another problem in the
+/// resource skips the check.
 /// </summary>
 internal static class StudioExpressionEndpoints
 {
@@ -65,13 +67,14 @@ internal static class StudioExpressionEndpoints
             || id.Length != 36 || !Guid.TryParseExact(id, "D", out var resourceId)
             || body["path"] is not JsonValue pathValue || !pathValue.TryGetValue<string>(out var path)
             || !JsonPointer.TryParse(path, out var pointer)
-            || body["expression"] is not JsonValue expressionValue || !expressionValue.TryGetValue<string>(out var expression))
+            || body["expression"] is not JsonValue expressionValue || !expressionValue.TryGetValue<string>(out var expression)
+            || body["draft"] is not (null or JsonObject))
         {
             return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadCheck);
         }
 
         var (resources, folderFiles) = StudioFolder.ListWithContent(folder);
-        var (answer, problem) = Check(resources, folderFiles, resourceId, path, pointer, expression, packages, modules);
+        var (answer, problem) = Check(resources, folderFiles, resourceId, path, pointer, expression, packages, modules, body["draft"] as JsonObject);
         return problem switch
         {
             null => Results.Ok(answer),
@@ -87,7 +90,8 @@ internal static class StudioExpressionEndpoints
 
     /// <summary>
     /// Checks <paramref name="expression"/> at <paramref name="path"/> of the resource <paramref name="resourceId"/> in the compile
-    /// of <paramref name="files"/>, as the route does. Answers the type and diagnostics, or the title of the refusal:
+    /// of <paramref name="files"/>, as the route does. <paramref name="draft"/>, when given, stands in for the saved resource
+    /// at that path. Answers the type and diagnostics, or the title of the refusal:
     /// <see cref="StudioEndpoints.NoResource"/> for a resource the files lack and <see cref="NoExpressionTitle"/> for a path that holds no
     /// expression. Writes nothing.
     /// </summary>
@@ -99,14 +103,15 @@ internal static class StudioExpressionEndpoints
         JsonPointer pointer,
         string expression,
         PackageCatalog packages,
-        ModuleCatalog modules)
+        ModuleCatalog modules,
+        JsonObject? draft = null)
     {
         if (resources.FirstOrDefault(file => file.Id == resourceId) is not { } found)
         {
             return (null, StudioEndpoints.NoResource);
         }
 
-        var edited = Place(found, pointer, expression);
+        var edited = Place(found, pointer, expression, draft);
         if (edited is null)
         {
             return (null, NoExpressionTitle);
@@ -141,14 +146,15 @@ internal static class StudioExpressionEndpoints
     }
 
     /// <summary>
-    /// The resource's JSON with <paramref name="expression"/> at <paramref name="pointer"/>: in place of the string there, or
-    /// as a new property when the object that would hold it exists. Null when the path is neither.
+    /// The resource's JSON, from <paramref name="draft"/> when given and the saved file otherwise, with
+    /// <paramref name="expression"/> at <paramref name="pointer"/>: in place of the string there, or as a new property when
+    /// the object that would hold it exists. Null when the path is neither.
     /// </summary>
-    private static string? Place(StudioFile file, JsonPointer pointer, string expression)
+    private static string? Place(StudioFile file, JsonPointer pointer, string expression, JsonObject? draft)
     {
         try
         {
-            var content = JsonNode.Parse(file.Bytes);
+            var content = draft?.DeepClone() ?? JsonNode.Parse(file.Bytes);
             var value = JsonValue.Create(expression);
             PatchOperation operation;
             if (pointer.TryEvaluate(content, out var current))
