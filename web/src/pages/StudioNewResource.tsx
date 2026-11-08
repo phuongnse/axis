@@ -1,6 +1,8 @@
 import { Form, Input, Modal, Select } from 'antd'
 import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { requiredMark } from '../platform/requiredMark'
 import {
   createStudioResource,
   fetchStudioResource,
@@ -17,8 +19,10 @@ import { useDesignTokens } from '../platform/themeMode'
 /** The locale a new text resource copies when the application has no site. */
 const fallbackLocale = 'en'
 
-/** What the dialog says is wrong with the author's input, as the text key to show under the field. */
+/** What the server says is wrong with the author's input, as the text key to show under the field. */
 type Problem = 'exists' | 'invalid' | 'failed'
+
+type Values = { kind?: string; value: string }
 
 /**
  * The New resource button of the open application's band, a text button, and its dialog. The dialog asks for a kind, listed by its singular
@@ -27,7 +31,9 @@ type Problem = 'exists' | 'invalid' | 'failed'
  * or the locale alone. It creates the resource from
  * the kind's starter with an id from `crypto.randomUUID()`. A new text resource is named after its locale, such as `TextsVi`, and copies every key and
  * text of the default locale of the first site in file order, or of `en` when there is no site, so every label still
- * resolves. A `409` or a `400` shows under the field, and the dialog stays open. `onCreated` gets the new resource and
+ * resolves. The fields are marked required and have help, see [New resource](docs/reference/studio.md#new-resource).
+ * Create is on until a create runs. A click with a field empty shows what is missing under it and focuses it, and sends nothing.
+ * A `409` or a `400` shows under the field, and the dialog stays open. `onCreated` gets the new resource and
  * the folder's diagnostics after the write.
  */
 export function StudioNewResource({
@@ -45,10 +51,8 @@ export function StudioNewResource({
   const { size } = useDesignTokens()
   const { lost } = useStudioConnection()
   const [open, setOpen] = useState(false)
-  const [chosenKind, setKind] = useState<string | undefined>(fixedKind)
-  const kind = fixedKind ?? chosenKind
-  const [value, setValue] = useState('')
-  const [problem, setProblem] = useState<Problem>()
+  const [form] = Form.useForm<Values>()
+  const kind = Form.useWatch('kind', form) ?? fixedKind
   const [creating, setCreating] = useState(false)
   const isText = kind === 'text'
   const kindOptions = kindGroupNames.flatMap((group) => {
@@ -60,43 +64,37 @@ export function StudioNewResource({
   })
   const label = t(isText ? 'shell.studio.newResource.locale' : 'shell.studio.newResource.name')
 
-  function show() {
-    setKind(fixedKind)
-    setValue('')
-    setProblem(undefined)
-    setOpen(true)
+  function problemOf(problem: Problem) {
+    form.setFields([{ name: 'value', errors: [t(`shell.studio.newResource.${problem}`)] }])
   }
 
-  async function create() {
-    if (kind === undefined || value.trim() === '') {
-      return
-    }
-    const entered = value.trim()
+  async function create(values: Values) {
+    const chosen = values.kind ?? fixedKind!
+    const entered = values.value.trim()
     setCreating(true)
-    setProblem(undefined)
     try {
       const body =
-        kind === 'text'
-          ? createStarter(kind, {
+        chosen === 'text'
+          ? createStarter(chosen, {
               id: crypto.randomUUID(),
               name: textResourceName(entered),
               locale: entered,
               texts: await sourceTexts(application, resources),
             })
-          : createStarter(kind, { id: crypto.randomUUID(), name: entered })
+          : createStarter(chosen, { id: crypto.randomUUID(), name: entered })
       const result = await createStudioResource(application, body)
       if (result.status === 'created') {
         setOpen(false)
-        onCreated({ ...result.item, titles: {}, locale: kind === 'text' ? entered : null }, result.diagnostics)
+        onCreated({ ...result.item, titles: {}, locale: chosen === 'text' ? entered : null }, result.diagnostics)
       } else {
-        setProblem(result.status === 'conflict' ? 'exists' : 'invalid')
+        problemOf(result.status === 'conflict' ? 'exists' : 'invalid')
       }
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()
       } else {
         console.warn(`Creating a resource in '${application}' failed`, error)
-        setProblem('failed')
+        problemOf('failed')
       }
     } finally {
       setCreating(false)
@@ -105,7 +103,7 @@ export function StudioNewResource({
 
   return (
     <>
-      <AxisButton role={fixedKind === undefined ? 'secondary' : 'main'} onClick={show}>
+      <AxisButton role={fixedKind === undefined ? 'secondary' : 'main'} onClick={() => setOpen(true)}>
         {t(
           fixedKind === undefined
             ? 'shell.studio.newResource.button'
@@ -122,44 +120,49 @@ export function StudioNewResource({
         )}
         okText={t('shell.studio.newResource.create')}
         cancelText={t('shell.studio.cancel')}
-        okButtonProps={{ disabled: kind === undefined || value.trim() === '' }}
         confirmLoading={creating}
-        onOk={create}
+        onOk={() => form.submit()}
         onCancel={() => setOpen(false)}
+        // Each opening starts with empty fields.
+        afterClose={() => form.resetFields()}
       >
-        <Form layout="vertical">
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          initialValues={{ kind: fixedKind, value: '' }}
+          scrollToFirstError={{ focus: true }}
+          // A server problem under the value belongs to the kind it was shown for, and goes when the kind changes.
+          onValuesChange={(changed) => 'kind' in changed && form.setFields([{ name: 'value', errors: [] }])}
+          onFinish={create}
+        >
           {fixedKind === undefined && (
-            <Form.Item label={t('shell.studio.newResource.kind')}>
+            <AxisField
+              name="kind"
+              label={t('shell.studio.newResource.kind')}
+              help={t('shell.studio.newResource.kind.help')}
+              requiredMessage={t('shell.studio.newResource.kindRequired')}
+            >
               <Select
                 aria-label={t('shell.studio.newResource.kind')}
-                value={kind}
                 // All kinds render, so each one can be reached without scrolling the list, and the author can type to narrow it.
                 showSearch
                 optionFilterProp="label"
                 virtual={false}
                 options={kindOptions}
-                onChange={(next) => {
-                  setKind(next)
-                  setProblem(undefined)
-                }}
               />
-            </Form.Item>
+            </AxisField>
           )}
-          <Form.Item
+          <AxisField
+            name="value"
             label={label}
-            validateStatus={problem === undefined ? undefined : 'error'}
-            help={problem === undefined ? undefined : t(`shell.studio.newResource.${problem}`)}
+            help={t(isText ? 'shell.studio.newResource.locale.help' : 'shell.studio.newResource.name.help')}
+            requiredMessage={t(
+              isText ? 'shell.studio.newResource.localeRequired' : 'shell.studio.newResource.nameRequired',
+            )}
           >
-            <Input
-              aria-label={label}
-              value={value}
-              onChange={(event) => {
-                setValue(event.target.value)
-                setProblem(undefined)
-              }}
-              onPressEnter={create}
-            />
-          </Form.Item>
+            <Input aria-label={label} onPressEnter={() => form.submit()} />
+          </AxisField>
         </Form>
       </Modal>
     </>

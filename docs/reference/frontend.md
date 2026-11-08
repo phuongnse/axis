@@ -869,7 +869,7 @@ narrow one.
 Every field of the platform's own screens has help text, enforced three ways, because in an application
 builder help is not optional.
 
-- **`AxisField` requires `help`,** _(planned for M31)_ so a screen cannot leave it out.
+- **`AxisField` requires `help`,** so a screen cannot leave it out.
 - **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
   that are not fields, such as `modules.addTitle`, move out of it.
 - **Every editor draws its labels through `AxisField`,** _(planned for M31)_ those that draw their own today

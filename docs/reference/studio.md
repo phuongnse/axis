@@ -57,7 +57,7 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   author can type to narrow it. The dialog then asks for a name, or for a locale when the kind is
   `text`. A `409`, when the id or the file exists, or a `400`, when the name or the locale is refused,
   shows under the field and keeps the dialog open.
-- **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
+- **Its fields.** Kind and Name, or Locale, are marked required and have help. Create
   stays on, and a click [checks the fields](actions-and-controls.md#fields).
 - **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's
   schema except at the references the author must still choose, with an id from
