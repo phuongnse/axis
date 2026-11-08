@@ -175,6 +175,9 @@ const texts = {
   'shell.table.import': 'Import…',
   'shell.table.importTitle': 'Import records',
   'shell.table.importChoose': 'Choose a CSV or Excel file',
+  'shell.table.importFileField': 'File',
+  'shell.table.importFileField.help': 'A CSV or Excel file.',
+  'shell.table.importFileRequired': 'Choose a file.',
   'shell.table.importCheck': 'Check',
   'shell.table.importChecking': 'Checking the file…',
   'shell.table.importChecked': 'The file is clean.',
@@ -1752,7 +1755,24 @@ describe('TableWidget import', () => {
     await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
 
     expect(await screen.findByTestId('import-problem')).toHaveTextContent('Only a CSV or Excel file can be imported.')
-    expect(within(dialog).getByRole('button', { name: 'Check' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Check' })).toBeEnabled()
+    expect(uploads()).toHaveLength(0)
+  })
+
+  it('checks for a file on click and sends nothing', async () => {
+    const { uploads } = stubImport([])
+    renderWidget('', importWidget)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Import…' }))
+    const dialog = await screen.findByRole('dialog')
+    const check = within(dialog).getByRole('button', { name: 'Check' })
+    expect(check).toBeEnabled()
+    await userEvent.click(check)
+
+    expect(await within(dialog).findByText('Choose a file.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Choose a CSV or Excel file' })).toHaveFocus(),
+    )
     expect(uploads()).toHaveLength(0)
   })
 

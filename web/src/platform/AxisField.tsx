@@ -13,34 +13,58 @@ export type AxisFieldProps = {
   requiredMessage?: string
   /** More rules of Ant Design's form, checked after the required one. */
   rules?: FormItemProps['rules']
+  /** For an input whose value is not called `value`, such as an `Upload`'s `fileList`. Ant Design's form setting of that name. */
+  valuePropName?: FormItemProps['valuePropName']
+  /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
+  getValueFromEvent?: FormItemProps['getValueFromEvent']
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
+}
+
+/** Whether a field has no value: none, blank text or an empty list. A number, even 0, is a value. */
+function isEmpty(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === 'string' && value.trim() === '') ||
+    (Array.isArray(value) && value.length === 0)
+  )
 }
 
 /**
  * A field of a platform screen: its label, its help, its input and its error, in the form widget's field look. The
  * label sits above the help, the help above the input and the error under it. The help describes the input. A
- * `requiredMessage` marks the field required and adds the rule that checks it, so the mark and the check never part. It
- * belongs inside a vertical form that takes the shared `requiredMark`, see
+ * `requiredMessage` marks the field required and adds the rule that checks it, so the mark and the check never part. The
+ * check holds for text, numbers and lists, and blank text is empty. It belongs inside a vertical form that takes the shared `requiredMark`, see
  * docs/reference/actions-and-controls.md#fields and docs/reference/frontend.md#platform-field-help.
  */
-export function AxisField({ label, help, name, requiredMessage, rules, children }: AxisFieldProps) {
+export function AxisField({
+  label,
+  help,
+  name,
+  requiredMessage,
+  rules,
+  valuePropName,
+  getValueFromEvent,
+  children,
+}: AxisFieldProps) {
   const { colour } = useDesignTokens()
   return (
     <Form.Item
       name={name}
       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{label}</span>}
       required={requiredMessage !== undefined}
+      valuePropName={valuePropName}
+      getValueFromEvent={getValueFromEvent}
       rules={[
         ...(requiredMessage === undefined
           ? []
           : [
               {
                 required: true,
-                whitespace: true,
                 message: requiredMessage,
-                // A multiple select holds an array, which is empty when nothing is chosen. The rule reads text, so it reads the joined values.
-                transform: (value: unknown) => (Array.isArray(value) ? value.join('') : value),
+                validator: (_rule: unknown, value: unknown) =>
+                  isEmpty(value) ? Promise.reject(new Error(requiredMessage)) : Promise.resolve(),
               },
             ]),
         ...(rules ?? []),
