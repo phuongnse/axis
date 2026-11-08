@@ -161,7 +161,14 @@ export function StudioNewResource({
               isText ? 'shell.studio.newResource.localeRequired' : 'shell.studio.newResource.nameRequired',
             )}
           >
-            <Input aria-label={label} onPressEnter={() => form.submit()} />
+            <Input
+              aria-label={label}
+              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+              onPressEnter={(event) => {
+                event.preventDefault()
+                form.submit()
+              }}
+            />
           </AxisField>
         </Form>
       </Modal>

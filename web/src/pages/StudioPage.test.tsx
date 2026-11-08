@@ -1853,6 +1853,19 @@ describe('StudioPage publishing', () => {
       expect(JSON.parse(init!.body as string)).toMatchObject({ kind: 'entity', name: 'CostCentre' })
     })
 
+    it("creates once when Enter is pressed in a kind's New entity…", async () => {
+      const fetchMock = stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre{Enter}')
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
+      expect(fetchMock.mock.calls.filter(([, call]) => call?.method === 'POST')).toHaveLength(1)
+    })
+
     it("asks a kind's New text resource… for a locale alone", async () => {
       const fetchMock = stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=text')
