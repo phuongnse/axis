@@ -413,8 +413,8 @@ describe('StudioPage', () => {
     expect(within(name).getByRole('textbox')).toHaveValue('number')
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('200')
     const label = screen.getByTestId('studio-field-/label')
-    expect(within(label).getByRole('textbox', { name: 'Text key' })).toHaveValue('entity.purchaseRequest')
-    expect(within(label).getByRole('textbox', { name: 'en' })).toHaveValue('Purchase request')
+    expect(within(label).queryByRole('textbox', { name: 'Text key' })).toBeNull()
+    expect(within(label).getByRole('textbox', { name: 'English' })).toHaveValue('Purchase request')
     expect(screen.getByTestId('studio-entity-designer')).toBeInTheDocument()
   })
 

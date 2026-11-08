@@ -66,7 +66,7 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   `openStudio`, which opens Studio before a publish, each with a limit of 60 seconds. The other
   journeys of that spec write their changed files through the Studio resource API, without the
   browser.
-- **Label texts.** A journey types a label's texts into the label editor, one box per locale, and keeps
+- **Label texts.** A journey types a label's texts in the label's Translations… dialog, and keeps
   the key that Studio makes. It types a key into a text resource only for the keys that a label picks
   from a list, and for keys that no label uses.
 - **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks

@@ -126,6 +126,10 @@ describe('the Axis Helm chart', () => {
       'cell.certificate.enabled=false',
       '--set',
       'cell.pgbouncer.enabled=false',
+      '--set',
+      'studio.folders=null',
+      '--set',
+      'studio.persistence=null',
     )
     const publisher = find(output, 'Deployment', 'axis-publisher')
     assert.match(publisher, /replicas: 1\n/)
@@ -145,6 +149,28 @@ describe('the Axis Helm chart', () => {
     for (const service of documents(output).filter((d) => /^kind: Service$/m.test(d))) {
       assert.doesNotMatch(service, /component: publisher/)
     }
+  })
+
+  test('outside a cell the publisher mounts the Studio volume read-write and gets the folders and the platform connection when studio.folders is set', () => {
+    const publisher = find(
+      renderOk(
+        '--set',
+        'secrets.scenarioServerConnection.name=',
+        '--set',
+        'cell.id=',
+        '--set',
+        'cell.certificate.enabled=false',
+        '--set',
+        'cell.pgbouncer.enabled=false',
+      ),
+      'Deployment',
+      'axis-publisher',
+    )
+    assert.match(publisher, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
+    assert.match(publisher, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
+    assert.match(publisher, /- name: Studio__Folders__0\n\s+value: "\/studio\/purchase-requests"/)
+    assert.match(publisher, /- key: "ConnectionStrings__Platform"\n\s+path: ConnectionStrings__Platform\n/)
+    assert.doesNotMatch(publisher, /Studio__ApplicationsPath|Studio__AuthorRole|Studio__PublisherRole|Studio__Tests/)
   })
 
   test('the scenario connection is mounted in the publisher only, and only when it is named', () => {
@@ -576,11 +602,26 @@ describe('the Axis Helm chart', () => {
     assert.match(publisher, /- name: IdentityProvider__AdminClientId\n\s+value: axis-admin\n/)
     assert.match(publisher, /- name: Cell__TenantDomain\n\s+value: "vn\.example\.com"\n/)
     assert.match(publisher, /- name: Studio__ApplicationsPath\n\s+value: \/studio\n/)
+    assert.match(publisher, /path: ConnectionStrings__Platform\n/)
     assert.match(publisher, /- name: studio\n\s+mountPath: \/studio\n(?!\s+readOnly)/)
     assert.match(publisher, /- name: studio\n\s+persistentVolumeClaim:\n\s+claimName: axis-studio\n/)
     assert.match(publisher, /- name: Templates__Path\n\s+value: \/templates\n/)
     assert.match(publisher, /- name: templates\n\s+mountPath: \/templates\n\s+readOnly: true\n/)
     assert.match(publisher, /- name: templates\n\s+persistentVolumeClaim:\n\s+claimName: axis-templates\n/)
+  })
+
+  test("the installation doc's publisher row of 'Which pod gets which secret' lists the secrets the chart gives the publisher", () => {
+    const keys = [...readFileSync(new URL('../deploy/helm/axis/values.yaml', import.meta.url), 'utf8').matchAll(/^  ([a-z][A-Za-z]+):\n    name:/gm)].map((match) => match[1])
+    assert.ok(keys.length > 10, 'no secrets in values.yaml')
+    const publisher = find(renderOk(...keys.flatMap((key) => ['--set', `secrets.${key}.name=named-${key}`])), 'Deployment', 'axis-publisher')
+    const rendered = [...new Set([...publisher.matchAll(/(?:secretName|name): "named-([A-Za-z]+)"/g)].map((match) => match[1]))].sort()
+
+    const doc = readFileSync(new URL('../docs/reference/installation.md', import.meta.url), 'utf8')
+    const row = doc.split('\n').find((line) => line.startsWith('| Publisher | '))
+    assert.ok(row, 'no Publisher row in the secrets table')
+    const listed = [...new Set([...row.matchAll(/`([a-z][A-Za-z]+)`/g)].map((match) => match[1]).filter((name) => keys.includes(name)))].sort()
+    assert.ok(rendered.length > 0, 'the publisher mounts no secret')
+    assert.deepEqual(listed, rendered)
   })
 
   test('in a cell the server and the publisher mount the same Studio volume and use /studio as the applications folder', () => {

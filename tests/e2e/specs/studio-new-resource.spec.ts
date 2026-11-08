@@ -8,7 +8,7 @@ import { waitForDialog } from '../dialogs'
 import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab, openKind, openProblemsIfAny } from '../studio-resources'
+import { createResource, openFormTab, openKind, openProblemsIfAny, writeLabel } from '../studio-resources'
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000)
@@ -288,8 +288,7 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByRole('textbox', { name: 'Issuer (URL binding)', exact: true }).fill('PartnerIssuer')
     await page.getByRole('textbox', { name: 'Client id (Secret binding)', exact: true }).fill('PartnerClientId')
     await page.getByRole('textbox', { name: 'Client secret (Secret binding)', exact: true }).fill('PartnerClientSecret')
-    const label = page.getByTestId('studio-field-/label')
-    await label.getByRole('textbox', { name: 'en', exact: true }).fill('Continue with Partner')
+    await writeLabel(page, 'studio-field-/label', { en: 'Continue with Partner' })
     await page.getByRole('button', { name: 'Add role', exact: true }).click()
     const row = page.getByTestId('studio-role-row-0')
     await row.getByRole('textbox').fill('managers')

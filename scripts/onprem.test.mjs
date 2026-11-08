@@ -56,7 +56,7 @@ const secretFiles = {
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   agent: [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
-  publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -172,6 +172,32 @@ describe('the example holds no secret', () => {
     assert.deepEqual(publisher.command, ['publisher'])
     assert.match(publisher.image, /axis-admin:/)
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
+  })
+
+  test("the installation doc's 'Mounted in' table lists the secret files of each service as the rendered config mounts them", () => {
+    const { services } = render([scenariosFile])
+    const mounted = {}
+    for (const [name, service] of Object.entries(services)) {
+      for (const secret of service.secrets ?? []) (mounted[secret.source] ??= []).push(name)
+    }
+    const doc = readFileSync(join(root, 'docs/reference/installation.md'), 'utf8')
+    const start = doc.indexOf('| File | Mounted in |')
+    assert.notEqual(start, -1, 'no Mounted in table')
+    const listed = {}
+    for (const line of doc.slice(start).split('\n').slice(2)) {
+      if (!line.startsWith('|')) break
+      const cells = line.split('|').map((cell) => cell.trim())
+      const file = /`([^`]+)`/.exec(cells[1])?.[1]
+      assert.ok(file, `no file in ${line}`)
+      listed[file] = cells[2].split(',').map((service) => service.trim())
+    }
+    assert.ok(Object.keys(mounted).length > 0, 'the config mounts no secret')
+    const sort = (table) => Object.fromEntries(Object.entries(table).map(([file, names]) => [file, [...names].sort()]).sort(([a], [b]) => a.localeCompare(b)))
+    // The doc says "server" for both replicas.
+    for (const files of Object.values(mounted)) {
+      if (files.includes('server-2')) files.splice(files.indexOf('server-2'), 1)
+    }
+    assert.deepEqual(sort(listed), sort(mounted))
   })
 
   test('the scenario secret and Studio__Tests come only with compose.scenarios.yaml, in the publisher and the servers', () => {
@@ -390,23 +416,27 @@ describe('the TLS proxy', () => {
 })
 
 describe('the Studio folder', () => {
-  test('only the servers mount the Studio folder, read-write, and Studio is off without shell values', () => {
+  test('only the servers and the publisher mount the Studio folder, read-write, and Studio is off without shell values', () => {
     const { services } = render()
     const sources = []
-    for (const name of ['server', 'server-2']) {
+    for (const name of ['server', 'server-2', 'publisher']) {
       const mounts = services[name].volumes.filter((volume) => volume.target === '/studio')
       assert.equal(mounts.length, 1, `${name} mounts /studio ${mounts.length} times`)
       assert.equal(mounts[0].type, 'bind')
       assert.notEqual(mounts[0].read_only, true, `${name} mounts /studio read-only`)
       sources.push(mounts[0].source)
-      for (const key of ['Studio__Folders__0', 'Studio__AuthorRole', 'Studio__PublisherRole']) {
+      const keys = name === 'publisher' ? ['Studio__Folders__0'] : ['Studio__Folders__0', 'Studio__AuthorRole', 'Studio__PublisherRole']
+      for (const key of keys) {
         const value = services[name].environment[key]
         assert.ok(value === null || value === undefined || value === '', `${name} sets ${key}`)
       }
     }
-    assert.equal(sources[0], sources[1])
+    assert.equal(new Set(sources).size, 1, 'the servers and the publisher mount one folder')
     assert.equal(sources[0], join(root, 'deploy/compose/studio'))
-    for (const name of ['worker', 'agent', 'publisher', 'admin', 'proxy', 'identity']) {
+    // The roles decide what a signed-in user may do, and the publisher serves no users.
+    assert.equal(services.publisher.environment.Studio__AuthorRole, undefined)
+    assert.equal(services.publisher.environment.Studio__PublisherRole, undefined)
+    for (const name of ['worker', 'agent', 'admin', 'proxy', 'identity']) {
       assert.equal(
         (services[name].volumes ?? []).some((volume) => volume.target === '/studio'),
         false,

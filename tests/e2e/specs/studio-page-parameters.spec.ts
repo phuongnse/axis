@@ -9,7 +9,7 @@ import { confirmDialog, waitForDialog } from "../dialogs";
 import { pickAction, pickOption } from "../select";
 import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource, openFormTab, openNewApplication } from "../studio-resources";
+import { createResource, openFormTab, openNewApplication, writeLabel } from "../studio-resources";
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it. Publishing Approvals
 // runs the contract scenarios of both built-in modules, which takes longer than the other Studio journeys.
@@ -77,9 +77,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
 
   /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
   async function fillTexts(page: Page, label: string, en: string, vi: string) {
-    const field = page.getByTestId(label);
-    await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
-    await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
+    await writeLabel(page, label, { en, vi });
   }
 
   async function writeResource(folder: string, file: string, value: unknown) {

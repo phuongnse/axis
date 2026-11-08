@@ -107,7 +107,8 @@ a seed record.
 
 ## Studio settings
 
-These server settings turn Studio on and say who may author, publish and run tests. What each one
+These settings turn Studio on and say who may author, publish and run tests. The server reads all of
+them, and the publisher reads the three paths, as the **Publisher and Studio** item below says. What each one
 allows in the authoring API, and the Studio fields of `GET /api/me` that follow from them, are in
 [authoring API settings](authoring.md#settings).
 
@@ -134,6 +135,17 @@ allows in the authoring API, and the Studio fields of `GET /api/me` that follow 
 - **Revisions.** With neither path set, the server keeps no revisions. In a cell the folder is
   `<Studio:ApplicationsPath>/<tenant id>/.revisions`. Setting `Studio:RevisionsPath` there stops the
   start, and the message names `Studio:RevisionsPath` and `Cell:Id`.
+- **Publisher and Studio.** The publisher reads `Studio:Folders`, `Studio:ApplicationsPath` and
+  `Studio:RevisionsPath` with the rules above, the cell rule included, and finds an application folder
+  by its name as Studio does. A name that is not one plain folder name, such as `..`, `a/b` or an
+  absolute path, finds nothing, even when a manifest carries it. A setting that stops the server stops
+  the publisher too, with exit code 2 and a message that names the setting and not its path. A
+  relative path is resolved against the publisher's working directory. It also reads
+  `ConnectionStrings:Platform` for the Studio write lock, which the [server](authoring.md#versions)
+  holds the same way, and starts without it, holding no lock. It reads no role and no `Studio:Tests`,
+  because it serves no signed-in user. With none of the three paths set, it runs without Studio. The
+  folders sit on the same volume, at the same path, as on the servers, because the lock is keyed by
+  the full path.
 - **Tests.** `Studio:Tests` grants no right: a `test` request needs the author role only, and the
   publisher runs it, see [test](authoring.md#test). Turn it on together with the publisher's
   `Scenarios:ServerConnectionString`, because the server cannot see the publisher's settings.

@@ -21,8 +21,9 @@ The server, the worker and the agent host open these connections:
 | agent | A model provider's API | `Ai:Bindings:<name>:Endpoint`, or the provider's own address when it is empty, see [model bindings](model-bindings.md#bindings) | [Model provider](installation.md#tls) |
 | worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](installation.md#tls) |
 
-The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema` and
-`Scenarios:ServerConnectionString`, and calls no HTTP address. The admin host connects to PostgreSQL
+The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema`,
+`ConnectionStrings:Platform` for the Studio write lock and `Scenarios:ServerConnectionString`, and
+calls no HTTP address. The admin host connects to PostgreSQL
 with `Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`. Only `tenant create` of a main
 tenant also calls an HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over
 HTTPS outside `Development` and `Testing`. That address is an operator setting, so it is on the

@@ -58,7 +58,7 @@ namespace Axis.Admin;
 /// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
 /// A stop lets a running job finish. In a fourth loop it also checks the pending host requests of <c>platform.tenant_host_requests</c> every
 /// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. In a fifth loop it deletes the stored tenant exports that are older
-/// than 7 days every hour, see <see cref="TenantExportSweep"/>, and only with the export storage settings. A failed round writes one line, and the next round tries again.
+/// than 7 days every hour, see <see cref="TenantExportSweep"/>, and only with the export storage settings. With a Studio setting it also holds the Studio folders and their write lock, see <see cref="PublisherStudio"/>. A failed round writes one line, and the next round tries again.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -72,8 +72,12 @@ internal sealed class Publisher(
     CancellationToken stopping,
     ProvisioningJobs? jobs = null,
     TenantHostVerification? hosts = null,
-    TenantExportSweep? exports = null)
+    TenantExportSweep? exports = null,
+    PublisherStudio? studio = null)
 {
+    /// <summary>The Studio folders this publisher reads and writes, or null when no Studio setting is set.</summary>
+    internal PublisherStudio? Studio { get; } = studio;
+
     // Both loops write to these.
     private readonly TextWriter _output = TextWriter.Synchronized(output);
     private readonly TextWriter _error = TextWriter.Synchronized(error);

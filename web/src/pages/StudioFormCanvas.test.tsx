@@ -537,7 +537,8 @@ describe('the Design tab of a form', () => {
 
     const panel = screen.getByTestId('studio-design-panel')
     const title = within(panel).getByTestId('studio-field-/steps/1/title')
-    expect(within(title).getByRole('textbox', { name: 'Text key' })).toHaveValue('ticket.steps.details')
+    expect(within(title).getByRole('textbox', { name: 'English' })).toHaveValue('Add details')
+    expect(within(title).queryByRole('textbox', { name: 'Text key' })).toBeNull()
     expect(within(steps).getByText('Add details')).toHaveAttribute('aria-current', 'true')
     expect(await within(canvas).findByRole('textbox', { name: 'Resolution' }, slow)).toBeInTheDocument()
   })
@@ -554,7 +555,7 @@ describe('the Design tab of a form', () => {
 
     expect(first).toHaveAttribute('aria-current', 'true')
     const title = within(screen.getByTestId('studio-design-panel')).getByTestId('studio-field-/steps/0/title')
-    expect(within(title).getByRole('textbox', { name: 'Text key' })).toBeInTheDocument()
+    expect(within(title).getByRole('textbox', { name: 'English' })).toHaveValue('Describe the problem')
 
     // A field inside the shown step takes the selection. A click on the step takes it back.
     await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
@@ -575,8 +576,8 @@ describe('the Design tab of a form', () => {
     expect(section).toHaveAttribute('aria-current', 'true')
     const panel = screen.getByTestId('studio-design-panel')
     expect(
-      within(within(panel).getByTestId('studio-field-/sections/1/title')).getByRole('textbox', { name: 'Text key' }),
-    ).toHaveValue('ticket.sections.details')
+      within(within(panel).getByTestId('studio-field-/sections/1/title')).getByRole('textbox', { name: 'English' }),
+    ).toHaveValue('The details')
     expect(await within(panel).findByRole('textbox', { name: 'Visible when' }, slow)).toBeInTheDocument()
   })
 

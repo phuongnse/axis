@@ -69,7 +69,7 @@ from a secret store of the platform, never from a committed file.
 | --- | --- | --- | --- | --- |
 | `Tenancy:Source` | `Tenancy__Source` | server, worker | no | Set to `directory`. The default `configuration` reads a `Tenants` section, which is for development. |
 | `Tenancy:RefreshInterval` | `Tenancy__RefreshInterval` | server, worker | no | Optional. It defaults to 30 seconds. |
-| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. |
+| `ConnectionStrings:Platform` | `ConnectionStrings__Platform` | server, worker, publisher | yes | The platform database role. It reads the `platform` schema, and writes only the keys of the server, the usage tables, the leases and the daily counters. The publisher holds it for the Studio write lock only, and starts without it. |
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | server, admin | yes | The role that owns the `platform` schema. The server uses it at start for the platform migrations, and for the unpooled connection that `PUT /api/cell/tenants/{id}/quotas` opens for each write. Revoking or blocking this role stops that route. The worker never gets it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | server, worker, admin | yes | The installation key, 32 bytes in base64. Generate it once and give every host the same value. |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | server, worker, admin | yes | Set it only during a key rotation, to the old installation key. See [installation key](tenant-setting-commands.md#installation-key). The Helm chart and the Compose example set no value, so add the variable or a secret file yourself. |
@@ -242,7 +242,7 @@ Compose reads one file per secret from `AXIS_SECRETS_DIR`, which defaults to `./
 
 | File | Mounted in |
 | --- | --- |
-| `ConnectionStrings__Platform` | server, worker |
+| `ConnectionStrings__Platform` | server, worker, publisher |
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
 | `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
@@ -402,7 +402,8 @@ configured like `server`.
   `docker compose --profile replicas up -d server-2` and wait for its `/health/ready`. The proxy is
   already running.
 - **Studio.** Studio is off until you turn it on. Both servers mount `AXIS_STUDIO_DIR`, `./studio` by
-  default, read-write at `/studio`, and no other service mounts it. To turn Studio on, set
+  default, read-write at `/studio`, and so does the publisher, at the same path, because the write lock is
+  keyed by the folder path. No other service mounts it. To turn Studio on, set
   `Studio__Folders__0=/studio/<folder>` in the shell, where `<folder>` is an application folder inside
   `AXIS_STUDIO_DIR`. Set `Studio__AuthorRole` and `Studio__PublisherRole` too, because without them
   nobody may author or publish. All three pass through from the shell to both servers. More folders
@@ -455,7 +456,8 @@ The chart has these objects:
   `publisher`. It uses the `Recreate` strategy, so a rollout never runs two publishers. It has no
   Service, no container port, no probe and no Ingress, because the publisher has no HTTP endpoint. Its
   termination grace period is 360 seconds, longer than the five-minute lease. Outside a cell it mounts
-  the same secrets as the migrate Job.
+  the same secrets as the migrate Job. When `studio.folders` is set, it also mounts the Studio volume
+  and gets the folders and `platformConnection`, as the server does.
 - **The identity provider**, see [below](#the-identity-provider-in-the-chart).
 - **PgBouncer**, in a cell that turns it on, see [PgBouncer](#pgbouncer).
 - **The migrate Job and the CronJobs** of a cell, see [jobs](#jobs).
@@ -472,14 +474,16 @@ With `cell.id` set, the publisher also gets what the `create` job reads:
 - the `cellBackupKey` Secret read-only at `/cell-backup-key/key`, which `Cell:BackupKeyFile` names
   whatever `cell.backupKeyFile` says;
 - `studio.persistence` read-write at `/studio` and `templates.volume` read-only at `/templates`, with
-  `Studio:ApplicationsPath` and `Templates:Path` set to them.
+  `Studio:ApplicationsPath` and `Templates:Path` set to them;
+- the `platformConnection` Secret, for the Studio write lock.
 
 The server also mounts `studio.persistence` at `/studio` and sets `Studio:ApplicationsPath`, so the
 applications that the job writes are the ones that Studio shows, and a cell needs a `ReadWriteMany`
 volume source even with one server replica. The server gets no `Templates:Path`, so Studio lists no
 templates there. Rendering fails with a message that names the value when `secrets.adminConnection`,
 `secrets.cellBackupKey`, `studio.persistence` or `templates.volume` is missing. Outside a cell the
-publisher gets none of these.
+publisher gets none of these, unless `studio.folders` is set, which gives it the volume, the folders and
+`platformConnection` only.
 
 ### The identity provider in the chart
 
@@ -646,7 +650,7 @@ values schema rejects any field in a reference other than `name` and `key`.
 | Worker | `platformConnection` and `platformSecretKey` |
 | Agent host | none |
 | Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
-| Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set. In a cell also `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
+| Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set, and `platformConnection` when `studio.folders` is set. In a cell also `platformConnection`, `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |
 | PgBouncer | `pgbouncerAuth` and `pgbouncerCertificate`, which no other pod mounts |
 | Cell backup CronJob | `platformSchemaConnection`, `platformSecretKey`, `backupStorageAccessKeyId`, `backupStorageSecretAccessKey` and `identityCredentialsConnection`, and `cellBackupKey` read-only at `/cell-backup-key/key`, outside `/run/secrets` |
@@ -671,9 +675,9 @@ The values of the chart, with their defaults:
 | `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](several-server-replicas.md). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `agent.replicas` | 1 | Agent host replicas. |
-| `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
+| `studio.folders` | none | The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>` on the server and on the publisher. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
-| `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. In a cell the publisher mounts it at `/studio` too, and the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
+| `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica and on the publisher. In a cell the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
 | `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server and identity provider. IP addresses and CIDR ranges of your proxies, rendered on the server as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`, and on the identity provider as one `KC_PROXY_TRUSTED_ADDRESSES` list with `KC_PROXY_HEADERS=xforwarded`. Empty trusts no proxy, and the identity provider sets no proxy headers. |
 | `server.resources`, `worker.resources`, `agent.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
@@ -807,7 +811,7 @@ their addresses.
   - The server checks `ConnectionStrings:Platform` and `ConnectionStrings:PlatformSchema`.
   - The worker checks `ConnectionStrings:Platform` under `Tenancy:Source=directory`.
   - Every admin command, `publisher` included, checks `Admin:ConnectionString`,
-    `ConnectionStrings:PlatformSchema` and `Scenarios:ServerConnectionString` when set, and exits with
+    `ConnectionStrings:PlatformSchema`, `ConnectionStrings:Platform` and `Scenarios:ServerConnectionString` when set, and exits with
     code 2.
   - Every tenant connection copies `SSL Mode`, `Root Certificate` and `Check Certificate Revocation`
     from `ConnectionStrings:Platform` (the server and the worker), `Admin:ConnectionString`

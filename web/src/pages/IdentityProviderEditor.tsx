@@ -5,7 +5,6 @@ import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
-import { LabelTextsContext } from './labelTextsContext'
 
 type Content = Record<string, unknown>
 
@@ -47,7 +46,6 @@ function bindingName(value: unknown): string {
 export function IdentityProviderEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
   const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
   const type = typeof value.type === 'string' ? value.type : undefined
   const claims = isContent(value.claims) ? value.claims : {}
   const roles = isContent(value.roles) ? value.roles : {}
@@ -207,15 +205,7 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
       {(type === 'oidc' || type === 'saml') && (
         <div data-testid="studio-field-/label">
           <div>{t('shell.studio.identityProvider.label')}</div>
-          {names !== undefined && label !== null ? (
-            <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-          ) : (
-            <Input
-              aria-label={t('shell.studio.labelKey')}
-              value={text(isContent(value.label) ? value.label.textKey : undefined)}
-              onChange={(event) => onChange('/label/textKey', event.target.value)}
-            />
-          )}
+          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
         </div>
       )}
       {(type === 'oidc' || type === 'saml') && (

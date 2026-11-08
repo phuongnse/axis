@@ -276,10 +276,14 @@ flowchart LR
     subgraph publisher [Publisher]
         Activate[Validates and activates with schema role]
     end
+    subgraph studiofolders [Studio volume]
+        Folders[Studio folders and their revisions]
+    end
     subgraph running [Server and worker]
         Instances[Running instances stay on their release]
     end
     Request -->|stores request| Requests
+    Activate -->|reads and writes under the Studio roots, with the write lock| Folders
     Requests -->|claimed by| Activate
     Activate -->|sets the active release| Requests
     Requests -->|new work uses the active release| Instances
@@ -351,6 +355,7 @@ flowchart LR
 | P49 | A request keeps crashing the publisher and blocks the queue. | Publishing | Denial of service | Medium | **Mitigated** | `AdminPublisherTests` fails a request with `AXC0215` after three expired claims. |
 | P50 | The server activates a release or holds a schema connection. | Publishing | Elevation of privilege | High | **Mitigated** | The server stores a publish request and never activates. Only the publisher holds the tenant schema role. See [publishing](authoring.md#publishing) and [D47](../decisions/d47-publishing-from-studio.md). |
 | P51 | A test request reaches the tenant's data. | Publishing | Information disclosure | Medium | **Mitigated** | `PublisherTestRequestTests` runs scenarios in their own database and leaves no record in the tenant database. |
+| P139 | The publisher writes outside the Studio roots or into another tenant's folder. | Publishing | Tampering | High | **Mitigated** | The publisher finds a folder by name through the rule that Studio uses, and in a cell only inside the tenant's own folder. `StudioFolderTests` shows that `..`, `.`, a path, an absolute path and a blank name find nothing, even when a manifest carries the name, and that a tenant finds no other tenant's application. `AdminPublisherTests` shows that a Studio setting that cannot be used exits with code 2 and names the setting and not the path. `scripts/helm.test.mjs` and `scripts/onprem.test.mjs` show that only the servers and the publisher mount the Studio volume. |
 | P52 | A preview reaches its main tenant's data. | Preview tenant | Information disclosure | High | **Mitigated** | `PublisherPreviewTests` activates the release on the preview tenant only. `StudioPreviewTests` leaves the main tenant unchanged. See [preview tenants](../architecture.md#preview-tenants). |
 | P53 | A preview uses the main tenant's bindings. | Preview tenant | Information disclosure | Medium | **Mitigated** | `PreviewTenantActivationTests` gives the preview its own bindings, empty by default. `ReleaseActivatorTests` warns for each missing binding on a preview. |
 | P54 | A session made on the preview host is used on the main host, or the other way round. | Preview tenant | Spoofing | Medium | **Mitigated** | `PreviewTenantSignInTests` answers 401 when a session made on the preview host is used on the main host. |

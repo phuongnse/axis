@@ -166,7 +166,7 @@ describe('FormSteps', () => {
     renderSteps(steps)
 
     const card = screen.getByTestId('studio-field-/steps/1')
-    expect(within(card).getByRole('textbox', { name: 'en' })).toHaveValue('Decision')
+    expect(within(card).getByRole('textbox', { name: 'English' })).toHaveValue('Decision')
   })
 
   it('leaves steps that are not a list to the JSON view', () => {

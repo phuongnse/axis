@@ -526,7 +526,7 @@ describe('StudioEditor for a site', () => {
 
     const dialog = await openNavigationEntry()
     await chooseOption('tasks', within(dialog).getByTestId('studio-field-/navigation/0/icon'))
-    const en = within(dialog).getByRole('textbox', { name: 'en' })
+    const en = within(dialog).getByRole('textbox', { name: 'English' })
     await userEvent.clear(en)
     await userEvent.type(en, 'Requests')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
@@ -551,13 +551,13 @@ describe('StudioEditor for a site', () => {
     renderResource(siteItem, siteNames)
 
     const dialog = await openNavigationEntry()
-    await userEvent.type(within(dialog).getByRole('textbox', { name: 'en' }), ' list')
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'English' }), ' list')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
 
     expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
     expect(requests(fetchMock, 'PUT')).toBe(0)
     const reopened = await openNavigationEntry()
-    expect(within(reopened).getByRole('textbox', { name: 'en' })).toHaveValue('Purchase requests')
+    expect(within(reopened).getByRole('textbox', { name: 'English' })).toHaveValue('Purchase requests')
   })
 })
 
@@ -1349,6 +1349,12 @@ function sentTexts(fetchMock: ReturnType<typeof vi.fn>) {
   return fetchMock.mock.calls.filter(([, call]) => call?.method === 'PUT') as [string, RequestInit][]
 }
 
+/** Opens the Translations… dialog of the only label on screen. */
+async function openTranslations() {
+  await userEvent.click(await screen.findByRole('button', { name: 'Translations…' }, slow))
+  return await screen.findByRole('dialog')
+}
+
 describe('StudioEditor for a label', () => {
   it('writes the texts of every locale in one call before the patch that adds the key', async () => {
     const fetchMock = stubPage(pageContent, () => json({ resources: [], diagnostics: [] }))
@@ -1356,10 +1362,11 @@ describe('StudioEditor for a label', () => {
     renderResource(pageItem, namesWithTexts, onTextsWritten)
     await openFormTab()
 
-    const key = await screen.findByRole('textbox', { name: 'Text key' }, slow)
-    expect(key).toHaveValue('pages.myTasks.title')
-    await userEvent.type(screen.getByRole('textbox', { name: 'en' }), 'My tasks')
-    await userEvent.type(screen.getByRole('textbox', { name: 'vi' }), 'Việc của tôi')
+    const dialog = await openTranslations()
+    expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'English' }), 'My tasks')
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Vietnamese' }), 'Việc của tôi')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     expect(screen.getByTestId('studio-save-bar')).toBeInTheDocument()
     expect(sentTexts(fetchMock)).toHaveLength(0)
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -1382,7 +1389,7 @@ describe('StudioEditor for a label', () => {
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
-    await userEvent.type(await screen.findByRole('textbox', { name: 'en' }, slow), '!')
+    await userEvent.type(await screen.findByRole('textbox', { name: 'English' }, slow), '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -1399,22 +1406,29 @@ describe('StudioEditor for a label', () => {
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
-    const en = await screen.findByRole('textbox', { name: 'en' }, slow)
+    const en = await screen.findByRole('textbox', { name: 'English' }, slow)
     await userEvent.type(en, 'My tasks')
     await userEvent.tab()
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
-    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('')
+    expect(screen.getByRole('textbox', { name: 'English' })).toHaveValue('')
 
     await userEvent.click(screen.getByRole('button', { name: 'Redo' }))
-    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('My tasks')
+    expect(screen.getByRole('textbox', { name: 'English' })).toHaveValue('My tasks')
   })
 
-  it('takes an empty key as no key and suggests one', async () => {
-    stubPage({ ...pageContent, title: { textKey: '' } }, () => json({ resources: [], diagnostics: [] }))
+  it('takes an empty key as no key and makes one', async () => {
+    const fetchMock = stubPage({ ...pageContent, title: { textKey: '' } }, () =>
+      json({ resources: [], diagnostics: [] }),
+    )
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
-    expect(await screen.findByRole('textbox', { name: 'Text key' }, slow)).toHaveValue('pages.myTasks.title')
+    await userEvent.type(await screen.findByRole('textbox', { name: 'English' }, slow), 'My tasks')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentTexts(fetchMock)[0][0]).toBe(`${folder}/texts/pages.myTasks.title`)
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'replace', path: '/title/textKey', value: 'pages.myTasks.title' }])
   })
 
   it('shows how many other labels use the key of a saved label', async () => {
@@ -1422,9 +1436,8 @@ describe('StudioEditor for a label', () => {
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
-    expect(await screen.findByRole('textbox', { name: 'Text key' }, slow)).toHaveValue('pages.home.title')
-    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('Home')
-    expect(screen.getByRole('textbox', { name: 'vi' })).toHaveValue('Trang chủ')
+    expect(await screen.findByRole('textbox', { name: 'English' }, slow)).toHaveValue('Home')
+    expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
     expect(screen.getByTestId('studio-label-used-by')).toHaveTextContent('2')
   })
 
@@ -1433,13 +1446,13 @@ describe('StudioEditor for a label', () => {
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
-    await userEvent.type(await screen.findByRole('textbox', { name: 'en' }, slow), 'My tasks')
+    await userEvent.type(await screen.findByRole('textbox', { name: 'English' }, slow), 'My tasks')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('studio-save-error')).toHaveTextContent('The resource could not be saved.')
     expect(requests(fetchMock, 'PATCH')).toBe(0)
     expect(sentTexts(fetchMock)).toHaveLength(1)
-    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('My tasks')
+    expect(screen.getByRole('textbox', { name: 'English' })).toHaveValue('My tasks')
   })
 })
 

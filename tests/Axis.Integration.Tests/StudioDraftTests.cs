@@ -157,6 +157,115 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
     }
 
     [Fact]
+    public async Task Conflicts_list_each_used_resource_whose_version_on_main_now_differs_and_not_an_unrelated_change()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var rule = StudioFolder.List(folder.Path).Single(file => file.Id == Guid.Parse(RuleId));
+        var unrelated = StudioFolder.List(folder.Path).First(file => file.Kind == "entity");
+        var policy = Guid.NewGuid();
+
+        await author.Drafts.ReadAsync(draft.Id, rule.Id, CancellationToken);
+        await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken);
+        Assert.Empty(author.Drafts.Conflicts(draft.Id).Value!);
+
+        await File.AppendAllTextAsync(Path.Combine(folder.Path, RuleFile), "\n", CancellationToken);
+        await File.AppendAllTextAsync(Path.Combine(folder.Path, unrelated.File), "\n", CancellationToken);
+        await File.WriteAllBytesAsync(Path.Combine(folder.Path, "policies", "outside.json"), StudioWrites.Serialize(Policy(policy)), CancellationToken);
+        author.Revisions.RecordOutside();
+
+        var conflicts = author.Drafts.Conflicts(draft.Id).Value!;
+        var expected = new[]
+        {
+            new StudioDraftConflict(rule.Id, StudioFolder.List(folder.Path).Single(file => file.Id == rule.Id).Version),
+            new StudioDraftConflict(policy, StudioFolder.List(folder.Path).Single(file => file.Id == policy).Version),
+        };
+        Assert.Equal(expected.OrderBy(conflict => conflict.Id), conflicts);
+        Assert.DoesNotContain(conflicts, conflict => conflict.Id == unrelated.Id);
+
+        File.Delete(Path.Combine(folder.Path, RuleFile));
+        author.Revisions.RecordOutside();
+        Assert.Contains(new StudioDraftConflict(rule.Id, null), author.Drafts.Conflicts(draft.Id).Value!);
+    }
+
+    [Fact]
+    public async Task Apply_returns_the_folders_files_with_the_drafts_changes_and_leaves_the_folder_alone()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var main = StudioFolder.List(folder.Path);
+        var rule = main.Single(file => file.Id == Guid.Parse(RuleId));
+        var removed = main.First(file => file.Kind == "entity");
+        var other = main.First(file => file.Id != rule.Id && file.Id != removed.Id && file.Kind != "application");
+        var changed = (JsonObject)JsonNode.Parse(rule.Bytes)!;
+        changed["expression"] = "20000";
+        var policy = Guid.NewGuid();
+        await author.Drafts.WriteAsync(draft.Id, changed, CancellationToken);
+        await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken);
+        await author.Drafts.DeleteAsync(draft.Id, removed.Id, CancellationToken);
+
+        await File.AppendAllTextAsync(Path.Combine(folder.Path, other.File), "\n", CancellationToken);
+        author.Revisions.RecordOutside();
+        var before = Snapshot(folder.Path);
+
+        var applied = author.Drafts.Apply(draft.Id, StudioFolder.Files(folder.Path)).Value!;
+
+        Assert.Equal(StudioWrites.Serialize(changed), applied.Single(file => file.File == rule.File).Bytes);
+        Assert.Equal(StudioWrites.Serialize(Policy(policy)), applied.Single(file => file.File == "policies/fresh.json").Bytes);
+        Assert.DoesNotContain(applied, file => file.File == removed.File);
+        Assert.Equal(File.ReadAllBytes(Path.Combine(folder.Path, other.File)), applied.Single(file => file.File == other.File).Bytes);
+        Assert.Equal(applied.Select(file => file.File).Order(StringComparer.Ordinal), applied.Select(file => file.File));
+        Assert.Equal(before, Snapshot(folder.Path));
+    }
+
+    [Fact]
+    public async Task Committing_an_accept_adds_one_revision_naming_the_request_and_deletes_the_draft()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var removed = StudioFolder.List(folder.Path).First(file => file.Kind == "entity");
+        await author.Drafts.WriteAsync(draft.Id, Policy(Guid.NewGuid()), CancellationToken);
+        await author.Drafts.DeleteAsync(draft.Id, removed.Id, CancellationToken);
+
+        var applied = author.Drafts.Apply(draft.Id, StudioFolder.Files(folder.Path)).Value!;
+        foreach (var (file, bytes) in applied)
+        {
+            var target = Path.Combine(folder.Path, file);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            await File.WriteAllBytesAsync(target, bytes, CancellationToken);
+        }
+
+        var kept = applied.Select(file => file.File).ToHashSet(StringComparer.Ordinal);
+        foreach (var (file, _) in StudioFolder.Files(folder.Path).Where(file => !kept.Contains(file.File)))
+        {
+            File.Delete(Path.Combine(folder.Path, file));
+        }
+
+        var count = author.Revisions.List().Count;
+        var requestId = Guid.NewGuid();
+        var accepted = author.Drafts.CommitAccept(draft.Id, "Accept draft", "author", "Author User", "agent", requestId).Value!;
+
+        var list = author.Revisions.List();
+        Assert.Equal(count + 1, list.Count);
+        Assert.Equal(accepted, list[0]);
+        Assert.Equal("Accept draft", accepted.Summary);
+        Assert.Equal(requestId.ToString("D"), accepted.Request);
+        Assert.Equal("agent", accepted.Client);
+        Assert.Equal("author", accepted.UserId);
+        Assert.Equal("Author User", accepted.Author);
+        Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.FindAsync(draft.Id, CancellationToken)).Refusal);
+        using var repository = new Repository(Path.Combine(revisions.Path, Path.GetFileName(folder.Path) + ".git"));
+        Assert.Null(repository.Refs["refs/heads/drafts/" + draft.Id]);
+        Assert.Null(repository.Refs["refs/axis/drafts/" + draft.Id]);
+    }
+
+    [Fact]
     public async Task Another_persons_draft_and_an_unknown_id_are_not_found_for_every_operation()
     {
         using var folder = StudioPublishTests.NewFolder();
@@ -172,7 +281,14 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
             return repository.Refs["refs/heads/drafts/" + theirs.Id].TargetIdentifier;
         }
 
+        string MainTip()
+        {
+            using var repository = new Repository(path);
+            return repository.Refs["refs/heads/main"].TargetIdentifier;
+        }
+
         var tip = Tip();
+        var mainTip = MainTip();
 
         foreach (var id in new[] { theirs.Id, Guid.NewGuid().ToString("D"), "not-a-guid", "../main" })
         {
@@ -182,8 +298,12 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.WriteAsync(id, Policy(Guid.NewGuid()), CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.DeleteAsync(id, rule.Id, CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.DropAsync(id, CancellationToken)).Refusal);
+            Assert.Equal(StudioWriteRefusal.NotFound, author.Drafts.Conflicts(id).Refusal);
+            Assert.Equal(StudioWriteRefusal.NotFound, author.Drafts.Apply(id, StudioFolder.Files(folder.Path)).Refusal);
+            Assert.Equal(StudioWriteRefusal.NotFound, author.Drafts.CommitAccept(id, "Accept", "author", "Author User", "agent", Guid.NewGuid()).Refusal);
         }
 
+        Assert.Equal(mainTip, MainTip());
         Assert.Equal(tip, Tip());
         using (var repository = new Repository(path))
         {

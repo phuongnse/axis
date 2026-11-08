@@ -44,14 +44,8 @@ spec:
               value: /server-tls/tls.crt
             - name: Kestrel__Endpoints__Https__Certificate__KeyPath
               value: /server-tls/tls.key
-            {{- if .Values.cell.id }}
-            # The create job of the publisher writes the tenants' applications here.
-            - name: Studio__ApplicationsPath
-              value: /studio
-            {{- end }}
-            {{- range $i, $folder := .Values.studio.folders }}
-            - name: Studio__Folders__{{ $i }}
-              value: {{ printf "/studio/%s" $folder | quote }}
+            {{- with include "axis.studioEnv" . }}
+            {{- . | nindent 12 }}
             {{- end }}
             {{- with .Values.studio.authorRole }}
             - name: Studio__AuthorRole
