@@ -125,8 +125,9 @@ that holds it.
   rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
   check in the diff, the rule that an Agreed [decision](writing-docs.md#decisions) changes only by a
   new one, the rule that a change adds no exception to a check and loosens none, the rule on
-  removals in [testing](testing.md#rules-for-tests), and the rule that a rule
-  [states its scope by kind](writing-docs.md#reference-pages). Each item checks one thing. An item not met requests changes
+  removals in [testing](testing.md#rules-for-tests), the rule that a rule
+  [states its scope by kind](writing-docs.md#reference-pages), and the rules of [UI writing](reference/ui-writing.md)
+  and its glossary for a change that adds or changes a screen text. Each item checks one thing. An item not met requests changes
   like a blocking finding, so a pull request that leaves a doc false or loosens a check does not
   merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
