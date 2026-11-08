@@ -3,6 +3,7 @@ import { useContext } from 'react'
 import { Link } from 'react-router'
 import type { StudioChangeRow, StudioReleasePartChange } from '../platform/studio'
 import { sortByName } from '../platform/listOrder'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -10,7 +11,7 @@ import { PlatformContext } from './context'
 
 /**
  * The change list of Studio: one row for each file that differs, with its name, its kind and what changed. A name opens
- * its resource through `address`, except a removed file's, which the folder lacks and shows as plain text. With
+ * its resource, except a removed file's, which the folder lacks and shows as plain text. With
  * `plainChanged`, which a release page sets, a changed resource is plain text too, because the folder's version is not
  * the one the release changed. With `parts`, which a release page sets, each module and package that differs follows
  * the files, modules first and each group by label, and an empty `parts` says that none differs.
@@ -18,12 +19,12 @@ import { PlatformContext } from './context'
 export function StudioChangeList({
   rows,
   parts,
-  address,
+  application,
   plainChanged = false,
 }: {
   rows: StudioChangeRow[]
   parts?: StudioReleasePartChange[]
-  address: (extra: Record<string, string>) => string
+  application: string
   plainChanged?: boolean
 }) {
   const t = useText()
@@ -51,7 +52,7 @@ export function StudioChangeList({
           {row.resourceId === null || (plainChanged && row.change === 'changed') ? (
             <Typography.Text>{row.name}</Typography.Text>
           ) : (
-            <Link to={address({ resource: row.resourceId })}>{row.name}</Link>
+            <Link to={studioResourceAddress(application, row.resourceId)}>{row.name}</Link>
           )}
           <Typography.Text style={{ color: colour.textMuted }}>
             {row.kind === null ? '—' : kindSingular(row.kind, t)}

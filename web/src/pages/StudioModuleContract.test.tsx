@@ -1,10 +1,11 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
+import { followLink, renderGuarded } from '../test/leaveGuard'
 import type { StudioDiagnostic, StudioResource } from '../platform/studio'
 import { StudioModuleContract } from './StudioModuleContract'
 
@@ -155,7 +156,7 @@ describe('StudioModuleContract', () => {
       removed: [],
     }
 
-    function renderLayered(diagnostics: StudioDiagnostic[] = []) {
+    function renderLayered(diagnostics: StudioDiagnostic[] = [], mount?: typeof renderGuarded) {
       const fetchMock = vi.fn(async (_input: string, init?: RequestInit) =>
         init?.method === 'PUT'
           ? new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
@@ -163,7 +164,7 @@ describe('StudioModuleContract', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       const onWritten = vi.fn()
-      render(
+      const ui = (
         <ThemeModeProvider>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
             <StudioModuleContract
@@ -174,10 +175,11 @@ describe('StudioModuleContract', () => {
               onWritten={onWritten}
             />
           </TextProvider>
-        </ThemeModeProvider>,
+        </ThemeModeProvider>
       )
+      const router = mount ? mount(ui) : render(ui) && undefined
       const puts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')
-      return { puts, onWritten }
+      return { puts, onWritten, router }
     }
 
     it('marks an added state and transition Added with Remove, and the module rows have no Remove', async () => {
@@ -229,6 +231,21 @@ describe('StudioModuleContract', () => {
       expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
       expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
+    })
+
+    it('asks before a link leaves an edited contract, and not before one leaves an untouched contract', async () => {
+      const router = renderLayered([], renderGuarded).router!
+      await screen.findByRole('note', { name: 'Added onHold' })
+
+      await followLink()
+      expect(router.state.location.pathname).toBe('/elsewhere')
+      await act(() => router.navigate('/studio'))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove onHold' }))
+      await followLink()
+
+      expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/studio')
     })
 
     it('shows the diagnostics that name the contract layer and no other', async () => {

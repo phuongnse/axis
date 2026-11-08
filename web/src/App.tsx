@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { AccountPage } from './pages/AccountPage'
 import { CellConsoleRoute } from './pages/CellConsoleRoute'
@@ -16,7 +16,6 @@ import { PageRoute } from './pages/PageRoute'
 import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from './pages/context'
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
-import { StudioPage } from './pages/StudioPage'
 import { UserPage } from './pages/UserPage'
 import { UsersPage } from './pages/UsersPage'
 import { readStoredLocale } from './platform/locale'
@@ -25,6 +24,13 @@ import { TextProvider } from './platform/TextProvider'
 import { fetchSite, type SiteMetadata } from './platform/site'
 import { setHostSite } from './platform/siteLinks'
 import { fetchTexts, type TextMap } from './platform/texts'
+import { LeaveWithoutSaving, UnsavedChangesGuard } from './platform/UnsavedChangesGuard'
+
+/**
+ * Studio is for authors only, so it loads in a chunk of its own, and the main bundle stays within the budget of
+ * docs/development.md#bundle-budget.
+ */
+const LazyStudioPage = lazy(() => import('./pages/StudioPage').then((module) => ({ default: module.StudioPage })))
 
 interface LoadedPlatform {
   site: SiteMetadata
@@ -33,7 +39,7 @@ interface LoadedPlatform {
 }
 
 /** Loads the platform site and its texts once, then renders the matching route. */
-function PlatformRoot({ development }: { development: boolean }) {
+export function PlatformRoot({ development }: { development: boolean }) {
   const [loaded, setLoaded] = useState<LoadedPlatform>()
   const [failed, setFailed] = useState(false)
 
@@ -81,10 +87,13 @@ function PlatformRoot({ development }: { development: boolean }) {
   }
   return (
     <PlatformContext.Provider value={platform}>
-      <PlatformRoutes />
-      <TextProvider catalogs={catalogs} development={development}>
-        <SignInPrompt />
-      </TextProvider>
+      <UnsavedChangesGuard>
+        <PlatformRoutes />
+        <TextProvider catalogs={catalogs} development={development}>
+          <SignInPrompt />
+          <LeaveWithoutSaving />
+        </TextProvider>
+      </UnsavedChangesGuard>
     </PlatformContext.Provider>
   )
 }
@@ -146,7 +155,9 @@ function PlatformRoutes() {
         path="studio"
         element={
           <PlatformShellRoute>
-            <StudioPage />
+            <Suspense fallback={null}>
+              <LazyStudioPage />
+            </Suspense>
           </PlatformShellRoute>
         }
       />
@@ -214,15 +225,6 @@ function PlatformRoutes() {
           </PlatformShellRoute>
         }
       />
-    </Routes>
-  )
-}
-
-/** The routes of the SPA. The caller provides the router, so tests can start at any address. */
-export function App({ development }: { development: boolean }) {
-  return (
-    <Routes>
-      <Route path="*" element={<PlatformRoot development={development} />} />
     </Routes>
   )
 }

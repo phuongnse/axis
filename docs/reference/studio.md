@@ -145,13 +145,13 @@ what changed.
   the editor carries on from the new version.
 - **A stale version** is a `409`. The editor keeps the author's draft on screen and offers Reload,
   which reads the resource again and drops the draft.
-- **Leave without saving** _(planned for M31)_. One guard around the shell asks "Leave without saving?", with
+- **Leave without saving.** One guard around the shell asks "Leave without saving?", with
   Stay and Leave, before a link in the shell is followed and before a move that the workspace starts by
   itself, such as opening a reference or a problem. It guards Back and Forward too, through the
   [data router](frontend.md#routing). An editor counts itself in through `useUnsavedChanges`, which
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
-  asked about.
+  asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
 
 ## References
 

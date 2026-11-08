@@ -1,8 +1,8 @@
 import { EditorView } from '@codemirror/view'
 import { ConfigProvider } from 'antd'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
@@ -11,6 +11,7 @@ import { assignLocation } from '../platform/navigation'
 import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
+import { LeaveWithoutSaving, UnsavedChangesGuard } from '../platform/UnsavedChangesGuard'
 import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
@@ -286,6 +287,42 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
     ),
   )
   return claim
+}
+
+/**
+ * Renders the page under the guard of docs/reference/studio.md#editor, in a data router that holds `entries` with the
+ * last one open. A link to `/` stands for a link in the shell. Returns the router.
+ */
+function renderGuardedPage(entries: string[]) {
+  sidebar = document.createElement('div')
+  sidebar.dataset.testid = 'sidebar'
+  document.body.append(sidebar)
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <ConfigProvider theme={{ token: { motion: false } }}>
+            <ThemeModeProvider>
+              <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+                <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim: () => () => {} }}>
+                  <UnsavedChangesGuard>
+                    <StudioPage />
+                    <Location />
+                    <Link to="/">Home</Link>
+                    <LeaveWithoutSaving />
+                  </UnsavedChangesGuard>
+                </ShellSidebarContext.Provider>
+              </TextProvider>
+            </ThemeModeProvider>
+          </ConfigProvider>
+        ),
+      },
+    ],
+    { initialEntries: entries, initialIndex: entries.length - 1 },
+  )
+  render(<RouterProvider router={router} />)
+  return router
 }
 
 /** Opens the Problems panel from the band's problems button and returns it. */
@@ -1203,6 +1240,99 @@ describe('StudioPage', () => {
 
     await waitFor(() => expect(isSignInNeeded()).toBe(true), { timeout: 3000 })
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+})
+
+describe('StudioPage leaving unsaved changes', () => {
+  const overview = '/studio?app=PurchaseRequests'
+  const entityAddress = `${overview}&resource=${entityId}`
+
+  async function editMaxLength() {
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    return maxLength
+  }
+
+  async function stay() {
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    await waitFor(() => expect(screen.getByText('Leave without saving?')).not.toBeVisible())
+  }
+
+  it('asks before a shell link, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    const maxLength = await editMaxLength()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+    expect(screen.getByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
+  })
+
+  it('moves on when the author picks Leave', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await editMaxLength()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('asks before opening a problem, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    const maxLength = await editMaxLength()
+
+    await openProblems()
+    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+  })
+
+  it('asks before Back, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([overview, entityAddress])
+    const maxLength = await editMaxLength()
+
+    act(() => {
+      void router.navigate(-1)
+    })
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+  })
+
+  it('does not ask before a link while nothing is unsaved', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await screen.findByTestId('studio-field-/fields/1/maxLength')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+  })
+
+  it('opens the Overview after a delete without asking, though the draft is unsaved', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await editMaxLength()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(overview))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
   })
 })
 

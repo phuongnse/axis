@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { StudioConnectionContext } from '../platform/studioConnection'
 import type { ModuleResourceItem, StudioNames } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { ThemeModeProvider } from '../platform/theme'
+import { followLink, renderGuarded } from '../test/leaveGuard'
 import { StudioModuleEditor } from './StudioModuleEditor'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -56,6 +57,7 @@ function renderEditor(
   respond: (url: string, init?: RequestInit) => Response,
   editing: ModuleResourceItem = item,
   names?: StudioNames,
+  mount?: typeof renderGuarded,
 ) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
     String(input).endsWith('/page-metadata')
@@ -64,20 +66,19 @@ function renderEditor(
   )
   vi.stubGlobal('fetch', fetchMock)
   const onWritten = vi.fn()
-  render(
-    <MemoryRouter>
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
-            <StudioNamesContext.Provider value={names}>
-              <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
-            </StudioNamesContext.Provider>
-          </StudioConnectionContext.Provider>
-        </TextProvider>
-      </ThemeModeProvider>
-    </MemoryRouter>,
+  const ui = (
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <StudioConnectionContext.Provider value={{ generation: 0, reconnecting: false, lost: () => {} }}>
+          <StudioNamesContext.Provider value={names}>
+            <StudioModuleEditor application="Leave Requests" item={editing} onWritten={onWritten} />
+          </StudioNamesContext.Provider>
+        </StudioConnectionContext.Provider>
+      </TextProvider>
+    </ThemeModeProvider>
   )
-  return { fetchMock, onWritten }
+  const router = mount ? mount(ui) : render(<MemoryRouter>{ui}</MemoryRouter>) && undefined
+  return { fetchMock, onWritten, router }
 }
 
 function calls(fetchMock: ReturnType<typeof vi.fn>, method: string) {
@@ -94,6 +95,21 @@ async function rename() {
 }
 
 describe('StudioModuleEditor', () => {
+  it('asks before a link leaves an edited entity, and not before one leaves an untouched entity', async () => {
+    const router = renderEditor(() => read(null), item, undefined, renderGuarded).router!
+    await screen.findByTestId('studio-entity-designer')
+
+    await followLink()
+    expect(router.state.location.pathname).toBe('/elsewhere')
+    await act(() => router.navigate('/studio'))
+
+    await rename()
+    await followLink()
+
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/studio')
+  })
+
   it('opens the entity editable, with Save off and no layer tag', async () => {
     renderEditor(() => read(null))
 

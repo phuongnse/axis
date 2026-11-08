@@ -1,5 +1,6 @@
 import type { ShellNavigationEntry, ShellNavigationGroup } from '../platform/ShellNavigation'
 import type { ModuleResourceGroup, ModuleResourceItem, StudioResourceItem } from '../platform/studio'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { kindGroup, kindGroupNames, kindName, studioKind, studioKinds } from '../platform/studioKinds'
 
 /**
@@ -38,7 +39,7 @@ export function studioNavigation(
   if (manifest !== undefined) {
     entries.push({
       key: 'settings',
-      path: path({ resource: manifest.id }),
+      path: studioResourceAddress(application, manifest.id),
       icon: 'settings',
       label: t('shell.studio.nav.settings'),
     })

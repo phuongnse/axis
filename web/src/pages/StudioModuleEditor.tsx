@@ -34,6 +34,7 @@ import { isObject } from '../platform/scenarioSteps'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { EntityDesigner } from './EntityDesigner'
 import type { DesignerLayer } from './LayerMarkViews'
 import { SchemaForm } from './SchemaForm'
@@ -214,6 +215,9 @@ export function StudioModuleEditor({
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'records') }
   }, [schema, seedFields])
 
+  const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
+  useUnsavedChanges(patch.length > 0)
+
   if (loadFailed) {
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
@@ -224,8 +228,6 @@ export function StudioModuleEditor({
   ) {
     return null
   }
-
-  const patch = diffPatch(loaded.content, draft)
 
   /** Sets the draft's value at the pointer as it is. A seed cell that picks `false` must keep it. */
   function update(pointer: string, value: unknown) {

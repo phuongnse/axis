@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { createMemoryRouter, Outlet, RouterProvider, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
-import { App } from './App'
+import { appRoutes } from './appRoutes'
 import { homeGridColumns } from './pages/homeGrid'
 import { apiFetch, signInUrl } from './platform/api'
 import { narrowWidthQuery } from './platform/useNarrowWidth'
@@ -451,14 +451,23 @@ function CurrentPath() {
   return <output data-testid="location">{useLocation().pathname}</output>
 }
 
-function renderApp(path = '/') {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <ThemeModeProvider>
-        <App development={false} />
-      </ThemeModeProvider>
+function CurrentPathLayout() {
+  return (
+    <>
+      <Outlet />
       <CurrentPath />
-    </MemoryRouter>,
+    </>
+  )
+}
+
+function renderApp(path = '/') {
+  const router = createMemoryRouter([{ element: <CurrentPathLayout />, children: appRoutes(false) }], {
+    initialEntries: [path],
+  })
+  return render(
+    <ThemeModeProvider>
+      <RouterProvider router={router} />
+    </ThemeModeProvider>,
   )
 }
 
