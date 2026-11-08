@@ -142,7 +142,7 @@ settings give it the identity provider's admin client. The command takes no `--o
 any one is a usage error, with or without `--preview-of`. It does not read
 `AXIS_OIDC_CLIENT_SECRET`. It sets the platform client's redirect addresses from the hosts it is
 given, so a person can finish a sign-in on each of them, and `tenant host add`, `remove` and `move`
-keep those addresses in step. It also turns accounts on in the tenant's
+keep those addresses, and the audiences of the realm's scope `axis:authoring`, in step. It also turns accounts on in the tenant's
 [platform sign-in](identity-provider.md#platform-sign-in). With `--administrator <email>`, the realm
 gets one invited account, see [the first administrator](user-administration.md#the-first-administrator).
 Its emailed link names no address to return to, so the person sets a password and an authenticator

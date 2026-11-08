@@ -32,6 +32,9 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// must hold the themes and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
 /// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the themes, the client and the roles again. An error names the step and the status code,
 /// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
+/// It also gets the token rules of the MCP sign-in (see <c>docs/reference/mcp-server.md#sign-in</c>): access tokens of <see cref="AccessTokenLifespanSeconds"/>
+/// seconds, refresh tokens that work once, and a client policy that refuses an authorization request from a public client that sends no PKCE <c>S256</c> challenge.
+/// The client scope <see cref="RealmSync.AuthoringScope"/> comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, which <see cref="EnsureForTenantAsync"/> calls.
 /// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -52,6 +55,12 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
     public const string PasswordPolicy = $"length(12) and maxLength(128) and passwordBlacklist({BreachedPasswordList})";
     public const int PasswordResetLifespanSeconds = 1800;
+
+    /// <summary>How long an access token of the realm lasts.</summary>
+    public const int AccessTokenLifespanSeconds = 300;
+
+    /// <summary>The name of the client policy and of its profile that require PKCE of every public client.</summary>
+    public const string PublicPkcePolicy = "axis-public-pkce";
 
     private const string ManagementClientId = "realm-management";
     private const string AccountConsoleClientId = "account-console";
@@ -176,6 +185,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
 
         await EnsureRealmAsync(token, realm, realmPath, displayName, smtpServer, cancellationToken);
+        await EnsureAuthoringAsync(token, realmPath, cancellationToken);
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
@@ -272,6 +282,75 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         }
 
         return representation;
+    }
+
+    /// <summary>
+    /// Sets the token rules of the MCP sign-in: access tokens of <see cref="AccessTokenLifespanSeconds"/> seconds, and refresh tokens that
+    /// rotate and cannot be used again (<c>refreshTokenMaxReuse</c> 0). It also gives the realm the client policy <see cref="PublicPkcePolicy"/>, with the
+    /// <c>pkce-enforcer</c> executor for every client with the <c>public</c> access type. The executor adds the PKCE attribute to a public client that
+    /// lacks it, because Keycloak would refuse to create or update such a client otherwise. It replaces the profile and the policy of that name,
+    /// keeps every other realm profile and policy, and never writes Keycloak's global profiles.
+    /// </summary>
+    internal async Task EnsureAuthoringAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var settings = new Dictionary<string, object?>
+        {
+            ["accessTokenLifespan"] = AccessTokenLifespanSeconds,
+            ["revokeRefreshToken"] = true,
+            ["refreshTokenMaxReuse"] = 0,
+        };
+        using var updated = await SendAsync(token, HttpMethod.Put, realmPath, settings, cancellationToken);
+        EnsureSuccess(updated, "set the token rules");
+
+        var profile = new Dictionary<string, object?>
+        {
+            ["name"] = PublicPkcePolicy,
+            ["description"] = "Requires PKCE S256 of every public client.",
+            ["executors"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["executor"] = "pkce-enforcer",
+                    ["configuration"] = new Dictionary<string, object?> { ["auto-configure"] = true },
+                },
+            },
+        };
+        await ReplaceClientPolicyEntryAsync(token, $"{realmPath}/client-policies/profiles", "profiles", "profile", profile, cancellationToken);
+
+        var policy = new Dictionary<string, object?>
+        {
+            ["name"] = PublicPkcePolicy,
+            ["description"] = "Applies the PKCE profile to every public client.",
+            ["enabled"] = true,
+            ["conditions"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["condition"] = "client-access-type",
+                    ["configuration"] = new Dictionary<string, object?> { ["type"] = new[] { "public" } },
+                },
+            },
+            ["profiles"] = new[] { PublicPkcePolicy },
+        };
+        await ReplaceClientPolicyEntryAsync(token, $"{realmPath}/client-policies/policies", "policies", "policy", policy, cancellationToken);
+    }
+
+    /// <summary>Reads the realm's list of client profiles or policies, replaces the entry named like <paramref name="entry"/> or adds it, and writes the list back.</summary>
+    private async Task ReplaceClientPolicyEntryAsync(
+        string token, string path, string property, string what, Dictionary<string, object?> entry, CancellationToken cancellationToken)
+    {
+        using var read = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+        EnsureSuccess(read, $"read the client {what}s");
+        var entries = new List<object?>();
+        var body = await read.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        if (body.TryGetProperty(property, out var current) && current.ValueKind == JsonValueKind.Array)
+        {
+            entries.AddRange(current.EnumerateArray().Where(item => item.GetProperty("name").GetString() != (string)entry["name"]!).Cast<object?>());
+        }
+
+        entries.Add(entry);
+        using var written = await SendAsync(token, HttpMethod.Put, path, new Dictionary<string, object?> { [property] = entries }, cancellationToken);
+        EnsureSuccess(written, $"write the client {what}s");
     }
 
     /// <summary>

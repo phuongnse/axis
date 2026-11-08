@@ -47,6 +47,10 @@ sign-in. Tenants share nothing in it, as they share no database. `tenant create`
   its card, and Axis while the realm has none, see [theme](#theme). `tenant create` gives the realm no
   display name, and a rerun clears one that holds the tenant id, so the pages never name the tenant
   id.
+- **MCP sign-in.** The realm holds what an outside MCP client needs to sign a person in: the client
+  scope `axis:authoring`, whose audiences are the `/mcp` URLs of the tenant's hosts, a client policy
+  that requires PKCE of every public client, access tokens of 5 minutes and refresh tokens that work
+  once. The rules are in [sign-in](mcp-server.md#sign-in).
 - **Preview tenants.** A preview tenant has no realm. It signs people in through its main tenant's
   realm, see [preview tenants](#preview-tenants).
 
@@ -338,10 +342,14 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
   - turns off Keycloak's Verify Profile required action, so no sign-in stops on a page that asks for a
     missing profile field, such as the last name that a `saml` provider may not send;
   - allows two users to share an email, which turns sign-in by email off: an account's username is its
-    email, see [accounts](user-administration.md#accounts).
+    email, see [accounts](user-administration.md#accounts);
+  - sets the token rules of the MCP sign-in, the access token lifetime and the single-use refresh
+    tokens, and the client policy `axis-public-pkce` that requires PKCE of public clients, see
+    [sign-in](mcp-server.md#sign-in). The client scope `axis:authoring` comes with the
+    [redirect addresses](#keeping-the-realm-in-step), because its audiences come from the hosts.
 
-  A second run updates the realm, brings it up to the account rules and sets its login theme and its
-  email theme to `axis` again. When the identity provider answers a server error (5xx), the realm step
+  A second run updates the realm, brings it up to the account rules and the token rules and sets its
+  login theme and its email theme to `axis` again. When the identity provider answers a server error (5xx), the realm step
   reads the realm again and repeats, up to three attempts, and then fails, naming the step and its
   status.
 - **The breached-password list:** the realm's password policy names the file
@@ -359,6 +367,11 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     attribute of the client, such as the settings that `tenant oidc set` wrote. A rerun, or a later host
     command, therefore repairs a realm that fell out of step, and an address added by hand is replaced.
     A move rewrites both tenants. The next realm sync copies the addresses to the site clients.
+  - Each write also gives the realm the client scope `axis:authoring`, with one audience mapper named
+    `mcp audience <host>` for each host, whose audience is `https://<host>/mcp`. It removes the mappers
+    with that name prefix whose host is gone and leaves every other mapper alone. It makes the scope a
+    default optional scope of the realm in place of `offline_access`, so a client made from then on can
+    ask for it.
   - The command signs in to the realm as `axis-activation`, so it reads `Platform:SecretKey` to decrypt
     the activation secret. A preview tenant, and a tenant whose sign-in points at an identity provider
     outside Axis, have no realm to write and no identity provider is called. When the identity provider

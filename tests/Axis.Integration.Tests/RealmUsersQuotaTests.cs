@@ -120,7 +120,7 @@ public sealed class RealmUsersQuotaTests(KeycloakFixture keycloak) : IAsyncLifet
         _realms.SignInAsync(
             new Uri(_baseAddress,
                 $"realms/{tenant}/protocol/openid-connect/auth?client_id={TenantClientId}&redirect_uri={Uri.EscapeDataString(RedirectUri)}"
-                + $"&response_type=code&scope=openid&kc_idp_hint={alias}"),
+                + $"&response_type=code&scope=openid&kc_idp_hint={alias}{Pkce.New().Query}"),
             upstream,
             RedirectUri);
 }

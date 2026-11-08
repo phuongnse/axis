@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// <c>tenant create</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c> set the redirect addresses, web origins and
 /// post-logout redirect addresses of the platform client <c>axis</c> in a real Keycloak realm from the tenant's hosts, and keep its
-/// other attributes. The next activation copies them to the site clients. A preview tenant, and a tenant that signs in through an
+/// other attributes. They also keep the audiences of the client scope <c>axis:authoring</c> equal to the <c>/mcp</c> URLs of those hosts. The next activation copies them to the site clients. A preview tenant, and a tenant that signs in through an
 /// outside identity provider, leave every realm as it is.
 /// </summary>
 public sealed class AdminTenantHostRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
@@ -52,22 +52,30 @@ public sealed class AdminTenantHostRealmTests(KeycloakFixture keycloak, PostgreS
         // Create gives the client the addresses of its host.
         AssertAddresses(await PlatformClientAsync(id), first);
         AssertAddresses(await PlatformClientAsync(other), otherHost);
+        await AssertAudiencesAsync(id, first);
+        await AssertAudiencesAsync(other, otherHost);
+        await AssertAuthoringScopeIsOptionalAsync(id);
         await SetMarkerAsync(id);
 
         var added = await HostAsync(scenario, "add", id, extra);
         Assert.Equal([$"{id} host ok"], added.Output);
         AssertAddresses(await PlatformClientAsync(id), first, extra);
+        await AssertAudiencesAsync(id, first, extra);
 
         // The host leaves one realm and enters the other.
         var moved = await HostAsync(scenario, "move", extra, "--to", other);
         Assert.Equal([$"{other} host ok"], moved.Output);
         AssertAddresses(await PlatformClientAsync(id), first);
         AssertAddresses(await PlatformClientAsync(other), otherHost, extra);
+        await AssertAudiencesAsync(id, first);
+        await AssertAudiencesAsync(other, otherHost, extra);
 
         Assert.Equal(0, (await HostAsync(scenario, "add", id, third)).Exit);
         AssertAddresses(await PlatformClientAsync(id), first, third);
+        await AssertAudiencesAsync(id, first, third);
         Assert.Equal(0, (await HostAsync(scenario, "remove", id, third)).Exit);
         AssertAddresses(await PlatformClientAsync(id), first);
+        await AssertAudiencesAsync(id, first);
 
         Assert.Equal("kept", RealmClientProfile.ReadAttributes(await PlatformClientAsync(id))[Marker]);
         await scenario.AssertNoSecretsAsync();
@@ -158,6 +166,37 @@ public sealed class AdminTenantHostRealmTests(KeycloakFixture keycloak, PostgreS
         Assert.Equal(redirectUris, actualRedirect);
         Assert.Equal(webOrigins, actualOrigins);
         Assert.Equal(postLogout, actualPostLogout);
+    }
+
+    // The scope axis:authoring holds exactly the /mcp URL of each host, one audience mapper for each.
+    private async Task AssertAudiencesAsync(string realm, params string[] hosts)
+    {
+        var scope = (await GetJsonAsync($"admin/realms/{realm}/client-scopes")).EnumerateArray()
+            .Single(candidate => candidate.GetProperty("name").GetString() == RealmSync.AuthoringScope);
+        var mappers = await GetJsonAsync($"admin/realms/{realm}/client-scopes/{scope.GetProperty("id").GetString()}/protocol-mappers/models");
+        var audiences = mappers.EnumerateArray()
+            .Select(mapper => mapper.GetProperty("config").GetProperty("included.custom.audience").GetString()!)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(RealmSync.AuthoringAudiences(hosts), audiences);
+    }
+
+    // A client made from now on can ask for the scope, and offline_access is no longer offered by default.
+    private async Task AssertAuthoringScopeIsOptionalAsync(string realm)
+    {
+        var optional = (await GetJsonAsync($"admin/realms/{realm}/default-optional-client-scopes")).EnumerateArray()
+            .Select(scope => scope.GetProperty("name").GetString()).ToList();
+        Assert.Contains(RealmSync.AuthoringScope, optional);
+        Assert.DoesNotContain("offline_access", optional);
+    }
+
+    private async Task<JsonElement> GetJsonAsync(string path)
+    {
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var token = await MasterTokenAsync(http);
+        using var response = await SendAsync(http, token, HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
     }
 
     private static (string[] RedirectUris, string[] WebOrigins, string[] PostLogout) Lists(JsonElement client)

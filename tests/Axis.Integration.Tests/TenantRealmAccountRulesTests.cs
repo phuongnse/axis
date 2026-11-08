@@ -440,7 +440,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     }
 
     private Uri AuthorizeUri(string realm) => new(_baseAddress,
-        $"realms/{realm}/protocol/openid-connect/auth?client_id={ClientId}&redirect_uri={Uri.EscapeDataString(RedirectUri)}&response_type=code&scope=openid");
+        $"realms/{realm}/protocol/openid-connect/auth?client_id={ClientId}&redirect_uri={Uri.EscapeDataString(RedirectUri)}&response_type=code&scope=openid{Pkce.New().Query}");
 
     /// <summary>Opens the login page as a browser does and returns the address its form posts to and the cookies Keycloak set.</summary>
     private async Task<(string Action, Dictionary<string, string> Jar)> OpenLoginPageAsync(string realm)

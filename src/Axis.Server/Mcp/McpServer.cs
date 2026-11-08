@@ -7,6 +7,7 @@ using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Studio;
 using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Axis.Server.Mcp;
@@ -30,7 +31,7 @@ internal static partial class McpServer
     public const string MetadataPath = "/.well-known/oauth-protected-resource/mcp";
 
     /// <summary>The scope that the metadata names, which the author role's person asks the identity provider for.</summary>
-    public const string Scope = "axis:authoring";
+    public const string Scope = RealmSync.AuthoringScope;
 
     private const string SessionHeader = "Mcp-Session-Id";
     private const string VersionHeader = "MCP-Protocol-Version";
