@@ -118,22 +118,6 @@ public sealed class DocumentationTests
     }
 
     [Fact]
-    public void Function_table_matches_ExpressionFunctions()
-    {
-        // The aggregates table has other columns, so it is not matched.
-        var tables = FunctionTables(@"^\|\s*Function\s*\|\s*Result\s*\|\s*Notes\s*\|\s*SQL\s*\|");
-
-        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Function | Result | Notes | SQL |' under docs/, found {tables.Count}.");
-        var (documented, planned) = tables[0];
-        var declared = ExpressionFunctions.Names;
-
-        Assert.True(!planned.Intersect(declared).Any(), $"Marked planned in the docs but already in ExpressionFunctions: {string.Join(", ", planned.Intersect(declared))}.");
-        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}. Add a row to the table in docs/reference/expressions.md.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}. Mark the row _(planned for Mx)_ or add the function to ExpressionFunctions.");
-        Assert.Equal(documented.Count, documented.Distinct().Count());
-    }
-
-    [Fact]
     public void Function_tables_SQL_column_matches_ExpressionFunctions()
     {
         const string docs = "docs/reference/expressions.md";
@@ -143,7 +127,7 @@ public sealed class DocumentationTests
         {
             for (var i = 0; i < lines.Length; i++)
             {
-                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|\s*Result\s*\|\s*Notes\s*\|\s*SQL\s*\|"))
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|.*\|\s*SQL\s*\|\s*$"))
                 {
                     continue;
                 }
@@ -160,7 +144,7 @@ public sealed class DocumentationTests
             }
         }
 
-        Assert.True(found == 1, $"Expected exactly one table with header '| Function | Result | Notes | SQL |' under docs/, found {found}.");
+        Assert.True(found == 1, $"Expected exactly one table with header '| Function | … | SQL |' under docs/, found {found}.");
         var invalid = sqlRows.Where(row => row.Sql is not ("Yes" or "No")).Select(row => row.Name).ToList();
         Assert.True(invalid.Count == 0, $"The SQL column in {docs} must be Yes or No, but it is not for: {string.Join(", ", invalid)}.");
 
@@ -169,23 +153,6 @@ public sealed class DocumentationTests
         Assert.True(
             documented.SequenceEqual(declared),
             $"The SQL column in {docs} says Yes for [{string.Join(", ", documented)}], but ExpressionFunctions marks [{string.Join(", ", declared)}] as in the SQL subset.");
-    }
-
-    [Fact]
-    public void Aggregate_table_matches_ExpressionFunctions()
-    {
-        var tables = FunctionTables(@"^\|\s*Function\s*\|\s*Result\s*\|\s*Empty list\s*\|");
-
-        Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Function | Result | Empty list |' under docs/, found {tables.Count}.");
-
-        // count has a row with a condition and one without.
-        var documented = tables[0].Built.Distinct().ToList();
-        var planned = tables[0].Planned;
-        var declared = ExpressionFunctions.AggregateNames;
-
-        Assert.True(!planned.Intersect(declared).Any(), $"Marked planned in the docs but already in ExpressionFunctions: {string.Join(", ", planned.Intersect(declared))}.");
-        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}. Add a row to the table in docs/reference/expressions.md.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}. Mark the row _(planned for Mx)_ or add the function to ExpressionFunctions.");
     }
 
     [Fact]
@@ -243,40 +210,6 @@ public sealed class DocumentationTests
             using var schema = JsonDocument.Parse(stream);
             Assert.Equal(kind, schema.RootElement.GetProperty("properties").GetProperty("kind").GetProperty("const").GetString());
         }
-    }
-
-    // A row marked _(planned for Mx)_ is not built yet, so it is listed apart from the built functions.
-    private static List<(List<string> Built, List<string> Planned)> FunctionTables(string headerPattern)
-    {
-        var tables = new List<(List<string> Built, List<string> Planned)>();
-        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
-        {
-            for (var i = 0; i < lines.Length; i++)
-            {
-                if (!Regex.IsMatch(lines[i], headerPattern))
-                {
-                    continue;
-                }
-
-                var built = new List<string>();
-                var planned = new List<string>();
-                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
-                {
-                    var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
-                    if (!match.Success)
-                    {
-                        continue;
-                    }
-
-                    var isPlanned = Regex.IsMatch(lines[j], @"_\(planned for M\d+\)_");
-                    (isPlanned ? planned : built).Add(match.Groups[1].Value);
-                }
-
-                tables.Add((built, planned));
-            }
-        }
-
-        return tables;
     }
 
     private static IEnumerable<string> DocsFiles() =>

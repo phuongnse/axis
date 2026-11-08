@@ -7,6 +7,8 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Tests;
 using Axis.Expressions.Diagnostics;
 using Axis.Expressions.Functions;
+using Axis.Presentation.Texts;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
 using Json.Pointer;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -296,6 +298,40 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
     }
 
     [Fact]
+    public async Task Each_function_is_described_in_the_language_of_the_request_and_in_english_without_one()
+    {
+        var id = await _studio.IdOfAsync("entities/purchase-request.json");
+        using var inVietnamese = await _studio.ScopeAsync(id, "/fields/7/expression", "vi");
+        using var inEnglish = await _studio.ScopeAsync(id, "/fields/7/expression");
+        var texts = new EmbeddedTextResourceProvider();
+        var vietnamese = texts.GetTexts("vi")!.Texts;
+        var english = texts.GetTexts("en")!.Texts;
+
+        Assert.Equal(
+            FunctionNames(inVietnamese).ToDictionary(name => name, name => vietnamese[StudioExpressionEndpoints.FunctionDescriptionKey(name)]),
+            Descriptions(inVietnamese));
+        Assert.Equal(
+            FunctionNames(inEnglish).ToDictionary(name => name, name => english[StudioExpressionEndpoints.FunctionDescriptionKey(name)]),
+            Descriptions(inEnglish));
+    }
+
+    [Fact]
+    public async Task Each_function_carries_its_parameters_result_group_and_example()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("entities/purchase-request.json"), "/fields/7/expression");
+
+        var functions = answer.RootElement.GetProperty("functions").EnumerateArray().ToList();
+        Assert.NotEmpty(functions);
+        foreach (var function in functions)
+        {
+            Assert.Equal(JsonValueKind.Array, function.GetProperty("parameters").ValueKind);
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("result").GetString()));
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("group").GetString()));
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("example").GetString()));
+        }
+    }
+
+    [Fact]
     public async Task A_data_sources_scope_lists_the_entitys_fields_with_label_keys_then_the_parameters_with_none()
     {
         using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("data-sources/purchase-request-list.json"), "/filter");
@@ -388,6 +424,10 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
 
     private static List<string> FunctionNames(JsonDocument answer) =>
         [.. answer.RootElement.GetProperty("functions").EnumerateArray().Select(function => function.GetProperty("name").GetString()!)];
+
+    private static Dictionary<string, string> Descriptions(JsonDocument answer) =>
+        answer.RootElement.GetProperty("functions").EnumerateArray()
+            .ToDictionary(function => function.GetProperty("name").GetString()!, function => function.GetProperty("description").GetString()!);
 
     private static string ScopeBody(string id, string path) =>
         new JsonObject { ["resourceId"] = id, ["path"] = path }.ToJsonString();
@@ -504,9 +544,15 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
             return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         }
 
-        public async Task<JsonDocument> ScopeAsync(string id, string path)
+        public async Task<JsonDocument> ScopeAsync(string id, string path, string? language = null)
         {
-            using var response = await SendAsync(Author, ScopeBody(id, path), url: ScopeUrl);
+            using var request = RecordApiFixture.Request(HttpMethod.Post, ScopeUrl, Host, ScopeBody(id, path));
+            if (language is not null)
+            {
+                request.Headers.AcceptLanguage.ParseAdd(language);
+            }
+
+            using var response = await Author.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         }
