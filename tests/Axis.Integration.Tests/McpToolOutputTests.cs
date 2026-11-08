@@ -74,6 +74,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             new Dictionary<string, string>
             {
                 ["list_applications"] = "{}",
+                ["read_reference"] = """{"topic":"entity"}""",
                 ["list_resources"] = """{"application":"StepApp"}""",
                 ["read_resource"] = $$"""{"application":"StepApp","id":"{{StepAppManifestId()}}"}""",
                 ["read_module_resource"] = $$"""{"application":"PurchaseRequests","module":"department-budgets","id":"{{BudgetApprovalId}}"}""",

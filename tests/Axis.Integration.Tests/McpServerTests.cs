@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Loading;
 using Axis.Server.Mcp;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -144,6 +145,47 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
             Assert.DoesNotContain("   at ", text, StringComparison.Ordinal);
             Assert.DoesNotContain(_applications!, text, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task Read_reference_answers_the_embedded_schema_and_the_page_text_of_a_resource_kind()
+    {
+        var (token, session) = await OpenSessionAsync();
+
+        using var call = await PostAsync(Host, token, ToolCall("read_reference", """{"topic":"entity"}"""), session, Version);
+
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var body = JsonNode.Parse(await call.Content.ReadAsStringAsync(CancellationToken))!;
+        var result = body["result"]!;
+        Assert.False(result["isError"]!.GetValue<bool>());
+        var answer = result["structuredContent"]!;
+        Assert.Equal("entity", answer["topic"]!.GetValue<string>());
+        Assert.True(ResourceSchemas.TryGetText("entity", out var schema));
+        Assert.True(JsonNode.DeepEquals(JsonNode.Parse(schema), answer["schema"]));
+        var page = Assert.Single(answer["pages"]!.AsArray(), entry => entry!["page"]!.GetValue<string>() == "resource-files.md");
+        Assert.Equal(
+            File.ReadAllText(Path.Combine(RepositoryRoot(), "docs", "reference", "resource-files.md")),
+            page!["text"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Read_reference_for_an_unknown_topic_answers_a_fixed_tool_error_that_holds_no_topic_and_no_path()
+    {
+        var (token, session) = await OpenSessionAsync();
+        var topic = $"unknown-{Guid.NewGuid():N}";
+
+        using var call = await PostAsync(Host, token, ToolCall("read_reference", $$"""{"topic":"{{topic}}"}"""), session, Version);
+
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var text = await call.Content.ReadAsStringAsync(CancellationToken);
+        using var body = JsonDocument.Parse(text);
+        var result = body.RootElement.GetProperty("result");
+        Assert.True(result.GetProperty("isError").GetBoolean());
+        Assert.Equal(McpReference.NoTopic, result.GetProperty("content")[0].GetProperty("text").GetString());
+        Assert.DoesNotContain(topic, text, StringComparison.Ordinal);
+        Assert.DoesNotContain("   at ", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(_applications!, text, StringComparison.Ordinal);
+        Assert.DoesNotContain(AppContext.BaseDirectory, text, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -290,6 +332,17 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
         {
             Directory.Delete(_applications, recursive: true);
         }
+    }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Axis.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Axis.slnx was not found above the test output folder.");
     }
 
     private static string Initialize(string version) => McpTestCalls.Initialize(version);

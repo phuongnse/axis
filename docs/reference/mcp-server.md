@@ -114,7 +114,7 @@ clients may connect at all.
 
 ## Tools
 
-Each tool takes the application's `name`, and a tool that writes names a draft. Every write goes
+Each tool that reads or writes an application takes its `name`, and a tool that writes names a draft. Every write goes
 through the authoring API's checks, so a tool can do nothing that the person could not do in Studio.
 A tool with an optional draft reads the working folder without it and the person's own
 [draft](revisions-and-drafts.md#drafts) with it.
@@ -122,7 +122,7 @@ A tool with an optional draft reads the working folder without it and the person
 | Tool                                   | Input                                               | Output                                                                                                                        |
 | -------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `list_applications`                    | none                                                | The applications the person may author                                                                                        |
-| `read_reference` _(planned for M35)_   | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
+| `read_reference`                       | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
 | `list_resources`                       | application, optional draft                         | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                    |
 | `read_resource`                        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
 | `read_module_resource`                 | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
@@ -149,6 +149,42 @@ A tool with an optional draft reads the working folder without it and the person
   and nothing an outside client read elsewhere, gives an agent more than its tools allow.
 - **Errors.** A refused call answers a tool error with the authoring API's problem title and
   diagnostics, never a stack trace or a path on disk.
+
+### Reference topics
+
+`read_reference` takes a resource kind as its topic. It answers the kind's JSON Schema, which the
+[configuration pipeline](configuration.md) checks resources against, and the text of the pages that
+describe the kind. Both are embedded in the server at build time, so an agent reads the rules of the
+version it talks to. An unknown topic answers a tool error with a fixed title.
+
+| Topic | Pages |
+| --- | --- |
+| `application` | [Resource files](resource-files.md) |
+| `entity` | [Resource files](resource-files.md) |
+| `site` | [Resource files](resource-files.md) |
+| `page` | [Resource files](resource-files.md), [Frontend](frontend.md) |
+| `text` | [Resource files](resource-files.md) |
+| `seed` | [Resource files](resource-files.md) |
+| `dataSource` | [Data sources](data-sources.md) |
+| `rule` | [Resource files](resource-files.md) |
+| `sequence` | [Resource files](resource-files.md) |
+| `process` | [Processes](processes.md), [Process flow](process-flow.md) |
+| `form` | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
+| `role` | [Roles and policies](roles-and-policies.md) |
+| `policy` | [Roles and policies](roles-and-policies.md) |
+| `connector` | [Connectors, events and endpoints](integration-resources.md) |
+| `identityProvider` | [Axis's identity provider](identity-provider.md) |
+| `event` | [Connectors, events and endpoints](integration-resources.md) |
+| `endpoint` | [Connectors, events and endpoints](integration-resources.md) |
+| `trigger` | [Connectors, events and endpoints](integration-resources.md) |
+| `webhook` | [Outbound webhooks](outbound-webhooks.md) |
+| `migration` | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md) |
+| `scenario` | [Test scenarios](test-scenarios.md) |
+| `contract` | [Module contracts](module-contracts.md) |
+| `layer` | [Customization layers](customization-layers.md) |
+
+`McpReferenceTopicsDocumentationTests` compares this table with the server's map and with the resource
+kinds.
 
 ## Limits
 
