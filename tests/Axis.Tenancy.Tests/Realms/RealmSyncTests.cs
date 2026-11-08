@@ -34,6 +34,16 @@ public sealed class RealmSyncTests
     }
 
     [Fact]
+    public void The_authoring_audiences_name_the_mcp_url_of_each_host_once_in_ordinal_order()
+    {
+        Assert.Equal(
+            ["https://a.example.test/mcp", "https://b.example.test/mcp"],
+            RealmSync.AuthoringAudiences([" B.example.test ", "a.example.test", "b.example.test"]));
+        Assert.Empty(RealmSync.AuthoringAudiences([]));
+        Assert.Empty(RealmSync.AuthoringAudiences(["  "]));
+    }
+
+    [Fact]
     public async Task A_conflict_on_a_client_update_reads_the_clients_again_and_retries()
     {
         using var handler = new ScriptedHandler(HttpStatusCode.Conflict, HttpStatusCode.NoContent);

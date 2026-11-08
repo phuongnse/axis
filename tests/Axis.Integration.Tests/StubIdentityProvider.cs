@@ -39,7 +39,8 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
         }
 
         // RealmSync reads the uuid of a created client from the Location header.
-        if (request.Method == HttpMethod.Post && uri.AbsolutePath.EndsWith("/clients", StringComparison.Ordinal))
+        if (request.Method == HttpMethod.Post
+            && (uri.AbsolutePath.EndsWith("/clients", StringComparison.Ordinal) || uri.AbsolutePath.EndsWith("/client-scopes", StringComparison.Ordinal)))
         {
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created) { Headers = { Location = new Uri($"{uri.AbsoluteUri}/{Guid.NewGuid()}") } });
         }
@@ -57,9 +58,21 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
         if (uri.AbsolutePath.EndsWith("/users", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/protocol-mappers/models", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/identity-provider/instances", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/client-scopes", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/default-optional-client-scopes", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/mappers", StringComparison.Ordinal))
         {
             return "[]";
+        }
+
+        if (uri.AbsolutePath.EndsWith("/client-policies/profiles", StringComparison.Ordinal))
+        {
+            return """{"profiles":[]}""";
+        }
+
+        if (uri.AbsolutePath.EndsWith("/client-policies/policies", StringComparison.Ordinal))
+        {
+            return """{"policies":[]}""";
         }
 
         if (uri.AbsolutePath.EndsWith("/.well-known/openid-configuration", StringComparison.Ordinal))

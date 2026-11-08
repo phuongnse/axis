@@ -90,7 +90,7 @@ public sealed class RealmBrokeredUsersTests(KeycloakFixture keycloak) : IAsyncLi
     {
         var authorize = new Uri(_baseAddress,
             $"realms/{tenant}/protocol/openid-connect/auth?client_id={TenantClientId}&redirect_uri={Uri.EscapeDataString(RedirectUri)}"
-            + $"&response_type=code&scope=openid&kc_idp_hint={alias}");
+            + $"&response_type=code&scope=openid&kc_idp_hint={alias}{Pkce.New().Query}");
 
         await _realms.LogInAsync(authorize, upstream, RedirectUri);
     }

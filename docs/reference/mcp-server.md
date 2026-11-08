@@ -44,13 +44,22 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
   metadata of RFC 9728 with the resource URL, the realm as the authorization server, the scope
   `axis:authoring` and the header as the bearer method. The route is open and has no rate limit. A call
   without a valid token answers `401` with a `WWW-Authenticate` header that points to it.
-- **Flow** _(planned for M35)_. The authorization code flow with PKCE (`S256`). The client sends the
-  resource indicator of RFC 8707, the MCP server's URL, such as `https://acme.vn.example.com/mcp`.
+- **Flow.** The authorization code flow with PKCE (`S256`). The realm's client policy requires it of
+  every public client: a request with no `S256` challenge, or with the method `plain`, is refused with
+  `invalid_request` at the client's redirect address, so no code is issued and no sign-in page shows.
+  The client asks for the scope `axis:authoring`, which every client of the realm may ask for. It also
+  sends the resource indicator of RFC 8707, the MCP server's URL, such as
+  `https://acme.vn.example.com/mcp`. Keycloak 26.8 ignores that parameter. The audience comes from the
+  scope's audience mappers, one for each host of the tenant, which put `https://<host>/mcp` into `aud`.
+  A token for the scope therefore names the `/mcp` URL of every host of the tenant, whatever the client
+  sends as the resource.
 - **Tokens.** The server takes only a bearer token whose audience is the MCP server's URL on the
   request's own host, such as `https://acme.vn.example.com/mcp`, and refuses any other audience, so a
   token for another resource or another tenant never works here.
-- **Token lifetime** _(planned for M35)_. Access tokens live 5 minutes. Refresh tokens rotate on each
-  use and end with the realm session, at most 8 hours.
+- **Token lifetime.** Access tokens live 5 minutes. A refresh token works once: using it gives a new
+  one, and using the old one again is refused with `invalid_grant`. Refresh tokens end with the realm
+  session, at most 8 hours. These rules, and the PKCE policy, hold for every client of the tenant's
+  realm.
 - **Who acts.** The token's subject is the person. The route needs the [author role](authoring.md#settings)
   and answers `403` without it.
 - **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for

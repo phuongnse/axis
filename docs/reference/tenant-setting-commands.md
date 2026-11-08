@@ -325,7 +325,8 @@ keep the tenant's realm in step.
   hosts.
 - **The realm.** After `add`, `remove` or `move` commits, the command rewrites the redirect addresses of the platform
   client `axis` in the realm of each tenant it changed, so a move rewrites two realms. The client holds the callback,
-  web origin and post-logout address of exactly the tenant's current hosts, see
+  web origin and post-logout address of exactly the tenant's current hosts, and the realm's scope `axis:authoring` holds the `/mcp` URL
+  of each of them as its audiences, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant, and a tenant that signs in
   through an outside identity provider, have no realm details, so the command calls no identity provider for them. When the
   identity provider fails, the host change stays stored and the command prints `<id> realm failed: <step and status>` and exits
