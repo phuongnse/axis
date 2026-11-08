@@ -112,6 +112,7 @@ test.describe('Settings in Studio', () => {
     const href = await page.getByTestId('studio-relaxed-point').getByRole('link').getAttribute('href')
     await page.getByTestId('studio-relaxed-point').getByRole('link').click()
     await expect(page).toHaveURL(new RegExp(`resource=${new URL(href!, server.url).searchParams.get('resource')}`))
-    await expect(page.getByTestId('studio-editor')).toBeVisible()
+    await expect(page.getByTestId('studio-resource-details')).toBeVisible()
+    await expect(page.getByTestId(`studio-contract-relaxed-${point}`)).toContainText('Small team')
   })
 })
