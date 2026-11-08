@@ -505,7 +505,9 @@ transitions through a layer, and relaxes and restores points.
   a state diagram, then the core validations, the effects and the ceilings, each with its named point.
 - **Added states and transitions.** **Add state** and **Add transition** open a dialog. A state takes a
   name, **Initial** and **Deletable**, and a transition a name, its from-states, its to-state and an
-  optional guard. A state or transition that the application added shows an **Added** tag and a
+  optional guard. The names, the from-states and the to-state are required fields with help. **Add**
+  stays on, and a click [checks the fields](actions-and-controls.md#fields), including a name the
+  contract already uses and a to-state that is also a from-state. A state or transition that the application added shows an **Added** tag and a
   **Remove** button, and has no named point, because a relax entry cannot name it. The module's own
   states and transitions show neither and stay read-only. **Remove** takes the row out of the unsaved
   draft, and **Save** writes the contract's layer, or deletes the layer file when no added row is left.
@@ -514,7 +516,8 @@ transitions through a layer, and relaxes and restores points.
 - **Relax.** Each point has a **Relax** action, which asks for the reason and writes the `relax` entry
   on the module's entry in `application.json`. A relaxed point shows its reason and an **Undo relax**
   action, which removes the entry. Relax shows only for a module that `application.json` declares
-  directly. The reason is 1 to 500 characters once trimmed, and a blank reason writes nothing. Undoing
+  directly. The reason is a required field with help, of 1 to 500 characters once trimmed. **Relax**
+  stays on, and a click with a blank reason shows what is missing and writes nothing. Undoing
   the last entry removes the `relax` array. Both write with the authoring API's `PATCH` and `If-Match`,
   so a write is refused with a conflict when `application.json` changed since Studio loaded it, and
   Studio loads it again.

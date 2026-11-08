@@ -181,8 +181,10 @@ the active release. See [migrations](migrations.md#migrations).
   a rename is answered Drop data, the `convert` question is skipped and a required field counts as
   new, so its `fill` is still asked. When a required field is renamed and keeps its data, no `fill` is
   asked.
-- **Expressions.** A `convert` or `fill` question asks for the expression in a plain text box, with the
-  button that adds it, a Skip button that adds nothing for that field, and Cancel, which stops the whole
+- **Expressions.** A `convert` or `fill` question asks for the expression in a plain text box, a required
+  field whose help is the question's hint. The button that adds it stays on, and a click
+  [checks the field](actions-and-controls.md#fields): with the box empty it asks for a value and
+  answers nothing. A Skip button adds nothing for that field, and Cancel stops the whole
   save and keeps the draft. Studio does not check the expression, and the save's diagnostics report a
   bad value at `/changes/{i}/value`.
 - **Warnings.** A loaded field that switches to or from `enum`, or gains `unique`, shows a warning as
