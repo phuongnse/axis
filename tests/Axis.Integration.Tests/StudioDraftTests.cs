@@ -150,6 +150,26 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
     }
 
     [Fact]
+    public async Task A_write_that_changes_the_kind_of_a_resource_the_draft_has_is_refused_and_changes_nothing()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var policy = Guid.NewGuid();
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken)).Refusal);
+        var before = (await author.Drafts.FilesAsync(draft.Id, CancellationToken)).Value!;
+        var asRole = new JsonObject { ["id"] = policy.ToString("D"), ["kind"] = "role", ["name"] = "Fresh" };
+
+        var refused = await author.Drafts.WriteAsync(draft.Id, asRole, CancellationToken);
+
+        Assert.Equal(StudioWriteRefusal.ChangesIdOrKind, refused.Refusal);
+        var after = (await author.Drafts.FilesAsync(draft.Id, CancellationToken)).Value!;
+        Assert.Equal(before.Select(file => (file.File, Convert.ToHexString(file.Bytes))), after.Select(file => (file.File, Convert.ToHexString(file.Bytes))));
+        Assert.Null((await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken)).Refusal);
+    }
+
+    [Fact]
     public async Task Dropping_a_draft_deletes_its_branch_and_its_record()
     {
         using var folder = StudioPublishTests.NewFolder();

@@ -127,11 +127,11 @@ A tool with an optional draft reads the working folder without it and the person
 | `read_resource`                        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
 | `read_module_resource`                 | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
 | `read_names`                           | application, optional draft                         | The names the application defines, as the [names route](authoring.md#names) gives them                                        |
-| `check_expression` _(planned for M35)_ | application, draft, resource, path, expression      | The expression's type and diagnostics                                                                                         |
-| `create_draft` _(planned for M35)_     | application, a title                                | A new [draft](revisions-and-drafts.md#drafts), with the version of the working folder it starts from                          |
-| `write_resource` _(planned for M35)_   | application, draft, resource content                | Creates or replaces a resource in the draft, with its diagnostics                                                             |
+| `check_expression`                     | application, draft, `id`, path, expression          | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft   |
+| `create_draft`                         | application                                         | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from          |
+| `write_resource`                       | application, draft, `content`                       | Creates or replaces a resource in the draft, with its diagnostics                                                             |
 | `write_layer` _(planned for M35)_      | application, draft, module resource, edited content | Writes the layer that holds the difference, as Studio saves do, see [customization layers](customization-layers.md#in-studio) |
-| `delete_resource` _(planned for M35)_  | application, draft, `id`                            | Removes a resource from the draft                                                                                             |
+| `delete_resource`                      | application, draft, `id`                            | Removes a resource from the draft, with the draft's diagnostics                                                               |
 | `validate_draft` _(planned for M35)_   | application, draft                                  | The draft's diagnostics, contract checks included                                                                             |
 | `run_scenarios` _(planned for M35)_    | application, draft, optional names                  | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher       |
 | `diff_draft` _(planned for M35)_       | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
@@ -203,8 +203,8 @@ A call to the server is limited in rate and size, and the agent host's requests 
 
 What an agent did is recorded, but never the content it read or wrote.
 
-- **Calls** _(planned for M35)_. Each write tool call writes an audit record with the person, the client id, the tool, the
-  application, the draft and the resource ids.
+- **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
+  application, the draft and the resource ids. The fields are in [audit actions](storage.md#audit-actions).
 - **Consent** _(planned for M35)_. Consent and its revocation write audit records in the realm and a platform audit
   record in Axis.
 - **Logs.** The server logs each call's tool, client id and outcome, and the

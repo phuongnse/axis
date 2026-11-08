@@ -67,29 +67,59 @@ internal static class StudioExpressionEndpoints
             || !JsonPointer.TryParse(path, out var pointer)
             || body["expression"] is not JsonValue expressionValue || !expressionValue.TryGetValue<string>(out var expression))
         {
-            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid expression check.");
+            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadCheck);
         }
 
         var (resources, folderFiles) = StudioFolder.ListWithContent(folder);
+        var (answer, problem) = Check(resources, folderFiles, resourceId, path, pointer, expression, packages, modules);
+        return problem switch
+        {
+            null => Results.Ok(answer),
+            StudioEndpoints.NoResource => StudioEndpoints.NotFound(StudioEndpoints.NoResource),
+            _ => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, problem),
+        };
+    }
+
+    /// <summary>The title of the refusal for a body, or for a tool input, that is not an expression check.</summary>
+    internal const string BadCheck = "The body is not a valid expression check.";
+
+    internal const string NoExpressionTitle = "The path holds no expression.";
+
+    /// <summary>
+    /// Checks <paramref name="expression"/> at <paramref name="path"/> of the resource <paramref name="resourceId"/> in the compile
+    /// of <paramref name="files"/>, as the route does. Answers the type and diagnostics, or the title of the refusal:
+    /// <see cref="StudioEndpoints.NoResource"/> for a resource the files lack and <see cref="NoExpressionTitle"/> for a path that holds no
+    /// expression. Writes nothing.
+    /// </summary>
+    internal static (StudioExpressionCheckResponse? Answer, string? Refusal) Check(
+        IReadOnlyList<StudioFile> resources,
+        IReadOnlyList<ResourceContent> files,
+        Guid resourceId,
+        string path,
+        JsonPointer pointer,
+        string expression,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
         if (resources.FirstOrDefault(file => file.Id == resourceId) is not { } found)
         {
-            return StudioEndpoints.NotFound(StudioEndpoints.NoResource);
+            return (null, StudioEndpoints.NoResource);
         }
 
         var edited = Place(found, pointer, expression);
         if (edited is null)
         {
-            return NoExpression();
+            return (null, NoExpressionTitle);
         }
 
-        var files = folderFiles
+        var checkedFiles = files
             .Select(file => string.Equals(file.Path, found.File, StringComparison.Ordinal) ? new ResourceContent(file.Path, edited) : file)
             .ToList();
         var probe = new ExpressionProbe(found.File, path);
-        var result = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules, probe);
+        var result = ApplicationCompiler.CompileFiles(checkedFiles, packages.Versions, modules.Modules, probe);
         if (!probe.Found)
         {
-            return NoExpression();
+            return (null, NoExpressionTitle);
         }
 
         StudioExpressionDiagnostic? diagnostic = null;
@@ -105,13 +135,10 @@ internal static class StudioExpressionEndpoints
             diagnostic = new StudioExpressionDiagnostic(other.Code, other.Message, 0, expression.Length);
         }
 
-        return Results.Ok(new StudioExpressionCheckResponse(
-            diagnostic is null ? TypeName(probe.Type) : null,
-            diagnostic is null ? [] : [diagnostic]));
+        return (
+            new StudioExpressionCheckResponse(diagnostic is null ? TypeName(probe.Type) : null, diagnostic is null ? [] : [diagnostic]),
+            null);
     }
-
-    private static IResult NoExpression() =>
-        StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The path holds no expression.");
 
     /// <summary>
     /// The resource's JSON with <paramref name="expression"/> at <paramref name="pointer"/>: in place of the string there, or
