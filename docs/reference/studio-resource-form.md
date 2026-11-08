@@ -28,7 +28,7 @@ last section with no heading.
 
 ## Fields
 
-- **Named in words.** _(planned for M31)_ Every field is named in words. Its label and its optional help
+- **Named in words.** Every field is named in words. Its label and its optional help
   are the texts `shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as
   the form widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between
   the label and the input. Every field has its help, see

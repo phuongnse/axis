@@ -34,10 +34,31 @@ const labelContext = {
   file: 'roles/approver.json',
   name: 'Approver',
   saved: {},
-  onTextsWritten: vi.fn(),
+  texts: {},
+  onTextsChange: vi.fn(),
 }
 
-const kinds = ['application', 'role', 'policy', 'rule', 'sequence', 'event'] as const
+/**
+ * The kinds that SchemaForm draws, with the root properties that a dedicated editor draws instead: StudioEditor's
+ * processSchema, siteSchema, endpointSchema and formSchema memos, and ProcessEditor's withoutSubject.
+ */
+const formKinds: Record<string, string[]> = {
+  application: [],
+  role: [],
+  policy: [],
+  rule: [],
+  sequence: [],
+  event: [],
+  trigger: [],
+  dataSource: [],
+  webhook: [],
+  migration: [],
+  seed: [],
+  site: ['signIn'],
+  endpoint: ['values', 'event'],
+  form: ['steps'],
+  process: ['entity', 'parameters', 'start', 'steps'],
+}
 const hiddenRootProperties = ['id', 'kind', 'formatVersion']
 
 function renderForm(schema: JsonSchema, value: Record<string, unknown>) {
@@ -114,10 +135,62 @@ describe('SchemaForm field texts', () => {
     expect(within(name).getByText(english['shell.studio.field.role.name.help'])).toBeVisible()
   })
 
-  it('keeps a property name as the label of a kind with no field texts', async () => {
-    renderForm((await loadKindSchema('trigger'))!, { kind: 'trigger', name: 'Daily', formatVersion: 1, parameters: {} })
+  it('keeps a property name as the label of a kind with no field texts', () => {
+    renderForm(
+      { type: 'object', properties: { kind: { const: 'example' }, note: { type: 'string' } } },
+      { kind: 'example', note: 'Draft' },
+    )
 
-    expect(within(screen.getByTestId('studio-field-/parameters')).getByText('parameters')).toBeVisible()
+    expect(within(screen.getByTestId('studio-field-/note')).getByText('note')).toBeVisible()
+  })
+
+  it('names a data source in words, with its help, and shows no raw property name', async () => {
+    renderForm((await loadKindSchema('dataSource'))!, {
+      kind: 'dataSource',
+      name: 'Orders',
+      formatVersion: 1,
+      entity: 'Order',
+      fields: [{ name: 'Title', path: 'title' }],
+      parameters: [{ name: 'Status', type: 'text' }],
+      filter: 'x',
+      aggregate: { groupBy: [], measures: [{ name: 'Total', function: 'count' }] },
+      sort: 'Title',
+      pageSize: 10,
+      search: true,
+    })
+
+    for (const field of [
+      'name',
+      'entity',
+      'fields',
+      'parameters',
+      'filter',
+      'aggregate',
+      'sort',
+      'pageSize',
+      'search',
+    ]) {
+      const key = `shell.studio.field.dataSource.${field}`
+      const row = screen.getByTestId(`studio-field-/${field}`)
+      expect(within(row).getByText(english[key])).toBeVisible()
+      expect(within(row).getByText(english[`${key}.help`])).toBeVisible()
+    }
+    for (const raw of [
+      'entity',
+      'fields',
+      'parameters',
+      'filter',
+      'aggregate',
+      'groupBy',
+      'measures',
+      'sort',
+      'pageSize',
+      'search',
+      'path',
+      'function',
+    ]) {
+      expect(screen.queryByText(raw)).toBeNull()
+    }
   })
 
   it('sits a grant behind a subtle rule on its start side', async () => {
@@ -150,16 +223,19 @@ describe('field text catalogues', () => {
     expect(missingHelp(vietnamese)).toEqual([])
   })
 
-  it.each(kinds)('gives every field of %s a text in English and Vietnamese', async (kind) => {
-    const schema = (await loadKindSchema(kind))!
-    const paths = fieldPaths(schema, schema, [])
+  it.each(Object.entries(formKinds))(
+    'gives every field of %s a text in English and Vietnamese',
+    async (kind, dedicated) => {
+      const schema = (await loadKindSchema(kind))!
+      const paths = fieldPaths(schema, schema, []).filter((path) => !dedicated.includes(path.split('.')[0]))
 
-    expect(paths.length).toBeGreaterThan(0)
-    const missing = paths.flatMap((path) =>
-      [english, vietnamese]
-        .filter((catalogue) => catalogue[`shell.studio.field.${kind}.${path}`] === undefined)
-        .map(() => `${kind}.${path}`),
-    )
-    expect(missing).toEqual([])
-  })
+      expect(paths.length).toBeGreaterThan(0)
+      const missing = paths.flatMap((path) =>
+        [english, vietnamese]
+          .filter((catalogue) => catalogue[`shell.studio.field.${kind}.${path}`] === undefined)
+          .map(() => `${kind}.${path}`),
+      )
+      expect(missing).toEqual([])
+    },
+  )
 })
