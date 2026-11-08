@@ -5,6 +5,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Configuration.Tests;
@@ -114,6 +115,44 @@ public sealed class DocumentationTests
         Assert.True(!drawn.Except(foreignKeys).Any(), $"Drawn in docs/reference/storage.md but not a foreign key: {string.Join(", ", drawn.Except(foreignKeys))}.");
         var missing = foreignKeys.Where(key => drawnTables.Contains(key.Principal) && drawnTables.Contains(key.Dependent)).Except(drawn).ToList();
         Assert.True(missing.Count == 0, $"Foreign keys between drawn tables missing from the diagram in docs/reference/storage.md: {string.Join(", ", missing)}.");
+    }
+
+    [Fact]
+    public void Function_tables_SQL_column_matches_ExpressionFunctions()
+    {
+        const string docs = "docs/reference/expressions.md";
+        var sqlRows = new List<(string Name, string Sql)>();
+        var found = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|.*\|\s*SQL\s*\|\s*$"))
+                {
+                    continue;
+                }
+
+                found++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
+                    if (match.Success)
+                    {
+                        sqlRows.Add((match.Groups[1].Value, lines[j].Split('|')[^2].Trim()));
+                    }
+                }
+            }
+        }
+
+        Assert.True(found == 1, $"Expected exactly one table with header '| Function | … | SQL |' under docs/, found {found}.");
+        var invalid = sqlRows.Where(row => row.Sql is not ("Yes" or "No")).Select(row => row.Name).ToList();
+        Assert.True(invalid.Count == 0, $"The SQL column in {docs} must be Yes or No, but it is not for: {string.Join(", ", invalid)}.");
+
+        var documented = sqlRows.Where(row => row.Sql == "Yes").Select(row => row.Name).Order().ToList();
+        var declared = ExpressionFunctions.Names.Where(ExpressionFunctions.IsInSqlSubset).Order().ToList();
+        Assert.True(
+            documented.SequenceEqual(declared),
+            $"The SQL column in {docs} says Yes for [{string.Join(", ", documented)}], but ExpressionFunctions marks [{string.Join(", ", declared)}] as in the SQL subset.");
     }
 
     [Fact]
