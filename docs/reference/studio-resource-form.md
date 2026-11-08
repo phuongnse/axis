@@ -93,22 +93,19 @@ values keeps its rows of inputs.
 
 ## Controls that know what they hold
 
-_(planned for M31)_
-
 A field whose values Axis knows is chosen, never typed, so an author cannot name what does not exist.
 
-| Field             | Control                                                                                                                                                                                                                                                                                                            |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Module or package | Chosen from those installed, by label, from [`GET /api/studio/catalog`](#studio-api). Choosing one fills an empty version range with its newest version, as `^1.2.0`. A chosen module with no roles or connectors says so.                                                                                         |
-| A module's slots  | The module's role and connector maps are one field for each slot of the chosen module: the slot's label above a select of the application's roles or connectors.                                                                                                                                                   |
-| Version range     | Two selects, because a range has three forms. Version lists the installed versions, newest first, as "1.2.0 (newest)". Updates reads "Compatible updates (1.x)" for `^`, the default, "Fixes only (1.2.x)" for `~` and "This version only" for an exact version.                                                   |
-| Time zone         | A searchable select of the time zones the server knows, from the catalog, so every choice passes `AXC0277`. Each reads as "(UTC+07:00) Asia/Ho Chi Minh", by offset then id. Cleared, the application's dates are UTC. A schedule trigger's time zone is the same control.                                         |
-| Binding           | Chosen from the names of the kind the place needs, from [`GET /api/studio/bindings`](#studio-api): the application's file storage, a webhook's URL and secret, and a connector's base URL, token URL and secrets. File storage also offers "The tenant's database, with no binding", which clears the whole entry. |
+| Field             | Control                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Module or package | Chosen from those installed, by label, from [`GET /api/studio/catalog`](#studio-api). Choosing one fills an empty version range with its newest version, as `^1.2.0`. A chosen module with no roles or connectors says so.                                                                                                                                                                                                           |
+| A module's slots  | The module's role and connector maps are one field for each slot of the chosen module: the slot's label above a select of the application's roles or connectors.                                                                                                                                                                                                                                                                     |
+| Version range     | Two selects, because a range has three forms. Version lists the installed versions, newest first, as "1.2.0 (newest)". Updates reads "Compatible updates (1.x)" for `^`, the default, "Fixes only (1.2.x)" for `~` and "This version only" for an exact version.                                                                                                                                                                     |
+| Time zone         | A searchable select of the time zones the server knows, from the catalog, so every choice passes `AXC0277`. Each reads as "(UTC+07:00) Asia/Ho Chi Minh", by offset then id. Cleared, the application's dates are UTC. A schedule trigger's time zone is the same control.                                                                                                                                                           |
+| Binding           | _(planned for M31)_ Chosen from the names of the kind the place needs, from [`GET /api/studio/bindings`](#studio-api): the application's file storage, a webhook's URL and secret, and a connector's base URL, token URL and secrets. File storage also offers "The tenant's database, with no binding", which clears the whole entry. A binding name the tenant lacks stays shown, with a line that says activation will refuse it. |
 
 The file keeps a version range as written, and a table shows it in words, as "1.2.0 and later 1.x" or
 "1.2.0 only". A version that is no longer installed stays shown, with a line in `warningText` that says
-to choose an installed one. A binding name the tenant lacks stays shown, with a line that says
-activation will refuse it.
+to choose an installed one.
 
 ## Relaxed points in Settings
 

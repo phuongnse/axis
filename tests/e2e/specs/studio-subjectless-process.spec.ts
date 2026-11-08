@@ -88,7 +88,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
     await pick(page, '/type', 'schedule')
     await dropEvent(page)
     await page.getByTestId('studio-field-/schedule').getByRole('textbox').fill('0 8 * * 1-5')
-    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await pick(page, '/timeZone', '(UTC+07:00) Asia/Ho Chi Minh')
     await pick(page, '/process', 'DailyReminder')
     const schedule = page.getByTestId('studio-field-/parameters')
     await schedule.getByRole('button', { name: 'Add', exact: true }).click()

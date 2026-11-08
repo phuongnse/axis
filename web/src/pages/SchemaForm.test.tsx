@@ -6,7 +6,8 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { designTokensFor } from '../platform/designTokens'
 import { policyKeyedLists } from '../platform/layerMarks'
-import type { StudioNames } from '../platform/studio'
+import type { StudioCatalog, StudioNames } from '../platform/studio'
+import { StudioCatalogContext } from '../platform/studioCatalog'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
@@ -68,16 +69,18 @@ function renderForm(
   schema: JsonSchema,
   value: Record<string, unknown>,
   onChange: ChangeHandler = vi.fn(),
-  extra: Partial<ComponentProps<typeof SchemaForm>> & { names?: StudioNames } = {},
+  extra: Partial<ComponentProps<typeof SchemaForm>> & { names?: StudioNames; catalog?: StudioCatalog } = {},
 ) {
-  const { names: shownNames = names, ...formProps } = extra
+  const { names: shownNames = names, catalog, ...formProps } = extra
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioNamesContext.Provider value={shownNames}>
-          <LabelTextsContext.Provider value={labelContext}>
-            <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
-          </LabelTextsContext.Provider>
+          <StudioCatalogContext.Provider value={catalog}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
+            </LabelTextsContext.Provider>
+          </StudioCatalogContext.Provider>
         </StudioNamesContext.Provider>
       </TextProvider>
     </ThemeModeProvider>,
@@ -522,4 +525,271 @@ describe('item name catalogues', () => {
       expect(missing).toEqual([])
     },
   )
+})
+
+describe('SchemaForm controls that know what they hold', () => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', 'light'))
+
+  const catalog: StudioCatalog = {
+    modules: [
+      {
+        id: 'sales',
+        label: 'Sales',
+        versions: ['1.2.0', '1.1.0'],
+        roles: [{ name: 'approver', titles: { en: 'Budget approver', vi: 'Người duyệt ngân sách' } }],
+        connectors: [{ name: 'mail', titles: { en: 'Mail server' } }],
+      },
+      { id: 'hr', label: 'People', versions: ['2.0.0'], roles: [], connectors: [] },
+    ],
+    packages: [{ id: 'finance', label: 'Finance', versions: ['3.1.0'] }],
+    // The server sends the zones by offset, then id.
+    timeZones: [
+      { id: 'America/Sao_Paulo', offset: -180 },
+      { id: 'Asia/Kolkata', offset: 330 },
+      { id: 'Asia/Bangkok', offset: 420 },
+      { id: 'Asia/Ho_Chi_Minh', offset: 420 },
+    ],
+  }
+  const catalogNames = {
+    ...names,
+    roles: [{ name: 'DepartmentManager' }, { name: 'Clerk' }],
+    connectors: [{ name: 'Smtp', operations: [] }],
+  } as unknown as StudioNames
+
+  // In tests every select has the id `test-id`, as the dialog's title does, so the dialog is found by its title.
+  async function findDialog(title: string): Promise<HTMLElement> {
+    return (await screen.findByText(title)).closest<HTMLElement>('[role="dialog"]')!
+  }
+
+  async function openAddModule(value: Record<string, unknown>, onChange: ChangeHandler = vi.fn()) {
+    renderForm((await loadKindSchema('application'))!, value, onChange, { catalog, names: catalogNames })
+    await userEvent.click(
+      within(screen.getByTestId('studio-section-modules')).getByRole('button', { name: 'Add module…' }),
+    )
+    return findDialog('Add module')
+  }
+
+  it('fills an empty version range with ^ and the newest version when a module is chosen', async () => {
+    const onChange = vi.fn()
+    const dialog = await openAddModule({ name: 'Shop' }, onChange)
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Module' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Sales' }))
+
+    expect(within(dialog).getByRole('combobox', { name: 'Version' })).toBeVisible()
+    expect(within(dialog).getByText('1.2.0 (newest)')).toBeVisible()
+    expect(within(dialog).getByText('Compatible updates (1.x)')).toBeVisible()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(onChange).toHaveBeenCalledWith('/modules', [{ id: 'sales', version: '^1.2.0' }])
+  })
+
+  it('keeps the version range that a module already has when another module is chosen', async () => {
+    const onChange = vi.fn()
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '~1.1.0' }] },
+      onChange,
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    const dialog = await findDialog('Edit module')
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Module' }))
+    await userEvent.click(screen.getByRole('option', { name: 'People' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/modules/0', { id: 'hr', version: '~1.1.0' })
+  })
+
+  it('writes the range as the operator and the version that the two selects choose', async () => {
+    const onChange = vi.fn()
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      onChange,
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    const dialog = await findDialog('Edit module')
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Updates' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Fixes only (1.2.x)' }))
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Version' }))
+    await userEvent.click(screen.getByRole('option', { name: '1.1.0' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/modules/0', { id: 'sales', version: '~1.1.0' })
+  })
+
+  it('shows one select for each slot of the chosen module, labelled by the slot title', async () => {
+    const onChange = vi.fn()
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0', roles: { approver: 'Clerk' } }] },
+      onChange,
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    const dialog = await findDialog('Edit module')
+
+    const approver = within(dialog).getByRole('combobox', { name: 'Budget approver' })
+    expect(within(dialog).getByTestId('studio-slot-approver')).toHaveTextContent('Budget approver')
+    expect(within(dialog).getByText('Clerk')).toBeVisible()
+    await userEvent.click(approver)
+    expect(screen.getByRole('option', { name: 'DepartmentManager' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('option', { name: 'DepartmentManager' }))
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Mail server' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Smtp' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/modules/0', {
+      id: 'sales',
+      version: '^1.2.0',
+      roles: { approver: 'DepartmentManager' },
+      connectors: { mail: 'Smtp' },
+    })
+  })
+
+  it('says that a chosen module has no slots, once', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'hr', version: '^2.0.0' }] },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'hr' }))
+    const dialog = await findDialog('Edit module')
+
+    expect(within(dialog).getAllByText(english['shell.studio.module.noSlots'])).toHaveLength(1)
+    expect(within(dialog).queryByTestId(/^studio-slot-/)).toBeNull()
+  })
+
+  it('keeps a version that is no longer installed selected, with a warning line', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.0.0' }] },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    const dialog = await findDialog('Edit module')
+
+    const version = within(dialog).getByTestId('studio-field-/modules/0/version')
+    expect(within(version).getByText('1.0.0')).toBeVisible()
+    const warning = within(version).getByTestId('studio-version-not-installed')
+    expect(warning).toHaveTextContent(english['shell.studio.versionRange.notInstalled'])
+    expect(warning).toHaveStyle({ color: designTokensFor('light').colour.warningText })
+  })
+
+  it('keeps the text input for a range in no valid form and for a module that is not installed', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      {
+        name: 'Shop',
+        modules: [
+          { id: 'sales', version: 'latest' },
+          { id: 'gone', version: '^1.0.0' },
+        ],
+      },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    let dialog = await findDialog('Edit module')
+    expect(within(within(dialog).getByTestId('studio-field-/modules/0/version')).getByRole('textbox')).toHaveValue(
+      'latest',
+    )
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'gone' }))
+    dialog = await findDialog('Edit module')
+    expect(within(within(dialog).getByTestId('studio-field-/modules/1/version')).getByRole('textbox')).toHaveValue(
+      '^1.0.0',
+    )
+  })
+
+  it('keeps the text inputs until the catalog loads', async () => {
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop', timeZone: 'Asia/Ho_Chi_Minh' })
+
+    expect(within(screen.getByTestId('studio-field-/timeZone')).getByRole('textbox')).toHaveValue('Asia/Ho_Chi_Minh')
+  })
+
+  it('lists the time zones as the UTC offset and the id, by offset then id', async () => {
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop' }, vi.fn(), { catalog, names: catalogNames })
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Time zone' }))
+
+    expect(
+      Array.from(document.querySelectorAll('.ant-select-item-option-content'), (node) => node.textContent),
+    ).toEqual([
+      '(UTC-03:00) America/Sao Paulo',
+      '(UTC+05:30) Asia/Kolkata',
+      '(UTC+07:00) Asia/Bangkok',
+      '(UTC+07:00) Asia/Ho Chi Minh',
+    ])
+  })
+
+  it('chooses a time zone by its id, and clears it to UTC', async () => {
+    const onChange = vi.fn()
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop', timeZone: 'Asia/Kolkata' }, onChange, {
+      catalog,
+      names: catalogNames,
+    })
+
+    expect(screen.getByText('(UTC+05:30) Asia/Kolkata')).toBeVisible()
+    await userEvent.click(screen.getByRole('combobox', { name: 'Time zone' }))
+    await userEvent.click(screen.getByRole('option', { name: '(UTC+07:00) Asia/Ho Chi Minh' }))
+    expect(onChange).toHaveBeenLastCalledWith('/timeZone', 'Asia/Ho_Chi_Minh')
+
+    const field = screen.getByTestId('studio-field-/timeZone')
+    await userEvent.hover(field)
+    await userEvent.click(field.querySelector('.ant-select-clear')!)
+    expect(onChange).toHaveBeenLastCalledWith('/timeZone', undefined)
+  })
+
+  it('gives a schedule trigger the same time zone select', async () => {
+    renderForm(
+      (await loadKindSchema('trigger'))!,
+      { kind: 'trigger', name: 'Daily', formatVersion: 1, type: 'schedule', schedule: '0 6 * * *' },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Time zone' }))
+
+    expect(screen.getByRole('option', { name: '(UTC+07:00) Asia/Bangkok' })).toBeInTheDocument()
+  })
+
+  it('chooses a package by label and fills its empty version', async () => {
+    const onChange = vi.fn()
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop' }, onChange, { catalog, names: catalogNames })
+    await userEvent.click(
+      within(screen.getByTestId('studio-section-packages')).getByRole('button', { name: 'Add package…' }),
+    )
+    const dialog = await findDialog('Add package')
+
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Package' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Finance' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledWith('/packages', [{ id: 'finance', version: '^3.1.0' }])
+  })
+
+  it('shows a version range in words in the Modules and Packages tables', async () => {
+    renderForm((await loadKindSchema('application'))!, {
+      name: 'Shop',
+      modules: [
+        { id: 'sales', version: '^1.2.0' },
+        { id: 'hr', version: '1.2.0' },
+        { id: 'ops', version: '~1.2.3' },
+      ],
+      packages: [{ id: 'finance', version: '^3.1.0' }],
+    })
+
+    const modules = within(screen.getByTestId('studio-field-/modules'))
+    expect(modules.getByText('1.2.0 and later 1.x')).toBeVisible()
+    expect(modules.getByText('1.2.0 only')).toBeVisible()
+    expect(modules.getByText('1.2.3 and later 1.2.x')).toBeVisible()
+    expect(within(screen.getByTestId('studio-field-/packages')).getByText('3.1.0 and later 3.x')).toBeVisible()
+  })
 })

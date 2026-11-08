@@ -1,13 +1,22 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useId, useState, type CSSProperties, type ReactNode } from 'react'
-import type { StudioNames } from '../platform/studio'
+import type { StudioCatalog, StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
-import { parameterType, referenceOptions, StudioNamesContext, textsOf } from '../platform/studioNames'
+import {
+  catalogControlOf,
+  parseVersionRange,
+  StudioCatalogContext,
+  versionRangeWords,
+  type CatalogControl,
+} from '../platform/studioCatalog'
+import { getAt, parameterType, referenceOptions, StudioNamesContext, textsOf } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
+import { PlatformContext } from './context'
+import { CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
@@ -334,10 +343,15 @@ function SchemaNode({
   const { colour, radius, spacing } = useDesignTokens()
   const inDialog = useContext(ItemDialogContext)
   const names = useContext(StudioNamesContext)
+  const catalog = useContext(StudioCatalogContext)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
   const layer = useContext(SchemaLayerContext)
   const schema = textAlternative(resolveSchema(node, root), root, value)
+  const control = readOnly
+    ? undefined
+    : usableControl(catalogControlOf(root.properties?.kind?.const, path), catalog, names, rootValue, pointer, value)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
@@ -346,7 +360,7 @@ function SchemaNode({
   const keyMark = schema.propertyNames?.['x-axis-reference']
   const isMarkedMap =
     schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined
-  const unsupported = !isMarkedMap && !isSupported(schema)
+  const unsupported = control === undefined && !isMarkedMap && !isSupported(schema)
   const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const helpNode =
     help === undefined ? undefined : (
@@ -363,6 +377,8 @@ function SchemaNode({
     )
   } else if (schema.const !== undefined || readOnly) {
     input = <Typography.Text>{String(schema.const ?? value ?? '')}</Typography.Text>
+  } else if (control !== undefined && catalog !== undefined) {
+    input = catalogInput({ control, catalog, names, name, locale, rootValue, pointer, value, onChange })
   } else if (schema.enum !== undefined) {
     input = (
       <Select
@@ -565,6 +581,132 @@ function SchemaNode({
   )
 }
 
+/**
+ * The catalog control that a field can draw now, see docs/reference/studio-resource-form.md#controls-that-know-what-they-hold,
+ * or `undefined` when the field keeps its input: the catalog or the names have not loaded, the item's module or package
+ * is not installed, or a version range is in no valid form.
+ */
+function usableControl(
+  control: CatalogControl | undefined,
+  catalog: StudioCatalog | undefined,
+  names: StudioNames | undefined,
+  rootValue: unknown,
+  pointer: string,
+  value: unknown,
+): CatalogControl | undefined {
+  if (control === undefined || catalog === undefined) {
+    return undefined
+  }
+  switch (control) {
+    case 'moduleVersion':
+    case 'packageVersion':
+      return typeof value === 'string' &&
+        parseVersionRange(value) !== undefined &&
+        installedOf(catalog, control === 'moduleVersion' ? 'module' : 'package', rootValue, pointer) !== undefined
+        ? control
+        : undefined
+    case 'roles':
+    case 'connectors':
+      return names !== undefined && installedModule(catalog, rootValue, pointer) !== undefined ? control : undefined
+    default:
+      return control
+  }
+}
+
+/** The installed module or package that the item holding the property at `pointer` names, if it is installed. */
+function installedOf(catalog: StudioCatalog, kind: 'module' | 'package', rootValue: unknown, pointer: string) {
+  const id = getAt(rootValue, `${itemPointerOf(pointer)}/id`)
+  return (kind === 'module' ? catalog.modules : catalog.packages).find((entry) => entry.id === id)
+}
+
+/** The installed module that the item holding the property at `pointer` names, if it is installed. */
+function installedModule(catalog: StudioCatalog, rootValue: unknown, pointer: string) {
+  const id = getAt(rootValue, `${itemPointerOf(pointer)}/id`)
+  return catalog.modules.find((entry) => entry.id === id)
+}
+
+function itemPointerOf(pointer: string): string {
+  return pointer.slice(0, pointer.lastIndexOf('/'))
+}
+
+/** The control of a field that chooses from the catalog. `usableControl` has checked that the catalog has what it needs. */
+function catalogInput({
+  control,
+  catalog,
+  names,
+  name,
+  locale,
+  rootValue,
+  pointer,
+  value,
+  onChange,
+}: {
+  control: CatalogControl
+  catalog: StudioCatalog
+  names: StudioNames | undefined
+  name: string
+  locale: string
+  rootValue: unknown
+  pointer: string
+  value: unknown
+  onChange: ChangeHandler
+}): ReactNode {
+  const text = typeof value === 'string' ? value : undefined
+  const itemPointer = itemPointerOf(pointer)
+  switch (control) {
+    case 'timeZone':
+      return (
+        <TimeZoneSelect
+          name={name}
+          zones={catalog.timeZones}
+          value={text}
+          onChange={(next) => onChange(pointer, next === undefined || next === '' ? undefined : next)}
+        />
+      )
+    case 'module':
+    case 'package': {
+      const item = getAt(rootValue, itemPointer)
+      return (
+        <CatalogChoice
+          name={name}
+          installed={control === 'module' ? catalog.modules : catalog.packages}
+          value={text}
+          item={isRecord(item) ? item : {}}
+          itemPointer={itemPointer}
+          onChange={onChange}
+        />
+      )
+    }
+    case 'moduleVersion':
+    case 'packageVersion':
+      return (
+        <VersionRangeInput
+          range={parseVersionRange(text ?? '')!}
+          versions={
+            installedOf(catalog, control === 'moduleVersion' ? 'module' : 'package', rootValue, pointer)!.versions
+          }
+          onChange={(next) => onChange(pointer, next)}
+        />
+      )
+    case 'roles':
+    case 'connectors': {
+      const installed = installedModule(catalog, rootValue, pointer)!
+      const slots = control === 'roles' ? installed.roles : installed.connectors
+      return (
+        <ModuleSlots
+          slots={slots}
+          noSlots={control === 'roles' && installed.roles.length === 0 && installed.connectors.length === 0}
+          names={referenceOptions(names!, control === 'roles' ? 'role' : 'connector', rootValue, pointer)}
+          value={value}
+          pointer={pointer}
+          locale={locale}
+          onChange={onChange}
+        />
+      )
+    }
+  }
+}
+
 /** Whether the item schema is an object with properties that is not a label, which a list draws as a table. */
 function isObjectList(item: JsonSchema): boolean {
   return item.type === 'object' && item.properties !== undefined && !isLabelSchema(item)
@@ -713,7 +855,12 @@ function ObjectList({
         resolved.enum !== undefined
           ? 'fixed'
           : 'freeText',
-      render: (item) => cellWords(child, root, item[name], words),
+      render: (item) => {
+        const cell = item[name]
+        return typeof cell === 'string' && catalogControlOf(kind, `${path}.${name}`)?.endsWith('Version')
+          ? versionRangeWords(cell, t)
+          : cellWords(child, root, cell, words)
+      },
     }
   })
   const large = properties.some(([, child]) => {
