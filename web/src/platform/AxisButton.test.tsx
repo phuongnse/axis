@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider } from 'antd'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { AxisActionRow, AxisButton } from './AxisButton'
+import { buttonRoles } from './buttonRoles'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -187,6 +190,33 @@ describe.each(['light', 'dark'] as const)('the roles of the button in %s mode', 
     renderRoles()
 
     expect(screen.getByRole('button', { name: 'Main' })).not.toHaveAttribute('role')
+  })
+
+  it('draws link as a link button with its text in primaryText', () => {
+    renderIn(mode, <AxisButton role="link">Open</AxisButton>)
+
+    const link = screen.getByRole('button', { name: 'Open' })
+    expect(link).toHaveClass('ant-btn-variant-link')
+    expect(link).toHaveStyle({ color: colour.primaryText })
+    expect(link).not.toHaveAttribute('role')
+  })
+})
+
+describe('the roles of the button in the docs', () => {
+  it('are the roles AxisButton defines', () => {
+    // Vitest runs from the web folder, as `npm test --prefix web` does.
+    const doc = readFileSync(join(process.cwd(), '..', 'docs/reference/actions-and-controls.md'), 'utf8')
+    const start = doc.indexOf('## Buttons')
+    const end = doc.indexOf('\n## ', start + 1)
+    const documented = doc
+      .slice(start, end === -1 ? undefined : end)
+      .split('\n')
+      .filter((line) => line.startsWith('|'))
+      .slice(2)
+      .map((line) => line.split('|')[1].trim().toLowerCase())
+
+    expect(new Set(documented)).toEqual(new Set(buttonRoles))
+    expect(documented).toHaveLength(buttonRoles.length)
   })
 })
 

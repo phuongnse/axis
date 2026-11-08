@@ -19,6 +19,7 @@ widget names a role, never an Ant Design button type.
 | Secondary   | The default grey outline                    | Other actions, such as Cancel and Import                                                                                                                                         |
 | Icon        | A text button with only an icon             | Small actions such as Refresh. Choose and Clear of a `reference` field are bordered and joined                                                                                   |
 | Plain       | A borderless text button in the text colour | Header controls, such as the account button                                                                                                                                      |
+| Link | Text in `primaryText` with no border | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects) |
 | Destructive | `dangerText` at any level                   | Actions that remove, such as Remove row and Delete                                                                                                                               |
 
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
