@@ -609,9 +609,9 @@ Every other page that Keycloak can show is drawn from the same frame.
 - **The SAML redirect**, a short card whose form posts at once, and **the front-channel sign-out**,
   whose hidden frames load before the page goes on to the redirect address.
 - **The choice of method** behind "Try another way", which shows "Choose how to sign in" with one row
-  per method, its name and a help line, and "Back to sign in" through Keycloak's restart address. Each
-  row is a submit button that posts the method's execution id as `authenticationExecution`, in one real
-  `<form method="post">` to the login address.
+  per method, its name and a help line at the row's start, and "Back to sign in" through Keycloak's restart
+  address. Each row is a submit button that posts the method's execution id as `authenticationExecution`, in
+  one real `<form method="post">` to the login address.
 - **Update profile and review profile**, "Update your profile" and "Review your profile", one card that
   differs only in its title. It draws one single-line input per user profile field, filled with the
   current value, with a read-only field not editable and the email field typed `email`. Keycloak's

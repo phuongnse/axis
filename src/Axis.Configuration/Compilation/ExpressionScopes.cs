@@ -59,7 +59,8 @@ public static class ExpressionScopes
                     .ToList(),
             referenceFields: null,
             modules,
-            undeclaredModuleIsUnknown);
+            undeclaredModuleIsUnknown,
+            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))));
     }
 
     internal static ExpressionScope ForEntity(
@@ -82,7 +83,8 @@ public static class ExpressionScopes
             findEntity is null ? null : CollectionsOf(all, findEntity, references),
             referenceFields: null,
             modules,
-            undeclaredModuleIsUnknown);
+            undeclaredModuleIsUnknown,
+            labelKeys: LabelKeysOf(all));
     }
 
     /// <summary>
@@ -129,13 +131,19 @@ public static class ExpressionScopes
                         ? new ExpressionCollection(
                             field.Name,
                             item.Name,
-                            Build(item.Fields.Select(itemField => (itemField.Name, TypeOf(itemField))), rules: null, collections: null, resolver))
+                            Build(
+                                item.Fields.Select(itemField => (itemField.Name, TypeOf(itemField))),
+                                rules: null,
+                                collections: null,
+                                resolver,
+                                labelKeys: LabelKeysOf(item.Fields.Select(itemField => (itemField.Name, itemField.Label)))))
                         : null)
                     .OfType<ExpressionCollection>(),
             ],
             resolver,
             modules,
-            undeclaredModuleIsUnknown);
+            undeclaredModuleIsUnknown,
+            labelKeys: LabelKeysOf(all.Select(field => (field.Name, field.Label))));
     }
 
     /// <summary>
@@ -165,7 +173,8 @@ public static class ExpressionScopes
             ReferenceFieldsOf(findEntity),
             modules,
             undeclaredModuleIsUnknown,
-            ReferenceCollectionsOf(findEntity));
+            ReferenceCollectionsOf(findEntity),
+            LabelKeysOf(all));
     }
 
     /// <summary>
@@ -192,7 +201,8 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity),
             ReferenceFieldsOf(findEntity),
             modules,
-            referenceCollections: ReferenceCollectionsOf(findEntity));
+            referenceCollections: ReferenceCollectionsOf(findEntity),
+            labelKeys: LabelKeysOf(all));
     }
 
     /// <summary>
@@ -218,7 +228,8 @@ public static class ExpressionScopes
             CollectionsOf(all, findEntity),
             referenceFields: null,
             modules,
-            undeclaredModuleIsUnknown: true);
+            undeclaredModuleIsUnknown: true,
+            labelKeys: LabelKeysOf(all));
     }
 
     /// <summary>
@@ -268,12 +279,16 @@ public static class ExpressionScopes
     /// the entity had them before the change. The scope has no rules, no collections and resolves no
     /// paths. A child collection or a references field is not a field here.
     /// </summary>
-    internal static ExpressionScope ForMigration(IEnumerable<(string Name, FieldDefinition Field)> fields) =>
-        Build(
-            fields.Select(pair => (pair.Name, TypeOf(pair.Field))),
+    internal static ExpressionScope ForMigration(IEnumerable<(string Name, FieldDefinition Field)> fields)
+    {
+        var all = fields.ToList();
+        return Build(
+            all.Select(pair => (pair.Name, TypeOf(pair.Field))),
             rules: null,
             collections: null,
-            referenceFields: null);
+            referenceFields: null,
+            labelKeys: LabelKeysOf(all.Select(pair => (pair.Name, pair.Field.Label))));
+    }
 
     /// <summary>
     /// The scope of a navigate action's parameter: <c>id</c> as a reference parameter to the root
@@ -330,7 +345,8 @@ public static class ExpressionScopes
                                 child.Fields.Select(item => (item.Name, TypeOf(item))),
                                 rules: null,
                                 collections: null,
-                                ReferenceFieldsOf(findEntity))
+                                ReferenceFieldsOf(findEntity),
+                                labelKeys: LabelKeysOf(child.Fields))
                             : ForEntity(child.Fields))
                     : null)
                 .OfType<ExpressionCollection>(),
@@ -367,7 +383,8 @@ public static class ExpressionScopes
         ReferenceFieldResolver? referenceFields,
         IEnumerable<string>? modules = null,
         bool undeclaredModuleIsUnknown = false,
-        ReferenceCollectionResolver? referenceCollections = null)
+        ReferenceCollectionResolver? referenceCollections = null,
+        IReadOnlyDictionary<string, string>? labelKeys = null)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -378,8 +395,26 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections);
+        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown, referenceCollections, labelKeys);
     }
+
+    /// <summary>The text key of each field's label by name, for the fields that have a label. A repeated name keeps its first.</summary>
+    private static Dictionary<string, string> LabelKeysOf(IEnumerable<(string Name, TextReference? Label)> fields)
+    {
+        var keys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, label) in fields)
+        {
+            if (label is not null)
+            {
+                keys.TryAdd(name, label.TextKey);
+            }
+        }
+
+        return keys;
+    }
+
+    private static Dictionary<string, string> LabelKeysOf(IEnumerable<FieldDefinition> fields) =>
+        LabelKeysOf(fields.Select(field => (field.Name, field.Label)));
 
     /// <summary>
     /// A parameter's type is a field's, except that an enum parameter declares its own values and a

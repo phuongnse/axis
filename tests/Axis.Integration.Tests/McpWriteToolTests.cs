@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
@@ -14,7 +15,7 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c> and <c>delete_resource</c>, and
+/// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c>, <c>delete_resource</c> and <c>write_layer</c>, and
 /// <c>check_expression</c>, see docs/reference/mcp-server.md#tools. The server is tenant <c>a</c> on a real PostgreSQL database,
 /// because a draft holds the folder's write lock, which lives in the platform database, and each write call writes an audit
 /// record to the tenant database. The folder holds the purchase-requests sample.
@@ -28,6 +29,9 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     private const string NoDraft = "The application has no draft with this id.";
     private const string NoResource = "The application has no resource with this id.";
     private const string KindChange = "A patch may not change id or kind.";
+    private const string Module = "department-budgets";
+    private const string ProcessId = "94f1cc25-6a68-435f-9383-36fc43aae860";
+    private const string LayerFile = "customizations/department-budgets/BudgetApproval.json";
 
     private readonly List<string> _bodies = [];
     private readonly string _applications = Directory.CreateTempSubdirectory("axis-mcp-write-").FullName;
@@ -216,6 +220,99 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task Adding_a_step_to_a_module_process_writes_a_layer_in_the_draft_that_holds_only_that_step()
+    {
+        var before = FolderState();
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var edited = (await CallAsync("read_module_resource", Arguments(("module", Module), ("id", ProcessId)))).Output!["content"]!.DeepClone();
+        var step = JsonNode.Parse("""
+            {
+              "name": "financeReview",
+              "type": "task",
+              "assignee": { "role": "approver" },
+              "form": "BudgetReview",
+              "outcomes": [
+                { "name": "approve", "next": "markApproved" },
+                { "name": "reject", "next": "markRejected" }
+              ]
+            }
+            """)!;
+        ((JsonArray)edited["steps"]!).Add(step.DeepClone());
+
+        var written = await CallAsync("write_layer", Arguments(("draft", draft), ("module", Module), ("id", ProcessId)), Content(edited.ToJsonString()));
+
+        Assert.False(written.IsError, written.Error);
+        Assert.Equal(LayerFile, written.Output!["file"]!.GetValue<string>());
+        Assert.NotEmpty(written.Output["version"]!.GetValue<string>());
+        Assert.NotNull(written.Output["diagnostics"]);
+        var change = Assert.Single((await Drafts(_user!).DiffAsync(draft, null, CancellationToken)).Value!.Resources);
+        Assert.Equal(LayerFile, change.File);
+        Assert.Equal("added", change.Change);
+        var bytes = (await Drafts(_user!).FilesAsync(draft, CancellationToken)).Value!.Single(file => file.File == LayerFile).Bytes;
+        var layer = JsonNode.Parse(bytes)!;
+        Assert.Equal("layer", layer["kind"]!.GetValue<string>());
+        Assert.Equal("department-budgets/BudgetApproval", layer["target"]!.GetValue<string>());
+        Assert.Equal(written.Output["version"]!.GetValue<string>(), Convert.ToHexStringLower(SHA256.HashData(bytes)));
+        var expected = new JsonObject { ["steps"] = new JsonArray(step.DeepClone()) };
+        Assert.True(JsonNode.DeepEquals(expected, layer["changes"]), layer["changes"]!.ToJsonString());
+        Assert.Equal(before, FolderState());
+        Assert.False(File.Exists(Path.Combine(Folder, LayerFile)));
+        Assert.Equal(1L, await CountAsync(
+            $"SELECT count(*) FROM axis.audit_records WHERE action = 'mcp.toolCalled' AND details->>'draftId' = '{draft}'"
+            + $" AND details->>'tool' = 'write_layer' AND details->>'resourceId' = '{ProcessId}'"));
+    }
+
+    [Fact]
+    public async Task Module_content_that_changes_nothing_writes_no_layer_and_removes_the_draft_layer_it_had()
+    {
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var unchanged = (await CallAsync("read_module_resource", Arguments(("module", Module), ("id", ProcessId)))).Output!["content"]!.ToJsonString();
+        var arguments = Arguments(("draft", draft), ("module", Module), ("id", ProcessId));
+
+        var nothing = await CallAsync("write_layer", arguments, Content(unchanged));
+
+        Assert.False(nothing.IsError, nothing.Error);
+        Assert.Null(nothing.Output!["file"]);
+        Assert.Null(nothing.Output["version"]);
+        Assert.NotNull(nothing.Output["diagnostics"]);
+        Assert.Empty((await Drafts(_user!).DiffAsync(draft, null, CancellationToken)).Value!.Resources);
+
+        var edited = JsonNode.Parse(unchanged)!;
+        edited["steps"]![0]!["outcomes"]![0]!["next"] = "markRejected";
+        Assert.Equal(LayerFile, (await CallAsync("write_layer", arguments, Content(edited.ToJsonString()))).Output!["file"]!.GetValue<string>());
+        Assert.Single((await Drafts(_user!).DiffAsync(draft, null, CancellationToken)).Value!.Resources);
+
+        var removed = await CallAsync("write_layer", arguments, Content(unchanged));
+
+        Assert.False(removed.IsError, removed.Error);
+        Assert.Null(removed.Output!["file"]);
+        Assert.Null(removed.Output["version"]);
+        Assert.Empty((await Drafts(_user!).DiffAsync(draft, null, CancellationToken)).Value!.Resources);
+    }
+
+    [Fact]
+    public async Task A_layer_write_that_the_save_route_refuses_answers_its_title_and_changes_nothing()
+    {
+        var before = FolderState();
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var edited = (await CallAsync("read_module_resource", Arguments(("module", Module), ("id", ProcessId)))).Output!["content"]!.DeepClone();
+        edited["name"] = "Renamed";
+
+        Assert.Equal(
+            "The edit cannot be saved as a layer.",
+            (await CallAsync("write_layer", Arguments(("draft", draft), ("module", Module), ("id", ProcessId)), Content(edited.ToJsonString()))).Error);
+        Assert.Equal(
+            "The application uses no module with this id.",
+            (await CallAsync("write_layer", Arguments(("draft", draft), ("module", "no-module"), ("id", ProcessId)), Content(edited.ToJsonString()))).Error);
+        Assert.Equal(
+            "The module has no resource with this id.",
+            (await CallAsync("write_layer", Arguments(("draft", draft), ("module", Module), ("id", Guid.NewGuid().ToString("D"))), Content(edited.ToJsonString()))).Error);
+        Assert.Empty((await Drafts(_user!).DiffAsync(draft, null, CancellationToken)).Value!.Resources);
+        Assert.Equal(0L, await AuditCountAsync(draft, "write_layer"));
+        Assert.Equal(before, FolderState());
+    }
+
+    [Fact]
     public async Task Another_persons_draft_and_an_unknown_one_answer_no_draft_and_change_nothing_and_write_no_audit_record()
     {
         var theirs = (await Drafts("someone-else").CreateAsync(Revisions("someone-else"), CancellationToken)).Value!;
@@ -240,6 +337,9 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
         {
             Assert.Equal(NoDraft, (await CallAsync("write_resource", Arguments(("draft", draft)), Content(content.ToJsonString()))).Error);
             Assert.Equal(NoDraft, (await CallAsync("delete_resource", Arguments(("draft", draft), ("id", role)))).Error);
+            Assert.Equal(
+                NoDraft,
+                (await CallAsync("write_layer", Arguments(("draft", draft), ("module", Module), ("id", ProcessId)), Content("""{ "id": "x" }"""))).Error);
             Assert.Equal(NoDraft, (await CallAsync("check_expression", Arguments(("draft", draft), ("id", role), ("path", "/expression"), ("expression", "1")))).Error);
         }
 

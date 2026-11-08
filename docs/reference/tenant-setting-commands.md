@@ -509,3 +509,7 @@ The publisher and the server also write records for the operator's work in a cel
 - **Export starts by an administrator.** `POST /api/tenant/exports` writes `tenant export start` in one
   transaction with the job it queues, with the administrator as actor and `export:<id>` in `changed`. A
   start that answers the export already running writes none.
+- **Model keys.** `PUT` and `DELETE /api/tenant/model-key` write `tenant model-key set` or
+  `tenant model-key remove` in one transaction with the change, with the administrator as actor and
+  `modelKey` in `changed`, never the key. A remove with no key writes none. See
+  [the tenant's model key](user-administration.md#the-tenants-model-key).

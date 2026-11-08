@@ -619,6 +619,41 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([]);
   });
 
+  test(`the identitySignIn preview's Choose how to sign in state starts each method's name at the row's start in ${mode} mode`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(
+      page,
+      `?preview=identitySignIn&mode=${mode}`,
+      {
+        sandboxed: true,
+        frameWidth: 992,
+      },
+    );
+    const state = figure(
+      page.frameLocator("iframe"),
+      "Choose how to sign in",
+    );
+    const insets: number[] = [];
+
+    for (const label of ["Authenticator app", "Password"]) {
+      const row = state.getByRole("button", { name: new RegExp(label) });
+      const name = row.getByText(label, { exact: true });
+      const rowBox = await row.boundingBox();
+      const nameBox = await name.boundingBox();
+      if (!rowBox || !nameBox) {
+        throw new Error(`The ${label} row or its name has no box`);
+      }
+      insets.push(nameBox.x - rowBox.x);
+    }
+
+    const [authenticatorInset, passwordInset] = insets;
+    expect(Math.abs(passwordInset - authenticatorInset)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(recording.errors).toEqual([]);
+  });
+
   test(`the signIn preview draws the Axis heading above the sign-in card in ${mode} mode`, async ({
     page,
   }) => {

@@ -33,15 +33,17 @@ function renderList(onChange = vi.fn(), large = false, extra: Partial<ComponentP
           large={large}
           newItem={() => ({ name: '', version: '' })}
           onChange={onChange}
-          fields={(copy, change) => (
+          fields={(copy, change, _index, problem) => (
             <>
               {columns.map((column) => (
-                <Input
-                  key={column.key}
-                  aria-label={column.title}
-                  value={String(copy[column.key] ?? '')}
-                  onChange={(event) => change(`/${column.key}`, event.target.value)}
-                />
+                <div key={column.key}>
+                  <Input
+                    aria-label={column.title}
+                    value={String(copy[column.key] ?? '')}
+                    onChange={(event) => change(`/${column.key}`, event.target.value)}
+                  />
+                  {problem(column.key)}
+                </div>
               ))}
             </>
           )}
@@ -96,18 +98,45 @@ describe('the list of objects', () => {
     expect(onChange).toHaveBeenCalledWith('/modules/0', { name: 'budget', version: '^1.0.0.1' })
   })
 
-  it('turns Done off while a required field of the copy is empty', async () => {
+  it('keeps Done on while a required field of the copy is empty', async () => {
     renderList()
+
+    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
+    await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Module' }))
+
+    expect(within(dialog).getByRole('button', { name: 'Done' })).toBeEnabled()
+  })
+
+  it('shows what to fill in under an empty required field, focuses it and keeps the dialog open on Done', async () => {
+    const onChange = renderList()
+
+    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
+    await userEvent.clear(within(dialog).getByRole('textbox', { name: 'Module' }))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(within(dialog).getByText('Fill in this field.')).toBeVisible()
+    expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveFocus()
+    expect(dialog).toBeVisible()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('removes the message once the field is filled, then Done writes the item with one change', async () => {
+    const onChange = renderList()
 
     await userEvent.click(screen.getByRole('button', { name: 'budget' }))
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
     const name = within(dialog).getByRole('textbox', { name: 'Module' })
     await userEvent.clear(name)
-
-    expect(within(dialog).getByRole('button', { name: 'Done' })).toBeDisabled()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     await userEvent.type(name, 'budget2')
 
-    expect(within(dialog).getByRole('button', { name: 'Done' })).toBeEnabled()
+    expect(within(dialog).queryByText('Fill in this field.')).toBeNull()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith('/modules/0', { name: 'budget2', version: '^1.0.0' })
   })
 
   it('leaves out a column that is empty on every row, while the dialog keeps its field', async () => {

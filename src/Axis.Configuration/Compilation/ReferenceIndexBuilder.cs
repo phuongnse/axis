@@ -35,8 +35,8 @@ internal sealed class ReferenceIndexBuilder
     /// Tells the probe of an expression check, with its type or its problem. Every place that checks an
     /// expression calls it, whether or not the compile collects edges.
     /// </summary>
-    public void RecordExpression(Resource owner, string path, ExpressionType? type, ExpressionDiagnostic? problem) =>
-        _probe?.Record(owner.File, path, type, problem);
+    public void RecordExpression(Resource owner, string path, ExpressionType? type, ExpressionDiagnostic? problem, ExpressionPlace? place = null) =>
+        _probe?.Record(owner.File, path, type, problem, place);
 
     public void Add(Resource from, string path, string relation, ReferenceNode to)
     {

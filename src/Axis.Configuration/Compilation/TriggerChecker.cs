@@ -131,7 +131,7 @@ internal static class TriggerChecker
                     ? ExpressionTypeChecker.Check(parsed.Expression!, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean)
                     : null;
                 var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
-                references.RecordExpression(trigger, "/when", check?.Type, problem);
+                references.RecordExpression(trigger, "/when", check?.Type, problem, check?.Place);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, "/when");
@@ -244,6 +244,7 @@ internal static class TriggerChecker
             var parsed = ExpressionParser.Parse(when);
             ExpressionDiagnostic? problem;
             ExpressionType? type = null;
+            ExpressionPlace? place = null;
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(
@@ -255,13 +256,14 @@ internal static class TriggerChecker
 
                 problem = check.Diagnostic;
                 type = check.Type;
+                place = check.Place;
             }
             else
             {
                 problem = parsed.Diagnostic;
             }
 
-            references.RecordExpression(trigger, "/when", type, problem);
+            references.RecordExpression(trigger, "/when", type, problem, place);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, "/when");
@@ -325,6 +327,7 @@ internal static class TriggerChecker
             var parsed = ExpressionParser.Parse(value.GetString()!);
             ExpressionDiagnostic? problem;
             ExpressionType? type = null;
+            ExpressionPlace? place = null;
             if (parsed.Succeeded)
             {
                 // A parameter whose type is unknown has a diagnostic of its own on the process.
@@ -344,13 +347,14 @@ internal static class TriggerChecker
 
                 problem = check.Diagnostic;
                 type = check.Type;
+                place = check.Place;
             }
             else
             {
                 problem = parsed.Diagnostic;
             }
 
-            references.RecordExpression(trigger, path, type, problem);
+            references.RecordExpression(trigger, path, type, problem, place);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);

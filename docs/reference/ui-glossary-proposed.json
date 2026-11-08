@@ -20,12 +20,6 @@
       "status": "proposed"
     },
     {
-      "concept": "Job",
-      "en": "job",
-      "vi": "tác vụ",
-      "status": "proposed"
-    },
-    {
       "concept": "Platform operator",
       "en": "platform operator",
       "vi": "người vận hành nền tảng",
@@ -50,18 +44,6 @@
       "status": "proposed"
     },
     {
-      "concept": "Package",
-      "en": "package",
-      "vi": "gói",
-      "status": "proposed"
-    },
-    {
-      "concept": "Binding",
-      "en": "binding",
-      "vi": "liên kết",
-      "status": "proposed"
-    },
-    {
       "concept": "Grant",
       "en": "grant",
       "vi": "quyền",
@@ -83,6 +65,42 @@
       "concept": "Draft",
       "en": "draft",
       "vi": "bản nháp",
+      "status": "proposed"
+    },
+    {
+      "concept": "Application template",
+      "en": "template",
+      "vi": "mẫu",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Apply",
+      "en": "Apply",
+      "vi": "Áp dụng",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Reset",
+      "en": "Reset",
+      "vi": "Đặt lại",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Move up",
+      "en": "Move up",
+      "vi": "Chuyển lên",
+      "status": "proposed"
+    },
+    {
+      "concept": "Action: Move down",
+      "en": "Move down",
+      "vi": "Chuyển xuống",
+      "status": "proposed"
+    },
+    {
+      "concept": "Column",
+      "en": "column",
+      "vi": "cột",
       "status": "proposed"
     }
   ]

@@ -489,7 +489,7 @@ internal static class EndpointChecker
                 ? ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionScopes.TypeOf(field)!)
                 : null;
             var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
-            references.RecordExpression(endpoint, path, check?.Type, problem);
+            references.RecordExpression(endpoint, path, check?.Type, problem, check?.Place);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, path);

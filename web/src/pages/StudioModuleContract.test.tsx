@@ -5,6 +5,7 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
+import { chooseOption, formItem } from '../test/antd'
 import { followLink, renderGuarded } from '../test/leaveGuard'
 import type { StudioDiagnostic, StudioResource } from '../platform/studio'
 import { StudioModuleContract } from './StudioModuleContract'
@@ -220,17 +221,71 @@ describe('StudioModuleContract', () => {
 
       await userEvent.click(await screen.findByTestId('studio-contract-add-state'))
       const stateDialog = await screen.findByRole('dialog')
-      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
-      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'ONHOLD')
-      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
-      await userEvent.clear(within(stateDialog).getByRole('textbox', { name: 'Name' }))
-      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'review')
+      const add = within(stateDialog).getByRole('button', { name: 'Add' })
+      const name = within(stateDialog).getByRole('textbox', { name: 'Name' })
+      expect(add).toBeEnabled()
+      await userEvent.click(add)
+      expect(await within(stateDialog).findByText('Enter a name.')).toBeInTheDocument()
+      expect(name).toHaveFocus()
+      expect(screen.queryByRole('note', { name: 'Added ' })).toBeNull()
+      await userEvent.type(name, 'ONHOLD')
+      await userEvent.click(add)
+      expect(await within(stateDialog).findByText('A state with this name already exists.')).toBeInTheDocument()
+      expect(add).toBeEnabled()
+      await userEvent.clear(name)
+      await userEvent.type(name, 'review')
       await userEvent.click(within(stateDialog).getByRole('checkbox', { name: 'Deletable' }))
-      await userEvent.click(within(stateDialog).getByRole('button', { name: 'Add' }))
+      await userEvent.click(add)
 
       expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
       expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
+    })
+
+    it('keeps Add transition on, and a click with nothing chosen shows what is missing and adds no row', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      const add = within(dialog).getByRole('button', { name: 'Add' })
+      expect(add).toBeEnabled()
+      await userEvent.click(add)
+
+      expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose at least one state.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose a state.')).toBeInTheDocument()
+      expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+      expect(screen.getByTestId('studio-save')).toBeDisabled()
+    })
+
+    it('rejects a taken transition name and a To state among the From states, then adds the transition', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      const add = within(dialog).getByRole('button', { name: 'Add' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'HOLD')
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'From' })))
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'To' })))
+      await userEvent.click(add)
+
+      expect(await within(dialog).findByText('A transition with this name already exists.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose a state that the transition does not leave.')).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeDisabled()
+    })
+
+    it('adds a transition once its fields are right', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'park')
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'From' })))
+      await chooseOption('onHold', formItem(within(dialog).getByRole('combobox', { name: 'To' })))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+      expect(await screen.findByRole('note', { name: 'Added park' })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeEnabled()
     })
 
     it('asks before a link leaves an edited contract, and not before one leaves an untouched contract', async () => {
@@ -325,16 +380,19 @@ describe('StudioModuleContract', () => {
       return within(screen.getByRole('dialog')).getByRole('button', { name: 'Relax' })
     }
 
-    it('sends no write for a blank or whitespace-only reason', async () => {
+    it('keeps Relax on, and a click with a blank or whitespace-only reason asks for a reason and sends no write', async () => {
       const { patches } = renderRelax(manifestWith([{ id: 'checklists', version: '^1.0.0' }]))
       const reason = await openRelax()
 
-      expect(okButton()).toBeDisabled()
+      expect(okButton()).toBeEnabled()
       await userEvent.click(okButton())
+      expect(await screen.findByText('Enter a reason.')).toBeInTheDocument()
+      expect(reason).toHaveFocus()
       await userEvent.type(reason, '   ')
-      expect(okButton()).toBeDisabled()
       await userEvent.click(okButton())
 
+      expect(okButton()).toBeEnabled()
+      expect(screen.getByText('Enter a reason.')).toBeInTheDocument()
       expect(patches()).toHaveLength(0)
     })
 

@@ -300,6 +300,7 @@ internal static class PresentationChecker
         var parsed = ExpressionParser.Parse(expression);
         ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
         ExpressionType? type = null;
+        ExpressionPlace? place = null;
         string? unlisted = null;
         if (parsed.Succeeded)
         {
@@ -317,9 +318,10 @@ internal static class PresentationChecker
 
             problem = check.Diagnostic;
             type = check.Type;
+            place = check.Place;
         }
 
-        references.RecordExpression(form, path, type, problem);
+        references.RecordExpression(form, path, type, problem, place);
 
         if (problem is not null)
         {
@@ -1435,6 +1437,7 @@ internal static class PresentationChecker
     {
         var parsed = ExpressionParser.Parse(expression);
         ExpressionType? type = null;
+        ExpressionPlace? place = null;
         ExpressionDiagnostic? problem;
         if (!parsed.Succeeded)
         {
@@ -1448,10 +1451,11 @@ internal static class PresentationChecker
         {
             var check = ExpressionTypeChecker.Check(parsed.Expression!, scope, ExpressionType.Boolean);
             type = check.Type;
+            place = check.Place;
             problem = check.Diagnostic;
         }
 
-        references.RecordExpression(page, path, type, problem);
+        references.RecordExpression(page, path, type, problem, place);
         if (problem is not null)
         {
             diagnostics.Add(new Diagnostic(problem.Code, problem.Message, page.File, path, page.Id));

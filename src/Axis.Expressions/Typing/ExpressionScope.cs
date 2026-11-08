@@ -10,6 +10,11 @@ namespace Axis.Expressions.Typing;
 public sealed record ExpressionCollection(string Name, string Entity, ExpressionScope Items);
 
 /// <summary>
+/// A name in a scope with its type and the text key of its label, or null when the name has no label.
+/// </summary>
+public sealed record ExpressionScopeField(string Name, ExpressionType Type, string? LabelKey);
+
+/// <summary>
 /// Finds the type of the field <paramref name="fieldName"/> of the entity
 /// <paramref name="targetEntity"/>, or null when the entity has no such field with a value.
 /// </summary>
@@ -37,6 +42,7 @@ public delegate ExpressionCollection? ReferenceCollectionResolver(string targetE
 public sealed class ExpressionScope
 {
     private readonly Dictionary<string, ExpressionType> _fields;
+    private readonly List<ExpressionScopeField> _fieldList = [];
     private readonly Dictionary<string, ExpressionRule> _rules = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, ExpressionRule>> _moduleRules = new(StringComparer.Ordinal);
     private readonly HashSet<string>? _modules;
@@ -51,10 +57,20 @@ public sealed class ExpressionScope
         ReferenceFieldResolver? referenceFields = null,
         IEnumerable<string>? modules = null,
         bool undeclaredModuleIsUnknown = false,
-        ReferenceCollectionResolver? referenceCollections = null)
+        ReferenceCollectionResolver? referenceCollections = null,
+        IReadOnlyDictionary<string, string>? labelKeys = null)
     {
         ArgumentNullException.ThrowIfNull(fields);
-        _fields = new Dictionary<string, ExpressionType>(fields, StringComparer.OrdinalIgnoreCase);
+        _fields = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (name, type) in fields)
+        {
+            if (_fields.TryAdd(name, type))
+            {
+                _fieldList.Add(new ExpressionScopeField(
+                    name, type, labelKeys is not null && labelKeys.TryGetValue(name, out var labelKey) ? labelKey : null));
+            }
+        }
+
         foreach (var rule in rules ?? [])
         {
             if (rule.Module is null)
@@ -89,6 +105,12 @@ public sealed class ExpressionScope
     /// undeclared module. True in a module file, where the fix is not in <c>application.json</c>.
     /// </summary>
     public bool UndeclaredModuleIsUnknown { get; }
+
+    /// <summary>The fields in the order they were given, each with its type and the text key of its label.</summary>
+    public IReadOnlyList<ExpressionScopeField> Fields => _fieldList;
+
+    /// <summary>Whether the scope has a child collection or references field an aggregate can name.</summary>
+    public bool HasCollections => _collections.Count > 0;
 
     /// <summary>Whether paths through reference fields resolve in this scope.</summary>
     public bool ResolvesPaths => _referenceFields is not null;

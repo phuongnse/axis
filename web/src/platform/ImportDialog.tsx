@@ -1,6 +1,8 @@
-import { Alert, Button, Flex, Modal, Typography, Upload } from 'antd'
+import { Alert, Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from './AxisButton'
+import { AxisField } from './AxisField'
 import {
   commitImport,
   fetchImport,
@@ -9,6 +11,7 @@ import {
   uploadImport,
   type ImportError,
 } from './imports'
+import { requiredMark } from './requiredMark'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -36,12 +39,16 @@ interface ImportDialogProps {
  * import is `checked`. It sends the commit and checks every second until the import is `committed`,
  * which calls `onCommitted`, or `failed`, which lists its errors. Picking another file starts a new
  * import. Closing the dialog stops the checking. The status and the errors sit in an `aria-live`
- * region, and the picker and every button take the keyboard.
+ * region, and the picker and every button take the keyboard. Check is on until a check or commit runs, and
+ * once the file has passed its check. A click with no file shows what is missing under the picker, focuses
+ * its button and sends nothing, see docs/reference/actions-and-controls.md#fields.
  */
 export function ImportDialog({ importsPath, fields, onClose, onCommitted }: ImportDialogProps) {
   const t = useText()
   const { size } = useDesignTokens()
-  const [file, setFile] = useState<File | null>(null)
+  const [form] = Form.useForm<{ file: UploadFile[] }>()
+  const file = Form.useWatch('file', form)?.[0]?.originFileObj ?? null
+  const chooseRef = useRef<HTMLButtonElement>(null)
   const [phase, setPhase] = useState<Phase>('idle')
   const [importId, setImportId] = useState<string | null>(null)
   const [errors, setErrors] = useState<ImportError[]>([])
@@ -98,8 +105,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
   }, [watch, importsPath, t])
 
   // Picking a file, or removing it, drops the import of the file before.
-  const pick = (next: File | null) => {
-    setFile(next)
+  const reset = () => {
     setPhase('idle')
     setImportId(null)
     setWatch(null)
@@ -215,9 +221,9 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
           </AxisButton>
           <AxisButton
             role={phase === 'checked' || phase === 'committing' ? 'secondary' : 'finish'}
-            disabled={file === null || busy || phase === 'checked'}
+            disabled={busy || phase === 'checked'}
             loading={phase === 'uploading' || phase === 'checking'}
-            onClick={() => void upload()}
+            onClick={() => form.submit()}
           >
             {t('shell.table.importCheck')}
           </AxisButton>
@@ -230,24 +236,41 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
       }
     >
       <Flex vertical gap="middle">
-        <Upload
-          accept=".csv,.xlsx"
-          maxCount={1}
-          disabled={busy}
-          beforeUpload={(picked) => {
-            if (importContentType(picked) === null) {
-              pick(null)
-              setProblem(t('shell.table.importWrongType'))
-              return Upload.LIST_IGNORE
-            }
-            pick(picked)
-            return false
-          }}
-          onRemove={() => pick(null)}
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          onFinish={() => void upload()}
+          onFinishFailed={() => chooseRef.current?.focus()}
         >
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button>{t('shell.table.importChoose')}</Button>
-        </Upload>
+          <AxisField
+            name="file"
+            label={t('shell.table.importFileField')}
+            help={t('shell.table.importFileField.help')}
+            requiredMessage={t('shell.table.importFileRequired')}
+            valuePropName="fileList"
+            getValueFromEvent={(event: UploadChangeParam) => event.fileList}
+          >
+            <Upload
+              accept=".csv,.xlsx"
+              maxCount={1}
+              disabled={busy}
+              beforeUpload={(picked) => {
+                reset()
+                if (importContentType(picked) === null) {
+                  form.setFieldValue('file', [])
+                  setProblem(t('shell.table.importWrongType'))
+                  return Upload.LIST_IGNORE
+                }
+                return false
+              }}
+              onRemove={reset}
+            >
+              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+              <Button ref={chooseRef}>{t('shell.table.importChoose')}</Button>
+            </Upload>
+          </AxisField>
+        </Form>
         <div aria-live="polite" data-testid="import-status">
           {status !== null && <Typography.Text>{status}</Typography.Text>}
           {errors.length > 0 && (
