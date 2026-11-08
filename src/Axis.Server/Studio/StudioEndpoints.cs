@@ -410,25 +410,10 @@ internal static class StudioEndpoints
                 return Problem(StatusCodes.Status400BadRequest, "The body is not a resource.");
             }
 
-            if (found.Kind == ResourceKinds.Scenario || found.Name is null)
+            var (changes, layerRefusal) = LayerChanges(found, module, body.RootElement);
+            if (layerRefusal is not null)
             {
-                return Problem(StatusCodes.Status400BadRequest, "A layer cannot change this resource.");
-            }
-
-            if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
-            {
-                return Problem(StatusCodes.Status400BadRequest, "The module has more than one resource with this name.");
-            }
-
-            var difference = LayerDifference.Compare(found.Kind, found.Root, body.RootElement);
-            if (difference.Refusal is not null)
-            {
-                return Problem(StatusCodes.Status400BadRequest, "The edit cannot be saved as a layer.");
-            }
-
-            if (!LayerAllowed(found, module, difference.Changes))
-            {
-                return Problem(StatusCodes.Status400BadRequest, "A layer on a contract only adds states and transitions.");
+                return Problem(StatusCodes.Status400BadRequest, layerRefusal);
             }
 
             // A tag other than * in If-None-Match matches no state of the layer, so the save is stale.
@@ -442,13 +427,41 @@ internal static class StudioEndpoints
                 await RevisionsAsync(httpContext, options, folder),
                 folder,
                 module,
-                found.Name,
-                difference.Changes,
+                found.Name!,
+                changes,
                 hasIfMatch ? request.Headers.IfMatch.ToString() : null,
                 hasIfNoneMatch,
                 httpContext.RequestAborted);
             return await LayerAnswerAsync(httpContext, folder, packages, modules, outcome);
         }
+    }
+
+    /// <summary>
+    /// The layer changes that save <paramref name="edited"/> over the module's file, null when nothing differs, or the title of
+    /// the 400 refusal. The save route and the MCP tool <c>write_layer</c> both check an edit through it, see
+    /// <c>docs/reference/module-resource-saves.md#the-save</c>.
+    /// </summary>
+    internal static (JsonObject? Changes, string? Refusal) LayerChanges(ModuleFile found, string module, JsonElement edited)
+    {
+        if (found.Kind == ResourceKinds.Scenario || found.Name is null)
+        {
+            return (null, "A layer cannot change this resource.");
+        }
+
+        if (LayerChecker.KindsByName(found.Module)[found.Name].Distinct(StringComparer.Ordinal).Count() > 1)
+        {
+            return (null, "The module has more than one resource with this name.");
+        }
+
+        var difference = LayerDifference.Compare(found.Kind, found.Root, edited);
+        if (difference.Refusal is not null)
+        {
+            return (null, "The edit cannot be saved as a layer.");
+        }
+
+        return LayerAllowed(found, module, difference.Changes)
+            ? (difference.Changes, null)
+            : (null, "A layer on a contract only adds states and transitions.");
     }
 
     // A layer on a contract only adds states and transitions, so any other change is refused before it is written.
