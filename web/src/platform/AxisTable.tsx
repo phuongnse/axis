@@ -9,7 +9,8 @@ import { nameCompare } from './listOrder'
 import { markCurrentPage } from './pagination'
 import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
-import type { TableQuery, TableSort } from './tableQuery'
+import { TableColumnsButton } from './TableColumns'
+import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -63,6 +64,8 @@ export interface AxisTableView {
   total?: number
   /** Whether the table has a search box. A table that holds its rows has one also when a column gives `searchText`. */
   search?: boolean
+  /** Whether the table has the Columns button. */
+  columns?: boolean
 }
 
 /**
@@ -170,7 +173,7 @@ const foldFrom = 3
 
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
- * order, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
+ * order, with the Columns button after Search and Filter for a view that turns it on, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
  * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
@@ -206,14 +209,20 @@ export function AxisTable<T extends object>({
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
-  const freeTexts = columns.filter((column) => column.kind === 'freeText').length
+  // The first column identifies the row. A table with the Columns button shows the columns of the choice in the view.
+  const arrangeable = view?.columns === true && query !== undefined
+  const keys = columns.map((column) => column.key)
+  const shown = arrangeable
+    ? shownColumns(keys, query.columns).map((key) => columns.find((column) => column.key === key)!)
+    : columns
+  const freeTexts = shown.filter((column) => column.kind === 'freeText').length
   // Each free-text column takes an equal share of the width. Without one, the last column takes what is left.
   const share = freeTexts > 0 ? `${100 / freeTexts}%` : undefined
-  const lastKey = columns.at(-1)?.key
+  const lastKey = shown.at(-1)?.key
   const fold = narrow || (rowActions?.configured ?? 0) >= foldFrom
 
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
-  const antColumns: TableColumnType<T>[] = columns.map(
+  const antColumns: TableColumnType<T>[] = shown.map(
     ({ kind, render, onCell, onHeaderCell, searchText: _searchText, sortValue, filter: _filter, ...column }) => {
       const freeText = kind === 'freeText'
       const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
@@ -236,12 +245,12 @@ export function AxisTable<T extends object>({
           return { ...own, style: { ...sizing, ...own?.style } }
         },
         render: (value: unknown, row: T, index: number) => {
-          const shown = render ? render(value, row, index) : value
-          const empty = shown === null || shown === undefined || (!render && shown === '')
+          const cell = render ? render(value, row, index) : value
+          const empty = cell === null || cell === undefined || (!render && cell === '')
           if (empty) {
             return blankRow?.(row) ? null : <EmptyDash />
           }
-          const content = shown as ReactNode
+          const content = cell as ReactNode
           return freeText ? (
             <div style={{ maxWidth: freeTextMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{content}</div>
           ) : (
@@ -303,6 +312,7 @@ export function AxisTable<T extends object>({
   const hasToolbar =
     searchable ||
     filterable ||
+    arrangeable ||
     toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
@@ -338,11 +348,17 @@ export function AxisTable<T extends object>({
       view.onChange({ ...query, page: 1, filter })
     }
   }
+  // Showing, hiding or ordering a column changes neither the rows nor their order, so the page stays.
+  const onColumns = (next: string[] | undefined) => {
+    if (view && query) {
+      view.onChange({ ...query, columns: next })
+    }
+  }
   return (
     <Flex vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
-          {(searchable || filterable || toolbar.view !== undefined) && (
+          {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (
             <Flex gap="small" wrap>
               {searchable && (
                 <Input.Search
@@ -358,6 +374,16 @@ export function AxisTable<T extends object>({
               )}
               {filterable && query && (
                 <TableFilterButton columns={filterColumns} filter={query.filter} onApply={onFilter} />
+              )}
+              {arrangeable && (
+                <TableColumnsButton
+                  columns={columns.map((column) => ({
+                    key: column.key,
+                    title: typeof column.title === 'string' ? column.title : column.key,
+                  }))}
+                  shown={shown.map((column) => column.key)}
+                  onApply={onColumns}
+                />
               )}
               {toolbar.view}
             </Flex>
