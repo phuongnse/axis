@@ -8,6 +8,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Presentation.Sites;
+using Axis.Studio;
 using Microsoft.Net.Http.Headers;
 
 namespace Axis.Server.Studio;

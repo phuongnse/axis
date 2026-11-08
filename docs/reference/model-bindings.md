@@ -11,20 +11,34 @@ page gives the bindings and their settings, a tenant's own key, and the eval. Th
 A binding names a model and how to reach it. Two kinds of binding stand side by side, and any
 installation chooses either.
 
-- **`anthropic`**, for Claude through the Anthropic API, Amazon Bedrock or Google Vertex AI.
+- **`anthropic`**, for Claude through the Anthropic API, or any endpoint that speaks its Messages
+  API. The adapter sends the key in an `x-api-key` header.
 - **`openai-compatible`**, for any endpoint that speaks that API, such as OpenAI, Azure OpenAI, Gemini,
   DeepSeek, Qwen, Mistral, or a model the installation serves itself through vLLM or Ollama.
+- **Amazon Bedrock and Google Vertex AI** _(planned for M35)_ come with their own sign-in, which a key
+  file read once does not cover. Until then an `anthropic` binding reaches them only through a gateway
+  that speaks the Messages API.
 - **Who pays the provider.** On premises the customer pays its model provider. In Axis SaaS the
   plan includes a number of requests, see [tenant quotas](tenant-quotas.md).
-- **No provider is built in.** _(planned for M35)_ The request loop, the tools and the checks talk to an adapter and do
-  not know which model is behind it. A new provider is a new adapter, and nothing else changes.
+- **No provider is built in.** The request loop, the tools and the checks talk to an adapter and do
+  not know which model is behind it. A call hands the adapter the system text, the messages, the tool
+  definitions and an output limit, and gets back text, tool calls and token counts. The limit is never
+  above the binding's `MaxOutputTokens`. A new provider is a new adapter, and nothing else changes.
+- **Retries.** When the provider answers that it is rate limited, with status 429 or, for `anthropic`,
+  529, the call waits as `Retry-After` asks, at most 60 seconds, or 1, 2 and 4 seconds, and tries
+  again. After four attempts, or on any other error, it fails with a message that names the binding
+  and the status code, never the response body or a header.
+- **Tokens.** Each call reports its input and output tokens and writes one log line with the binding,
+  the model and the tokens.
+- **Tests.** A scripted adapter replays recorded answers for every binding, for the request loop's
+  tests and the journey. The host refuses to register it outside Development and Testing.
 
 The agent host reads these settings:
 
 | Setting                              | Meaning                                                                                                |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `Ai:Bindings:<name>:Kind`            | `anthropic` or `openai-compatible`                                                                     |
-| `Ai:Bindings:<name>:Endpoint`        | The API's base URL. For `anthropic`, empty for the Anthropic API, or the Bedrock or Vertex AI endpoint |
+| `Ai:Bindings:<name>:Endpoint`        | The API's base URL. Empty for the provider's own API, which is Anthropic's or OpenAI's by the kind       |
 | `Ai:Bindings:<name>:Model`           | The model id, such as `claude-opus-5-5`                                                                |
 | `Ai:Bindings:<name>:KeyFile`         | A file that holds the API key, as other secrets are files. Empty for a self-served model with no key   |
 | `Ai:Bindings:<name>:MaxOutputTokens` | The largest output of one call, 16,000 by default                                                      |

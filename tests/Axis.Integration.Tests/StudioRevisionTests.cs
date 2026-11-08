@@ -6,6 +6,7 @@ using System.Text.Json;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
 using Axis.Server.Tests;
+using Axis.Studio;
 using LibGit2Sharp;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

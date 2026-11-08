@@ -8,7 +8,6 @@
   <ItemGroup>
     <PackageReference Include="DocumentFormat.OpenXml" />
     <PackageReference Include="JsonPatch.Net" />
-    <PackageReference Include="LibGit2Sharp" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
@@ -26,6 +25,7 @@
     <ProjectReference Include="..\Axis.Policy\Axis.Policy.csproj" />
     <ProjectReference Include="..\Axis.Presentation\Axis.Presentation.csproj" />
     <ProjectReference Include="..\Axis.Processes\Axis.Processes.csproj" />
+    <ProjectReference Include="..\Axis.Studio\Axis.Studio.csproj" />
     <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
   </ItemGroup>
 

@@ -220,9 +220,11 @@ export async function writeLabel(scope: Page | Locator, field: string, texts: Re
   const label = scope.getByTestId(field).getByTestId('studio-label')
   const languages = new Intl.DisplayNames(['en'], { type: 'language' })
   await expect(async () => {
-    if ((await page.getByRole('dialog').count()) > 0) {
+    // A label can sit in an item dialog, such as a form's section title, so only a leftover Translations is closed.
+    const leftover = page.getByRole('dialog', { name: 'Translations', exact: true })
+    if ((await leftover.count()) > 0) {
       await page.keyboard.press('Escape')
-      await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 2_000 })
+      await expect(leftover).toHaveCount(0, { timeout: 2_000 })
     }
     await label.getByRole('button', { name: 'Translations…', exact: true }).click()
     const dialog = await waitForDialog(page, 'Translations')

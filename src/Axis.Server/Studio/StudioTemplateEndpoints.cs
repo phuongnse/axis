@@ -1,6 +1,7 @@
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Templates;
+using Axis.Studio;
 
 namespace Axis.Server.Studio;
 

@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { pickOptions } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { doneListItem, openFormTab, openListItem } from "../studio-resources";
+import { doneListItem, openFormTab, openListItem, writeLabel } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -38,9 +38,7 @@ test.describe("Studio edits form conditions and steps", () => {
 
   /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
   async function fillTexts(page: Page, label: string, en: string, vi: string) {
-    const field = page.getByTestId(label);
-    await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
-    await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
+    await writeLabel(page, label, { en, vi });
   }
 
   test("an author checks a new requiredWhen before saving, then adds two reordered steps, with no new diagnostic", async ({

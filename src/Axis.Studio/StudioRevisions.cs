@@ -1,8 +1,9 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using LibGit2Sharp;
+using Microsoft.Extensions.Logging;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>
 /// Records the revisions of one application folder in a bare git repository outside the folder, named

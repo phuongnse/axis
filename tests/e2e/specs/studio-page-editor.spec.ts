@@ -7,7 +7,7 @@ import { startServer } from "../activate";
 import { pickOption } from "../select";
 import { e2eApp, purchaseRequests } from "../server-settings";
 import { useSession } from "../sessions";
-import { createResource, openFormTab } from "../studio-resources";
+import { createResource, openFormTab, writeLabel } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -51,9 +51,7 @@ test.describe("Studio builds pages in the page editor", () => {
 
   /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
   async function fillTexts(page: Page, label: string, en: string, vi: string) {
-    const field = page.getByTestId(label);
-    await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
-    await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
+    await writeLabel(page, label, { en, vi });
   }
 
   async function pick(page: Page, field: string, option: string) {

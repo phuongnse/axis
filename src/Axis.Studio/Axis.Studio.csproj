@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="JsonPatch.Net" />
+    <PackageReference Include="LibGit2Sharp" />
+    <PackageReference Include="Npgsql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+    <ProjectReference Include="..\Axis.Tenancy\Axis.Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Server" />
+    <InternalsVisibleTo Include="Axis.Admin" />
+    <InternalsVisibleTo Include="Axis.Server.Tests" />
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
+    <InternalsVisibleTo Include="Axis.OpenApiDocument" />
+  </ItemGroup>
+
+</Project>

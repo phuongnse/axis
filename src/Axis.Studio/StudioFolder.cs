@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Releases;
 
-namespace Axis.Server.Studio;
+namespace Axis.Studio;
 
 /// <summary>The <c>id</c> and <c>name</c> of a folder's manifest. Each is null when the manifest has no usable value.</summary>
 internal sealed record StudioManifest(Guid? Id, string? Name);

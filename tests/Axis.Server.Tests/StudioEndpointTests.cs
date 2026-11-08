@@ -8,6 +8,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
+using Axis.Studio;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
