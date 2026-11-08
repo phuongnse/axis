@@ -517,6 +517,13 @@
       "note": "Empties a value or a search; destroys nothing that was saved."
     },
     {
+      "concept": "Accept the terms (action)",
+      "en": "Accept",
+      "vi": "Đồng ý",
+      "status": "approved",
+      "note": "\"Đồng ý với điều khoản\", \"Tôi đồng ý với {0}\". Never \"chấp nhận\" for the terms; \"chấp nhận\" stays for accepting a draft."
+    },
+    {
       "concept": "Error",
       "en": "Error",
       "vi": "lỗi",
