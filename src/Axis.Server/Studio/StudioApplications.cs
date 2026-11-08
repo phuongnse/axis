@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Axis.Configuration.Templates;
+using Axis.Studio;
 
 namespace Axis.Server.Studio;
 

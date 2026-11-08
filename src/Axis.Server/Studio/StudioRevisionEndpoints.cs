@@ -2,6 +2,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 
 namespace Axis.Server.Studio;
 

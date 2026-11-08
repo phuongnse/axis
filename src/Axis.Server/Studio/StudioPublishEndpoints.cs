@@ -6,6 +6,7 @@ using Axis.Data.Profiles;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 using Axis.Tenancy;
 using Microsoft.Net.Http.Headers;
 using Npgsql;

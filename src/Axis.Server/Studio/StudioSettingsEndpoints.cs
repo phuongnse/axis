@@ -4,6 +4,7 @@ using Axis.Data.Audit;
 using Axis.Data.Profiles;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Studio;
 using Microsoft.Net.Http.Headers;
 using Npgsql;
 

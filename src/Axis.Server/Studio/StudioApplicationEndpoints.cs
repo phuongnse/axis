@@ -7,6 +7,7 @@ using Axis.Configuration.Resources;
 using Axis.Configuration.Templates;
 using Axis.Core.Tenancy;
 using Axis.Server.Tenancy;
+using Axis.Studio;
 using Axis.Tenancy;
 using Microsoft.Net.Http.Headers;
 

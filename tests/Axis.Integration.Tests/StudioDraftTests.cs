@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Server.Studio;
+using Axis.Studio;
 using LibGit2Sharp;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;

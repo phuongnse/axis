@@ -2,6 +2,7 @@ using System.Xml.Linq;
 using Axis.Server.Authentication;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
+using Axis.Studio;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.Hosting;
