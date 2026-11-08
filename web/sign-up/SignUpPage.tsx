@@ -134,7 +134,8 @@ export function SignUpPage({
           position: 'relative',
           paddingBlock: spacing.lg,
           background: colour.canvas,
-          minHeight: '100vh',
+          // Proposed: a design-system frame sets --shell-min-height to its own height, so the page fills it.
+          minHeight: 'var(--shell-min-height, 100vh)',
           boxSizing: 'border-box',
         }}
       >

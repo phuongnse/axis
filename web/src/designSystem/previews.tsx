@@ -16,6 +16,8 @@ import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
+import { SignUpPreview } from './SignUpPreview'
+import { signUpFixtures, signUpBusinessName } from './signUpFixtures'
 import { studioFixtures } from './studioFixtures'
 import {
   application,
@@ -293,6 +295,25 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 480,
     },
   ],
+  signUp: [
+    { caption: 'Empty', fixtures: signUpFixtures.empty, draw: () => <SignUpPreview /> },
+    {
+      caption: 'Subdomain free',
+      fixtures: signUpFixtures.free,
+      draw: () => <SignUpPreview businessName={signUpBusinessName} />,
+    },
+    {
+      caption: 'Subdomain taken',
+      fixtures: signUpFixtures.taken,
+      draw: () => <SignUpPreview businessName={signUpBusinessName} />,
+    },
+    {
+      caption: 'Check failed',
+      fixtures: signUpFixtures.checkFailed,
+      draw: () => <SignUpPreview businessName={signUpBusinessName} />,
+    },
+    { caption: 'Applications failed', fixtures: signUpFixtures.applicationsFailed, draw: () => <SignUpPreview /> },
+  ].map((state) => ({ ...state, frameHeight: 820 })),
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
