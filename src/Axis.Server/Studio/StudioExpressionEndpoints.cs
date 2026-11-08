@@ -4,7 +4,10 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
 using Axis.Expressions.Typing;
+using Axis.Presentation.Texts;
+using Axis.Server.Presentation;
 using Axis.Studio;
 using Json.Patch;
 using Json.Pointer;
@@ -22,7 +25,8 @@ namespace Axis.Server.Studio;
 /// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic.
 /// <c>POST /api/studio/apps/{application}/expressions/scope</c> answers what the same place offers. Its body is
 /// <c>{ resourceId, path, draft }</c> and the answer is <c>{ type, fields, functions }</c>, from the compile's type check at
-/// the place. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
+/// the place. Each function carries its parameters, result, group and example, and a description in the language of the
+/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
 /// application (404), then 415 for a content type other than
 /// <c>application/json</c>, 400 for a body that is not an expression check or a <c>draft</c> that is not an object, 404 for a
 /// resource id the application does not have, and 400 for a path that holds no expression. A path holds no expression when
@@ -61,7 +65,8 @@ internal static class StudioExpressionEndpoints
         HttpContext httpContext,
         StudioOptions options,
         PackageCatalog packages,
-        ModuleCatalog modules)
+        ModuleCatalog modules,
+        ITextResourceProvider texts)
     {
         var (request, refusal) = await ReadAsync(application, httpContext, options, withExpression: false, BadScope);
         if (request is null)
@@ -70,7 +75,15 @@ internal static class StudioExpressionEndpoints
         }
 
         var (answer, problem) = Scope(
-            request.Resources, request.Files, request.ResourceId, request.Path, request.Pointer, packages, modules, request.Draft);
+            request.Resources,
+            request.Files,
+            request.ResourceId,
+            request.Path,
+            request.Pointer,
+            packages,
+            modules,
+            RequestLocale.Choose(httpContext.Request, texts),
+            request.Draft);
         return Answer(answer, problem);
     }
 
@@ -192,7 +205,7 @@ internal static class StudioExpressionEndpoints
     /// type it needs, the fields in scope and the functions it allows, all from the compile's own type check there. The
     /// expression <c>null</c> stands at the path, because it parses and fits every type, so the type check always runs. A place
     /// the compile checks without a type check answers no type, no fields and no functions. Refuses as <see cref="Check"/> does.
-    /// Writes nothing.
+    /// Each function's description is the platform text in <paramref name="texts"/>. Writes nothing.
     /// </summary>
     internal static (StudioExpressionScopeResponse? Answer, string? Refusal) Scope(
         IReadOnlyList<StudioFile> resources,
@@ -202,6 +215,7 @@ internal static class StudioExpressionEndpoints
         JsonPointer pointer,
         PackageCatalog packages,
         ModuleCatalog modules,
+        TextResources texts,
         JsonObject? draft = null)
     {
         var (probe, _, refusal) = Compile(resources, files, resourceId, path, pointer, "null", packages, modules, draft);
@@ -219,8 +233,23 @@ internal static class StudioExpressionEndpoints
             new StudioExpressionScopeResponse(
                 place.Expected.Kind == ExpressionTypeKind.Null ? null : TypeName(place.Expected),
                 [.. place.Scope.Fields.Select(field => new StudioExpressionScopeField(field.Name, field.LabelKey, TypeName(field.Type)))],
-                [.. place.Functions.Select(name => new StudioExpressionScopeFunction(name))]),
+                [.. place.Functions.Select(name => ScopeFunction(name, texts))]),
             null);
+    }
+
+    /// <summary>The key of the platform text that describes a function or an aggregate.</summary>
+    internal static string FunctionDescriptionKey(string name) => $"shell.studio.function.{name}";
+
+    private static StudioExpressionScopeFunction ScopeFunction(string name, TextResources texts)
+    {
+        var signature = ExpressionFunctions.Get(name);
+        return new StudioExpressionScopeFunction(
+            signature.Name,
+            signature.Parameters,
+            signature.Result,
+            signature.Group,
+            signature.Example,
+            texts.Texts[FunctionDescriptionKey(signature.Name)]);
     }
 
     /// <summary>
@@ -323,8 +352,9 @@ internal sealed record StudioExpressionScopeResponse(
 /// <summary>One name in scope. <c>LabelKey</c> is null for a name with no label, such as a parameter.</summary>
 internal sealed record StudioExpressionScopeField(string Name, string? LabelKey, string? Type);
 
-/// <summary>One function or aggregate a place allows.</summary>
-internal sealed record StudioExpressionScopeFunction(string Name);
+/// <summary>One function or aggregate a place allows, with its signature, its result, its group, an example and what it does.</summary>
+internal sealed record StudioExpressionScopeFunction(
+    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description);
 
 /// <summary>The answer to an expression check: the expression's type, and the problem with its range when there is one.</summary>
 internal sealed record StudioExpressionCheckResponse(string? Type, IReadOnlyList<StudioExpressionDiagnostic> Diagnostics);
