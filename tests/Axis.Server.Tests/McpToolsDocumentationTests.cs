@@ -3,7 +3,10 @@ using Axis.Server.Mcp;
 
 namespace Axis.Server.Tests;
 
-/// <summary>The tools table of docs/reference/mcp-server.md lists, without a planned marker, exactly the tools of <see cref="McpServer.Tools"/>.</summary>
+/// <summary>
+/// The tools table of docs/reference/mcp-server.md lists, without a planned marker, exactly the tools of <see cref="McpServer.Tools"/>
+/// and exactly the tools that the <c>tools/list</c> answer offers.
+/// </summary>
 public sealed partial class McpToolsDocumentationTests
 {
     [Fact]
@@ -36,6 +39,10 @@ public sealed partial class McpToolsDocumentationTests
         Assert.True(!served.Except(documented).Any(), $"Served but not listed without a planned marker in docs/reference/mcp-server.md: {string.Join(", ", served.Except(documented))}.");
         Assert.True(!documented.Except(served).Any(), $"Listed without a planned marker but not served by McpServer: {string.Join(", ", documented.Except(served))}.");
         Assert.True(documented.Distinct().Count() == documented.Count, "The tools table in docs/reference/mcp-server.md lists a tool twice.");
+
+        var offered = McpServer.ListTools()["tools"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()).ToList();
+        Assert.True(!offered.Except(served).Any() && !served.Except(offered).Any(), $"The tools/list answer and McpServer.Tools differ: only in tools/list: {string.Join(", ", offered.Except(served))}, only in McpServer.Tools: {string.Join(", ", served.Except(offered))}.");
+        Assert.True(offered.Distinct().Count() == offered.Count, "The tools/list answer offers a tool twice.");
     }
 
     [GeneratedRegex(@"^\|\s*Tool\s*\|\s*Input\s*\|\s*Output\s*\|")]

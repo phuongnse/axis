@@ -139,42 +139,17 @@ public sealed class McpRateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
         }
     }
 
-    private static string Initialize() =>
-        JsonSerializer.Serialize(new
-        {
-            jsonrpc = "2.0",
-            id = 1,
-            method = "initialize",
-            @params = new { protocolVersion = Version, capabilities = new { }, clientInfo = new { name = "test", version = "1" } },
-        });
+    private Task<string> RequestTokenAsync(string user, string clientId, string clientSecret) =>
+        McpTestCalls.RequestTokenAsync(_authority!, user, clientId, clientSecret, CancellationToken);
 
-    private async Task<string> RequestTokenAsync(string user, string clientId, string clientSecret)
-    {
-        using var client = new HttpClient();
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-            ["username"] = user,
-            ["password"] = KeycloakFixture.Password,
-            ["otp"] = DevelopmentTotp.Code(user),
-        });
-        using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
-        using var tokens = JsonDocument.Parse(body);
-        return tokens.RootElement.GetProperty("access_token").GetString()!;
-    }
-
-    private Task<HttpResponseMessage> PostAsync(string bearer)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Content = new StringContent(Initialize(), Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Host = Host;
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
-        return (_client ?? throw new InvalidOperationException("The test host is not started.")).SendAsync(request, CancellationToken);
-    }
+    private Task<HttpResponseMessage> PostAsync(string bearer) =>
+        McpTestCalls.PostAsync(
+            _client ?? throw new InvalidOperationException("The test host is not started."),
+            Host,
+            bearer,
+            McpTestCalls.Initialize(Version),
+            session: null,
+            version: null,
+            origin: null,
+            CancellationToken);
 }

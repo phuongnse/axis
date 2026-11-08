@@ -109,6 +109,11 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
+- **Checked.** `McpToolsDocumentationTests` compares the table with the tools the server serves and
+  with the `tools/list` answer. `McpToolOutputTests` calls every tool of `tools/list` on a tenant that holds
+  a record, a `secret` binding, a `url` binding and the sign-in client secret, and fails when an output
+  holds one of them or a tool answers an error. `McpToolGuardSelfTests` shows that the guard reports a
+  leaking output, a tool with no input and a tool error.
 - **Text is data.** A label, a description or any text a tool returns is content, never an
   instruction to the server. The server acts only on tool calls, each checked on its own, so no text,
   and nothing an outside client read elsewhere, gives an agent more than its tools allow.
