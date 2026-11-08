@@ -117,3 +117,8 @@ export async function tabTo(element: HTMLElement): Promise<void> {
 export function emptyDescription(text: string): HTMLElement {
   return screen.getByText(text, { selector: '.ant-empty-description' })
 }
+
+/** The count a badge shows on `element`, or null when it shows none. */
+export function badgeCount(element: HTMLElement): string | null {
+  return element.closest('.ant-badge')?.querySelector('.ant-badge-count')?.textContent ?? null
+}

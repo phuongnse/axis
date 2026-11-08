@@ -7,6 +7,8 @@ import { EmptyDash } from './EmptyValue'
 import { EmptyState } from './EmptyState'
 import { nameCompare } from './listOrder'
 import { markCurrentPage } from './pagination'
+import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
+import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import type { TableQuery, TableSort } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -34,11 +36,21 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
   searchText?: (row: T) => string
   /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
   sortValue?: (row: T) => string | number | null
+  /**
+   * What the column filters on, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables:
+   * its kind of value, how a row gives it (null is empty) and, for an enum, its options. A column without it has no
+   * filter. Dates compare as ISO text.
+   */
+  filter?: {
+    kind: FilterKind
+    value: (row: T) => string | number | null
+    options?: { value: string; label: string }[]
+  }
 }
 
 /**
- * The view of a table: its search, sort, page and page size, see docs/reference/actions-and-controls.md#tables.
- * Without a `total`, the table holds all its rows, and AxisTable searches, sorts and pages them itself. With a `total`,
+ * The view of a table: its search, filter, sort, page and page size, see docs/reference/actions-and-controls.md#tables.
+ * Without a `total`, the table holds all its rows, and AxisTable searches, filters, sorts and pages them itself. With a `total`,
  * the server has done that work, and `dataSource` is the page.
  */
 export interface AxisTableView {
@@ -201,7 +213,7 @@ export function AxisTable<T extends object>({
 
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
   const antColumns: TableColumnType<T>[] = columns.map(
-    ({ kind, render, onCell, onHeaderCell, searchText: _searchText, sortValue, ...column }) => {
+    ({ kind, render, onCell, onHeaderCell, searchText: _searchText, sortValue, filter: _filter, ...column }) => {
       const freeText = kind === 'freeText'
       const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
       const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
@@ -253,6 +265,21 @@ export function AxisTable<T extends object>({
   const local = view !== undefined && view.total === undefined
   const searchColumns = columns.filter((column) => column.searchText !== undefined)
   const searchable = view !== undefined && (view.search === true || (local && searchColumns.length > 0))
+  const filterColumns: FilterColumn[] = local
+    ? columns.flatMap((column) =>
+        column.filter
+          ? [
+              {
+                key: column.key,
+                title: typeof column.title === 'string' ? column.title : column.key,
+                kind: column.filter.kind,
+                options: column.filter.options,
+              },
+            ]
+          : [],
+      )
+    : []
+  const filterable = filterColumns.length > 0
   let pageRows = dataSource
   let total = 0
   let current = 1
@@ -273,6 +300,7 @@ export function AxisTable<T extends object>({
   const selected = bulk ? (pageRows ?? []).filter((item) => selectedKeys.includes(rowKey(item))) : []
   const hasToolbar =
     searchable ||
+    filterable ||
     toolbar.view !== undefined ||
     toolbar.onRefresh !== undefined ||
     toolbar.secondary !== undefined ||
@@ -302,11 +330,17 @@ export function AxisTable<T extends object>({
     }
     view.onChange({ ...query, page: 1, search: value || undefined })
   }
+  // A new filter starts again at page 1. No filter leaves it out.
+  const onFilter = (filter: FilterGroup | undefined) => {
+    if (view && query) {
+      view.onChange({ ...query, page: 1, filter })
+    }
+  }
   return (
     <Flex vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
-          {(searchable || toolbar.view !== undefined) && (
+          {(searchable || filterable || toolbar.view !== undefined) && (
             <Flex gap="small" wrap>
               {searchable && (
                 <Input.Search
@@ -319,6 +353,9 @@ export function AxisTable<T extends object>({
                   onChange={(event) => setDraft(event.target.value)}
                   onSearch={onSearch}
                 />
+              )}
+              {filterable && query && (
+                <TableFilterButton columns={filterColumns} filter={query.filter} onApply={onFilter} />
               )}
               {toolbar.view}
             </Flex>
@@ -336,6 +373,9 @@ export function AxisTable<T extends object>({
             {toolbar.main}
           </Flex>
         </Flex>
+      )}
+      {filterable && query?.filter && (
+        <TableFilterChips columns={filterColumns} filter={query.filter} locale={locale} onChange={onFilter} />
       )}
       {below}
       {failure ?? (
@@ -406,16 +446,23 @@ export function AxisTable<T extends object>({
 }
 
 /**
- * The rows of a table that holds them, searched by the columns that give `searchText`, then sorted by the sorted
- * column's `sortValue`. The search is case-insensitive and ignores the spaces around it. An empty value comes last.
+ * The rows of a table that holds them, filtered by the columns that give `filter`, searched by the columns that give
+ * `searchText`, then sorted by the sorted column's `sortValue`. The search is case-insensitive and ignores the spaces
+ * around it. An empty value comes last.
  */
 function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: TableQuery, locale: string): T[] {
+  const { filter } = query
+  const filtered = filter
+    ? rows.filter((row) =>
+        matchesFilter(row, filter, (field) => columns.find((column) => column.key === field)?.filter, locale),
+      )
+    : rows
   const needle = query.search?.trim().toLocaleLowerCase(locale)
   const searched = needle
-    ? rows.filter((row) =>
+    ? filtered.filter((row) =>
         columns.some((column) => column.searchText?.(row).toLocaleLowerCase(locale).includes(needle) === true),
       )
-    : [...rows]
+    : [...filtered]
   const value = columns.find((column) => column.key === query.sort?.field)?.sortValue
   if (!value || !query.sort) {
     return searched
