@@ -1,6 +1,7 @@
 import { Alert, Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
 import type { ModuleKind } from '../platform/moduleKinds'
@@ -34,7 +35,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
 import { HomeTileStyle } from './HomeTileStyle'
-import { StudioEditor } from './StudioEditor'
+import { StudioEditor, type StudioEditorHandle } from './StudioEditor'
 import { StudioHistory, StudioRevisionPage } from './StudioHistory'
 import { ModuleResourceView } from './StudioModuleView'
 import { StudioNewApplication } from './StudioNewApplication'
@@ -44,6 +45,7 @@ import { StudioPageHeading } from './StudioPageHeading'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioProblems } from './StudioProblems'
+import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
 import { StudioSidebar } from './StudioSidebar'
@@ -249,6 +251,7 @@ function StudioWorkspace() {
   const [manifestState, setManifestState] = useState<ManifestState>()
   const [manifestReload, setManifestReload] = useState(0)
   const publishing = useRef<StudioPublishingHandle>(null)
+  const editor = useRef<StudioEditorHandle>(null)
   const [problemsOpen, setProblemsOpen] = useState(false)
   const [requestBusy, setRequestBusy] = useState(false)
 
@@ -618,15 +621,26 @@ function StudioWorkspace() {
                     <StudioPageHeading
                       title={resourceTitle(selected, locale, t)}
                       actions={
-                        canTest && selected.kind === 'scenario' && selected.name ? (
-                          // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                          <Button
-                            data-testid="studio-run-scenario"
-                            disabled={requestBusy || reconnecting}
-                            onClick={() => publishing.current?.runTests([selected.name!])}
-                          >
-                            {t('shell.studio.runScenario')}
-                          </Button>
+                        (canTest && selected.kind === 'scenario' && selected.name) ||
+                        selected.kind !== 'application' ? (
+                          <AxisActionRow align="center">
+                            {canTest && selected.kind === 'scenario' && selected.name && (
+                              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                              <Button
+                                data-testid="studio-run-scenario"
+                                disabled={requestBusy || reconnecting}
+                                onClick={() => publishing.current?.runTests([selected.name!])}
+                              >
+                                {t('shell.studio.runScenario')}
+                              </Button>
+                            )}
+                            {selected.kind !== 'application' && (
+                              <StudioResourceMenu
+                                disabled={reconnecting}
+                                onDelete={() => editor.current?.askDelete()}
+                              />
+                            )}
+                          </AxisActionRow>
                         ) : undefined
                       }
                     />
@@ -642,6 +656,7 @@ function StudioWorkspace() {
                     <StudioNamesContext.Provider value={names ?? undefined}>
                       <StudioEditor
                         key={`editor-${selected.id}`}
+                        ref={editor}
                         application={application!}
                         item={selected}
                         publisher={canPublish}

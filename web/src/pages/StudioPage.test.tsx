@@ -1,4 +1,5 @@
 import { EditorView } from '@codemirror/view'
+import { ConfigProvider } from 'antd'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
@@ -263,16 +264,19 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
   sidebar.dataset.testid = 'sidebar'
   document.body.append(sidebar)
   const page = (
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim }}>
-          <MemoryRouter initialEntries={[entry]}>
-            <StudioPage />
-            <Location />
-          </MemoryRouter>
-        </ShellSidebarContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>
+    // Without motion a closed dialog leaves the document at once, as jsdom runs no animations.
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim }}>
+            <MemoryRouter initialEntries={[entry]}>
+              <StudioPage />
+              <Location />
+            </MemoryRouter>
+          </ShellSidebarContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </ConfigProvider>
   )
   render(
     locale === undefined ? (
@@ -1037,10 +1041,33 @@ describe('StudioPage', () => {
     }
   })
 
+  async function openDeleteDialog() {
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+  }
+
+  it('closes the delete dialog and opens the Used by tab from See what uses it', async () => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    await openDeleteDialog()
+
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'See what uses it' }))
+
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'Used by' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), slow)
+    expect(screen.getByRole('tab', { name: 'Used by' })).toHaveAttribute('aria-selected', 'true')
+  })
+
   it('warns with the number of references before a delete, and deletes after confirming', async () => {
     const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }))
+    await screen.findByTestId('studio-editor')
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    await openDeleteDialog()
 
     const dialog = await screen.findByRole('dialog')
     expect(within(within(dialog).getByTestId('studio-delete-warning')).getByText('3')).toBeInTheDocument()
@@ -1066,7 +1093,7 @@ describe('StudioPage', () => {
     await screen.findByTestId('studio-saved')
     await waitFor(() => expect(loads()).toBe(2))
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await openDeleteDialog()
     await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
     await waitFor(() => expect(loads()).toBe(3))
   })
@@ -1090,6 +1117,8 @@ describe('StudioPage', () => {
     renderPage(`/studio?app=PurchaseRequests&resource=${manifestId}`)
 
     await screen.findByTestId('studio-editor')
+    expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Delete…' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
   })
 

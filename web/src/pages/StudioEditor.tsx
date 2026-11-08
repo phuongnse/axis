@@ -1,6 +1,18 @@
 import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
-import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from 'react'
 import {
   applyAnswers,
   fieldQuestions,
@@ -164,11 +176,17 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
   return children
 }
 
+/** What the page calls on the editor: open the delete dialog, see studio.md#delete. */
+export interface StudioEditorHandle {
+  askDelete(): void
+}
+
 /**
  * The editor of one resource. A form built from the kind's JSON Schema and a JSON view edit one draft. Save sends
  * only the difference from what was loaded, as a JSON Patch with the loaded version. A `409` keeps the draft and
- * offers Reload, which reads the file again and drops the draft. Delete asks first and warns with the number of
- * references to the resource, and it is off for the application manifest. When `path` is set, the editor opens the
+ * offers Reload, which reads the file again and drops the draft. The page heading's "…" menu opens Delete through
+ * `StudioEditorHandle`, which asks first and warns with the number of references to the resource, with a link to the
+ * Used by tab, see studio.md#delete. The application manifest has no Delete. When `path` is set, the editor opens the
  * form at the field that holds it and scrolls to that field once the resource has loaded. A path the form cannot
  * show opens the JSON view instead. A seed whose entity is a resource of the folder shows its records as a grid with
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
@@ -214,6 +232,7 @@ export function StudioEditor({
   onDeleted,
   onOpen,
   publisher = false,
+  ref,
 }: {
   application: string
   item: StudioResourceItem
@@ -225,6 +244,7 @@ export function StudioEditor({
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
   onDeleted: (diagnostics: StudioDiagnostic[]) => void
   publisher?: boolean
+  ref?: Ref<StudioEditorHandle>
 }) {
   const t = useText()
   const { size, colour } = useDesignTokens()
@@ -251,6 +271,7 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
+  useImperativeHandle(ref, () => ({ askDelete: () => setDeleteOpen(true) }), [])
   const [tab, setTab] = useState<'design' | 'form' | 'json' | 'usedBy'>(
     item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
@@ -1176,11 +1197,6 @@ export function StudioEditor({
       {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
       {deleteFailed && <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />}
       <AxisActionRow align="center">
-        {item.kind !== 'application' && (
-          <AxisButton role="destructive" disabled={reconnecting} onClick={() => setDeleteOpen(true)}>
-            {t('shell.studio.delete')}
-          </AxisButton>
-        )}
         {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
       </AxisActionRow>
       {item.kind === 'application' && <StudioAutoAccept application={application} publisher={publisher} />}
@@ -1210,6 +1226,17 @@ export function StudioEditor({
               <>
                 {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
               </>
+            }
+            action={
+              <AxisButton
+                role="secondary"
+                onClick={() => {
+                  setDeleteOpen(false)
+                  setTab('usedBy')
+                }}
+              >
+                {t('shell.studio.deleteSeeUses')}
+              </AxisButton>
             }
           />
         )}
