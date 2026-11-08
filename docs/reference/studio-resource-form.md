@@ -129,8 +129,9 @@ The tab is the [standard table](actions-and-controls.md#tables), flat, with sear
 2. Kind, as wide as its content.
 3. How it is used, in words, such as "A field refers to it", with one text for each relation of the compiler.
 
-No file, path or relation code shows. It sorts by kind in
-the sidebar's order, then by name. The same resource used the same way shows once. With none, the table
+No file, path or relation code shows. Name and Kind sort from their headers, Kind in the sidebar's order, and
+search looks in the name. Until a person sorts, the rows are by kind in the sidebar's order, then by name. The
+same resource used the same way shows once. With none, the table
 says so.
 
 ## Save bar

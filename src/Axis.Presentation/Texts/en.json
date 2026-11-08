@@ -412,6 +412,7 @@
   "shell.table.refresh": "Refresh",
   "shell.table.rowActions": "Actions",
   "shell.table.selected": "{count} selected",
+  "shell.table.range": "{from}–{to} of {total}",
   "shell.table.selectRow": "Select row",
   "shell.table.delete": "Delete",
   "shell.table.deleteConfirm": "Delete this record? This cannot be undone.",

@@ -1,4 +1,4 @@
-import { Alert, Flex, Input, Select } from 'antd'
+import { Alert, Select } from 'antd'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -15,7 +15,9 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { studioResourceAddress } from '../platform/studioAddress'
 import { kindSingular, sidebarRank } from '../platform/studioKinds'
+import { recordPageSize } from '../platform/tableQuery'
 import { useText } from '../platform/texts'
+import { useTableView } from '../platform/useTableView'
 import { PlatformContext } from './context'
 
 /** One resource that uses the open one, in one way. `path` is where the reference sits in that resource. */
@@ -27,6 +29,12 @@ interface UsedByRow {
   how: string
   path: string
 }
+
+/** The columns the view's sort can name, see docs/reference/studio-resource-form.md#used-by. */
+const usedByFields = [
+  { name: 'label', type: 'text' },
+  { name: 'kind', type: 'text' },
+] as const
 
 /**
  * The resources that use the open one, from the `usedBy` entries of its references. A resource that uses it the same
@@ -83,7 +91,6 @@ export function StudioUsedBy({
   const { generation, lost } = useStudioConnection()
   const [usedBy, setUsedBy] = useState<StudioReference[]>()
   const [failed, setFailed] = useState(false)
-  const [search, setSearch] = useState('')
   const [kind, setKind] = useState<string>()
 
   useEffect(() => {
@@ -113,22 +120,23 @@ export function StudioUsedBy({
     () => [...new Set(rows.map((row) => row.kind))].sort((left, right) => sidebarRank(left) - sidebarRank(right)),
     [rows],
   )
-  const query = search.trim().toLowerCase()
-  const shown = rows.filter(
-    (row) => (kind === undefined || row.kind === kind) && row.label.toLowerCase().includes(query),
-  )
+  const shown = useMemo(() => rows.filter((row) => kind === undefined || row.kind === kind), [rows, kind])
+  const { view, setView } = useTableView(usedByFields, recordPageSize, [], true)
 
   const columns: AxisColumn<UsedByRow>[] = [
     {
       key: 'label',
       kind: 'freeText',
       title: t('shell.studio.usedBy.name'),
+      searchText: (row) => row.label,
+      sortValue: (row) => row.label,
       render: (_value, row) => <Link to={studioResourceAddress(application, row.id, row.path)}>{row.label}</Link>,
     },
     {
       key: 'kind',
       kind: 'fixed',
       title: t('shell.studio.kind'),
+      sortValue: (row) => sidebarRank(row.kind),
       render: (_value, row) => kindSingular(row.kind, t),
     },
     {
@@ -145,31 +153,22 @@ export function StudioUsedBy({
       columns={columns}
       rowKey={(row) => row.key}
       dataSource={shown}
+      view={{ query: view, onChange: setView }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
       failure={failed ? <Alert type="error" title={t('shell.studio.referencesFailed')} /> : undefined}
       toolbar={{
         view: (
-          <Flex gap="small" wrap>
-            <Input.Search
-              allowClear
-              aria-label={t('shell.table.search')}
-              placeholder={t('shell.table.search')}
-              style={{ maxWidth: 400 }}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <Select
-              allowClear
-              virtual={false}
-              aria-label={t('shell.studio.kind')}
-              placeholder={t('shell.studio.kind')}
-              style={{ minWidth: 160 }}
-              value={kind}
-              onChange={(value: string | undefined) => setKind(value)}
-              options={kinds.map((item) => ({ value: item, label: kindSingular(item, t) }))}
-            />
-          </Flex>
+          <Select
+            allowClear
+            virtual={false}
+            aria-label={t('shell.studio.kind')}
+            placeholder={t('shell.studio.kind')}
+            style={{ minWidth: 160 }}
+            value={kind}
+            onChange={(value: string | undefined) => setKind(value)}
+            options={kinds.map((item) => ({ value: item, label: kindSingular(item, t) }))}
+          />
         ),
       }}
     />
