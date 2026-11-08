@@ -22,12 +22,13 @@ internal sealed class RateLimitRefusals
     public void Record(Partition partition) =>
         _refused.Add(1, new KeyValuePair<string, object?>(AxisTelemetry.PartitionTag, Name(partition)));
 
-    private static string Name(Partition partition) => partition switch
+    internal static string Name(Partition partition) => partition switch
     {
         Partition.SignIn => "sign_in",
         Partition.Session => "session",
         Partition.Bearer => "bearer",
         Partition.Publishing => "publishing",
+        Partition.Mcp => "mcp",
         _ => throw new ArgumentOutOfRangeException(nameof(partition)),
     };
 }
