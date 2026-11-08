@@ -53,10 +53,10 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         var condition = await ManagerCondition(model, request);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
-        await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, CancellationToken);
+        await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, null, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, CancellationToken);
+        var page = await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, null, CancellationToken);
         stopwatch.Stop();
 
         TestContext.Current.TestOutputHelper?.WriteLine($"The record list took {stopwatch.Elapsed}.");
@@ -65,7 +65,7 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         Assert.Equal(RequestCount / DepartmentCount, page.TotalCount);
         Assert.Equal(PageSize, page.Items.Count);
 
-        var statement = RecordQueries.ListStatement(request, null, null, condition);
+        var statement = RecordQueries.ListStatement(request, null, null, condition, null);
         AssertPolicyReadsDepartmentsByPrimaryKey(model, await ExplainAsync(dataSource, statement.CountSql, condition.AddTo));
         AssertPolicyReadsDepartmentsByPrimaryKey(
             model, await ExplainAsync(dataSource, statement.PageSql, command => BindPage(condition.AddTo, command)));

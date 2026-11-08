@@ -73,6 +73,28 @@ public sealed class ExportEndpointTests(RecordApiFixture fixture) : IClassFixtur
     [Theory]
     [InlineData("csv")]
     [InlineData("xlsx")]
+    public async Task An_entity_export_with_a_filter_writes_only_the_matching_rows_and_refuses_a_field_the_user_may_not_read(string format)
+    {
+        await SeedAsync();
+        using var client = fixture.CreateClient().SignedInAs("eve");
+        var open = Uri.EscapeDataString("""{"all":[{"field":"status","op":"eq","value":"open"}]}""");
+        var onPrice = Uri.EscapeDataString("""{"all":[{"field":"price","op":"gt","value":1}]}""");
+
+        using var response = await GetAsync(client, $"{Items}/export?format={format}&filter={open}");
+        using var refused = await GetAsync(client, $"{Items}/export?format={format}&filter={onPrice}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var file = await ReadAsync(response, format);
+        Assert.Equal(["name", "quantity", "status", "department"], file.Rows[0]);
+
+        // A CSV cell that starts with a formula character gets a leading quote.
+        Assert.Equal(format == "csv" ? ["'-minus", "Alpha"] : ["-minus", "Alpha"], file.Rows.Skip(1).Select(row => row[0]!).Order(StringComparer.Ordinal));
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("csv")]
+    [InlineData("xlsx")]
     public async Task A_data_source_export_holds_the_groups_the_rows_route_shows_and_is_audited(string format)
     {
         await SeedAsync();

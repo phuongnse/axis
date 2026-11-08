@@ -258,7 +258,7 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
     {
         var filters = Filters(compiled, person, role);
         var condition = await RecordFilters.ConditionAsync(compiled.Model!, person, filters, User, conditionCipher ?? cipher, CancellationToken);
-        var page = await RecordQueries.ListAsync(connection, null, person, 1, 50, null, null, condition, cipher, CancellationToken);
+        var page = await RecordQueries.ListAsync(connection, null, person, 1, 50, null, null, condition, null, cipher, CancellationToken);
         Assert.NotNull(page);
         return [.. page.Items.Select(record => record.Id)];
     }

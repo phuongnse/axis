@@ -32,7 +32,8 @@ public static class RecordQueries
     /// with fields keeps only the records where any searched field contains its text, ignoring case,
     /// with no wildcard characters; the text is a parameter. A
     /// <paramref name="condition"/>, such as the user's read filters, keeps only the records that
-    /// match it, in both the page and the count. Returns <see langword="null"/> when the database
+    /// match it, in both the page and the count, and so does a <paramref name="filter"/>, the conditions
+    /// of the request's query, which narrows the records further. Returns <see langword="null"/> when the database
     /// rejects the condition for these records with a data exception (SQLSTATE class 22), such as
     /// an integer overflow. Any other database error is thrown.
     /// When <paramref name="transaction"/>, the transaction of <paramref name="connection"/>, is given,
@@ -49,8 +50,9 @@ public static class RecordQueries
         RecordSort? sort,
         RecordSearch? search,
         RecordCondition? condition = null,
+        RecordListFilter? filter = null,
         CancellationToken cancellationToken = default) =>
-        ListAsync(connection, transaction, entity, page, pageSize, sort, search, condition, null, cancellationToken);
+        ListAsync(connection, transaction, entity, page, pageSize, sort, search, condition, filter, null, cancellationToken);
 
     /// <summary>
     /// Reads a page as the list without a cipher does, and decrypts the sensitive values with <paramref name="cipher"/>.
@@ -65,6 +67,7 @@ public static class RecordQueries
         RecordSort? sort,
         RecordSearch? search,
         RecordCondition? condition,
+        RecordListFilter? filter,
         RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
@@ -73,7 +76,7 @@ public static class RecordQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var statement = ListStatement(entity, sort, search, condition);
+        var statement = ListStatement(entity, sort, search, condition, filter);
         try
         {
             long? totalCount = null;
@@ -88,6 +91,7 @@ public static class RecordQueries
                 search?.AddTo(count);
 
                 condition?.AddTo(count);
+                filter?.AddTo(count);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
                 if (transaction is not null)
                 {
@@ -105,6 +109,7 @@ public static class RecordQueries
             search?.AddTo(command);
 
             condition?.AddTo(command);
+            filter?.AddTo(command);
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
@@ -127,7 +132,7 @@ public static class RecordQueries
     }
 
     /// <summary>
-    /// Streams up to <paramref name="limit"/> records in the order and under the search and condition of
+    /// Streams up to <paramref name="limit"/> records in the order and under the search, condition and filter of
     /// <see cref="ListAsync"/>, one at a time, so a caller never holds them all. It does not count. A database
     /// error is thrown as it is, including a data exception (SQLSTATE class 22) that the
     /// <paramref name="condition"/> raises for some record, which the caller maps.
@@ -138,9 +143,10 @@ public static class RecordQueries
         RecordSort? sort,
         RecordSearch? search,
         RecordCondition? condition,
+        RecordListFilter? filter,
         int limit,
         CancellationToken cancellationToken = default) =>
-        ReadAllAsync(connection, entity, sort, search, condition, limit, null, cancellationToken);
+        ReadAllAsync(connection, entity, sort, search, condition, filter, limit, null, cancellationToken);
 
     /// <summary>
     /// Streams the records as the stream without a cipher does, and decrypts the sensitive values of each with
@@ -152,6 +158,7 @@ public static class RecordQueries
         RecordSort? sort,
         RecordSearch? search,
         RecordCondition? condition,
+        RecordListFilter? filter,
         int limit,
         RecordCipher? cipher,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -160,11 +167,12 @@ public static class RecordQueries
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
-        var statement = ListStatement(entity, sort, search, condition);
+        var statement = ListStatement(entity, sort, search, condition, filter);
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
         search?.AddTo(command);
 
         condition?.AddTo(command);
+        filter?.AddTo(command);
         command.Parameters.AddWithValue("limit", limit);
         command.Parameters.AddWithValue("offset", 0L);
 
@@ -181,10 +189,10 @@ public static class RecordQueries
     /// The count and the page statement of a list of <paramref name="entity"/>. The page statement
     /// ends with <c>LIMIT @limit OFFSET @offset</c>. When <paramref name="search"/> has fields, both
     /// keep only the records where any searched field contains <c>@search</c>. Both keep only the
-    /// records that match <paramref name="condition"/>.
+    /// records that match <paramref name="condition"/> and <paramref name="filter"/>.
     /// Neither holds a value: each is a parameter that the caller adds.
     /// </summary>
-    internal static RecordListStatement ListStatement(EntityModel entity, RecordSort? sort, RecordSearch? search, RecordCondition? condition)
+    internal static RecordListStatement ListStatement(EntityModel entity, RecordSort? sort, RecordSearch? search, RecordCondition? condition, RecordListFilter? filter)
     {
         var table = Table(entity);
         var row = EntityNaming.Quote(RowAlias);
@@ -199,6 +207,11 @@ public static class RecordQueries
             conditions.Add(condition.Sql);
         }
 
+        if (filter is not null)
+        {
+            conditions.Add(filter.Sql(RowAlias));
+        }
+
         var where = conditions.Count > 0 ? $" WHERE {string.Join(" AND ", conditions)}" : "";
         var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var order = sort is null
@@ -210,10 +223,10 @@ public static class RecordQueries
     }
 
     /// <summary>
-    /// The condition that <paramref name="column"/> contains <c>@search</c>, ignoring letter case.
+    /// The condition that <paramref name="column"/> contains the pattern in <paramref name="placeholder"/>, ignoring letter case.
     /// It is a <c>LIKE</c> over <c>lower(column)</c>, so the trigram index of the column serves it.
     /// </summary>
-    internal static string SearchTerm(string column) => $"lower({column}) LIKE lower(@search)";
+    internal static string SearchTerm(string column, string placeholder = "@search") => $"lower({column}) LIKE lower({placeholder})";
 
     /// <summary>The <c>@search</c> parameter for <paramref name="search"/>, as a pattern that matches it as plain text.</summary>
     internal static NpgsqlParameter SearchParameter(string search) =>

@@ -35,13 +35,13 @@ record's audit records are read through its history route.
 
 | Route                                                                                  | Response                                                                                                          |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=&search=`          | `200` with one page of records                                                                                    |
+| `GET /api/apps/{app}/entities/{entity}/records?page=&pageSize=&sort=&filter=&search=`  | `200` with one page of records                                                                                    |
 | `GET /api/apps/{app}/entities/{entity}/records/{id}`                                   | `200` with one record                                                                                             |
 | `POST /api/apps/{app}/entities/{entity}/records`                                       | `201` with the new record and a `Location` header                                                                 |
 | `PATCH /api/apps/{app}/entities/{entity}/records/{id}`                                 | `200` with the updated record                                                                                     |
 | `DELETE /api/apps/{app}/entities/{entity}/records/{id}`                                | `204` with no body                                                                                                |
 | `GET /api/apps/{app}/entities/{entity}/records/{id}/history?page=&pageSize=`           | `200` with one page of the record's audit records. See [the history route](record-audit.md#the-history-route)     |
-| `GET /api/apps/{app}/entities/{module}/{entity}/records?page=&pageSize=&sort=&search=` | `200` with one page of records of a module entity, see [routes](#routes)                                          |
+| `GET /api/apps/{app}/entities/{module}/{entity}/records?page=&pageSize=&sort=&filter=&search=` | `200` with one page of records of a module entity, see [routes](#routes)                                          |
 | `GET /api/apps/{app}/entities/{module}/{entity}/records/{id}`                          | `200` with one record of a module entity, see [routes](#routes)                                                   |
 | `POST /api/apps/{app}/entities/{module}/{entity}/records`                              | `201` with the new record of a module entity, see [routes](#routes)                                               |
 | `PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}`                        | `200` with the updated record of a module entity, see [routes](#routes)                                           |
@@ -133,9 +133,9 @@ reads a request sees its department's name even when no read filter on
 A list response is `{ "items": [ ... ], "page": 1, "pageSize": 20,
 "totalCount": 42 }`. `items` holds records in the shape above, including
 `labels`. `page` and `pageSize` are the values used, and `totalCount` counts
-the records of the entity that match the `search`, or every record without
-one. A list holds only records that match one of the user's read filters,
-and `totalCount` counts only those. A grant without a `filter` matches every
+the records of the entity that match the `search` and the `filter`, or every
+record without them. A list holds only records that match one of the user's
+read filters, and `totalCount` counts only those. A grant without a `filter` matches every
 record. Each reference step of a read filter finds the target record through its
 primary key. Every reference column and every child table's `owner_id` has an
 index, and so does each index an entity declares, see
@@ -162,7 +162,7 @@ Each field type has one JSON form in a read:
 
 ## Paging and sorting
 
-A list takes a page, a page size, a sort and a search text in its query.
+A list takes a page, a page size, a sort, a filter and a search text in its query.
 
 - **`page`.** An integer of at least 1. It defaults to 1.
 - **`pageSize`.** An integer from 1 to 100. It defaults to 20.
@@ -170,9 +170,22 @@ A list takes a page, a page size, a sort and a search text in its query.
   order. The name matches exactly, so letter case matters. A `child-collection`
   or `sensitive` field is not a valid `sort`, nor is a field the user may not
   read, as for an unknown field.
-- **`filter`** _(planned for M31)_. Keeps only the records that match the conditions of a
-  [table's filter](actions-and-controls.md#tables), in groups of All or Any. It refuses a field the user
-  may not read, as `sort` does.
+- **`filter`.** Keeps only the records that match its conditions, on top of the user's read filters.
+  It is URL-encoded JSON. The root is a group, `{"all": [...]}` or `{"any": [...]}`, which holds
+  conditions `{"field", "op", "value"}` and more groups, so groups nest. A group without a condition
+  is left out, and an empty `filter` means no filter. The field name matches exactly. A field is
+  refused with one message, as an unknown field is, when it does not exist, when the user may not
+  read it, when it is `sensitive`, or when it is not a `text`, `enum`, `integer`, `decimal`, `money`,
+  `date` or `date-time` field. Each operator takes the field types in the table below, `number`
+  standing for `integer`, `decimal` and `money`, and `date` for `date` and `date-time`. `value` is
+  a JSON value of the field's type, such as an enum value that the field declares, and it is not
+  checked against the field's `min`, `max` or length limits. It is never null, and `empty` and
+  `notEmpty` take none. A text value holds at most 200 characters with no U+0000. A filter holds at
+  most 50 conditions and groups, and it is invalid when it is repeated, when it is not valid JSON of
+  this shape, or when a value does not fit. `ne` also keeps records whose value is empty. For text,
+  `empty` matches `NULL` and the empty string. `contains` matches as `search` does, ignoring letter
+  case and reading `%`, `_`, quotes and backslashes as plain characters, and `eq` is exact. Every value is a
+  parameter and never part of the SQL.
 - **`search`.** Keeps only the records where the display field or any
   `searchable` field the user may read contains the text, ignoring letter
   case. Both sides go through PostgreSQL `lower()`, so case folding follows the
@@ -196,21 +209,33 @@ A list takes a page, a page size, a sort and a search text in its query.
   collation.
 - **Past the end.** A page past the last one is `200` with empty `items` and
   the real `totalCount`.
-- **Count.** `totalCount` is counted in a separate statement from the page.
+- **Count.** `totalCount` counts only the records that match the read filters and `filter`. It is counted in a separate statement from the page.
   Both run in one read-only `READ COMMITTED` transaction, so under concurrent
   writes it can still differ from the items by a few rows. When only the count
   runs past `Data:QueryTimeout`, `totalCount` is `null`.
 
-The paging parameters are digits only: a sign, a space or a repeated parameter
-(`page=1&page=2`) is invalid. A repeated `sort` or `search` is invalid too.
+| Operator   | Field types              | Matches                                             |
+| ---------- | ------------------------ | --------------------------------------------------- |
+| `eq`       | text, enum, number, date | The value equals the given one                      |
+| `ne`       | text, enum, number, date | The value differs, or is empty                      |
+| `contains` | text                     | The text contains the given text                    |
+| `lt`       | number, date             | The value is less than the given one                |
+| `lte`      | number, date             | The value is less than or equal to the given one    |
+| `gt`       | number, date             | The value is greater than the given one             |
+| `gte`      | number, date             | The value is greater than or equal to the given one |
+| `empty`    | text, enum, number, date | The value is empty                                  |
+| `notEmpty` | text, enum, number, date | The value is not empty                              |
 
-A `sort` or `search` that names a
+The paging parameters are digits only: a sign, a space or a repeated parameter
+(`page=1&page=2`) is invalid. A repeated `sort`, `search` or `filter` is invalid too.
+
+A `sort`, `search` or `filter` that names a
 [pending field](migrations.md#recomputing-computed-fields) is a `409`. For
 `search`, that is any searched field. The title is fixed: "A field is being
-recomputed." `errors` is keyed `sort` or `search`, with one message for each
+recomputed." `errors` is keyed `sort`, `search` or `filter`, with one message for each
 such field, in field order, that names the field. The request is valid, so this
 is a state conflict, not a `400`. It is only reported once the query is valid.
-A list with no `sort` or `search` on a pending field answers with the stored
+A list with no `sort`, `search` or `filter` on a pending field answers with the stored
 values. A single read computes the pending field on the spot.
 
 ## Create, update and delete
@@ -404,9 +429,9 @@ release.
   server logs the policy name and the grant's index. Another grant can still
   match the record. A list whose combined read filters fail is a `400` with
   a fixed title, because PostgreSQL cannot fail one branch of an `or`.
-- **`409` for a pending field.** A `sort` or `search`
+- **`409` for a pending field.** A `sort`, `search` or `filter`
   names a field that is being recomputed. The title is fixed: "A field is being
-  recomputed." `errors` is keyed `sort` or `search`, with a message that names
+  recomputed." `errors` is keyed `sort`, `search` or `filter`, with a message that names
   the field. See [Paging and sorting](#paging-and-sorting).
 - **`409` for a policy that reads a pending field.** A
   `read` filter of the user's grants reads a field that is being recomputed.

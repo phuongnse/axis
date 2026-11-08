@@ -104,6 +104,8 @@ public sealed class SensitiveValueSourceTests
         ["Axis.Data/Records/RecordQueries.cs:LabelJoins"] = Untouched.NeverSensitive,
         ["Axis.Data/Records/RecordQueries.cs:ReadValue"] = Untouched.Helper,
 
+        ["Axis.Data/Records/RecordListFilter.cs:Sql"] = Untouched.NeverSensitive,
+
         ["Axis.Data/Records/RecordSearch.cs:Sql"] = Untouched.NeverSensitive,
 
         ["Axis.Data/Schema/EntityIndexes.cs:Expected"] = Untouched.SchemaPlanning,
