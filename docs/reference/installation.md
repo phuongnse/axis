@@ -807,16 +807,17 @@ their addresses.
   the server trust only that file, see [the order](#the-order).
 - **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection string, plus
   `Root Certificate` for a private authority. Outside Development and Testing, the server, the worker,
-  the publisher and the admin tool stop at start when one of their own connection strings sets a lower
+  the agent host, the publisher and the admin tool stop at start when one of their own connection strings sets a lower
   mode or none, and the error names the setting and never shows its value. A connection string with
   no `SSL Mode` counts as `Prefer`, which falls back to plain text, so it is refused.
   - The server checks `ConnectionStrings:Platform` and `ConnectionStrings:PlatformSchema`.
-  - The worker checks `ConnectionStrings:Platform` under `Tenancy:Source=directory`.
+  - The worker checks `ConnectionStrings:Platform` under `Tenancy:Source=directory`. The agent host
+    does the same when `Ai:DefaultBinding` is set, see [AI settings](host-settings.md#ai-settings).
   - Every admin command, `publisher` included, checks `Admin:ConnectionString`,
     `ConnectionStrings:PlatformSchema`, `ConnectionStrings:Platform` and `Scenarios:ServerConnectionString` when set, and exits with
     code 2.
   - Every tenant connection copies `SSL Mode`, `Root Certificate` and `Check Certificate Revocation`
-    from `ConnectionStrings:Platform` (the server and the worker), `Admin:ConnectionString`
+    from `ConnectionStrings:Platform` (the server, the worker and the agent host), `Admin:ConnectionString`
     (`tenant create` and `tenant restore`) or `ConnectionStrings:PlatformSchema` (the other admin
     commands and the publisher).
   - `pg_dump` and `pg_restore` get `PGSSLMODE` and `PGSSLROOTCERT`, with `system` under `verify-full`
