@@ -192,7 +192,8 @@ internal static partial class McpServer
         };
     }
 
-    private static JsonObject ListTools() =>
+    /// <summary>The <c>tools/list</c> answer, which offers each tool the server serves.</summary>
+    internal static JsonObject ListTools() =>
         new()
         {
             ["tools"] = new JsonArray(new JsonObject

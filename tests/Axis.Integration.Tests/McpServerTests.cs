@@ -291,25 +291,15 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
         }
     }
 
-    private static string Initialize(string version) =>
-        JsonSerializer.Serialize(new
-        {
-            jsonrpc = "2.0",
-            id = 1,
-            method = "initialize",
-            @params = new { protocolVersion = version, capabilities = new { }, clientInfo = new { name = "test", version = "1" } },
-        });
+    private static string Initialize(string version) => McpTestCalls.Initialize(version);
 
-    private static string ToolCall(string tool, string? arguments = null)
-    {
-        var parameters = new JsonObject { ["name"] = tool };
-        if (arguments is not null)
-        {
-            parameters["arguments"] = JsonNode.Parse(arguments);
-        }
+    private static string ToolCall(string tool, string? arguments = null) => McpTestCalls.ToolCall(tool, arguments);
 
-        return new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 3, ["method"] = "tools/call", ["params"] = parameters }.ToJsonString();
-    }
+    private Task<string> RequestTokenAsync(string user, string clientId, string clientSecret) =>
+        McpTestCalls.RequestTokenAsync(_authority!, user, clientId, clientSecret, CancellationToken);
+
+    private Task<HttpResponseMessage> PostAsync(string host, string? bearer, string body, string? session = null, string? version = null, string? origin = null) =>
+        McpTestCalls.PostAsync(Client(), host, bearer, body, session, version, origin, CancellationToken);
 
     private async Task<(string Token, string Session)> OpenSessionAsync()
     {
@@ -320,70 +310,11 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
 
     private static string Ping() => """{"jsonrpc":"2.0","id":2,"method":"ping"}""";
 
-    private async Task<string> RequestTokenAsync(string user, string clientId, string clientSecret)
-    {
-        using var client = new HttpClient();
-        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["grant_type"] = "password",
-            ["client_id"] = clientId,
-            ["client_secret"] = clientSecret,
-            ["username"] = user,
-            ["password"] = KeycloakFixture.Password,
-            ["otp"] = DevelopmentTotp.Code(user),
-        });
-        using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, CancellationToken);
-        var body = await response.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
-        using var tokens = JsonDocument.Parse(body);
-        return tokens.RootElement.GetProperty("access_token").GetString()!;
-    }
-
-    private Task<HttpResponseMessage> PostAsync(
-        string host,
-        string? bearer,
-        string body,
-        string? session = null,
-        string? version = null,
-        string? origin = null)
-    {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Content = new StringContent(body, Encoding.UTF8, "application/json"),
-        };
-        Prepare(request, host, bearer);
-        if (session is not null)
-        {
-            request.Headers.Add("Mcp-Session-Id", session);
-        }
-
-        if (version is not null)
-        {
-            request.Headers.Add("MCP-Protocol-Version", version);
-        }
-
-        if (origin is not null)
-        {
-            request.Headers.Add("Origin", origin);
-        }
-
-        return Client().SendAsync(request, CancellationToken);
-    }
-
     private Task<HttpResponseMessage> SendAsync(HttpMethod method, string host, string path, string? bearer)
     {
         var request = new HttpRequestMessage(method, path);
-        Prepare(request, host, bearer);
+        McpTestCalls.Prepare(request, host, bearer);
         return Client().SendAsync(request, CancellationToken);
-    }
-
-    private static void Prepare(HttpRequestMessage request, string host, string? bearer)
-    {
-        request.Headers.Host = host;
-        if (bearer is not null)
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
-        }
     }
 
     private HttpClient Client() => _client ?? throw new InvalidOperationException("The test host is not started.");
