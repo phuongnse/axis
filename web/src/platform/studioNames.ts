@@ -5,6 +5,12 @@ import type { ReferenceMark } from './studioSchemas'
 /** The names the application defines, or `undefined` until they load. */
 export const StudioNamesContext = createContext<StudioNames | undefined>(undefined)
 
+/** The texts of a key, one entry per locale, with an empty text for a locale the key does not have. */
+export function textsOf(names: StudioNames, key: string): Record<string, string> {
+  const known = names.texts.find((text) => text.key === key)
+  return Object.fromEntries(names.locales.map((locale) => [locale, known?.texts[locale] ?? '']))
+}
+
 /** The JSON Pointer that a part mark's `of` names, given the pointer of the property that holds the mark. */
 export function referencePointer(pointer: string, of: string): string {
   const relative = /^(\d+)(\/.*)$/.exec(of)

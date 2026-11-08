@@ -561,7 +561,7 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author gives a new page a title in two locales, writes the texts and saves', async ({ page }) => {
+  test('an author gives a new page a title in two locales and saves', async ({ page }) => {
     await useSession(page, 'author')
     const pageFile = path.join(copy, 'pages/label-texts-e2e.json')
     const textFiles = ['en', 'vi'].map((locale) => path.join(copy, `texts/${locale}.json`))
@@ -578,8 +578,6 @@ test.describe('Studio on a copy of its own', () => {
       await expect(page.getByRole('textbox', { name: 'Text key', exact: true })).toHaveValue('pages.labelTextsE2e.title')
       await page.getByRole('textbox', { name: 'en', exact: true }).fill('Label texts')
       await page.getByRole('textbox', { name: 'vi', exact: true }).fill('Văn bản nhãn')
-      await page.getByRole('button', { name: 'Write texts', exact: true }).click()
-      await expect(page.getByTestId('studio-label-written')).toBeVisible()
       await page.getByRole('button', { name: 'Save', exact: true }).click()
       await expect(page.getByTestId('studio-saved')).toBeVisible()
 

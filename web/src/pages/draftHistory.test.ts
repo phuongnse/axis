@@ -8,10 +8,13 @@ import {
   removedItem,
   undoStep,
   type DraftSnapshot,
+  type LabelTextDrafts,
 } from './draftHistory'
 
+const noTexts: LabelTextDrafts = {}
+
 function snapshot(n: number): DraftSnapshot {
-  return { draft: { n }, jsonText: null }
+  return { draft: { n }, jsonText: null, texts: noTexts }
 }
 
 describe('draftHistory', () => {
@@ -95,9 +98,18 @@ describe('draftHistory', () => {
   it('skips a step whose draft is the draft of the last step', () => {
     const before = snapshot(0)
     let history = recordStep(emptyHistory, before, null)
-    history = recordStep(history, { draft: before.draft, jsonText: null }, null)
+    history = recordStep(history, { draft: before.draft, jsonText: null, texts: noTexts }, null)
 
     expect(history.past).toEqual([before])
+  })
+
+  it('keeps a step whose draft is unchanged but whose label texts changed', () => {
+    const before = snapshot(0)
+    let history = recordStep(emptyHistory, before, null)
+    const typed = { draft: before.draft, jsonText: null, texts: { 'pages.a.title': { en: 'Title' } } }
+    history = recordStep(history, typed, null)
+
+    expect(history.past).toEqual([before, typed])
   })
 })
 

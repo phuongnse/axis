@@ -324,16 +324,17 @@ picks what exists.
 ## Label texts
 
 A label is an object whose only property is `textKey`. Studio edits its texts in every locale, as
-[labels](studio-resource-form.md#labels) shows, and writes them through the
-[text write route](authoring.md#text-writes).
+[labels](studio-resource-form.md#labels) shows, and Save writes them through the
+[text write route](authoring.md#text-writes). Typing a label's texts is an unsaved change of the
+resource, and Undo steps through it.
 
 - **The key.** A new label gets a key made of the kind's folder and the resource's name in camelCase,
   then the path's segments without the final `textKey`, joined with `.`, such as
   `pages.myTasks.title`. Studio adds `2`, `3` and so on when the key is taken. An empty `textKey`, as a
   starter leaves it, counts as no key and gets the same key.
-- **Texts before the key.** The texts are written before the key goes into the saved resource, so a
-  resource never names a key with no text, and an unused key does no harm. A write that fails shows a
-  message and leaves the draft as it was.
+- **Texts before the patch.** Save writes the texts of each changed key before the patch that puts the
+  key into the saved resource, so a resource never names a key with no text, and an unused key does no
+  harm. A write that fails shows the save error, sends no patch and keeps the draft.
 - **A text write changes the folder,** as a save does: the Problems panel shows the diagnostics that it
   answered, and the names and the release history load again.
 - **A shared key.** A label whose key other labels use says how many, from `usedBy` in the names

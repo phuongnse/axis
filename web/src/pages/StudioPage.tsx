@@ -174,7 +174,7 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
  * and expression completion offer load with the application too, and again after a save, a text write, a delete and a
- * reconnect. A text write, which a label's Write texts button sends, updates the Problems panel and loads the names
+ * reconnect. A text write, which Save sends for a label's texts before the patch, updates the Problems panel and loads the names
  * and the release list again, as a save does. The sidebar's Policy matrix entry shows the policy matrix, kept in the address
  * as `&view=policies`. The matrix shows in place of the content under a Policy matrix heading, and
  * its Open policy link opens the policy in the Resources view. The band and the Problems panel show in every view.

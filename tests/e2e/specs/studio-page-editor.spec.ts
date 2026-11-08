@@ -49,13 +49,11 @@ test.describe("Studio builds pages in the page editor", () => {
     ).toHaveValue(name);
   }
 
-  /** Fills the texts of a label in every locale and writes them, so the label's key exists before the save. */
-  async function writeTexts(page: Page, label: string, en: string, vi: string) {
+  /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
+  async function fillTexts(page: Page, label: string, en: string, vi: string) {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts", exact: true }).click();
-    await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
   async function pick(page: Page, field: string, option: string) {
@@ -81,7 +79,7 @@ test.describe("Studio builds pages in the page editor", () => {
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
     await createPage(page, "ReviewForm");
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/title",
       "Review form",
@@ -95,7 +93,7 @@ test.describe("Studio builds pages in the page editor", () => {
       "studio-field-/widgets/0/actions/0/process",
       "PurchaseRequestApproval",
     );
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/widgets/0/actions/0/label",
       "Send for review",
@@ -112,7 +110,7 @@ test.describe("Studio builds pages in the page editor", () => {
         .getByTestId("studio-page-editor")
         .getByRole("textbox", { name: "Name", exact: true }),
     ).toHaveValue("ReviewList");
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/title",
       "Review list",
@@ -129,7 +127,7 @@ test.describe("Studio builds pages in the page editor", () => {
       .getByRole("button", { name: "Add navigate action", exact: true })
       .click();
     await pick(page, "studio-field-/widgets/0/rowActions/0/page", "ReviewForm");
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/widgets/0/rowActions/0/label",
       "Open",

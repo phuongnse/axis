@@ -58,7 +58,6 @@ away instead.
 - **The key is Studio's own.** Studio makes it from the resource and the path, and never shows it.
 - **One Save.** The texts are part of the resource's one Save and its history, so Undo steps through a
   label's texts too. Save writes the label's texts first, so a resource never names a key with no text.
-  There is no Write texts button.
 
 ## Lists of objects
 

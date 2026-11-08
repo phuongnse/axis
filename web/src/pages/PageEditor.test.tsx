@@ -76,7 +76,8 @@ const labelContext = {
   file: 'pages/review-list.json',
   name: 'ReviewList',
   saved: {},
-  onTextsWritten: vi.fn(),
+  texts: {},
+  onTextsChange: vi.fn(),
 }
 
 function page(widget: Record<string, unknown>, extra: Record<string, unknown> = {}) {
@@ -1299,27 +1300,14 @@ describe('PageEditor container panels', () => {
     expect(screen.getByRole('button', { name: 'Remove column' })).toBeDisabled()
   })
 
-  it('writes the texts of a tab label in every locale and puts its key in the draft', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ resources: [], diagnostics: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+  it('sets the texts of a tab label in the draft, in every locale', async () => {
     const onChange = await open(tabs)
 
     const label = within(screen.getByTestId('studio-field-/widgets/0/tabs/1/label'))
-    await userEvent.type(label.getByRole('textbox', { name: 'en' }), 'Second')
-    await userEvent.type(label.getByRole('textbox', { name: 'vi' }), 'Thứ hai')
-    await userEvent.click(label.getByRole('button', { name: 'Write texts' }))
+    await userEvent.type(label.getByRole('textbox', { name: 'en' }), 'S')
 
-    await waitFor(() => expect(onChange).toHaveBeenCalled())
-    expect(onChange).toHaveBeenCalledWith('/widgets/0/tabs/1/label', { textKey: 'tabs.two' })
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-    expect(decodeURIComponent(url)).toContain('/texts/tabs.two')
-    expect(JSON.parse(init.body as string)).toEqual({ texts: { en: 'Second', vi: 'Thứ hai' } })
+    expect(labelContext.onTextsChange).toHaveBeenCalledWith('/widgets/0/tabs/1/label', 'tabs.two', { en: 'S', vi: '' })
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('writes the key of a tab label when the names are not loaded', async () => {
@@ -1421,25 +1409,17 @@ describe('PageEditor container panels', () => {
     expect(pointers).toContain('/widgets/0/collapsed')
   })
 
-  it('writes the texts of a section title and puts its key in the draft', async () => {
-    const fetchMock = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ resources: [], diagnostics: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+  it('sets the texts of a section title in the draft, in every locale', async () => {
     const onChange = await open(section)
 
     const title = within(screen.getByTestId('studio-field-/widgets/0/title'))
     await userEvent.type(title.getByRole('textbox', { name: 'en' }), '!')
-    await userEvent.click(title.getByRole('button', { name: 'Write texts' }))
 
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith('/widgets/0/title', { textKey: 'pages.review.title' }))
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-    expect(decodeURIComponent(url)).toContain('/texts/pages.review.title')
-    expect(JSON.parse(init.body as string)).toEqual({ texts: { en: 'Review!', vi: 'Xem xét' } })
+    expect(labelContext.onTextsChange).toHaveBeenCalledWith('/widgets/0/title', 'pages.review.title', {
+      en: 'Review!',
+      vi: 'Xem xét',
+    })
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('writes only the collapsed key on a section with a key it does not show', async () => {

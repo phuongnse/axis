@@ -1,6 +1,6 @@
 import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
-import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   applyAnswers,
   fieldQuestions,
@@ -23,6 +23,7 @@ import {
   fetchResourceReferences,
   fetchStudioResource,
   patchStudioResource,
+  putStudioTexts,
   saveStudioChanges,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -30,7 +31,7 @@ import {
   writeStudioText,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
-import { StudioNamesContext } from '../platform/studioNames'
+import { StudioNamesContext, textsOf } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -40,7 +41,16 @@ import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
 import { IdentityProviderEditor } from './IdentityProviderEditor'
-import { emptyHistory, endStep, recordStep, redoStep, removedItem, undoStep, type DraftSnapshot } from './draftHistory'
+import {
+  emptyHistory,
+  endStep,
+  recordStep,
+  redoStep,
+  removedItem,
+  undoStep,
+  type DraftSnapshot,
+  type LabelTextDrafts,
+} from './draftHistory'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import type { JsonViewHandle } from './JsonView'
@@ -90,6 +100,24 @@ function tryParse(text: string): unknown {
   } catch {
     return null
   }
+}
+
+/** Every non-empty `textKey` that a label of `value` names, at any depth. */
+function textKeysOf(value: unknown, keys = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    value.forEach((item) => textKeysOf(item, keys))
+  } else if (isContent(value)) {
+    for (const [name, child] of Object.entries(value)) {
+      if (name === 'textKey' && typeof child === 'string') {
+        if (child !== '') {
+          keys.add(child)
+        }
+      } else {
+        textKeysOf(child, keys)
+      }
+    }
+  }
+  return keys
 }
 
 /** The step key of an edit made while a text box has focus, so typing in one box is one step. Else `null`. */
@@ -153,6 +181,9 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
  * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
+ * A label's texts are part of the draft: typing them is an unsaved change that Undo steps through, and Save writes each
+ * changed key through the text write route before the patch. A text write that fails shows the save error and sends no
+ * patch.
  * Every kind has Undo and Redo on the save bar, which shows while there is something to save or a step can be redone,
  * and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to 100 steps of its draft on all its tabs. Typing in one box is one
  * step, and a load of the file clears the history. JSON that does not parse is an unsaved change with Save off, and
@@ -248,6 +279,15 @@ export function StudioEditor({
   // The pages and process steps that use a form, or `failed` when their references did not load.
   const [usedOn, setUsedOn] = useState<FormUse[] | 'failed'>()
   const [history, setHistory] = useState(emptyHistory)
+  // The label texts of the draft by key, which Save writes, and the texts this editor wrote, which stand in for the
+  // names until they load again.
+  const [labelTexts, setLabelTexts] = useState<LabelTextDrafts>({})
+  const [writtenTexts, setWrittenTexts] = useState<LabelTextDrafts>({})
+  const [seenNames, setSeenNames] = useState(names)
+  if (names !== seenNames) {
+    setSeenNames(names)
+    setWrittenTexts({})
+  }
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -263,11 +303,12 @@ export function StudioEditor({
     setSaved(false)
     setSaveError(null)
     setHistory(emptyHistory)
+    setLabelTexts({})
   }
 
   /** Steps through the history. It restores the snapshot, and it does nothing while a save runs. */
   function step(move: typeof undoStep) {
-    const current: DraftSnapshot = { draft, jsonText }
+    const current: DraftSnapshot = { draft, jsonText, texts: labelTexts }
     const result = saving ? null : move(history, current)
     if (!result) {
       return
@@ -276,6 +317,7 @@ export function StudioEditor({
     setHistory(next)
     setDraft(snapshot.draft)
     setJsonText(snapshot.jsonText)
+    setLabelTexts(snapshot.texts)
     setJsonInvalid(snapshot.jsonText !== null && !isContent(tryParse(snapshot.jsonText)))
     if (item.kind === 'entity') {
       setOrigins(matchOrigins(loaded!.content, snapshot.draft))
@@ -287,10 +329,14 @@ export function StudioEditor({
 
   const undo = () => step(undoStep)
   const redo = () => step(redoStep)
-  const latest = useRef({ undo, redo })
+  const latest = useRef({ undo, redo, changeTexts })
+  const onTextsChange = useCallback(
+    (pointer: string, key: string, texts: Record<string, string>) => latest.current.changeTexts(pointer, key, texts),
+    [],
+  )
 
   useEffect(() => {
-    latest.current = { undo, redo }
+    latest.current = { undo, redo, changeTexts }
   })
 
   // Studio takes the undo keys before the browser's own undo and CodeMirror's. They work inside the editor and when
@@ -459,9 +505,10 @@ export function StudioEditor({
       file: item.file,
       name: item.name,
       saved: loaded?.content ?? {},
-      onTextsWritten,
+      texts: { ...writtenTexts, ...labelTexts },
+      onTextsChange,
     }),
-    [application, item.file, item.name, loaded?.content, onTextsWritten],
+    [application, item.file, item.name, loaded?.content, writtenTexts, labelTexts, onTextsChange],
   )
   const checkContext = useMemo(
     () => ({ application, resourceId: item.id, kind: item.kind, draft, names: names ?? null }),
@@ -520,7 +567,21 @@ export function StudioEditor({
 
   const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
   const isLoaded = loaded !== undefined
-  const unsaved = patch.length > 0 || jsonInvalid
+  // The keys that the draft names whose texts differ from the last known texts: the ones this editor wrote, else the names.
+  const changedTexts = useMemo(() => {
+    if (!names) {
+      return []
+    }
+    return [...textKeysOf(draft)].flatMap((key) => {
+      if (!(key in labelTexts)) {
+        return []
+      }
+      const texts = Object.fromEntries(names.locales.map((locale) => [locale, labelTexts[key][locale] ?? '']))
+      const known = writtenTexts[key] ?? textsOf(names, key)
+      return names.locales.some((locale) => texts[locale] !== (known[locale] ?? '')) ? [{ key, texts }] : []
+    })
+  }, [names, draft, labelTexts, writtenTexts])
+  const unsaved = patch.length > 0 || changedTexts.length > 0 || jsonInvalid
 
   useEffect(() => {
     dirtyRef.current = unsaved
@@ -590,7 +651,7 @@ export function StudioEditor({
     }
     const removed = removedItem(draft, pointer, value)
     messageApi.destroy('studio-removed')
-    setHistory((h) => recordStep(h, { draft, jsonText }, removed ? null : typingStep(pointer)))
+    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, removed ? null : typingStep(pointer)))
     setDraft((current) => setAt(current, pointer, value) as Content)
     setJsonText(null)
     setJsonInvalid(false)
@@ -620,9 +681,20 @@ export function StudioEditor({
     }
   }
 
+  /** Sets the texts of a label's key in the draft, as typing in the label's boxes does, so it joins the typing step. */
+  function changeTexts(pointer: string, key: string, texts: Record<string, string>) {
+    if (jsonInvalid) {
+      return
+    }
+    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, typingStep(pointer)))
+    setLabelTexts((current) => ({ ...current, [key]: texts }))
+    setSaved(false)
+    setSaveError(null)
+  }
+
   function changeJson(text: string) {
     messageApi.destroy('studio-removed')
-    setHistory((h) => recordStep(h, { draft, jsonText }, typingStep('#json')))
+    setHistory((h) => recordStep(h, { draft, jsonText, texts: labelTexts }, typingStep('#json')))
     setJsonText(text)
     setSaved(false)
     setSaveError(null)
@@ -676,12 +748,13 @@ export function StudioEditor({
   }
 
   /**
-   * Writes `final` as the entity or resource. With migration `changes`, the patch and the new migration go in one
-   * changes call. When nothing differs from what was loaded, no request is sent.
+   * Writes `final` as the entity or resource. Each changed label key's texts go first, one after another, and the first
+   * failure shows the save error and sends no patch. With migration `changes`, the patch and the new migration go in
+   * one changes call. When nothing differs from what was loaded, no request is sent.
    */
   async function write(final: Content, changes: MigrationChange[], finalOrigins?: FieldOrigin[]) {
     const operations = diffPatch(loaded!.content, final)
-    if (changes.length === 0 && operations.length === 0) {
+    if (changes.length === 0 && operations.length === 0 && changedTexts.length === 0) {
       setDraft(final)
       setOrigins(finalOrigins ?? loadedOrigins(final))
       setTouched([])
@@ -691,6 +764,15 @@ export function StudioEditor({
     setSaving(true)
     setSaveError(null)
     try {
+      for (const { key, texts } of changedTexts) {
+        const result = await putStudioTexts(application, key, texts)
+        setWrittenTexts((current) => ({ ...current, [key]: texts }))
+        onTextsWritten(result.diagnostics)
+      }
+      if (changes.length === 0 && operations.length === 0) {
+        setSaved(true)
+        return
+      }
       let version: string
       let diagnostics: StudioDiagnostic[]
       let created: StudioResourceItem[] | undefined
@@ -1123,7 +1205,14 @@ export function StudioEditor({
         unsaved={unsaved}
         undoable={history.past.length > 0}
         redoable={history.future.length > 0}
-        saveable={patch.length > 0 && !jsonInvalid && problems.size === 0 && !conflict && !saving && !reconnecting}
+        saveable={
+          (patch.length > 0 || changedTexts.length > 0) &&
+          !jsonInvalid &&
+          problems.size === 0 &&
+          !conflict &&
+          !saving &&
+          !reconnecting
+        }
         busy={saving}
         onUndo={undo}
         onRedo={redo}

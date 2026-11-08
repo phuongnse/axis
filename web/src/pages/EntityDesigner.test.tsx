@@ -50,7 +50,8 @@ const labelContext = {
   file: 'entities/invoice.json',
   name: 'Invoice',
   saved: {},
-  onTextsWritten: vi.fn(),
+  texts: {},
+  onTextsChange: vi.fn(),
 }
 
 /** One field of each type, with every setting its type takes. */
