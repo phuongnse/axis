@@ -18,7 +18,7 @@ The server speaks the Streamable HTTP transport of the MCP specification, on the
 | `GET /.well-known/oauth-protected-resource/mcp` | Serves the protected resource metadata, see [sign-in](#sign-in)                                            |
 
 - **Route.** `POST /mcp` on each tenant's host takes the JSON-RPC messages `initialize`,
-  `notifications/*` and `ping`. The host names the tenant, as for every route. `GET /mcp` answers `405`,
+  `notifications/*`, `ping`, `tools/list` and `tools/call`. The host names the tenant, as for every route. `GET /mcp` answers `405`,
   because the server offers no server-sent stream. A preview tenant's host serves no MCP server: both MCP
   routes there answer `404`.
 - **Pinned version.** Axis serves MCP specification version `2025-11-25`. This line is the one place
@@ -86,28 +86,26 @@ clients may connect at all.
 
 ## Tools
 
-_(planned for M35)_
-
 Each tool takes the application's `name`, and a tool that writes names a draft. Every write goes
 through the authoring API's checks, so a tool can do nothing that the person could not do in Studio.
 
-| Tool                   | Input                                               | Output                                                                                                                        |
-| ---------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `list_applications`    | none                                                | The applications the person may author                                                                                        |
-| `read_reference`       | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
-| `list_resources`       | application, optional draft                         | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                    |
-| `read_resource`        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
-| `read_module_resource` | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
-| `read_names`           | application, optional draft                         | The names the application defines, as the [names route](authoring.md#names) gives them                                        |
-| `check_expression`     | application, draft, resource, path, expression      | The expression's type and diagnostics                                                                                         |
-| `create_draft`         | application, a title                                | A new [draft](revisions-and-drafts.md#drafts), with the version of the working folder it starts from                          |
-| `write_resource`       | application, draft, resource content                | Creates or replaces a resource in the draft, with its diagnostics                                                             |
-| `write_layer`          | application, draft, module resource, edited content | Writes the layer that holds the difference, as Studio saves do, see [customization layers](customization-layers.md#in-studio) |
-| `delete_resource`      | application, draft, `id`                            | Removes a resource from the draft                                                                                             |
-| `validate_draft`       | application, draft                                  | The draft's diagnostics, contract checks included                                                                             |
-| `run_scenarios`        | application, draft, optional names                  | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher       |
-| `diff_draft`           | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
-| `accept_draft`         | application, draft                                  | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                           |
+| Tool                                       | Input                                               | Output                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `list_applications`                        | none                                                | The applications the person may author                                                                                        |
+| `read_reference` _(planned for M35)_       | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
+| `list_resources` _(planned for M35)_       | application, optional draft                         | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                    |
+| `read_resource` _(planned for M35)_        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
+| `read_module_resource` _(planned for M35)_ | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
+| `read_names` _(planned for M35)_           | application, optional draft                         | The names the application defines, as the [names route](authoring.md#names) gives them                                        |
+| `check_expression` _(planned for M35)_     | application, draft, resource, path, expression      | The expression's type and diagnostics                                                                                         |
+| `create_draft` _(planned for M35)_         | application, a title                                | A new [draft](revisions-and-drafts.md#drafts), with the version of the working folder it starts from                          |
+| `write_resource` _(planned for M35)_       | application, draft, resource content                | Creates or replaces a resource in the draft, with its diagnostics                                                             |
+| `write_layer` _(planned for M35)_          | application, draft, module resource, edited content | Writes the layer that holds the difference, as Studio saves do, see [customization layers](customization-layers.md#in-studio) |
+| `delete_resource` _(planned for M35)_      | application, draft, `id`                            | Removes a resource from the draft                                                                                             |
+| `validate_draft` _(planned for M35)_       | application, draft                                  | The draft's diagnostics, contract checks included                                                                             |
+| `run_scenarios` _(planned for M35)_        | application, draft, optional names                  | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher       |
+| `diff_draft` _(planned for M35)_           | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
+| `accept_draft` _(planned for M35)_         | application, draft                                  | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                           |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
@@ -119,25 +117,24 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 
 ## Limits
 
-A call to the server is limited in rate.
+A call to the server is limited in rate and size, and the agent host's requests count toward a quota.
 
 - **Rate limit.** Every call to `/mcp` counts in the MCP partition, by tenant and client id, see
   [rate limits](headers-and-rate-limits.md#rate-limits).
-- **Quota.** _(planned for M35)_ Tool calls of outside clients count toward no quota, because the client brings its own
+- **Quota** _(planned for M35)_. Tool calls of outside clients count toward no quota, because the client brings its own
   model. Requests of the agent host count toward `authoringRequests`, see
   [tenant quotas](tenant-quotas.md#quotas).
-- **Size.** _(planned for M35)_ A tool input or output is at most 1 MiB. A larger output, such as the diff of a large
-  draft, is cut into pages that the tool's `cursor` reads.
+- **Size.** `POST /mcp` refuses a request body over 1 MiB with `413`, so a tool input is at most 1 MiB.
+- **Output pages** _(planned for M35)_. A tool output is at most 1 MiB. A larger output, such as the
+  diff of a large draft, is cut into pages that the tool's `cursor` reads.
 
 ## Audit
 
-_(planned for M35)_
-
 What an agent did is recorded, but never the content it read or wrote.
 
-- **Calls.** Each write tool call writes an audit record with the person, the client id, the tool, the
+- **Calls** _(planned for M35)_. Each write tool call writes an audit record with the person, the client id, the tool, the
   application, the draft and the resource ids.
-- **Consent.** Consent and its revocation write audit records in the realm and a platform audit
+- **Consent** _(planned for M35)_. Consent and its revocation write audit records in the realm and a platform audit
   record in Axis.
 - **Logs.** The server logs each call's tool, client id and outcome, and the
-  [log inventory](log-inventory.md) lists the event.
+  [log inventory](log-inventory.md#security-events) lists the event.
