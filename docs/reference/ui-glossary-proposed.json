@@ -48,6 +48,36 @@
       "en": "usage",
       "vi": "mức sử dụng",
       "status": "proposed"
+    },
+    {
+      "concept": "Package",
+      "en": "package",
+      "vi": "gói",
+      "status": "proposed"
+    },
+    {
+      "concept": "Binding",
+      "en": "binding",
+      "vi": "liên kết",
+      "status": "proposed"
+    },
+    {
+      "concept": "Grant",
+      "en": "grant",
+      "vi": "quyền",
+      "status": "proposed"
+    },
+    {
+      "concept": "Parameter",
+      "en": "parameter",
+      "vi": "tham số",
+      "status": "proposed"
+    },
+    {
+      "concept": "Result type",
+      "en": "result type",
+      "vi": "kiểu kết quả",
+      "status": "proposed"
     }
   ]
 }

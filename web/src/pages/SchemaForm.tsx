@@ -19,8 +19,8 @@ const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
 
-/** Properties that are read-only at the root: the file's identity. */
-const readOnlyRootProperties = new Set(['id', 'kind'])
+/** The file's identity, which the root form never shows, see docs/reference/studio-resource-form.md#fields. */
+const hiddenRootProperties = new Set(['id', 'kind', 'formatVersion'])
 
 /** The keywords of a conditional. A combination of only these is shown as a form, because the form does not enforce them. */
 const conditionalKeywords = new Set(['if', 'then', 'else'])
@@ -29,9 +29,9 @@ const conditionalKeywords = new Set(['if', 'then', 'else'])
  * A form built from the JSON Schema of a resource kind, for the draft `value`. It shows text, number,
  * boolean and enum values, nested objects and arrays. A string that names a resource gets a picker of the
  * application's names, as does each key of a map whose keys are marked. Anything else points to the JSON view.
- * `readOnlyNames` replaces the root properties that show as text, which are `id` and `kind` unless given. With a
- * `layer` and its `keyedLists`, each element of a keyed list shows its Added or Changed tag with Reset to module, and the elements the
- * layer removed show as muted rows below the list.
+ * Each root property is named by its field text, and the file's identity is hidden. `readOnlyNames` lists the root
+ * properties that show as text instead of an input. With a `layer` and its `keyedLists`, each element of a keyed list
+ * shows its Added or Changed tag with Reset to module, and the elements the layer removed show as muted rows below the list.
  */
 export function SchemaForm({
   schema,
@@ -39,7 +39,7 @@ export function SchemaForm({
   onChange,
   layer,
   keyedLists,
-  readOnlyNames = readOnlyRootProperties,
+  readOnlyNames,
 }: {
   schema: JsonSchema
   value: Record<string, unknown>
@@ -55,6 +55,7 @@ export function SchemaForm({
         root={schema}
         rootValue={value}
         pointer=""
+        path=""
         value={value}
         onChange={onChange}
         readOnlyNames={readOnlyNames}
@@ -68,6 +69,8 @@ interface NodeProps {
   root: JsonSchema
   rootValue: unknown
   pointer: string
+  /** The property names from the root to this node, joined by dots, with list indices and map keys left out. */
+  path: string
   value: unknown
   onChange: ChangeHandler
 }
@@ -77,29 +80,58 @@ function Properties({
   root,
   rootValue,
   pointer,
+  path,
   value,
   onChange,
   readOnlyNames,
 }: NodeProps & { readOnlyNames?: Set<string> }) {
+  const t = useText()
   const required = new Set(node.required)
+  const kind = root.properties?.kind?.const
   return (
     <Flex vertical gap="small">
-      {Object.entries(node.properties ?? {}).map(([name, child]) => (
-        <SchemaNode
-          key={name}
-          node={child}
-          root={root}
-          rootValue={rootValue}
-          pointer={`${pointer}/${escapeSegment(name)}`}
-          name={name}
-          value={(value as Record<string, unknown> | undefined)?.[name]}
-          required={required.has(name)}
-          readOnly={readOnlyNames?.has(name) ?? false}
-          onChange={onChange}
-        />
-      ))}
+      {Object.entries(node.properties ?? {})
+        .filter(([name]) => pointer !== '' || !hiddenRootProperties.has(name))
+        .map(([name, child]) => {
+          const childPath = path === '' ? name : `${path}.${name}`
+          const { label, help } = fieldTexts(t, kind, childPath, name)
+          return (
+            <SchemaNode
+              key={name}
+              node={child}
+              root={root}
+              rootValue={rootValue}
+              pointer={`${pointer}/${escapeSegment(name)}`}
+              path={childPath}
+              name={label}
+              help={help}
+              value={(value as Record<string, unknown> | undefined)?.[name]}
+              required={required.has(name)}
+              readOnly={readOnlyNames?.has(name) ?? false}
+              onChange={onChange}
+            />
+          )
+        })}
     </Flex>
   )
+}
+
+/** The label and help of a property, from its field text, or its own name and no help when the kind has no text for it. */
+function fieldTexts(
+  t: (key: string) => string,
+  kind: unknown,
+  path: string,
+  name: string,
+): { label: string; help?: string } {
+  if (typeof kind !== 'string') {
+    return { label: name }
+  }
+  const key = `shell.studio.field.${kind}.${path}`
+  if (t(key) === key) {
+    return { label: name }
+  }
+  const help = t(`${key}.help`)
+  return { label: t(key), help: help === `${key}.help` ? undefined : help }
 }
 
 function SchemaNode({
@@ -107,13 +139,15 @@ function SchemaNode({
   root,
   rootValue,
   pointer,
+  path,
   name,
+  help,
   value,
   required,
   readOnly = false,
   item = false,
   onChange,
-}: NodeProps & { name: string; required: boolean; readOnly?: boolean; item?: boolean }) {
+}: NodeProps & { name: string; help?: string; required: boolean; readOnly?: boolean; item?: boolean }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext)
@@ -130,6 +164,12 @@ function SchemaNode({
   const isMarkedMap =
     schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined
   const unsupported = !isMarkedMap && !isSupported(schema)
+  const labelStyle = { fontWeight: 500, color: colour.textMuted }
+  const helpNode =
+    help === undefined ? undefined : (
+      <div style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted, marginBottom: spacing.xs }}>{help}</div>
+    )
+  const groupStyle = { borderInlineStart: `1px solid ${colour.borderSubtle}`, paddingInlineStart: spacing.md }
 
   let input
   if (unsupported) {
@@ -221,6 +261,7 @@ function SchemaNode({
         root={root}
         rootValue={rootValue}
         pointer={pointer}
+        path={path}
         name={name}
         value={value}
         onChange={onChange}
@@ -228,23 +269,30 @@ function SchemaNode({
     )
   } else if (isLabel) {
     input = (
-      <fieldset style={{ margin: 0 }}>
-        <legend>{name}</legend>
-        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+      <fieldset style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
+        <legend style={labelStyle}>{name}</legend>
+        {helpNode}
+        <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
+          <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+        </div>
       </fieldset>
     )
   } else if (isObject) {
     input = (
-      <fieldset style={{ margin: 0 }}>
-        <legend>{name}</legend>
-        <Properties
-          node={schema}
-          root={root}
-          rootValue={rootValue}
-          pointer={pointer}
-          value={value}
-          onChange={onChange}
-        />
+      <fieldset style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
+        <legend style={labelStyle}>{name}</legend>
+        {helpNode}
+        <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
+          <Properties
+            node={schema}
+            root={root}
+            rootValue={rootValue}
+            pointer={pointer}
+            path={path}
+            value={value}
+            onChange={onChange}
+          />
+        </div>
       </fieldset>
     )
   } else if (isArray) {
@@ -274,6 +322,7 @@ function SchemaNode({
                 root={root}
                 rootValue={rootValue}
                 pointer={`${pointer}/${index}`}
+                path={path}
                 name={`${name} ${index + 1}`}
                 value={item}
                 required
@@ -299,7 +348,8 @@ function SchemaNode({
   const showsLabel = !isObject
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      {showsLabel && <div>{name}</div>}
+      {showsLabel && <div style={labelStyle}>{name}</div>}
+      {showsLabel && helpNode}
       {input}
     </div>
   )
@@ -316,6 +366,7 @@ function MarkedMap({
   root,
   rootValue,
   pointer,
+  path,
   name,
   value,
   onChange,
@@ -326,6 +377,7 @@ function MarkedMap({
   root: JsonSchema
   rootValue: unknown
   pointer: string
+  path: string
   name: string
   value: unknown
   onChange: ChangeHandler
@@ -390,6 +442,7 @@ function MarkedMap({
               root={root}
               rootValue={rootValue}
               pointer={`${pointer}/${escapeSegment(key)}`}
+              path={path}
               name={key}
               value={entry}
               required

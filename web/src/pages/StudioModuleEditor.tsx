@@ -54,8 +54,8 @@ const noProblems = new Map<string, string>()
 /** The kinds whose editor is the schema form, or the process designer, and so waits for the kind's schema. */
 const schemaKinds: readonly string[] = ['process', 'dataSource', 'rule', 'trigger', 'sequence', 'event', 'seed']
 
-/** The root properties of a module resource that show as text: its identity, and its name, which the save route refuses to change. */
-const moduleReadOnlyNames = new Set(['id', 'kind', 'name', 'formatVersion'])
+/** The root properties of a module resource that show as text: its name, which the save route refuses to change. */
+const moduleReadOnlyNames = new Set(['name'])
 
 /** The fields of the entity a seed names, or `null` when they could not be read. */
 interface SeedEntity {
