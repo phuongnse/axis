@@ -1105,7 +1105,8 @@ internal static class StudioEndpoints
             return (null, refusal);
         }
 
-        return StudioFolder.Find(ForRequest(httpContext, options), application) is { } folder
+        var tenantId = httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current?.TenantId;
+        return StudioFolder.Find(options, tenantId, application) is { } folder
             ? (folder, null)
             : (null, NotFound("No Studio folder holds an application with this name."));
     }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Axis.Tenancy;
 using Microsoft.Extensions.Configuration;
 
@@ -57,7 +58,7 @@ internal sealed record StudioOptions(
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
                 throw new InvalidOperationException(
-                    $"The folder '{applications}' set by 'Studio:ApplicationsPath' cannot be created.", exception);
+                    "The folder set by Studio:ApplicationsPath cannot be created.", exception);
             }
         }
 
@@ -82,6 +83,17 @@ internal sealed record StudioOptions(
     }
 
     /// <summary>
+    /// True when <paramref name="name"/> is one folder name that cannot leave the folder it is joined to: not blank, not
+    /// <c>.</c> or <c>..</c>, and with no path separator. A tenant id and an application name must both be one.
+    /// </summary>
+    public static bool IsPlainName([NotNullWhen(true)] string? name) =>
+        !string.IsNullOrWhiteSpace(name)
+        && name is not ("." or "..")
+        && !name.Contains('/')
+        && !name.Contains('\\')
+        && Path.GetFileName(name) == name;
+
+    /// <summary>
     /// The options of one request. Outside a cell they are these options. In a cell they name only the folder
     /// <c>Studio:ApplicationsPath/&lt;tenantId&gt;</c>, created when missing, and its revisions in the <c>.revisions</c> folder inside it. With no applications path, no tenant, or a
     /// tenant id that is not a plain folder name, they name no applications folder, so Studio answers as if it were off.
@@ -94,9 +106,7 @@ internal sealed record StudioOptions(
         }
 
         if (ApplicationsPath is not { } root
-            || string.IsNullOrWhiteSpace(tenantId)
-            || tenantId is "." or ".."
-            || Path.GetFileName(tenantId) != tenantId)
+            || !IsPlainName(tenantId))
         {
             return this with { ApplicationsPath = null, PerTenant = false, RevisionsPath = null };
         }
