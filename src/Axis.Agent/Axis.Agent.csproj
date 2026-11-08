@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Data\Axis.Data.csproj" />
     <ProjectReference Include="..\Axis.Hosting\Axis.Hosting.csproj" />
   </ItemGroup>
 

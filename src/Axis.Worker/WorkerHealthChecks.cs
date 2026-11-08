@@ -1,3 +1,4 @@
+using Axis.Tenancy;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Axis.Worker;
@@ -31,7 +32,7 @@ internal sealed class TenantMigrationsHealthCheck(WorkerHealth health) : IHealth
 /// Unhealthy until the worker has read the tenant directory once. Degraded while the last read failed, because the worker
 /// keeps running the last good read.
 /// </summary>
-internal sealed class TenantDirectoryHealthCheck(WorkerTenantCatalog catalog) : IHealthCheck
+internal sealed class TenantDirectoryHealthCheck(BackgroundTenantCatalog catalog) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default) =>
         Task.FromResult(!catalog.IsLoaded

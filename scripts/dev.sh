@@ -249,8 +249,8 @@ start_server
 web=$!
 disown "$web" 2>/dev/null || true
 
-# The agent host does no database work yet, so it does not wait for the server. The explicit Health__Urls wins over an
-# exported one, which is for the worker.
+# The agent host does no database work while AI authoring is off, which is how it starts here, so it does not wait for the
+# server. The explicit Health__Urls wins over an exported one, which is for the worker.
 (exec env DOTNET_ENVIRONMENT=Development Health__Urls="http://127.0.0.1:$agent_health_port" \
   dotnet "$PWD/src/Axis.Agent/bin/Debug/net10.0/Axis.Agent.dll") \
   </dev/null > >(prefix agent) 2>&1 &

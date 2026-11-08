@@ -79,7 +79,7 @@ public sealed class AiSettingsTests : IDisposable
                 throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null);
         }
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAxisAgent(Configure(values)));
+        var exception = Assert.Throws<InvalidOperationException>(() => new ServiceCollection().AddAxisAgent(Configure(values), new TestEnvironment()));
 
         var text = exception.ToString();
         Assert.Contains($"'{setting}'", text, StringComparison.Ordinal);
@@ -118,7 +118,7 @@ public sealed class AiSettingsTests : IDisposable
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["Health:Urls"] = "http://127.0.0.1:0" });
-        builder.Services.AddAxisAgent(builder.Configuration);
+        builder.Services.AddAxisAgent(builder.Configuration, builder.Environment);
         await using var app = builder.Build();
         app.MapHostHealth();
         await app.StartAsync(CancellationToken);
@@ -134,7 +134,7 @@ public sealed class AiSettingsTests : IDisposable
     public void A_blank_health_address_stops_the_start()
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            new ServiceCollection().AddAxisAgent(Configure(new Dictionary<string, string?> { ["Health:Urls"] = " " })));
+            new ServiceCollection().AddAxisAgent(Configure(new Dictionary<string, string?> { ["Health:Urls"] = " " }), new TestEnvironment()));
 
         Assert.Equal("'Health:Urls' must not be empty.", exception.Message);
     }

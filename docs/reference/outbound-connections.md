@@ -10,8 +10,8 @@ The server, the worker and the agent host open these connections:
 
 | Host | Destination | Named by | TLS |
 | --- | --- | --- | --- |
-| server, worker | The platform database | `ConnectionStrings:Platform`. The server also uses `ConnectionStrings:PlatformSchema`, at start and for the unpooled write connection of `PUT /api/cell/tenants/{id}/quotas` | [PostgreSQL](installation.md#tls) |
-| server, worker | Each tenant's database | The [tenant directory](../architecture.md#tenant-directory), with the platform connection's TLS settings | [PostgreSQL](installation.md#tls) |
+| server, worker, agent | The platform database | `ConnectionStrings:Platform`. The agent host opens it only with AI authoring on, see [AI settings](host-settings.md#ai-settings). The server also uses `ConnectionStrings:PlatformSchema`, at start and for the unpooled write connection of `PUT /api/cell/tenants/{id}/quotas` | [PostgreSQL](installation.md#tls) |
+| server, worker, agent | Each tenant's database | The [tenant directory](../architecture.md#tenant-directory), with the platform connection's TLS settings | [PostgreSQL](installation.md#tls) |
 | server | Each tenant's identity provider: discovery, signing keys and the token endpoint, with DPoP and pushed authorization requests under `fapi2` | The tenant's OIDC `Authority` in the tenant directory | [Identity provider](installation.md#tls) |
 | server, worker | The telemetry collector | `OTEL_EXPORTER_OTLP_*`, see [telemetry export](host-settings.md#telemetry-export) | [Telemetry export](installation.md#tls) |
 | worker | A connector's service | The `url` binding that the connector names as its `baseUrl`, see [deployment bindings](integration-resources.md#deployment-bindings) | [URL bindings](installation.md#tls) |

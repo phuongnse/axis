@@ -60,7 +60,7 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(server, /Health__Urls/)
   })
 
-  test('the agent host has startup, liveness and readiness probes on its health port and mounts no secret', () => {
+  test('the agent host has startup, liveness and readiness probes on its health port and mounts the platform connection and the installation key only', () => {
     const agent = find(renderOk(), 'Deployment', 'axis-agent')
     for (const [probe, path] of [
       ['startupProbe', 'live'],
@@ -72,7 +72,25 @@ describe('the Axis Helm chart', () => {
     assert.match(agent, /- name: health\n\s+containerPort: 5209/)
     assert.doesNotMatch(agent, /scheme:/)
     assert.match(agent, /- name: Health__Urls\n\s+value: http:\/\/0\.0\.0\.0:5209\n/)
-    assert.doesNotMatch(agent, /projected:|secretName:|\/run\/secrets|ConnectionStrings__|Platform__SecretKey|serviceAccountName/)
+    assert.match(agent, /- name: Tenancy__Source\n\s+value: directory\n/)
+    const items = [...agent.matchAll(/^\s+path: ([A-Za-z_]+)$/gm)].map((match) => match[1]).sort()
+    assert.deepEqual(items, ['ConnectionStrings__Platform', 'Platform__SecretKey'])
+    assert.match(agent, /mountPath: \/run\/secrets\n\s+readOnly: true\n/)
+    assert.doesNotMatch(agent, /PlatformSchema|Admin__|Cell__|Extensions__|Modules__|serviceAccountName/)
+  })
+
+  test("the installation doc's agent host row of 'Which pod gets which secret' lists the secrets the chart gives the agent host", () => {
+    const keys = [...readFileSync(new URL('../deploy/helm/axis/values.yaml', import.meta.url), 'utf8').matchAll(/^  ([a-z][A-Za-z]+):\n    name:/gm)].map((match) => match[1])
+    assert.ok(keys.length > 10, 'no secrets in values.yaml')
+    const agent = find(renderOk(...keys.flatMap((key) => ['--set', `secrets.${key}.name=named-${key}`])), 'Deployment', 'axis-agent')
+    const rendered = [...new Set([...agent.matchAll(/(?:secretName|name): "named-([A-Za-z]+)"/g)].map((match) => match[1]))].sort()
+
+    const doc = readFileSync(new URL('../docs/reference/installation.md', import.meta.url), 'utf8')
+    const row = doc.split('\n').find((line) => line.startsWith('| Agent host | '))
+    assert.ok(row, 'no Agent host row in the secrets table')
+    const listed = [...new Set([...row.matchAll(/`([a-z][A-Za-z]+)`/g)].map((match) => match[1]).filter((name) => keys.includes(name)))].sort()
+    assert.deepEqual(rendered, ['platformConnection', 'platformSecretKey'])
+    assert.deepEqual(listed, rendered)
   })
 
   test('the server listens on HTTPS only, with the certificate of its TLS Secret, and no other host does', () => {

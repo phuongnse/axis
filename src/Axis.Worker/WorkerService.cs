@@ -50,7 +50,7 @@ namespace Axis.Worker;
 /// with its <c>users</c> quota. That housekeeping is outside the rounds.
 /// </summary>
 internal sealed partial class WorkerService(
-    WorkerTenantCatalog tenants,
+    BackgroundTenantCatalog tenants,
     WorkerOptions options,
     NotificationOptions notifications,
     WorkItemRunner runner,
@@ -524,19 +524,15 @@ internal sealed partial class WorkerService(
 
     private async Task<bool> PassesRoleCheckAsync(TenantEntry entry, CancellationToken cancellationToken)
     {
-        try
+        // The role check names the tenant and the role. A connection failure may name the database host, so it is not logged.
+        var refusal = await RuntimeRoleCheck.RefusalAsync(entry, cancellationToken);
+        if (refusal is null)
         {
-            await using var source = NpgsqlDataSource.Create(entry.ConnectionString.Reveal());
-            await using var connection = await source.OpenConnectionAsync(cancellationToken);
-            await RuntimeRoleCheck.CheckAsync(connection, entry.Id, cancellationToken);
             return true;
         }
-        catch (Exception exception) when (exception is InvalidOperationException or NpgsqlException)
-        {
-            // The role check names the tenant and the role. A connection failure may name the database host, so it is not logged.
-            LogTenantNotServed(entry.Id, exception is InvalidOperationException ? exception.Message : "The tenant database could not be reached.");
-            return false;
-        }
+
+        LogTenantNotServed(entry.Id, refusal);
+        return false;
     }
 
     /// <summary>

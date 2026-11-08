@@ -1,8 +1,6 @@
 using Axis.Agent.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
 using static Axis.Agent.Tests.ModelTestData;
 
 namespace Axis.Agent.Tests;
@@ -39,7 +37,7 @@ public sealed class ScriptedModelAdapterTests
             ["Ai:Bindings:main:Model"] = "model-1",
             ["Ai:Bindings:other:Kind"] = "openai-compatible",
             ["Ai:Bindings:other:Model"] = "model-2",
-        }).Build());
+        }).Build(), new TestEnvironment());
         services.AddScriptedModelAdapter(new TestEnvironment(environment), [first, second]);
         await using var provider = services.BuildServiceProvider();
         var adapters = provider.GetRequiredService<ModelAdapters>();
@@ -66,7 +64,7 @@ public sealed class ScriptedModelAdapterTests
         {
             ["Ai:Bindings:main:Kind"] = "anthropic",
             ["Ai:Bindings:main:Model"] = "model-1",
-        }).Build());
+        }).Build(), new TestEnvironment());
         await using var provider = services.BuildServiceProvider();
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<ModelAdapters>().For("missing-binding"));
@@ -76,15 +74,4 @@ public sealed class ScriptedModelAdapterTests
     }
 
     private static ModelAnswer Answer(string text) => new([new ModelText(text)], ModelStopReason.EndTurn, new ModelTokens(1, 1));
-
-    private sealed class TestEnvironment(string name) : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = name;
-
-        public string ApplicationName { get; set; } = "Axis.Agent.Tests";
-
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-
-        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
-    }
 }

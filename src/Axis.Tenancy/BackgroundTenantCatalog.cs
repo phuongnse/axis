@@ -1,15 +1,14 @@
-using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 
-namespace Axis.Worker;
+namespace Axis.Tenancy;
 
 /// <summary>
-/// The tenant catalog of the worker. Under the <c>configuration</c> source it is loaded from the start. Under
-/// <c>directory</c> it is empty until <see cref="LoadAsync"/> reads the tenant directory once, so the worker can
-/// start before the platform database is ready and retry the first read. Then <see cref="RefreshAsync"/> reads it
+/// The tenant catalog of the hosts that run in the background, the worker and the agent host. Under the <c>configuration</c>
+/// source it is loaded from the start. Under <c>directory</c> it is empty until <see cref="LoadAsync"/> reads the tenant
+/// directory once, so the host can start before the platform database is ready and retry the first read. Then <see cref="RefreshAsync"/> reads it
 /// again, and keeps the last good read when a read fails.
 /// </summary>
-internal sealed class WorkerTenantCatalog : ITenantCatalog
+public sealed class BackgroundTenantCatalog : ITenantCatalog
 {
     private readonly string? _platformConnectionString;
     private readonly TenantSecretCipher? _cipher;
@@ -21,7 +20,7 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
     // The tenants that were read-only in the last good read, before the catalog withheld them.
     private HashSet<string> _readOnly = new(StringComparer.Ordinal);
 
-    private WorkerTenantCatalog(
+    private BackgroundTenantCatalog(
         ITenantCatalog? catalog,
         string? platformConnectionString,
         TenantSecretCipher? cipher,
@@ -62,14 +61,14 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
     public bool IsUnavailableHost(string host) => _current?.IsUnavailableHost(host) ?? false;
 
     /// <summary>A catalog that is loaded from the start, such as the one of the <c>configuration</c> source.</summary>
-    public static WorkerTenantCatalog Loaded(ITenantCatalog catalog)
+    public static BackgroundTenantCatalog Loaded(ITenantCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
-        return new WorkerTenantCatalog(catalog, null, null, TimeSpan.Zero, tenantsSectionIgnored: false);
+        return new BackgroundTenantCatalog(catalog, null, null, TimeSpan.Zero, tenantsSectionIgnored: false);
     }
 
     /// <summary>A catalog that has no tenants until <see cref="LoadAsync"/> succeeds.</summary>
-    public static WorkerTenantCatalog FromDirectory(
+    public static BackgroundTenantCatalog FromDirectory(
         string platformConnectionString,
         TenantSecretCipher cipher,
         TimeSpan refreshInterval,
@@ -78,10 +77,10 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
         ArgumentNullException.ThrowIfNull(cipher);
-        return new WorkerTenantCatalog(null, platformConnectionString, cipher, refreshInterval, tenantsSectionIgnored, runtimeAddress);
+        return new BackgroundTenantCatalog(null, platformConnectionString, cipher, refreshInterval, tenantsSectionIgnored, runtimeAddress);
     }
 
-    // The directory serves read-only tenants to the hosts that answer requests, but the worker claims no work for them, as for a suspended tenant.
+    // The directory serves read-only tenants to the hosts that answer requests, but the background hosts claim no work for them, as for a suspended tenant.
     private static DirectoryTenantCatalog WithholdReadOnly(DirectoryTenantCatalog loaded) =>
         loaded.Withhold([.. ReadOnlyIds(loaded)]);
 
@@ -171,4 +170,4 @@ internal sealed class WorkerTenantCatalog : ITenantCatalog
 /// <param name="TenantCount">The tenants that are active after the read.</param>
 /// <param name="CheckedCount">The tenants that went through the runtime role check.</param>
 /// <param name="WithheldCount">The tenants that failed the runtime role check.</param>
-internal sealed record TenantRefreshResult(IReadOnlyList<string> Retired, IReadOnlyList<string> Resumed, int TenantCount, int CheckedCount, int WithheldCount);
+public sealed record TenantRefreshResult(IReadOnlyList<string> Retired, IReadOnlyList<string> Resumed, int TenantCount, int CheckedCount, int WithheldCount);
