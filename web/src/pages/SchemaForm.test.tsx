@@ -714,6 +714,18 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(onChange).toHaveBeenCalledWith('/modules', [{ id: 'sales', version: '^1.2.0' }])
   })
 
+  it('shows the message under each empty required field of a new module on Done, and focuses the first', async () => {
+    const onChange = vi.fn()
+    const dialog = await openAddModule({ name: 'Shop' }, onChange)
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(within(screen.getByTestId('studio-field-/modules/0/id')).getByText('Fill in this field.')).toBeVisible()
+    expect(within(screen.getByTestId('studio-field-/modules/0/version')).getByText('Fill in this field.')).toBeVisible()
+    expect(within(dialog).getByRole('combobox', { name: 'Module' })).toHaveFocus()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('keeps the version range that a module already has when another module is chosen', async () => {
     const onChange = vi.fn()
     renderForm(

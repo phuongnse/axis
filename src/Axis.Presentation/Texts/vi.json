@@ -1254,6 +1254,7 @@
   "shell.studio.list.addTitle": "Thêm {name}",
   "shell.studio.list.editTitle": "Sửa {name}",
   "shell.studio.list.done": "Xong",
+  "shell.studio.list.required": "Hãy điền trường này.",
   "shell.studio.list.remove": "Loại bỏ",
   "shell.studio.list.addRow": "Thêm dòng",
   "shell.studio.list.item": "mục",

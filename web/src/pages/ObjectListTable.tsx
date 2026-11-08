@@ -1,6 +1,6 @@
 import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
@@ -32,6 +32,8 @@ interface Row {
 interface Editing {
   index: number | null
   copy: Item
+  /** Whether a click on Done has shown the messages of the empty required fields. */
+  checked: boolean
 }
 
 function isEmpty(value: unknown): boolean {
@@ -54,6 +56,8 @@ function hasValue(value: unknown): boolean {
  * leaves out a column that is empty on every row, except the first, which opens the row. Add… and the first cell open
  * a dialog that edits a copy of the item, so nothing changes until Done, which writes the copy with one change. Remove
  * writes `undefined` at the item's index. The caller draws the dialog's fields, so the component knows no JSON Schema.
+ * Done stays on. A click on it with a required field empty shows the field's message, focuses the first such field and
+ * keeps the dialog open, see docs/reference/actions-and-controls.md#fields.
  * With `addIn`, Add… is drawn into that element and the table has no toolbar row.
  */
 export function ObjectListTable({
@@ -78,13 +82,17 @@ export function ObjectListTable({
   columns: ObjectListColumn[]
   /** The item's name in the dialog's title and in Add…, such as "module". */
   itemName: string
-  /** The property names the item must have a value for before Done is on. */
+  /** The property names the item must have a value for, which a click on Done checks. */
   required: string[]
   /** Whether the item holds a list or a map, which takes the large dialog. */
   large: boolean
   newItem: () => Item
-  /** Draws the dialog's fields on the copy, for the item at `index`, or `items.length` for Add. Its `change` takes a pointer relative to the item. */
-  fields: (copy: Item, change: ChangeHandler, index: number) => ReactNode
+  /**
+   * Draws the dialog's fields on the copy, for the item at `index`, or `items.length` for Add. Its `change` takes a pointer
+   * relative to the item. `problem(name)` is the message of a required property that is empty after a click on Done, or
+   * `null`. The caller draws it inside the element that holds the property's input, so that it can focus that input.
+   */
+  fields: (copy: Item, change: ChangeHandler, index: number, problem: (name: string) => ReactNode) => ReactNode
   onChange: ChangeHandler
   /** Called right after Done writes the item, in the same event, so the caller can write what it held for the copy. */
   onDone?: () => void
@@ -97,9 +105,20 @@ export function ObjectListTable({
   testId?: string
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const { colour, size } = useDesignTokens()
   const [editing, setEditing] = useState<Editing | null>(null)
+  const [focusRequest, setFocusRequest] = useState(0)
+  const body = useRef<HTMLDivElement>(null)
   const named = (text: string) => text.replace('{name}', itemName)
+  const emptyRequired = (copy: Item) => required.filter((name) => !hasValue(copy[name]))
+  const missing = editing?.checked ? emptyRequired(editing.copy) : []
+
+  useEffect(() => {
+    body.current
+      ?.querySelector('[data-item-problem]')
+      ?.parentElement?.querySelector<HTMLElement>('input, textarea')
+      ?.focus()
+  }, [focusRequest])
 
   const rows: Row[] = items.map((item, index) => ({ key: String(index), index, item }))
   const cellOf = (column: ObjectListColumn, item: Item) => (column.render ? column.render(item) : item[column.key])
@@ -111,11 +130,15 @@ export function ObjectListTable({
     (column, at) => at === 0 || rows.length === 0 || rows.some((row) => present(column, row.item)),
   )
 
-  const openAdd = () => setEditing({ index: null, copy: newItem() })
-  const openEdit = (index: number) => setEditing({ index, copy: structuredClone(items[index]) })
-  const complete = editing !== null && required.every((name) => hasValue(editing.copy[name]))
+  const openAdd = () => setEditing({ index: null, copy: newItem(), checked: false })
+  const openEdit = (index: number) => setEditing({ index, copy: structuredClone(items[index]), checked: false })
   const done = () => {
     if (editing === null) return
+    if (emptyRequired(editing.copy).length > 0) {
+      setEditing({ ...editing, checked: true })
+      setFocusRequest((request) => request + 1)
+      return
+    }
     if (editing.index === null) {
       onChange(pointer, [...items, editing.copy])
     } else {
@@ -193,18 +216,25 @@ export function ObjectListTable({
         }
         okText={t('shell.studio.list.done')}
         cancelText={t('shell.studio.cancel')}
-        okButtonProps={{ disabled: !complete }}
         onOk={done}
         onCancel={cancel}
         destroyOnHidden
       >
-        {editing &&
-          fields(
-            editing.copy,
-            (relative, next) =>
-              setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
-            editing.index ?? items.length,
-          )}
+        <div ref={body}>
+          {editing &&
+            fields(
+              editing.copy,
+              (relative, next) =>
+                setEditing((current) => current && { ...current, copy: setAt(current.copy, relative, next) as Item }),
+              editing.index ?? items.length,
+              (name) =>
+                missing.includes(name) ? (
+                  <div data-item-problem style={{ color: colour.dangerText }}>
+                    {t('shell.studio.list.required')}
+                  </div>
+                ) : null,
+            )}
+        </div>
       </Modal>
     </>
   )

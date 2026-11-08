@@ -1254,6 +1254,7 @@
   "shell.studio.list.addTitle": "Add {name}",
   "shell.studio.list.editTitle": "Edit {name}",
   "shell.studio.list.done": "Done",
+  "shell.studio.list.required": "Fill in this field.",
   "shell.studio.list.remove": "Remove",
   "shell.studio.list.addRow": "Add row",
   "shell.studio.list.item": "item",

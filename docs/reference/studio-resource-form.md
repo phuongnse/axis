@@ -75,7 +75,9 @@ values keeps its rows of inputs.
   and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`,
   which every list of objects in a kind with field texts has. A list without one reads "item", as in
   Add item…. The dialog's fields are the item's fields at their real pointers. Done writes the copy to the
-  list as one step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so
+  list as one step to undo. Done stays on, and a click on it with a required field empty shows what to fill in under
+  each such field and focuses the first, as [fields](actions-and-controls.md#fields) says, and the dialog stays open.
+  Cancel leaves the list as it was, so
   Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
   dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
