@@ -122,6 +122,24 @@ describe.each(['light', 'dark'])('ConnectorEditor in %s mode', (mode) => {
 })
 
 describe('ConnectorEditor', () => {
+  it('shows the description after the name, and writes its key', async () => {
+    const onChange = renderEditor({ ...connector, description: { textKey: 'connectors.purchasing.description' } })
+
+    const description = screen.getByTestId('studio-field-/description')
+    const box = within(description).getByRole('textbox', { name: 'Text key' })
+    expect(box).toHaveValue('connectors.purchasing.description')
+    expect(
+      screen.getByTestId('studio-field-/name').compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+    expect(
+      description.compareDocumentPosition(screen.getByTestId('studio-field-/baseUrl/binding')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+
+    await userEvent.type(box, 'x')
+    expect(onChange).toHaveBeenLastCalledWith('/description/textKey', 'connectors.purchasing.descriptionx')
+  })
+
   it('shows only a binding name, never a value, whatever else the file holds', () => {
     renderEditor({ ...connector, baseUrl: { binding: 'PurchasingSystemUrl', value: 'https://secret.example' } })
 

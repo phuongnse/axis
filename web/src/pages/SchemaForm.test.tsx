@@ -269,6 +269,42 @@ describe('SchemaForm sections', () => {
     expect(screen.queryByTestId('studio-section-rest')).toBeNull()
   })
 
+  it('shows the description of a role after its name and label, and writes its texts', async () => {
+    renderForm((await loadKindSchema('role'))!, {
+      name: 'Approver',
+      label: { textKey: 'roles.approver' },
+      description: { textKey: 'roles.approver.description' },
+    })
+
+    const section = screen.getByTestId('studio-section-general')
+    const description = within(section).getByTestId('studio-field-/description')
+    expect(within(description).getByText(english['shell.studio.field.role.description'])).toBeVisible()
+    expect(within(description).getByText(english['shell.studio.field.role.description.help'])).toBeVisible()
+    for (const before of ['/name', '/label']) {
+      expect(
+        within(section).getByTestId(`studio-field-${before}`).compareDocumentPosition(description) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0)
+    }
+
+    await userEvent.type(within(description).getByRole('textbox', { name: 'English' }), 'x')
+    expect(labelContext.onTextsChange).toHaveBeenCalledWith(
+      '/description',
+      'roles.approver.description',
+      expect.objectContaining({ en: 'x' }),
+    )
+  })
+
+  it.each(Object.keys(formKinds))('shows the description of %s after its name', async (kind) => {
+    renderForm((await loadKindSchema(kind))!, { name: 'Example', description: { textKey: `${kind}.description` } })
+
+    const description = screen.getByTestId('studio-field-/description')
+    expect(within(description).getByText(english[`shell.studio.field.${kind}.description`])).toBeVisible()
+    expect(
+      screen.getByTestId('studio-field-/name').compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+  })
+
   it('shows the application in General, Modules, Packages and File storage, in that order', async () => {
     renderForm((await loadKindSchema('application'))!, applicationValue)
 

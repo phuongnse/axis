@@ -15,6 +15,9 @@ public abstract record Resource
 
     public TextReference? Label { get; init; }
 
+    /// <summary>The resource's description, or null when it has none. A text resource and a layer take none.</summary>
+    public TextReference? Description { get; init; }
+
     /// <summary>
     /// The file the resource was loaded from, relative to the application folder with <c>/</c>
     /// separators. Set by the loader, never read from the file.

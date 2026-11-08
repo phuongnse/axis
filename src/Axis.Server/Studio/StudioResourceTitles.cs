@@ -4,20 +4,24 @@ using Axis.Studio;
 namespace Axis.Server.Studio;
 
 /// <summary>
-/// Reads the label of each resource by locale from a folder's JSON files, without compiling the folder. An entity,
-/// a role, an identity provider and the manifest name a text key in <c>label</c>, a page and a site in <c>title</c>,
-/// and each text resource gives the text of that key for its locale.
+/// Reads the label and the description of each resource by locale from a folder's JSON files, without compiling the
+/// folder. An entity, a role, an identity provider and the manifest name a text key in <c>label</c>, a page and a site
+/// in <c>title</c>, and every kind but a text resource and a layer may name one in <c>description</c>. Each text
+/// resource gives the text of that key for its locale.
 /// </summary>
 internal static class StudioResourceTitles
 {
     private static readonly IReadOnlyDictionary<string, string> _noTitles = new Dictionary<string, string>();
 
     /// <summary>
-    /// The titles and the locale of each file of <paramref name="files"/>, keyed by the file's id. The titles are
-    /// keyed by locale, and a locale whose text resource has no string for the key is left out. They are empty for a
-    /// kind that has no label or title, or a file that cannot be read. The locale is that of a text resource, else null.
+    /// The titles, the descriptions and the locale of each file of <paramref name="files"/>, keyed by the file's id.
+    /// The titles and the descriptions are keyed by locale, and a locale whose text resource has no string for the key
+    /// is left out. The titles are empty for a kind that has no label or title, and the descriptions for a file that
+    /// has none, or a file that cannot be read. The locale is that of a text resource, else null.
     /// </summary>
-    public static IReadOnlyDictionary<Guid, (IReadOnlyDictionary<string, string> Titles, string? Locale)> Read(
+    public static IReadOnlyDictionary<
+        Guid,
+        (IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string> Descriptions, string? Locale)> Read(
         IReadOnlyList<StudioFile> files)
     {
         var texts = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
@@ -42,16 +46,22 @@ internal static class StudioResourceTitles
                 }
             }
 
-            var result = new Dictionary<Guid, (IReadOnlyDictionary<string, string>, string?)>();
+            var result = new Dictionary<Guid, (IReadOnlyDictionary<string, string>, IReadOnlyDictionary<string, string>, string?)>();
             foreach (var file in files)
             {
                 var titles = _noTitles;
-                if (TitleProperty(file.Kind) is { } property && Parse(file, documents) is { ValueKind: JsonValueKind.Object } root)
+                var descriptions = _noTitles;
+                if (Parse(file, documents) is { ValueKind: JsonValueKind.Object } root)
                 {
-                    titles = Titles(root, property, texts);
+                    if (TitleProperty(file.Kind) is { } property)
+                    {
+                        titles = Titles(root, property, texts);
+                    }
+
+                    descriptions = Titles(root, "description", texts);
                 }
 
-                result[file.Id] = (titles, locales.GetValueOrDefault(file.Id));
+                result[file.Id] = (titles, descriptions, locales.GetValueOrDefault(file.Id));
             }
 
             return result;

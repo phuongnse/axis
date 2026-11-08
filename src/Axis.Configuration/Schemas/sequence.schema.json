@@ -8,6 +8,7 @@
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "sequence" },
     "name": { "$ref": "#/$defs/name" },
+    "description": { "$ref": "#/$defs/textReference" },
     "formatVersion": { "const": 1 },
     "format": {
       "type": "string",
@@ -15,6 +16,14 @@
     }
   },
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
+      }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

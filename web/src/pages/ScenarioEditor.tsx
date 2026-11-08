@@ -3,6 +3,7 @@ import { useContext } from 'react'
 import { findNamed, freshKey, isObject, pointerSegment, renameKey } from '../platform/scenarioSteps'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
 import { Field, KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
 import type { ChangeHandler } from './SchemaForm'
@@ -146,6 +147,9 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
           value={typeof value.name === 'string' ? value.name : ''}
           onChange={(event) => onChange('/name', event.target.value)}
         />
+      </Field>
+      <Field pointer="/description" name={t('shell.studio.scenario.description')}>
+        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
       </Field>
       <Field pointer="/now" name={t('shell.studio.scenario.now')}>
         <Input

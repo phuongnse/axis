@@ -40,6 +40,11 @@ const names = {
   pages: [],
   texts: [
     { key: 'entity.invoice', texts: { en: 'Invoice', vi: 'Hóa đơn' }, usedBy: 1 },
+    {
+      key: 'entity.invoice.description',
+      texts: { en: 'What an invoice is for', vi: 'Hóa đơn dùng để làm gì' },
+      usedBy: 1,
+    },
     { key: 'field.total', texts: { en: 'Total', vi: 'Tổng' }, usedBy: 1 },
     { key: 'validation.total', texts: { en: 'Total must be positive', vi: 'Tổng phải dương' }, usedBy: 1 },
   ],
@@ -254,6 +259,9 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
   })
 })
 
+const follows = (first: HTMLElement, second: HTMLElement) =>
+  (first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+
 describe('EntityDesigner', () => {
   it('shows the header and the fields of the entity', () => {
     renderDesigner(entity())
@@ -265,6 +273,23 @@ describe('EntityDesigner', () => {
     expect(within(screen.getByTestId('studio-field-/displayField')).getByText('code')).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('20')
     expect(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('total')
+  })
+
+  it('shows the description after the name and the label and writes its texts', async () => {
+    renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
+
+    const description = screen.getByTestId('studio-field-/description')
+    const box = within(description).getByRole('textbox', { name: 'English' })
+    expect(box).toHaveValue('What an invoice is for')
+    expect(follows(screen.getByTestId('studio-field-/name'), description)).toBe(true)
+    expect(follows(screen.getByTestId('studio-field-/label'), description)).toBe(true)
+    expect(follows(description, screen.getByTestId('studio-field-/displayField'))).toBe(true)
+
+    await userEvent.type(box, '!')
+    expect(labelContext.onTextsChange).toHaveBeenCalledWith('/description', 'entity.invoice.description', {
+      en: 'What an invoice is for!',
+      vi: 'Hóa đơn dùng để làm gì',
+    })
   })
 
   it('lists the field names of the draft in the display field picker and clears it with undefined', async () => {

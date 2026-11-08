@@ -149,6 +149,34 @@ describe('IdentityProviderEditor', () => {
     ])
   })
 
+  it('shows the description after the name and the label, and writes its key', async () => {
+    const onChange = renderEditor({ ...oidc, description: { textKey: 'signIn.company.description' } })
+
+    const description = screen.getByTestId('studio-field-/description')
+    const box = within(description).getByRole('textbox', { name: 'Text key' })
+    expect(box).toHaveValue('signIn.company.description')
+    for (const before of ['/name', '/label']) {
+      expect(
+        screen.getByTestId(`studio-field-${before}`).compareDocumentPosition(description) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0)
+    }
+
+    await userEvent.type(box, 'x')
+    expect(onChange).toHaveBeenLastCalledWith('/description/textKey', 'signIn.company.descriptionx')
+  })
+
+  it('shows the description after the type for accounts, which has no label', () => {
+    renderEditor({ ...accounts, description: { textKey: 'signIn.accounts.description' } })
+
+    expect(screen.queryByTestId('studio-field-/label')).not.toBeInTheDocument()
+    expect(
+      screen
+        .getByTestId('studio-field-/type')
+        .compareDocumentPosition(screen.getByTestId('studio-field-/description')) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0)
+  })
+
   it('shows no type fields for accounts', () => {
     renderEditor(accounts)
 
@@ -265,7 +293,10 @@ describe('IdentityProviderEditor', () => {
   it('shows a plain key box for the label until the names load', async () => {
     const onChange = renderEditor(oidc, vi.fn(), undefined)
 
-    await userEvent.type(screen.getByRole('textbox', { name: 'Text key' }), 'X')
+    await userEvent.type(
+      within(screen.getByTestId('studio-field-/label')).getByRole('textbox', { name: 'Text key' }),
+      'X',
+    )
 
     expect(onChange).toHaveBeenLastCalledWith('/label/textKey', 'signIn.companyX')
   })

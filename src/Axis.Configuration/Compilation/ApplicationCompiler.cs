@@ -496,7 +496,6 @@ public static partial class ApplicationCompiler
             texts = ModuleTextChecker.Check(application, modules, loaded.Texts, moduleResources.Texts, diagnostics);
             textKeys.UnionWith(texts.SelectMany(text => text.Texts.Keys));
             CheckTextKey(application.Label, application, "/label", references, diagnostics);
-            CheckTextKey(application.Description, application, "/description", references, diagnostics);
         }
 
         // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
@@ -522,6 +521,37 @@ public static partial class ApplicationCompiler
         foreach (var provider in loaded.IdentityProviders)
         {
             CheckTextKey(provider.Label, provider, "/label", references, diagnostics);
+        }
+
+        // Every kind but text and layer may carry a description, and its text key resolves like a label's.
+        IEnumerable<Resource> described =
+        [
+            .. loaded.Application is { } applicationResource ? [applicationResource] : Array.Empty<Resource>(),
+            .. loaded.Sites,
+            .. allEntities,
+            .. allSeeds,
+            .. allEvents,
+            .. allSequences,
+            .. loaded.DataSources,
+            .. loaded.Forms,
+            .. loaded.Pages,
+            .. loaded.Processes,
+            .. loaded.Policies,
+            .. loaded.Triggers,
+            .. loaded.Rules,
+            .. moduleResources.Rules.SelectMany(moduleRules => moduleRules.Rules),
+            .. loaded.Roles,
+            .. loaded.Connectors,
+            .. loaded.IdentityProviders,
+            .. loaded.Endpoints,
+            .. loaded.Webhooks,
+            .. loaded.Migrations,
+            .. loaded.Scenarios,
+            .. moduleResources.Scenarios.Select(scenario => scenario.Scenario),
+        ];
+        foreach (var resource in described)
+        {
+            CheckTextKey(resource.Description, resource, "/description", references, diagnostics);
         }
 
         // A module rule sees the rules of its own module by plain name and those of the modules it

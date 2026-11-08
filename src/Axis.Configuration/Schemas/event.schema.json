@@ -8,6 +8,7 @@
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "event" },
     "name": { "$ref": "#/$defs/name" },
+    "description": { "$ref": "#/$defs/textReference" },
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
     "fields": {
@@ -16,6 +17,14 @@
     }
   },
   "$defs": {
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
+      }
+    },
     "id": {
       "type": "string",
       "format": "uuid",

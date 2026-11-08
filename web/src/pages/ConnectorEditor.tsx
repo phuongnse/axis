@@ -3,6 +3,7 @@ import { useContext } from 'react'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
 import { BindingSelect } from './CatalogControls'
+import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -128,6 +129,10 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   return (
     <Flex vertical gap="small" data-testid="studio-connector-editor">
       {textField('/name', t('shell.studio.connector.name'), value.name, true)}
+      <div data-testid="studio-field-/description">
+        <div>{t('shell.studio.connector.description')}</div>
+        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+      </div>
       {bindingField('/baseUrl/binding', t('shell.studio.connector.urlBinding'), value.baseUrl, 'url')}
       <div data-testid="studio-field-/auth">
         <div data-testid="studio-field-/auth/type">
