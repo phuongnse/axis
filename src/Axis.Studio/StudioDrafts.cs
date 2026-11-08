@@ -12,7 +12,8 @@ namespace Axis.Studio;
 /// the same repository: the owner, the commit it started at, its creation time and, for each resource it first read or
 /// changed, the version that resource had on <c>main</c>, or null when <c>main</c> lacked it. A write or delete commits
 /// to the branch from memory, so the working folder, <c>main</c> and other drafts never change. Every operation holds
-/// the folder's write lock. A draft that is not this person's answers <see cref="StudioWriteRefusal.NotFound"/>, as an
+/// the folder's write lock, except <see cref="Conflicts"/>, <see cref="Apply"/> and <see cref="CommitAccept"/>, which
+/// expect the caller to hold it. A draft that is not this person's answers <see cref="StudioWriteRefusal.NotFound"/>, as an
 /// unknown id does.
 /// </summary>
 internal sealed class StudioDrafts(string repository, string userId, string displayName, IStudioWriteLock writeLock, string folder)
@@ -202,6 +203,85 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             return StudioDraftOutcome<bool>.Of(true);
         }, ct);
 
+    /// <summary>
+    /// The resources the draft read or changed whose version on <c>main</c> now differs from the one it recorded, sorted by
+    /// resource id. Each comes with its version on <c>main</c>, or null when <c>main</c> no longer has it. A resource
+    /// recorded as absent that now exists is one too. The caller holds the folder's write lock. Records no version.
+    /// </summary>
+    public StudioDraftOutcome<IReadOnlyList<StudioDraftConflict>> Conflicts(string id) =>
+        InDraft(id, (git, draft, _) =>
+        {
+            var main = git.Refs[Main]?.ResolveToDirectReference().Target as Commit;
+            var current = main is null ? [] : Resources(main);
+            var conflicts = new List<StudioDraftConflict>();
+            foreach (var (resource, recorded) in draft.Versions)
+            {
+                var version = current.FirstOrDefault(file => file.Id == resource)?.Version;
+                if (!string.Equals(version, recorded, StringComparison.Ordinal))
+                {
+                    conflicts.Add(new StudioDraftConflict(resource, version));
+                }
+            }
+
+            conflicts.Sort((left, right) => left.Id.CompareTo(right.Id));
+            return StudioDraftOutcome<IReadOnlyList<StudioDraftConflict>>.Of(conflicts);
+        });
+
+    /// <summary>
+    /// The <paramref name="folderFiles"/> with the files the draft added or changed since its start put in and the files it
+    /// removed taken out, sorted by file. Nothing is written, so the folder, <c>main</c> and the draft stay as they were.
+    /// The caller holds the folder's write lock.
+    /// </summary>
+    public StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>> Apply(string id, IReadOnlyList<(string File, byte[] Bytes)> folderFiles) =>
+        InDraft(id, (git, draft, tip) =>
+        {
+            var files = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+            foreach (var (file, bytes) in folderFiles)
+            {
+                files[file] = bytes;
+            }
+
+            var start = git.Lookup<Commit>(draft.Start);
+            foreach (var change in git.Diff.Compare<TreeChanges>(start?.Tree, tip.Tree, new LibGit2Sharp.CompareOptions { Similarity = SimilarityOptions.None }))
+            {
+                if (change.Status == ChangeKind.Deleted)
+                {
+                    files.Remove(change.Path);
+                }
+                else if (tip.Tree[change.Path]?.Target is Blob blob)
+                {
+                    using var stream = blob.GetContentStream();
+                    using var buffer = new MemoryStream();
+                    stream.CopyTo(buffer);
+                    files[change.Path] = buffer.ToArray();
+                }
+            }
+
+            var applied = files.OrderBy(entry => entry.Key, StringComparer.Ordinal).Select(entry => (entry.Key, entry.Value)).ToList();
+            return StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(applied);
+        });
+
+    /// <summary>
+    /// Records the folder as one revision on <c>main</c> that names the user, the <paramref name="client"/> and the authoring
+    /// request <paramref name="requestId"/>, even when the folder already matches <c>main</c>, then deletes the draft's
+    /// branch and record. Returns the revision. The caller holds the folder's write lock and has written the applied files
+    /// to the folder.
+    /// </summary>
+    public StudioDraftOutcome<StudioRevision> CommitAccept(
+        string id, string summary, string byUserId, string byDisplayName, string client, Guid requestId) =>
+        InDraft(id, (git, draft, _) =>
+        {
+            var commit = StudioRevisions.WriteCommit(
+                git,
+                folder,
+                StudioRevisions.Author(byUserId, byDisplayName),
+                StudioRevisions.Message(summary, byUserId, client, requestId),
+                onlyWhenChanged: false)!;
+            git.Refs.Remove(BranchName(draft.Id));
+            git.Refs.Remove(RecordName(draft.Id));
+            return StudioDraftOutcome<StudioRevision>.Of(StudioRevisions.Describe(commit));
+        });
+
     // A cursor is the base64url of "<commit id>:<index of the next entry>". Null when it is not that, or the index is below 1.
     private static (string Sha, int Index)? ReadCursor(string cursor)
     {
@@ -264,18 +344,21 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
     // Runs the action on a draft of this user. An id that is no draft of this user is NotFound, so another person's draft is never touched.
     private Task<StudioDraftOutcome<T>> InDraftAsync<T>(
         string id, Func<Repository, StudioDraft, Commit, StudioDraftOutcome<T>> action, CancellationToken ct) =>
-        RunAsync(() =>
-        {
-            if (!Repository.IsValid(repository))
-            {
-                return StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
-            }
+        RunAsync(() => InDraft(id, action), ct);
 
-            using var git = new Repository(repository);
-            return Load(git, id) is var (draft, tip)
-                ? action(git, draft, tip)
-                : StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
-        }, ct);
+    // As InDraftAsync, without taking the write lock: the caller holds it.
+    private StudioDraftOutcome<T> InDraft<T>(string id, Func<Repository, StudioDraft, Commit, StudioDraftOutcome<T>> action)
+    {
+        if (!Repository.IsValid(repository))
+        {
+            return StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
+        }
+
+        using var git = new Repository(repository);
+        return Load(git, id) is var (draft, tip)
+            ? action(git, draft, tip)
+            : StudioDraftOutcome<T>.Refused(StudioWriteRefusal.NotFound);
+    }
 
     // The record and the branch tip of this user's draft, or null.
     private (StudioDraft Draft, Commit Tip)? Load(Repository git, string id)
@@ -373,7 +456,7 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
         }
 
         var author = StudioRevisions.Author(userId, displayName);
-        var message = $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {StudioRevisions.StudioClient}\n";
+        var message = StudioRevisions.Message(summary, userId, StudioRevisions.StudioClient, null);
         var commit = git.ObjectDatabase.CreateCommit(author, author, message, tree, [tip], prettifyMessage: false);
         git.Refs.Add(BranchName(draft.Id), commit.Id, allowOverwrite: true);
     }
@@ -446,3 +529,6 @@ internal sealed record StudioDraft(string Id, string UserId, string Start, DateT
 /// file, and the cursor of the next page, null on the last page.
 /// </summary>
 internal sealed record StudioDraftDiff(string Start, string Tip, IReadOnlyList<StudioRevisionChange> Resources, string? Cursor);
+
+/// <summary>A resource a draft used whose version on <c>main</c> has changed: its id and the new version, null when <c>main</c> lacks it.</summary>
+internal sealed record StudioDraftConflict(Guid Id, string? Version);
