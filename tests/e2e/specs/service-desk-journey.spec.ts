@@ -9,7 +9,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { addMapping, createResource, grantIn, openFormTab, openKind, writeLabel } from '../studio-resources'
+import { addMapping, createResource, deleteResource, grantIn, openFormTab, openKind, writeLabel } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -265,8 +265,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await starter.getByRole('button').click()
     await expectForm(page)
 
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(starter.getByRole('button')).toHaveCount(0)
 
     await createResource(page, 'text', 'en')
@@ -468,8 +467,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await openKind(page, 'migration')
     await migrations.getByRole('button').click()
     await expectForm(page)
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(migrations).toHaveCount(0)
   })
 
@@ -1022,8 +1020,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await openKind(page, 'page')
     await home.click()
     await openFormTab(page)
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(page.getByTestId("studio-group-page").getByRole("button", { name: /Home/i })).toHaveCount(0)
   })
 
@@ -1310,8 +1307,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await openKind(page, 'event')
     await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(page.getByTestId('studio-group-event')).toHaveCount(0)
   })
 
