@@ -109,7 +109,7 @@ public sealed class RecordListFilter
             error = null;
             if (Parser.PruneEmpty(root))
             {
-                var names = parser.Parameters.Select(condition => condition.Field.Name).ToHashSet(StringComparer.Ordinal);
+                var names = parser.Conditions.Select(condition => condition.Field.Name).ToHashSet(StringComparer.Ordinal);
                 filter = new RecordListFilter(root, parser.Parameters, [.. entity.Fields.Where(field => names.Contains(field.Name))]);
             }
 
@@ -187,7 +187,11 @@ public sealed class RecordListFilter
 
         public string? Error { get; private set; }
 
+        // The conditions that compare a value, in parse order.
         public List<Condition> Parameters { get; } = [];
+
+        // Every condition, whether it compares a value or not.
+        public List<Condition> Conditions { get; } = [];
 
         // Reads the root of a filter, or a node that holds All or Any. Returns null with Error set when it is malformed.
         public Group? ReadGroup(JsonElement element)
@@ -280,7 +284,9 @@ public sealed class RecordListFilter
 
             if (!comparesValue)
             {
-                return new Condition(column, name, null, -1);
+                var unvalued = new Condition(column, name, null, -1);
+                Conditions.Add(unvalued);
+                return unvalued;
             }
 
             if (kind == "text" && value!.Value.ValueKind == JsonValueKind.String && value.Value.GetString()!.Length > MaxTextLength)
@@ -295,6 +301,7 @@ public sealed class RecordListFilter
 
             var condition = new Condition(column, name, compared, Parameters.Count);
             Parameters.Add(condition);
+            Conditions.Add(condition);
             return condition;
         }
 

@@ -55,6 +55,17 @@ public sealed class RecordListFilterTests
         Assert.Equal(["name", "status"], filter!.Fields.Select(field => field.Name));
     }
 
+    [Fact]
+    public void Fields_include_those_of_empty_and_not_empty_conditions()
+    {
+        Assert.True(Parses(
+            """{"all":[{"field":"status","op":"notEmpty"},{"field":"name","op":"empty"},{"any":[{"field":"quantity","op":"empty"}]}]}""",
+            out var filter,
+            out _));
+
+        Assert.Equal(["name", "quantity", "status"], filter!.Fields.Select(field => field.Name));
+    }
+
     [Theory]
     [InlineData("""{"all":[]}""")]
     [InlineData("""{"any":[{"all":[{"any":[]}]}]}""")]

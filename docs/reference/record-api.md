@@ -375,8 +375,8 @@ A request is checked in this order, and the first failure is the response:
    before the `403`. On delete, a stored record that is the subject of a running or waiting process
    instance is a `409`, after the `403` and before storage.
 7. The content type, `415`, answered before the body is read.
-8. The query of a list, or the body, `400`. Then, on a list, a `sort` or `search` on a pending
-   field, `409`.
+8. The query of a list, or the body, `400`. Then, on a list, a `sort`, `search` or `filter` on a
+   pending field, `409`.
 9. Fields the user may not write, `403`.
 10. The matched references, then the computed fields and the validations, `400`, as
     [Child rows, computed fields and validations](#child-rows-computed-fields-and-validations)
@@ -454,7 +454,7 @@ release.
   an unknown entity, an unknown record and an `{id}` that is not a UUID in the
   hyphenated form. The path is resolved before the query is checked, so a
   path that names nothing is a 404 whatever its query.
-- **`400`.** An invalid `page`, `pageSize`, `sort` or `search` is a
+- **`400`.** An invalid `page`, `pageSize`, `sort`, `search` or `filter` is a
   validation problem whose `errors` is keyed by the parameter's name. Every invalid
   parameter is reported in the same response.
 - **`400` for a body.** A body the parser rejects, as

@@ -60,6 +60,12 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
         using var refusedExport = await SendAsync(maria, HttpMethod.Get, $"{Records}/export?format=csv&filter={onPending}", TenantA);
         Assert.Equal(HttpStatusCode.Conflict, refusedExport.StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={onStored}", TenantA)).StatusCode);
+        foreach (var op in new[] { "empty", "notEmpty" })
+        {
+            var withoutValue = Uri.EscapeDataString("{\"all\":[{\"field\":\"doubled\",\"op\":\"" + op + "\"}]}");
+            using var refusedWithoutValue = await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={withoutValue}", TenantA);
+            Assert.Equal(HttpStatusCode.Conflict, refusedWithoutValue.StatusCode);
+        }
 
         await BackfillAsync(TenantA);
 
