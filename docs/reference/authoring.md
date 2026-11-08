@@ -82,7 +82,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
 | `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes)                                                                                                                                                                                                                                                                                                                                                                                          |
-| `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression, draft }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/studio/apps/{application}/expressions/scope`                             | `200` with `{ type, fields, functions }` _(planned for M31)_, see [Expression scope](#expression-scope)                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
 | `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata`  | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [a module page](draft-page-metadata.md#a-module-page)                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -235,10 +235,10 @@ list above, except where it says so.
   has a `texts` that is not an object. There is no `404` for an unknown key, because a `PUT` creates
   the key.
 - **Expression check.** Checks 1, 2, 3 and 5, then `415`, then `400` for a bad body: one that is not a
-  JSON object, a `resourceId` that is not a UUID, a `path` that is not a JSON Pointer or an
-  `expression` that is not a string. Then `404` for an unknown `resourceId`, which comes after the body
-  because the id is in it, then `400` for a `path` that holds no expression place. It takes no lock,
-  so it has no `503`.
+  JSON object, a `resourceId` that is not a UUID, a `path` that is not a JSON Pointer, an `expression`
+  that is not a string or a `draft` that is not a JSON object. Then `404` for an unknown `resourceId`,
+  which comes after the body because the id is in it, then `400` for a `path` that holds no expression
+  place. It takes no lock, so it has no `503`.
 - **Application settings.** Checks 1, 2, 3 and 5 on `GET`, plus 4 and 7 on `PUT`, then `415`, then `400`,
   see [Application settings](#application-settings). A `GET` is a read, so it has no CSRF check.
 - **Page metadata.** Checks 1, 2, 3, 5 and 8, then those of
@@ -358,15 +358,16 @@ again after a save, a delete and a reconnect. The answer is:
 
 ```
 { locales: ["en", "vi"],
-  entities: [{ id, name, module, fields: [{ name, type, target, values }] }],
-  dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
-  processes: [{ id, name, module, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
-  rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
-  connectors: [{ id, name, operations: [{ name }] }], roles: [{ id, name }],
-  events: [{ id, name, module, entity, fields: [{ name, type }] }],
-  sequences, forms, seeds, triggers, scenarios, textResources: [{ id, name, module }],
-  pages: [{ id, name, module, parameters: [{ name, type, required }] }],
-  policies: [{ id, name, module }], contracts: [{ id, name, module }],
+  entities: [{ id, name, module, labelKey, fields: [{ name, type, target, values, labelKey, unique }] }],
+  dataSources: [{ id, name, module, labelKey, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
+  processes: [{ id, name, module, labelKey, entity, parameters: [{ name, type }],
+    steps: [{ name, type, labelKey, outcomes: [...] }] }],
+  rules: [{ id, name, module, labelKey, parameters: [{ name, type }], resultType }],
+  connectors: [{ id, name, labelKey, operations: [{ name }] }], roles: [{ id, name, labelKey }],
+  events: [{ id, name, module, labelKey, entity, fields: [{ name, type }] }],
+  sequences, forms, seeds, triggers, scenarios, textResources: [{ id, name, module, labelKey }],
+  pages: [{ id, name, module, labelKey, parameters: [{ name, type, required }] }],
+  policies: [{ id, name, module, labelKey }], contracts: [{ id, name, module, labelKey }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
 ```
 
@@ -398,11 +399,13 @@ again after a save, a delete and a reconnect. The answer is:
   for a process with a subject. A step that is not a task has `outcomes: []`.
 - **Page `parameters`** are the parameters the page declares, in file order. `required` is false when
   the file leaves it out.
-- **`labelKey`** _(planned for M31)_. Each name that has a label or title in its format also has the text key
-  of that label, `labelKey`, or null: an entity, a field, a process, a step, a data source, a rule, a
-  connector, an event, a role, a page, a policy and the module resources. Columns, parameters and operations
-  have none. A module's key resolves too, as `texts` holds the module texts merged into the application's.
-- **`unique`** _(planned for M31)_. Each field of `entities` says whether it is unique, for a matched
+- **`labelKey`**. Each item of `entities` and their `fields`, `processes` and their `steps`, `dataSources`,
+  `rules`, `connectors`, `events`, `roles`, `pages`, `policies`, `contracts`, `sequences`, `forms`, `seeds`,
+  `triggers`, `scenarios` and `textResources` has `labelKey`: the text key of its `label`, or of a page's
+  `title`, or null when it has none. Columns, parameters, operations and event fields have none, so the
+  property is left out. A module's key resolves too, as `texts` holds the module texts merged into the
+  application's.
+- **`unique`**. Each field of `entities` says whether the entity file marks it `unique`, for a matched
   reference's [Find by](entity-designer.md#field-drawer).
 - **`locales`** are the locales of the folder's text resources.
 - **`texts`.** Each key comes with its text in every locale, and `usedBy`, the number of `label text`
@@ -459,23 +462,26 @@ _(planned for M31)_
 ## Expression check
 
 `POST .../expressions/check` checks one expression without saving it, so Studio's expression editor
-can show errors as the author types. The body is `{ resourceId, path, expression }`.
+can show errors as the author types. The body is `{ resourceId, path, expression, draft }`, and `draft`
+may be left out.
 
-- **The place.** The server puts `expression` into a copy of the saved resource at `path` and compiles
-  the folder in memory. The compile checks the expression where it stands, so the names in scope, the
-  expected type, the [SQL subset](expressions.md#sql-subset) and the policy-filter rules are the
-  compile's own, not a copy of them. The body carries no draft content. The `path` may point at a
-  string, which the text replaces, or at a property the saved object lacks, which the text adds, so an
-  optional expression that the author has just added, such as a form field's `requiredWhen`, is
-  checked before the first save. A place inside an object that the saved resource lacks is not found.
-- **The draft** _(planned for M31)_. The body may also carry `draft`, the resource as the author has it, which
-  the server uses in place of the saved one, so a validation not yet saved gets an answer rather than a
-  `400`.
+- **The place.** The server puts `expression` into a copy of the resource at `path` and compiles the
+  folder in memory. The resource is the saved one, or the `draft` when one is given. The compile checks
+  the expression where it stands, so the names in scope, the expected type, the
+  [SQL subset](expressions.md#sql-subset) and the policy-filter rules are the compile's own, not a copy
+  of them. The `path` may point at a string, which the text replaces, or at a property the object lacks,
+  which the text adds, so an optional expression that the author has just added, such as a form field's
+  `requiredWhen`, is checked before the first save. A place inside an object that the resource lacks is
+  not found.
+- **The draft.** The server uses `draft`, the resource as the author has it, in place of the saved one,
+  so a validation not yet saved gets an answer rather than a `400`. The server does not compare the
+  draft's `id` with `resourceId`. A `draft` that is neither a JSON object nor `null` is `400`, and `null`
+  means no draft.
 - **Where it works.** In every place the compile checks an expression: computed fields, validations,
   rules, data source filters, process conditions and values, policy filters, migration values,
   endpoint values, trigger conditions and form conditions.
 - **No expression place.** A `path` that points at neither a string nor a missing property of an
-  object in the saved resource is `400`. So is a place where the compile checks no expression because
+  object in the resource is `400`. So is a place where the compile checks no expression because
   another problem in the resource skips the check, such as a process step whose subject entity is
   unknown. A save shows no problem at such a place either.
 - **The rules.** The scope, types, limits and codes are those of

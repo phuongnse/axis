@@ -254,6 +254,102 @@ public sealed class StudioNamesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Each_listed_kind_has_a_label_key_that_is_a_string_or_null()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        foreach (var list in _labelledLists)
+        {
+            foreach (var item in names.GetProperty(list).EnumerateArray())
+            {
+                AssertLabelKey(item, list);
+            }
+        }
+
+        foreach (var entity in names.GetProperty("entities").EnumerateArray())
+        {
+            foreach (var field in entity.GetProperty("fields").EnumerateArray())
+            {
+                AssertLabelKey(field, "fields");
+            }
+        }
+
+        foreach (var process in names.GetProperty("processes").EnumerateArray())
+        {
+            foreach (var step in process.GetProperty("steps").EnumerateArray())
+            {
+                AssertLabelKey(step, "steps");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_label_key_is_the_text_key_of_the_label_in_the_resource_file()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+        var entity = Named(names, "entities", "PurchaseRequest");
+        var file = JsonNode.Parse(File.ReadAllText(Path.Combine(_purchaseRequests.Path, "entities", "purchase-request.json")))!;
+
+        Assert.Equal(TextKeyOf(file), entity.GetProperty("labelKey").GetString());
+        Assert.Equal(
+            TextKeyOf(Item(file, "fields", "department")),
+            Named(entity, "fields", "department").GetProperty("labelKey").GetString());
+
+        var process = JsonNode.Parse(File.ReadAllText(Path.Combine(_purchaseRequests.Path, "processes", "purchase-request-approval.json")))!;
+        Assert.Equal(
+            TextKeyOf(Item(process, "steps", "managerApproval")),
+            Named(Named(names, "processes", "PurchaseRequestApproval"), "steps", "managerApproval").GetProperty("labelKey").GetString());
+        Assert.Equal(JsonValueKind.Null, Named(names, "processes", "PurchaseRequestApproval").GetProperty("labelKey").ValueKind);
+
+        var role = JsonNode.Parse(File.ReadAllText(Path.Combine(_purchaseRequests.Path, "roles", "employee.json")))!;
+        Assert.Equal(TextKeyOf(role), Named(names, "roles", "employee").GetProperty("labelKey").GetString());
+
+        var page = JsonNode.Parse(File.ReadAllText(Path.Combine(_purchaseRequests.Path, "pages", "approvals.json")))!;
+        Assert.Equal(TextKeyOf(page), Named(names, "pages", "Approvals").GetProperty("labelKey").GetString());
+    }
+
+    [Fact]
+    public async Task A_module_label_key_is_module_prefixed_and_resolves_in_the_texts()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        var budget = Named(names, "entities", "department-budgets/Budget");
+        Assert.Equal("department-budgets.budget.label", budget.GetProperty("labelKey").GetString());
+        var text = names.GetProperty("texts").EnumerateArray()
+            .Single(item => item.GetProperty("key").GetString() == "department-budgets.budget.label");
+        Assert.Equal("Budget", text.GetProperty("texts").GetProperty("en").GetString());
+    }
+
+    [Fact]
+    public async Task Columns_parameters_operations_and_event_fields_have_no_label_key()
+    {
+        var purchase = await NamesAsync("PurchaseRequests");
+        var leave = await NamesAsync("LeaveRequests");
+
+        // The column has a label in its file, and the answer still leaves the key out.
+        AssertNoLabelKey(Named(Named(purchase, "dataSources", "PurchaseRequestList"), "columns", "status"));
+        AssertNoLabelKey(Named(Named(purchase, "connectors", "PurchasingSystem"), "operations", "createPurchaseOrder"));
+        AssertNoLabelKey(Named(Named(purchase, "events", "PaymentReceived"), "fields", "amount"));
+        AssertNoLabelKey(Named(Named(leave, "rules", "organization:IsDelegating"), "parameters", "from"));
+        AssertNoLabelKey(Named(Named(leave, "processes", "DailyReminder"), "parameters", "daysOverdue"));
+    }
+
+    [Fact]
+    public async Task Every_entity_field_says_whether_it_is_unique()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        var fields = names.GetProperty("entities").EnumerateArray()
+            .SelectMany(entity => entity.GetProperty("fields").EnumerateArray())
+            .ToList();
+        Assert.All(fields, field => Assert.True(field.GetProperty("unique").ValueKind is (JsonValueKind.True or JsonValueKind.False)));
+
+        var supplier = Named(names, "entities", "Supplier");
+        Assert.True(Named(supplier, "fields", "code").GetProperty("unique").GetBoolean());
+        Assert.False(Named(supplier, "fields", "name").GetProperty("unique").GetBoolean());
+    }
+
+    [Fact]
     public async Task Names_need_a_session_the_author_role_and_a_known_application()
     {
         using var anonymous = _factory.CreateClient();
@@ -280,6 +376,22 @@ public sealed class StudioNamesTests : IAsyncLifetime
 
     private static JsonElement Named(JsonElement parent, string list, string name) =>
         parent.GetProperty(list).EnumerateArray().Single(item => item.GetProperty("name").GetString() == name);
+
+    private static readonly string[] _labelledLists =
+    [
+        "entities", "dataSources", "processes", "rules", "connectors", "events", "roles", "sequences", "forms", "pages",
+        "policies", "contracts", "seeds", "triggers", "scenarios", "textResources",
+    ];
+
+    private static void AssertLabelKey(JsonElement item, string list) =>
+        Assert.True(item.TryGetProperty("labelKey", out var key) && (key.ValueKind is JsonValueKind.String or JsonValueKind.Null), list);
+
+    private static void AssertNoLabelKey(JsonElement item) => Assert.False(item.TryGetProperty("labelKey", out _));
+
+    private static JsonNode Item(JsonNode file, string list, string name) =>
+        file[list]!.AsArray().Single(item => item!["name"]!.GetValue<string>() == name)!;
+
+    private static string? TextKeyOf(JsonNode node) => (node["label"] ?? node["title"])?["textKey"]?.GetValue<string>();
 
     private static void RenameApplication(string file, string name)
     {

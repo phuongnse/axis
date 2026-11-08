@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Presentation.Texts;
@@ -73,6 +74,23 @@ public sealed class TextCatalogTests
         {
             var breaks = UntranslatedKeys(english, _provider.GetTexts(locale)!.Texts, keepWords);
             problems.AddRange(CompareWithBaseline("untranslated", locale, breaks, baseline.Untranslated.GetValueOrDefault(locale) ?? []));
+        }
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    [Fact]
+    public void No_locale_file_writes_a_key_twice()
+    {
+        var textsFolder = Path.Combine(RepositoryRoot(), "src", "Axis.Presentation", "Texts");
+        var problems = new List<string>();
+
+        foreach (var file in Directory.GetFiles(textsFolder, "*.json").Order(StringComparer.Ordinal))
+        {
+            foreach (var key in DuplicateKeys(File.ReadAllText(file)))
+            {
+                problems.Add($"Locale file '{Path.GetFileName(file)}' writes key '{key}' more than once");
+            }
         }
 
         Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
@@ -184,6 +202,18 @@ public sealed class TextCatalogTests
     }
 
     [Fact]
+    public void A_key_written_twice_in_a_locale_file_is_reported()
+    {
+        Assert.Equal(["a"], DuplicateKeys("""{"a":"A","b":"B","a":"A2"}"""));
+    }
+
+    [Fact]
+    public void A_locale_file_with_unique_keys_reports_nothing()
+    {
+        Assert.Empty(DuplicateKeys("""{"a":"A","b":"B"}"""));
+    }
+
+    [Fact]
     public void The_baseline_reports_a_new_break_and_a_key_that_no_longer_breaks()
     {
         var problems = CompareWithBaseline("untranslated", "vi", ["a", "c"], ["a", "b"]);
@@ -220,6 +250,22 @@ public sealed class TextCatalogTests
                 && Words(other[key]).Any(word => !keepWords.Contains(word)))
             .Order(StringComparer.Ordinal)
             .ToList();
+    }
+
+    internal static IReadOnlyList<string> DuplicateKeys(string json)
+    {
+        var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(json));
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var duplicates = new SortedSet<string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1 && !seen.Add(reader.GetString()!))
+            {
+                duplicates.Add(reader.GetString()!);
+            }
+        }
+
+        return duplicates.ToList();
     }
 
     internal static IReadOnlyList<string> GlossaryProblems(JsonElement approved, JsonElement proposed)

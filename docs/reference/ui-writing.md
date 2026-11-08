@@ -167,6 +167,7 @@ A test checks the rules that a test can decide, and no list of words. It fails w
 
 - a key is missing in a locale, or a placeholder of the English text is missing or added in another locale;
 - a text in another locale is the same as the English one, unless the glossary's `keep` allows it;
+- a key is written more than once in one locale file;
 - a concept is in both glossary files, or a term is in the glossary file that does not match its `status`.
 
 `tests/Axis.Server.Tests/TextCatalogTests.cs` runs these checks in `scripts/test.sh`. A word of a text passes when a

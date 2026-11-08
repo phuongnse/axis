@@ -179,6 +179,43 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
     }
 
     [Fact]
+    public async Task A_validation_not_yet_saved_is_checked_in_the_draft_and_answers_400_without_it()
+    {
+        const string SupplierFile = "entities/supplier.json";
+        const string ValidationPath = "/validations/0/expression";
+        var id = await _studio.IdOfAsync(SupplierFile);
+        var before = Hash(SupplierFile);
+
+        using var withoutDraft = await StudioFixture.SendAsync(_studio.Author, CheckBody(id, ValidationPath, "code is not null"));
+        Assert.Equal(HttpStatusCode.BadRequest, withoutDraft.StatusCode);
+
+        var draft = JsonNode.Parse(File.ReadAllText(Path.Combine(_studio.Folder, SupplierFile)))!.AsObject();
+        draft["validations"] = new JsonArray(new JsonObject
+        {
+            ["name"] = "codeSet",
+            ["expression"] = string.Empty,
+            ["field"] = "code",
+            ["message"] = new JsonObject { ["textKey"] = "supplier.code" },
+        });
+        using var answer = await _studio.CheckAsync(id, ValidationPath, "code is not null", draft);
+
+        Assert.Equal("boolean", answer.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, answer.RootElement.GetProperty("diagnostics").GetArrayLength());
+        Assert.Equal(before, Hash(SupplierFile));
+    }
+
+    [Fact]
+    public async Task A_draft_that_is_not_an_object_answers_400()
+    {
+        var id = await _studio.IdOfAsync("entities/line-item.json");
+
+        using var response = await StudioFixture.SendAsync(
+            _studio.Author, CheckBody(id, "/validations/0/expression", "quantity > 0", JsonValue.Create("x")));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task The_route_needs_a_session_the_author_role_and_the_csrf_header()
     {
         var id = await _studio.IdOfAsync("entities/line-item.json");
@@ -202,8 +239,16 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
     }
 
-    private static string CheckBody(string id, string path, string expression) =>
-        new JsonObject { ["resourceId"] = id, ["path"] = path, ["expression"] = expression }.ToJsonString();
+    private static string CheckBody(string id, string path, string expression, JsonNode? draft = null)
+    {
+        var body = new JsonObject { ["resourceId"] = id, ["path"] = path, ["expression"] = expression };
+        if (draft is not null)
+        {
+            body["draft"] = draft;
+        }
+
+        return body.ToJsonString();
+    }
 
     private string ReadString(string file, string path)
     {
@@ -284,9 +329,9 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
                 .Single(item => item.GetProperty("file").GetString() == file).GetProperty("version").GetString()!;
         }
 
-        public async Task<JsonDocument> CheckAsync(string id, string path, string expression)
+        public async Task<JsonDocument> CheckAsync(string id, string path, string expression, JsonNode? draft = null)
         {
-            using var response = await SendAsync(Author, CheckBody(id, path, expression));
+            using var response = await SendAsync(Author, CheckBody(id, path, expression, draft));
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         }
