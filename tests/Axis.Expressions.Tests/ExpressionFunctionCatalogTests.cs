@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Axis.Expressions.Functions;
 using Axis.Expressions.Parsing;
 using Axis.Expressions.Syntax;
@@ -46,38 +47,61 @@ public sealed class ExpressionFunctionCatalogTests
         var groupColumn = Array.IndexOf(scalarHeader, "Group");
         var problems = new List<string>();
 
+        Assert.True(groupColumn >= 0, "The function table has no Group column.");
         Compare(scalarRows, groupColumn, ExpressionFunctions.Names, aggregate: false, problems);
         Compare(aggregateRows, -1, ExpressionFunctions.AggregateNames, aggregate: true, problems);
-
-        Assert.True(groupColumn >= 0, "The function table has no Group column.");
         Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
     }
 
     private static void Compare(
         IReadOnlyList<string[]> rows, int groupColumn, IReadOnlyList<string> names, bool aggregate, List<string> problems)
     {
-        // A count has a shorter and a longer row. The longer one is the signature the compiler lists.
-        var documented = new Dictionary<string, (string Signature, string? Group)>(StringComparer.Ordinal);
+        // A row marked _(planned for Mx)_ is not built yet, so it may name a function the compiler does not have.
+        var documented = new Dictionary<string, List<(string Signature, string? Group)>>(StringComparer.Ordinal);
+        var planned = new List<string>();
         foreach (var row in rows)
         {
             var signature = row[0].Trim('`');
             var name = signature[..signature.IndexOf('(', StringComparison.Ordinal)];
-            if (!documented.TryGetValue(name, out var kept) || signature.Length > kept.Signature.Length)
+            if (row.Any(cell => Regex.IsMatch(cell, @"_\(planned for M\d+\)_")))
             {
-                documented[name] = (signature, groupColumn >= 0 ? row[groupColumn] : null);
+                planned.Add(name);
+                continue;
             }
+
+            if (!documented.TryGetValue(name, out var listed))
+            {
+                documented[name] = listed = [];
+            }
+
+            listed.Add((signature, groupColumn >= 0 ? row[groupColumn] : null));
+        }
+
+        if (!aggregate)
+        {
+            foreach (var name in documented.Where(entry => entry.Value.Count > 1).Select(entry => entry.Key))
+            {
+                problems.Add($"'{name}' is listed more than once in {Reference}");
+            }
+        }
+
+        foreach (var name in planned.Intersect(names, StringComparer.Ordinal))
+        {
+            problems.Add($"'{name}' is marked planned in {Reference} but is already in the compiler");
         }
 
         foreach (var name in names)
         {
-            var signature = ExpressionFunctions.Get(name);
-            var listed = $"{name}({string.Join(", ", signature.Parameters)})";
-            if (!documented.TryGetValue(name, out var doc))
+            var compiled = ExpressionFunctions.Get(name);
+            var listed = $"{name}({string.Join(", ", compiled.Parameters)})";
+            if (!documented.TryGetValue(name, out var listings))
             {
                 problems.Add($"'{name}' is in the compiler but not in {Reference}");
                 continue;
             }
 
+            // A count has a shorter and a longer row. The longer one is the signature the compiler lists.
+            var doc = listings.MaxBy(entry => entry.Signature.Length);
             if (doc.Signature != listed)
             {
                 problems.Add($"'{name}' is '{listed}' in the compiler but '{doc.Signature}' in {Reference}");
@@ -85,14 +109,14 @@ public sealed class ExpressionFunctionCatalogTests
 
             if (aggregate)
             {
-                if (signature.Group != "aggregate")
+                if (compiled.Group != "aggregate")
                 {
-                    problems.Add($"Aggregate '{name}' is in the group '{signature.Group}', not 'aggregate'");
+                    problems.Add($"Aggregate '{name}' is in the group '{compiled.Group}', not 'aggregate'");
                 }
             }
-            else if (doc.Group != signature.Group)
+            else if (doc.Group != compiled.Group)
             {
-                problems.Add($"'{name}' is in the group '{signature.Group}' in the compiler but '{doc.Group}' in {Reference}");
+                problems.Add($"'{name}' is in the group '{compiled.Group}' in the compiler but '{doc.Group}' in {Reference}");
             }
         }
 

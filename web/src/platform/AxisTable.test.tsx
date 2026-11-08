@@ -21,6 +21,8 @@ const texts = {
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
   'shell.table.selected': '{count} selected',
+  'shell.table.range': '{from}–{to} of {total}',
+  'shell.table.search': 'Search',
   'shell.table.selectRow': 'Select row',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
@@ -160,6 +162,19 @@ describe('AxisTable', () => {
     renderTable({ dataSource: [] })
 
     expect(screen.getByText('Nothing here')).toBeInTheDocument()
+  })
+
+  it("shows what a paged table shows of how many, with the number in the locale's format", () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    renderTable({ dataSource: many, pagination: { current: 1, pageSize: 20, total: 143, pageSizeOptions: [10, 20] } })
+
+    expect(screen.getByText('1–20 of 143')).toBeInTheDocument()
+  })
+
+  it('draws no search box for a table that holds its rows when no column gives searchText', () => {
+    renderTable({ view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() }, pagination: undefined })
+
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
   it('lists every row on one page without paging when pagination is false', () => {

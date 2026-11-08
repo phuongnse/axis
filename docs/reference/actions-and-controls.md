@@ -139,11 +139,15 @@ be kept right.
   actions its author configures.
 - **Every control in one table** _(planned for M31)_. `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address.
-- **Sort** _(planned for M31)_. A column sorts from its header when its values have an order a person uses:
-  names, people, statuses, dates and numbers. Long text, files, lists and actions do not. A header only
-  sorts, as there is one place to filter.
-- **Search** _(planned for M31)_. A column is searchable when it says so, through `searchText`, as a field
-  marked `searchable` is in the record API, and search looks in all of them. The box says Search.
+- **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
+  statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
+  one place to filter. A table that holds all its rows sorts them by the value its column gives through
+  `sortValue`, and a table paged on the server sends the sort to the server. A new sort starts at page 1.
+- **Search.** A column is searchable when it says so, through `searchText`, as a field marked `searchable` is
+  in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
+  table that holds all its rows searches them by itself, while a table paged on the server sends the text to
+  the server. The text applies on Enter, on the search button and when the box is cleared, never on each
+  key, and a new search starts at page 1. Search, sort, page and page size live in the address.
 - **Filter** _(planned for M31)_. Filter is an icon button that carries the count of conditions in force, and
   opens a builder of conditions in groups of All or Any, with no limit on depth. Every column can be
   filtered on, and conditions follow the kind of value, text, enum, number or date, each with empty and
@@ -169,7 +173,8 @@ be kept right.
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
 - **Paging.** A long table pages.
-- **How many** _(planned for M31)_. A paged table says what it shows of how many, as "1–20 of 143".
+- **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
+  language's format.
 - **Too little room** _(planned for M31)_. A table measures its own width, as it changes. Its text columns
   narrow to 160 px first. Then columns move under their row one at a time, from the right or by a column's
   `priority`, `low` first and `high` last, as "Title: value" on the row's own surface, with no line between
