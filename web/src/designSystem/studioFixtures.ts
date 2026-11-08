@@ -197,6 +197,7 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/diagnostics`]: () => ({ diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
+    [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
     [`${folderPath}/releases`]: () => releases,
     [`${folderPath}/settings`]: () => settings,

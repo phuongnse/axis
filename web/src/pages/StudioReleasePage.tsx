@@ -22,6 +22,7 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { relaxedPointLabel } from './relaxEntries'
 import { StudioActivateDialog, StudioLiveTag, StudioReleaseBlockers } from './StudioReleases'
 import { StudioChangeList } from './StudioChangeList'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -369,9 +370,7 @@ function RelaxedPoints({ relaxed, locale }: { relaxed: StudioRelaxedPoint[]; loc
     const module = point.moduleTitle ?? point.module
     groups.set(module, [...(groups.get(module) ?? []), point])
   }
-  const pointLabel = (point: StudioRelaxedPoint) =>
-    point.titles?.[locale] ??
-    (point.point.endsWith('ceiling/others') ? t('shell.studio.release.relaxed.others') : point.point)
+  const pointLabel = (point: StudioRelaxedPoint) => relaxedPointLabel(point, locale, t)
   const sortedGroups = sortByName([...groups], ([module]) => module, locale)
   return (
     <Flex vertical gap={spacing.md}>

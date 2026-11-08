@@ -1,12 +1,16 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
+import { Link } from 'react-router'
 import { createContext, lazy, Suspense, useContext, useId, useState, type CSSProperties, type ReactNode } from 'react'
-import type { StudioCatalog, StudioNames } from '../platform/studio'
+import type { StudioCatalog, StudioFolderRelaxedPoint, StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
 import {
   catalogControlOf,
+  isTableOnlyField,
   parseVersionRange,
+  slotTitle,
   StudioCatalogContext,
+  StudioRelaxedContext,
   versionRangeWords,
   type CatalogControl,
 } from '../platform/studioCatalog'
@@ -16,6 +20,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
 import { PlatformContext } from './context'
+import { relaxedPointLabel } from './relaxEntries'
 import { CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
@@ -790,6 +795,36 @@ function cellWords(schema: JsonSchema, root: JsonSchema, value: unknown, words: 
   return text === '' ? null : text
 }
 
+/**
+ * A module's relaxed points in the Modules table, each a link to its contract's page, then its reason, see
+ * docs/reference/studio-resource-form.md#relaxed-points-in-settings. A point whose contract the server cannot find is
+ * plain text.
+ */
+function RelaxedPointLines({ application, points }: { application: string; points: StudioFolderRelaxedPoint[] }) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { spacing } = useDesignTokens()
+  return (
+    <Flex vertical gap={spacing.sm}>
+      {points.map((point) => {
+        const label = relaxedPointLabel(point, locale, t)
+        return (
+          <Flex key={point.point} vertical data-testid="studio-relaxed-point">
+            {point.contractId === null ? (
+              <span>{label}</span>
+            ) : (
+              <Link to={`/studio?${new URLSearchParams({ app: application, resource: point.contractId })}`}>
+                {label}
+              </Link>
+            )}
+            <span>{point.reason}</span>
+          </Flex>
+        )
+      })}
+    </Flex>
+  )
+}
+
 /** The item's name in Add… and the dialog's title, from `shell.studio.item.<kind>.<path>`, or a plain "item". */
 function itemNameOf(t: (key: string) => string, kind: unknown, path: string): string {
   const key = `shell.studio.item.${String(kind)}.${path}`
@@ -826,6 +861,10 @@ function ObjectList({
   const labels = useContext(LabelTextsContext)
   const layer = useContext(SchemaLayerContext)
   const check = useContext(ExpressionCheckContext)
+  const catalog = useContext(StudioCatalogContext)
+  const relaxed = useContext(StudioRelaxedContext)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { colour } = useDesignTokens()
   const [held, setHeld] = useState<Record<string, { pointer: string; texts: Record<string, string> }>>({})
   const kind = root.properties?.kind?.const
   const items = (Array.isArray(value) ? value : []).filter(isRecord)
@@ -845,6 +884,7 @@ function ObjectList({
   }
   const columns: ObjectListColumn[] = properties.map(([name, child]) => {
     const resolved = resolveSchema(child, root)
+    const control = catalogControlOf(kind, `${path}.${name}`)
     return {
       key: name,
       title: fieldTexts(t, kind, `${path}.${name}`, name).label,
@@ -852,18 +892,55 @@ function ObjectList({
         resolved.type === 'boolean' ||
         resolved.type === 'integer' ||
         resolved.type === 'number' ||
-        resolved.enum !== undefined
+        resolved.enum !== undefined ||
+        control?.endsWith('Version')
           ? 'fixed'
           : 'freeText',
       render: (item) => {
         const cell = item[name]
-        return typeof cell === 'string' && catalogControlOf(kind, `${path}.${name}`)?.endsWith('Version')
-          ? versionRangeWords(cell, t)
-          : cellWords(child, root, cell, words)
+        if (isTableOnlyField(kind, `${path}.${name}`)) {
+          const points = relaxed?.points.filter((point) => point.module === item.id) ?? []
+          return points.length === 0 ? null : <RelaxedPointLines application={relaxed!.application} points={points} />
+        }
+        if (typeof cell === 'string' && control?.endsWith('Version')) {
+          return versionRangeWords(cell, t)
+        }
+        if (typeof cell === 'string' && (control === 'module' || control === 'package')) {
+          return (
+            catalog?.[control === 'module' ? 'modules' : 'packages'].find((entry) => entry.id === cell)?.label ?? cell
+          )
+        }
+        const slots = control === 'roles' ? catalog?.modules.find((entry) => entry.id === item.id)?.roles : undefined
+        if (slots !== undefined && slots.length > 0) {
+          const roles = isRecord(cell) ? cell : {}
+          return (
+            <Flex vertical>
+              {slots.map((slot) => {
+                const role = roles[slot.name]
+                return (
+                  <span key={slot.name}>
+                    {slotTitle(slot, locale)}:{' '}
+                    {typeof role === 'string' && role !== '' ? (
+                      role
+                    ) : (
+                      <span style={{ color: colour.warningText }}>{t('shell.studio.module.notMapped')}</span>
+                    )}
+                  </span>
+                )
+              })}
+            </Flex>
+          )
+        }
+        return cellWords(child, root, cell, words)
       },
     }
   })
-  const large = properties.some(([, child]) => {
+  // The dialog leaves out the fields that only the table shows. Its copy still carries them, so Done writes them back.
+  const dialogSchema: JsonSchema = {
+    ...itemSchema,
+    properties: Object.fromEntries(properties.filter(([name]) => !isTableOnlyField(kind, `${path}.${name}`))),
+  }
+  const large = Object.values(dialogSchema.properties ?? {}).some((child) => {
     const resolved = resolveSchema(child, root)
     return resolved.type === 'array' || (resolved.type === 'object' && resolved.properties === undefined)
   })
@@ -905,7 +982,7 @@ function ObjectList({
             <ExpressionCheckContext.Provider value={check && { ...check, draft: view as Record<string, unknown> }}>
               <ItemDialogContext.Provider value>
                 <Properties
-                  node={itemSchema}
+                  node={dialogSchema}
                   root={root}
                   rootValue={view}
                   pointer={itemPointer}
