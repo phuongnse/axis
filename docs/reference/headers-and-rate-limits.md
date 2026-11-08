@@ -60,13 +60,13 @@ and behind any proxy.
 The server limits how often a caller may repeat a request, with the ASP.NET Core rate limiter, so that one caller
 cannot use up a replica.
 
-| Partition  | Routes                                                                 | Counted by           | Setting                 |
-| ---------- | ---------------------------------------------------------------------- | -------------------- | ----------------------- |
-| Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`                   | Client address       | `RateLimits:SignIn`     |
-| Session    | Every other route that takes a session                                 | Tenant and user      | `RateLimits:Session`    |
-| Bearer     | Inbound endpoints, [service accounts](security.md#service-accounts) and `/mcp` | Tenant and caller id | `RateLimits:Bearer`     |
-| Publishing | Studio validate, publish, preview, activate and test requests          | Tenant and user      | `RateLimits:Publishing` |
-| MCP        | `/mcp`, the [MCP server](mcp-server.md) _(planned for M35)_            | Tenant and client    | `RateLimits:Mcp`        |
+| Partition  | Routes                                                        | Counted by           | Setting                 |
+| ---------- | ------------------------------------------------------------- | -------------------- | ----------------------- |
+| Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`          | Client address       | `RateLimits:SignIn`     |
+| Session    | Every other route that takes a session                        | Tenant and user      | `RateLimits:Session`    |
+| Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
+| Publishing | Studio validate, publish, preview, activate and test requests | Tenant and user      | `RateLimits:Publishing` |
+| MCP        | `/mcp`, the [MCP server](mcp-server.md)                       | Tenant and client id | `RateLimits:Mcp`        |
 
 ### How a limit counts
 
@@ -94,7 +94,10 @@ cannot use up a replica.
   count as session, not as publishing or sign-in.
 - **No valid session or token.** A request on a session or bearer route with no valid session or token counts in that
   route's partition by tenant and client address. So it is not unlimited, and a user's empty bucket never turns an
-  anonymous `401` into a `429`.
+  anonymous `401` into a `429`. On an MCP route that count is by tenant and client address too.
+- **MCP.** A call to `/mcp` counts in the MCP partition, whatever its method. The count key is the tenant and the
+  token's client id, which is its `azp` claim, so everyone who uses one client in a tenant shares one count and
+  another client of the tenant has its own. A valid token with no `azp` claim counts by tenant and person.
 - **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the limiter counts the
   callback just before authentication. It shares the sign-in count of its client address.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `GET /.well-known/oauth-protected-resource/mcp`, `/health` and
@@ -108,8 +111,7 @@ cannot use up a replica.
 - **The answer.** A request over a limit answers `429` problem details titled "Too many requests.", with a
   `Retry-After` header in seconds. The route never runs, so it writes nothing and no audit record.
 - **The metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute `axis.partition`:
-  `sign_in`, `session`, `bearer` or `publishing`. It carries no tenant, user or address.
-- **The MCP partition's metric** _(planned for M35)_. Refusals of the MCP partition count with `axis.partition` `mcp`.
+  `sign_in`, `session`, `bearer`, `publishing` or `mcp`. It carries no tenant, user or address.
 
 ### Rate limit tests
 
@@ -117,5 +119,9 @@ cannot use up a replica.
   request in another partition, of another user, from another client address or of another tenant still passes.
   Another shows that a bearer caller is refused past `RateLimits:Bearer`, and that a refused write still gets its CSRF
   `403` first.
+- **MCP integration tests** (`McpRateLimitTests`) send `/mcp` calls past `RateLimits:Mcp` with one client and expect
+  the `429` with `Retry-After` and one refusal in the metric with `axis.partition` `mcp`, while another client of the
+  same tenant still passes.
 - **A unit test** reads every route from the server's endpoint data source and fails on a route that is not open and
-  has no partition, or that takes a bearer token and has no bearer partition.
+  has no partition, that takes a bearer token and has no bearer partition, or that is the MCP route and has no MCP
+  partition.

@@ -4,9 +4,9 @@ namespace Axis.Server.Http;
 
 /// <summary>
 /// The requests per minute that one replica allows in each rate limit partition, from <c>RateLimits:SignIn</c>,
-/// <c>RateLimits:Session</c>, <c>RateLimits:Bearer</c> and <c>RateLimits:Publishing</c>. A missing setting takes its default.
+/// <c>RateLimits:Session</c>, <c>RateLimits:Bearer</c>, <c>RateLimits:Publishing</c> and <c>RateLimits:Mcp</c>. A missing setting takes its default.
 /// </summary>
-internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, int Publishing)
+internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, int Publishing, int Mcp)
 {
     public const string SignInSetting = "RateLimits:SignIn";
 
@@ -16,6 +16,8 @@ internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, in
 
     public const string PublishingSetting = "RateLimits:Publishing";
 
+    public const string McpSetting = "RateLimits:Mcp";
+
     public const int DefaultSignIn = 300;
 
     public const int DefaultSession = 1200;
@@ -23,6 +25,8 @@ internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, in
     public const int DefaultBearer = 1200;
 
     public const int DefaultPublishing = 60;
+
+    public const int DefaultMcp = 600;
 
     /// <summary>How often a caller's allowance is topped up, by a sixth of the setting. Tests make it long.</summary>
     public TimeSpan ReplenishmentPeriod { get; init; } = TimeSpan.FromSeconds(10);
@@ -34,6 +38,7 @@ internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, in
         Partition.Session => Session,
         Partition.Bearer => Bearer,
         Partition.Publishing => Publishing,
+        Partition.Mcp => Mcp,
         _ => throw new ArgumentOutOfRangeException(nameof(partition)),
     };
 
@@ -46,7 +51,8 @@ internal sealed record RateLimitSettings(int SignIn, int Session, int Bearer, in
             Read(configuration, SignInSetting, DefaultSignIn),
             Read(configuration, SessionSetting, DefaultSession),
             Read(configuration, BearerSetting, DefaultBearer),
-            Read(configuration, PublishingSetting, DefaultPublishing));
+            Read(configuration, PublishingSetting, DefaultPublishing),
+            Read(configuration, McpSetting, DefaultMcp));
     }
 
     private static int Read(IConfiguration configuration, string setting, int fallback)

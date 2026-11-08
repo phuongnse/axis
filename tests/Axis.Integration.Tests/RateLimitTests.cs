@@ -200,7 +200,7 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
             builder.ConfigureTestServices(services =>
             {
                 // The allowance never refills during a test.
-                services.AddSingleton(new RateLimitSettings(SignInLimit, SessionLimit, BearerLimit, PublishingLimit)
+                services.AddSingleton(new RateLimitSettings(SignInLimit, SessionLimit, BearerLimit, PublishingLimit, RateLimitSettings.DefaultMcp)
                 {
                     ReplenishmentPeriod = TimeSpan.FromHours(1),
                 });

@@ -117,10 +117,10 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 
 ## Limits
 
-Tool calls are limited in rate and size, and the agent host's requests count toward a quota.
+A call to the server is limited in rate and size, and the agent host's requests count toward a quota.
 
-- **Rate limit** _(planned for M35)_. Tool calls count in the MCP partition, by tenant and client, see
-  [rate limits](headers-and-rate-limits.md#rate-limits). The agent host's calls count there too.
+- **Rate limit.** Every call to `/mcp` counts in the MCP partition, by tenant and client id, see
+  [rate limits](headers-and-rate-limits.md#rate-limits).
 - **Quota** _(planned for M35)_. Tool calls of outside clients count toward no quota, because the client brings its own
   model. Requests of the agent host count toward `authoringRequests`, see
   [tenant quotas](tenant-quotas.md#quotas).

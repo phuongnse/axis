@@ -52,6 +52,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
 
     public const string McpClientSecret = "axis-mcp-test-development-secret";
 
+    /// <summary>A second client with the same audience, so a test can call the MCP server as another client of one tenant.</summary>
+    public const string McpOtherClientId = "axis-mcp-other-test";
+
+    public const string McpOtherClientSecret = "axis-mcp-other-test-development-secret";
+
     /// <summary>The client that the realm's FAPI 2.0 client policy covers. It has no secret, only the two keys below.</summary>
     public const string FapiClientId = "axis-fapi";
 

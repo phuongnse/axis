@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using Axis.Core.Telemetry;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Axis.Server.Tests;
 
 /// <summary>The partition and the count key that a request gets, and the refusal metric.</summary>
-public sealed class RateLimitsTests
+public sealed partial class RateLimitsTests
 {
     [Fact]
     public void A_bearer_caller_on_a_route_that_also_takes_a_session_counts_as_bearer_by_caller_id()
@@ -88,6 +89,44 @@ public sealed class RateLimitsTests
     }
 
     [Fact]
+    public void An_MCP_caller_counts_by_tenant_and_client_id()
+    {
+        var route = new RateLimitRoute(Session: null, Bearer: false, Mcp: true);
+        var author = EndpointCaller.CreatePrincipal("a", "author", "Author", [], clientId: "claude");
+        var other = EndpointCaller.CreatePrincipal("a", "reviewer", "Reviewer", [], clientId: "claude");
+
+        Assert.Equal((Partition.Mcp, "a|claude"), RateLimits.Choose(Request(route, author), "a"));
+        Assert.Equal((Partition.Mcp, "a|claude"), RateLimits.Choose(Request(route, other), "a"));
+        Assert.Equal((Partition.Mcp, "c|claude"), RateLimits.Choose(Request(route, author), "c"));
+    }
+
+    [Fact]
+    public void An_MCP_caller_with_no_client_id_counts_by_person_and_a_request_with_no_token_by_address()
+    {
+        var route = new RateLimitRoute(Session: null, Bearer: false, Mcp: true);
+        var author = EndpointCaller.CreatePrincipal("a", "author", "Author", []);
+
+        Assert.Equal((Partition.Mcp, "a|sub:author"), RateLimits.Choose(Request(route, author), "a"));
+        Assert.Equal((Partition.Mcp, "a|addr:10.0.0.2"), RateLimits.Choose(Request(route, new ClaimsPrincipal(), "10.0.0.2"), "a"));
+    }
+
+    [Fact]
+    public void The_metric_values_of_the_docs_are_the_partition_names_of_the_code()
+    {
+        var lines = File.ReadAllLines(Path.Combine(RepositoryRoot(), "docs", "reference", "headers-and-rate-limits.md"));
+        var bullet = lines.SkipWhile(line => !line.StartsWith("- **The metric.**", StringComparison.Ordinal)).Skip(1)
+            .TakeWhile(line => line.StartsWith("  ", StringComparison.Ordinal))
+            .Prepend(lines.First(line => line.StartsWith("- **The metric.**", StringComparison.Ordinal)));
+        var text = string.Join(' ', bullet);
+        var documented = MetricValue().Matches(text[(text.IndexOf("`axis.partition`:", StringComparison.Ordinal) + 1)..])
+            .Select(match => match.Groups[1].Value);
+
+        Assert.Equal(
+            [.. Enum.GetValues<Partition>().Select(RateLimitRefusals.Name).Order(StringComparer.Ordinal)],
+            [.. documented.Order(StringComparer.Ordinal)]);
+    }
+
+    [Fact]
     public void Refusals_count_by_partition()
     {
         var counts = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -117,12 +156,27 @@ public sealed class RateLimitsTests
         refusals.Record(Partition.Session);
         refusals.Record(Partition.Bearer);
         refusals.Record(Partition.Publishing);
+        refusals.Record(Partition.Mcp);
 
         Assert.Equal(["axis.partition"], keys);
         Assert.Equal(
-            new Dictionary<string, long> { ["sign_in"] = 1, ["session"] = 2, ["bearer"] = 1, ["publishing"] = 1 },
+            new Dictionary<string, long> { ["sign_in"] = 1, ["session"] = 2, ["bearer"] = 1, ["publishing"] = 1, ["mcp"] = 1 },
             counts);
     }
+
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Axis.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new InvalidOperationException("Axis.slnx was not found above the test output folder.");
+    }
+
+    [GeneratedRegex("`([a-z_]+)`")]
+    private static partial Regex MetricValue();
 
     private static DefaultHttpContext Request(
         RateLimitRoute? route,
