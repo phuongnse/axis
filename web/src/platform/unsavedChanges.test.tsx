@@ -101,6 +101,21 @@ describe('useUnsavedChanges', () => {
     expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
   })
 
+  it('asks when Back returns to an entry that carries leaveWithoutAsking', async () => {
+    const router = renderGuarded(<Editor />)
+    await act(() => router.navigate('/studio?app=A', { state: leaveWithoutAsking }))
+    await act(() => router.navigate('/studio?app=B'))
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    act(() => {
+      void router.navigate(-1)
+    })
+
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    expect(router.state.location.search).toBe('?app=B')
+  })
+
   it('cancels the reload and the close of the tab only while changes are unsaved', async () => {
     renderGuarded(<Editor />)
     expect(beforeUnload().defaultPrevented).toBe(false)

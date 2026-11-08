@@ -9,7 +9,8 @@ export const BlockerContext = createContext<Blocker | null>(null)
 
 /**
  * The navigation state of a move that Studio makes after it deleted the resource whose draft is open, so the guard lets
- * it through, see docs/reference/studio.md#editor.
+ * it through, see docs/reference/studio.md#editor. The guard honours it only for the move itself, not when Back or
+ * Forward returns to the entry that kept it.
  */
 export const leaveWithoutAsking = { leaveWithoutAsking: true }
 

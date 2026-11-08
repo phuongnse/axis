@@ -14,9 +14,9 @@ export function UnsavedChangesGuard({ children }: { children: ReactNode }): Reac
   const counted = useRef(0)
   const [unsaved, setUnsaved] = useState(false)
   const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
+    ({ currentLocation, nextLocation, historyAction }) =>
       counted.current > 0 &&
-      !leavesWithoutAsking(nextLocation.state) &&
+      !(historyAction !== 'POP' && leavesWithoutAsking(nextLocation.state)) &&
       (currentLocation.pathname !== nextLocation.pathname || currentLocation.search !== nextLocation.search),
   )
 
