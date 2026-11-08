@@ -1698,7 +1698,6 @@
   "shell.studio.process.timerUntil": "Đến",
   "shell.studio.process.waitFor": "Khoảng thời gian",
   "shell.studio.process.untilTime": "Thời điểm",
-  "shell.studio.process.event": "Sự kiện",
   "shell.studio.process.timeout": "Hết hạn chờ",
   "shell.studio.process.addTimeout": "Thêm hạn chờ",
   "shell.studio.process.removeTimeout": "Bỏ hạn chờ",
