@@ -456,8 +456,8 @@ memory. `null` fits every type, so the compile always type checks the place. The
 - **`type`** is the type the place needs, as in [Types](expressions.md#types), or null when any will do.
 - **`fields`** are the names in scope, in scope order, as `{ name, labelKey, type }`. `labelKey` is null
   for a name with no label, such as a parameter. A child collection is not listed.
-- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name }`, by
-  the rules of [functions](expressions.md#functions) and [aggregates](expressions.md#aggregates).
+- **`functions`** are the functions and aggregates the type check allows at the place, as `{ name }`, by the rules of
+  [functions](expressions.md#functions) and [aggregates](expressions.md#aggregates). A place whose expression runs as SQL, such as a filter or a migration value, lists only the [SQL subset](expressions.md#sql-subset).
 - **No type check.** A place checked without one, such as a migration value whose field types are not
   known yet, answers `{ type: null, fields: [], functions: [] }`.
 - **Function details.** _(planned for M31)_ Each function also carries its parameters, result, group,

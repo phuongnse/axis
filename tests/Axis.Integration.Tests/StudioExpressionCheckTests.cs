@@ -312,6 +312,35 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
     }
 
     [Fact]
+    public async Task A_data_sources_scope_lists_only_the_functions_of_the_SQL_subset()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("data-sources/purchase-request-list.json"), "/filter");
+
+        var functions = FunctionNames(answer);
+        Assert.DoesNotContain("lower", functions);
+        Assert.DoesNotContain("upper", functions);
+        Assert.DoesNotContain("trim", functions);
+        Assert.DoesNotContain("sum", functions);
+        Assert.Contains("any", functions);
+        Assert.Contains("count", functions);
+        Assert.Contains("currentUser", functions);
+    }
+
+    [Theory]
+    [InlineData("policies/department-manager-access.json", "/grants/0/filter")]
+    [InlineData(MigrationFile, "/changes/0/value")]
+    public async Task A_policy_filters_and_a_migration_values_scope_lists_no_function_outside_the_SQL_subset(string file, string path)
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync(file), path);
+
+        var functions = FunctionNames(answer);
+        Assert.DoesNotContain("lower", functions);
+        Assert.DoesNotContain("upper", functions);
+        Assert.DoesNotContain("trim", functions);
+        Assert.Contains("length", functions);
+    }
+
+    [Fact]
     public async Task A_place_without_a_type_check_answers_no_type_no_fields_and_no_functions()
     {
         using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync(UntypedMigrationFile), "/changes/1/value");

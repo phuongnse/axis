@@ -9,31 +9,31 @@ public static class ExpressionFunctions
 {
     private static readonly FunctionSignature[] _signatures =
     [
-        new("length", 1, 1),
-        new("contains", 2, 2),
-        new("startsWith", 2, 2),
-        new("endsWith", 2, 2),
-        new("concat", 1, int.MaxValue),
+        new("length", 1, 1) { Sql = true },
+        new("contains", 2, 2) { Sql = true },
+        new("startsWith", 2, 2) { Sql = true },
+        new("endsWith", 2, 2) { Sql = true },
+        new("concat", 1, int.MaxValue) { Sql = true },
         new("lower", 1, 1),
         new("upper", 1, 1),
         new("trim", 1, 1),
-        new("abs", 1, 1),
-        new("round", 2, 2),
-        new("floor", 1, 1),
-        new("ceiling", 1, 1),
-        new("year", 1, 1),
-        new("month", 1, 1),
-        new("day", 1, 1),
-        new("addDays", 2, 2),
-        new("daysBetween", 2, 2),
-        new("coalesce", 2, int.MaxValue),
-        new("if", 3, 3),
-        new("date", 1, 1),
-        new("dateTime", 1, 1),
-        new("now", 0, 0),
-        new("today", 0, 0),
-        new("toDate", 1, 1),
-        new("currentUser", 0, 0),
+        new("abs", 1, 1) { Sql = true },
+        new("round", 2, 2) { Sql = true },
+        new("floor", 1, 1) { Sql = true },
+        new("ceiling", 1, 1) { Sql = true },
+        new("year", 1, 1) { Sql = true },
+        new("month", 1, 1) { Sql = true },
+        new("day", 1, 1) { Sql = true },
+        new("addDays", 2, 2) { Sql = true },
+        new("daysBetween", 2, 2) { Sql = true },
+        new("coalesce", 2, int.MaxValue) { Sql = true },
+        new("if", 3, 3) { Sql = true },
+        new("date", 1, 1) { Sql = true },
+        new("dateTime", 1, 1) { Sql = true },
+        new("now", 0, 0) { Sql = true },
+        new("today", 0, 0) { Sql = true },
+        new("toDate", 1, 1) { Sql = true },
+        new("currentUser", 0, 0) { Sql = true },
         new("previous", 1, 1),
         new("accountableUser", 0, 0),
         new("decisionTask", 0, 0),
@@ -41,12 +41,12 @@ public static class ExpressionFunctions
 
     private static readonly FunctionSignature[] _aggregates =
     [
-        new("count", 1, 2) { IsAggregate = true },
+        new("count", 1, 2) { IsAggregate = true, Sql = true },
         new("sum", 2, 2) { IsAggregate = true },
         new("avg", 2, 2) { IsAggregate = true },
         new("min", 2, 2) { IsAggregate = true },
         new("max", 2, 2) { IsAggregate = true },
-        new("any", 2, 2) { IsAggregate = true },
+        new("any", 2, 2) { IsAggregate = true, Sql = true },
         new("all", 2, 2) { IsAggregate = true },
         new("first", 3, 3) { IsAggregate = true },
     ];
@@ -62,6 +62,12 @@ public static class ExpressionFunctions
 
     /// <summary>Whether <paramref name="name"/> is a scalar function or an aggregate, ignoring letter case.</summary>
     public static bool IsFunction(string name) => _byName.ContainsKey(name);
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is in the SQL subset, see docs/reference/expressions.md#sql-subset.
+    /// A name that is not a function is not.
+    /// </summary>
+    public static bool IsInSqlSubset(string name) => _byName.TryGetValue(name, out var signature) && signature.Sql;
 
     /// <summary>Finds a function by name, ignoring letter case.</summary>
     internal static bool TryGet(string name, out FunctionSignature signature) =>
@@ -79,4 +85,10 @@ internal sealed record FunctionSignature(string Name, int MinArguments, int MaxA
     /// collection, and the arguments after it, when there are any, are evaluated once per row.
     /// </summary>
     public bool IsAggregate { get; init; }
+
+    /// <summary>
+    /// Whether the function is in the SQL subset, see docs/reference/expressions.md#sql-subset.
+    /// A place whose expression runs as SQL offers only these, and the SQL translator refuses the rest.
+    /// </summary>
+    public bool Sql { get; init; }
 }

@@ -328,19 +328,21 @@ public static class SqlTranslator
                 throw Fail($"Function '{name}' needs {needs} {noun}, found {count}", call.Offset, code: ExpressionDiagnosticCodes.WrongArgumentCount);
             }
 
+            if (!signature.Sql)
+            {
+                throw NotTranslated(name, call.Offset);
+            }
+
             if (signature.IsAggregate)
             {
-                return name is "any" or "count" && collection is not null
+                return collection is not null
                     ? Aggregate(call, name)
                     : throw NotTranslated(name, call.Offset);
             }
 
-            switch (name)
+            if (name is "date" or "dateTime")
             {
-                case "date" or "dateTime":
-                    return DateLiteral(call, name);
-                case "lower" or "upper" or "trim" or "previous" or "accountableUser" or "decisionTask":
-                    throw NotTranslated(name, call.Offset);
+                return DateLiteral(call, name);
             }
 
             var arguments = call.Arguments.Select(Render).ToList();

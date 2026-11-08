@@ -134,6 +134,44 @@ public sealed class DocumentationTests
     }
 
     [Fact]
+    public void Function_tables_SQL_column_matches_ExpressionFunctions()
+    {
+        const string docs = "docs/reference/expressions.md";
+        var sqlRows = new List<(string Name, string Sql)>();
+        var found = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Function\s*\|\s*Result\s*\|\s*Notes\s*\|\s*SQL\s*\|"))
+                {
+                    continue;
+                }
+
+                found++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var match = Regex.Match(lines[j], @"^\|\s*`([A-Za-z]+)\(");
+                    if (match.Success)
+                    {
+                        sqlRows.Add((match.Groups[1].Value, lines[j].Split('|')[^2].Trim()));
+                    }
+                }
+            }
+        }
+
+        Assert.True(found == 1, $"Expected exactly one table with header '| Function | Result | Notes | SQL |' under docs/, found {found}.");
+        var invalid = sqlRows.Where(row => row.Sql is not ("Yes" or "No")).Select(row => row.Name).ToList();
+        Assert.True(invalid.Count == 0, $"The SQL column in {docs} must be Yes or No, but it is not for: {string.Join(", ", invalid)}.");
+
+        var documented = sqlRows.Where(row => row.Sql == "Yes").Select(row => row.Name).Order().ToList();
+        var declared = ExpressionFunctions.Names.Where(ExpressionFunctions.IsInSqlSubset).Order().ToList();
+        Assert.True(
+            documented.SequenceEqual(declared),
+            $"The SQL column in {docs} says Yes for [{string.Join(", ", documented)}], but ExpressionFunctions marks [{string.Join(", ", declared)}] as in the SQL subset.");
+    }
+
+    [Fact]
     public void Aggregate_table_matches_ExpressionFunctions()
     {
         var tables = FunctionTables(@"^\|\s*Function\s*\|\s*Result\s*\|\s*Empty list\s*\|");

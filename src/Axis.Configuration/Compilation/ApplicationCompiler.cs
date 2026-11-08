@@ -2952,7 +2952,7 @@ public static partial class ApplicationCompiler
             return parsed.Diagnostic;
         }
 
-        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, currentUser: currentUser);
+        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, currentUser: currentUser, sql: true);
         if (!typeCheck.Succeeded)
         {
             return typeCheck.Diagnostic;
