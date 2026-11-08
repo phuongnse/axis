@@ -148,7 +148,8 @@ and Add a host apply at once.
 - **Set quotas.** The Tenant view shows Set quotas for every status. A dialog that names the tenant lists every
   quota key, and each key takes a value, no limit or the cell's default. Saving sends only the keys that
   changed to `PUT /api/cell/tenants/{id}/quotas`, see [the routes](tenant-lifecycle.md#routes), and Save is off
-  until a key has changed. The quota table then shows the quotas that the route answered.
+  until a choice has changed. Its fields are [checked on click](actions-and-controls.md#fields). The quota table
+  then shows the quotas that the route answered.
 - **Add a host.** The Tenant view shows Add a host for every status. A dialog that names the tenant asks for a
   host and calls `POST /api/cell/tenants/{id}/hosts`, see [hosts](tenant-lifecycle.md#hosts). It then shows the
   TXT and CNAME records that the customer must add and when the request expires.

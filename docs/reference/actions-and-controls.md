@@ -99,7 +99,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
   focuses the first. A message goes once the field is put right. A button is disabled only while its
-  action runs. This holds for every form and dialog, as it does for the form widget's Save.
+  action runs. This holds for every form and dialog, as it does for the form widget's Save. A confirmation
+  that asks the user to type a name before a destructive action keeps its button off until the name
+  matches, as [the cell console's Delete](cell-console.md#actions) does.
 
 ## Tab bars
 
