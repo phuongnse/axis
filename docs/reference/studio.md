@@ -761,9 +761,9 @@ The connector editor's Form tab shows the base URL binding, the auth type with i
 the same draft.
 
 - **No values.** A binding is a name, labelled as a URL or a secret binding, and no value of a binding
-  is shown or stored: the editor reads and writes only the resource and schema routes, and the values
-  stay in tenant settings.
-- **Bindings from the tenant** _(planned for M31)_. A binding is chosen from the tenant's names of the
+  is shown or stored: the editor reads the resource and schema routes and the binding names, and
+  writes only the resource, and the values stay in tenant settings.
+- **Bindings from the tenant.** A binding is chosen from the tenant's names of the
   kind it needs, see
   [controls that know what they hold](studio-resource-form.md#controls-that-know-what-they-hold).
 - **Auth.** Choosing a type removes the keys the new type forbids, such as `token` for `header`, and

@@ -555,6 +555,23 @@ export async function fetchStudioCatalog(signal?: AbortSignal): Promise<StudioCa
   return (await response.json()) as StudioCatalog
 }
 
+/** The names of the tenant's deployment bindings by kind, as `GET /api/studio/bindings` answers them. Never a value. */
+export interface StudioBindings {
+  url: string[]
+  secret: string[]
+  storage: string[]
+}
+
+/** Loads the names of the tenant's bindings, for the controls that choose a binding. */
+export async function fetchStudioBindings(signal?: AbortSignal): Promise<StudioBindings> {
+  const path = '/api/studio/bindings'
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioBindings
+}
+
 /** A relaxed point of the application's folder, with the id of its contract, or `null` when the route cannot find one. */
 export interface StudioFolderRelaxedPoint extends StudioRelaxedPoint {
   contractId: string | null

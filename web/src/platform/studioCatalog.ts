@@ -1,5 +1,5 @@
 import { createContext } from 'react'
-import type { StudioCatalog, StudioCatalogSlot, StudioFolderRelaxedPoint } from './studio'
+import type { StudioBindings, StudioCatalog, StudioCatalogSlot, StudioFolderRelaxedPoint } from './studio'
 
 /** What the installed server offers the resource form, or `undefined` until it loads or when it fails to load. */
 export const StudioCatalogContext = createContext<StudioCatalog | undefined>(undefined)
@@ -37,6 +37,27 @@ export function catalogControlOf(kind: unknown, path: string): CatalogControl | 
     Object.hasOwn(catalogFieldsByKind, kind) &&
     Object.hasOwn(catalogFieldsByKind[kind], path)
     ? catalogFieldsByKind[kind][path]
+    : undefined
+}
+
+/** The tenant's binding names, or `undefined` until they load or when they fail to load. */
+export const StudioBindingsContext = createContext<StudioBindings | undefined>(undefined)
+
+/**
+ * The fields that take a binding chosen from the tenant, by kind and field path as {@link catalogFieldsByKind} writes it,
+ * with the kind of binding each needs, see docs/reference/studio-resource-form.md#controls-that-know-what-they-hold.
+ */
+export const bindingFieldsByKind: Record<string, Record<string, keyof StudioBindings>> = {
+  application: { 'fileStorage.binding': 'storage' },
+  webhook: { 'url.binding': 'url', 'secret.binding': 'secret' },
+}
+
+/** The kind of binding a field takes from the tenant, if any. */
+export function bindingKindOf(kind: unknown, path: string): keyof StudioBindings | undefined {
+  return typeof kind === 'string' &&
+    Object.hasOwn(bindingFieldsByKind, kind) &&
+    Object.hasOwn(bindingFieldsByKind[kind], path)
+    ? bindingFieldsByKind[kind][path]
     : undefined
 }
 

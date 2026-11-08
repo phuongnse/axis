@@ -562,7 +562,7 @@ describe('StudioEditor for a site', () => {
 })
 
 describe('StudioEditor for a connector', () => {
-  it('shows the binding names and saves only names, reading only the resource route', async () => {
+  it('shows the binding names and saves only names, reading only the resource route and the binding names', async () => {
     const { fetchMock, url } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
@@ -586,7 +586,7 @@ describe('StudioEditor for a connector', () => {
         typeof operation.value === 'string' || (operation.value as { binding?: unknown })?.binding !== undefined,
       ).toBe(true)
     }
-    expect(new Set(fetchMock.mock.calls.map(([input]) => input))).toEqual(new Set([url]))
+    expect(new Set(fetchMock.mock.calls.map(([input]) => input))).toEqual(new Set([url, '/api/studio/bindings']))
   })
 
   it('keeps an unknown key of the file, of an operation and of the auth object', async () => {

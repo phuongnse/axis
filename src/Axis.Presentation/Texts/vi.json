@@ -1092,6 +1092,8 @@
   "shell.studio.versionRange.fixes": "Chỉ bản sửa lỗi ({major}.{minor}.x)",
   "shell.studio.versionRange.exact": "Chỉ bản này",
   "shell.studio.versionRange.notInstalled": "Bản này không còn được cài. Hãy chọn một bản đã cài.",
+  "shell.studio.binding.noBinding": "Cơ sở dữ liệu của tenant, không dùng binding",
+  "shell.studio.binding.notInTenant": "Tenant không có binding loại này với tên đó. Việc kích hoạt sẽ từ chối tên này.",
   "shell.studio.versionRange.words.compatible": "{version} và các bản {major}.x mới hơn",
   "shell.studio.versionRange.words.fixes": "{version} và các bản {major}.{minor}.x mới hơn",
   "shell.studio.versionRange.words.exact": "Chỉ {version}",

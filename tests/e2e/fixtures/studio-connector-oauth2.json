@@ -3,12 +3,12 @@
   "kind": "connector",
   "name": "WarehouseShipping",
   "formatVersion": 1,
-  "baseUrl": { "binding": "ShippingUrl" },
+  "baseUrl": { "binding": "PurchasingSystemUrl" },
   "auth": {
     "type": "oauth2",
-    "tokenUrl": { "binding": "ShippingTokenUrl" },
-    "clientId": { "binding": "ShippingClientId" },
-    "clientSecret": { "binding": "ShippingClientSecret" },
+    "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+    "clientId": { "binding": "PurchasingSystemClientId" },
+    "clientSecret": { "binding": "PurchasingSystemClientSecret" },
     "scope": "shipments.write"
   },
   "operations": [

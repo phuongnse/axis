@@ -1,5 +1,6 @@
 import type {
   StudioApplication,
+  StudioBindings,
   StudioCatalog,
   StudioDiagnostic,
   StudioNameEntity,
@@ -187,6 +188,12 @@ const catalog = {
   ],
 } satisfies StudioCatalog
 
+const bindings = {
+  url: ['PurchasingSystemUrl', 'PurchasingSystemTokenUrl'],
+  secret: ['PurchasingSystemClientId', 'PurchasingSystemClientSecret'],
+  storage: ['Files'],
+} satisfies StudioBindings
+
 const settings = { autoAccept: false } satisfies { autoAccept: boolean }
 
 /** The routes of the open application, with the state's own applications, resources and names. */
@@ -197,6 +204,7 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/diagnostics`]: () => ({ diagnostics }) satisfies { diagnostics: StudioDiagnostic[] },
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
+    '/api/studio/bindings': () => bindings,
     [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
     [`${folderPath}/releases`]: () => releases,
