@@ -131,6 +131,25 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
     }
 
     [Fact]
+    public async Task The_files_of_a_draft_hold_an_added_resource_and_record_no_version()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        using var revisions = new TemporaryFolder();
+        var author = await NewAuthorAsync(folder.Path, revisions.Path, "author");
+        var draft = Created(await author.Drafts.CreateAsync(author.Revisions, CancellationToken));
+        var policy = Guid.NewGuid();
+        var added = (await author.Drafts.WriteAsync(draft.Id, Policy(policy), CancellationToken)).Value!;
+        var before = (await author.Drafts.FindAsync(draft.Id, CancellationToken)).Value!.Versions;
+
+        var files = (await author.Drafts.FilesAsync(draft.Id, CancellationToken)).Value!;
+
+        Assert.Contains(files, file => file.File == added.File);
+        Assert.Contains(files, file => file.File == RuleFile);
+        Assert.Equal(StudioFolder.Files(folder.Path).Count + 1, files.Count);
+        Assert.Equal(before, (await author.Drafts.FindAsync(draft.Id, CancellationToken)).Value!.Versions);
+    }
+
+    [Fact]
     public async Task Dropping_a_draft_deletes_its_branch_and_its_record()
     {
         using var folder = StudioPublishTests.NewFolder();
@@ -294,6 +313,7 @@ public sealed class StudioDraftTests(PostgreSqlFixture database) : IClassFixture
         {
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.FindAsync(id, CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.ListAsync(id, CancellationToken)).Refusal);
+            Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.FilesAsync(id, CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.ReadAsync(id, rule.Id, CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.WriteAsync(id, Policy(Guid.NewGuid()), CancellationToken)).Refusal);
             Assert.Equal(StudioWriteRefusal.NotFound, (await author.Drafts.DeleteAsync(id, rule.Id, CancellationToken)).Refusal);

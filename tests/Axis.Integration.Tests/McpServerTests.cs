@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Server.Mcp;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -102,7 +103,7 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_author_lists_the_tool_and_list_applications_answers_the_applications_of_the_studio_folders()
+    public async Task An_author_lists_the_tools_and_list_applications_answers_the_applications_of_the_studio_folders()
     {
         var (token, session) = await OpenSessionAsync();
 
@@ -111,9 +112,9 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, tools.StatusCode);
         using var listed = JsonDocument.Parse(await tools.Content.ReadAsStringAsync(CancellationToken));
-        var tool = Assert.Single(listed.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray());
-        Assert.Equal("list_applications", tool.GetProperty("name").GetString());
-        Assert.Equal("object", tool.GetProperty("inputSchema").GetProperty("type").GetString());
+        var offered = listed.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray().ToList();
+        Assert.Equal(McpServer.Tools, offered.Select(tool => tool.GetProperty("name").GetString()!).ToList());
+        Assert.All(offered, tool => Assert.Equal("object", tool.GetProperty("inputSchema").GetProperty("type").GetString()));
 
         Assert.Equal(HttpStatusCode.OK, call.StatusCode);
         using var called = JsonDocument.Parse(await call.Content.ReadAsStringAsync(CancellationToken));

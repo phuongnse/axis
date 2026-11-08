@@ -99,24 +99,26 @@ clients may connect at all.
 
 Each tool takes the application's `name`, and a tool that writes names a draft. Every write goes
 through the authoring API's checks, so a tool can do nothing that the person could not do in Studio.
+A tool with an optional draft reads the working folder without it and the person's own
+[draft](revisions-and-drafts.md#drafts) with it.
 
-| Tool                                       | Input                                               | Output                                                                                                                        |
-| ------------------------------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `list_applications`                        | none                                                | The applications the person may author                                                                                        |
-| `read_reference` _(planned for M35)_       | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
-| `list_resources` _(planned for M35)_       | application, optional draft                         | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                    |
-| `read_resource` _(planned for M35)_        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
-| `read_module_resource` _(planned for M35)_ | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
-| `read_names` _(planned for M35)_           | application, optional draft                         | The names the application defines, as the [names route](authoring.md#names) gives them                                        |
-| `check_expression` _(planned for M35)_     | application, draft, resource, path, expression      | The expression's type and diagnostics                                                                                         |
-| `create_draft` _(planned for M35)_         | application, a title                                | A new [draft](revisions-and-drafts.md#drafts), with the version of the working folder it starts from                          |
-| `write_resource` _(planned for M35)_       | application, draft, resource content                | Creates or replaces a resource in the draft, with its diagnostics                                                             |
-| `write_layer` _(planned for M35)_          | application, draft, module resource, edited content | Writes the layer that holds the difference, as Studio saves do, see [customization layers](customization-layers.md#in-studio) |
-| `delete_resource` _(planned for M35)_      | application, draft, `id`                            | Removes a resource from the draft                                                                                             |
-| `validate_draft` _(planned for M35)_       | application, draft                                  | The draft's diagnostics, contract checks included                                                                             |
-| `run_scenarios` _(planned for M35)_        | application, draft, optional names                  | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher       |
-| `diff_draft` _(planned for M35)_           | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
-| `accept_draft` _(planned for M35)_         | application, draft                                  | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                           |
+| Tool                                   | Input                                               | Output                                                                                                                        |
+| -------------------------------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `list_applications`                    | none                                                | The applications the person may author                                                                                        |
+| `read_reference` _(planned for M35)_   | a topic, such as a resource kind                    | The schema and reference text of that kind, from the installed version of Axis                                                |
+| `list_resources`                       | application, optional draft                         | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                    |
+| `read_resource`                        | application, `id`, optional draft                   | The resource's content and version                                                                                            |
+| `read_module_resource`                 | application, module, `id`                           | A resource of the pinned module version, with the application's layer applied                                                 |
+| `read_names`                           | application, optional draft                         | The names the application defines, as the [names route](authoring.md#names) gives them                                        |
+| `check_expression` _(planned for M35)_ | application, draft, resource, path, expression      | The expression's type and diagnostics                                                                                         |
+| `create_draft` _(planned for M35)_     | application, a title                                | A new [draft](revisions-and-drafts.md#drafts), with the version of the working folder it starts from                          |
+| `write_resource` _(planned for M35)_   | application, draft, resource content                | Creates or replaces a resource in the draft, with its diagnostics                                                             |
+| `write_layer` _(planned for M35)_      | application, draft, module resource, edited content | Writes the layer that holds the difference, as Studio saves do, see [customization layers](customization-layers.md#in-studio) |
+| `delete_resource` _(planned for M35)_  | application, draft, `id`                            | Removes a resource from the draft                                                                                             |
+| `validate_draft` _(planned for M35)_   | application, draft                                  | The draft's diagnostics, contract checks included                                                                             |
+| `run_scenarios` _(planned for M35)_    | application, draft, optional names                  | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher       |
+| `diff_draft` _(planned for M35)_       | application, draft                                  | The draft's changes from the working folder, resource by resource                                                             |
+| `accept_draft` _(planned for M35)_     | application, draft                                  | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                           |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.

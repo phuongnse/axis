@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Tests;
 using Axis.Data.Naming;
 using Axis.Server.Mcp;
 using Axis.Server.Tests;
@@ -18,6 +19,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
 {
     private const string Host = "localhost";
     private const string Version = "2025-11-25";
+    private const string BudgetApprovalId = "94f1cc25-6a68-435f-9383-36fc43aae860";
 
     private Uri? _authority;
     private string? _applications;
@@ -42,6 +44,8 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             builder.UseSetting("Tenants:a:Bindings:GuardUrl:Value", url);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseSetting("Studio:ApplicationsPath", _applications);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
+            builder.UseSetting("Extensions:Path", SamplePackages.Path);
         });
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -67,7 +71,14 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
 
         var failures = await McpToolGuard.LeakFailuresAsync(
             tools,
-            new Dictionary<string, string> { ["list_applications"] = "{}" },
+            new Dictionary<string, string>
+            {
+                ["list_applications"] = "{}",
+                ["list_resources"] = """{"application":"StepApp"}""",
+                ["read_resource"] = $$"""{"application":"StepApp","id":"{{StepAppManifestId()}}"}""",
+                ["read_module_resource"] = $$"""{"application":"PurchaseRequests","module":"department-budgets","id":"{{BudgetApprovalId}}"}""",
+                ["read_names"] = """{"application":"StepApp"}""",
+            },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),
             [TaskApiFixture.RequestTitle(record), secret, url, KeycloakFixture.ClientSecret],
             CancellationToken);
@@ -87,11 +98,19 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ("id", record)));
     }
 
+    // The id of the StepApp manifest, which is a resource of the folder.
+    private static string StepAppManifestId()
+    {
+        using var manifest = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp", "application.json")));
+        return manifest.RootElement.GetProperty("id").GetString()!;
+    }
+
     public async ValueTask InitializeAsync()
     {
         _authority = await keycloak.StartAsync();
         _applications = Directory.CreateTempSubdirectory("axis-mcp-output-").FullName;
         StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp"), Path.Combine(_applications, "step-app"));
+        StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), Path.Combine(_applications, "purchase-requests"));
     }
 
     public ValueTask DisposeAsync()

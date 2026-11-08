@@ -97,7 +97,7 @@ internal static class StudioAuthoringRequestEndpoints
 
         if (StudioFolder.Find(StudioEndpoints.ForRequest(httpContext, options), application) is not { } folder)
         {
-            return StudioEndpoints.NotFound("No Studio folder holds an application with this name.");
+            return StudioEndpoints.NotFound(StudioEndpoints.NoApplication);
         }
 
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
