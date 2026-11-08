@@ -572,6 +572,24 @@ export async function fetchStudioBindings(signal?: AbortSignal): Promise<StudioB
   return (await response.json()) as StudioBindings
 }
 
+/** A relaxed point of the application's folder, with the id of its contract, or `null` when the route cannot find one. */
+export interface StudioFolderRelaxedPoint extends StudioRelaxedPoint {
+  contractId: string | null
+}
+
+/** Loads the relaxed points of the application's saved `application.json`, as `GET .../relaxed` answers them. */
+export async function fetchStudioRelaxed(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioFolderRelaxedPoint[]> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/relaxed`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { items: StudioFolderRelaxedPoint[] }).items
+}
+
 /** A column of the policy matrix: a root entity, data source, process or endpoint. */
 export interface StudioMatrixTarget {
   kind: 'entity' | 'dataSource' | 'process' | 'endpoint'

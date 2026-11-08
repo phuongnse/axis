@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
@@ -49,8 +50,11 @@ namespace Axis.Admin;
 /// setting it fails with <c>AXC0217</c>, and an unknown scenario name fails it with <c>AXC0218</c>.
 /// An <c>accept</c> applies a person's draft to the application's folder, see <see href="docs/reference/revisions-and-drafts.md#accepting-a-draft">accepting a draft</see>.
 /// Holding the folder's write lock throughout, it fails when the draft is not the requester's or a resource the draft read has changed on
-/// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files. Only then does it write the changed files
-/// and commit one revision, and on any failure the folder and <c>main</c> stay as they were. It has no audit record.
+/// <c>main</c> (<c>AXC0377</c>), then runs the steps of a <c>validate</c> on the applied files, with their contract scenarios, and
+/// then a <c>test</c> step with the application's own test scenarios, in the same way and with the same limit as a <c>test</c>
+/// request, except that a stop never cuts them short. Only then does it write the changed files and commit one revision, and on any
+/// failure the folder and <c>main</c> stay as they were. It stores the outcomes of the scenarios on the request, the contract
+/// scenarios first. It has no audit record.
 /// The first four kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
 /// own for each application, and run in a second loop of this process, so a long test holds up no publish and a publish holds
 /// up no test. While a request runs,
@@ -60,7 +64,7 @@ namespace Axis.Admin;
 /// so the next round claims it again on a new connection, within the same three claims. Every step runs as the tenant's schema role. A <c>test</c> may run for at most
 /// 10 minutes, and past that its running scenario fails, its database is dropped and the request ends <c>failed</c> with
 /// <c>AXC0219</c>. A stop ends a running <c>test</c> at once in the same way, with <c>AXC0220</c>, and lets a running
-/// <c>publish</c>, <c>validate</c> or <c>activate</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
+/// <c>publish</c>, <c>validate</c>, <c>activate</c> or <c>accept</c> finish. Then the loops end. The tenants come from the tenant directory or from the <c>Tenants</c> configuration section,
 /// see <see cref="IPublisherTenants"/>. After a <c>publish</c> or an <c>activate</c> that left a work item due now for the tenant, such
 /// as a schedule trigger that is past due, the publisher sends the wake signal for that tenant, and a failure to send it fails nothing.
 /// Under the directory source it also runs the provisioning jobs of <c>platform.jobs</c> in a third loop, see <see cref="ProvisioningJobs"/>.
@@ -504,7 +508,7 @@ internal sealed class Publisher(
             return;
         }
 
-        var contractResults = new JsonArray();
+        var scenarioResults = new JsonArray();
         if (request.Kind == "validate")
         {
             var valid = await activation.ValidateAsync(
@@ -516,17 +520,17 @@ internal sealed class Publisher(
                     ? null
                     : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics,
-                contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
+                contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false, ContractResultsJson(contractResults));
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false, ScenarioResultsJson(scenarioResults));
             return;
         }
 
         if (request.Kind == "accept")
         {
-            var accepted = await AcceptAsync(tenant, connections, request, activation, diagnostics, contractResults);
+            var accepted = await AcceptAsync(tenant, connections, request, activation, diagnostics, scenarioResults);
             await StopRenewalAsync(renewing, renewal);
-            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(accepted, null), diagnostics, audit: false, ContractResultsJson(contractResults));
+            await FinishAsync(tenant.Id, connections, request, new ReleaseRun(accepted, null), diagnostics, audit: false, ScenarioResultsJson(scenarioResults));
             return;
         }
 
@@ -571,26 +575,26 @@ internal sealed class Publisher(
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
                 syncRealm: target.SyncRealm,
-                contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
+                contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
         }
 
         await WakeAsync(target.Id, publishSignals);
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.
         await StopRenewalAsync(renewing, renewal);
-        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ContractResultsJson(contractResults));
+        await FinishAsync(tenant.Id, connections, request, run, diagnostics, audit: !preview, ScenarioResultsJson(scenarioResults));
     }
 
     // Applies a person's draft to the application's folder as one revision. The folder's write lock spans every step, so Studio
-    // writes wait and nothing changes between the conflict check, the checks of the applied files and the write. A failure
-    // before the write leaves the folder and main as they were.
+    // writes wait and nothing changes between the conflict check, the checks of the applied files, the application's own test
+    // scenarios and the write. A failure before the write leaves the folder and main as they were.
     private async Task<bool> AcceptAsync(
         PublisherTenant tenant,
         ITenantConnections connections,
         ClaimedRequest request,
         TenantReleaseActivation activation,
         List<Diagnostic> diagnostics,
-        JsonArray contractResults)
+        JsonArray scenarioResults)
     {
         const string notFound = "The draft is not found.";
         if (Studio?.WriteLock is not { } writeLock
@@ -655,8 +659,17 @@ internal sealed class Publisher(
             tenant.Bindings,
             configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
             diagnostics,
-            contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, contractResults, testLimit));
+            contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
         if (!valid)
+        {
+            return false;
+        }
+
+        // Without scenarios the step does not run, so the application needs no scenario server. A stop never cuts them short.
+        var ownScenarios = ApplicationLoader.Load(files).Scenarios.Select(scenario => scenario.Name).ToList();
+        if (ownScenarios.Count > 0
+            && !await activation.TestStepAsync(
+                tenant.Id, scenarioServer, files, JsonSerializer.Serialize(ownScenarios), settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit, CancellationToken.None))
         {
             return false;
         }
@@ -707,8 +720,9 @@ internal sealed class Publisher(
         }
     }
 
-    // The outcomes of the contract scenarios of a publish or validate, or null when none ran.
-    private static string? ContractResultsJson(JsonArray results) => results.Count > 0 ? results.ToJsonString() : null;
+    // The outcomes of the contract scenarios of a publish or validate, and of an accept's contract scenarios and then its own
+    // scenarios, or null when none ran.
+    private static string? ScenarioResultsJson(JsonArray results) => results.Count > 0 ? results.ToJsonString() : null;
 
     // The release of an activate, rebuilt from its stored files as the server does when it serves a release. A release that
     // is missing, or that belongs to another application, is a failure of the step, and so is a failure to rebuild it.

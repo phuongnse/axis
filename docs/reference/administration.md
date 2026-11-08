@@ -597,7 +597,7 @@ tenant's schema role unless it says otherwise.
    those that had not started get none. The step writes `<tenant> test failed: AXC0219 …`. A `test`
    gets no audit record and no release id.
 
-8. For `accept`: the steps are `draft`, `version`, `contracts`, `validate` and `accept`, in the order
+8. For `accept`: the steps are `draft`, `version`, `contracts`, `validate`, `test` and `accept`, in the order
    of [accepting a draft](revisions-and-drafts.md#accepting-a-draft), and the publisher holds the
    folder's write lock from `draft` to `accept`. It reads the folder named by `Studio:Folders` and
    writes it, so it needs the Studio settings and `ConnectionStrings:Platform`.
@@ -609,8 +609,13 @@ tenant's schema role unless it says otherwise.
      that changed on `main` since the draft read it writes
      `<tenant> draft failed: AXC0377 <message>`, and the step ends the request.
    - `version`, `contracts` and `validate` are as for a `validate`, and run on the folder's files
-     with the draft applied, in memory. They run the contract scenarios and not the application's own
-     test scenarios, store no release and change nothing.
+     with the draft applied, in memory. They store no release and change nothing.
+   - `test` runs only the application's own scenarios on those files, as for a `test` request and with
+     the same 10-minute limit, which ends the request `failed` with `AXC0219`. An application with no
+     scenario has no `test` step and needs no scenario server. Otherwise the step fails with
+     `AXC0217` when the setting is empty. A stop never cuts the scenarios short. Each outcome goes in
+     the request's `scenario_results` after the contract scenarios, and a failing scenario writes
+     `<tenant> test failed: …` and ends the request with nothing written.
    - `accept` writes the changed files to the folder, commits them as one revision and deletes the
      draft. It writes `<tenant> accept ok`, or `<tenant> accept failed: <message>` when a file cannot
      be written or the revision cannot be recorded.
@@ -663,7 +668,7 @@ because it is stored on the request.
   tenant that has a realm, so it must reach it and trust its certificate.
 - **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the request it is
   running, then exits. A `publish`, `validate`, `activate` or `accept` finishes first, and so do the contract
-  scenarios of a `publish`, `validate` or `accept`. A running `test` request is the exception, because a test
+  scenarios of a `publish`, `validate` or `accept`, and the test scenarios of an `accept`. A running `test` request is the exception, because a test
   may run for 10 minutes, which is longer than the stop grace period of both installs: the publisher
   stops it at once, the running scenario fails, its scenario database is dropped, and the request
   ends `failed` with `AXC0220`. The step writes `<tenant> test failed: AXC0220 …`.

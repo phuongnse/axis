@@ -205,6 +205,7 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     [`${folderPath}/names`]: () => names(folder),
     '/api/studio/catalog': () => catalog,
     '/api/studio/bindings': () => bindings,
+    [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
     [`${folderPath}/releases`]: () => releases,
     [`${folderPath}/settings`]: () => settings,

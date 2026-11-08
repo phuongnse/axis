@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Modules;
+using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -15,7 +17,8 @@ namespace Axis.Server.Mcp;
 /// <summary>
 /// The MCP server of a tenant host, at <c>/mcp</c>. It speaks the Streamable HTTP transport as a server that offers no
 /// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
-/// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The tools are
+/// <c>list_applications</c> and the read tools of <see cref="McpReadTools"/>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
 /// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
@@ -37,6 +40,11 @@ internal static partial class McpServer
     private const string VersionHeader = "MCP-Protocol-Version";
     private const int MaxBodyBytes = 1024 * 1024;
     private const string ListApplicationsTool = "list_applications";
+    private const string ListResourcesTool = "list_resources";
+    private const string ReadResourceTool = "read_resource";
+    private const string ReadModuleResourceTool = "read_module_resource";
+    private const string ReadNamesTool = "read_names";
+    private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
 
     private const int ParseError = -32700;
@@ -44,8 +52,36 @@ internal static partial class McpServer
     private const int MethodNotFound = -32601;
     private const int InvalidParams = -32602;
 
+    private static readonly ToolProperty _applicationInput = new("application", "The name of the application.", true);
+    private static readonly ToolProperty _draftInput = new("draft", "The id of one of your drafts of the application. Leave it out to read the working folder.", false);
+    private static readonly ToolProperty _idInput = new("id", "The id of the resource.", true);
+    private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
+
+    private static readonly ToolDefinition[] _definitions =
+    [
+        new(ListApplicationsTool, "Lists the applications you may author.", []),
+        new(
+            ListResourcesTool,
+            "Lists the resources of an application: each one's id, kind, name, file, version, titles and how many references use it. "
+            + "Reads the working folder, or your draft when you name one.",
+            [_applicationInput, _draftInput]),
+        new(
+            ReadResourceTool,
+            "Reads one resource of an application by its id: its content and version. Reads the working folder, or your draft when you name one.",
+            [_applicationInput, _idInput, _draftInput]),
+        new(
+            ReadModuleResourceTool,
+            "Reads one resource of the module version the application pins, with the application's customization layer applied, "
+            + "and tells which layer applied and what it added, changed and removed.",
+            [_applicationInput, _moduleInput, _idInput]),
+        new(
+            ReadNamesTool,
+            "Lists every name the application defines, module names included. Reads the working folder, or your draft when you name one.",
+            [_applicationInput, _draftInput]),
+    ];
+
     /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
-    internal static readonly IReadOnlyList<string> Tools = [ListApplicationsTool];
+    internal static readonly IReadOnlyList<string> Tools = [.. _definitions.Select(definition => definition.Name)];
 
     private static readonly string _serverVersion =
         typeof(McpServer).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0";
@@ -113,7 +149,15 @@ internal static partial class McpServer
                 });
         }).WithMetadata(McpMetadataRoute.Instance);
 
-    private static async Task<IResult> PostAsync(HttpContext context, ITenantContextAccessor tenants, StudioOptions studio, McpSession sessions, ILoggerFactory loggers)
+    private static async Task<IResult> PostAsync(
+        HttpContext context,
+        ITenantContextAccessor tenants,
+        StudioOptions studio,
+        McpSession sessions,
+        ILoggerFactory loggers,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        IStudioWriteLock writeLock)
     {
         var tenantId = tenants.Current?.TenantId ?? throw new InvalidOperationException("No tenant context is set.");
         if (EndpointCaller.Read(context.User) is not { } caller || !studio.ForTenant(tenantId).Allows(caller.Roles))
@@ -189,61 +233,78 @@ internal static partial class McpServer
         {
             "ping" => Result(id, new JsonObject()),
             "tools/list" => Result(id, ListTools()),
-            "tools/call" => CallTool(message["params"], id, tenantId, caller.ClientId, studio, loggers.CreateLogger(typeof(McpServer).FullName!)),
+            "tools/call" => await CallToolAsync(
+                message["params"],
+                id,
+                new McpReadContext(studio.ForTenant(tenantId), caller, packages, modules, writeLock),
+                loggers.CreateLogger(typeof(McpServer).FullName!),
+                context.RequestAborted),
             _ => Error(StatusCodes.Status200OK, id, MethodNotFound, "The method is not supported."),
         };
     }
 
     /// <summary>The <c>tools/list</c> answer, which offers each tool the server serves.</summary>
     internal static JsonObject ListTools() =>
-        new()
-        {
-            ["tools"] = new JsonArray(new JsonObject
-            {
-                ["name"] = ListApplicationsTool,
-                ["description"] = "Lists the applications you may author.",
-                ["inputSchema"] = new JsonObject
-                {
-                    ["type"] = "object",
-                    ["properties"] = new JsonObject(),
-                    ["additionalProperties"] = false,
-                },
-            }),
-        };
+        new() { ["tools"] = new JsonArray([.. _definitions.Select(definition => (JsonNode)definition.Describe())]) };
 
     /// <summary>
-    /// Runs one tool. A call that names no tool is the JSON-RPC error <c>-32602</c>. An unknown tool and bad input are a tool
-    /// error, a result marked <c>isError</c> whose text is a fixed problem title. Each call writes one log entry, which
-    /// names the tool only when it is known, never the input or the output.
+    /// Runs one tool. A call that names no tool is the JSON-RPC error <c>-32602</c>. An unknown tool, input that breaks the tool's
+    /// input schema and a refused call are a tool error, a result marked <c>isError</c> whose text is a problem title of the
+    /// authoring API or a fixed one. Each call writes one log entry, which names the tool only when it is known, never the input
+    /// or the output.
     /// </summary>
-    private static IResult CallTool(JsonNode? parameters, JsonNode? id, string tenantId, string? clientId, StudioOptions studio, ILogger logger)
+    private static async Task<IResult> CallToolAsync(JsonNode? parameters, JsonNode? id, McpReadContext context, ILogger logger, CancellationToken ct)
     {
+        var clientId = context.Caller.ClientId;
         if (parameters is not JsonObject call || call["name"] is not JsonValue nameValue || !nameValue.TryGetValue<string>(out var tool))
         {
             LogToolCall(logger, UnknownTool, clientId, "invalid params");
             return Error(StatusCodes.Status200OK, id, InvalidParams, "The call names no tool.");
         }
 
-        if (!Tools.Contains(tool, StringComparer.Ordinal))
+        if (_definitions.FirstOrDefault(definition => definition.Name == tool) is not { } definition)
         {
             LogToolCall(logger, UnknownTool, clientId, "tool error");
             return ToolError(id, "The tool does not exist.");
         }
 
-        if (call["arguments"] is { } arguments && arguments is not JsonObject { Count: 0 })
+        if (definition.Read(call["arguments"]) is not { } arguments)
         {
             LogToolCall(logger, tool, clientId, "tool error");
-            return ToolError(id, "The tool takes no input.");
+            return ToolError(id, definition.Properties.Count == 0 ? "The tool takes no input." : InputMismatch);
         }
 
-        var output = JsonSerializer.SerializeToNode(StudioEndpoints.ListApplications(studio.ForTenant(tenantId)), JsonSerializerOptions.Web);
+        var (output, error) = await RunAsync(tool, arguments, context, ct);
+        if (error is not null)
+        {
+            LogToolCall(logger, tool, clientId, "tool error");
+            return ToolError(id, error);
+        }
+
+        var node = JsonSerializer.SerializeToNode(output, JsonSerializerOptions.Web);
         LogToolCall(logger, tool, clientId, "succeeded");
         return Result(id, new JsonObject
         {
-            ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = output!.ToJsonString() }),
-            ["structuredContent"] = output,
+            ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = node!.ToJsonString() }),
+            ["structuredContent"] = node,
             ["isError"] = false,
         });
+    }
+
+    // The tool's output, which is a JSON object, or the text of its tool error. The arguments are checked against the tool's properties.
+    private static async Task<(object? Output, string? Error)> RunAsync(
+        string tool, IReadOnlyDictionary<string, string> arguments, McpReadContext context, CancellationToken ct)
+    {
+        arguments.TryGetValue(_draftInput.Name, out var draft);
+        return tool switch
+        {
+            ListApplicationsTool => (StudioEndpoints.ListApplications(context.Options), null),
+            ListResourcesTool => await McpReadTools.ListResourcesAsync(context, arguments[_applicationInput.Name], draft, ct),
+            ReadResourceTool => await McpReadTools.ReadResourceAsync(context, arguments[_applicationInput.Name], arguments[_idInput.Name], draft, ct),
+            ReadModuleResourceTool => McpReadTools.ReadModuleResource(context, arguments[_applicationInput.Name], arguments[_moduleInput.Name], arguments[_idInput.Name]),
+            ReadNamesTool => await McpReadTools.ReadNamesAsync(context, arguments[_applicationInput.Name], draft, ct),
+            _ => throw new InvalidOperationException("The tool has no implementation."),
+        };
     }
 
     private static IResult ToolError(JsonNode? id, string title) =>
@@ -311,5 +372,60 @@ internal sealed class McpMetadataRoute
 
     private McpMetadataRoute()
     {
+    }
+}
+
+/// <summary>One string property of a tool's input: its name, what it holds and whether a call must give it.</summary>
+internal sealed record ToolProperty(string Name, string Description, bool Required);
+
+/// <summary>A tool of the MCP server: its name, its description and the string properties of its input.</summary>
+internal sealed record ToolDefinition(string Name, string Description, IReadOnlyList<ToolProperty> Properties)
+{
+    /// <summary>The <c>tools/list</c> entry: the name, the description and an input schema that lists exactly the properties.</summary>
+    public JsonObject Describe()
+    {
+        var properties = new JsonObject();
+        foreach (var property in Properties)
+        {
+            properties[property.Name] = new JsonObject { ["type"] = "string", ["description"] = property.Description };
+        }
+
+        return new JsonObject
+        {
+            ["name"] = Name,
+            ["description"] = Description,
+            ["inputSchema"] = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = properties,
+                ["required"] = new JsonArray([.. Properties.Where(property => property.Required).Select(property => (JsonNode)property.Name)]),
+                ["additionalProperties"] = false,
+            },
+        };
+    }
+
+    /// <summary>
+    /// The arguments by property name, or null when they break the input schema: a key that is not a property, a required
+    /// property that is missing or a value that is not a string. A missing <c>arguments</c> is none.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Read(JsonNode? arguments)
+    {
+        if (arguments is not null and not JsonObject)
+        {
+            return null;
+        }
+
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (key, value) in arguments?.AsObject() ?? [])
+        {
+            if (!Properties.Any(property => property.Name == key) || value is not JsonValue text || !text.TryGetValue<string>(out var content))
+            {
+                return null;
+            }
+
+            values[key] = content;
+        }
+
+        return Properties.All(property => !property.Required || values.ContainsKey(property.Name)) ? values : null;
     }
 }

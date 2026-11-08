@@ -1,14 +1,15 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useEffect, useState, type ComponentProps } from 'react'
+import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { designTokensFor } from '../platform/designTokens'
 import { setAt } from '../platform/jsonPatch'
 import { policyKeyedLists } from '../platform/layerMarks'
-import type { StudioBindings, StudioCatalog, StudioNames } from '../platform/studio'
-import { StudioBindingsContext, StudioCatalogContext } from '../platform/studioCatalog'
+import type { StudioBindings, StudioCatalog, StudioFolderRelaxedPoint, StudioNames } from '../platform/studio'
+import { StudioBindingsContext, StudioCatalogContext, StudioRelaxedContext } from '../platform/studioCatalog'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
@@ -75,23 +76,28 @@ function renderForm(
     names?: StudioNames
     catalog?: StudioCatalog
     bindings?: StudioBindings
+    relaxed?: StudioFolderRelaxedPoint[]
   } = {},
 ) {
-  const { names: shownNames = names, catalog, bindings, ...formProps } = extra
+  const { names: shownNames = names, catalog, bindings, relaxed, ...formProps } = extra
   render(
-    <ThemeModeProvider>
-      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-        <StudioNamesContext.Provider value={shownNames}>
-          <StudioCatalogContext.Provider value={catalog}>
-            <StudioBindingsContext.Provider value={bindings}>
-              <LabelTextsContext.Provider value={labelContext}>
-                <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
-              </LabelTextsContext.Provider>
-            </StudioBindingsContext.Provider>
-          </StudioCatalogContext.Provider>
-        </StudioNamesContext.Provider>
-      </TextProvider>
-    </ThemeModeProvider>,
+    <MemoryRouter>
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={shownNames}>
+            <StudioCatalogContext.Provider value={catalog}>
+              <StudioBindingsContext.Provider value={bindings}>
+                <StudioRelaxedContext.Provider value={relaxed && { application: 'Shop', points: relaxed }}>
+                  <LabelTextsContext.Provider value={labelContext}>
+                    <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
+                  </LabelTextsContext.Provider>
+                </StudioRelaxedContext.Provider>
+              </StudioBindingsContext.Provider>
+            </StudioCatalogContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>
+    </MemoryRouter>,
   )
 }
 
@@ -333,11 +339,11 @@ describe('SchemaForm sections', () => {
     ])
   })
 
-  it('draws a module as a row that opens Edit module, a large dialog with its relaxed points as rows of inputs', async () => {
+  it('draws a module as a row that opens Edit module, a large dialog with no relaxed points to edit', async () => {
     const onChange = vi.fn()
     renderForm(
       (await loadKindSchema('application'))!,
-      { name: 'Shop', modules: [{ id: 'Sales', version: '^1.0.0', relax: [{ point: 'a.b' }] }] },
+      { name: 'Shop', modules: [{ id: 'Sales', version: '^1.0.0', relax: [{ point: 'a.b', reason: 'Small team' }] }] },
       onChange,
     )
 
@@ -345,13 +351,17 @@ describe('SchemaForm sections', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Edit module' })
 
     expect(dialog.closest('.ant-modal')).toHaveStyle({ width: `${designTokensFor('light').size.dialog.large}px` })
-    const point = within(dialog).getByTestId('studio-field-/modules/0/relax/0/point')
-    expect(within(point).getByRole('textbox')).toHaveValue('a.b')
-    expect(within(dialog).queryByRole('table')).toBeNull()
-
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Add row' }))
-    expect(within(dialog).getByTestId('studio-field-/modules/0/relax/1/point')).toBeVisible()
+    expect(within(dialog).queryByTestId('studio-field-/modules/0/relax')).toBeNull()
+    expect(within(dialog).queryByTestId('studio-field-/modules/0/relax/0/point')).toBeNull()
+    expect(within(dialog).queryByRole('button', { name: 'Add row' })).toBeNull()
     expect(onChange).not.toHaveBeenCalled()
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(onChange).toHaveBeenCalledWith('/modules/0', {
+      id: 'Sales',
+      version: '^1.0.0',
+      relax: [{ point: 'a.b', reason: 'Small team' }],
+    })
   })
 
   it('shows the fields of the File storage object without a label or group of its own', async () => {
@@ -635,6 +645,17 @@ describe('SchemaForm controls that know what they hold', () => {
     return (await screen.findByText(title)).closest<HTMLElement>('[role="dialog"]')!
   }
 
+  const relaxedPoint: StudioFolderRelaxedPoint = {
+    module: 'sales',
+    point: 'Budget/transitions/approve',
+    reason: 'Small team',
+    moduleTitle: 'Sales',
+    part: 'transition',
+    entityTitles: { en: 'Budget' },
+    titles: { en: 'Approve a budget' },
+    contractId: '7c1d2e3f-0000-4000-8000-000000000001',
+  }
+
   async function openAddModule(value: Record<string, unknown>, onChange: ChangeHandler = vi.fn()) {
     renderForm((await loadKindSchema('application'))!, value, onChange, { catalog, names: catalogNames })
     await userEvent.click(
@@ -665,7 +686,7 @@ describe('SchemaForm controls that know what they hold', () => {
       onChange,
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
     const dialog = await findDialog('Edit module')
 
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Module' }))
@@ -683,7 +704,7 @@ describe('SchemaForm controls that know what they hold', () => {
       onChange,
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
     const dialog = await findDialog('Edit module')
 
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Updates' }))
@@ -703,7 +724,7 @@ describe('SchemaForm controls that know what they hold', () => {
       onChange,
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
     const dialog = await findDialog('Edit module')
 
     const approver = within(dialog).getByRole('combobox', { name: 'Budget approver' })
@@ -731,7 +752,7 @@ describe('SchemaForm controls that know what they hold', () => {
       vi.fn(),
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'hr' }))
+    await userEvent.click(screen.getByRole('button', { name: 'People' }))
     const dialog = await findDialog('Edit module')
 
     expect(within(dialog).getAllByText(english['shell.studio.module.noSlots'])).toHaveLength(1)
@@ -745,7 +766,7 @@ describe('SchemaForm controls that know what they hold', () => {
       vi.fn(),
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
     const dialog = await findDialog('Edit module')
 
     const version = within(dialog).getByTestId('studio-field-/modules/0/version')
@@ -768,7 +789,7 @@ describe('SchemaForm controls that know what they hold', () => {
       vi.fn(),
       { catalog, names: catalogNames },
     )
-    await userEvent.click(screen.getByRole('button', { name: 'sales' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Sales' }))
     let dialog = await findDialog('Edit module')
     expect(within(within(dialog).getByTestId('studio-field-/modules/0/version')).getByRole('textbox')).toHaveValue(
       'latest',
@@ -780,6 +801,98 @@ describe('SchemaForm controls that know what they hold', () => {
     expect(within(within(dialog).getByTestId('studio-field-/modules/1/version')).getByRole('textbox')).toHaveValue(
       '^1.0.0',
     )
+  })
+
+  it('shows the module and the package in the table by the label of their manifest', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      {
+        name: 'Shop',
+        modules: [{ id: 'sales', version: '^1.2.0' }],
+        packages: [{ id: 'finance', version: '^3.1.0' }],
+      },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+
+    const modules = screen.getByTestId('studio-field-/modules')
+    expect(within(modules).getByRole('button', { name: 'Sales' })).toBeVisible()
+    expect(within(modules).queryByText('sales')).toBeNull()
+    expect(within(screen.getByTestId('studio-field-/packages')).getByRole('button', { name: 'Finance' })).toBeVisible()
+  })
+
+  it('shows each role slot of the installed module as a line, and "Not mapped" in warning colour for one no role plays', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+
+    const modules = screen.getByTestId('studio-field-/modules')
+    const line = within(modules).getByText(/^Budget approver:/)
+    expect(line).toHaveTextContent('Budget approver: Not mapped')
+    expect(within(line).getByText('Not mapped')).toHaveStyle({ color: designTokensFor('light').colour.warningText })
+  })
+
+  it('shows the role that plays a slot by its name, without the warning', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0', roles: { approver: 'department-manager' } }] },
+      vi.fn(),
+      { catalog, names: catalogNames },
+    )
+
+    const line = within(screen.getByTestId('studio-field-/modules')).getByText(/^Budget approver:/)
+    expect(line).toHaveTextContent('Budget approver: department-manager')
+    expect(within(line).queryByText('Not mapped')).toBeNull()
+  })
+
+  it('shows a relaxed point as a link to its contract page, then its reason, with no input in the cell', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0', relax: [{ point: relaxedPoint.point }] }] },
+      vi.fn(),
+      {
+        catalog,
+        names: catalogNames,
+        relaxed: [relaxedPoint, { ...relaxedPoint, module: 'hr', point: 'Other/point' }],
+      },
+    )
+
+    const cells = screen.getAllByTestId('studio-relaxed-point')
+    expect(cells).toHaveLength(1)
+    const link = within(cells[0]).getByRole('link', { name: 'Approve a budget' })
+    expect(link).toHaveAttribute('href', `/studio?app=Shop&resource=${relaxedPoint.contractId}`)
+    expect(cells[0]).toHaveTextContent('Approve a budgetSmall team')
+    expect(within(cells[0]).queryByRole('textbox')).toBeNull()
+    expect(within(cells[0]).queryByRole('combobox')).toBeNull()
+  })
+
+  it('shows a relaxed point whose contract is not found as plain text', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      vi.fn(),
+      { catalog, names: catalogNames, relaxed: [{ ...relaxedPoint, contractId: null }] },
+    )
+
+    const cell = screen.getByTestId('studio-relaxed-point')
+    expect(within(cell).queryByRole('link')).toBeNull()
+    expect(cell).toHaveTextContent('Approve a budgetSmall team')
+  })
+
+  it('leaves the Relaxed points column out when no module has a relaxed point', async () => {
+    renderForm(
+      (await loadKindSchema('application'))!,
+      { name: 'Shop', modules: [{ id: 'sales', version: '^1.2.0' }] },
+      vi.fn(),
+      { catalog, names: catalogNames, relaxed: [] },
+    )
+
+    expect(
+      within(screen.getByTestId('studio-field-/modules')).queryByRole('columnheader', { name: 'Relaxed points' }),
+    ).toBeNull()
   })
 
   it('keeps the text inputs until the catalog loads', async () => {

@@ -83,13 +83,13 @@ values keeps its rows of inputs.
   they were.
 - **Layer marks.** In a module's resource, a row that the [customization layer](customization-layers.md#in-studio)
   added or changed shows its tag in the first cell, and the rows the layer removed show below the table.
-- **A known kind's label.** _(planned for M31)_ A value of a known kind shows its label, such as a module
+- **A known kind's label.** A value of a known kind shows its label, such as a module
   or a package by the label of its manifest.
-- **A module's roles.** _(planned for M31)_ A module's roles are one line for each slot, such as "Budget
-  approver: Department manager", and a slot that no role plays reads "Not mapped" in `warningText`.
-- **A module's relaxed points.** _(planned for M31)_ A module's relaxed points show as
+- **A module's roles.** A module's roles are one line for each slot, such as "Budget
+  approver: department-manager", which names the application's role, and a slot that no role plays reads "Not mapped" in `warningText`.
+- **A module's relaxed points.** A module's relaxed points show as
   [relaxed points in Settings](#relaxed-points-in-settings) says.
-- **A version range's column.** _(planned for M31)_ A version range is as wide as its content.
+- **A version range's column.** A version range is as wide as its content.
 
 ## Controls that know what they hold
 
@@ -108,8 +108,6 @@ The file keeps a version range as written, and a table shows it in words, as "1.
 to choose an installed one.
 
 ## Relaxed points in Settings
-
-_(planned for M31)_
 
 The Modules table's Relaxed points cell lists each of a module's relaxed points in two lines, from
 [`GET .../relaxed`](#studio-api): its name as a link to it on its contract's page, then its reason. Its
