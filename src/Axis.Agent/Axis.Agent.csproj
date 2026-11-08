@@ -5,6 +5,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Axis.Agent.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Axis.Hosting\Axis.Hosting.csproj" />
   </ItemGroup>
 

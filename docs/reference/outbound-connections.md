@@ -6,7 +6,7 @@ its address, and the rules that keep that list closed. The TLS rule of each conn
 
 ## Connections
 
-The server and the worker open these connections:
+The server, the worker and the agent host open these connections:
 
 | Host | Destination | Named by | TLS |
 | --- | --- | --- | --- |
@@ -18,6 +18,7 @@ The server and the worker open these connections:
 | worker | A connector's OAuth2 token endpoint | The `url` binding that an `oauth2` auth names as its `tokenUrl`, see [OAuth2 auth](integration-resources.md#oauth2-auth) | [URL bindings](installation.md#tls) |
 | worker | A webhook's receiver | The `url` binding that the webhook names as its `url`, see [outbound webhooks](outbound-webhooks.md#webhook-resource) | [URL bindings](installation.md#tls) |
 | worker | A package operation's service | A `url` binding that the operation declares in its `capabilities` | [URL bindings](installation.md#tls) |
+| agent | A model provider's API | `Ai:Bindings:<name>:Endpoint`, or the provider's own address when it is empty, see [model bindings](model-bindings.md#bindings) | HTTPS |
 | worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](installation.md#tls) |
 
 The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema` and

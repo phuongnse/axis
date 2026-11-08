@@ -85,6 +85,8 @@ The integration tests share their containers, so a run starts each service at mo
   Tenant isolation tests still use one tenant database per tenant. Tests that read
   `pg_stat_activity` filter on `current_database()`, so they neither see nor end other classes'
   sessions.
+- **Models.** No test calls a paid model. Tests that need a model's answer use the scripted adapter,
+  see [model bindings](reference/model-bindings.md#bindings).
 - **Scenarios.** `scripts/integration.sh` runs the scenarios of every application under
   `samples/apps/` from the integration tests, on their PostgreSQL container, see
   [test scenarios](reference/test-scenarios.md).
