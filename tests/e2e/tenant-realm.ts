@@ -100,6 +100,27 @@ export async function addRealmAccount(
   return { id, username: email, password, secret }
 }
 
+/**
+ * Adds a public client to `realm` that signs a person in through the code flow and requires consent, so its sign-in opens
+ * the consent screen. The realm's default optional scopes already include `axis:authoring`.
+ */
+export async function addConsentClient(
+  realm: string,
+  { clientId, name, baseUrl, redirectUri }: { clientId: string; name: string; baseUrl: string; redirectUri: string },
+): Promise<void> {
+  await admin(`Creating the client ${clientId} in ${realm}`, 'POST', `/${realm}/clients`, {
+    clientId,
+    name,
+    enabled: true,
+    publicClient: true,
+    standardFlowEnabled: true,
+    consentRequired: true,
+    rootUrl: baseUrl,
+    baseUrl,
+    redirectUris: [redirectUri],
+  })
+}
+
 /** Removes the required actions of the user `userId` of `realm`, such as the setup of an authenticator that a realm adds to every new account. */
 export async function clearRequiredActions(realm: string, userId: string): Promise<void> {
   await admin(`Clearing the required actions of ${userId}`, 'PUT', `/${realm}/users/${userId}`, { requiredActions: [] })

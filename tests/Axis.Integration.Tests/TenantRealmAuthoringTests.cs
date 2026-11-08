@@ -158,6 +158,41 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         Assert.DoesNotContain("offline_access", optional);
     }
 
+    [Fact]
+    public async Task Each_host_write_gives_the_authoring_scope_its_consent_text_even_when_the_text_was_removed()
+    {
+        var (realm, _) = await NewRealmAsync();
+
+        var scope = await AuthoringScopeAsync(realm);
+        Assert.Equal("${axisAuthoringScopeConsentText}", Attribute(scope, "consent.screen.text"));
+        Assert.Equal("true", Attribute(scope, "display.on.consent.screen"));
+
+        var stripped = scope.Deserialize<Dictionary<string, JsonElement>>()!;
+        var attributes = scope.GetProperty("attributes").Deserialize<Dictionary<string, JsonElement>>()!;
+        // Keycloak keeps an attribute that an update leaves out, so the text is emptied.
+        attributes["consent.screen.text"] = JsonSerializer.SerializeToElement(string.Empty);
+        stripped["attributes"] = JsonSerializer.SerializeToElement(attributes);
+        using (var removed = await SendAsync(HttpMethod.Put, $"admin/realms/{realm}/client-scopes/{scope.GetProperty("id").GetString()}", stripped))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        }
+
+        Assert.NotEqual("${axisAuthoringScopeConsentText}", Attribute(await AuthoringScopeAsync(realm), "consent.screen.text"));
+
+        await new RealmSync(_http, _baseAddress).SyncPlatformAddressesAsync(realm, _secrets.Activation, [Host], CancellationToken);
+
+        var repaired = await AuthoringScopeAsync(realm);
+        Assert.Equal("${axisAuthoringScopeConsentText}", Attribute(repaired, "consent.screen.text"));
+        Assert.Equal("true", Attribute(repaired, "include.in.token.scope"));
+    }
+
+    private async Task<JsonElement> AuthoringScopeAsync(string realm) =>
+        (await GetJsonAsync($"admin/realms/{realm}/client-scopes")).EnumerateArray()
+            .Single(scope => scope.GetProperty("name").GetString() == RealmSync.AuthoringScope);
+
+    private static string? Attribute(JsonElement scope, string name) =>
+        scope.TryGetProperty("attributes", out var attributes) && attributes.TryGetProperty(name, out var value) ? value.GetString() : null;
+
     // One realm for each test, because Keycloak refuses an authenticator code that was already used in its period.
     private async Task<(string Realm, string Secret)> NewRealmAsync()
     {

@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { AddAuthenticatorPage } from '../src/identitySignIn/AddAuthenticatorPage'
+import { ConsentPage } from '../src/identitySignIn/ConsentPage'
 import { ErrorPage } from '../src/identitySignIn/ErrorPage'
 import { FrontChannelSignOutPage } from '../src/identitySignIn/FrontChannelSignOutPage'
 import { NoticePage } from '../src/identitySignIn/NoticePage'
@@ -30,6 +31,8 @@ function ThemePage({ context }: { context: IdentityContext }) {
       return <UpdatePasswordPage context={context} />
     case 'terms':
       return <TermsPage context={context} />
+    case 'consent':
+      return <ConsentPage context={context} />
     case 'selectAuthenticator':
       return <SelectAuthenticatorPage context={context} />
     case 'updateProfile':
@@ -50,7 +53,7 @@ function ThemePage({ context }: { context: IdentityContext }) {
   }
 }
 
-/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password, set-password, terms, method choice, update profile, review profile, sign-out, notice, error, expired, SAML redirect or front-channel sign-out page with the SPA's theme provider, fed Keycloak's context. */
+/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password, set-password, terms, consent, method choice, update profile, review profile, sign-out, notice, error, expired, SAML redirect or front-channel sign-out page with the SPA's theme provider, fed Keycloak's context. */
 export function SignInEntry({ context }: { context: IdentityContext }) {
   return (
     <StrictMode>
