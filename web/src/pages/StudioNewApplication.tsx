@@ -1,5 +1,7 @@
 import { Alert, Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { requiredMark } from '../platform/requiredMark'
 import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
@@ -10,13 +12,16 @@ import { PlatformContext } from './context'
 /** What the server refused, as the text key to show under the name. */
 type Problem = 'exists' | 'invalid' | 'failed'
 
+type Values = { name: string; template: string }
+
 /**
  * The New application… button and its dialog. The button is the solid main button with `primary`. The dialog asks for a name and for Blank or an installed template, and
  * shows each template's title and description in the UI locale, with `en` as the fallback. A built-in template keeps the
- * server's order and carries a "Built in" tag after its title. Create stays off while the
- * name breaks the API's rule. A `409` shows that the name is taken, and a `400` that it is refused, and the dialog stays
- * open in both cases. When the template list does not load, the dialog offers only Blank. `onCreated` gets the new
- * application's name once the create succeeds.
+ * server's order and carries a "Built in" tag after its title. The name is marked required and both fields have help, see
+ * [New application](docs/reference/studio.md#new-application). Create is on until a create runs. A click with the name
+ * empty or breaking the API's rule shows what is wrong under it and focuses it, and sends nothing. A `409` shows that
+ * the name is taken, and a `400` that it is refused, and the dialog stays open in both cases. When the template list does
+ * not load, the dialog offers only Blank. `onCreated` gets the new application's name once the create succeeds.
  * Given `open` and `onOpenChange`, the dialog is controlled by its parent and draws no button, so another control can open it.
  */
 export function StudioNewApplication({
@@ -37,13 +42,13 @@ export function StudioNewApplication({
   const [ownOpen, setOwnOpen] = useState(false)
   const controlled = controlledOpen !== undefined
   const open = controlled ? controlledOpen : ownOpen
-  const [value, setValue] = useState('')
-  const [template, setTemplate] = useState('')
+  const [form] = Form.useForm<Values>()
   const [templates, setTemplates] = useState<StudioTemplate[] | 'failed'>()
-  const [problem, setProblem] = useState<Problem>()
   const [creating, setCreating] = useState(false)
-  const entered = value.trim()
-  const nameInvalid = entered !== '' && !isApplicationName(entered)
+
+  function problemOf(problem: Problem) {
+    form.setFields([{ name: 'name', errors: [t(`shell.studio.newApplication.${problem}`)] }])
+  }
 
   function setOpen(next: boolean) {
     if (controlled) {
@@ -72,37 +77,29 @@ export function StudioNewApplication({
     return () => controller.abort()
   }, [open, lost])
 
-  async function create() {
-    if (!isApplicationName(entered)) {
-      return
-    }
+  async function create(values: Values) {
+    const entered = values.name.trim()
+    const template = values.template
     setCreating(true)
-    setProblem(undefined)
     try {
       const result = await createStudioApp(entered, template === '' ? undefined : template)
       if (result.status === 'created') {
         setOpen(false)
         onCreated(result.name)
       } else {
-        setProblem(result.status === 'conflict' ? 'exists' : 'invalid')
+        problemOf(result.status === 'conflict' ? 'exists' : 'invalid')
       }
     } catch (error) {
       if (error instanceof ServerUnreachableError) {
         lost()
       } else {
         console.warn(`Creating the application '${entered}' failed`, error)
-        setProblem('failed')
+        problemOf('failed')
       }
     } finally {
       setCreating(false)
     }
   }
-
-  const message = nameInvalid
-    ? t('shell.studio.newApplication.invalid')
-    : problem === undefined
-      ? undefined
-      : t(`shell.studio.newApplication.${problem}`)
 
   return (
     <>
@@ -118,42 +115,53 @@ export function StudioNewApplication({
         title={t('shell.studio.newApplication.title')}
         okText={t('shell.studio.newApplication.create')}
         cancelText={t('shell.studio.cancel')}
-        okButtonProps={{ disabled: !isApplicationName(entered) }}
         confirmLoading={creating}
-        onOk={create}
+        onOk={() => form.submit()}
         onCancel={() => setOpen(false)}
+        // Each opening starts with empty fields and loads the templates again.
         afterClose={() => {
-          setValue('')
-          setTemplate('')
+          form.resetFields()
           setTemplates(undefined)
-          setProblem(undefined)
         }}
       >
-        <Form layout="vertical">
-          <Form.Item
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          initialValues={{ name: '', template: '' }}
+          scrollToFirstError={{ focus: true }}
+          onFinish={create}
+        >
+          <AxisField
+            name="name"
             label={t('shell.studio.newApplication.name')}
-            validateStatus={message === undefined ? undefined : 'error'}
-            help={message}
+            help={t('shell.studio.newApplication.name.help')}
+            requiredMessage={t('shell.studio.newApplication.nameRequired')}
+            rules={[
+              {
+                // An empty name has the required message, so this skips it.
+                validator: (_, value: string) =>
+                  value.trim() === '' || isApplicationName(value.trim())
+                    ? Promise.resolve()
+                    : Promise.reject(new Error(t('shell.studio.newApplication.invalid'))),
+              },
+            ]}
           >
             <Input
               aria-label={t('shell.studio.newApplication.name')}
-              value={value}
-              onChange={(event) => {
-                setValue(event.target.value)
-                setProblem(undefined)
+              // The browser also submits a form with one text box on Enter, so this stops it from creating twice.
+              onPressEnter={(event) => {
+                event.preventDefault()
+                form.submit()
               }}
-              onPressEnter={create}
             />
-          </Form.Item>
-          <Form.Item label={t('shell.studio.newApplication.template')}>
-            {templates === 'failed' && (
-              <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
-            )}
-            <Radio.Group
-              aria-label={t('shell.studio.newApplication.template')}
-              value={template}
-              onChange={(event) => setTemplate(event.target.value)}
-            >
+          </AxisField>
+          <AxisField
+            name="template"
+            label={t('shell.studio.newApplication.template')}
+            help={t('shell.studio.newApplication.template.help')}
+          >
+            <Radio.Group aria-label={t('shell.studio.newApplication.template')}>
               <Flex vertical>
                 <Radio value="">{t('shell.studio.newApplication.blank')}</Radio>
                 {Array.isArray(templates) &&
@@ -170,7 +178,10 @@ export function StudioNewApplication({
                   ))}
               </Flex>
             </Radio.Group>
-          </Form.Item>
+          </AxisField>
+          {templates === 'failed' && (
+            <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
+          )}
         </Form>
       </Modal>
     </>
