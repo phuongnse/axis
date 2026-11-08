@@ -157,6 +157,36 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         Assert.Equal(before, (await GetJsonAsync($"admin/realms/{realm}/clients")).GetArrayLength());
     }
 
+    [Theory]
+    [MemberData(nameof(Refusals))]
+    public async Task The_realm_refuses_the_same_asks_in_an_update_with_the_registration_access_token(string asks, string overrides)
+    {
+        var (realm, _) = await NewRealmAsync();
+        var (status, registered) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Created, registered.GetRawText());
+        var registeredId = registered.GetProperty("client_id").GetString()!;
+        var update = registered.EnumerateObject().ToDictionary(property => property.Name, property => (object?)property.Value);
+        using var document = JsonDocument.Parse(overrides);
+        foreach (var property in document.RootElement.EnumerateObject())
+        {
+            update[property.Name] = property.Value;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri(_baseAddress, new Uri(registered.GetProperty("registration_client_uri").GetString()!).AbsolutePath))
+        {
+            Content = JsonContent.Create(update),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", registered.GetProperty("registration_access_token").GetString());
+        using var response = await _http.SendAsync(request, CancellationToken);
+
+        Assert.True(response.StatusCode == HttpStatusCode.Forbidden, $"{asks}: {response.StatusCode} {await response.Content.ReadAsStringAsync(CancellationToken)}");
+        var client = (await GetJsonAsync($"admin/realms/{realm}/clients?clientId={Uri.EscapeDataString(registeredId)}")).EnumerateArray().Single();
+        Assert.True(client.GetProperty("publicClient").GetBoolean());
+        Assert.False(client.GetProperty("implicitFlowEnabled").GetBoolean());
+        Assert.False(client.GetProperty("directAccessGrantsEnabled").GetBoolean());
+        Assert.Equal([LoopbackRedirectUri], client.GetProperty("redirectUris").EnumerateArray().Select(uri => uri.GetString()));
+    }
+
     [Fact]
     public async Task A_rerun_repairs_the_registration_rules_that_were_changed_by_hand()
     {

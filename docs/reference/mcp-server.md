@@ -93,6 +93,9 @@ clients may connect at all.
     error `invalid_redirect_uri`;
   - its scope is `axis:authoring` and the realm's default client scopes, and no other.
 
+  The same rules hold when the client changes its own registration with the registration access token
+  that the registration returns: the realm refuses each change that a registration would refuse.
+
   Registration does not refuse the device authorization grant, but consent and the scope rules hold
   for it too. Keycloak's own limits stay: a realm holds at most 200 clients, those of the realm
   included, and a registered client may use only the mapper types that Keycloak allows an anonymous

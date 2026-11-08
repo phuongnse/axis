@@ -351,7 +351,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// <summary>
     /// Lets an outside MCP client register itself at the realm without a token, as a public client that requires consent
     /// (<c>docs/reference/mcp-server.md#client-registration</c>). The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
-    /// registration writes and never to one that an administrator or Axis writes. Its executors refuse a redirect address that is neither <c>https</c>
+    /// registration writes and to an update with the registration access token that the registration returns, and never to a client that an administrator or Axis writes. Its executors refuse a redirect address that is neither <c>https</c>
     /// nor <c>http</c> on a loopback address, the implicit flow, the password flow and every client authenticator, which makes a confidential client impossible,
     /// and they set consent required and the full scope off. The realm's anonymous registration
     /// policies lose the Trusted Hosts policy, which Keycloak cannot loosen, and a Consent Required policy is added when it is missing. The Allowed Client Scopes
@@ -401,14 +401,14 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         var registrationPolicy = new Dictionary<string, object?>
         {
             ["name"] = RegistrationPolicy,
-            ["description"] = "Applies the registration rules to every client that an anonymous registration writes.",
+            ["description"] = "Applies the registration rules to every client that an anonymous registration writes and that its registration access token updates.",
             ["enabled"] = true,
             ["conditions"] = new object[]
             {
                 new Dictionary<string, object?>
                 {
                     ["condition"] = "client-updater-context",
-                    ["configuration"] = new Dictionary<string, object?> { ["update-client-source"] = new[] { "ByAnonymous" } },
+                    ["configuration"] = new Dictionary<string, object?> { ["update-client-source"] = new[] { "ByAnonymous", "ByRegistrationAccessToken" } },
                 },
             },
             ["profiles"] = new[] { RegistrationPolicy },
