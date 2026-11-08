@@ -20,6 +20,9 @@ public static class TenantSecretFields
     /// <summary>The field of a tenant's own SMTP password.</summary>
     public const string SmtpPassword = "smtp_password";
 
+    /// <summary>The field of a tenant's own model key.</summary>
+    public const string ModelKey = "model_key";
+
     /// <summary>The field of the secret of the tenant realm's client that activation uses to change providers and clients.</summary>
     public const string RealmActivationClientSecret = "realm_activation_client_secret";
 
