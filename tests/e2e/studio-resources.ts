@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test'
-import { waitForDialog } from './dialogs'
+import { confirmDialog, waitForDialog } from './dialogs'
 import { pickOption, pickOptions } from './select'
 
 /**
@@ -80,6 +80,16 @@ export async function createResource(page: Page, kind: string, value: string) {
   await expect(dialog).toBeHidden()
   await expect(page).toHaveURL(/[?&]resource=/)
   await expect(kindEntry(page, kind)).toHaveAttribute('aria-current', 'page')
+}
+
+/**
+ * Deletes the open resource: it opens the "…" menu of the page heading, picks Delete… and confirms the dialog. It returns
+ * once the dialog is gone.
+ */
+export async function deleteResource(page: Page) {
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete…', exact: true }).click()
+  await confirmDialog(page, 'Delete')
 }
 
 /** Opens the New application… dialog from the application row of the sidebar, on a page that has an application open. */

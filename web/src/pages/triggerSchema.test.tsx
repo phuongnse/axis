@@ -166,7 +166,9 @@ describe('A scheduled job without a data source', () => {
     await userEvent.click(within(field).getByRole('button', { name: 'Add' }))
     expect(latest.value.parameters).toEqual({ daysOverdue: 0 })
 
-    await userEvent.click(within(field).getByRole('combobox', { name: 'parameters 1' }))
+    await userEvent.click(
+      within(field).getByRole('combobox', { name: `${platformEnglish['shell.studio.field.trigger.parameters']} 1` }),
+    )
     const dropdown = await openDropdown('label')
     expect(optionTexts(dropdown)).toEqual(['daysOverdue', 'label'])
     await userEvent.keyboard('{Escape}')
@@ -219,7 +221,9 @@ describe('A delete trigger', () => {
   it('offers the entity fields and id in the when expression of a data change trigger', async () => {
     renderTrigger({ ...deletion, on: ['create'], when: 'x' })
 
-    const editor = await within(screen.getByTestId('studio-field-/when')).findByRole('group', { name: 'when' })
+    const editor = await within(screen.getByTestId('studio-field-/when')).findByRole('group', {
+      name: platformEnglish['shell.studio.field.trigger.when'],
+    })
     expect((editor.getAttribute('data-options') ?? '').split(',').slice(0, 2)).toEqual(['id', 'title'])
   })
 })

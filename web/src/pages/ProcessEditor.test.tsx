@@ -181,7 +181,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const editor = screen.getByTestId('studio-process-editor')
     expect(editor.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(editor).toBeVisible()
-    expect(screen.getByRole('textbox', { name: 'name' })).toHaveValue('PurchaseRequestApproval')
+    expect(screen.getByRole('textbox', { name: platformEnglish['shell.studio.field.process.name'] })).toHaveValue(
+      'PurchaseRequestApproval',
+    )
     expect(selectRoot(screen.getByRole('combobox', { name: 'Start step' }))).toBeVisible()
     for (let index = 0; index < process.steps.length; index++) {
       expect(screen.getByTestId(`studio-step-${index}`)).toBeVisible()

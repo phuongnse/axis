@@ -9,8 +9,6 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 
 ## Sections
 
-_(planned for M31)_
-
 The form puts a resource's root properties in sections, so that an author reads them in groups that
 each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
 heading and a line that says what it holds. The application's Settings, for example, has General
@@ -23,12 +21,12 @@ last section with no heading.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
 - **One rhythm.** The sections are `spacing-md` apart.
-- **Shared parts.** Every Studio form is built from these sections, with its fields as
+- **Shared parts.** _(planned for M31)_ Every Studio form is built from these sections, with its fields as
   [fields](actions-and-controls.md#fields) says.
 
 ## Fields
 
-- **Named in words.** _(planned for M31)_ Every field is named in words. Its label and its optional help
+- **Named in words.** Every field is named in words. Its label and its optional help
   are the texts `shell.studio.field.<kind>.<path>` and `shell.studio.field.<kind>.<path>.help`, drawn as
   the form widget draws them: the label in medium `textMuted`, and the help in small `textMuted` between
   the label and the input. Every field has its help, see

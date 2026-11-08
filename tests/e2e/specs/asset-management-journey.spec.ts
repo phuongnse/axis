@@ -10,7 +10,7 @@ import { assetManagement, journeyApplications, journeyURL } from '../server-sett
 import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
-import { addMapping, createResource, hasKind, jsonViewText, openFormTab, openKind, openTab } from '../studio-resources'
+import { addMapping, createResource, deleteResource, hasKind, jsonViewText, openFormTab, openKind, openTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -261,8 +261,7 @@ test.describe('the author builds the asset management application with Studio on
       const before = await migrations.getByRole('button').count()
       await migrations.getByRole('button').first().click()
       await expectForm(page)
-      await page.getByRole('button', { name: 'Delete', exact: true }).click()
-      await confirmDialog(page, 'Delete')
+      await deleteResource(page)
       if (before > 1) {
         await openKind(page, 'migration')
       }
@@ -336,8 +335,7 @@ test.describe('the author builds the asset management application with Studio on
     await starter.getByRole('button').click()
     await expectForm(page)
 
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(starter.getByRole('button')).toHaveCount(0)
 
     await createResource(page, 'text', 'en')
@@ -804,8 +802,7 @@ test.describe('the author builds the asset management application with Studio on
     await openKind(page, 'page')
     await home.click()
     await openFormTab(page)
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(page.getByTestId('studio-group-page').getByRole('button', { name: /Home/i })).toHaveCount(0)
   })
 
@@ -1162,8 +1159,7 @@ test.describe('the author builds the asset management application with Studio on
 
     await openKind(page, 'event')
     await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
-    await page.getByRole('button', { name: 'Delete', exact: true }).click()
-    await confirmDialog(page, 'Delete')
+    await deleteResource(page)
     await expect(page.getByTestId('studio-group-event')).toHaveCount(0)
   })
 
