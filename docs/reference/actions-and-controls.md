@@ -148,11 +148,15 @@ be kept right.
   table that holds all its rows searches them by itself, while a table paged on the server sends the text to
   the server. The text applies on Enter, on the search button and when the box is cleared, never on each
   key, and a new search starts at page 1. Search, sort, page and page size live in the address.
-- **Filter** _(planned for M31)_. Filter is an icon button that carries the count of conditions in force, and
-  opens a builder of conditions in groups of All or Any, with no limit on depth. Every column can be
-  filtered on, and conditions follow the kind of value, text, enum, number or date, each with empty and
-  not empty. Apply puts it in force, and a condition with no value is left out. A chip stands for each
-  condition and group, with Clear all.
+- **Filter.** Filter is an icon button that carries the count of conditions in force, and
+  opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
+  on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number
+  or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
+  out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
+  them itself, and the filter lives in the address as `filter`, in the shape of
+  [the record API's filter](record-api.md#paging-and-sorting).
+- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, and a table
+  paged on the server sends its filter to the server as the record API's `filter`.
 - **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
   orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
   still searched and filtered on. The platform keeps each person's choice.

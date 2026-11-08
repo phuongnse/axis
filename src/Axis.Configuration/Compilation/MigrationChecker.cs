@@ -374,7 +374,7 @@ internal static class MigrationChecker
         {
             var scope = ExpressionScopes.ForMigration(
                 before.Where(pair => pair.Value is not null).Select(pair => (pair.Key, pair.Value!)));
-            var check = ExpressionTypeChecker.Check(expression, scope, ExpressionScopes.TypeOf(field)!);
+            var check = ExpressionTypeChecker.Check(expression, scope, ExpressionScopes.TypeOf(field)!, sql: true);
             place = check.Place;
             if (!check.Succeeded)
             {

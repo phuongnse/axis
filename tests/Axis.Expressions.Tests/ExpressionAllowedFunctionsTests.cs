@@ -1,5 +1,6 @@
 using Axis.Expressions.Functions;
 using Axis.Expressions.Parsing;
+using Axis.Expressions.Sql;
 using Axis.Expressions.Typing;
 
 namespace Axis.Expressions.Tests;
@@ -66,6 +67,53 @@ public sealed class ExpressionAllowedFunctionsTests
         var place = new ExpressionPlace(_scope, ExpressionType.Null, storedValue, currentUser, contract, stepSet);
 
         Assert.All(ExpressionFunctions.Names.Except(restricted), name => Assert.Contains(name, place.Functions));
+    }
+
+    [Theory]
+    [InlineData("lower", "lower('a')")]
+    [InlineData("upper", "upper('a')")]
+    [InlineData("trim", "trim('a')")]
+    [InlineData("length", "length('a')")]
+    [InlineData("now", "now()")]
+    [InlineData("currentUser", "currentUser()")]
+    [InlineData("count", "count(lines)")]
+    [InlineData("any", "any(lines, true)")]
+    [InlineData("sum", "sum(lines, 1)")]
+    [InlineData("first", "first(lines, true, 1)")]
+    public void At_a_SQL_place_a_function_is_listed_exactly_when_it_checks_and_translates(string name, string text)
+    {
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, text);
+
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Null, currentUser: true, sql: true);
+        var translated = SqlTranslator.Translate(
+            parsed.Expression,
+            path => string.Join('.', path),
+            check,
+            collection: collectionName => new SqlCollection(collectionName, "TRUE", path => string.Join('.', [collectionName, .. path])));
+
+        Assert.True(check.Place!.Sql);
+        Assert.Equal(check.Succeeded && translated.Succeeded, check.Place.Functions.Contains(name));
+    }
+
+    [Fact]
+    public void At_a_SQL_place_only_the_functions_of_the_SQL_subset_are_listed()
+    {
+        var place = new ExpressionPlace(_scope, ExpressionType.Null, false, true, true, true, Sql: true);
+
+        Assert.Equal(
+            [.. ExpressionFunctions.Names.Concat(ExpressionFunctions.AggregateNames).Where(ExpressionFunctions.IsInSqlSubset).Order()],
+            [.. place.Functions.Order()]);
+    }
+
+    [Fact]
+    public void A_place_that_does_not_run_as_SQL_still_lists_the_functions_outside_the_SQL_subset()
+    {
+        var place = new ExpressionPlace(_scope, ExpressionType.Null, false, false, false, false);
+
+        Assert.Contains("lower", place.Functions);
+        Assert.Contains("sum", place.Functions);
+        Assert.False(place.Sql);
     }
 
     [Fact]

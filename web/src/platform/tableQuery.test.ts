@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldMetadata } from './site'
+import type { FilterGroup } from './tableFilter'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 
 const fields = [
@@ -148,5 +149,43 @@ describe('search', () => {
 
   it('is sent in the request', () => {
     expect(recordQuery({ page: 1, pageSize: 20, sort: null, search: 'a&b' })).toBe('search=a%26b')
+  })
+})
+
+describe('filter', () => {
+  const filterFields = [
+    { name: 'title', type: 'text' },
+    { name: 'total', type: 'integer' },
+  ] as FieldMetadata[]
+  const parse = (filter: string) =>
+    parseTableQuery(new URLSearchParams({ filter }), filterFields, 20, [], false, true).filter
+
+  it('drops a filter that is not valid and writes a valid one after search and before page', () => {
+    for (const filter of [
+      'not json',
+      '{"all":[{"field":"nope","op":"eq","value":"x"}]}',
+      '{"all":[{"field":"title","op":"empty","value":"x"}]}',
+      '{"all":[{"field":"title","op":"like","value":"x"}]}',
+      '{"all":[{"field":"title","op":"eq","value":null}]}',
+      '{"all":[],"any":[]}',
+      '{"field":"title","op":"eq","value":"x"}',
+    ]) {
+      expect(parse(filter)).toBeUndefined()
+    }
+    expect(
+      parseTableQuery(new URLSearchParams('filter={"all":[{"field":"title","op":"eq","value":"x"}]}'), filterFields),
+    ).not.toHaveProperty('filter')
+
+    const filter: FilterGroup = {
+      any: [{ field: 'title', op: 'contains', value: 'a b' }, { all: [{ field: 'total', op: 'empty' }] }],
+    }
+    expect(parse(JSON.stringify(filter))).toEqual(filter)
+
+    const query = { page: 2, pageSize: 20, sort: null, search: 'x', filter }
+    const written = writeTableQuery(new URLSearchParams('filter=old&other=1'), query).toString()
+    expect(written).toBe(`other=1&search=x&${new URLSearchParams({ filter: JSON.stringify(filter) })}&page=2`)
+    expect(writeTableQuery(new URLSearchParams('filter=old'), { page: 1, pageSize: 20, sort: null }).toString()).toBe(
+      '',
+    )
   })
 })

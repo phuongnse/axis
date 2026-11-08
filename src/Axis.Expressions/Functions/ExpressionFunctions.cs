@@ -9,31 +9,31 @@ public static class ExpressionFunctions
 {
     private static readonly FunctionSignature[] _signatures =
     [
-        new("length", 1, 1, ["text"], "integer", "text", "length(title)"),
-        new("contains", 2, 2, ["text", "text"], "boolean", "text", "contains(title, 'PR-')"),
-        new("startsWith", 2, 2, ["text", "text"], "boolean", "text", "startsWith(title, 'PR-')"),
-        new("endsWith", 2, 2, ["text", "text"], "boolean", "text", "endsWith(title, '.pdf')"),
-        new("concat", 1, int.MaxValue, ["text", "…"], "text", "text", "concat(firstName, ' ', lastName)"),
+        new("length", 1, 1, ["text"], "integer", "text", "length(title)") { Sql = true },
+        new("contains", 2, 2, ["text", "text"], "boolean", "text", "contains(title, 'PR-')") { Sql = true },
+        new("startsWith", 2, 2, ["text", "text"], "boolean", "text", "startsWith(title, 'PR-')") { Sql = true },
+        new("endsWith", 2, 2, ["text", "text"], "boolean", "text", "endsWith(title, '.pdf')") { Sql = true },
+        new("concat", 1, int.MaxValue, ["text", "…"], "text", "text", "concat(firstName, ' ', lastName)") { Sql = true },
         new("lower", 1, 1, ["text"], "text", "text", "lower(title)"),
         new("upper", 1, 1, ["text"], "text", "text", "upper(title)"),
         new("trim", 1, 1, ["text"], "text", "text", "trim(title)"),
-        new("abs", 1, 1, ["n"], "n", "number", "abs(balance)"),
-        new("round", 2, 2, ["decimal", "integer"], "decimal", "number", "round(amount, 2)"),
-        new("floor", 1, 1, ["n"], "n", "number", "floor(amount)"),
-        new("ceiling", 1, 1, ["n"], "n", "number", "ceiling(amount)"),
-        new("year", 1, 1, ["date"], "integer", "date", "year(orderDate)"),
-        new("month", 1, 1, ["date"], "integer", "date", "month(orderDate)"),
-        new("day", 1, 1, ["date"], "integer", "date", "day(orderDate)"),
-        new("addDays", 2, 2, ["date", "integer"], "date", "date", "addDays(orderDate, 30)"),
-        new("daysBetween", 2, 2, ["date", "date"], "integer", "date", "daysBetween(orderDate, dueDate)"),
-        new("coalesce", 2, int.MaxValue, ["a", "b", "…"], "a", "logic", "coalesce(nickname, name)"),
-        new("if", 3, 3, ["condition", "then", "else"], "then", "logic", "if(urgent, 1, 3)"),
-        new("date", 1, 1, ["text literal"], "date", "date", "date('2026-10-08')"),
-        new("dateTime", 1, 1, ["text literal"], "date-time", "date", "dateTime('2026-10-08T09:30:00Z')"),
-        new("now", 0, 0, [], "date-time", "date", "now()"),
-        new("today", 0, 0, [], "date", "date", "today()"),
-        new("toDate", 1, 1, ["date-time"], "date", "date", "toDate(createdAt)"),
-        new("currentUser", 0, 0, [], "text", "context", "currentUser()"),
+        new("abs", 1, 1, ["n"], "n", "number", "abs(balance)") { Sql = true },
+        new("round", 2, 2, ["decimal", "integer"], "decimal", "number", "round(amount, 2)") { Sql = true },
+        new("floor", 1, 1, ["n"], "n", "number", "floor(amount)") { Sql = true },
+        new("ceiling", 1, 1, ["n"], "n", "number", "ceiling(amount)") { Sql = true },
+        new("year", 1, 1, ["date"], "integer", "date", "year(orderDate)") { Sql = true },
+        new("month", 1, 1, ["date"], "integer", "date", "month(orderDate)") { Sql = true },
+        new("day", 1, 1, ["date"], "integer", "date", "day(orderDate)") { Sql = true },
+        new("addDays", 2, 2, ["date", "integer"], "date", "date", "addDays(orderDate, 30)") { Sql = true },
+        new("daysBetween", 2, 2, ["date", "date"], "integer", "date", "daysBetween(orderDate, dueDate)") { Sql = true },
+        new("coalesce", 2, int.MaxValue, ["a", "b", "…"], "a", "logic", "coalesce(nickname, name)") { Sql = true },
+        new("if", 3, 3, ["condition", "then", "else"], "then", "logic", "if(urgent, 1, 3)") { Sql = true },
+        new("date", 1, 1, ["text literal"], "date", "date", "date('2026-10-08')") { Sql = true },
+        new("dateTime", 1, 1, ["text literal"], "date-time", "date", "dateTime('2026-10-08T09:30:00Z')") { Sql = true },
+        new("now", 0, 0, [], "date-time", "date", "now()") { Sql = true },
+        new("today", 0, 0, [], "date", "date", "today()") { Sql = true },
+        new("toDate", 1, 1, ["date-time"], "date", "date", "toDate(createdAt)") { Sql = true },
+        new("currentUser", 0, 0, [], "text", "context", "currentUser()") { Sql = true },
         new("previous", 1, 1, ["field"], "field", "context", "previous(status)"),
         new("accountableUser", 0, 0, [], "text", "context", "accountableUser()"),
         new("decisionTask", 0, 0, [], "text", "context", "decisionTask()"),
@@ -41,12 +41,12 @@ public static class ExpressionFunctions
 
     private static readonly FunctionSignature[] _aggregates =
     [
-        new("count", 1, 2, ["list", "condition"], "integer", "aggregate", "count(lines, quantity > 10)") { IsAggregate = true },
+        new("count", 1, 2, ["list", "condition"], "integer", "aggregate", "count(lines, quantity > 10)") { IsAggregate = true, Sql = true },
         new("sum", 2, 2, ["list", "item"], "item", "aggregate", "sum(lines, quantity * unitPrice)") { IsAggregate = true },
         new("avg", 2, 2, ["list", "item"], "decimal", "aggregate", "avg(lines, quantity)") { IsAggregate = true },
         new("min", 2, 2, ["list", "item"], "item", "aggregate", "min(lines, unitPrice)") { IsAggregate = true },
         new("max", 2, 2, ["list", "item"], "item", "aggregate", "max(lines, unitPrice)") { IsAggregate = true },
-        new("any", 2, 2, ["list", "condition"], "boolean", "aggregate", "any(lines, quantity > 10)") { IsAggregate = true },
+        new("any", 2, 2, ["list", "condition"], "boolean", "aggregate", "any(lines, quantity > 10)") { IsAggregate = true, Sql = true },
         new("all", 2, 2, ["list", "condition"], "boolean", "aggregate", "all(lines, quantity > 0)") { IsAggregate = true },
         new("first", 3, 3, ["list", "condition", "item"], "item", "aggregate", "first(lines, quantity > 10, description)") { IsAggregate = true },
     ];
@@ -62,6 +62,12 @@ public static class ExpressionFunctions
 
     /// <summary>Whether <paramref name="name"/> is a scalar function or an aggregate, ignoring letter case.</summary>
     public static bool IsFunction(string name) => _byName.ContainsKey(name);
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is in the SQL subset, see docs/reference/expressions.md#sql-subset.
+    /// A name that is not a function is not.
+    /// </summary>
+    public static bool IsInSqlSubset(string name) => _byName.TryGetValue(name, out var signature) && signature.Sql;
 
     /// <summary>Finds a function or an aggregate by name, ignoring letter case. Throws for a name that is none.</summary>
     public static FunctionSignature Get(string name) => _byName[name];
@@ -91,4 +97,10 @@ public sealed record FunctionSignature(
     /// collection, and the arguments after it, when there are any, are evaluated once per row.
     /// </summary>
     public bool IsAggregate { get; init; }
+
+    /// <summary>
+    /// Whether the function is in the SQL subset, see docs/reference/expressions.md#sql-subset.
+    /// A place whose expression runs as SQL offers only these, and the SQL translator refuses the rest.
+    /// </summary>
+    public bool Sql { get; init; }
 }

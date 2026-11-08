@@ -90,6 +90,12 @@
       "en": "template",
       "vi": "mẫu",
       "status": "proposed"
+    },
+    {
+      "concept": "Action: Apply",
+      "en": "Apply",
+      "vi": "Áp dụng",
+      "status": "proposed"
     }
   ]
 }

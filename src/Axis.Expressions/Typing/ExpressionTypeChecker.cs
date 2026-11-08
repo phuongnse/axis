@@ -31,13 +31,13 @@ public static class ExpressionTypeChecker
     public const string OuterName = "outer";
 
     public static ExpressionCheckResult Check(
-        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool currentUser = false, bool contract = false, bool stepSet = false)
+        ExpressionNode expression, ExpressionScope scope, ExpressionType expected, bool storedValue = false, bool currentUser = false, bool contract = false, bool stepSet = false, bool sql = false)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(scope);
         ArgumentNullException.ThrowIfNull(expected);
 
-        var place = new ExpressionPlace(scope, expected, storedValue, currentUser, contract, stepSet);
+        var place = new ExpressionPlace(scope, expected, storedValue, currentUser, contract, stepSet, sql);
         try
         {
             var context = new Context(
@@ -81,7 +81,8 @@ public static class ExpressionTypeChecker
 
     /// <summary>
     /// The names of the functions and aggregates <see cref="Check"/> accepts at <paramref name="place"/>, scalar
-    /// functions first. The list follows the rules of <see cref="InferCall"/>.
+    /// functions first. The list follows the rules of <see cref="InferCall"/>. At a place whose expression runs as
+    /// SQL, it keeps only the functions and aggregates in the SQL subset, see <see cref="ExpressionFunctions.IsInSqlSubset"/>.
     /// </summary>
     public static IReadOnlyList<string> AllowedFunctions(ExpressionPlace place)
     {
@@ -89,7 +90,7 @@ public static class ExpressionTypeChecker
         var aggregates = place.Scope.HasCollections || place.Scope.ResolvesCollectionPaths;
         return
         [
-            .. ExpressionFunctions.Names.Where(name => name switch
+            .. ExpressionFunctions.Names.Where(name => (!place.Sql || ExpressionFunctions.IsInSqlSubset(name)) && name switch
             {
                 "now" or "today" or "toDate" => !place.StoredValue,
                 "currentUser" => place.CurrentUser,
@@ -97,7 +98,7 @@ public static class ExpressionTypeChecker
                 "accountableUser" or "decisionTask" => place.StepSet || place.Contract,
                 _ => true,
             }),
-            .. aggregates ? ExpressionFunctions.AggregateNames : [],
+            .. aggregates ? ExpressionFunctions.AggregateNames.Where(name => !place.Sql || ExpressionFunctions.IsInSqlSubset(name)) : [],
         ];
     }
 
