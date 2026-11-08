@@ -1,7 +1,9 @@
 import { Alert, Button, Flex, Tag, Typography } from 'antd'
 import type { StudioReference, StudioReferenceNode } from '../platform/studio'
 import { useText } from '../platform/texts'
-import type { OpenResource } from './StudioReferences'
+
+/** Opens a resource. `path` is set for a reference entry, where the reference sits in that resource. */
+export type OpenResource = (id: string, path: string | null) => void
 
 /** A `widget form` or `task form` reference whose holder is a resource. */
 export type FormUse = StudioReference & { node: Extract<StudioReferenceNode, { type: 'resource' }> }

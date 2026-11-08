@@ -4,7 +4,7 @@ import type { JsonPatchOperation } from './jsonPatch'
 import { type ModuleKind, moduleKinds } from './moduleKinds'
 import { QuotaRefusedError, quotaRefusalTitle } from './quota'
 import { sortByName } from './listOrder'
-import { kindSingular, sidebarRank, studioKinds } from './studioKinds'
+import { kindSingular, sidebarRank } from './studioKinds'
 import type { EntityWidgetMetadata, PageMetadata } from './site'
 
 /** The server did not answer a Studio request, or answered it with 502, 503 or 504. */
@@ -301,45 +301,9 @@ export interface StudioResourceReferences {
   usedBy: StudioReference[]
 }
 
-/**
- * The entries of a Uses or Used by list: resources and text keys in the sidebar's kind order, then modules, then
- * packages, each group by name in `locale`.
- */
-export function sortReferences(entries: readonly StudioReference[], locale: string): StudioReference[] {
-  return sortByName(
-    entries,
-    (entry) => referenceTitle(entry.node),
-    locale,
-    (entry) => nodeRank(entry.node),
-  )
-}
-
-function nodeRank(node: StudioReferenceNode): number {
-  switch (node.type) {
-    case 'resource':
-      return sidebarRank(node.kind)
-    case 'text':
-      return sidebarRank('text')
-    case 'module':
-      return studioKinds.length + 1
-    case 'package':
-      return studioKinds.length + 2
-  }
-}
-
-function referenceTitle(node: StudioReferenceNode): string {
-  if (node.type === 'resource') {
-    return node.name ?? node.file
-  }
-  if (node.type === 'text') {
-    return node.key
-  }
-  return node.id
-}
-
-/** The `usedBy` entries of a text key: the labels and text resources that use it. */
-export interface StudioTextReferences {
-  usedBy: StudioReference[]
+/** The text key of a relation's "How it is used" text, such as `shell.studio.relation.fieldTarget` for `field target`. */
+export function relationTextKey(relation: string): string {
+  return `shell.studio.relation.${relation.replace(/ (\w)/g, (_, letter: string) => letter.toUpperCase())}`
 }
 
 /** A field of an entity in `GET .../names`. `target` and `values` are `null` when the field has none. */
@@ -872,20 +836,6 @@ export async function fetchResourceReferences(
     throw new Error(`Loading '${path}' failed with status ${response.status}.`)
   }
   return (await response.json()) as StudioResourceReferences
-}
-
-/** Loads what uses a text key. A 401 shows the sign-in prompt and throws, as any other failure does. */
-export async function fetchTextReferences(
-  application: string,
-  key: string,
-  signal?: AbortSignal,
-): Promise<StudioTextReferences> {
-  const path = `/api/studio/apps/${encodeURIComponent(application)}/texts/${encodeURIComponent(key)}/references`
-  const response = await studioFetch(path, { signal })
-  if (!response.ok) {
-    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
-  }
-  return (await response.json()) as StudioTextReferences
 }
 
 /** What a text write answers: the new version of every locale's file, or `invalid` for a `400`. */

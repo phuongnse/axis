@@ -63,8 +63,8 @@ import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
 import { SiteSignIn } from './SiteSignIn'
 import { StudioAutoAccept } from './StudioAutoAccept'
-import type { FormUse } from './StudioFormUsedOn'
-import type { OpenResource } from './StudioReferences'
+import type { FormUse, OpenResource } from './StudioFormUsedOn'
+import { StudioUsedBy } from './StudioUsedBy'
 import { TextTable, type TextColumn } from './TextTable'
 import { triggerSchema } from './triggerSchema'
 
@@ -190,6 +190,7 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * while it has an error the Form and Design tabs are read-only and the editor ignores every edit from them. Discard
  * asks first and puts back the loaded resource. A removed row asks nothing and shows a notice with Undo.
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
+ * Every resource but the application has a Used by tab, which lists the resources that use it and loads only when it opens.
  * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
  * Its code loads when the tab first opens.
  * A page, a form or a process opens on its Design tab, and every other kind opens on Form. A path switches to the Form tab, or to JSON when the form cannot show it. A process's Design tab draws its steps and transitions as a graph, laid out again after every edit,
@@ -250,7 +251,7 @@ export function StudioEditor({
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
-  const [tab, setTab] = useState<'design' | 'form' | 'json'>(
+  const [tab, setTab] = useState<'design' | 'form' | 'json' | 'usedBy'>(
     item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
   const [formDrawn, setFormDrawn] = useState(false)
@@ -929,7 +930,7 @@ export function StudioEditor({
         <LabelTextsContext.Provider value={labelContext}>
           <Tabs
             activeKey={tab}
-            onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
+            onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'usedBy')}
             tabBarExtraContent={
               tab === 'json' ? (
                 <AxisActionRow align="center">
@@ -1147,6 +1148,18 @@ export function StudioEditor({
                   </Suspense>
                 ),
               },
+              ...(item.kind === 'application'
+                ? []
+                : [
+                    {
+                      key: 'usedBy',
+                      label: t('shell.studio.usedBy'),
+                      children:
+                        tab === 'usedBy' ? (
+                          <StudioUsedBy application={application} resourceId={item.id} resources={resources} />
+                        ) : null,
+                    },
+                  ]),
             ]}
           />
         </LabelTextsContext.Provider>

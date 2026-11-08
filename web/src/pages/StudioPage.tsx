@@ -46,7 +46,6 @@ import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioProblems } from './StudioProblems'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { studioActiveEntry, studioNavigation } from './studioNavigation'
-import { StudioReferences } from './StudioReferences'
 import { StudioSidebar } from './StudioSidebar'
 
 /** The titles and test ids of the module resource groups in the list. */
@@ -673,12 +672,6 @@ function StudioWorkspace() {
                         }}
                       />
                     </StudioNamesContext.Provider>
-                    <StudioReferences
-                      key={`references-${selected.id}`}
-                      application={application!}
-                      resourceId={selected.id}
-                      onOpen={openReference}
-                    />
                   </Flex>
                 </div>
               ) : selectedModuleItem ? (

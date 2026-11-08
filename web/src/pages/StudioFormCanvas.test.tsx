@@ -17,7 +17,7 @@ import { loadKindSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioEditor } from './StudioEditor'
-import type { OpenResource } from './StudioReferences'
+import type { OpenResource } from './StudioFormUsedOn'
 
 const folder = '/api/studio/apps/Desk'
 const formId = '1db765b0-483d-456b-9939-17e2a36de3b6'

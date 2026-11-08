@@ -88,24 +88,6 @@ const referenceAnswers: Record<string, { uses: StudioReference[]; usedBy: Studio
   [formId]: { uses: [], usedBy: [] },
 }
 
-/** What the text key `purchaseRequest.label` is used by, as its text key route answers. */
-const labelUsers: { usedBy: StudioReference[] } = {
-  usedBy: [
-    {
-      relation: 'label text',
-      file: 'entities/purchase-request.json',
-      path: '/label/textKey',
-      node: {
-        type: 'resource',
-        id: entityId,
-        kind: 'entity',
-        name: 'PurchaseRequest',
-        file: 'entities/purchase-request.json',
-      },
-    },
-  ],
-}
-
 const diagnostics: StudioDiagnostic[] = [
   {
     code: 'AXC0101',
@@ -256,9 +238,6 @@ function stubServer(
     if (input === `${folder}/expressions/check` && expressions.check) {
       checkCalls++
       return expressions.check(checkCalls)
-    }
-    if (input === `${folder}/texts/purchaseRequest.label/references`) {
-      return json(labelUsers)
     }
     const answer = Object.entries(referenceAnswers).find(([id]) => input === `${folder}/resources/${id}/references`)
     if (answer) {
@@ -905,34 +884,46 @@ describe('StudioPage', () => {
     warn.mockRestore()
   })
 
-  it('lists what a resource uses and what uses it, with the relation, resource, file and path of each entry', async () => {
+  it('gives the application manifest no Used by tab', async () => {
     stubServer()
-    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
+    renderPage(`/studio?app=PurchaseRequests&resource=${manifestId}`)
 
-    const uses = await screen.findByTestId('studio-uses')
-    const [department, label] = within(uses).getAllByTestId('studio-reference')
-    expect(department).toHaveTextContent('field target')
-    expect(department).toHaveTextContent('Department')
-    expect(department).toHaveTextContent('entities/purchase-request.json, Path: /fields/3/target')
-    expect(label).toHaveTextContent('label text')
-    expect(label).toHaveTextContent('purchaseRequest.label')
-    expect(within(screen.getByTestId('studio-used-by')).getByText('None.')).toBeInTheDocument()
+    await screen.findByTestId('studio-editor')
+    expect(screen.queryByRole('tab', { name: 'Used by' })).not.toBeInTheDocument()
   })
 
-  it('opens a Uses entry at its top and a Used by entry at the path of its reference', async () => {
-    stubServer()
+  it('loads what uses an entity only when its Used by tab is opened', async () => {
+    const fetchMock = stubServer()
     renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    await userEvent.click(within(await screen.findByTestId('studio-uses')).getByRole('button', { name: 'Department' }))
+    await screen.findByRole('tab', { name: 'Used by' })
 
-    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/department.json')
-    expect(screen.getByTestId('location')).toHaveTextContent(/^\/studio\?app=PurchaseRequests&resource=[^&]+$/)
+    expect(fetchMock.mock.calls.some(([input]) => String(input).endsWith('/references'))).toBe(false)
 
+    await userEvent.click(screen.getByRole('tab', { name: 'Used by' }))
+
+    expect(await screen.findByTestId('studio-used-by')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledWith(`${folder}/resources/${entityId}/references`, expect.anything())
+  })
+
+  it('opens a resource that uses the open one at the path of its reference', async () => {
+    const fetchMock = stubServer()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/resources/${departmentId}`
+        ? json({
+            ...resources[0],
+            content: { id: departmentId, kind: 'entity', name: 'Department', formatVersion: 1, fields: [] },
+          })
+        : base(input, init),
+    )
+    renderPage(`/studio?app=PurchaseRequests&resource=${departmentId}`)
+
+    await userEvent.click(await screen.findByRole('tab', { name: 'Used by' }))
     const usedBy = await screen.findByTestId('studio-used-by')
-    await userEvent.click(await within(usedBy).findByRole('button', { name: 'PurchaseRequest' }))
+    await userEvent.click(await within(usedBy).findByRole('link', { name: 'PurchaseRequest' }))
 
-    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('entities/purchase-request.json')
-    expect(screen.getByTestId('studio-resource-details')).toHaveTextContent('/fields/3/target')
     expect(screen.getByTestId('location')).toHaveTextContent(`resource=${entityId}&path=%2Ffields%2F3%2Ftarget`)
+    expect(await screen.findByTestId('studio-resource-details')).toHaveTextContent('/fields/3/target')
   })
 
   it('scrolls the form field of the path in the address into view', async () => {
@@ -1044,35 +1035,6 @@ describe('StudioPage', () => {
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
-  })
-
-  it('loads an entry once when it is first expanded, and a text key entry loads its text key route', async () => {
-    const fetchMock = stubServer()
-    renderPage(`/studio?app=PurchaseRequests&resource=${entityId}`)
-    const uses = await screen.findByTestId('studio-uses')
-    const departmentRequests = () =>
-      fetchMock.mock.calls.filter(
-        ([input]) => input === `/api/studio/apps/PurchaseRequests/resources/${departmentId}/references`,
-      )
-    const department = within(uses).getByRole('button', { name: 'Department' }).closest('li')!
-
-    await userEvent.click(within(department).getByRole('button', { name: 'Expand' }))
-    expect(await within(department).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
-    await userEvent.click(within(department).getByRole('button', { name: 'Collapse' }))
-    await userEvent.click(within(department).getByRole('button', { name: 'Expand' }))
-
-    expect(within(department).getByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
-    expect(departmentRequests()).toHaveLength(1)
-
-    const label = within(uses).getByText('purchaseRequest.label').closest('li')!
-    await userEvent.click(within(label).getByRole('button', { name: 'Expand' }))
-
-    expect(await within(label).findByRole('button', { name: 'PurchaseRequest' })).toBeInTheDocument()
-    expect(within(label).queryByText('Uses')).not.toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/studio/apps/PurchaseRequests/texts/purchaseRequest.label/references',
-      expect.anything(),
-    )
   })
 
   it('warns with the number of references before a delete, and deletes after confirming', async () => {

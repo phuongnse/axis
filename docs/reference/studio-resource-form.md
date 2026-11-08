@@ -115,8 +115,6 @@ Version, Roles and Connectors, as [a dialog holds only what it edits](actions-an
 
 ## Used by
 
-_(planned for M31)_
-
 What uses a resource is a tab of its own, Used by, beside Design, Form and JSON, opened when it is needed,
 before a rename or a delete. A kind nothing can use, the application, has no such tab. What a resource uses
 is shown by its own editor, and deleting it breaks nothing it uses, so it has no list of its own, see
@@ -126,9 +124,9 @@ The tab is the [standard table](actions-and-controls.md#tables), flat, with sear
 
 1. Name: the other resource by its label, as the link that opens it at the path of the reference.
 2. Kind, as wide as its content.
-3. How it is used, in words, such as "Grants to it", with one text for each relation of the compiler.
+3. How it is used, in words, such as "A field refers to it", with one text for each relation of the compiler.
 
-No file, path or relation code shows, and modules and packages show by their labels. It sorts by kind in
+No file, path or relation code shows. It sorts by kind in
 the sidebar's order, then by name. The same resource used the same way shows once. With none, the table
 says so.
 
