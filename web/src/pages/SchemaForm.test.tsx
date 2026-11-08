@@ -461,6 +461,17 @@ describe('SchemaForm lists of objects', () => {
     expect(removed).toBeVisible()
     expect(screen.getByRole('table').compareDocumentPosition(removed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
+
+  it('names the item of a list with no item text as item in Add… and the dialog titles', async () => {
+    renderForm(listSchema, { kind: 'example', rows: [{ name: 'budget' }] })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add item…' }))
+    expect(await screen.findByRole('dialog', { name: 'Add item' })).toBeVisible()
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    await userEvent.click(within(rowOf(0)).getByRole('button', { name: 'budget' }))
+    expect(await screen.findByRole('dialog', { name: 'Edit item' })).toBeVisible()
+  })
 })
 
 describe('field text catalogues', () => {
