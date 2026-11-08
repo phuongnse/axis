@@ -34,7 +34,8 @@ const labelContext = {
   file: 'roles/approver.json',
   name: 'Approver',
   saved: {},
-  onTextsWritten: vi.fn(),
+  texts: {},
+  onTextsChange: vi.fn(),
 }
 
 const kinds = ['application', 'role', 'policy', 'rule', 'sequence', 'event'] as const
