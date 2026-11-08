@@ -96,6 +96,12 @@
       "en": "Apply",
       "vi": "Áp dụng",
       "status": "proposed"
+    },
+    {
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
+      "status": "proposed"
     }
   ]
 }
