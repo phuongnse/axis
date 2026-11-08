@@ -550,10 +550,11 @@ label. A child collection and a `references` field have no column.
 ### Toolbar
 
 The toolbar always shows, also when the table has no search and no toolbar action. What changes the view sits on the
-left: the search box and the filter inputs. On the right is a Refresh icon button, named by the platform text
-`shell.table.refresh` ("Refresh", in `vi` "Làm mới"), which loads the current page of rows again. Then come the
-secondary actions, Import, Export and the toolbar actions after the first, and last the first shown toolbar action, as
-the table's main action, see [buttons](actions-and-controls.md#buttons). Toolbar actions sit above the table.
+left: the search box, the Filter button of an entity table and the filter inputs of a data source table. On the right
+is a Refresh icon button, named by the platform text `shell.table.refresh` ("Refresh", in `vi` "Làm mới"), which loads
+the current page of rows again. Then come the secondary actions, Import, Export and the toolbar actions after the first,
+and last the first shown toolbar action, as the table's main action, see [buttons](actions-and-controls.md#buttons).
+Toolbar actions sit above the table.
 
 ### Search
 
@@ -563,24 +564,39 @@ right.
 - **When.** An entity table has a search box when the entity's display field is among the fields the user may read,
   that is in the widget's `entity.fields`. A data source table has one when the data source's metadata has
   `"search": true`.
-- **Applying.** The text applies on Enter, on the search button and when the box is cleared, so typing does not
-  request rows and add a history entry for every key. It lives in the URL as `search`. A new search starts again at
-  page 1 and adds a history entry, and paging and sorting keep it.
+- **Applying.** The box applies as [tables](actions-and-controls.md#tables) says, so typing does not request rows
+  for every key. The text lives in the URL as `search`, a new search adds a history entry, and paging and sorting
+  keep it.
 - **The text.** The text is sent to the rows request as typed, without trimming. An empty text means no search, so
   clearing the box removes `search` from the URL. The box takes at most 200 characters, the limit of the rows routes.
 - **No search.** On a table that cannot search, a `search` in the URL is ignored and removed without a history entry,
   as an invalid `sort` is, and is not sent. `search` is a reserved page parameter name, because the table owns it in
   the URL.
 
+### Filter
+
+An entity table has a Filter button in the toolbar, after the search box, which opens the builder of
+[tables](actions-and-controls.md#tables).
+
+- **Columns.** The builder offers the text, enum, integer, decimal, money and date columns. It leaves out boolean,
+  reference, file and date-time columns, as the record API refuses the first three and the builder's date picker gives
+  no time for the fourth. An enum column offers its values by their labels. The builder cannot tell which fields are
+  `sensitive`, so it may offer one, and the record API then answers `400`.
+- **Operators.** Each column takes the operators the record API takes for its type, see
+  [record API paging and sorting](record-api.md#paging-and-sorting).
+- **Sending.** The filter lives in the URL as `filter`, and the rows request and the export send it to the record API
+  as `filter`. A data source table has no Filter button, because its rows route takes no `filter`, and a `filter` in its
+  URL is ignored and removed.
+
 ### Paging and sorting
 
 Paging, sorting and search live in the URL, so reload, sharing and the back button keep them.
 
-- **URL state.** They are the record API's own `page`, `pageSize`, `sort` (`-` and the field name for descending) and
-  `search`. The widget writes them after every other parameter, always in the order `search`, `page`, `pageSize`,
-  `sort`, and leaves out defaults: no search, page 1, 20 a page or the data source's page size, and no sort. It
-  changes only its own four parameters and, for a data source, its [parameter values](#data-source-binding). Any
-  other parameter, such as `x=1`, stays as it is.
+- **URL state.** They are the record API's own `page`, `pageSize`, `sort` (`-` and the field name for descending),
+  `search` and, on an entity table, `filter`. The widget writes them after every other parameter, always in the order
+  `search`, `filter`, `page`, `pageSize`, `sort`, and leaves out defaults: no search, no filter, page 1, 20 a page or
+  the data source's page size, and no sort. It changes only its own parameters and, for a data source, its
+  [parameter values](#data-source-binding). Any other parameter, such as `x=1`, stays as it is.
 - **Changes.** A new sort or page size starts again at page 1, because the old page number means nothing under a new
   order or size. Only the pagination control moves between pages. Each change adds a history entry.
 - **Invalid values.** A `page` that is not a positive integer, a `pageSize` other than the offered sizes, and a `sort`
@@ -824,8 +840,9 @@ exports nothing.
 - **The choice.** The dropdown offers CSV and Excel, and it opens and selects with the keyboard.
 - **The request.** A choice sends `GET` to the export route: the entity's `recordsPath` with `/export` added, or the
   data source's `rowsPath` with its last `/rows` swapped for `/export`. The address holds the table's data source
-  parameter values, bound and filter, its `search` and its `sort`, as the rows request has them, and `format` as `csv`
-  or `xlsx`. It holds no `page` or `pageSize`, so the file has every matching row.
+  parameter values, bound and filter, its `search`, its `sort` and, on an entity table, its `filter`, as the rows
+  request has them, and `format` as `csv` or `xlsx`. It holds no `page` or `pageSize`, so the file has every matching
+  row.
 - **The file.** The SPA saves the file under the name in the response's `Content-Disposition`, through a temporary
   download link. A success shows no message. When the response carries `Axis-Export-Truncated: true`, a notice above
   the table says the file stops at the row limit.
@@ -869,7 +886,7 @@ narrow one.
 Every field of the platform's own screens has help text, enforced three ways, because in an application
 builder help is not optional.
 
-- **`AxisField` requires `help`,** _(planned for M31)_ so a screen cannot leave it out.
+- **`AxisField` requires `help`,** so a screen cannot leave it out.
 - **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
   that are not fields, such as `modules.addTitle`, move out of it.
 - **Every editor draws its labels through `AxisField`,** _(planned for M31)_ those that draw their own today

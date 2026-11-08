@@ -4,7 +4,10 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
 using Axis.Expressions.Typing;
+using Axis.Presentation.Texts;
+using Axis.Server.Presentation;
 using Axis.Studio;
 using Json.Patch;
 using Json.Pointer;
@@ -19,8 +22,12 @@ namespace Axis.Server.Studio;
 /// saved resource otherwise. The text goes into a copy of that resource and the folder compiles in memory, so the answer
 /// is the compile's own and nothing is written or locked. It answers <c>{ type, diagnostics }</c>. A diagnostic has the
 /// compile's <c>code</c> and <c>message</c> and a character range, <c>start</c> and <c>end</c>, as UTF-16 offsets into the
-/// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic. The checks run in the order of the
-/// rest of the authoring API: session (401), author role (403), application (404), then 415 for a content type other than
+/// expression with <c>end</c> exclusive. <c>type</c> is null when there is a diagnostic.
+/// <c>POST /api/studio/apps/{application}/expressions/scope</c> answers what the same place offers. Its body is
+/// <c>{ resourceId, path, draft }</c> and the answer is <c>{ type, fields, functions }</c>, from the compile's type check at
+/// the place. Each function carries its parameters, result, group and example, and a description in the language of the
+/// request's <c>Accept-Language</c> header, or in <c>en</c>, see <see cref="RequestLocale"/>. The checks run in the order of the rest of the authoring API for both routes: session (401), author role (403),
+/// application (404), then 415 for a content type other than
 /// <c>application/json</c>, 400 for a body that is not an expression check or a <c>draft</c> that is not an object, 404 for a
 /// resource id the application does not have, and 400 for a path that holds no expression. A path holds no expression when
 /// it points at neither a string nor a missing property of an object the resource has, so a condition not yet saved is
@@ -29,8 +36,11 @@ namespace Axis.Server.Studio;
 /// </summary>
 internal static class StudioExpressionEndpoints
 {
-    public static void MapStudioExpressionEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapStudioExpressionEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapPost("/api/studio/apps/{application}/expressions/check", CheckAsync);
+        endpoints.MapPost("/api/studio/apps/{application}/expressions/scope", ScopeAsync);
+    }
 
     private static async Task<IResult> CheckAsync(
         string application,
@@ -39,17 +49,79 @@ internal static class StudioExpressionEndpoints
         PackageCatalog packages,
         ModuleCatalog modules)
     {
+        var (request, refusal) = await ReadAsync(application, httpContext, options, withExpression: true, BadCheck);
+        if (request is null)
+        {
+            return refusal!;
+        }
+
+        var (answer, problem) = Check(
+            request.Resources, request.Files, request.ResourceId, request.Path, request.Pointer, request.Expression!, packages, modules, request.Draft);
+        return Answer(answer, problem);
+    }
+
+    private static async Task<IResult> ScopeAsync(
+        string application,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        ITextResourceProvider texts)
+    {
+        var (request, refusal) = await ReadAsync(application, httpContext, options, withExpression: false, BadScope);
+        if (request is null)
+        {
+            return refusal!;
+        }
+
+        var (answer, problem) = Scope(
+            request.Resources,
+            request.Files,
+            request.ResourceId,
+            request.Path,
+            request.Pointer,
+            packages,
+            modules,
+            RequestLocale.Choose(httpContext.Request, texts),
+            request.Draft);
+        return Answer(answer, problem);
+    }
+
+    private static IResult Answer(object? answer, string? problem) => problem switch
+    {
+        null => Results.Ok(answer),
+        StudioEndpoints.NoResource => StudioEndpoints.NotFound(StudioEndpoints.NoResource),
+        _ => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, problem),
+    };
+
+    /// <summary>The body both routes read. <c>Expression</c> is set only for the check.</summary>
+    private sealed record ExpressionRequest(
+        IReadOnlyList<StudioFile> Resources,
+        IReadOnlyList<ResourceContent> Files,
+        Guid ResourceId,
+        string Path,
+        JsonPointer Pointer,
+        string? Expression,
+        JsonObject? Draft);
+
+    /// <summary>
+    /// The refusals both routes share, in order: the application (401, 403, 404), the content type (415) and a body that is
+    /// not a request (400 with <paramref name="badTitle"/>). Otherwise the folder's files and the body's parts.
+    /// </summary>
+    private static async Task<(ExpressionRequest? Request, IResult? Refusal)> ReadAsync(
+        string application, HttpContext httpContext, StudioOptions options, bool withExpression, string badTitle)
+    {
         var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
         if (folder is null)
         {
-            return refusal!;
+            return (null, refusal);
         }
 
         var request = httpContext.Request;
         if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var mediaType)
             || !mediaType.MediaType.Equals("application/json", StringComparison.OrdinalIgnoreCase))
         {
-            return StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json.");
+            return (null, StudioEndpoints.Problem(StatusCodes.Status415UnsupportedMediaType, "The body must be application/json."));
         }
 
         JsonObject? body;
@@ -62,29 +134,27 @@ internal static class StudioExpressionEndpoints
             body = null;
         }
 
+        string? expression = null;
         if (body is null
             || body["resourceId"] is not JsonValue idValue || !idValue.TryGetValue<string>(out var id)
             || id.Length != 36 || !Guid.TryParseExact(id, "D", out var resourceId)
             || body["path"] is not JsonValue pathValue || !pathValue.TryGetValue<string>(out var path)
             || !JsonPointer.TryParse(path, out var pointer)
-            || body["expression"] is not JsonValue expressionValue || !expressionValue.TryGetValue<string>(out var expression)
+            || (withExpression && (body["expression"] is not JsonValue expressionValue || !expressionValue.TryGetValue(out expression)))
             || body["draft"] is not (null or JsonObject))
         {
-            return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, BadCheck);
+            return (null, StudioEndpoints.Problem(StatusCodes.Status400BadRequest, badTitle));
         }
 
-        var (resources, folderFiles) = StudioFolder.ListWithContent(folder);
-        var (answer, problem) = Check(resources, folderFiles, resourceId, path, pointer, expression, packages, modules, body["draft"] as JsonObject);
-        return problem switch
-        {
-            null => Results.Ok(answer),
-            StudioEndpoints.NoResource => StudioEndpoints.NotFound(StudioEndpoints.NoResource),
-            _ => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, problem),
-        };
+        var (resources, files) = StudioFolder.ListWithContent(folder);
+        return (new ExpressionRequest(resources, files, resourceId, path, pointer, expression, body["draft"] as JsonObject), null);
     }
 
     /// <summary>The title of the refusal for a body, or for a tool input, that is not an expression check.</summary>
     internal const string BadCheck = "The body is not a valid expression check.";
+
+    /// <summary>The title of the refusal for a body that is not a scope request.</summary>
+    internal const string BadScope = "The body is not a valid expression scope request.";
 
     internal const string NoExpressionTitle = "The path holds no expression.";
 
@@ -106,25 +176,10 @@ internal static class StudioExpressionEndpoints
         ModuleCatalog modules,
         JsonObject? draft = null)
     {
-        if (resources.FirstOrDefault(file => file.Id == resourceId) is not { } found)
+        var (probe, result, refusal) = Compile(resources, files, resourceId, path, pointer, expression, packages, modules, draft);
+        if (probe is null)
         {
-            return (null, StudioEndpoints.NoResource);
-        }
-
-        var edited = Place(found, pointer, expression, draft);
-        if (edited is null)
-        {
-            return (null, NoExpressionTitle);
-        }
-
-        var checkedFiles = files
-            .Select(file => string.Equals(file.Path, found.File, StringComparison.Ordinal) ? new ResourceContent(file.Path, edited) : file)
-            .ToList();
-        var probe = new ExpressionProbe(found.File, path);
-        var result = ApplicationCompiler.CompileFiles(checkedFiles, packages.Versions, modules.Modules, probe);
-        if (!probe.Found)
-        {
-            return (null, NoExpressionTitle);
+            return (null, refusal);
         }
 
         StudioExpressionDiagnostic? diagnostic = null;
@@ -133,8 +188,8 @@ internal static class StudioExpressionEndpoints
             var (start, end) = ExpressionRange.Of(expression, problem);
             diagnostic = new StudioExpressionDiagnostic(problem.Code, problem.Message, start, end);
         }
-        else if (result.Diagnostics.FirstOrDefault(
-            item => string.Equals(item.File, found.File, StringComparison.Ordinal) && string.Equals(item.Path, path, StringComparison.Ordinal)) is { } other)
+        else if (result!.Diagnostics.FirstOrDefault(
+            item => string.Equals(item.File, probe.File, StringComparison.Ordinal) && string.Equals(item.Path, path, StringComparison.Ordinal)) is { } other)
         {
             // A limit the compile reports at the place but not inside the expression check, such as a rule cycle.
             diagnostic = new StudioExpressionDiagnostic(other.Code, other.Message, 0, expression.Length);
@@ -143,6 +198,92 @@ internal static class StudioExpressionEndpoints
         return (
             new StudioExpressionCheckResponse(diagnostic is null ? TypeName(probe.Type) : null, diagnostic is null ? [] : [diagnostic]),
             null);
+    }
+
+    /// <summary>
+    /// Answers what the expression place at <paramref name="path"/> of the resource <paramref name="resourceId"/> offers: the
+    /// type it needs, the fields in scope and the functions it allows, all from the compile's own type check there. The
+    /// expression <c>null</c> stands at the path, because it parses and fits every type, so the type check always runs. A place
+    /// the compile checks without a type check answers no type, no fields and no functions. Refuses as <see cref="Check"/> does.
+    /// Each function's description is the platform text in <paramref name="texts"/>. Writes nothing.
+    /// </summary>
+    internal static (StudioExpressionScopeResponse? Answer, string? Refusal) Scope(
+        IReadOnlyList<StudioFile> resources,
+        IReadOnlyList<ResourceContent> files,
+        Guid resourceId,
+        string path,
+        JsonPointer pointer,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        TextResources texts,
+        JsonObject? draft = null)
+    {
+        var (probe, _, refusal) = Compile(resources, files, resourceId, path, pointer, "null", packages, modules, draft);
+        if (probe is null)
+        {
+            return (null, refusal);
+        }
+
+        if (probe.Place is not { } place)
+        {
+            return (new StudioExpressionScopeResponse(null, [], []), null);
+        }
+
+        return (
+            new StudioExpressionScopeResponse(
+                place.Expected.Kind == ExpressionTypeKind.Null ? null : TypeName(place.Expected),
+                [.. place.Scope.Fields.Select(field => new StudioExpressionScopeField(field.Name, field.LabelKey, TypeName(field.Type)))],
+                [.. place.Functions.Select(name => ScopeFunction(name, texts))]),
+            null);
+    }
+
+    /// <summary>The key of the platform text that describes a function or an aggregate.</summary>
+    internal static string FunctionDescriptionKey(string name) => $"shell.studio.function.{name}";
+
+    private static StudioExpressionScopeFunction ScopeFunction(string name, TextResources texts)
+    {
+        var signature = ExpressionFunctions.Get(name);
+        return new StudioExpressionScopeFunction(
+            signature.Name,
+            signature.Parameters,
+            signature.Result,
+            signature.Group,
+            signature.Example,
+            texts.Texts[FunctionDescriptionKey(signature.Name)]);
+    }
+
+    /// <summary>
+    /// Compiles the folder in memory with <paramref name="expression"/> at <paramref name="path"/> of the resource, and answers
+    /// the probe that watched the place with the compile's result. Otherwise the title of the refusal.
+    /// </summary>
+    private static (ExpressionProbe? Probe, CompilationResult? Result, string? Refusal) Compile(
+        IReadOnlyList<StudioFile> resources,
+        IReadOnlyList<ResourceContent> files,
+        Guid resourceId,
+        string path,
+        JsonPointer pointer,
+        string expression,
+        PackageCatalog packages,
+        ModuleCatalog modules,
+        JsonObject? draft)
+    {
+        if (resources.FirstOrDefault(file => file.Id == resourceId) is not { } found)
+        {
+            return (null, null, StudioEndpoints.NoResource);
+        }
+
+        var edited = Place(found, pointer, expression, draft);
+        if (edited is null)
+        {
+            return (null, null, NoExpressionTitle);
+        }
+
+        var checkedFiles = files
+            .Select(file => string.Equals(file.Path, found.File, StringComparison.Ordinal) ? new ResourceContent(file.Path, edited) : file)
+            .ToList();
+        var probe = new ExpressionProbe(found.File, path);
+        var result = ApplicationCompiler.CompileFiles(checkedFiles, packages.Versions, modules.Modules, probe);
+        return probe.Found ? (probe, result, null) : (null, null, NoExpressionTitle);
     }
 
     /// <summary>
@@ -200,6 +341,20 @@ internal static class StudioExpressionEndpoints
         _ => null,
     };
 }
+
+/// <summary>
+/// The answer to an expression scope request: the type the place needs, or null when any type will do, the fields in scope
+/// in scope order, and the functions the place allows.
+/// </summary>
+internal sealed record StudioExpressionScopeResponse(
+    string? Type, IReadOnlyList<StudioExpressionScopeField> Fields, IReadOnlyList<StudioExpressionScopeFunction> Functions);
+
+/// <summary>One name in scope. <c>LabelKey</c> is null for a name with no label, such as a parameter.</summary>
+internal sealed record StudioExpressionScopeField(string Name, string? LabelKey, string? Type);
+
+/// <summary>One function or aggregate a place allows, with its signature, its result, its group, an example and what it does.</summary>
+internal sealed record StudioExpressionScopeFunction(
+    string Name, IReadOnlyList<string> Parameters, string Result, string Group, string Example, string Description);
 
 /// <summary>The answer to an expression check: the expression's type, and the problem with its range when there is one.</summary>
 internal sealed record StudioExpressionCheckResponse(string? Type, IReadOnlyList<StudioExpressionDiagnostic> Diagnostics);

@@ -251,7 +251,8 @@ the import's state and errors stay.
 A table offers Export and Import buttons to a user who holds those actions.
 
 - A table whose user holds `export` shows an Export button with CSV and Excel. It exports the
-  table's data source or entity with the table's current parameters, sort and search.
+  table's data source or entity with the table's current parameters, filter, sort and search. A data source table
+  has no filter.
 - An entity table whose user holds `import` shows an Import button. It uploads the file, waits for
   the dry run, lists its errors, and commits when there are none.
 - Studio's [policy matrix](studio.md#policy-matrix) shows the `export` and `import` actions.

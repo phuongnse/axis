@@ -57,12 +57,25 @@
       "en": "version",
       "vi": "bản",
       "status": "approved",
-      "note": "A module's version, with its number: \"Organization bản 1.2.0\". \"phiên bản\" is a release of the application."
+      "note": "A module's or an extension package's version, with its number: \"Organization bản 1.2.0\". \"phiên bản\" is a release of the application."
     },
     {
       "concept": "Built-in module",
       "en": "built-in module",
       "vi": "mô-đun có sẵn",
+      "status": "approved"
+    },
+    {
+      "concept": "Module slot",
+      "en": "slot",
+      "vi": "vị trí",
+      "status": "approved",
+      "note": "A role or a connector that a module names and the application fills: \"vị trí vai trò\", \"vị trí bộ kết nối\". A role or a connector \"điền vào\" a slot."
+    },
+    {
+      "concept": "Extension package",
+      "en": "extension package",
+      "vi": "gói mở rộng",
       "status": "approved"
     },
     {
@@ -76,12 +89,13 @@
       "concept": "Relaxed point",
       "en": "relaxed point",
       "vi": "điểm nới lỏng",
-      "status": "approved"
+      "status": "approved",
+      "note": "A point of a module's contract that a release relaxes. Never \"điểm được nới lỏng\"."
     },
     {
       "concept": "Customization layer",
       "en": "layer",
-      "vi": "lớp tùy biến",
+      "vi": "tùy biến",
       "status": "approved"
     },
     {
@@ -198,6 +212,13 @@
       "en": "Reference",
       "vi": "Tham chiếu",
       "status": "approved"
+    },
+    {
+      "concept": "Reference target",
+      "en": "Refers to",
+      "vi": "Tham chiếu tới",
+      "status": "approved",
+      "note": "The entity a reference parameter or input picks its records from, as the Reference field type says."
     },
     {
       "concept": "Child collection (field type)",
@@ -319,6 +340,13 @@
       "status": "approved"
     },
     {
+      "concept": "Deployment binding",
+      "en": "deployment binding",
+      "vi": "giá trị triển khai",
+      "status": "approved",
+      "note": "A deployment's value that a resource names, such as the storage that holds the files."
+    },
+    {
       "concept": "Endpoint",
       "en": "endpoint",
       "vi": "endpoint",
@@ -402,6 +430,13 @@
       "status": "approved"
     },
     {
+      "concept": "Policy matrix",
+      "en": "policy matrix",
+      "vi": "bảng phân quyền",
+      "status": "approved",
+      "note": "The view of every role's grants on every entity. \"Ma trận\" is a word-by-word translation."
+    },
+    {
       "concept": "Identity provider",
       "en": "identity provider",
       "vi": "nhà cung cấp danh tính",
@@ -470,7 +505,7 @@
     {
       "concept": "Action: Remove",
       "en": "Remove",
-      "vi": "Loại bỏ",
+      "vi": "Gỡ",
       "status": "approved",
       "note": "Takes a thing out of a list or a setting; the thing itself stays."
     },

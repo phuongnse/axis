@@ -87,6 +87,17 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             ["label"] = new JsonObject { ["textKey"] = "role.guardwriter" },
         };
 
+        // A second draft, on the folder whose application pins the module, for the tool that writes a layer. The module's own
+        // content is an edit with no difference.
+        var purchaseApp = Path.Combine(_applications!, "purchase-requests");
+        var purchaseDrafts = StudioDrafts.For(_revisions, purchaseApp, subject, subject, factory.Services.GetRequiredService<IStudioWriteLock>())!;
+        var purchaseDraft = (await purchaseDrafts.CreateAsync(
+            StudioRevisions.For(_revisions, purchaseApp, subject, subject, NullLogger<StudioRevisions>.Instance)!, CancellationToken)).Value!.Id;
+        var moduleResource = await SendAsync(McpTestCalls.ToolCall(
+            "read_module_resource",
+            $$"""{"application":"PurchaseRequests","module":"department-budgets","id":"{{BudgetApprovalId}}"}"""));
+        var moduleContent = moduleResource["result"]!["structuredContent"]!["content"]!.DeepClone();
+
         var listed = await SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
         var tools = listed["result"]!["tools"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()).ToList();
         Assert.Equal(McpServer.Tools.Order(StringComparer.Ordinal), tools.Order(StringComparer.Ordinal));
@@ -104,6 +115,14 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ["create_draft"] = """{"application":"StepApp"}""",
                 ["write_resource"] = new JsonObject { ["application"] = "StepApp", ["draft"] = draft, ["content"] = written }.ToJsonString(),
                 ["delete_resource"] = $$"""{"application":"StepApp","draft":"{{draft}}","id":"{{FixtureId("roles", "auditor.json")}}"}""",
+                ["write_layer"] = new JsonObject
+                {
+                    ["application"] = "PurchaseRequests",
+                    ["draft"] = purchaseDraft,
+                    ["module"] = "department-budgets",
+                    ["id"] = BudgetApprovalId,
+                    ["content"] = moduleContent,
+                }.ToJsonString(),
                 ["check_expression"] = $$"""{"application":"StepApp","draft":"{{draft}}","id":"{{FixtureId("rules", "needs-review.json")}}","path":"/expression","expression":"total >= 500"}""",
             },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),

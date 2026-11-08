@@ -1,6 +1,6 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { Link } from 'react-router'
-import { createContext, lazy, Suspense, useContext, useId, useState, type CSSProperties, type ReactNode } from 'react'
+import { createContext, lazy, Suspense, useContext, useState, type ReactElement, type ReactNode } from 'react'
 import type { StudioCatalog, StudioFolderRelaxedPoint, StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
@@ -22,6 +22,8 @@ import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { PlatformContext } from './context'
 import { relaxedPointLabel } from './relaxEntries'
 import { BindingSelect, CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
@@ -32,6 +34,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { ObjectListTable, type ObjectListColumn } from './ObjectListTable'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import { SchemaLayerContext } from './schemaLayerContext'
 import { sectionsByKind } from './schemaFormSections'
 
@@ -39,6 +42,7 @@ const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /** Whether the node is drawn inside an item's dialog, where a nested list is rows of inputs and never a table. */
 const ItemDialogContext = createContext(false)
+const ItemProblemContext = createContext<(pointer: string) => ReactNode>(() => null)
 
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
@@ -106,8 +110,6 @@ function Sections({
   readOnlyNames?: Set<string>
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
-  const headingId = useId()
   const kind = schema.properties?.kind?.const
   const shown = Object.keys(schema.properties ?? {}).filter((name) => !hiddenRootProperties.has(name))
   const mapped = typeof kind === 'string' && Object.hasOwn(sectionsByKind, kind) ? sectionsByKind[kind] : []
@@ -119,15 +121,8 @@ function Sections({
     })),
     { name: undefined, properties: shown.filter((name) => !named.has(name)) },
   ].filter((group) => group.properties.length > 0)
-  const panel = {
-    background: colour.surface,
-    border: `1px solid ${colour.borderSubtle}`,
-    borderRadius: radius.base,
-    padding: spacing.md,
-  }
-
   return (
-    <Flex vertical gap={spacing.md}>
+    <ResourceFormSections>
       {groups.map((group) => {
         const single = group.name !== undefined && group.properties.length === 1 ? group.properties[0] : undefined
         const singleSchema = single === undefined ? undefined : resolveSchema(schema.properties![single], schema)
@@ -160,23 +155,18 @@ function Sections({
         )
         if (group.name === undefined) {
           return (
-            <div key="rest" data-testid="studio-section-rest" style={panel}>
+            <ResourceFormSection key="rest" testName="rest">
               {fieldsIn(undefined)}
-            </div>
+            </ResourceFormSection>
           )
         }
-        const id = `${headingId}-${group.name}`
         const prefix = `shell.studio.section.${String(kind)}.${group.name}`
         return (
-          <HeadedSection
+          <ResourceFormSection
             key={group.name}
-            id={id}
-            name={group.name}
-            title={t(prefix)}
-            line={t(`${prefix}.line`)}
-            style={panel}
-            tableInHeading={tableInHeading}
-            add={
+            testName={group.name}
+            heading={{ title: t(prefix), line: t(`${prefix}.line`) }}
+            action={
               single !== undefined && itemSchema !== undefined && !tableInHeading ? (
                 <AxisButton
                   role="secondary"
@@ -191,52 +181,12 @@ function Sections({
                 </AxisButton>
               ) : null
             }
-            fieldsIn={fieldsIn}
-          />
+          >
+            {tableInHeading ? fieldsIn : fieldsIn(undefined)}
+          </ResourceFormSection>
         )
       })}
-    </Flex>
-  )
-}
-
-/**
- * A section with its heading. A section that holds one list of objects has a slot on the right of the heading, which
- * the list draws its Add… into, and a section that holds one list of plain values has the Add of `add` there.
- */
-function HeadedSection({
-  id,
-  name,
-  title,
-  line,
-  style,
-  tableInHeading,
-  add,
-  fieldsIn,
-}: {
-  id: string
-  name: string
-  title: string
-  line: string
-  style: CSSProperties
-  tableInHeading: boolean
-  add: ReactNode
-  fieldsIn: (slot: HTMLElement | null | undefined) => ReactNode
-}) {
-  const { spacing } = useDesignTokens()
-  const [slot, setSlot] = useState<HTMLElement | null>(null)
-  return (
-    <section aria-labelledby={id} data-testid={`studio-section-${name}`} style={style}>
-      <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
-        <div>
-          <Typography.Title id={id} level={5} style={{ margin: 0 }}>
-            {title}
-          </Typography.Title>
-          <Typography.Text type="secondary">{line}</Typography.Text>
-        </div>
-        {tableInHeading ? <div ref={setSlot} /> : add}
-      </Flex>
-      {fieldsIn(tableInHeading ? slot : undefined)}
-    </section>
+    </ResourceFormSections>
   )
 }
 
@@ -321,6 +271,14 @@ function fieldTexts(
   return { label: t(key), help: help === `${key}.help` ? undefined : help }
 }
 
+/**
+ * The expression editor while it loads. `AxisField` gives its input an id and a description, which the editor does not
+ * take yet, so they stop here and never reach `Suspense`. The editor keeps its own name.
+ */
+function ExpressionInput({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
+  return <Suspense fallback={fallback}>{children}</Suspense>
+}
+
 function SchemaNode({
   node,
   root,
@@ -350,6 +308,7 @@ function SchemaNode({
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const inDialog = useContext(ItemDialogContext)
+  const problemAt = useContext(ItemProblemContext)
   const names = useContext(StudioNamesContext)
   const catalog = useContext(StudioCatalogContext)
   const bindings = useContext(StudioBindingsContext)
@@ -371,14 +330,11 @@ function SchemaNode({
   const isMarkedMap =
     schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined
   const unsupported = control === undefined && !isMarkedMap && !isSupported(schema)
-  const labelStyle = { fontWeight: 500, color: colour.textMuted }
-  const helpNode =
-    help === undefined ? undefined : (
-      <div style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted, marginBottom: spacing.xs }}>{help}</div>
-    )
   const groupStyle = { borderInlineStart: `1px solid ${colour.borderSubtle}`, paddingInlineStart: spacing.md }
 
   let input
+  // Whether the input holds several inputs, rows or a table, which a group names by its title and a label cannot.
+  let grouped = false
   if (unsupported) {
     input = (
       <Typography.Text type="secondary" data-testid="studio-json-only">
@@ -402,11 +358,12 @@ function SchemaNode({
       />
     )
   } else if (control !== undefined && catalog !== undefined) {
+    grouped =
+      control === 'moduleVersion' || control === 'packageVersion' || control === 'roles' || control === 'connectors'
     input = catalogInput({ control, catalog, names, name, locale, rootValue, pointer, value, onChange })
   } else if (schema.enum !== undefined) {
     input = (
       <Select
-        aria-label={name}
         showSearch
         optionFilterProp="label"
         virtual={false}
@@ -430,7 +387,7 @@ function SchemaNode({
   } else if (schema.type === 'string' && schema['x-axis-expression'] === true && check) {
     const text = typeof value === 'string' ? value : ''
     input = (
-      <Suspense fallback={<Input aria-label={name} value={text} readOnly aria-busy="true" />}>
+      <ExpressionInput fallback={<Input aria-label={name} value={text} readOnly aria-busy="true" />}>
         <LazyExpressionEditor
           application={check.application}
           resourceId={check.resourceId}
@@ -441,12 +398,11 @@ function SchemaNode({
           options={expressionScope(check.kind, check.draft, pointer, check.names)}
           onChange={onChange}
         />
-      </Suspense>
+      </ExpressionInput>
     )
   } else if (schema.type === 'string') {
     input = (
       <Input
-        aria-label={name}
         value={typeof value === 'string' ? value : ''}
         onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
       />
@@ -454,7 +410,6 @@ function SchemaNode({
   } else if (schema.type === 'integer' || schema.type === 'number') {
     input = (
       <InputNumber
-        aria-label={name}
         precision={schema.type === 'integer' ? 0 : undefined}
         min={schema.minimum}
         max={schema.maximum}
@@ -468,14 +423,9 @@ function SchemaNode({
       />
     )
   } else if (schema.type === 'boolean') {
-    input = (
-      <Checkbox
-        aria-label={name}
-        checked={value === true}
-        onChange={(event) => onChange(pointer, event.target.checked)}
-      />
-    )
+    input = <Checkbox checked={value === true} onChange={(event) => onChange(pointer, event.target.checked)} />
   } else if (isMarkedMap) {
+    grouped = true
     input = (
       <MarkedMap
         schema={schema}
@@ -491,14 +441,11 @@ function SchemaNode({
       />
     )
   } else if (isLabel) {
+    grouped = true
     input = (
-      <fieldset style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
-        <legend style={labelStyle}>{name}</legend>
-        {helpNode}
-        <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
-          <LabelTexts pointer={pointer} value={value} onChange={onChange} />
-        </div>
-      </fieldset>
+      <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
+        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
+      </div>
     )
   } else if (isObject && named) {
     input = (
@@ -513,24 +460,22 @@ function SchemaNode({
       />
     )
   } else if (isObject) {
+    grouped = true
     input = (
-      <fieldset style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
-        <legend style={labelStyle}>{name}</legend>
-        {helpNode}
-        <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
-          <Properties
-            node={schema}
-            root={root}
-            rootValue={rootValue}
-            pointer={pointer}
-            path={path}
-            value={value}
-            onChange={onChange}
-          />
-        </div>
-      </fieldset>
+      <div data-testid={`studio-group-${pointer}`} style={groupStyle}>
+        <Properties
+          node={schema}
+          root={root}
+          rootValue={rootValue}
+          pointer={pointer}
+          path={path}
+          value={value}
+          onChange={onChange}
+        />
+      </div>
     )
   } else if (isArray && !inDialog && isObjectList(resolveSchema(schema.items!, root))) {
+    grouped = true
     input = (
       <ObjectList
         itemSchema={resolveSchema(schema.items!, root)}
@@ -544,6 +489,7 @@ function SchemaNode({
       />
     )
   } else if (isArray) {
+    grouped = true
     const items = Array.isArray(value) ? value : []
     const itemSchema = schema.items!
     const keyProperty = layer === undefined ? undefined : keyPropertyOf(layer.keyedLists, pointer)
@@ -595,12 +541,23 @@ function SchemaNode({
     )
   }
 
-  const showsLabel = !isObject && !named
+  // A group or a field draws the label and the help, so the heading of a section that names this field leaves them out.
+  const drawn =
+    named || input === undefined ? (
+      input
+    ) : grouped ? (
+      <AxisFieldGroup title={name} help={help ?? ''}>
+        {input}
+      </AxisFieldGroup>
+    ) : (
+      <AxisField label={name} help={help ?? ''}>
+        {input}
+      </AxisField>
+    )
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      {showsLabel && <div style={labelStyle}>{name}</div>}
-      {showsLabel && helpNode}
-      {input}
+      {drawn}
+      {problemAt(pointer)}
     </div>
   )
 }
@@ -674,7 +631,7 @@ function catalogInput({
   pointer: string
   value: unknown
   onChange: ChangeHandler
-}): ReactNode {
+}): ReactElement {
   const text = typeof value === 'string' ? value : undefined
   const itemPointer = itemPointerOf(pointer)
   switch (control) {
@@ -961,6 +918,7 @@ function ObjectList({
     const resolved = resolveSchema(child, root)
     return resolved.type === 'array' || (resolved.type === 'object' && resolved.properties === undefined)
   })
+  const requiredShown = (itemSchema.required ?? []).filter((name) => Object.hasOwn(dialogSchema.properties ?? {}, name))
 
   return (
     <>
@@ -969,7 +927,7 @@ function ObjectList({
         items={items}
         columns={columns}
         itemName={itemNameOf(t, kind, path)}
-        required={itemSchema.required ?? []}
+        required={requiredShown}
         large={large}
         newItem={() => defaultFor(itemSchema, root) as Record<string, unknown>}
         addIn={addIn}
@@ -987,7 +945,7 @@ function ObjectList({
             <LayerMarkTag layer={layer.designer} list={pointer} index={index} name={key} />
           ) : null
         }}
-        fields={(copy, change, index) => {
+        fields={(copy, change, index, problem) => {
           const itemPointer = `${pointer}/${index}`
           const view = setAt(rootValue, pointer, index < items.length ? items.with(index, copy) : [...items, copy])
           const changeItem: ChangeHandler = (changed, next) => {
@@ -995,18 +953,24 @@ function ObjectList({
               change(changed.slice(itemPointer.length), next)
             }
           }
+          const problemAt = (at: string) => {
+            const name = requiredShown.find((required) => `${itemPointer}/${escapeSegment(required)}` === at)
+            return name === undefined ? null : problem(name)
+          }
           const fields = (
             <ExpressionCheckContext.Provider value={check && { ...check, draft: view as Record<string, unknown> }}>
               <ItemDialogContext.Provider value>
-                <Properties
-                  node={dialogSchema}
-                  root={root}
-                  rootValue={view}
-                  pointer={itemPointer}
-                  path={path}
-                  value={copy}
-                  onChange={changeItem}
-                />
+                <ItemProblemContext.Provider value={problemAt}>
+                  <Properties
+                    node={dialogSchema}
+                    root={root}
+                    rootValue={view}
+                    pointer={itemPointer}
+                    path={path}
+                    value={copy}
+                    onChange={changeItem}
+                  />
+                </ItemProblemContext.Provider>
               </ItemDialogContext.Provider>
             </ExpressionCheckContext.Provider>
           )

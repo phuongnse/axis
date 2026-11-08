@@ -16,6 +16,7 @@ import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResour
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
+import { isRequiredLabel } from '../test/antd'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
 
@@ -1781,6 +1782,58 @@ describe('StudioPage publishing', () => {
       expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
     })
 
+    it('keeps Create on, marks Kind and Name required and checks them on a click', async () => {
+      const fetchMock = stubCreate(201)
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
+
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
+      expect(isRequiredLabel(screen.getByText('Kind'))).toBe(true)
+      expect(isRequiredLabel(screen.getByText('Name'))).toBe(true)
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(
+        expect.stringContaining('Letters and digits'),
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Choose a kind.')).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveFocus()
+      expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(false)
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
+      await userEvent.click(await screen.findByTitle('Entity'))
+      await waitFor(() => expect(screen.queryByText('Choose a kind.')).not.toBeInTheDocument())
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+      expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(false)
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'CostCentre')
+
+      await waitFor(() => expect(screen.queryByText('Enter a name.')).not.toBeInTheDocument())
+    })
+
+    it('checks the locale of a kind that is text, and starts empty on each opening', async () => {
+      stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=text')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New text resource…' }))
+      expect(isRequiredLabel(screen.getByText('Locale'))).toBe(true)
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Enter a locale.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Locale' })).toHaveFocus()
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Locale' }), 'de')
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      await userEvent.click(screen.getByRole('button', { name: 'New text resource…' }))
+
+      expect(screen.getByRole('textbox', { name: 'Locale' })).toHaveValue('')
+      expect(screen.queryByText('Enter a locale.')).not.toBeInTheDocument()
+    })
+
     it("asks a kind's New entity… for the name alone", async () => {
       const fetchMock = stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=entity')
@@ -1790,7 +1843,7 @@ describe('StudioPage publishing', () => {
       const dialog = await screen.findByRole('dialog', { name: 'New entity' })
       expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
       const create = within(dialog).getByRole('button', { name: 'Create' })
-      expect(create).toBeDisabled()
+      expect(create).toBeEnabled()
       await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre')
       expect(create).toBeEnabled()
       await userEvent.click(create)
@@ -1798,6 +1851,19 @@ describe('StudioPage publishing', () => {
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
       expect(JSON.parse(init!.body as string)).toMatchObject({ kind: 'entity', name: 'CostCentre' })
+    })
+
+    it("creates once when Enter is pressed in a kind's New entity…", async () => {
+      const fetchMock = stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre{Enter}')
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
+      expect(fetchMock.mock.calls.filter(([, call]) => call?.method === 'POST')).toHaveLength(1)
     })
 
     it("asks a kind's New text resource… for a locale alone", async () => {
@@ -1847,10 +1913,9 @@ describe('StudioPage publishing', () => {
 
       expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Process'])
       await userEvent.click(screen.getByRole('option', { name: 'Process' }))
-      const create = screen.getByRole('button', { name: 'Create' })
-      expect(create).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
       await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Approval')
-      expect(create).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
     })
 
     it('creates a text resource that copies the texts of the default locale of the first site', async () => {

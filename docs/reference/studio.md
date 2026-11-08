@@ -41,10 +41,11 @@ New application… creates an application folder, blank or from a template, as
 [creating an application](authoring-applications.md#creating-an-application) describes. Where its button shows is
 in [applications](studio-workspace.md#applications) and [workspace](studio-workspace.md#workspace).
 
-The dialog asks for a name and checks it with the API's rule before it sends anything. It offers Blank
-or a template from `GET /api/studio/templates`, with the title and description in the UI locale and
-`en` as the fallback, and a built-in template first, with a "Built in" mark. A `409` or a `400` shows
-next to the name. A success adds the application to the list and to the application row's menu, opens
+The dialog asks for a name. It offers Blank or a template from `GET /api/studio/templates`, with the
+title and description in the UI locale and `en` as the fallback, and a built-in template first, with a
+"Built in" mark. Name is marked required and both fields have help. Create stays on, and a click
+[checks the fields](actions-and-controls.md#fields), including the name against the API's rule, and
+sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
 ## New resource
@@ -57,7 +58,7 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   author can type to narrow it. The dialog then asks for a name, or for a locale when the kind is
   `text`. A `409`, when the id or the file exists, or a `400`, when the name or the locale is refused,
   shows under the field and keeps the dialog open.
-- **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
+- **Its fields.** Kind and Name, or Locale, are marked required and have help. Create
   stays on, and a click [checks the fields](actions-and-controls.md#fields).
 - **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's
   schema except at the references the author must still choose, with an id from
@@ -152,6 +153,8 @@ what changed.
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
   asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
+  A move that only changes the `search`, `sort`, `page` or `pageSize` of a [table](actions-and-controls.md#tables)
+  is not asked about either, because the editor stays on screen.
 
 ## References
 

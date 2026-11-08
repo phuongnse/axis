@@ -1313,7 +1313,7 @@ internal static class ProcessChecker
             result = check;
         }
 
-        references.RecordExpression(process, path, check.Type, check.Diagnostic);
+        references.RecordExpression(process, path, check.Type, check.Diagnostic, check.Place);
         return check.Diagnostic;
     }
 
