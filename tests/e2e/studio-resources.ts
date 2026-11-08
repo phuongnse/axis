@@ -211,17 +211,32 @@ export async function addMapping(scope: Locator) {
 }
 
 /**
- * Types the texts of a label, one per locale, and keeps the key that Studio makes for it. The label editor makes the key
- * when the first text is typed. An editor that was replaced starts again from the draft, so the texts are typed again
- * until they show.
+ * Types the texts of a label, one per locale, in its Translations… dialog, and keeps the key that Studio makes for it.
+ * The label editor makes the key when Done keeps the texts. An editor that was replaced starts again from the draft,
+ * so the texts are typed again until the box in the author's language shows its text.
  */
 export async function writeLabel(scope: Page | Locator, field: string, texts: Record<string, string>) {
+  const page = 'goto' in scope ? scope : scope.page()
   const label = scope.getByTestId(field).getByTestId('studio-label')
+  const languages = new Intl.DisplayNames(['en'], { type: 'language' })
   await expect(async () => {
+    if ((await page.getByRole('dialog').count()) > 0) {
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 2_000 })
+    }
+    await label.getByRole('button', { name: 'Translations…', exact: true }).click()
+    const dialog = await waitForDialog(page, 'Translations')
     for (const [locale, text] of Object.entries(texts)) {
-      const box = label.getByRole('textbox', { name: locale, exact: true })
+      const box = dialog.getByRole('textbox', { name: languages.of(locale), exact: true })
       await box.fill(text)
       await expect(box).toHaveValue(text, { timeout: 2_000 })
+    }
+    await dialog.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(dialog).toHaveCount(0, { timeout: 2_000 })
+    if (texts.en !== undefined) {
+      await expect(label.getByRole('textbox', { name: 'English', exact: true })).toHaveValue(texts.en, {
+        timeout: 2_000,
+      })
     }
   }).toPass({ timeout: 20_000 })
 }

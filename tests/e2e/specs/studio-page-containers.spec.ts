@@ -9,7 +9,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab, openNewApplication } from '../studio-resources'
+import { createResource, openFormTab, openNewApplication, writeLabel } from '../studio-resources'
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it. The publisher runs
 // the contract scenarios of both modules, so the publish takes longer than in the other Studio journeys.
@@ -105,9 +105,7 @@ test.describe('Studio builds a page with two columns', () => {
     await openFormTab(page)
     await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Overview')
 
-    const title = page.getByTestId('studio-field-/title')
-    await title.getByRole('textbox', { name: 'en', exact: true }).fill(`Overview ${stamp}`)
-    await title.getByRole('textbox', { name: 'vi', exact: true }).fill(`Tổng hợp ${stamp}`)
+    await writeLabel(page, 'studio-field-/title', { en: `Overview ${stamp}`, vi: `Tổng hợp ${stamp}` })
 
     await pickAction(addWidgetPicker(page), 'columns', page.getByTestId('studio-widget-/widgets/1'))
     const firstColumn = page.getByTestId('studio-widget-list-/widgets/1/columns/0/widgets')

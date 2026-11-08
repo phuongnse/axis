@@ -40,8 +40,6 @@ last section with no heading.
 
 ## Labels
 
-_(planned for M31)_
-
 A label is one text box in the author's language, or in the application's first language when the
 label lacks that one. A box for each language would grow with every language, so the others are a step
 away instead.

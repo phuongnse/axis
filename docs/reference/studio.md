@@ -476,7 +476,7 @@ The page editor's Form tab edits a page's title, parameters and widgets, with a 
 and the JSON view stays as the second view of the same draft. The [page designer](#page-designer)
 edits the same draft on a canvas.
 
-- **The page.** The Form tab shows the page's name, its title with a text box for each locale, its
+- **The page.** The Form tab shows the page's name, its [title](studio-resource-form.md#labels), its
   [parameters](#page-parameters) and its [widget tree](#widget-tree).
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
@@ -510,7 +510,7 @@ edits the same draft on a canvas.
 
 ### KPI and chart panels
 
-A `kpi` panel has a data source picker, a measure picker and a label with a text box for each locale.
+A `kpi` panel has a data source picker, a measure picker and a [label](studio-resource-form.md#labels).
 Add comparison adds a comparison with its own measure picker and label, and Add navigate action adds a
 [navigate action](#navigate-actions), each with Remove. A `chart` panel has a data source picker, a
 kind picker over `bar`, `line` and `pie`, a category picker, a title, and a list of measures, each with
@@ -534,7 +534,7 @@ a picker and a label, with Add measure and Remove measure, which is off when one
 
 ### Navigate actions
 
-A navigate action has a page picker, a label with a text box for each locale, an optional `record`
+A navigate action has a page picker, a [label](studio-resource-form.md#labels), an optional `record`
 expression and parameter expressions. The page picker lists every page, the current one included,
 because a page may open itself with other parameters.
 
@@ -587,7 +587,7 @@ that is not a list, points to the JSON view.
   reports widths that do not add up to 12 after the save. Add column adds a column that takes what is
   left of 12, or 1 when nothing is left, and keeps the other widths. Remove column drops a column with
   its widgets.
-- **Tabs.** A `tabs` panel shows each tab's label as a key with a text box for each locale, with Add tab
+- **Tabs.** A `tabs` panel shows each tab's [label](studio-resource-form.md#labels), with Add tab
   and Remove tab.
 - **Names.** An added column or tab is named with the first free `column<n>` or `tab<n>` among its
   siblings, ignoring letter case.

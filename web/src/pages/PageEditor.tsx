@@ -29,7 +29,6 @@ import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
-import { LabelTextsContext } from './labelTextsContext'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { uniqueStepName } from './processPalette'
@@ -104,8 +103,6 @@ export function PageEditor({
   onSelect?: (pointer: string) => void
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
   const [picked, setPicked] = useState('/widgets/0')
 
   return (
@@ -120,17 +117,7 @@ export function PageEditor({
       </div>
       <div data-testid="studio-field-/title">
         <div>{t('shell.studio.page.title')}</div>
-        {names !== undefined && label !== null ? (
-          <LabelTexts pointer="/title" value={value.title} onChange={onChange} />
-        ) : (
-          <div data-testid="studio-field-/title/textKey">
-            <Input
-              aria-label={t('shell.studio.labelKey')}
-              value={text(isContent(value.title) ? value.title.textKey : undefined)}
-              onChange={(event) => onChange('/title/textKey', event.target.value)}
-            />
-          </div>
-        )}
+        <LabelTexts pointer="/title" value={value.title} onChange={onChange} />
       </div>
       <PageParameters value={value.parameters} onChange={onChange} />
       <PageWidgets value={value} selected={selected ?? picked} onSelect={onSelect ?? setPicked} onChange={onChange} />
@@ -888,7 +875,7 @@ function KpiPanel({
       />
       <div data-testid={`studio-field-${base}/label`}>
         <div>{t('shell.studio.page.kpiLabel')}</div>
-        <TextReferenceField pointer={`${base}/label`} value={widget.label} onChange={onChange} />
+        <LabelTexts pointer={`${base}/label`} value={widget.label} onChange={onChange} />
       </div>
       <div data-testid={`studio-field-${base}/comparison`}>
         <Flex vertical gap="small">
@@ -911,7 +898,7 @@ function KpiPanel({
               />
               <div data-testid={`studio-field-${base}/comparison/label`}>
                 <div>{t('shell.studio.page.kpiLabel')}</div>
-                <TextReferenceField pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
+                <LabelTexts pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
               </div>
               <div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
@@ -1040,7 +1027,7 @@ function ChartPanel({
       />
       <div data-testid={`studio-field-${base}/title`}>
         <div>{t('shell.studio.page.chartTitle')}</div>
-        <TextReferenceField pointer={`${base}/title`} value={widget.title} onChange={onChange} />
+        <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
       </div>
       <div data-testid={`studio-field-${base}/measures`}>
         <Flex vertical gap="small">
@@ -1063,7 +1050,7 @@ function ChartPanel({
                         />
                         <div data-testid={`studio-field-${base}/measures/${index}/label`}>
                           <div>{t('shell.studio.page.measureLabel')}</div>
-                          <TextReferenceField
+                          <LabelTexts
                             // The label editors keep their state by position, so they remount when a measure is
                             // added or removed.
                             key={`${index}:${measures.length}`}
@@ -1256,7 +1243,7 @@ function TabsPanel({
             {isContent(tab) ? (
               <div data-testid={`studio-field-${base}/tabs/${index}/label`}>
                 <div>{t('shell.studio.page.tabLabel')}</div>
-                <TextReferenceField
+                <LabelTexts
                   // The label editors keep their state by position, so they remount when a tab is added or removed.
                   key={`${index}:${tabs.length}`}
                   pointer={`${base}/tabs/${index}/label`}
@@ -1304,7 +1291,7 @@ function SectionPanel({ base, widget, onChange }: { base: string; widget: Conten
     <Flex vertical gap="small">
       <div data-testid={`studio-field-${base}/title`}>
         <div>{t('shell.studio.page.title')}</div>
-        <TextReferenceField pointer={`${base}/title`} value={widget.title} onChange={onChange} />
+        <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
       </div>
       <div data-testid={`studio-field-${base}/collapsed`}>
         <Flex gap="small" align="center">
@@ -1320,50 +1307,14 @@ function SectionPanel({ base, widget, onChange }: { base: string; widget: Conten
   )
 }
 
-/** A text reference as a key and a text box per locale, or as the plain key until the names are loaded. */
-function TextReferenceField({
-  pointer,
-  value,
-  onChange,
-}: {
-  pointer: string
-  value: unknown
-  onChange: ChangeHandler
-}) {
-  const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
-
-  if (names !== undefined && label !== null) {
-    return <LabelTexts pointer={pointer} value={value} onChange={onChange} />
-  }
-  return (
-    <Input
-      aria-label={t('shell.studio.labelKey')}
-      value={text(isContent(value) ? value.textKey : undefined)}
-      onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
-    />
-  )
-}
-
-/** The label of an action, with a box for each locale, or a plain key box while the names have not loaded. */
+/** The label of an action. */
 function ActionLabel({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
       <div>{t('shell.studio.page.actionLabel')}</div>
-      {names !== undefined && label !== null ? (
-        <LabelTexts pointer={pointer} value={value} onChange={onChange} />
-      ) : (
-        <Input
-          aria-label={t('shell.studio.labelKey')}
-          value={text(isContent(value) ? value.textKey : undefined)}
-          onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
-        />
-      )}
+      <LabelTexts pointer={pointer} value={value} onChange={onChange} />
     </div>
   )
 }

@@ -9,7 +9,7 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { pickAction, pickOption } from '../select'
 import { e2eApp } from '../server-settings'
 import { useSession } from '../sessions'
-import { createResource, openFormTab, openNewApplication } from '../studio-resources'
+import { createResource, openFormTab, openNewApplication, writeLabel } from '../studio-resources'
 
 // A second server starts in beforeAll, and the journey creates an application and publishes it. The publisher runs
 // the contract scenarios of both modules, so the publish takes longer than in the other Studio journeys.
@@ -65,9 +65,7 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
 
   /** Fills the text of a label field in both locales, which the next Save writes. */
   async function fillTexts(page: Page, field: string, en: string, vi: string) {
-    const label = page.getByTestId(field)
-    await label.getByRole('textbox', { name: 'en', exact: true }).fill(en)
-    await label.getByRole('textbox', { name: 'vi', exact: true }).fill(vi)
+    await writeLabel(page, field, { en, vi })
   }
 
   /** Writes a data source over approvals/Request with one measure, `requests`, that counts the requests. */

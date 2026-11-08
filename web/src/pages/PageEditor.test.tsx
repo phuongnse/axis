@@ -97,13 +97,19 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderEditor(value: Record<string, unknown>, onChange = vi.fn(), loaded: StudioNames | null = names) {
+/** `resource` is false where the page editor has no resource to write texts to, as in the module editor. */
+function renderEditor(
+  value: Record<string, unknown>,
+  onChange = vi.fn(),
+  loaded: StudioNames | null = names,
+  resource = true,
+) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
           <StudioNamesContext.Provider value={loaded ?? undefined}>
-            <LabelTextsContext.Provider value={labelContext}>
+            <LabelTextsContext.Provider value={resource ? labelContext : null}>
               <PageEditor value={value} onChange={onChange} />
             </LabelTextsContext.Provider>
           </StudioNamesContext.Provider>
@@ -146,7 +152,7 @@ describe.each(['light', 'dark'])('PageEditor in %s mode', (mode) => {
     expect(screen.getByRole('textbox', { name: 'Name' })).toBeVisible()
     expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('ReviewList')
     expect(screen.getByTestId('studio-field-/title')).toBeVisible()
-    expect(screen.getAllByRole('textbox', { name: 'Text key' })[0]).toBeVisible()
+    expect(screen.getAllByRole('textbox', { name: 'English' })[0]).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/0')).toBeVisible()
     expect(screen.getByTestId('studio-widget-/widgets/0')).toHaveTextContent('form, PurchaseRequest')
     expect(screen.getByTestId('studio-field-/widgets/0/type')).toBeVisible()
@@ -165,21 +171,21 @@ describe('PageEditor page', () => {
     expect(onChange).toHaveBeenLastCalledWith('/name', 'ReviewListX')
   })
 
-  it('shows the title with a box for each locale', () => {
+  it('shows the title as one box in the author language and no key box', () => {
     renderEditor(page(table))
 
     const title = within(screen.getByTestId('studio-field-/title'))
-    expect(title.getByRole('textbox', { name: 'Text key' })).toHaveValue('pages.review.title')
-    expect(title.getByRole('textbox', { name: 'en' })).toHaveValue('Review')
-    expect(title.getByRole('textbox', { name: 'vi' })).toHaveValue('Xem xét')
+    expect(title.getByRole('textbox', { name: 'English' })).toHaveValue('Review')
+    expect(title.queryByRole('textbox', { name: 'Vietnamese' })).toBeNull()
+    expect(title.queryByRole('textbox', { name: 'Text key' })).toBeNull()
   })
 
-  it('falls back to a plain key box when the names have not loaded', async () => {
+  it('shows a disabled title box and no key box until the names have loaded', async () => {
     const onChange = renderEditor(page(table), vi.fn(), null)
 
-    const key = within(screen.getByTestId('studio-field-/title/textKey')).getByRole('textbox')
-    await userEvent.type(key, 'X')
-    expect(onChange).toHaveBeenLastCalledWith('/title/textKey', 'pages.review.titleX')
+    const title = within(screen.getByTestId('studio-field-/title'))
+    expect(title.getByRole('textbox')).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
     await userEvent.type(within(screen.getByTestId('studio-field-/widgets/0/entity')).getByRole('textbox'), 'S')
     expect(onChange).toHaveBeenCalledWith('/widgets/0/entity', 'S')
   })
@@ -253,7 +259,7 @@ describe('PageEditor form panel', () => {
     expect(action.getByText('startProcess')).toBeVisible()
     expect(screen.getByTestId('studio-field-/widgets/0/actions/0/process')).toHaveTextContent('PurchaseRequestApproval')
     expect(
-      within(screen.getByTestId('studio-field-/widgets/0/actions/0/label')).getByRole('textbox', { name: 'en' }),
+      within(screen.getByTestId('studio-field-/widgets/0/actions/0/label')).getByRole('textbox', { name: 'English' }),
     ).toHaveValue('Review')
   })
 
@@ -312,7 +318,7 @@ describe('PageEditor form panel', () => {
 })
 
 /** Renders the editor over a draft that applies every change, so a test can read the JSON as it would be saved. */
-function renderStateful(initial: Record<string, unknown>, loaded: StudioNames | null = names) {
+function renderStateful(initial: Record<string, unknown>, loaded: StudioNames | null = names, resource = true) {
   let draft = initial
   function Harness() {
     const [value, setValue] = useState(initial)
@@ -330,7 +336,7 @@ function renderStateful(initial: Record<string, unknown>, loaded: StudioNames | 
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioNamesContext.Provider value={loaded ?? undefined}>
-          <LabelTextsContext.Provider value={labelContext}>
+          <LabelTextsContext.Provider value={resource ? labelContext : null}>
             <Harness />
           </LabelTextsContext.Provider>
         </StudioNamesContext.Provider>
@@ -362,6 +368,7 @@ describe('PageEditor delete actions', () => {
       page({ ...table, rowActions: [{ ...deleteAction, visibleWhen: 'done' }] }),
       vi.fn(),
       null,
+      false,
     )
 
     expect(screen.getByTestId(`${rows}/0/label`)).toBeVisible()
@@ -381,6 +388,7 @@ describe('PageEditor delete actions', () => {
         rowActions: [{ ...deleteAction, visibleWhen: 'done == false', note: 'kept' }],
       }),
       null,
+      false,
     )
 
     await userEvent.type(within(screen.getByTestId(`${rows}/0/label`)).getByRole('textbox', { name: 'Text key' }), 'x')
@@ -1222,8 +1230,13 @@ describe('PageEditor container panels', () => {
   }
   const section = { type: 'section', title: { textKey: 'pages.review.title' }, widgets: [inbox], 'x-note': 'keep' }
 
-  async function open(widget: Record<string, unknown>, onChange = vi.fn(), loaded: StudioNames | null = names) {
-    renderEditor(page(widget), onChange, loaded)
+  async function open(
+    widget: Record<string, unknown>,
+    onChange = vi.fn(),
+    loaded: StudioNames | null = names,
+    resource = true,
+  ) {
+    renderEditor(page(widget), onChange, loaded, resource)
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
     return onChange
   }
@@ -1300,18 +1313,18 @@ describe('PageEditor container panels', () => {
     expect(screen.getByRole('button', { name: 'Remove column' })).toBeDisabled()
   })
 
-  it('sets the texts of a tab label in the draft, in every locale', async () => {
+  it('sets the texts of a tab label in the draft', async () => {
     const onChange = await open(tabs)
 
     const label = within(screen.getByTestId('studio-field-/widgets/0/tabs/1/label'))
-    await userEvent.type(label.getByRole('textbox', { name: 'en' }), 'S')
+    await userEvent.type(label.getByRole('textbox', { name: 'English' }), 'S')
 
     expect(labelContext.onTextsChange).toHaveBeenCalledWith('/widgets/0/tabs/1/label', 'tabs.two', { en: 'S', vi: '' })
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('writes the key of a tab label when the names are not loaded', async () => {
-    const onChange = await open(tabs, vi.fn(), null)
+  it('writes the key of a tab label where there is no resource to write texts to', async () => {
+    const onChange = await open(tabs, vi.fn(), null, false)
 
     const key = within(screen.getByTestId('studio-field-/widgets/0/tabs/1/label')).getByRole('textbox')
     await userEvent.type(key, 'x')
@@ -1339,8 +1352,8 @@ describe('PageEditor container panels', () => {
     expect(screen.getByRole('button', { name: 'Remove tab' })).toBeDisabled()
   })
 
-  it('edits the title of a section', async () => {
-    const onChange = await open(section, vi.fn(), null)
+  it('edits the key of the title of a section where there is no resource to write texts to', async () => {
+    const onChange = await open(section, vi.fn(), null, false)
 
     const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox')
     await userEvent.type(key, 'x')
@@ -1348,12 +1361,12 @@ describe('PageEditor container panels', () => {
     expect(onChange).toHaveBeenLastCalledWith('/widgets/0/title/textKey', 'pages.review.titlex')
   })
 
-  it('shows the title of a section with a text box per locale', async () => {
+  it('shows the title of a section as one box in the author language', async () => {
     await open(section)
 
     const title = within(screen.getByTestId('studio-field-/widgets/0/title'))
-    expect(title.getByRole('textbox', { name: 'en' })).toHaveValue('Review')
-    expect(title.getByRole('textbox', { name: 'vi' })).toHaveValue('Xem xét')
+    expect(title.getByRole('textbox', { name: 'English' })).toHaveValue('Review')
+    expect(title.queryByRole('textbox', { name: 'Vietnamese' })).toBeNull()
   })
 
   it('switches Collapsed on by writing true', async () => {
@@ -1401,7 +1414,7 @@ describe('PageEditor container panels', () => {
 
     // An edit of a section is a write at one key of it, so the other keys stay in the saved file.
     const sectionChange = await open(section)
-    const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox', { name: 'en' })
+    const key = within(screen.getByTestId('studio-field-/widgets/0/title')).getByRole('textbox', { name: 'English' })
     await userEvent.type(key, '!')
     await userEvent.click(within(screen.getByTestId('studio-field-/widgets/0/collapsed')).getByRole('switch'))
     const pointers = sectionChange.mock.calls.map(([pointer]) => pointer)
@@ -1409,11 +1422,11 @@ describe('PageEditor container panels', () => {
     expect(pointers).toContain('/widgets/0/collapsed')
   })
 
-  it('sets the texts of a section title in the draft, in every locale', async () => {
+  it('sets the texts of a section title in the draft', async () => {
     const onChange = await open(section)
 
     const title = within(screen.getByTestId('studio-field-/widgets/0/title'))
-    await userEvent.type(title.getByRole('textbox', { name: 'en' }), '!')
+    await userEvent.type(title.getByRole('textbox', { name: 'English' }), '!')
 
     expect(labelContext.onTextsChange).toHaveBeenCalledWith('/widgets/0/title', 'pages.review.title', {
       en: 'Review!',

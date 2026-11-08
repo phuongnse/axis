@@ -1,10 +1,8 @@
-import { Button, Card, Flex, Input, Select, Typography } from 'antd'
-import { useContext, useState } from 'react'
+import { Button, Card, Flex, Select, Typography } from 'antd'
+import { useState } from 'react'
 import { unusedStepName } from '../platform/formLayout'
-import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
-import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -23,11 +21,6 @@ function sectionNames(sections: unknown): string[] {
     .filter((name): name is string => typeof name === 'string' && name !== '')
 }
 
-function textKeyOf(step: unknown): string {
-  const title = isContent(step) ? step.title : undefined
-  return isContent(title) && typeof title.textKey === 'string' ? title.textKey : ''
-}
-
 /**
  * The `steps` of a form as cards: a title, the sections the step shows, and buttons to move or remove it. The section
  * picker lists the named sections of the form, so the author picks names and does not type them. Removing the last step
@@ -44,8 +37,6 @@ export function FormSteps({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
   // A title editor keeps its texts in its state, so a move or a removal remounts the cards.
   const [generation, setGeneration] = useState(0)
 
@@ -92,19 +83,11 @@ export function FormSteps({
               <Flex vertical gap="small">
                 <div data-testid={`studio-field-${pointer}/title`}>
                   <div>{t('shell.studio.formSteps.step')}</div>
-                  {names !== undefined && label !== null ? (
-                    <LabelTexts
-                      pointer={`${pointer}/title`}
-                      value={isContent(step) ? step.title : undefined}
-                      onChange={onChange}
-                    />
-                  ) : (
-                    <Input
-                      aria-label={t('shell.studio.formSteps.step')}
-                      value={textKeyOf(step)}
-                      onChange={(event) => onChange(`${pointer}/title`, { textKey: event.target.value })}
-                    />
-                  )}
+                  <LabelTexts
+                    pointer={`${pointer}/title`}
+                    value={isContent(step) ? step.title : undefined}
+                    onChange={onChange}
+                  />
                 </div>
                 <div data-testid={`studio-field-${pointer}/sections`}>
                   <div>{t('shell.studio.formSteps.sections')}</div>
