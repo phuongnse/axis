@@ -41,10 +41,11 @@ New application… creates an application folder, blank or from a template, as
 [creating an application](authoring-applications.md#creating-an-application) describes. Where its button shows is
 in [applications](studio-workspace.md#applications) and [workspace](studio-workspace.md#workspace).
 
-The dialog asks for a name and checks it with the API's rule before it sends anything. It offers Blank
-or a template from `GET /api/studio/templates`, with the title and description in the UI locale and
-`en` as the fallback, and a built-in template first, with a "Built in" mark. A `409` or a `400` shows
-next to the name. A success adds the application to the list and to the application row's menu, opens
+The dialog asks for a name. It offers Blank or a template from `GET /api/studio/templates`, with the
+title and description in the UI locale and `en` as the fallback, and a built-in template first, with a
+"Built in" mark. Name is marked required and both fields have help. Create stays on, and a click
+[checks the fields](actions-and-controls.md#fields), including the name against the API's rule, and
+sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
 ## New resource

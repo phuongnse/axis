@@ -2185,7 +2185,10 @@ describe('StudioEditor for an entity', () => {
     await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
-    expect(screen.getByRole('button', { name: 'Add convert' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add convert' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+    expect(await screen.findByText('Enter a value.')).toBeInTheDocument()
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
     await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(note)')
     await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
 

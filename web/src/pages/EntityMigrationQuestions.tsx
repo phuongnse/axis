@@ -1,7 +1,9 @@
-import { Flex, Input, Modal, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Typography } from 'antd'
 import { useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
 import { asked, type FieldAnswer, type FieldQuestion } from '../platform/entityMigrations'
+import { requiredMark } from '../platform/requiredMark'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 
@@ -88,7 +90,11 @@ export function EntityMigrationQuestions({
   )
 }
 
-/** The question for a `convert` or `fill` expression. The expression is plain text, and an empty one cannot be added. */
+/**
+ * The question for a `convert` or `fill` expression. The expression is plain text in a required field, and the
+ * question's hint is its help. The add button is on, and a click with the box empty shows that a value is needed under it
+ * and focuses it, see [Migrations](docs/reference/entity-designer.md#migrations).
+ */
 function ExpressionQuestion({
   question,
   onAnswer,
@@ -100,8 +106,11 @@ function ExpressionQuestion({
 }) {
   const t = useText()
   const { size } = useDesignTokens()
-  const [value, setValue] = useState('')
+  const [form] = Form.useForm<{ value: string }>()
   const convert = question.type === 'convert'
+  const label = t(
+    convert ? 'shell.studio.entity.migration.convertExpression' : 'shell.studio.entity.migration.fillExpression',
+  )
   const hint = !convert
     ? t('shell.studio.entity.migration.fillHint')
     : question.reason === 'type'
@@ -124,7 +133,7 @@ function ExpressionQuestion({
           <AxisButton role="secondary" onClick={() => onAnswer('skip')}>
             {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
           </AxisButton>
-          <AxisButton role="finish" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>
+          <AxisButton role="finish" onClick={() => form.submit()}>
             {t(convert ? 'shell.studio.entity.migration.addConvert' : 'shell.studio.entity.migration.fillNulls')}
           </AxisButton>
         </AxisActionRow>
@@ -135,17 +144,23 @@ function ExpressionQuestion({
           <Typography.Text strong data-testid="studio-migration-field">
             {question.field}
           </Typography.Text>
-          <Typography.Text type="secondary">{hint}</Typography.Text>
-          <Input
-            autoFocus
-            aria-label={t(
-              convert
-                ? 'shell.studio.entity.migration.convertExpression'
-                : 'shell.studio.entity.migration.fillExpression',
-            )}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-          />
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={requiredMark}
+            initialValues={{ value: '' }}
+            scrollToFirstError={{ focus: true }}
+            onFinish={({ value }) => onAnswer({ value: value.trim() })}
+          >
+            <AxisField
+              name="value"
+              label={label}
+              help={hint}
+              requiredMessage={t('shell.studio.entity.migration.expressionRequired')}
+            >
+              <Input autoFocus aria-label={label} />
+            </AxisField>
+          </Form>
         </Flex>
       </div>
     </Modal>

@@ -1,4 +1,4 @@
-import { ConfigProvider, Form, Input, InputNumber, Upload } from 'antd'
+import { ConfigProvider, Form, Input, InputNumber, Select, Upload } from 'antd'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { AxisField } from './AxisField'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
-import { hasFieldError, isRequiredLabel } from '../test/antd'
+import { chooseOption, formItem, hasFieldError, isRequiredLabel } from '../test/antd'
 
 const texts = {}
 const catalogs = [{ texts, fallbackTexts: texts }]
@@ -165,6 +165,22 @@ describe('AxisField', () => {
     await userEvent.upload(input, new File(['x'], 'notes.csv', { type: 'text/csv' }))
 
     await waitFor(() => expect(screen.queryByText('Choose a file.')).not.toBeInTheDocument())
+  })
+
+  it('checks a multiple select: empty it asks for a choice, and with a choice it is right', async () => {
+    renderForm(
+      <AxisField label="States" help="The states." name="states" requiredMessage="Choose a state.">
+        <Select mode="multiple" aria-label="States" virtual={false} options={[{ value: 'open', label: 'open' }]} />
+      </AxisField>,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Choose a state.')).toBeInTheDocument()
+
+    await chooseOption('open', formItem(screen.getByRole('combobox', { name: 'States' })))
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+    await waitFor(() => expect(screen.queryByText('Choose a state.')).not.toBeInTheDocument())
   })
 
   it('requires help', () => {

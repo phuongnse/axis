@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
+import { isRequiredLabel } from '../test/antd'
 import { ThemeModeProvider } from '../platform/theme'
 import { StudioNewApplication } from './StudioNewApplication'
 
@@ -26,6 +27,7 @@ const builtInTemplate = {
 const existsText = platformEnglish['shell.studio.newApplication.exists']
 const invalidText = platformEnglish['shell.studio.newApplication.invalid']
 const failedText = platformEnglish['shell.studio.newApplication.failed']
+const nameRequiredText = platformEnglish['shell.studio.newApplication.nameRequired']
 const templatesFailedText = platformEnglish['shell.studio.newApplication.templatesFailed']
 
 function json(body: unknown, status = 200) {
@@ -48,6 +50,10 @@ function stubFetch(
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
+}
+
+function posts(fetchMock: ReturnType<typeof stubFetch>) {
+  return fetchMock.mock.calls.filter(([input, init]) => input === '/api/studio/apps' && init?.method === 'POST')
 }
 
 function renderButton(onCreated = vi.fn()) {
@@ -79,18 +85,49 @@ describe.each(['light', 'dark'])('StudioNewApplication in %s mode', (mode) => {
   beforeEach(() => localStorage.setItem('axis.themeMode', mode))
 
   it.each(['1abc', 'a-b', 'Api', 'a'.repeat(61)])(
-    'turns Create off and shows the invalid text for %s',
+    'keeps Create on, and a click shows the invalid text and sends nothing for %s',
     async (name) => {
-      stubFetch()
+      const fetchMock = stubFetch()
       renderButton()
       const dialog = await openDialog()
 
       await typeName(dialog, name)
+      expect(within(dialog).getByRole('button', { name: 'Create' })).toBeEnabled()
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
 
-      expect(within(dialog).getByRole('button', { name: 'Create' })).toBeDisabled()
-      expect(within(dialog).getByText(invalidText)).toBeInTheDocument()
+      expect(await within(dialog).findByText(invalidText)).toBeInTheDocument()
+      expect(within(dialog).getByRole('button', { name: 'Create' })).toBeEnabled()
+      expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+      expect(posts(fetchMock)).toHaveLength(0)
     },
   )
+
+  it('keeps Create on, and a click with an empty name asks for a name and sends nothing', async () => {
+    const fetchMock = stubFetch()
+    renderButton()
+    const dialog = await openDialog()
+
+    expect(within(dialog).getByRole('button', { name: 'Create' })).toBeEnabled()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+
+    expect(await within(dialog).findByText(nameRequiredText)).toBeInTheDocument()
+    expect(within(dialog).queryByText(invalidText)).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+    expect(posts(fetchMock)).toHaveLength(0)
+  })
+
+  it('gives each field its help, and the name takes its help as its description', async () => {
+    stubFetch()
+    renderButton()
+    const dialog = await openDialog()
+
+    expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.newApplication.name.help'],
+    )
+    expect(isRequiredLabel(within(dialog).getByText('Name'))).toBe(true)
+    expect(isRequiredLabel(within(dialog).getByText('Start from'))).toBe(false)
+    expect(within(dialog).getByText(platformEnglish['shell.studio.newApplication.template.help'])).toBeInTheDocument()
+  })
 
   it('allows Inventory and shows no invalid text', async () => {
     stubFetch()

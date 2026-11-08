@@ -9,7 +9,7 @@ export type AxisFieldProps = {
   /** Required: every platform field has help, see docs/reference/frontend.md#platform-field-help. */
   help: string
   name: NonNullable<FormItemProps['name']>
-  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. */
+  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. A multiple select is empty when nothing is chosen. */
   requiredMessage?: string
   /** More rules of Ant Design's form, checked after the required one. */
   rules?: FormItemProps['rules']
