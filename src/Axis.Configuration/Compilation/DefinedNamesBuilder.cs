@@ -37,56 +37,67 @@ internal static class DefinedNamesBuilder
                 entity.Id,
                 entity.Name,
                 ModuleOf(entity),
-                [.. entity.Fields.Select(field => new DefinedField(field.Name, field.Type, field.Target, field.Values))]))],
+                entity.Label?.TextKey,
+                [.. entity.Fields.Select(field => new DefinedField(
+                    field.Name, field.Type, field.Target, field.Values, field.Label?.TextKey, field.Unique ?? false))]))],
             [.. loaded.DataSources.Select(dataSource => DataSource(dataSource, findEntity))],
             [.. loaded.Processes.Select(process => new DefinedProcess(
                 process.Id,
                 process.Name,
                 ModuleOf(process),
+                process.Label?.TextKey,
                 process.Entity,
                 [.. process.Parameters?.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type)) ?? []],
                 [.. process.Steps.Select(step => new DefinedStep(
-                    step.Name, step.Type, [.. step.Outcomes?.Select(outcome => outcome.Name) ?? []]))]))],
+                    step.Name, step.Type, step.Label?.TextKey, [.. step.Outcomes?.Select(outcome => outcome.Name) ?? []]))]))],
             rules,
             [.. loaded.Connectors.Select(connector => new DefinedConnector(
-                connector.Id, connector.Name, [.. connector.Operations.Select(operation => new DefinedOperation(operation.Name))]))],
+                connector.Id,
+                connector.Name,
+                connector.Label?.TextKey,
+                [.. connector.Operations.Select(operation => new DefinedOperation(operation.Name))]))],
             [.. events.Select(@event => new DefinedEvent(
                 @event.Id,
                 @event.Name,
                 ModuleOf(@event),
+                @event.Label?.TextKey,
                 ModuleOf(@event) is { } module && !@event.Entity.Contains('/') ? $"{module}/{@event.Entity}" : @event.Entity,
                 [.. @event.Fields.Select(field => new DefinedTyped(field.Name, field.Type))]))],
-            [.. loaded.Roles.Select(role => new DefinedResource(role.Id, role.Name))],
+            [.. loaded.Roles.Select(role => new DefinedResource(role.Id, role.Name, role.Label?.TextKey))],
             [.. sequences.Select(Qualified)],
             [.. loaded.Forms.Select(Qualified)],
             [.. loaded.Pages.Select(page => new DefinedPage(
                 page.Id,
                 page.Name,
                 ModuleOf(page),
+                page.Title.TextKey,
                 [.. page.Parameters.Select(parameter => new DefinedPageParameter(
                     parameter.Name, parameter.Type, parameter.Required ?? false))]))],
-            [.. loaded.Policies.Select(policy => new DefinedPolicy(policy.Id, policy.Name, ModuleOf(policy)))],
-            [.. contracts.Select(entry => new DefinedContract(entry.Contract.Id, entry.Contract.Name, entry.ModuleId))],
+            [.. loaded.Policies.Select(policy => new DefinedPolicy(policy.Id, policy.Name, ModuleOf(policy), policy.Label?.TextKey))],
+            [.. contracts.Select(entry => new DefinedContract(entry.Contract.Id, entry.Contract.Name, entry.ModuleId, entry.Contract.Label?.TextKey))],
             Texts(texts, index),
             [.. seeds.Select(Qualified)],
             [.. loaded.Triggers.Select(Qualified)],
             [
-                .. moduleScenarios.Select(entry => new DefinedModuleResource(entry.Scenario.Id, $"{entry.ModuleId}/{entry.Scenario.Name}", entry.ModuleId)),
-                .. loaded.Scenarios.Select(scenario => new DefinedModuleResource(scenario.Id, scenario.Name, null)),
+                .. moduleScenarios.Select(entry => new DefinedModuleResource(
+                    entry.Scenario.Id, $"{entry.ModuleId}/{entry.Scenario.Name}", entry.ModuleId, entry.Scenario.Label?.TextKey)),
+                .. loaded.Scenarios.Select(scenario => new DefinedModuleResource(scenario.Id, scenario.Name, null, scenario.Label?.TextKey)),
             ],
             [
-                .. moduleTexts.Select(entry => new DefinedModuleResource(entry.Text.Id, $"{entry.ModuleId}/{entry.Text.Name}", entry.ModuleId)),
-                .. loaded.Texts.Select(text => new DefinedModuleResource(text.Id, text.Name, null)),
+                .. moduleTexts.Select(entry => new DefinedModuleResource(
+                    entry.Text.Id, $"{entry.ModuleId}/{entry.Text.Name}", entry.ModuleId, entry.Text.Label?.TextKey)),
+                .. loaded.Texts.Select(text => new DefinedModuleResource(text.Id, text.Name, null, text.Label?.TextKey)),
             ]);
     }
 
-    private static DefinedModuleResource Qualified(Resource resource) => new(resource.Id, resource.Name, ModuleOf(resource));
+    private static DefinedModuleResource Qualified(Resource resource) =>
+        new(resource.Id, resource.Name, ModuleOf(resource), resource.Label?.TextKey);
 
     internal static string? ModuleOf(Resource resource) =>
         ApplicationCompiler.IsModuleResource(resource) ? resource.Name[..resource.Name.IndexOf('/')] : null;
 
     private static DefinedRule Rule(RuleResource rule, string name, string? module) =>
-        new(rule.Id, name, module, [.. rule.Parameters.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type))], rule.ResultType);
+        new(rule.Id, name, module, rule.Label?.TextKey, [.. rule.Parameters.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type))], rule.ResultType);
 
     private static DefinedDataSource DataSource(DataSourceResource dataSource, Func<string, EntityResource?> findEntity)
     {
@@ -108,7 +119,7 @@ internal static class DefinedNamesBuilder
         var parameters = dataSource.Parameters.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type));
         if (dataSource.Aggregate is not { } aggregate)
         {
-            return new DefinedDataSource(dataSource.Id, dataSource.Name, ModuleOf(dataSource), [.. parameters], fields, null);
+            return new DefinedDataSource(dataSource.Id, dataSource.Name, ModuleOf(dataSource), dataSource.Label?.TextKey, [.. parameters], fields, null);
         }
 
         var columns = new List<DefinedColumn>();
@@ -137,6 +148,7 @@ internal static class DefinedNamesBuilder
             dataSource.Id,
             dataSource.Name,
             ModuleOf(dataSource),
+            dataSource.Label?.TextKey,
             [.. parameters],
             columns,
             [.. aggregate.GroupBy.Select(group => group.Field)]);
