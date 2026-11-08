@@ -140,6 +140,30 @@ public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task A_run_of_short_steps_that_outlasts_the_lease_keeps_the_claim_alive()
+    {
+        var (connectionString, requestId) = await CreateRequestAsync("planning");
+        var stepTime = _options.Lease / 4 + TimeSpan.FromMilliseconds(100);
+        Func<AuthoringStepContext, CancellationToken, Task> pause = (_, token) => Task.Delay(stepTime, token);
+        string? claimed = null;
+        var planning = new TestStep("planning", "plan", "working", pause);
+        var working = new TestStep("working", "work", "checking", pause);
+        var checking = new TestStep("checking", "check", "reviewing", pause);
+        var reviewing = new TestStep("reviewing", "review", "fixing", pause);
+        var fixing = new TestStep("fixing", "fix", "awaitingApproval", async (_, _) =>
+            claimed = await ScalarAsync(connectionString, $"SELECT claimed_until > now() FROM axis.authoring_requests WHERE id = '{requestId}'"));
+        await using var host = BuildAgent(connectionString, new LogCollector(), planning, working, checking, reviewing, fixing);
+        var started = DateTimeOffset.UtcNow;
+        await host.StartAsync(CancellationToken);
+
+        await WaitUntilAsync(async () => await StateAsync(connectionString, requestId) == "awaitingApproval", "The host did not finish the steps.");
+
+        Assert.True(DateTimeOffset.UtcNow - started > _options.Lease, "The steps must run longer than the lease.");
+        Assert.Equal("True", claimed);
+        Assert.Equal(5, (await StepsAsync(connectionString, requestId)).Split(',').Length);
+    }
+
+    [Fact]
     public async Task A_host_with_no_registered_step_claims_nothing()
     {
         var (connectionString, requestId) = await CreateRequestAsync("working");

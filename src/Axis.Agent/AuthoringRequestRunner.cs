@@ -92,7 +92,7 @@ internal sealed partial class AuthoringRequestRunner(
                 }
 
                 var keepClaim = steps.Has(result.NextState);
-                if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, keepClaim, cancellationToken))
+                if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, keepClaim, options.Lease, cancellationToken))
                 {
                     LogClaimLost(request.Id);
                     return;

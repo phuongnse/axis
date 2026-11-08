@@ -56,7 +56,7 @@ loses no work.
   claim is fenced by `claimed_by`, which is new for each claim, so a host that lost its claim, or
   whose request was dropped, changes nothing and stops working on that request.
 - **Resuming.** Each finished step is committed with the request's next state before the next
-  starts, and after a restart the next host resumes at the last finished step. It closes the step
+  starts, and a commit that keeps the claim also extends the lease. After a restart the next host resumes at the last finished step. It closes the step
   that never finished with the outcome `interrupted`, which keeps its tokens, and runs that step
   again as a new step. A step's tokens are written to its row and to the request as soon as its
   call ends. A model call that was in flight is made again, and its tokens count again.
