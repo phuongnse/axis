@@ -1,8 +1,8 @@
-import { Card, Checkbox, ConfigProvider, Flex, Form, Input, Select, Typography } from 'antd'
+import { Checkbox, ConfigProvider, Form, Input, Select } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
-import { OrganizationHeading } from '../src/platform/OrganizationHeading'
+import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
@@ -42,7 +42,7 @@ export function SignUpPage({
   onLocaleChange: (locale: SignUpLocale) => void
 }) {
   const t = useText()
-  const { colour, spacing, radius } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
@@ -126,100 +126,76 @@ export function SignUpPage({
 
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
-      <Flex
-        vertical
-        align="center"
-        gap={spacing.md}
-        style={{
-          position: 'relative',
-          paddingBlock: spacing.lg,
-          background: colour.canvas,
-          // Proposed: a design-system frame sets --shell-min-height to its own height, so the page fills it.
-          minHeight: 'var(--shell-min-height, 100vh)',
-          boxSizing: 'border-box',
+      <CardPage
+        title={t('signUp.title')}
+        size="medium"
+        legal={{
+          texts: {
+            legal: t('shell.legal.label'),
+            privacy: t('shell.legal.privacy'),
+            terms: t('shell.legal.terms'),
+            licences: t('shell.legal.licences'),
+          },
         }}
-      >
-        <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg }}>
+        preferences={
           <PreferencesMenu
             locales={signUpLocales}
             locale={locale}
             onLocaleChange={(next) => onLocaleChange(next as SignUpLocale)}
           />
-        </div>
-        <OrganizationHeading />
-        <Card
-          style={{
-            width: '100%',
-            maxWidth: 480,
-            background: colour.surface,
-            borderColor: colour.borderSubtle,
-            borderRadius: radius.base,
-          }}
-          styles={{ body: { padding: spacing.xl } }}
-        >
-          <Flex vertical gap={spacing.md}>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {t('signUp.title')}
-            </Typography.Title>
-            <Form
-              form={form}
-              name="sign-up"
-              layout="vertical"
-              requiredMark={false}
-              initialValues={{ language: locale }}
-            >
-              <Form.Item name="fullName" label={<span style={labelStyle}>{t('signUp.fullName')}</span>}>
-                <Input autoComplete="name" />
-              </Form.Item>
-              <Form.Item name="email" label={<span style={labelStyle}>{t('signUp.email')}</span>}>
-                <Input type="email" autoComplete="email" />
-              </Form.Item>
-              <Form.Item name="businessName" label={<span style={labelStyle}>{t('signUp.businessName')}</span>}>
-                <Input
-                  autoComplete="organization"
-                  onChange={(event) => {
-                    if (!subdomainEdited.current) {
-                      form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
-                    }
-                  }}
-                />
-              </Form.Item>
-              <Form.Item
-                name="subdomain"
-                label={<span style={labelStyle}>{t('signUp.subdomain')}</span>}
-                {...subdomainField}
-              >
-                <Input
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={() => {
-                    subdomainEdited.current = true
-                  }}
-                />
-              </Form.Item>
-              <Form.Item name="application" label={<span style={labelStyle}>{t('signUp.application')}</span>}>
-                <Select
-                  options={applications.map((application) => ({
-                    value: application.id,
-                    label: application.titles[locale],
-                  }))}
-                />
-              </Form.Item>
-              <Form.Item name="language" label={<span style={labelStyle}>{t('signUp.language')}</span>}>
-                <Select
-                  options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
-                  onChange={() => {
-                    languageEdited.current = true
-                  }}
-                />
-              </Form.Item>
-              <Form.Item name="terms" valuePropName="checked" style={{ marginBottom: 0 }}>
-                <Checkbox>{t('signUp.terms')}</Checkbox>
-              </Form.Item>
-            </Form>
-          </Flex>
-        </Card>
-      </Flex>
+        }
+      >
+        <Form form={form} name="sign-up" layout="vertical" requiredMark={false} initialValues={{ language: locale }}>
+          <Form.Item name="fullName" label={<span style={labelStyle}>{t('signUp.fullName')}</span>}>
+            <Input autoComplete="name" />
+          </Form.Item>
+          <Form.Item name="email" label={<span style={labelStyle}>{t('signUp.email')}</span>}>
+            <Input type="email" autoComplete="email" />
+          </Form.Item>
+          <Form.Item name="businessName" label={<span style={labelStyle}>{t('signUp.businessName')}</span>}>
+            <Input
+              autoComplete="organization"
+              onChange={(event) => {
+                if (!subdomainEdited.current) {
+                  form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
+                }
+              }}
+            />
+          </Form.Item>
+          <Form.Item
+            name="subdomain"
+            label={<span style={labelStyle}>{t('signUp.subdomain')}</span>}
+            {...subdomainField}
+          >
+            <Input
+              autoComplete="off"
+              spellCheck={false}
+              onChange={() => {
+                subdomainEdited.current = true
+              }}
+            />
+          </Form.Item>
+          <Form.Item name="application" label={<span style={labelStyle}>{t('signUp.application')}</span>}>
+            <Select
+              options={applications.map((application) => ({
+                value: application.id,
+                label: application.titles[locale],
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="language" label={<span style={labelStyle}>{t('signUp.language')}</span>}>
+            <Select
+              options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
+              onChange={() => {
+                languageEdited.current = true
+              }}
+            />
+          </Form.Item>
+          <Form.Item name="terms" valuePropName="checked" style={{ marginBottom: 0 }}>
+            <Checkbox>{t('signUp.terms')}</Checkbox>
+          </Form.Item>
+        </Form>
+      </CardPage>
     </ConfigProvider>
   )
 }
