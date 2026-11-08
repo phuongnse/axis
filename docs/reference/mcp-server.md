@@ -65,8 +65,10 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
 - **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for
   reading and writing drafts, and the rules of [accepting](authoring-requests.md#accepting) for
   `accept_draft`.
-- **Consent** _(planned for M35)_. The realm shows a consent screen, in the Axis theme, that names the
-  client, its home page and the scope `axis:authoring`. Without consent, no token is issued.
+- **Consent.** A client that requires consent gets a screen in the [Axis theme](identity-provider.md#theme)
+  that names the client, links its home page and lists `axis:authoring` by its consent text, in every
+  locale the platform offers. Allow sends the client a code. Deny sends it back with
+  `error=access_denied` and no code, so without consent no token is issued.
 
 ## Client registration
 

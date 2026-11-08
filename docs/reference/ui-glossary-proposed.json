@@ -78,6 +78,12 @@
       "en": "result type",
       "vi": "kiểu kết quả",
       "status": "proposed"
+    },
+    {
+      "concept": "Draft",
+      "en": "draft",
+      "vi": "bản nháp",
+      "status": "proposed"
     }
   ]
 }

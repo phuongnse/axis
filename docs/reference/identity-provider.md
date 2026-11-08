@@ -371,7 +371,8 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     `mcp audience <host>` for each host, whose audience is `https://<host>/mcp`. It removes the mappers
     with that name prefix whose host is gone and leaves every other mapper alone. It makes the scope a
     default optional scope of the realm in place of `offline_access`, so a client made from then on can
-    ask for it.
+    ask for it. It also sets the scope's consent text to the theme message
+    `axisAuthoringScopeConsentText`, whether the scope is new or already exists.
   - The command signs in to the realm as `axis-activation`, so it reads `Platform:SecretKey` to decrypt
     the activation secret. A preview tenant, and a tenant whose sign-in points at an identity provider
     outside Axis, have no realm to write and no identity provider is called. When the identity provider
@@ -616,6 +617,9 @@ Every other page that Keycloak can show is drawn from the same frame.
   drawn specially. The page leaves out Keycloak's Cancel for an action that a person started from an
   application.
 - **The terms step** is in [accepting the terms](legal.md#accepting-the-terms).
+- **Consent**, "Allow access", one card that names the client, shows its home page address as a link
+  and lists the consent text of each scope the client asks for. Allow sends the client a code and Deny
+  sends it back with `error=access_denied`, see [sign-in](mcp-server.md#sign-in).
 
 ### Emails
 
@@ -644,7 +648,7 @@ applications' texts, which activation writes to the realm.
 - **Templates and contexts.** Each Keycloak template of the theme `axis` writes Keycloak's data as JSON,
   with a `page` field, and a React bundle draws the page from shared components in
   `web/src/identitySignIn/`. No page comes from Keycloak's `keycloak` parent theme. `frame.ftl` holds
-  the head, realm name, locales and frame texts macros that the fifteen templates share.
+  the head, realm name, locales and frame texts macros that the sixteen templates share.
 
   | Template                      | `page`                |
   | ----------------------------- | --------------------- |
@@ -654,6 +658,7 @@ applications' texts, which activation writes to the realm.
   | `login-reset-password.ftl`    | `resetPassword`       |
   | `login-update-password.ftl`   | `updatePassword`      |
   | `terms.ftl`                   | `terms`               |
+  | `login-oauth-grant.ftl`       | `consent`             |
   | `select-authenticator.ftl`    | `selectAuthenticator` |
   | `login-update-profile.ftl`    | `updateProfile`       |
   | `idp-review-user-profile.ftl` | `reviewProfile`       |
@@ -696,6 +701,11 @@ applications' texts, which activation writes to the realm.
   which Keycloak answers with `error=access_denied`. It links the checkbox to `termsUrl` and
   `privacyUrl`, from the client attributes `axis.tenantTermsUrl` and `axis.tenantPrivacyUrl`, each left
   out when the tenant does not set it.
+- **Consent** (`consent`, `ConsentPage`) is two real `<form method="post">` to `oauthAction`, each with
+  the hidden `code`. Allow also posts `accept=yes`, and Deny posts `cancel=no`, which Keycloak answers
+  with `error=access_denied`. The client's name is `clientName`, its id when it has no name. `homeUrl`
+  is the client's home address, left out when not set, and `scopes` holds each requested scope's consent
+  text, which `advancedMsg` resolves from the theme's messages.
 - **Sign-out** (`signOut`) is a real `<form method="post">` to `action` that posts the session code as
   `session_code` with `confirmLogout=on`, and links "Back to application" to `backUrl`.
 - **Notice** (`notice`) holds a `message` and, when Keycloak offers a link, the flat fields `linkUrl`

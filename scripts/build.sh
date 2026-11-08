@@ -34,6 +34,7 @@ test -f "$theme/select-authenticator.ftl"
 test -f "$theme/login-update-profile.ftl"
 test -f "$theme/idp-review-user-profile.ftl"
 test -f "$theme/terms.ftl"
+test -f "$theme/login-oauth-grant.ftl"
 test -f "$theme/resources/assets/axis-sign-in.js"
 node scripts/check-fonts.mjs "$theme/resources"
 email=artifacts/keycloak-theme/axis/email

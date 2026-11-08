@@ -228,6 +228,33 @@ export interface TermsContext extends IdentityFrameContext {
   texts: TermsTexts
 }
 
+/** The texts of the consent page. `intro` holds a `{client}` placeholder for the client's name. */
+export interface ConsentTexts {
+  title: string
+  intro: string
+  allow: string
+  deny: string
+}
+
+/** What the consent page draws: the client's name and home page, a line for each scope it asks for, Allow and Deny. */
+export interface ConsentContext extends IdentityFrameContext {
+  page: 'consent'
+  title: string
+  /** The message to show above the card. No error means no alert. */
+  error?: string
+  /** Where Allow posts `accept` and Deny posts `cancel`, each with the `code`. */
+  oauthAction: string
+  /** Keycloak's consent code, posted as `code`. */
+  code: string
+  /** The client's name, or its id when it has no name. */
+  clientName: string
+  /** The client's home page. Absent when not set. */
+  homeUrl?: string
+  /** The consent text of each scope the client asks for. */
+  scopes: string[]
+  texts: ConsentTexts
+}
+
 /** The texts of the page that offers the ways to sign in, which "Try another way" opens. */
 export interface SelectAuthenticatorTexts {
   title: string
@@ -368,6 +395,7 @@ export type IdentityContext =
   | ResetPasswordContext
   | UpdatePasswordContext
   | TermsContext
+  | ConsentContext
   | SelectAuthenticatorContext
   | UpdateProfileContext
   | SignOutContext

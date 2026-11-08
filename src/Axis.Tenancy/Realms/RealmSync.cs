@@ -95,6 +95,11 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <summary>The client scope whose audience mappers put the <c>/mcp</c> URL of each tenant host into the access token, and which the MCP server's metadata names.</summary>
     public const string AuthoringScope = "axis:authoring";
 
+    // A message key, which the theme's bundles resolve in every locale (docs/reference/identity-provider.md#theme). Keycloak's own scopes use the same form.
+    private const string AuthoringConsentText = "${axisAuthoringScopeConsentText}";
+    private const string ConsentTextAttribute = "consent.screen.text";
+    private const string DisplayOnConsentAttribute = "display.on.consent.screen";
+
     private const string AuthoringAudiencePrefix = "mcp audience ";
     private const string AudienceMapper = "oidc-audience-mapper";
     private const string OfflineAccessScope = "offline_access";
@@ -180,8 +185,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <para>
     /// It also gives the realm the client scope <see cref="AuthoringScope"/>, with one <c>oidc-audience-mapper</c> named
     /// <c>mcp audience &lt;host&gt;</c> for each host, whose audience is <see cref="AuthoringAudiences"/> of the hosts, and removes the
-    /// mappers with that name prefix whose host is gone. It makes the scope a default optional scope of the realm, so a client made from
-    /// then on can ask for it, and takes <c>offline_access</c> out of them.
+    /// mappers with that name prefix whose host is gone. It sets the scope's consent text to the theme message
+    /// <c>axisAuthoringScopeConsentText</c>, whether the scope is new or already exists. It makes the scope a default optional scope of the realm,
+    /// so a client made from then on can ask for it, and takes <c>offline_access</c> out of them.
     /// </para>
     /// </summary>
     public async Task SyncPlatformAddressesAsync(
@@ -226,8 +232,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     }
 
     /// <summary>
-    /// Makes the realm's <see cref="AuthoringScope"/> hold one audience mapper for each of <paramref name="hosts"/> and no stale one, and
-    /// makes it a default optional scope in place of <c>offline_access</c>. It leaves every mapper whose name does not start with
+    /// Makes the realm's <see cref="AuthoringScope"/> hold one audience mapper for each of <paramref name="hosts"/> and no stale one,
+    /// gives it its consent text, and makes it a default optional scope in place of <c>offline_access</c>. It leaves every mapper whose name does not start with
     /// <c>mcp audience </c> as it is.
     /// </summary>
     private async Task SyncAuthoringScopeAsync(string token, string realmPath, string[] hosts, CancellationToken cancellationToken)
@@ -236,6 +242,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         using var listed = await SendAsync(token, HttpMethod.Get, scopesPath, null, cancellationToken);
         EnsureSuccess(listed, "list the client scopes");
         string? scopeId = null;
+        JsonElement? authoringScope = null;
         string? offlineId = null;
         foreach (var scope in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
         {
@@ -243,6 +250,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             {
                 case AuthoringScope:
                     scopeId = scope.GetProperty("id").GetString();
+                    authoringScope = scope;
                     break;
                 case OfflineAccessScope:
                     offlineId = scope.GetProperty("id").GetString();
@@ -259,13 +267,19 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 ["attributes"] = new Dictionary<string, string>
                 {
                     ["include.in.token.scope"] = "true",
-                    ["display.on.consent.screen"] = "true",
+                    [DisplayOnConsentAttribute] = "true",
+                    [ConsentTextAttribute] = AuthoringConsentText,
                 },
             };
             using var created = await SendAsync(token, HttpMethod.Post, scopesPath, representation, cancellationToken);
             EnsureSuccess(created, $"create the client scope '{AuthoringScope}'");
             scopeId = created.Headers.Location?.Segments[^1].TrimEnd('/')
                 ?? throw new InvalidOperationException($"The identity provider step 'find the created client scope '{AuthoringScope}'' found no client scope.");
+        }
+
+        else if (authoringScope is { } existing)
+        {
+            await SyncAuthoringConsentTextAsync(token, $"{scopesPath}/{scopeId}", existing, cancellationToken);
         }
 
         await SyncAuthoringAudiencesAsync(token, $"{scopesPath}/{scopeId}/protocol-mappers/models", hosts, cancellationToken);
@@ -287,6 +301,26 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             using var removed = await SendAsync(token, HttpMethod.Delete, $"{defaultsPath}/{offlineId}", null, cancellationToken);
             EnsureSuccess(removed, $"take '{OfflineAccessScope}' out of the default optional client scopes");
         }
+    }
+
+    /// <summary>Sets the consent text of the scope, and shows the scope on the consent screen, when either differs. Every other attribute of the scope stays.</summary>
+    private async Task SyncAuthoringConsentTextAsync(string token, string scopePath, JsonElement scope, CancellationToken cancellationToken)
+    {
+        var attributes = scope.TryGetProperty("attributes", out var held) && held.ValueKind == JsonValueKind.Object
+            ? held.Deserialize<Dictionary<string, JsonElement>>()!
+            : new Dictionary<string, JsonElement>();
+        string? Read(string name) => attributes.TryGetValue(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        if (Read(ConsentTextAttribute) == AuthoringConsentText && Read(DisplayOnConsentAttribute) == "true")
+        {
+            return;
+        }
+
+        attributes[ConsentTextAttribute] = JsonSerializer.SerializeToElement(AuthoringConsentText);
+        attributes[DisplayOnConsentAttribute] = JsonSerializer.SerializeToElement("true");
+        var representation = scope.Deserialize<Dictionary<string, JsonElement>>()!;
+        representation["attributes"] = JsonSerializer.SerializeToElement(attributes);
+        using var updated = await SendAsync(token, HttpMethod.Put, scopePath, representation, cancellationToken);
+        EnsureSuccess(updated, $"update the client scope '{AuthoringScope}'");
     }
 
     private async Task SyncAuthoringAudiencesAsync(string token, string mappersPath, string[] hosts, CancellationToken cancellationToken)
