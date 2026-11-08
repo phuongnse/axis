@@ -174,6 +174,32 @@ describe('the example holds no secret', () => {
     for (const secret of Object.values(config.secrets)) assert.ok(secret.file, 'a secret has no file')
   })
 
+  test("the installation doc's 'Mounted in' table lists the secret files of each service as the rendered config mounts them", () => {
+    const { services } = render([scenariosFile])
+    const mounted = {}
+    for (const [name, service] of Object.entries(services)) {
+      for (const secret of service.secrets ?? []) (mounted[secret.source] ??= []).push(name)
+    }
+    const doc = readFileSync(join(root, 'docs/reference/installation.md'), 'utf8')
+    const start = doc.indexOf('| File | Mounted in |')
+    assert.notEqual(start, -1, 'no Mounted in table')
+    const listed = {}
+    for (const line of doc.slice(start).split('\n').slice(2)) {
+      if (!line.startsWith('|')) break
+      const cells = line.split('|').map((cell) => cell.trim())
+      const file = /`([^`]+)`/.exec(cells[1])?.[1]
+      assert.ok(file, `no file in ${line}`)
+      listed[file] = cells[2].split(',').map((service) => service.trim())
+    }
+    assert.ok(Object.keys(mounted).length > 0, 'the config mounts no secret')
+    const sort = (table) => Object.fromEntries(Object.entries(table).map(([file, names]) => [file, [...names].sort()]).sort(([a], [b]) => a.localeCompare(b)))
+    // The doc says "server" for both replicas.
+    for (const files of Object.values(mounted)) {
+      if (files.includes('server-2')) files.splice(files.indexOf('server-2'), 1)
+    }
+    assert.deepEqual(sort(listed), sort(mounted))
+  })
+
   test('the scenario secret and Studio__Tests come only with compose.scenarios.yaml, in the publisher and the servers', () => {
     const scenario = 'Scenarios__ServerConnectionString'
     for (const [name, service] of Object.entries(render().services)) {

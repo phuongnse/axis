@@ -610,6 +610,20 @@ describe('the Axis Helm chart', () => {
     assert.match(publisher, /- name: templates\n\s+persistentVolumeClaim:\n\s+claimName: axis-templates\n/)
   })
 
+  test("the installation doc's publisher row of 'Which pod gets which secret' lists the secrets the chart gives the publisher", () => {
+    const keys = [...readFileSync(new URL('../deploy/helm/axis/values.yaml', import.meta.url), 'utf8').matchAll(/^  ([a-z][A-Za-z]+):\n    name:/gm)].map((match) => match[1])
+    assert.ok(keys.length > 10, 'no secrets in values.yaml')
+    const publisher = find(renderOk(...keys.flatMap((key) => ['--set', `secrets.${key}.name=named-${key}`])), 'Deployment', 'axis-publisher')
+    const rendered = [...new Set([...publisher.matchAll(/(?:secretName|name): "named-([A-Za-z]+)"/g)].map((match) => match[1]))].sort()
+
+    const doc = readFileSync(new URL('../docs/reference/installation.md', import.meta.url), 'utf8')
+    const row = doc.split('\n').find((line) => line.startsWith('| Publisher | '))
+    assert.ok(row, 'no Publisher row in the secrets table')
+    const listed = [...new Set([...row.matchAll(/`([a-z][A-Za-z]+)`/g)].map((match) => match[1]).filter((name) => keys.includes(name)))].sort()
+    assert.ok(rendered.length > 0, 'the publisher mounts no secret')
+    assert.deepEqual(listed, rendered)
+  })
+
   test('in a cell the server and the publisher mount the same Studio volume and use /studio as the applications folder', () => {
     const output = renderOk('--set', 'studio.folders=null')
     for (const name of ['axis-server', 'axis-publisher']) {
