@@ -1297,7 +1297,7 @@ function sentTexts(fetchMock: ReturnType<typeof vi.fn>) {
 }
 
 describe('StudioEditor for a label', () => {
-  it('writes the texts of every locale in one call and then saves the key as a new label', async () => {
+  it('writes the texts of every locale in one call before the patch that adds the key', async () => {
     const fetchMock = stubPage(pageContent, () => json({ resources: [], diagnostics: [] }))
     const onTextsWritten = vi.fn()
     renderResource(pageItem, namesWithTexts, onTextsWritten)
@@ -1307,19 +1307,53 @@ describe('StudioEditor for a label', () => {
     expect(key).toHaveValue('pages.myTasks.title')
     await userEvent.type(screen.getByRole('textbox', { name: 'en' }), 'My tasks')
     await userEvent.type(screen.getByRole('textbox', { name: 'vi' }), 'Việc của tôi')
-    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: 'Write texts' }))
+    expect(screen.getByTestId('studio-save-bar')).toBeInTheDocument()
+    expect(sentTexts(fetchMock)).toHaveLength(0)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    await screen.findByTestId('studio-label-written')
+    await screen.findByTestId('studio-saved')
     const writes = sentTexts(fetchMock)
     expect(writes).toHaveLength(1)
     expect(writes[0][0]).toBe(`${folder}/texts/pages.myTasks.title`)
     expect(JSON.parse(writes[0][1].body as string)).toEqual({ texts: { en: 'My tasks', vi: 'Việc của tôi' } })
     expect(onTextsWritten).toHaveBeenCalledWith([])
-
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
-    await screen.findByTestId('studio-saved')
+    const order = fetchMock.mock.calls.map(([, call]) => call?.method)
+    expect(order.indexOf('PUT')).toBeLessThan(order.indexOf('PATCH'))
     expect(sentPatch(fetchMock)).toEqual([{ op: 'add', path: '/title', value: { textKey: 'pages.myTasks.title' } }])
+  })
+
+  it('writes the texts of a saved label and sends no patch when only the texts changed', async () => {
+    const fetchMock = stubPage({ ...pageContent, title: { textKey: 'pages.home.title' } }, () =>
+      json({ resources: [], diagnostics: [] }),
+    )
+    renderResource(pageItem, namesWithTexts)
+    await openFormTab()
+
+    await userEvent.type(await screen.findByRole('textbox', { name: 'en' }, slow), '!')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    const writes = sentTexts(fetchMock)
+    expect(writes).toHaveLength(1)
+    expect(writes[0][0]).toBe(`${folder}/texts/pages.home.title`)
+    expect(JSON.parse(writes[0][1].body as string)).toEqual({ texts: { en: 'Home!', vi: 'Trang chủ' } })
+    expect(requests(fetchMock, 'PATCH')).toBe(0)
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
+  })
+
+  it('undoes and redoes the texts of a label', async () => {
+    stubPage(pageContent, () => json({ resources: [], diagnostics: [] }))
+    renderResource(pageItem, namesWithTexts)
+    await openFormTab()
+
+    const en = await screen.findByRole('textbox', { name: 'en' }, slow)
+    await userEvent.type(en, 'My tasks')
+    await userEvent.tab()
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Redo' }))
+    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('My tasks')
   })
 
   it('takes an empty key as no key and suggests one', async () => {
@@ -1341,17 +1375,18 @@ describe('StudioEditor for a label', () => {
     expect(screen.getByTestId('studio-label-used-by')).toHaveTextContent('2')
   })
 
-  it('shows the failure and leaves the draft unchanged when the write fails', async () => {
+  it('shows the save error and sends no patch when the text write fails', async () => {
     const fetchMock = stubPage(pageContent, () => new Response(null, { status: 400 }))
     renderResource(pageItem, namesWithTexts)
     await openFormTab()
 
     await userEvent.type(await screen.findByRole('textbox', { name: 'en' }, slow), 'My tasks')
-    await userEvent.click(screen.getByRole('button', { name: 'Write texts' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByTestId('studio-label-write-error')).toHaveTextContent('The texts could not be written.')
-    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
+    expect(await screen.findByTestId('studio-save-error')).toHaveTextContent('The resource could not be saved.')
+    expect(requests(fetchMock, 'PATCH')).toBe(0)
     expect(sentTexts(fetchMock)).toHaveLength(1)
+    expect(screen.getByRole('textbox', { name: 'en' })).toHaveValue('My tasks')
   })
 })
 

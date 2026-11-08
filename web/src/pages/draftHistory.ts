@@ -1,9 +1,16 @@
 import { getAt } from '../platform/jsonPatch'
 
-/** The draft and the text of the JSON view at one moment. `jsonText` is `null` while the view shows the draft. */
+/** The texts of the labels that the editor holds, by key and then by locale. */
+export type LabelTextDrafts = Record<string, Record<string, string>>
+
+/**
+ * The draft, the text of the JSON view and the label texts at one moment. `jsonText` is `null` while the view shows the
+ * draft. `texts` is the label texts that the draft's labels show, which Save writes before the patch.
+ */
 export interface DraftSnapshot {
   draft: Record<string, unknown>
   jsonText: string | null
+  texts: LabelTextDrafts
 }
 
 /**
@@ -24,13 +31,13 @@ export const emptyHistory: DraftHistory = { past: [], future: [], step: null }
 
 /**
  * Records `before` as a new step, unless `step` is not `null` and equals the open step, which the edit then joins.
- * A new edit drops the steps that could have been redone. A `before` that is the last step's draft and JSON text is not
- * saved, because the same event edited the draft twice. The oldest step is dropped past `historyLimit`.
+ * A new edit drops the steps that could have been redone. A `before` that is the last step's draft, JSON text and label
+ * texts is not saved, because the same event edited the draft twice. The oldest step is dropped past `historyLimit`.
  */
 export function recordStep(history: DraftHistory, before: DraftSnapshot, step: string | null): DraftHistory {
   const joins = step !== null && step === history.step
   const last = history.past.at(-1)
-  const repeats = before.draft === last?.draft && before.jsonText === last.jsonText
+  const repeats = before.draft === last?.draft && before.jsonText === last.jsonText && before.texts === last.texts
   const past = joins || repeats ? history.past : [...history.past, before].slice(-historyLimit)
   return { past, future: [], step }
 }

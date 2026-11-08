@@ -25,7 +25,8 @@ const labelContext = {
   file: 'forms/review.json',
   name: 'Review',
   saved: {},
-  onTextsWritten: vi.fn(),
+  texts: {},
+  onTextsChange: vi.fn(),
 }
 
 const sections = [

@@ -695,15 +695,11 @@ test.describe("Studio edits a process in the process editor", () => {
       [target, ...texts].map((name) => readFile(name, "utf8")),
     );
 
-    // The label editor writes the texts files at once, outside the save, so the journey restores them too.
-    async function writeTexts(field: string, en: string, vi: string) {
+    // A save writes the texts files too, so the journey restores them as well.
+    async function fillTexts(field: string, en: string, vi: string) {
       const label = page.getByTestId(field);
       await label.getByRole("textbox", { name: "en", exact: true }).fill(en);
       await label.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-      await label
-        .getByRole("button", { name: "Write texts", exact: true })
-        .click();
-      await expect(label.getByTestId("studio-label-written")).toBeVisible();
     }
 
     try {
@@ -742,12 +738,12 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByRole("checkbox", { name: "In-app", exact: true })
         .check();
 
-      await writeTexts(
+      await fillTexts(
         `studio-field-/steps/${added}/message/subject`,
         "Request {number} was rejected",
         "Yêu cầu {number} bị từ chối",
       );
-      await writeTexts(
+      await fillTexts(
         `studio-field-/steps/${added}/message/body`,
         "Request {number} was rejected by a manager",
         "Yêu cầu {number} bị quản lý từ chối",
@@ -822,15 +818,11 @@ test.describe("Studio edits a process in the process editor", () => {
       [target, ...texts].map((name) => readFile(name, "utf8")),
     );
 
-    // The label editor writes the texts files at once, outside the save, so the journey restores them too.
-    async function writeTexts(field: string, en: string, vi: string) {
+    // A save writes the texts files too, so the journey restores them as well.
+    async function fillTexts(field: string, en: string, vi: string) {
       const label = page.getByTestId(field);
       await label.getByRole("textbox", { name: "en", exact: true }).fill(en);
       await label.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-      await label
-        .getByRole("button", { name: "Write texts", exact: true })
-        .click();
-      await expect(label.getByTestId("studio-label-written")).toBeVisible();
     }
 
     try {
@@ -894,12 +886,12 @@ test.describe("Studio edits a process in the process editor", () => {
         .getByTestId(`studio-field-${notify}/channels`)
         .getByRole("checkbox", { name: "In-app", exact: true })
         .check();
-      await writeTexts(
+      await fillTexts(
         `studio-field-${notify}/message/subject`,
         "A request waits for finance",
         "Một yêu cầu đang chờ tài chính",
       );
-      await writeTexts(
+      await fillTexts(
         `studio-field-${notify}/message/body`,
         "A request has waited a day for the finance review",
         "Một yêu cầu đã chờ tài chính một ngày",

@@ -109,8 +109,6 @@ test.describe('the author builds the asset management application with Studio on
       await keyBox.fill(key)
       await expect(english).toHaveValue(en, { timeout: 2_000 })
     }).toPass({ timeout: 20_000 })
-    await label.getByRole('button', { name: 'Write texts', exact: true }).click()
-    await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
   async function grantIn(

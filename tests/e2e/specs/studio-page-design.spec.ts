@@ -799,10 +799,6 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await label
       .getByRole("textbox", { name: "vi", exact: true })
       .fill("Xem kỹ");
-    await label
-      .getByRole("button", { name: "Write texts", exact: true })
-      .click();
-    await expect(label.getByTestId("studio-label-written")).toBeVisible();
     const parameter = panel.getByTestId(`${action}/parameters/ticket`);
     await expect(parameter).toContainText("ticket");
     await parameter.getByRole("textbox").fill("id");

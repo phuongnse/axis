@@ -63,13 +63,11 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
       .getByRole('combobox')
   }
 
-  /** Writes the text of a label field in both locales and saves the texts. */
-  async function writeTexts(page: Page, field: string, en: string, vi: string) {
+  /** Fills the text of a label field in both locales, which the next Save writes. */
+  async function fillTexts(page: Page, field: string, en: string, vi: string) {
     const label = page.getByTestId(field)
     await label.getByRole('textbox', { name: 'en', exact: true }).fill(en)
     await label.getByRole('textbox', { name: 'vi', exact: true }).fill(vi)
-    await label.getByRole('button', { name: 'Write texts', exact: true }).click()
-    await expect(label.getByTestId('studio-label-written')).toBeVisible()
   }
 
   /** Writes a data source over approvals/Request with one measure, `requests`, that counts the requests. */
@@ -138,21 +136,21 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
     await openFormTab(page)
     await expect(editor.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Dashboard')
 
-    await writeTexts(page, 'studio-field-/title', `Dashboard ${stamp}`, `Bảng điều khiển ${stamp}`)
+    await fillTexts(page, 'studio-field-/title', `Dashboard ${stamp}`, `Bảng điều khiển ${stamp}`)
 
     await pickAction(addWidgetPicker(page), 'kpi', page.getByTestId('studio-widget-/widgets/1'))
     await page.getByTestId('studio-widget-/widgets/1').click()
     await pick(page, 'studio-field-/widgets/1/dataSource', 'RequestTotals')
     await pick(page, 'studio-field-/widgets/1/measure', 'requests')
-    await writeTexts(page, 'studio-field-/widgets/1/label', `Requests ${stamp}`, `Yêu cầu ${stamp}`)
+    await fillTexts(page, 'studio-field-/widgets/1/label', `Requests ${stamp}`, `Yêu cầu ${stamp}`)
 
     await pickAction(addWidgetPicker(page), 'chart', page.getByTestId('studio-widget-/widgets/2'))
     await page.getByTestId('studio-widget-/widgets/2').click()
     await pick(page, 'studio-field-/widgets/2/dataSource', 'RequestsByStatus')
     await pick(page, 'studio-field-/widgets/2/category', 'status')
     await pick(page, 'studio-field-/widgets/2/measures/0/name', 'requests')
-    await writeTexts(page, 'studio-field-/widgets/2/measures/0/label', `Count ${stamp}`, `Số lượng ${stamp}`)
-    await writeTexts(page, 'studio-field-/widgets/2/title', `By status ${stamp}`, `Theo trạng thái ${stamp}`)
+    await fillTexts(page, 'studio-field-/widgets/2/measures/0/label', `Count ${stamp}`, `Số lượng ${stamp}`)
+    await fillTexts(page, 'studio-field-/widgets/2/title', `By status ${stamp}`, `Theo trạng thái ${stamp}`)
 
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()

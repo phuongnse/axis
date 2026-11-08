@@ -75,13 +75,11 @@ test.describe("Studio declares a page parameter and links to the page", () => {
       .getByRole("combobox");
   }
 
-  /** Fills the texts of a label in every locale and writes them, so the label's key exists before the save. */
-  async function writeTexts(page: Page, label: string, en: string, vi: string) {
+  /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
+  async function fillTexts(page: Page, label: string, en: string, vi: string) {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts", exact: true }).click();
-    await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
   async function writeResource(folder: string, file: string, value: unknown) {
@@ -154,7 +152,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "DepartmentDetail",
     );
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/title",
       `Department detail ${stamp}`,
@@ -177,7 +175,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     await expect(editor.getByRole("textbox", { name: "Name", exact: true })).toHaveValue(
       "DepartmentList",
     );
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/title",
       `Departments ${stamp}`,
@@ -198,7 +196,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
       .click();
     const action = "studio-field-/widgets/1/rowActions/0";
     await pick(page, `${action}/page`, "DepartmentDetail");
-    await writeTexts(page, `${action}/label`, "Details", "Chi tiết");
+    await fillTexts(page, `${action}/label`, "Details", "Chi tiết");
     const parameter = page.getByTestId(`${action}/parameters/department`);
     await expect(parameter).toContainText("department, reference, required");
     await parameter.getByRole("textbox").fill("id");

@@ -36,13 +36,11 @@ test.describe("Studio edits form conditions and steps", () => {
     }
   });
 
-  /** Fills the texts of a label in every locale and writes them, so the label's key exists before the save. */
-  async function writeTexts(page: Page, label: string, en: string, vi: string) {
+  /** Fills the texts of a label in every locale, which the next Save writes before it saves the label's key. */
+  async function fillTexts(page: Page, label: string, en: string, vi: string) {
     const field = page.getByTestId(label);
     await field.getByRole("textbox", { name: "en", exact: true }).fill(en);
     await field.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
-    await field.getByRole("button", { name: "Write texts", exact: true }).click();
-    await expect(field.getByTestId("studio-label-written")).toBeVisible();
   }
 
   test("an author checks a new requiredWhen before saving, then adds two reordered steps, with no new diagnostic", async ({
@@ -97,13 +95,13 @@ test.describe("Studio edits form conditions and steps", () => {
 
     const steps = page.getByTestId("studio-field-/steps");
     await steps.getByRole("button", { name: "Add step", exact: true }).click();
-    await writeTexts(page, "studio-field-/steps/0/title", "Request", "Yêu cầu");
+    await fillTexts(page, "studio-field-/steps/0/title", "Request", "Yêu cầu");
     await pickOptions(
       page.getByTestId("studio-field-/steps/0/sections").getByRole("combobox"),
       ["request"],
     );
     await steps.getByRole("button", { name: "Add step", exact: true }).click();
-    await writeTexts(
+    await fillTexts(
       page,
       "studio-field-/steps/1/title",
       "Decision",

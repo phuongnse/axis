@@ -290,8 +290,6 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByRole('textbox', { name: 'Client secret (Secret binding)', exact: true }).fill('PartnerClientSecret')
     const label = page.getByTestId('studio-field-/label')
     await label.getByRole('textbox', { name: 'en', exact: true }).fill('Continue with Partner')
-    await label.getByRole('button', { name: 'Write texts', exact: true }).click()
-    await expect(label.getByTestId('studio-label-written')).toBeVisible()
     await page.getByRole('button', { name: 'Add role', exact: true }).click()
     const row = page.getByTestId('studio-role-row-0')
     await row.getByRole('textbox').fill('managers')
