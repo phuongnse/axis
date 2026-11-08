@@ -52,6 +52,8 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
+# The server embeds reference pages for the MCP tool read_reference.
+COPY docs/reference/ docs/reference/
 COPY samples/packages/ samples/packages/
 COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -o /app \
@@ -111,6 +113,8 @@ ARG AXIS_VERSION
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
 COPY src/ src/
+# The server embeds reference pages for the MCP tool read_reference.
+COPY docs/reference/ docs/reference/
 COPY controlplane/src/ controlplane/src/
 COPY --from=web /src/src/Axis.Server/wwwroot src/Axis.Server/wwwroot
 COPY --from=web /src/controlplane/src/Axis.ControlPlane/wwwroot controlplane/src/Axis.ControlPlane/wwwroot

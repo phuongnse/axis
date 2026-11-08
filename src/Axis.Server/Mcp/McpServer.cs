@@ -18,7 +18,7 @@ namespace Axis.Server.Mcp;
 /// The MCP server of a tenant host, at <c>/mcp</c>. It speaks the Streamable HTTP transport as a server that offers no
 /// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
 /// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The tools are
-/// <c>list_applications</c> and the read tools of <see cref="McpReadTools"/>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// <c>list_applications</c>, <c>read_reference</c> of <see cref="McpReference"/> and the read tools of <see cref="McpReadTools"/>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
 /// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
@@ -40,6 +40,7 @@ internal static partial class McpServer
     private const string VersionHeader = "MCP-Protocol-Version";
     private const int MaxBodyBytes = 1024 * 1024;
     private const string ListApplicationsTool = "list_applications";
+    private const string ReadReferenceTool = "read_reference";
     private const string ListResourcesTool = "list_resources";
     private const string ReadResourceTool = "read_resource";
     private const string ReadModuleResourceTool = "read_module_resource";
@@ -53,6 +54,8 @@ internal static partial class McpServer
     private const int InvalidParams = -32602;
 
     private static readonly ToolProperty _applicationInput = new("application", "The name of the application.", true);
+    private static readonly ToolProperty _topicInput = new(
+        "topic", $"The topic: a resource kind, one of {string.Join(", ", McpReference.Pages.Keys)}.", true);
     private static readonly ToolProperty _draftInput = new("draft", "The id of one of your drafts of the application. Leave it out to read the working folder.", false);
     private static readonly ToolProperty _idInput = new("id", "The id of the resource.", true);
     private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
@@ -60,6 +63,11 @@ internal static partial class McpServer
     private static readonly ToolDefinition[] _definitions =
     [
         new(ListApplicationsTool, "Lists the applications you may author.", []),
+        new(
+            ReadReferenceTool,
+            "Answers the JSON Schema of a resource kind and the text of the reference pages that describe it, from the installed version of Axis. "
+            + $"The topics are the resource kinds: {string.Join(", ", McpReference.Pages.Keys)}.",
+            [_topicInput]),
         new(
             ListResourcesTool,
             "Lists the resources of an application: each one's id, kind, name, file, version, titles and how many references use it. "
@@ -299,6 +307,7 @@ internal static partial class McpServer
         return tool switch
         {
             ListApplicationsTool => (StudioEndpoints.ListApplications(context.Options), null),
+            ReadReferenceTool => McpReference.Read(arguments[_topicInput.Name]),
             ListResourcesTool => await McpReadTools.ListResourcesAsync(context, arguments[_applicationInput.Name], draft, ct),
             ReadResourceTool => await McpReadTools.ReadResourceAsync(context, arguments[_applicationInput.Name], arguments[_idInput.Name], draft, ct),
             ReadModuleResourceTool => McpReadTools.ReadModuleResource(context, arguments[_applicationInput.Name], arguments[_moduleInput.Name], arguments[_idInput.Name]),

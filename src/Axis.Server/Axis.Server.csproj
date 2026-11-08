@@ -30,6 +30,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The reference pages that docs/reference/mcp-server.md#reference-topics maps to the topics of read_reference. -->
+    <EmbeddedResource Include="..\..\docs\reference\resource-files.md;..\..\docs\reference\frontend.md;..\..\docs\reference\data-sources.md;..\..\docs\reference\processes.md;..\..\docs\reference\process-flow.md;..\..\docs\reference\form-widget.md;..\..\docs\reference\form-conditions.md;..\..\docs\reference\roles-and-policies.md;..\..\docs\reference\integration-resources.md;..\..\docs\reference\identity-provider.md;..\..\docs\reference\outbound-webhooks.md;..\..\docs\reference\migrations.md;..\..\docs\reference\test-scenarios.md;..\..\docs\reference\module-contracts.md;..\..\docs\reference\customization-layers.md" LogicalName="Axis.Server.Reference.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Axis.Server.Tests" />
     <InternalsVisibleTo Include="Axis.Integration.Tests" />
     <InternalsVisibleTo Include="Axis.OpenApiDocument" />
