@@ -820,6 +820,11 @@ their addresses.
 - **URL bindings.** A `url` binding must be `https` outside Development. Activation refuses an `http`
   binding, and the worker never sends a call to one, see
   [deployment bindings](integration-resources.md#deployment-bindings).
+- **Model provider.** The agent host calls the `Endpoint` of a model binding with the scheme that the
+  operator sets, and it checks no scheme. An empty `Endpoint` is the provider's own `https` address.
+  A binding with a key sends it in a header on every call, so use an `https` endpoint for any binding
+  that has a `KeyFile`. Use `http` only for a self-served model on a network that you trust. See
+  [bindings](model-bindings.md#bindings).
 - **Mail.** Outside Development the worker sends no email while `Email:Smtp:UseTls` is off, and
   `tenant email set` refuses `--tls false`. Both name the setting. See
   [mail settings](notifications.md#mail-settings).
