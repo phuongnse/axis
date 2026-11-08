@@ -355,9 +355,8 @@ The main Playwright journey proves that Studio alone builds a whole application.
   the dashboard, the ticket detail page, the time zone, the automations and their texts included.
 - It may not use a file edit, the JSON view or an `axis-admin` command.
 - At the end it compares the folder it built with the committed sample, `samples/apps/service-desk`.
-  The comparison ignores resource ids and key order, pairs seed record ids by position and label keys
-  by place, as [the folder comparison](testing.md#the-folder-comparison) says, and any other difference
-  fails the journey.
+  The comparison ignores only what [the folder comparison](testing.md#the-folder-comparison) lists, and
+  any other difference fails the journey.
 - It then runs the scenarios from Studio and publishes. The requester, the service desk lead and the
   agent take one ticket through the process on the site, and the requester opens the ticket from the
   bell after the agent resolves it.

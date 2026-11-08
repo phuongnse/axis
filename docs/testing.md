@@ -68,7 +68,7 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
   browser.
 - **Label texts.** A journey types a label's texts into the label editor, one box per locale, and keeps
   the key that Studio makes. It types a key into a text resource only for the keys that a label picks
-  from a list, and for keys that no label uses, as [the folder comparison](#the-folder-comparison) lists.
+  from a list, and for keys that no label uses.
 - **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks
   what the code does now. A guard against a kind of mistake is a lint rule or a check of the current
   rule, such as "every chart import goes through `ChartDrawing`", never a list of removed names.
@@ -245,11 +245,9 @@ file holds its steps. This section says what each proves and what it must not do
   schedule and delete triggers, the policies in the policy matrix, and the twelve test scenarios in
   the scenario editor, typing every expression in the expression editor and every label's texts in its
   label editor. Each save must report no error diagnostic. At the end the built folder must match
-  `samples/apps/service-desk` with no error diagnostic: only resource ids, seed record ids (paired by
-  position), key order and label keys that [the folder comparison](#the-folder-comparison) pairs may
-  differ, and
-  the `migrations` folder must be empty, because the sample has none. Run tests must pass all twelve
-  scenarios, and the release history must show release 1 as the one active row. On the
+  `samples/apps/service-desk` with no error diagnostic, as [the folder comparison](#the-folder-comparison)
+  says, and the `migrations` folder must be empty, because the sample has none. Run tests must pass all
+  twelve scenarios, and the release history must show release 1 as the one active row. On the
   `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
   the requester opening it from the bell, and the lead's bell has no row for that ticket.
 - **`first-application-tutorial.spec.ts`** runs the steps of the
@@ -315,12 +313,13 @@ sample. `compareApplicationFolders` in `tests/e2e/folder-comparison.ts` throws a
   same place, such as a field's label or a step's label. Each built key pairs with the sample key used
   at the same place, and one sample key may pair with a new key at each place where it is used.
 - **Texts.** A text resource compares through those pairs. Each built text must equal the sample's text
-  for each locale, and each sample key a label uses must be covered. A text that no label uses, or a
-  sample key that no label uses any more, fails.
+  for each locale, under the sample key it pairs with, or under its own key when none pairs with it. A
+  built key that no label uses fails when the sample's labels use that key, and passes when the sample
+  holds it with the same texts. A sample key that no built key covers fails as missing.
 - **Page element names.** A journey may skip the names of page widgets, actions, columns and tabs with
-  `ignorePageElementNames`, because Studio does not name them the way the samples do. With
-  `generatedNames`, a page may hold a generated name such as `table1` that the sample lacks. A different
-  name never passes.
+  `ignorePageElementNames`, because Studio does not name them the way the samples do. Without it, a
+  different name fails. With `generatedNames`, a page may hold an extra generated name such as `table1`
+  that the sample lacks.
 
 ## Purchasing system stub
 
