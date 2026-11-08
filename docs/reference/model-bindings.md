@@ -44,14 +44,15 @@ The agent host reads these settings:
 | `Ai:Bindings:<name>:MaxOutputTokens` | The largest output of one call, 16,000 by default                                                      |
 | `Ai:DefaultBinding`                  | The binding requests use. With no value, AI authoring is off and Studio shows no request panel         |
 | `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the default binding                                      |
-| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default _(planned for M35)_                         |
+| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default. The server reads it                        |
 | `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ |
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default _(planned for M35)_                                           |
 | `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default _(planned for M35)_                  |
 
 - **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
   `MaxOutputTokens` that is not a whole number of at least 1, or a default or review binding that names
-  no binding stops the agent host's start and names the setting, never a value.
+  no binding stops the agent host's start and names the setting, never a value. An `Ai:AllowTenantKeys`
+  that is not `true` or `false` stops the server's start in the same way.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
   tool or stored in a request.
 - **Axis SaaS** _(planned for M35)_ uses an `anthropic` binding with Claude by default, because it does well at long runs
@@ -61,16 +62,21 @@ The agent host reads these settings:
 
 ## A tenant's own key
 
-_(planned for M35)_
-
 Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
 
-- **The key.** A tenant administrator gives the tenant its own key for the default binding's provider,
-  on the [users page](user-administration.md). It is kept as a tenant secret, encrypted as other tenant
-  secrets are, and replaces the installation's key for that tenant's requests.
-- **Usage.** A tenant with its own key still counts toward `authoringRequests`, but its tokens are
-  recorded as its own in [usage](tenant-quotas.md#usage), so that a plan can price them apart.
-- **Audit.** Setting, changing and removing the key write platform audit records with no key value.
+- **The key.** A tenant administrator sets, changes and removes the tenant's own key through the
+  [model key routes](user-administration.md#the-tenants-model-key). It is kept as the tenant secret
+  `model_key`, encrypted as other tenant secrets are, see
+  [storage](storage.md#secrets-in-the-platform-database).
+- **The users page** _(planned for M35)_ holds the form where an administrator gives the key, for the
+  default binding's provider.
+- **Requests** _(planned for M35)_ use the tenant's key, and it replaces the installation's key for that
+  tenant's requests.
+- **Usage** _(planned for M35)_. A tenant with its own key still counts toward `authoringRequests`, but
+  its tokens are recorded as its own in [usage](tenant-quotas.md#usage), so that a plan can price them
+  apart.
+- **Audit.** Setting, changing and removing the key write platform audit records with no key value, see
+  [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
 
 ## The authoring eval
 

@@ -77,7 +77,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         Assert.Equal(versionBefore + 1, await VersionAsync(scenario.Platform, id));
-        Assert.Equal(["platform rekey ok: 13 tenant secrets, 2 data protection keys"], result.Output);
+        Assert.Equal(["platform rekey ok: 14 tenant secrets, 2 data protection keys"], result.Output);
         await scenario.AssertNoSecretsAsync(CipherFor(_newKey, TestPlatform.SecretKey));
     }
 
@@ -199,7 +199,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         Assert.True(reader.IsDBNull(1));
         Assert.Equal(Environment.UserName, reader.GetString(2));
         Assert.Equal(Environment.MachineName, reader.GetString(3));
-        Assert.Equal(["tenant secrets: 13", "data protection keys: 2"], (string[])reader[4]);
+        Assert.Equal(["tenant secrets: 14", "data protection keys: 2"], (string[])reader[4]);
         Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
@@ -288,6 +288,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         tenant.EmailFrom = "noreply@example.test";
         tenant.SmtpUserName = "mailer";
         tenant.SmtpPassword = cipher.Encrypt(id, TenantSecretFields.SmtpPassword, "smtp-password-value");
+        tenant.ModelKey = cipher.Encrypt(id, TenantSecretFields.ModelKey, "model-key-value");
         tenant.RealmActivationClientSecret = cipher.Encrypt(id, TenantSecretFields.RealmActivationClientSecret, "realm-activation-secret-value");
         tenant.RealmUsersClientSecret = cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, "realm-users-secret-value");
         context.TenantBindings.Add(new TenantBindingRow
@@ -384,6 +385,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             "tenants.schema_password" => cipher.Decrypt(row, TenantSecretFields.SchemaPassword, stored).Reveal(),
             "tenants.oidc_client_secret" => cipher.Decrypt(row, TenantSecretFields.OidcClientSecret, stored).Reveal(),
             "tenants.smtp_password" => cipher.Decrypt(row, TenantSecretFields.SmtpPassword, stored).Reveal(),
+            "tenants.model_key" => cipher.Decrypt(row, TenantSecretFields.ModelKey, stored).Reveal(),
             "tenants.realm_activation_client_secret" => cipher.Decrypt(row, TenantSecretFields.RealmActivationClientSecret, stored).Reveal(),
             "tenants.realm_users_client_secret" => cipher.Decrypt(row, TenantSecretFields.RealmUsersClientSecret, stored).Reveal(),
             "tenants.oidc_client_key" or "tenants.oidc_previous_client_key" => cipher.Decrypt(row, TenantSecretFields.OidcClientKey, stored).Reveal(),

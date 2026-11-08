@@ -107,6 +107,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.SmtpUseTls).HasColumnName("smtp_use_tls");
             tenant.Property(t => t.SmtpUserName).HasColumnName("smtp_user_name");
             tenant.Property(t => t.SmtpPassword).HasColumnName("smtp_password").HasColumnType("bytea");
+            tenant.Property(t => t.ModelKey).HasColumnName("model_key").HasColumnType("bytea");
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");

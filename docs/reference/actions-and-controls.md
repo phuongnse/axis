@@ -165,9 +165,13 @@ be kept right.
   filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
 - **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, a data source
   table's included.
-- **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
-  orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
-  still searched and filtered on. The platform keeps each person's choice.
+- **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
+  opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
+  back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
+  first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
+  the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
+  its first order. A change of columns keeps the page.
+- **Each person's columns** _(planned for M31)_. The platform keeps each person's choice of columns.
 - **Saved views** _(planned for M31)_. A person saves a table's search, filter and sort as a view.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free

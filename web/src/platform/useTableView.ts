@@ -4,7 +4,7 @@ import type { FieldMetadata } from './site'
 import { parseTableQuery, recordPageSize, writeTableQuery, type TableQuery } from './tableQuery'
 
 /**
- * A table's view, its search, filter, sort, page, page size and data source parameter values, kept in the address, see
+ * A table's view, its search, filter, columns, sort, page, page size and data source parameter values, kept in the address, see
  * docs/reference/actions-and-controls.md#tables. An invalid, empty, repeated or out-of-order value, or a search the
  * table cannot make or a filter that is not valid for `fields`, is rewritten without a history entry. `setView` adds a history entry unless `replace` is set.
  * `fields` and `parameterNames` must be stable between renders.
@@ -15,11 +15,13 @@ export function useTableView(
   parameterNames: readonly string[] = [],
   searchable = false,
   filterable = false,
+  columnsControl = false,
 ): { view: TableQuery; setView: (next: TableQuery, options?: { replace?: boolean }) => void } {
   const [searchParams, setSearchParams] = useSearchParams()
   const view = useMemo(
-    () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames, searchable, filterable),
-    [searchParams, fields, defaultPageSize, parameterNames, searchable, filterable],
+    () =>
+      parseTableQuery(searchParams, fields, defaultPageSize, parameterNames, searchable, filterable, columnsControl),
+    [searchParams, fields, defaultPageSize, parameterNames, searchable, filterable, columnsControl],
   )
 
   useEffect(() => {
