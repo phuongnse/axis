@@ -82,10 +82,16 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   such as a danger button, whose white text needs it.
 - **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
   names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
-- **One field for the platform's screens** _(planned for M31)_. `AxisField` draws every field of Studio
-  and the console: its label, its help and its input, as a group that its help describes.
-  `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
-  a few ways, each with its help, and `AxisFieldGroup` a titled group of fields.
+- **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
+  group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
+  Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change
+  handler, and `AxisField` still ties the label to the input and makes the help its description.
+  `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
+  group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
+  field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+- **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
+  a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
+  with its help.
 - **Every field has help** _(planned for M31)_, as [platform field help](frontend.md#platform-field-help) says.
 - **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
   its own.
