@@ -84,6 +84,12 @@
       "en": "draft",
       "vi": "bản nháp",
       "status": "proposed"
+    },
+    {
+      "concept": "Action: Apply",
+      "en": "Apply",
+      "vi": "Áp dụng",
+      "status": "proposed"
     }
   ]
 }
