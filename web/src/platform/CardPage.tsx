@@ -9,18 +9,16 @@ import { useDesignTokens } from './themeMode'
 /**
  * Proposed: the frame of every page that is one card on its own, such as the identity provider's pages and the sign-up
  * pages: the organization's mark and name above the card, the "Language and theme" gear at the top right and the legal
- * line below. The card is as wide as a dialog of the same size: `small` for a short task, `medium` for a longer form.
+ * line below. Every such page is one step of the same journey, so the card has one width, a small dialog's.
  */
 export function CardPage({
   title,
-  size = 'small',
   organization,
   preferences,
   legal,
   children,
 }: {
   title: string
-  size?: 'small' | 'medium'
   /** The organization's name above the card. No name means Axis. */
   organization?: string
   /** The "Language and theme" gear, with the texts its page resolves it with. */
@@ -30,7 +28,7 @@ export function CardPage({
 }) {
   const { colour, spacing, radius } = useDesignTokens()
   const [year] = useState(() => new Date().getFullYear())
-  const width = sizeTokens.dialog[size]
+  const width = sizeTokens.dialog.small
   // A design-system frame sets --shell-min-height to its own height, so the page fills it.
   return (
     <Flex

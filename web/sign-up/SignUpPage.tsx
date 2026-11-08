@@ -128,7 +128,6 @@ export function SignUpPage({
     <ConfigProvider locale={antLocaleFor(locale)}>
       <CardPage
         title={t('signUp.title')}
-        size="medium"
         legal={{
           texts: {
             legal: t('shell.legal.label'),

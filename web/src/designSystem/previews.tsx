@@ -313,7 +313,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       draw: () => <SignUpPreview businessName={signUpBusinessName} />,
     },
     { caption: 'Applications failed', fixtures: signUpFixtures.applicationsFailed, draw: () => <SignUpPreview /> },
-  ].map((state) => ({ ...state, frameHeight: 820 })),
+  ].map((state) => ({ ...state, frameHeight: 850 })),
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
