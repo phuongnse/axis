@@ -1,8 +1,16 @@
 # UI writing
 
 This page says how the words of Axis's own screens are written: Studio, the operator console, the shell, the sign-in
-pages and the platform's messages. It covers the platform texts in `src/Axis.Presentation/Texts/<locale>.json`, in every locale, and
-every person or agent that adds or changes one. An application's own texts belong to its author, who may follow it.
+pages and the platform's messages. It covers these screen texts, in every locale, and every person or agent that adds or
+changes one:
+
+- the platform texts in `src/Axis.Presentation/Texts/<locale>.json`;
+- the identity provider's messages and emails in `web/keycloak-theme/`;
+- the sign-up page's texts in `web/sign-up/texts.ts`;
+- the control plane's emails in `controlplane/src/Axis.ControlPlane/Emails/`;
+- the texts of the built-in modules and applications under `modules/` and `applications/`, which ship with Axis.
+
+An author's own application's texts, the samples' included, belong to that author, who may follow this page.
 
 The terms each locale uses are in the [glossary](ui-glossary.json), and the terms that wait for the owner are in the
 [proposed glossary](ui-glossary-proposed.json). This page says how to write; the glossary says which word names which
@@ -163,7 +171,7 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
 
 ## Checks
 
-A test checks the rules that a test can decide, and no list of words. It fails when:
+A test checks the platform texts for the rules that a test can decide, and no list of words. It fails when:
 
 - a key is missing in a locale, or a placeholder of the English text is missing or added in another locale;
 - a text in another locale is the same as the English one, unless the glossary's `keep` allows it;
@@ -175,9 +183,13 @@ one- or two-word `keep` entry names it, ignoring case. The keys that broke a rul
 key in `tests/Axis.Server.Tests/TextCatalogBaseline.json`. That list only goes down: a fixed key must be removed
 from it, and a new break fails.
 
+No test decides the words: a phrase that breaks a language's pattern, a synonym of a glossary term or a concept left in
+English. NexKit's review checks them on every change to a screen text, as
+[how pull requests merge](../delivery.md#how-pull-requests-merge) says.
+
 ## Changing a text
 
-A change to a platform text takes these steps:
+A change to a screen text takes these steps:
 
 1. Read the key's place on the screen and its purpose, then write every locale of the change from that purpose.
 2. A concept with no term yet, or a term to change, is added to `ui-glossary-proposed.json` as `proposed` in the same
