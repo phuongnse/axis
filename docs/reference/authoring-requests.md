@@ -9,20 +9,18 @@ the reasons are in [D119](../decisions/d119-ai-authoring-in-studio.md).
 
 ## The agent host
 
-_(planned for M35)_
-
 The agent host is the process that runs authoring requests. It is one client of the MCP server, with
 no shortcut of its own.
 
 - **A host of its own.** `axis-agent` runs beside the server, the worker and the publisher, from the
   same images, Helm chart and Compose file. It runs the same way in a cell and on premises, and needs
   no GitHub, no CI service and no particular cloud.
-- **One client of the MCP server.** It calls the [MCP server](mcp-server.md) over HTTP, like any
+- **One client of the MCP server** _(planned for M35)_. It calls the [MCP server](mcp-server.md) over HTTP, like any
   client, and has no other way into a tenant. It never opens a tenant database for an application's
   resources, and never reads a record.
-- **Its own state.** It reads and writes the request tables below in each tenant database, with the
+- **Its own state** _(planned for M35)_. It reads and writes the request tables below in each tenant database, with the
   tenant's runtime role, as the worker does.
-- **Models.** It calls a model through an adapter, by the binding the request uses, see
+- **Models** _(planned for M35)_. It calls a model through an adapter, by the binding the request uses, see
   [model bindings](model-bindings.md).
 
 ## Acting for the author

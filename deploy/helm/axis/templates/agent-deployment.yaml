@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-agent
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+spec:
+  replicas: {{ .Values.agent.replicas }}
+  selector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" . "component" "agent") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" . | nindent 8 }}
+        app.kubernetes.io/component: agent
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: agent
+          image: {{ include "axis.image" (dict "root" . "repository" .Values.agent.repository) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # The agent host gets no secret, tenant or cell setting yet, so it does not use axis.hostEnv.
+          env:
+            # The image keeps the health address on loopback. The kubelet probes the pod address.
+            - name: Health__Urls
+              value: http://0.0.0.0:5209
+          ports:
+            - name: health
+              containerPort: 5209
+          {{- include "axis.probes" "health" | nindent 10 }}
+          securityContext:
+            {{- include "axis.containerSecurityContext" . | nindent 12 }}
+          {{- with .Values.agent.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -60,6 +60,21 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(server, /Health__Urls/)
   })
 
+  test('the agent host has startup, liveness and readiness probes on its health port and mounts no secret', () => {
+    const agent = find(renderOk(), 'Deployment', 'axis-agent')
+    for (const [probe, path] of [
+      ['startupProbe', 'live'],
+      ['livenessProbe', 'live'],
+      ['readinessProbe', 'ready'],
+    ]) {
+      assert.match(agent, new RegExp(`${probe}:\\n\\s+httpGet:\\n\\s+path: /health/${path}\\n\\s+port: health\\n`))
+    }
+    assert.match(agent, /- name: health\n\s+containerPort: 5209/)
+    assert.doesNotMatch(agent, /scheme:/)
+    assert.match(agent, /- name: Health__Urls\n\s+value: http:\/\/0\.0\.0\.0:5209\n/)
+    assert.doesNotMatch(agent, /projected:|secretName:|\/run\/secrets|ConnectionStrings__|Platform__SecretKey|serviceAccountName/)
+  })
+
   test('the server listens on HTTPS only, with the certificate of its TLS Secret, and no other host does', () => {
     const output = renderOk()
     const server = find(output, 'Deployment', 'axis-server')
@@ -166,7 +181,7 @@ describe('the Axis Helm chart', () => {
 
   test('the image tag and registry apply to every host', () => {
     const output = renderOk('--set', 'image.registry=registry.example.com/axis', '--set', 'image.tag=1.2.3')
-    for (const image of ['axis-server', 'axis-worker', 'axis-admin']) {
+    for (const image of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin']) {
       assert.match(output, new RegExp(`image: "registry\\.example\\.com/axis/${image}:1\\.2\\.3"`))
     }
   })

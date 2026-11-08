@@ -1,11 +1,11 @@
-# Production Compose example: the server, the worker and the publisher run from the production images,
+# Production Compose example: the server, the worker, the agent host and the publisher run from the production images,
 # Axis's identity provider (Keycloak with the Axis theme) runs beside them, and the admin tool runs only on demand.
 # PostgreSQL 18 runs elsewhere and holds the identity provider's own database. Tenants come from the tenant
 # directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
 # compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
-# AXIS_VERSION          Required. The tag of the three images.
+# AXIS_VERSION          Required. The tag of the four images.
 # AXIS_IMAGE_PREFIX     Optional. A registry prefix for the image names, such as registry.example.com/axis/.
 # AXIS_SECRETS_DIR      The folder with the secret files. Default ./secrets.
 # AXIS_EXTENSIONS_DIR   The extension packages, mounted at /extensions. Default ./extensions.
@@ -19,6 +19,7 @@
 # AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. It serves HTTPS, so a client
 #                       checks the certificate for the name `servers`.
 # AXIS_WORKER_HEALTH_PORT  The host port of the worker's health endpoints, on 127.0.0.1 only. Default 5208.
+# AXIS_AGENT_HEALTH_PORT   The host port of the agent host's health endpoints, on 127.0.0.1 only. Default 5209.
 # AXIS_TLS_DIR          The folder with tls.crt and tls.key for the proxy, mounted read-only at /certs. Default ./tls.
 #                       It also holds server-ca.crt, the one authority certificate that the proxy trusts for the servers.
 # AXIS_HTTPS_PORT       The host port of the proxy. Default 443.
@@ -179,6 +180,19 @@ services:
     secrets:
       - ConnectionStrings__Platform
       - Platform__SecretKey
+
+  # The agent host. It needs no database yet and starts idle, so it gets no secret, volume or tenant setting.
+  agent:
+    image: ${AXIS_IMAGE_PREFIX:-}axis-agent:${AXIS_VERSION:?Set AXIS_VERSION}
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      # All interfaces inside the container. The published port stays on 127.0.0.1.
+      Health__Urls: http://0.0.0.0:5209
+    ports:
+      - "127.0.0.1:${AXIS_AGENT_HEALTH_PORT:-5209}:5209"
 
   # Runs the publish requests that Studio stores. It listens on no port.
   publisher:

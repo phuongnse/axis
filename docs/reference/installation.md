@@ -4,12 +4,13 @@ This page says how a platform operator installs and upgrades Axis, on one machin
 and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
 and the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-An installation runs three hosts, from three production images:
+An installation runs four hosts, from four production images:
 
 | Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | The server               | `axis-server` | Serves the API, the sites and the SPA.                                                                                                                                                                                                                                     |
 | The worker               | `axis-worker` | Runs background work.                                                                                                                                                                                                                                                      |
+| The agent host           | `axis-agent`  | Runs [AI authoring requests](authoring-requests.md#the-agent-host). It starts idle and needs no secret yet.                                                                                                                                                                |
 | The admin host           | `axis-admin`  | `Axis.Admin`, a command-line tool that a platform operator runs to create tenants, migrate tenant databases and activate releases, see [administration](administration.md).                                                                                                 |
 | The publisher            | `axis-admin`  | `axis-admin publisher`, a long-running command of the admin host that runs the publish requests that Studio stores, see [publisher](administration.md#publisher). It holds the schema role of every active tenant, so it runs apart from the server. It has no HTTP endpoint. |
 
@@ -25,7 +26,7 @@ extensions.
 
 ## Images
 
-Axis ships three production images, `axis-server`, `axis-worker` and `axis-admin`. They hold no
+Axis ships four production images, `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`. They hold no
 sample, no sample extension package, no sample module, no development realm, no credential and no
 source control metadata such as `.git`. The default target of the `Dockerfile` and the `compose.yaml`
 at the repository root build the development images instead, which hold the samples and development
@@ -34,15 +35,16 @@ credentials and are not for production, see [development](../development.md#dock
 [control plane](control-plane.md#image-and-chart).
 
 Build an image from the repository root with
-`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use `axis-worker` or
-`axis-admin` as the target for the other two. `AXIS_VERSION` defaults to `0.0.0-dev`.
+`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use `axis-worker`,
+`axis-agent` or `axis-admin` as the target for another. `AXIS_VERSION` defaults to `0.0.0-dev`.
 
 - **Environment.** The images run the `Production` environment.
 - **User.** They run as a non-root user, UID 1654, and work with a read-only root file system.
 - **Settings.** They read settings only from environment variables and from files in `/run/secrets`.
   Each file is named after a setting in its environment variable form, such as `Platform__SecretKey`,
   and its content is the value. Compose `secrets:` and Kubernetes secret volumes put files there.
-- **Packages and modules.** Mount extension packages at `/extensions` and modules at `/modules`.
+- **Packages and modules.** Mount extension packages at `/extensions` and modules at `/modules`. The
+  agent host loads neither, so `axis-agent` has no mount point for them.
 - **Application folders.** Mount the folder into the admin container, then run `activate` on it.
 - **No curl.** The images hold no `curl`, so they have no container health check. Use the probes of
   the orchestrator, see [health checks](health-checks.md).
@@ -50,7 +52,7 @@ Build an image from the repository root with
   backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`, and `axis-admin version` prints it.
-- **The package host image** _(planned for M21)_. A fourth image, `axis-package-host`, runs the
+- **The package host image** _(planned for M21)_. A fifth image, `axis-package-host`, runs the
   [package runners](extension-packages.md#package-runners) in the `package-host` container beside the
   worker. Compose and the Helm chart give that container no tenant settings, a read-only root file
   system, CPU and memory limits, and a network that reaches only the worker.
@@ -84,7 +86,7 @@ from a secret store of the platform, never from a committed file.
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
 | `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
-| `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
+| `Health:Urls` | `Health__Urls` | worker, agent | no | The worker's image keeps `http://127.0.0.1:5208` and the agent host's image keeps `http://127.0.0.1:5209`. The Helm chart sets each to all interfaces so the kubelet can probe it. |
 | `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080, plain HTTP. The Compose example and the Helm chart replace it with the Kestrel endpoint below, so nothing listens on 8080. |
 | `Kestrel:Endpoints:Https:Url` | `Kestrel__Endpoints__Https__Url` | server | no | The Compose example and the Helm chart set `https://+:8443`. A Kestrel endpoint replaces `ASPNETCORE_HTTP_PORTS`, so the server serves HTTPS only. |
 | `Kestrel:Endpoints:Https:Certificate:Path`, `Kestrel:Endpoints:Https:Certificate:KeyPath` | `Kestrel__Endpoints__Https__Certificate__Path`, `Kestrel__Endpoints__Https__Certificate__KeyPath` | server | no | The Compose example and the Helm chart set `/server-tls/tls.crt` and `/server-tls/tls.key`. The key is a private key, so the folder is a mounted volume and never a setting. See [TLS](#tls). |
@@ -108,20 +110,22 @@ This section installs Axis on one machine with Docker Compose, from the example 
 PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server with its own database
 on that PostgreSQL server.
 
-The example's `compose.yaml` has the server, the worker, the publisher, the identity provider, the TLS
+The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider, the TLS
 proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second
 server replica sits under the `replicas` profile, see
 [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password, client
 secret or key.
 
-- **The server and the worker** run the production images with a read-only root file system. The
+- **The server, the worker and the agent host** run the production images with a read-only root file system. The
   identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
 - **The admin host** runs only when asked, through `docker compose run --rm admin`.
 - **The publisher** runs the `axis-admin` image with the command `publisher`. It gets the
   `ConnectionStrings__PlatformSchema` and `Platform__SecretKey` files and not
   `Admin__ConnectionString`, and it publishes no port. Its `stop_grace_period` is six minutes, longer
   than the five-minute lease, so a stop lets the running request finish.
-- **The images.** Set `AXIS_VERSION` to the tag of the three images. `AXIS_IMAGE_PREFIX` adds a
+- **The agent host** runs the `axis-agent` image. It mounts no secret file and no folder, and it
+  publishes only its health port on `127.0.0.1`.
+- **The images.** Set `AXIS_VERSION` to the tag of the four images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
 The diagram shows the services of the example and the PostgreSQL server that they connect to. The
@@ -138,6 +142,7 @@ flowchart LR
         server2["server-2, replicas profile"]
         identity["identity, Keycloak"]
         worker["worker"]
+        agent["agent"]
         publisher["publisher"]
         admin["admin, only when asked"]
     end
@@ -316,8 +321,8 @@ Install in this order:
    with code 0.
 3. Start the identity provider and the proxy with `docker compose up -d identity proxy`, and wait until
    `https://<AXIS_IDENTITY_HOST>/realms/master/.well-known/openid-configuration` answers `200`. Then
-   start the server and the worker with `docker compose up -d server worker`, and wait until
-   `/health/ready` answers `200` on both, because the server creates the `platform` tables at start
+   start the server, the worker and the agent host with `docker compose up -d server worker agent`, and
+   wait until `/health/ready` answers `200` on the server and the worker, because the server creates the `platform` tables at start
    and `tenant create` needs them. Then start the publisher with `docker compose up -d publisher`. It
    exits with code 1 until the server has created those tables, so start it only after
    `/health/ready`.
@@ -343,9 +348,10 @@ by default.
   they reach the identity host through the proxy. Do not replace the store: pointing `SSL_CERT_FILE` at
   one file makes the server trust only that file.
 - **Ports.** The server listens on `127.0.0.1:8080` of the host, the second replica on
-  `127.0.0.1:8081`, and the worker's health endpoints on `127.0.0.1:5208`. Both servers serve HTTPS
-  only, on container port 8443. The worker's health endpoint stays plain HTTP, because it carries no
-  application traffic. The proxy is the only service published beyond the machine, on port 443. To
+  `127.0.0.1:8081`, the worker's health endpoints on `127.0.0.1:5208` and the agent host's on
+  `127.0.0.1:5209`. `AXIS_WORKER_HEALTH_PORT` and `AXIS_AGENT_HEALTH_PORT` change the last two. Both
+  servers serve HTTPS only, on container port 8443. The health endpoints stay plain HTTP, because they
+  carry no application traffic. The proxy is the only service published beyond the machine, on port 443. To
   use a reverse proxy of your own instead, put it on the same machine in front of the server, make it
   connect over HTTPS and check the server certificate, and let it reach the identity provider too. See
   [forwarded headers](several-server-replicas.md).
@@ -409,7 +415,7 @@ configured like `server`.
 
 Two kinds of test keep the example as this section describes it.
 
-- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the three
+- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the four
   production images and installs the example in the order above, against a test PostgreSQL over TLS
   and the example's own identity provider, with a certificate authority that it makes for the run. Its
   additions, such as the scenario role and the modules from `artifacts/modules`, sit in an override
@@ -442,6 +448,9 @@ The chart has these objects:
   HTTPS and the worker's use plain HTTP, and the chart sets `Health__Urls` to `http://0.0.0.0:5208` for
   the worker so that the kubelet can reach it. The server mounts the Studio volume and gets the Studio
   settings. The server and the identity provider get the forwarded headers settings.
+- **The agent host.** A Deployment with a startup, liveness and readiness probe over plain HTTP on port
+  5209, and the chart sets `Health__Urls` to `http://0.0.0.0:5209` so that the kubelet can reach it. It
+  has no Service, mounts no Secret and gets no host setting, so AI authoring stays off.
 - **The publisher.** A Deployment with one replica that runs the `axis-admin` image with the command
   `publisher`. It uses the `Recreate` strategy, so a rollout never runs two publishers. It has no
   Service, no container port, no probe and no Ingress, because the publisher has no HTTP endpoint. Its
@@ -635,6 +644,7 @@ values schema rejects any field in a reference other than `name` and `key`.
 | --- | --- |
 | Server | `platformConnection`, `platformSchemaConnection` and `platformSecretKey`, and `serverCertificate` read-only at `/server-tls`, which no other pod mounts |
 | Worker | `platformConnection` and `platformSecretKey` |
+| Agent host | none |
 | Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
 | Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set. In a cell also `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |
@@ -653,18 +663,19 @@ The values of the chart, with their defaults:
 
 | Value | Default | Meaning |
 | --- | --- | --- |
-| `image.registry` | empty | Registry prefix of the three images. |
-| `image.tag` | the chart's `appVersion` | Tag of all three images. |
+| `image.registry` | empty | Registry prefix of the four images. |
+| `image.tag` | the chart's `appVersion` | Tag of all four images. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
-| `server.repository`, `worker.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
+| `server.repository`, `worker.repository`, `agent.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-agent`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
 | `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](several-server-replicas.md). |
 | `worker.replicas` | 1 | Worker replicas. |
+| `agent.replicas` | 1 | Agent host replicas. |
 | `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. In a cell the publisher mounts it at `/studio` too, and the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
 | `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server and identity provider. IP addresses and CIDR ranges of your proxies, rendered on the server as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`, and on the identity provider as one `KC_PROXY_TRUSTED_ADDRESSES` list with `KC_PROXY_HEADERS=xforwarded`. Empty trusts no proxy, and the identity provider sets no proxy headers. |
-| `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
+| `server.resources`, `worker.resources`, `agent.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
 | `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
 | `identity.image` | the Keycloak image that `KeycloakFixture.Image` pins | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
@@ -856,7 +867,7 @@ an operator upgrades to get one, see [D108](../decisions/d108-reporting-a-vulner
 1. Back up the platform database and every tenant database. For example, run `pg_dump` from the admin
    image. Back up each tenant with [`tenant backup`](tenant-backup-and-restore.md#tenant-backup).
 2. Run `migrate` with the new admin image.
-3. Roll out the new server, the new worker and the new publisher.
+3. Roll out the new server, the new worker, the new agent host and the new publisher.
 
 Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration failed keeps its old
 version. See [migrate](administration.md#migrate) for the window and for failed tenants.

@@ -109,7 +109,7 @@ test('the stack runs from source', { timeout }, async () => {
       const log = inspect.status === 0 ? (JSON.parse(inspect.stdout).Log ?? []) : []
       lastChecks[service] = log.at(-1)?.Output ?? ''
     }
-    for (const service of ['server', 'worker', 'publisher', 'keycloak', 'purchasing', 'mailpit', 'postgres']) {
+    for (const service of ['server', 'worker', 'agent', 'publisher', 'keycloak', 'purchasing', 'mailpit', 'postgres']) {
       compose(['logs', service], { stdio: 'inherit' })
     }
     assert.fail(`docker compose up exited with ${up.status}\n${tail(up.stderr ?? '', 2000)}\n${describeNotReady(containers, lastChecks)}`)
@@ -191,6 +191,7 @@ test('the stack runs from source', { timeout }, async () => {
 
   const services = compose(['ps', '--status', 'running', '--services'])
   assert.match(services.stdout, /^worker$/m, `${services.stdout}${services.stderr}`)
+  assert.match(services.stdout, /^agent$/m, `${services.stdout}${services.stderr}`)
   assert.match(services.stdout, /^publisher$/m, `${services.stdout}${services.stderr}`)
   // The worker polls once a second, so it finds the migrated database soon after the server is up.
   let logs = ''
@@ -214,6 +215,13 @@ test('the stack runs from source', { timeout }, async () => {
     parsePs(ps.stdout).map((container) => container.Health),
     ['healthy'],
     ps.stdout,
+  )
+  const agent = compose(['ps', '--format', 'json', 'agent'])
+  assert.equal(agent.status, 0, agent.stderr)
+  assert.deepEqual(
+    parsePs(agent.stdout).map((container) => container.Health),
+    ['healthy'],
+    agent.stdout,
   )
 })
 
@@ -347,6 +355,14 @@ test('the worker checks /health/ready and publishes no port', () => {
   const { services } = JSON.parse(config.stdout)
   assert.equal(services.worker.ports, undefined)
   assert.match(services.worker.healthcheck.test.join(' '), /\/health\/ready/)
+})
+
+test('the agent host checks /health/ready and publishes no port', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  assert.equal(services.agent.ports, undefined)
+  assert.match(services.agent.healthcheck.test.join(' '), /\/health\/ready/)
 })
 
 // Compose prints a duration such as `5m0s`.

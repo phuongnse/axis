@@ -1,4 +1,4 @@
-// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the three
+// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the four
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and the example's own identity provider, creates two tenants and their realms there, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
@@ -42,7 +42,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
 const scenariosFile = join(root, 'deploy/compose/compose.scenarios.yaml')
 const timeout = 30 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-admin']
+const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin']
 const identityHost = 'id.axis.test'
 const identityAuthority = `https://${identityHost}/realms/axis`
 const passThrough = ['AXIS_OIDC_CLIENT_SECRET']
@@ -54,6 +54,7 @@ const secretFiles = {
   proxy: [],
   identity: ['IdentityProvider__AdminClientSecret', 'KC_DB_PASSWORD', 'KC_DB_URL', 'KC_DB_USERNAME'],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
+  agent: [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
@@ -139,7 +140,7 @@ describe('the example holds no secret', () => {
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
     const config = render()
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'identity', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -164,6 +165,7 @@ describe('the example holds no secret', () => {
     assert.equal(config.services.identity.profiles, undefined, 'the identity provider has a profile')
     assert.deepEqual(config.services['server-2'].profiles, ['replicas'])
     assert.equal(config.services.worker.profiles, undefined)
+    assert.equal(config.services.agent.profiles, undefined)
     const publisher = config.services.publisher
     assert.equal(publisher.profiles, undefined)
     assert.ok((publisher.ports ?? []).length === 0, 'the publisher publishes a port')
@@ -192,12 +194,22 @@ describe('the example holds no secret', () => {
       assert.equal(services[name].environment.Studio__Tests, 'true', `${name} Studio__Tests`)
       assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
     }
-    for (const name of ['worker', 'admin', 'proxy', 'identity']) {
+    for (const name of ['worker', 'agent', 'admin', 'proxy', 'identity']) {
       assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
       assert.equal(services[name].environment?.Studio__Tests, undefined, `${name} sets Studio__Tests`)
     }
     assert.deepEqual(services['server-2'].profiles, ['replicas'])
     assert.equal(services.publisher.environment?.Studio__Tests, undefined)
+  })
+
+  test('the agent host mounts no secret and publishes only its health port on 127.0.0.1', () => {
+    const { agent } = render().services
+    assert.deepEqual(agent.secrets ?? [], [])
+    assert.deepEqual(
+      (agent.ports ?? []).map((port) => [port.host_ip, port.target]),
+      [['127.0.0.1', 5209]],
+    )
+    assert.match(agent.image, /axis-agent:/)
   })
 
   test('the servers publish only on 127.0.0.1, and the proxy takes its certificate from a mounted folder', () => {
@@ -301,7 +313,7 @@ describe('the server certificate', () => {
       assert.equal(mounts[0].read_only, true, `${name} mounts /server-tls read-write`)
       assert.equal(mounts[0].source, join(root, 'deploy/compose/server-tls'))
     }
-    for (const name of ['proxy', 'worker', 'publisher', 'admin', 'identity']) {
+    for (const name of ['proxy', 'worker', 'agent', 'publisher', 'admin', 'identity']) {
       const service = services[name]
       assert.equal(
         (service.volumes ?? []).some((volume) => volume.target === '/server-tls' || volume.source === join(root, 'deploy/compose/server-tls')),
@@ -394,7 +406,7 @@ describe('the Studio folder', () => {
     }
     assert.equal(sources[0], sources[1])
     assert.equal(sources[0], join(root, 'deploy/compose/studio'))
-    for (const name of ['worker', 'publisher', 'admin', 'proxy', 'identity']) {
+    for (const name of ['worker', 'agent', 'publisher', 'admin', 'proxy', 'identity']) {
       assert.equal(
         (services[name].volumes ?? []).some((volume) => volume.target === '/studio'),
         false,
@@ -411,6 +423,7 @@ describe('the on-premises installation', () => {
   let env
   let serverPort
   let workerPort
+  let agentPort
   let httpsPort
   let server2Port
   let overrideFile
@@ -435,7 +448,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -631,7 +644,7 @@ describe('the on-premises installation', () => {
       const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
       assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
 
-      // Step 1, the images. The three targets are tagged with the version that compose.yaml requires.
+      // Step 1, the images. The four targets are tagged with the version that compose.yaml requires.
       for (const target of targets) await buildImage({ target, version, tag: `${target}:${version}` })
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
@@ -757,6 +770,7 @@ describe('the on-premises installation', () => {
 
       serverPort = await freePort()
       workerPort = await freePort()
+      agentPort = await freePort()
       httpsPort = await freePort()
       server2Port = await freePort()
 
@@ -814,6 +828,7 @@ describe('the on-premises installation', () => {
         AXIS_IDENTITY_THEME_DIR: join(root, 'artifacts/keycloak-theme'),
         AXIS_SERVER_TLS_DIR: serverTls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
+        AXIS_AGENT_HEALTH_PORT: String(agentPort),
         AXIS_STUDIO_DIR: studio,
         Studio__Folders__0: '/studio/leave-requests',
         Studio__AuthorRole: 'author',
@@ -864,8 +879,8 @@ describe('the on-premises installation', () => {
       const migrate = admin(['migrate'])
       assert.equal(migrate.status, 0, `migrate\n${migrate.stdout}${migrate.stderr}`)
 
-      // Step 3, start the server and the worker, and wait until the server is ready.
-      run(['up', '-d', 'server', 'worker'])
+      // Step 3, start the server, the worker and the agent host, and wait until the server is ready.
+      run(['up', '-d', 'server', 'worker', 'agent'])
       const ready200 = await waitFor(() => server('localhost', '/health/ready'), 200, 120)
       assert.equal(ready200.status, 200, 'the server never answered /health/ready with 200')
 
@@ -951,9 +966,10 @@ describe('the on-premises installation', () => {
         assert.equal(site.status, 200, `${host} did not serve /leave`)
       }
 
-      // Both hosts are ready.
+      // The hosts are ready.
       assert.equal((await server('localhost', '/health/ready')).status, 200)
       assert.equal((await request(workerPort, 'localhost', '/health/ready')).status, 200)
+      assert.equal((await request(agentPort, 'localhost', '/health/ready')).status, 200)
 
       // Every connection that an Axis host holds uses TLS. The check itself connects as postgres over the Unix socket,
       // so it leaves out that user.

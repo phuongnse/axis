@@ -15,12 +15,13 @@ flowchart LR
         Person[Operator]
     end
     subgraph registry [Registry]
-        Images[Images axis-server, axis-worker and axis-admin]
+        Images[Images axis-server, axis-worker, axis-agent and axis-admin]
     end
     subgraph hosts [Hosts]
         Proxy[TLS proxy]
         Servers[Server replicas]
         Worker[Worker and publisher]
+        Agent[Agent host]
     end
     subgraph secrets [Secrets]
         Files[Secret files or Kubernetes Secrets]
@@ -34,6 +35,7 @@ flowchart LR
     Person -->|stores| Backups
     Images -->|starts| Servers
     Images -->|starts| Worker
+    Images -->|starts| Agent
     Files -->|read at start| Servers
     Files -->|read at start| Worker
     Proxy -->|HTTPS| Servers
@@ -76,7 +78,7 @@ The images travel from a registry to each host, where Compose or the Helm chart 
 ```mermaid
 flowchart LR
     subgraph registry [Registry]
-        Images[axis-server, axis-worker and axis-admin images]
+        Images[axis-server, axis-worker, axis-agent and axis-admin images]
     end
     subgraph host [Host or cluster]
         Pull[Compose or Helm pulls the image]
@@ -90,7 +92,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | I5 | An image is swapped or changed between the registry and the host. | Images and registry | Tampering | High | **Delegated** | The operator builds the images or pulls them from a registry the operator controls, see [Images](installation.md#images). Signed images are planned for M32, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
 | I6 | An image ships samples, development settings or source control metadata. | Images and registry | Information disclosure | High | **Mitigated** | `scripts/images.test.mjs` (no image holds a sample, a Development settings file or `.git`). |
-| I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server, worker and control plane start read-only with their settings in `/run/secrets`). |
+| I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server, worker, agent host and control plane start read-only, the agent host with no secret file, and the others with their settings in `/run/secrets`). |
 | I8 | An install keeps running a version with a known vulnerability. | Images and registry | Elevation of privilege | Medium | **Delegated** | The operator upgrades to the latest version, the only one that gets security fixes, see [Upgrade](installation.md#upgrade). |
 
 Spoofing and repudiation do not apply to an image, which is a file that signs no one in and writes no record. Denial of service is covered by the server rows, such as P6.
