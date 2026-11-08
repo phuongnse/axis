@@ -9,7 +9,7 @@ import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
-import { formatValue, isNumeric } from './formatValue'
+import { enumLabel, formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -140,7 +140,9 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
  * Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
- * and the back button keep them. A data source table also has a filter bar, whose values live in the
+ * and the back button keep them. An entity table has a Filter button, and its filter lives in the URL as
+ * `filter` and goes to the rows and export routes as it is. A data source table has no Filter button, but a
+ * filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
  * no filter input: the table sends the page parameter's value under the data source parameter's name,
  * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
@@ -171,7 +173,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
-  const { view: query, setView } = useTableView(fields, defaultPageSize, parameterNames, searchable)
+  // The record API filters an entity's records. A data source's rows route takes no `filter`.
+  const filterable = widget.entity !== null
+  const { view: query, setView } = useTableView(fields, defaultPageSize, parameterNames, searchable, filterable)
   // The bound values and the filter values, in declaration order.
   const parameterValues = useMemo(() => {
     const values: Record<string, string> = {}
@@ -326,7 +330,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     }
   }, [confirming, deleting, t])
 
-  // Fetches the file with the table's parameters, search and sort, and saves it. A 403, 409 and 503 each have their own message.
+  // Fetches the file with the table's parameters, filter, search and sort, and saves it. A 403, 409 and 503 each have their own message.
   const runExport = useCallback(
     async (format: ExportFormat) => {
       if (exporting) {
@@ -391,6 +395,29 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
 
   const columns = useMemo<AxisColumn<TableRow>[]>(() => {
+    // The types the record API filters, see docs/reference/record-api.md#paging-and-sorting.
+    const filterOf = (field: FieldMetadata | DataSourceColumn): AxisColumn<TableRow>['filter'] => {
+      if (!filterable) {
+        return undefined
+      }
+      switch (field.type) {
+        case 'text':
+          return { kind: 'text' }
+        case 'enum':
+          return {
+            kind: 'enum',
+            options: (field.values ?? []).map((value) => ({ value, label: enumLabel(field, value, t) })),
+          }
+        case 'integer':
+        case 'decimal':
+        case 'money':
+          return { kind: 'number' }
+        case 'date':
+          return { kind: 'date' }
+        default:
+          return undefined
+      }
+    }
     // The link of the identifying cell. A cell with no id, or with no address the SPA can build, is plain text.
     const openLink = (shown: ReactNode, text: string, record: TableRow): ReactNode => {
       const action = rowActions[openIndex]
@@ -446,6 +473,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       align: isNumeric(field.type) ? 'right' : undefined,
+      filter: filterOf(field),
       // Digits of equal width line up in a column.
       onCell: () => (isNumeric(field.type) ? { style: { fontVariantNumeric: 'tabular-nums' } } : {}),
       render: (value: unknown, record: TableRow) => {
@@ -460,7 +488,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
+  }, [fields, filterable, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen

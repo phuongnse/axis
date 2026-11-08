@@ -2,7 +2,8 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it } from 'vitest'
-import { badgeCount, chooseOption } from '../test/antd'
+import { badgeCount } from '../test/antd'
+import { clickInDialog, dialog, filterTexts, pick } from '../test/tableFilter'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { TextProvider } from './TextProvider'
 import { useTableView } from './useTableView'
@@ -17,23 +18,7 @@ interface Row {
 const texts = {
   'shell.table.search': 'Search',
   'shell.table.range': '{from}–{to} of {total}',
-  'shell.table.filter': 'Filter',
-  'shell.table.filterApply': 'Apply',
-  'shell.table.filterAll': 'All',
-  'shell.table.filterAny': 'Any',
-  'shell.table.filterAddCondition': 'Add condition',
-  'shell.table.filterAddGroup': 'Add group',
-  'shell.table.filterRemove': 'Remove',
-  'shell.table.filterColumn': 'Column',
-  'shell.table.filterOperator': 'Operator',
-  'shell.table.filterValue': 'Value',
-  'shell.table.filterClearAll': 'Clear all',
-  'shell.table.filterGroupAll': 'All of {count} conditions',
-  'shell.table.filterGroupAny': 'Any of {count} conditions',
-  'shell.table.filterOp.eq': 'is',
-  'shell.table.filterOp.contains': 'contains',
-  'shell.table.filterOp.gt': 'is more than',
-  'shell.table.filterOp.empty': 'is empty',
+  ...filterTexts,
   'shell.form.cancel': 'Cancel',
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
@@ -120,15 +105,6 @@ const names = () =>
     .map((row) => within(row).getAllByRole('cell')[0].textContent)
 const address = () => screen.getByTestId('address').textContent
 const filterInAddress = () => JSON.parse(new URLSearchParams(address()!).get('filter')!) as unknown
-
-const dialog = () => screen.getByRole('dialog')
-const clickInDialog = (name: string, index = 0) =>
-  userEvent.click(within(dialog()).getAllByRole('button', { name })[index])
-/** Picks `title` in the `index`th picker named `name` of the filter dialog. */
-async function pick(name: string, index: number, title: string) {
-  await userEvent.click(within(dialog()).getAllByRole('combobox', { name })[index])
-  await chooseOption(title)
-}
 
 describe('useTableView', () => {
   it('sorts from a header and searches the rows, keeps both in the address and shows the same rows again from it', async () => {
