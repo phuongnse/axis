@@ -271,7 +271,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       .getByRole('link', { name: 'Settings', exact: true })
       .click()
     await expectForm(page)
-    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await pick(page, 'studio-field-/timeZone', '(UTC+07:00) Asia/Ho Chi Minh')
     await save(page)
   })
 
@@ -1294,7 +1294,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await pick(page, 'studio-field-/type', 'schedule')
     await dropEvent()
     await page.getByTestId('studio-field-/schedule').getByRole('textbox').fill('0 8 * * 1-5')
-    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await pick(page, 'studio-field-/timeZone', '(UTC+07:00) Asia/Ho Chi Minh')
     await pick(page, 'studio-field-/process', 'DailyOverdueReminder')
     const schedule = page.getByTestId('studio-field-/parameters')
     await schedule.getByRole('button', { name: 'Add', exact: true }).click()

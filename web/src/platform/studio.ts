@@ -516,6 +516,45 @@ export async function fetchStudioNames(application: string, signal?: AbortSignal
   return (await response.json()) as StudioNames
 }
 
+/** A role or connector slot of an installed module, with its label in each locale that has one. */
+export interface StudioCatalogSlot {
+  name: string
+  titles: Record<string, string>
+}
+
+/** An installed module: its versions newest first, and the slots of its newest version. */
+export interface StudioCatalogModule {
+  id: string
+  label: string
+  versions: string[]
+  roles: StudioCatalogSlot[]
+  connectors: StudioCatalogSlot[]
+}
+
+/** An installed package, with its versions newest first. */
+export interface StudioCatalogPackage {
+  id: string
+  label: string
+  versions: string[]
+}
+
+/** What the resource form chooses from, as `GET /api/studio/catalog` answers it. `offset` is minutes from UTC now. */
+export interface StudioCatalog {
+  modules: StudioCatalogModule[]
+  packages: StudioCatalogPackage[]
+  timeZones: { id: string; offset: number }[]
+}
+
+/** Loads the installed modules, packages and time zones, for the controls that choose them. */
+export async function fetchStudioCatalog(signal?: AbortSignal): Promise<StudioCatalog> {
+  const path = '/api/studio/catalog'
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioCatalog
+}
+
 /** A column of the policy matrix: a root entity, data source, process or endpoint. */
 export interface StudioMatrixTarget {
   kind: 'entity' | 'dataSource' | 'process' | 'endpoint'

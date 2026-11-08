@@ -2585,3 +2585,56 @@ describe('StudioEditor problems in the JSON view', () => {
     })
   })
 })
+
+const applicationItem: StudioResourceItem = {
+  id: '5b0e7d1a-2c3f-4a68-8d9e-1f2a3b4c5d6e',
+  kind: 'application',
+  name: 'Shop',
+  file: 'application.json',
+  version: 'a1',
+  usedBy: 0,
+}
+
+const applicationContent = { id: applicationItem.id, kind: 'application', name: 'Shop', formatVersion: 1 }
+
+/** Serves the application's resource, and answers the catalog route with `catalog`, or with a failure when it is `null`. */
+function stubApplication(catalog: unknown) {
+  const { fetchMock } = stubResource(applicationItem, applicationContent)
+  vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
+    input === '/api/studio/catalog'
+      ? Promise.resolve(catalog === null ? new Response(null, { status: 500 }) : json(catalog))
+      : fetchMock(input, init),
+  )
+  return fetchMock
+}
+
+describe('StudioEditor for the application settings', () => {
+  it('chooses the time zone from the catalog and saves its id', async () => {
+    const fetchMock = stubApplication({
+      modules: [],
+      packages: [],
+      timeZones: [{ id: 'Asia/Ho_Chi_Minh', offset: 420 }],
+    })
+    renderResource(applicationItem)
+
+    const field = await screen.findByTestId('studio-field-/timeZone', undefined, slow)
+    await waitFor(() => expect(within(field).getByRole('combobox')).toBeVisible())
+    await chooseOption('(UTC+07:00) Asia/Ho Chi Minh', field)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'add', path: '/timeZone', value: 'Asia/Ho_Chi_Minh' }])
+  })
+
+  it('keeps the time zone as a text input when the catalog does not load', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    stubApplication(null)
+    renderResource(applicationItem)
+
+    const field = await screen.findByTestId('studio-field-/timeZone', undefined, slow)
+
+    await waitFor(() => expect(warn).toHaveBeenCalled())
+    expect(within(field).getByRole('textbox')).toBeVisible()
+    warn.mockRestore()
+  })
+})
