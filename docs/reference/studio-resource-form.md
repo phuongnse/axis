@@ -35,8 +35,8 @@ last section with no heading.
   [platform field help](frontend.md#platform-field-help). A property's raw name, such as `textKey`, never
   shows. The `<path>` is the property names from the root joined by dots, with list indices and map keys
   left out, so every item of a list shares one label.
-- **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown, while `name` is. In a
-  module's view, `name` stays read-only.
+- **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown, while `name` is.
+  A module's `name` stays read-only, as [customization layers](customization-layers.md#in-studio) says.
 - **A group's fields sit in.** They sit in from the group's label, behind a rule in `borderSubtle`, so they
   read as its fields and not as its peers.
 
