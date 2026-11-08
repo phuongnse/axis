@@ -72,6 +72,13 @@
       "note": "What a module promises the application."
     },
     {
+      "concept": "Relaxed point",
+      "en": "relaxed point",
+      "vi": "điểm nới lỏng",
+      "status": "approved",
+      "note": "A point of a module's contract that a release relaxes. Never \"điểm được nới lỏng\"."
+    },
+    {
       "concept": "Customization layer",
       "en": "layer",
       "vi": "lớp tùy biến",
@@ -366,6 +373,13 @@
       "en": "policy",
       "vi": "chính sách",
       "status": "approved"
+    },
+    {
+      "concept": "Policy matrix",
+      "en": "policy matrix",
+      "vi": "bảng phân quyền",
+      "status": "approved",
+      "note": "The view of every role's grants on every entity. \"Ma trận\" is a word-by-word translation."
     },
     {
       "concept": "Identity provider",

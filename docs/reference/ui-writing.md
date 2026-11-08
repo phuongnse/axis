@@ -127,6 +127,9 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
   Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
+- **"Tạo" for an application, "Thêm" for a resource.** A button that makes a new application says "Tạo": "Tạo ứng
+  dụng…". A button that makes a new resource of an application says "Thêm", as the resource joins the application:
+  "Thêm đối tượng…", "Thêm tài nguyên…". English keeps "New application…" and "New entity…".
 - **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
   "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"
   is for a real request where English says "please", and is rare.
@@ -155,6 +158,8 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
     reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
 - **A short label that reads two ways on its own is rewritten.** "Nhãn trường" can read as a school's label; "Tên
   hiển thị" cannot.
+- **An optional field says "không bắt buộc".** A label that marks a field as optional ends with "(không bắt buộc)",
+  never "(tùy chọn)", which reads as a choice: "Ghi chú (không bắt buộc)" for "Note (optional)".
 - **Capital on the first word only**, on buttons and titles too: "Chọn tất cả", not "Chọn Tất Cả". A proper name keeps its
   capitals: "Việt Nam".
 - **One spelling and spacing.** The modern placement of tone marks: "xóa", "hủy", "hòa". No space before `. , : ; ? ! )`
