@@ -495,16 +495,69 @@ const siteContent = {
   navigation: [{ page: 'PurchaseRequests', label: { textKey: 'nav.purchaseRequests' } }],
 }
 
+const siteNames = {
+  ...namesWithEntity,
+  locales: ['en', 'vi'],
+  texts: [{ key: 'nav.purchaseRequests', texts: { en: 'Purchase requests', vi: 'Yêu cầu mua' }, usedBy: 1 }],
+} as unknown as StudioNames
+
+async function openNavigationEntry() {
+  await userEvent.click(await screen.findByRole('button', { name: 'PurchaseRequests' }, slow))
+  return screen.findByRole('dialog', { name: 'Edit navigation entry' })
+}
+
 describe('StudioEditor for a site', () => {
   it('offers the icons of the list for a navigation entry and saves the chosen one', async () => {
     const { fetchMock } = stubResource(siteItem, siteContent)
     renderResource(siteItem)
 
-    await chooseOption('tasks', await screen.findByTestId('studio-field-/navigation/0/icon', {}, slow))
+    const dialog = await openNavigationEntry()
+    await chooseOption('tasks', within(dialog).getByTestId('studio-field-/navigation/0/icon'))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
     expect(sentPatch(fetchMock)).toEqual([{ op: 'add', path: '/navigation/0/icon', value: 'tasks' }])
+  })
+
+  it('undoes Done of a navigation entry, with the texts of its label, as one step', async () => {
+    stubResource(siteItem, siteContent)
+    renderResource(siteItem, siteNames)
+
+    const dialog = await openNavigationEntry()
+    await chooseOption('tasks', within(dialog).getByTestId('studio-field-/navigation/0/icon'))
+    const en = within(dialog).getByRole('textbox', { name: 'en' })
+    await userEvent.clear(en)
+    await userEvent.type(en, 'Requests')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    const list = screen.getByTestId('studio-field-/navigation')
+    expect(within(list).getByText('Requests')).toBeVisible()
+    expect(within(list).getByText('tasks')).toBeVisible()
+    expect(screen.getByTestId('studio-save-bar')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Undo' }))
+
+    expect(within(list).getByText('Purchase requests')).toBeVisible()
+    expect(within(list).queryByText('Requests')).toBeNull()
+    expect(within(list).queryByText('tasks')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Redo' })).toBeEnabled()
+  })
+
+  it('leaves the item and the texts of its label as they were on Cancel', async () => {
+    const fetchMock = stubResource(siteItem, siteContent).fetchMock
+    renderResource(siteItem, siteNames)
+
+    const dialog = await openNavigationEntry()
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'en' }), ' list')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByTestId('studio-save-bar')).not.toBeInTheDocument()
+    expect(requests(fetchMock, 'PUT')).toBe(0)
+    const reopened = await openNavigationEntry()
+    expect(within(reopened).getByRole('textbox', { name: 'en' })).toHaveValue('Purchase requests')
   })
 })
 

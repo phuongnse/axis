@@ -160,7 +160,9 @@ so an author sees what a change or a delete touches. How it shows is in [Used by
 
 - **Opening an entry.** A Used by entry opens the other resource at the path of the reference: the path
   goes into the address, and the editor scrolls to the form field for that path, with nothing
-  highlighted. A path that the form cannot show, such as one inside a map, opens the JSON view.
+  highlighted. A path that the form cannot show, such as one inside a map, opens the JSON view. A path
+  inside an item of a [list of objects](studio-resource-form.md#lists-of-objects) lands on the list that
+  holds the item, and the author opens the row to reach the field.
 - **Counts can be stale.** The Used by list loads when its tab opens, and the `usedBy` counts load with
   the resources. A save does not reload either, so a count or the list can be out of date until the page
   reloads. The names, and so the counts that labels show, load again after a save and after a text write.

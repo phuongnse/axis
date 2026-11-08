@@ -11,13 +11,16 @@ import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
 import {
+  addListItem,
   addMapping,
   createResource,
   deleteResource,
+  doneListItem,
   hasKind,
   jsonViewText,
   openFormTab,
   openKind,
+  openListItem,
   openTab,
   writeLabel,
 } from '../studio-resources'
@@ -278,13 +281,12 @@ test.describe('the author builds the asset management application with Studio on
     await createResource(page, 'dataSource', name)
     await expectForm(page)
     await pick(page, 'studio-field-/entity', list.entity)
-    // The starter has the first row, so only the later rows are added.
+    // The starter has the first row, which is opened, and Add… adds the later rows.
     for (const [index, field] of list.fields.entries()) {
-      if (index > 0) {
-        await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
-      }
+      await (index === 0 ? openListItem(page, '/fields', 0) : addListItem(page, '/fields'))
       await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
       await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+      await doneListItem(page)
     }
     if (list.filter !== undefined) {
       const filter = page.getByTestId('studio-field-/filter')
@@ -304,15 +306,13 @@ test.describe('the author builds the asset management application with Studio on
       }
       for (const [index, measure] of list.aggregate.measures.entries()) {
         const at = `studio-field-/aggregate/measures/${index}`
-        await page
-          .getByTestId('studio-field-/aggregate/measures')
-          .getByRole('button', { name: 'Add', exact: true })
-          .click()
+        await addListItem(page, '/aggregate/measures')
         await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
         await pick(page, `${at}/function`, measure.function)
         if (measure.field !== undefined) {
           await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
         }
+        await doneListItem(page)
       }
     }
     await save(page)
@@ -795,12 +795,11 @@ test.describe('the author builds the asset management application with Studio on
       ['Dashboard', 'nav.dashboard', 'dashboard'],
     ]
     for (const [index, [target, key, icon]] of navigation.entries()) {
-      if (index > 0) {
-        await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
-      }
+      await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
       await pick(page, `studio-field-/navigation/${index}/page`, target)
       await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
+      await doneListItem(page)
     }
     await save(page)
     await expectForm(page)

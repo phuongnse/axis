@@ -9,7 +9,19 @@ import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { addMapping, createResource, deleteResource, grantIn, openFormTab, openKind, writeLabel } from '../studio-resources'
+import {
+  addListItem,
+  addListRow,
+  addMapping,
+  createResource,
+  deleteResource,
+  doneListItem,
+  grantIn,
+  openFormTab,
+  openKind,
+  openListItem,
+  writeLabel,
+} from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -515,13 +527,12 @@ test.describe('the author builds the service desk with Studio only', () => {
       await createResource(page, 'dataSource', name)
       await expectForm(page)
       await pick(page, 'studio-field-/entity', list.entity)
-      // The starter has the first row, so only the later rows are added.
+      // The starter has the first row, which is opened, and Add… adds the later rows.
       for (const [index, field] of list.fields.entries()) {
-        if (index > 0) {
-          await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
-        }
+        await (index === 0 ? openListItem(page, '/fields', 0) : addListItem(page, '/fields'))
         await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
         await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+        await doneListItem(page)
       }
       if (list.filter !== undefined) {
         const filter = page.getByTestId('studio-field-/filter')
@@ -541,15 +552,13 @@ test.describe('the author builds the service desk with Studio only', () => {
         }
         for (const [index, measure] of list.aggregate.measures.entries()) {
           const at = `studio-field-/aggregate/measures/${index}`
-          await page
-            .getByTestId('studio-field-/aggregate/measures')
-            .getByRole('button', { name: 'Add', exact: true })
-            .click()
+          await addListItem(page, '/aggregate/measures')
           await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
           await pick(page, `${at}/function`, measure.function)
           if (measure.field !== undefined) {
             await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
           }
+          await doneListItem(page)
         }
       }
       await save(page)
@@ -652,23 +661,15 @@ test.describe('the author builds the service desk with Studio only', () => {
       await openFormTab(page)
       await pick(page, 'studio-field-/entity', form.entity)
       for (const [sectionIndex, section] of form.sections.entries()) {
-        if (sectionIndex > 0) {
-          await page
-            .getByTestId('studio-field-/sections')
-            .getByRole('button', { name: 'Add', exact: true })
-            .last()
-            .click()
-        }
+        // The starter section is opened, and Add… adds the others.
+        await (sectionIndex === 0 ? openListItem(page, '/sections', 0) : addListItem(page, '/sections'))
         await page.getByTestId(`studio-field-/sections/${sectionIndex}/name`).getByRole('textbox').fill(section.name!)
         const titleKey = section.title.textKey
         await writeLabel(page, `studio-field-/sections/${sectionIndex}/title`, text(titleKey))
         for (const [fieldIndex, field] of section.fields.entries()) {
           // A new section starts with no fields. The starter section has its first field already.
           if (sectionIndex > 0 || fieldIndex > 0) {
-            await page
-              .getByTestId(`studio-field-/sections/${sectionIndex}/fields`)
-              .getByRole('button', { name: 'Add', exact: true })
-              .click()
+            await addListRow(page, `/sections/${sectionIndex}/fields`)
           }
           await pick(page, `studio-field-/sections/${sectionIndex}/fields/${fieldIndex}/field`, field.field)
           if (field.readOnly) {
@@ -678,6 +679,7 @@ test.describe('the author builds the service desk with Studio only', () => {
               .check()
           }
         }
+        await doneListItem(page)
       }
       await save(page)
       await expectForm(page)
@@ -1013,12 +1015,11 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['Dashboard', 'nav.dashboard', 'dashboard'],
     ]
     for (const [index, [target, key, icon]] of navigation.entries()) {
-      if (index > 0) {
-        await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
-      }
+      await (index === 0 ? openListItem(page, '/navigation', 0) : addListItem(page, '/navigation'))
       await pick(page, `studio-field-/navigation/${index}/page`, target)
       await writeLabel(page, `studio-field-/navigation/${index}/label`, text(key))
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
+      await doneListItem(page)
     }
     // The Service desk allows only accounts, so the site names that provider.
     await page.getByRole('button', { name: 'Add provider', exact: true }).click()

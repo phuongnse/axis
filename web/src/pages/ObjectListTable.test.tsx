@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
 import { Input } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
@@ -19,7 +20,7 @@ const columns: ObjectListColumn[] = [
   { key: 'connectors', title: 'Connectors', kind: 'freeText' },
 ]
 
-function renderList(onChange = vi.fn(), large = false) {
+function renderList(onChange = vi.fn(), large = false, extra: Partial<ComponentProps<typeof ObjectListTable>> = {}) {
   render(
     <ThemeModeProvider initialMode="light">
       <TextProvider catalogs={[{ texts: english, fallbackTexts: english }]} development={false}>
@@ -44,6 +45,7 @@ function renderList(onChange = vi.fn(), large = false) {
               ))}
             </>
           )}
+          {...extra}
         />
       </TextProvider>
     </ThemeModeProvider>,
@@ -135,5 +137,73 @@ describe('the list of objects', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Add module' })
 
     expect(dialog.closest('.ant-modal')).toHaveStyle({ width: `${designTokensFor('light').size.dialog.large}px` })
+  })
+
+  it('calls onDone right after Done writes the item, and onCancel on Cancel, not the other', async () => {
+    const calls: string[] = []
+    const onChange = vi.fn(() => calls.push('change'))
+    renderList(onChange, false, { onDone: () => calls.push('done'), onCancel: () => calls.push('cancel') })
+
+    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    expect(calls).toEqual(['cancel'])
+
+    await userEvent.click(screen.getByRole('button', { name: 'budget' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Done' }))
+    expect(calls).toEqual(['cancel', 'change', 'done'])
+  })
+
+  it('draws Add… into the element it is given and leaves the toolbar out', async () => {
+    const slot = document.createElement('div')
+    document.body.append(slot)
+    const onChange = renderList(vi.fn(), false, { addIn: slot })
+
+    const add = within(slot).getByRole('button', { name: 'Add module…' })
+    expect(screen.getAllByRole('button', { name: 'Add module…' })).toHaveLength(1)
+    await userEvent.click(add)
+    expect(await screen.findByRole('dialog', { name: 'Add module' })).toBeVisible()
+    expect(onChange).not.toHaveBeenCalled()
+    slot.remove()
+  })
+
+  it('shows no Add… until the element it is given exists', () => {
+    renderList(vi.fn(), false, { addIn: null })
+
+    expect(screen.queryByRole('button', { name: 'Add module…' })).toBeNull()
+  })
+
+  it('draws the mark of a row after the link in its first cell', () => {
+    renderList(vi.fn(), false, { firstCellMark: (index) => (index === 1 ? <span>Added</span> : null) })
+
+    expect(within(bodyRows()[0]).queryByText('Added')).toBeNull()
+    expect(within(bodyRows()[1]).getByText('Added')).toBeVisible()
+  })
+
+  it('gives the fields the index of the item to edit', async () => {
+    const indexes: number[] = []
+    renderList(vi.fn(), false, {
+      fields: (_copy, _change, index) => {
+        indexes.push(index)
+        return null
+      },
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'leave' }))
+    await screen.findByRole('dialog', { name: 'Edit module' })
+    expect(indexes.at(-1)).toBe(1)
+  })
+
+  it('gives the fields the length of the list as the index of an item to add', async () => {
+    const indexes: number[] = []
+    renderList(vi.fn(), false, {
+      fields: (_copy, _change, index) => {
+        indexes.push(index)
+        return null
+      },
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add module…' }))
+    await screen.findByRole('dialog', { name: 'Add module' })
+    expect(indexes.at(-1)).toBe(2)
   })
 })

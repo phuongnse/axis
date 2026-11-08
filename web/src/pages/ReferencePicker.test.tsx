@@ -182,10 +182,12 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     expect(screen.getByText('Order')).toBeInTheDocument()
   })
 
-  it('lists the fields of the entity that the grant names, from the draft', async () => {
+  it('lists the fields of the entity that the grant names, from the draft, in the grant dialog', async () => {
     const onChange = renderForm({ grants: [{ entity: 'Order', fields: ['Total'] }] })
 
-    const fields = screen.getByTestId('studio-field-/grants/0/fields/0')
+    await userEvent.click(screen.getByRole('button', { name: 'Order' }))
+    const dialog = await screen.findByRole('dialog')
+    const fields = within(dialog).getByTestId('studio-field-/grants/0/fields/0')
     await userEvent.click(within(fields).getByRole('combobox', { name: 'fields 1' }))
 
     expect(screen.getByRole('option', { name: 'Id' })).toBeInTheDocument()
@@ -193,7 +195,9 @@ describe.each(['light', 'dark'])('ReferencePicker in %s mode', (mode) => {
     expect(screen.queryByRole('option', { name: 'Email' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('option', { name: 'Id' }))
-    expect(onChange).toHaveBeenLastCalledWith('/grants/0/fields/0', 'Id')
+    expect(onChange).not.toHaveBeenCalled()
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(onChange).toHaveBeenLastCalledWith('/grants/0', { entity: 'Order', fields: ['Id'] })
   })
 
   it('shows a text box until the names load', () => {

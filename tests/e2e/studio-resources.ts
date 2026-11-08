@@ -143,7 +143,47 @@ export async function openFormTab(page: Page) {
  * line under its editor and moves what is below, so a click during it can miss.
  */
 export async function waitForExpressions(page: Page) {
-  await expect(page.getByTestId('studio-editor').locator('[aria-busy="true"]')).toHaveCount(0)
+  // An item's dialog is drawn outside the editor, so its expression editors are looked for in the dialog too.
+  await expect(
+    page.locator('[data-testid="studio-editor"] [aria-busy="true"], [role="dialog"] [aria-busy="true"]'),
+  ).toHaveCount(0)
+}
+
+/**
+ * Opens the dialog that adds an item to a list of objects, by the list's Add…, such as Add module…, and returns the
+ * dialog. `list` is the list's JSON Pointer. A list that is the only one in its section has its Add… in the section's
+ * heading, and any other list has it above its table. The fields of the new item sit at the pointer after the last row.
+ */
+export async function addListItem(page: Page, list: string): Promise<Locator> {
+  const field = page.getByTestId(`studio-field-${list}`)
+  const add = /^Add .+…$/
+  const inList = field.getByRole('button', { name: add })
+  const button =
+    (await inList.count()) > 0
+      ? inList
+      : field.locator('xpath=ancestor::section[1]').getByRole('button', { name: add })
+  await button.click()
+  return waitForDialog(page)
+}
+
+/**
+ * Opens the dialog of row `index` of a list of objects, which counts from 0, by the link in the row's first cell, and
+ * returns the dialog.
+ */
+export async function openListItem(page: Page, list: string, index: number): Promise<Locator> {
+  const row = page.getByTestId(`studio-field-${list}`).getByRole('row').nth(index + 1)
+  await row.getByRole('cell').first().getByRole('button').first().click()
+  return waitForDialog(page)
+}
+
+/** Clicks Done in the open item dialog, which writes the item and closes the dialog. */
+export async function doneListItem(page: Page) {
+  await confirmDialog(page, 'Done')
+}
+
+/** Clicks Add row in the open item dialog, for the nested list at `list`, a JSON Pointer. */
+export async function addListRow(page: Page, list: string) {
+  await page.getByTestId(`studio-field-${list}`).getByRole('button', { name: 'Add row', exact: true }).click()
 }
 
 /** Clicks Add mapping in `scope` once the expression editors are still. */
