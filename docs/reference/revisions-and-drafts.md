@@ -69,7 +69,8 @@ from every other draft.
 - **Writes.** Each tool write commits to the branch from memory, as a tree of the changed files, so
   writing a draft never touches the working folder or another draft. A write holds the full content of
   a resource. It replaces the file of the resource the draft has, and a new resource goes where a
-  create puts it. The manifest cannot be deleted.
+  create puts it. A write may not change the kind of a resource the draft has. The manifest cannot be
+  deleted.
 - **What it records.** For each resource it reads or changes, the version that resource had on `main`
   when the draft first used it. A resource `main` lacks is recorded as absent. Listing resources
   records nothing, so an unrelated change on `main` is not a conflict.

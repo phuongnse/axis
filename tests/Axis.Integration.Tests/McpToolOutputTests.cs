@@ -1,11 +1,16 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
 using Axis.Data.Naming;
 using Axis.Server.Mcp;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
+using Axis.Studio;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axis.Integration.Tests;
 
@@ -23,6 +28,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
 
     private Uri? _authority;
     private string? _applications;
+    private string? _revisions;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -44,6 +50,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             builder.UseSetting("Tenants:a:Bindings:GuardUrl:Value", url);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseSetting("Studio:ApplicationsPath", _applications);
+            builder.UseSetting("Studio:RevisionsPath", _revisions);
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
         });
@@ -65,6 +72,21 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
             return JsonNode.Parse(await response.Content.ReadAsStringAsync(CancellationToken))!;
         }
 
+        // A draft of the person who holds the token, which the tools that write and check a draft are given.
+        var subject = new JwtSecurityTokenHandler().ReadJwtToken(token).Subject;
+        var stepApp = Path.Combine(_applications!, "step-app");
+        var drafts = StudioDrafts.For(_revisions, stepApp, subject, subject, factory.Services.GetRequiredService<IStudioWriteLock>())!;
+        var draft = (await drafts.CreateAsync(
+            StudioRevisions.For(_revisions, stepApp, subject, subject, NullLogger<StudioRevisions>.Instance)!, CancellationToken)).Value!.Id;
+        var written = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString("D"),
+            ["kind"] = "role",
+            ["name"] = "guardwriter",
+            ["formatVersion"] = 1,
+            ["label"] = new JsonObject { ["textKey"] = "role.guardwriter" },
+        };
+
         var listed = await SendAsync("""{"jsonrpc":"2.0","id":2,"method":"tools/list"}""");
         var tools = listed["result"]!["tools"]!.AsArray().Select(tool => tool!["name"]!.GetValue<string>()).ToList();
         Assert.Equal(McpServer.Tools.Order(StringComparer.Ordinal), tools.Order(StringComparer.Ordinal));
@@ -79,6 +101,10 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ["read_resource"] = $$"""{"application":"StepApp","id":"{{StepAppManifestId()}}"}""",
                 ["read_module_resource"] = $$"""{"application":"PurchaseRequests","module":"department-budgets","id":"{{BudgetApprovalId}}"}""",
                 ["read_names"] = """{"application":"StepApp"}""",
+                ["create_draft"] = """{"application":"StepApp"}""",
+                ["write_resource"] = new JsonObject { ["application"] = "StepApp", ["draft"] = draft, ["content"] = written }.ToJsonString(),
+                ["delete_resource"] = $$"""{"application":"StepApp","draft":"{{draft}}","id":"{{FixtureId("roles", "auditor.json")}}"}""",
+                ["check_expression"] = $$"""{"application":"StepApp","draft":"{{draft}}","id":"{{FixtureId("rules", "needs-review.json")}}","path":"/expression","expression":"total >= 500"}""",
             },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),
             [TaskApiFixture.RequestTitle(record), secret, url, KeycloakFixture.ClientSecret],
@@ -100,16 +126,20 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
     }
 
     // The id of the StepApp manifest, which is a resource of the folder.
-    private static string StepAppManifestId()
+    private static string StepAppManifestId() => FixtureId("application.json");
+
+    // The id of a resource file of the StepApp fixture, such as roles/auditor.json.
+    private static string FixtureId(params string[] path)
     {
-        using var manifest = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp", "application.json")));
-        return manifest.RootElement.GetProperty("id").GetString()!;
+        using var resource = JsonDocument.Parse(File.ReadAllBytes(Path.Combine([AppContext.BaseDirectory, "Fixtures", "StepApp", .. path])));
+        return resource.RootElement.GetProperty("id").GetString()!;
     }
 
     public async ValueTask InitializeAsync()
     {
         _authority = await keycloak.StartAsync();
         _applications = Directory.CreateTempSubdirectory("axis-mcp-output-").FullName;
+        _revisions = Directory.CreateTempSubdirectory("axis-mcp-output-revisions-").FullName;
         StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Fixtures", "StepApp"), Path.Combine(_applications, "step-app"));
         StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), Path.Combine(_applications, "purchase-requests"));
     }
@@ -119,6 +149,11 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
         if (_applications is not null)
         {
             Directory.Delete(_applications, recursive: true);
+        }
+
+        if (_revisions is not null)
+        {
+            Directory.Delete(_revisions, recursive: true);
         }
 
         return ValueTask.CompletedTask;

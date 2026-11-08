@@ -142,7 +142,8 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
 
     /// <summary>
     /// Commits the full <paramref name="content"/> of a resource to the draft. It replaces the file when the draft has
-    /// the content's id, and otherwise puts it at the path a create would use.
+    /// the content's id, and otherwise puts it at the path a create would use. A write may not change the kind of a
+    /// resource the draft has, which is refused as <see cref="StudioWriteRefusal.ChangesIdOrKind"/>.
     /// </summary>
     public Task<StudioDraftOutcome<StudioFile>> WriteAsync(string id, JsonObject content, CancellationToken ct) =>
         InDraftAsync(id, (git, draft, tip) =>
@@ -158,6 +159,11 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
             string summary;
             if (existing is not null)
             {
+                if (!string.Equals(existing.Kind, (string?)content["kind"], StringComparison.Ordinal))
+                {
+                    return StudioDraftOutcome<StudioFile>.Refused(StudioWriteRefusal.ChangesIdOrKind);
+                }
+
                 path = existing.File;
                 summary = StudioWrites.ResourceSummary("Change", existing);
             }
