@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Axis.Agent;
 using Axis.Hosting;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -147,7 +148,7 @@ public sealed class AiSettingsTests : IDisposable
             .Select(line => line.Split('|')[1].Trim().Trim('`'))
             .ToList();
 
-        Assert.Equal(AiSettings.SettingNames.Order(StringComparer.Ordinal), documented.Order(StringComparer.Ordinal));
+        Assert.Equal(AiSettings.SettingNames.Append(TenantModelKeySettings.AllowSetting).Order(StringComparer.Ordinal), documented.Order(StringComparer.Ordinal));
     }
 
     private string KeyFile()

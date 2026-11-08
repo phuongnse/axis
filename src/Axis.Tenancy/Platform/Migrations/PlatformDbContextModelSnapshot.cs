@@ -656,6 +656,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("endpoint_audience");
 
+                    b.Property<byte[]>("ModelKey")
+                        .HasColumnType("bytea")
+                        .HasColumnName("model_key");
+
                     b.Property<string>("OidcAuthority")
                         .IsRequired()
                         .HasColumnType("text")
