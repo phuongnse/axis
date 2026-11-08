@@ -2,9 +2,11 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 
 namespace Axis.Integration.Tests;
 
@@ -27,6 +29,7 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
     private string? _applications;
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
+    private readonly LogCollector _logs = new();
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -89,13 +92,85 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
 
         using var notJson = await PostAsync(Host, token, "{");
         using var batch = await PostAsync(Host, token, "[]");
-        using var unknown = await PostAsync(Host, token, """{"jsonrpc":"2.0","id":3,"method":"tools/list"}""", session, Version);
+        using var unknown = await PostAsync(Host, token, """{"jsonrpc":"2.0","id":3,"method":"resources/list"}""", session, Version);
 
         Assert.Equal(HttpStatusCode.BadRequest, notJson.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, batch.StatusCode);
         Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
         using var body = JsonDocument.Parse(await unknown.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal(-32601, body.RootElement.GetProperty("error").GetProperty("code").GetInt32());
+    }
+
+    [Fact]
+    public async Task An_author_lists_the_tool_and_list_applications_answers_the_applications_of_the_studio_folders()
+    {
+        var (token, session) = await OpenSessionAsync();
+
+        using var tools = await PostAsync(Host, token, """{"jsonrpc":"2.0","id":3,"method":"tools/list"}""", session, Version);
+        using var call = await PostAsync(Host, token, ToolCall("list_applications"), session, Version);
+
+        Assert.Equal(HttpStatusCode.OK, tools.StatusCode);
+        using var listed = JsonDocument.Parse(await tools.Content.ReadAsStringAsync(CancellationToken));
+        var tool = Assert.Single(listed.RootElement.GetProperty("result").GetProperty("tools").EnumerateArray());
+        Assert.Equal("list_applications", tool.GetProperty("name").GetString());
+        Assert.Equal("object", tool.GetProperty("inputSchema").GetProperty("type").GetString());
+
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        using var called = JsonDocument.Parse(await call.Content.ReadAsStringAsync(CancellationToken));
+        var result = called.RootElement.GetProperty("result");
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        var names = result.GetProperty("structuredContent").GetProperty("items").EnumerateArray()
+            .Select(item => item.GetProperty("name").GetString()).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(["LeaveRequests", "PurchaseRequests"], names);
+    }
+
+    [Fact]
+    public async Task An_unknown_tool_and_input_for_list_applications_answer_a_tool_error_with_a_problem_title_only()
+    {
+        var (token, session) = await OpenSessionAsync();
+
+        using var unknown = await PostAsync(Host, token, ToolCall("delete_everything"), session, Version);
+        using var input = await PostAsync(Host, token, ToolCall("list_applications", """{"x":1}"""), session, Version);
+
+        foreach (var response in new[] { unknown, input })
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var text = await response.Content.ReadAsStringAsync(CancellationToken);
+            using var body = JsonDocument.Parse(text);
+            var result = body.RootElement.GetProperty("result");
+            Assert.True(result.GetProperty("isError").GetBoolean());
+            Assert.False(string.IsNullOrWhiteSpace(result.GetProperty("content")[0].GetProperty("text").GetString()));
+            Assert.DoesNotContain("   at ", text, StringComparison.Ordinal);
+            Assert.DoesNotContain(_applications!, text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task A_body_over_1_MiB_is_a_413()
+    {
+        var token = await RequestTokenAsync("author", KeycloakFixture.McpClientId, KeycloakFixture.McpClientSecret);
+        var body = "\"" + new string(' ', 1024 * 1024 - 1) + "\"";
+        Assert.Equal(1024 * 1024 + 1, Encoding.UTF8.GetByteCount(body));
+
+        using var response = await PostAsync(Host, token, body);
+
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_tool_call_writes_one_log_entry_with_the_tool_the_client_and_the_outcome_and_no_content()
+    {
+        var (token, session) = await OpenSessionAsync();
+
+        using var call = await PostAsync(Host, token, ToolCall("list_applications"), session, Version);
+
+        Assert.Equal(HttpStatusCode.OK, call.StatusCode);
+        var entry = Assert.Single(_logs.Records, record => record.Message.StartsWith("MCP tool", StringComparison.Ordinal));
+        Assert.Equal(LogLevel.Information, entry.Level);
+        Assert.Contains("list_applications", entry.Message, StringComparison.Ordinal);
+        Assert.Contains(KeycloakFixture.McpClientId, entry.Message, StringComparison.Ordinal);
+        Assert.Contains("succeeded", entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("LeaveRequests", entry.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -166,9 +241,15 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
     {
         _authority = await keycloak.StartAsync();
         _applications = Directory.CreateTempSubdirectory("axis-mcp-").FullName;
+        foreach (var sample in new[] { "leave-requests", "purchase-requests" })
+        {
+            StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", sample), Path.Combine(_applications, sample));
+        }
+
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
+            builder.ConfigureLogging(logging => logging.AddProvider(_logs));
             builder.UseTestPlatform(UnreachableDatabase);
             builder.WithoutPlatformMigration();
             foreach (var (tenant, host) in new[] { ("a", Host), ("b", OtherHost) })
@@ -218,6 +299,24 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
             method = "initialize",
             @params = new { protocolVersion = version, capabilities = new { }, clientInfo = new { name = "test", version = "1" } },
         });
+
+    private static string ToolCall(string tool, string? arguments = null)
+    {
+        var parameters = new JsonObject { ["name"] = tool };
+        if (arguments is not null)
+        {
+            parameters["arguments"] = JsonNode.Parse(arguments);
+        }
+
+        return new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 3, ["method"] = "tools/call", ["params"] = parameters }.ToJsonString();
+    }
+
+    private async Task<(string Token, string Session)> OpenSessionAsync()
+    {
+        var token = await RequestTokenAsync("author", KeycloakFixture.McpClientId, KeycloakFixture.McpClientSecret);
+        using var initialized = await PostAsync(Host, token, Initialize(Version));
+        return (token, Assert.Single(initialized.Headers.GetValues("Mcp-Session-Id")));
+    }
 
     private static string Ping() => """{"jsonrpc":"2.0","id":2,"method":"ping"}""";
 

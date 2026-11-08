@@ -135,13 +135,17 @@ internal static class StudioEndpoints
             return refusal;
         }
 
-        return Results.Ok(new StudioApplicationListResponse([.. StudioFolder.ApplicationFolders(ForRequest(httpContext, options))
+        return Results.Ok(ListApplications(ForRequest(httpContext, options)));
+    }
+
+    /// <summary>The applications in the Studio folders of <paramref name="options"/>, which <c>GET /api/studio/apps</c> and the MCP tool <c>list_applications</c> both answer.</summary>
+    internal static StudioApplicationListResponse ListApplications(StudioOptions options) =>
+        new([.. StudioFolder.ApplicationFolders(options)
             .Select(application =>
             {
                 var (titles, descriptions) = StudioApplicationTexts.Read(application.Folder);
                 return new StudioApplicationItem(application.Name, titles, descriptions);
-            })]));
-    }
+            })]);
 
     private static async Task<IResult> ListAsync(
         string application,

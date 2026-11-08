@@ -6,19 +6,20 @@ using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Tenancy;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Axis.Server.Mcp;
 
 /// <summary>
 /// The MCP server of a tenant host, at <c>/mcp</c>. It speaks the Streamable HTTP transport as a server that offers no
-/// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c> and
-/// <c>ping</c>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
+/// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
-/// author role (403), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
+/// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
 /// when it is not this person's session on this tenant) and the same <c>MCP-Protocol-Version</c> (400).
 /// </summary>
-internal static class McpServer
+internal static partial class McpServer
 {
     /// <summary>The one protocol version the server speaks.</summary>
     public const string ProtocolVersion = "2025-11-25";
@@ -32,12 +33,17 @@ internal static class McpServer
 
     private const string SessionHeader = "Mcp-Session-Id";
     private const string VersionHeader = "MCP-Protocol-Version";
-    private const int MaxBodyBytes = 64 * 1024;
+    private const int MaxBodyBytes = 1024 * 1024;
+    private const string ListApplicationsTool = "list_applications";
+    private const string UnknownTool = "unknown";
 
     private const int ParseError = -32700;
     private const int InvalidRequest = -32600;
     private const int MethodNotFound = -32601;
     private const int InvalidParams = -32602;
+
+    /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
+    internal static readonly IReadOnlyList<string> Tools = [ListApplicationsTool];
 
     private static readonly string _serverVersion =
         typeof(McpServer).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "0";
@@ -49,7 +55,7 @@ internal static class McpServer
             context.Response.Headers.Allow = "POST";
             return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
         });
-        endpoints.MapPost(Path, PostAsync);
+        endpoints.MapPost(Path, PostAsync).WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes));
     }
 
     /// <summary>
@@ -105,7 +111,7 @@ internal static class McpServer
                 });
         }).WithMetadata(McpMetadataRoute.Instance);
 
-    private static async Task<IResult> PostAsync(HttpContext context, ITenantContextAccessor tenants, StudioOptions studio, McpSession sessions)
+    private static async Task<IResult> PostAsync(HttpContext context, ITenantContextAccessor tenants, StudioOptions studio, McpSession sessions, ILoggerFactory loggers)
     {
         var tenantId = tenants.Current?.TenantId ?? throw new InvalidOperationException("No tenant context is set.");
         if (EndpointCaller.Read(context.User) is not { } caller || !studio.ForTenant(tenantId).Allows(caller.Roles))
@@ -113,7 +119,12 @@ internal static class McpServer
             return Grants.Forbidden();
         }
 
-        var body = await ReadBodyAsync(context.Request);
+        var (body, tooLarge) = await ReadBodyAsync(context.Request);
+        if (tooLarge)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status413PayloadTooLarge, title: "The request body is larger than 1 MiB.");
+        }
+
         if (body is null)
         {
             return Error(StatusCodes.Status400BadRequest, null, ParseError, "The body is not JSON.");
@@ -144,7 +155,7 @@ internal static class McpServer
             return Result(id, new JsonObject
             {
                 ["protocolVersion"] = ProtocolVersion,
-                ["capabilities"] = new JsonObject(),
+                ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
                 ["serverInfo"] = new JsonObject { ["name"] = "Axis", ["version"] = _serverVersion },
             });
         }
@@ -172,34 +183,106 @@ internal static class McpServer
             return Results.StatusCode(StatusCodes.Status202Accepted);
         }
 
-        return name == "ping"
-            ? Result(id, new JsonObject())
-            : Error(StatusCodes.Status200OK, id, MethodNotFound, "The method is not supported.");
+        return name switch
+        {
+            "ping" => Result(id, new JsonObject()),
+            "tools/list" => Result(id, ListTools()),
+            "tools/call" => CallTool(message["params"], id, tenantId, caller.ClientId, studio, loggers.CreateLogger(typeof(McpServer).FullName!)),
+            _ => Error(StatusCodes.Status200OK, id, MethodNotFound, "The method is not supported."),
+        };
     }
 
-    /// <summary>The body as JSON, or null when it is empty, too large or not JSON.</summary>
-    private static async Task<JsonNode?> ReadBodyAsync(HttpRequest request)
+    private static JsonObject ListTools() =>
+        new()
+        {
+            ["tools"] = new JsonArray(new JsonObject
+            {
+                ["name"] = ListApplicationsTool,
+                ["description"] = "Lists the applications you may author.",
+                ["inputSchema"] = new JsonObject
+                {
+                    ["type"] = "object",
+                    ["properties"] = new JsonObject(),
+                    ["additionalProperties"] = false,
+                },
+            }),
+        };
+
+    /// <summary>
+    /// Runs one tool. A call that names no tool is the JSON-RPC error <c>-32602</c>. An unknown tool and bad input are a tool
+    /// error, a result marked <c>isError</c> whose text is a fixed problem title. Each call writes one log entry, which
+    /// names the tool only when it is known, never the input or the output.
+    /// </summary>
+    private static IResult CallTool(JsonNode? parameters, JsonNode? id, string tenantId, string? clientId, StudioOptions studio, ILogger logger)
+    {
+        if (parameters is not JsonObject call || call["name"] is not JsonValue nameValue || !nameValue.TryGetValue<string>(out var tool))
+        {
+            LogToolCall(logger, UnknownTool, clientId, "invalid params");
+            return Error(StatusCodes.Status200OK, id, InvalidParams, "The call names no tool.");
+        }
+
+        if (!Tools.Contains(tool, StringComparer.Ordinal))
+        {
+            LogToolCall(logger, UnknownTool, clientId, "tool error");
+            return ToolError(id, "The tool does not exist.");
+        }
+
+        if (call["arguments"] is { } arguments && arguments is not JsonObject { Count: 0 })
+        {
+            LogToolCall(logger, tool, clientId, "tool error");
+            return ToolError(id, "The tool takes no input.");
+        }
+
+        var output = JsonSerializer.SerializeToNode(StudioEndpoints.ListApplications(studio.ForTenant(tenantId)), JsonSerializerOptions.Web);
+        LogToolCall(logger, tool, clientId, "succeeded");
+        return Result(id, new JsonObject
+        {
+            ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = output!.ToJsonString() }),
+            ["structuredContent"] = output,
+            ["isError"] = false,
+        });
+    }
+
+    private static IResult ToolError(JsonNode? id, string title) =>
+        Result(id, new JsonObject
+        {
+            ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = title }),
+            ["isError"] = true,
+        });
+
+    [LoggerMessage(LogLevel.Information, "MCP tool {Tool} was called by client {ClientId}: {Outcome}.")]
+    private static partial void LogToolCall(ILogger logger, string tool, string? clientId, string outcome);
+
+    /// <summary>The body as JSON, which is null when it is empty or not JSON, and whether it is larger than the limit.</summary>
+    private static async Task<(JsonNode? Body, bool TooLarge)> ReadBodyAsync(HttpRequest request)
     {
         using var buffer = new MemoryStream();
         var chunk = new byte[4096];
-        int read;
-        while ((read = await request.Body.ReadAsync(chunk, request.HttpContext.RequestAborted)) > 0)
+        try
         {
-            if (buffer.Length + read > MaxBodyBytes)
+            int read;
+            while ((read = await request.Body.ReadAsync(chunk, request.HttpContext.RequestAborted)) > 0)
             {
-                return null;
-            }
+                if (buffer.Length + read > MaxBodyBytes)
+                {
+                    return (null, true);
+                }
 
-            buffer.Write(chunk, 0, read);
+                buffer.Write(chunk, 0, read);
+            }
+        }
+        catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return (null, true);
         }
 
         try
         {
-            return JsonNode.Parse(buffer.ToArray());
+            return (JsonNode.Parse(buffer.ToArray()), false);
         }
         catch (JsonException)
         {
-            return null;
+            return (null, false);
         }
     }
 
