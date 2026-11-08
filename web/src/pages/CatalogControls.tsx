@@ -1,4 +1,5 @@
 import { Flex, Select } from 'antd'
+import type { ReactNode } from 'react'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import type { StudioCatalogSlot } from '../platform/studio'
 import { slotTitle, timeZoneText, type RangeOperator } from '../platform/studioCatalog'
@@ -59,6 +60,16 @@ export function CatalogChoice({
   )
 }
 
+/** A line in `warningText` under a control, for a value that the control keeps shown but that will not pass. */
+export function WarningLine({ testId, children }: { testId: string; children: ReactNode }) {
+  const { colour } = useDesignTokens()
+  return (
+    <div data-testid={testId} style={{ color: colour.warningText }}>
+      {children}
+    </div>
+  )
+}
+
 /**
  * A version range as two selects, because a range has three forms. Version lists the installed versions, newest first, and
  * Updates says which later versions the range takes. A version that is no longer installed stays selected, with a line in
@@ -74,7 +85,7 @@ export function VersionRangeInput({
   onChange: (next: string) => void
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const installed = versions.includes(range.version)
   const [major, minor] = range.version.split('.')
   const choices = [
@@ -110,9 +121,7 @@ export function VersionRangeInput({
         />
       </Flex>
       {!installed && (
-        <div data-testid="studio-version-not-installed" style={{ color: colour.warningText }}>
-          {t('shell.studio.versionRange.notInstalled')}
-        </div>
+        <WarningLine testId="studio-version-not-installed">{t('shell.studio.versionRange.notInstalled')}</WarningLine>
       )}
     </Flex>
   )
@@ -201,5 +210,55 @@ export function TimeZoneSelect({
       options={options}
       onChange={(next: string | undefined) => onChange(next)}
     />
+  )
+}
+
+/**
+ * A choice of the tenant's binding names of one kind, see
+ * docs/reference/studio-resource-form.md#controls-that-know-what-they-hold. A name that the tenant lacks, or has only as
+ * another kind, stays selected, with a line that says activation will refuse it. With `noBinding`, the first option is
+ * "The tenant's database, with no binding", which is selected while `value` is `undefined` and calls `onChange` with
+ * `undefined`.
+ */
+export function BindingSelect({
+  name,
+  names,
+  value,
+  noBinding = false,
+  onChange,
+}: {
+  name: string
+  names: string[]
+  /** The saved name, `''` for an entry without a name, and `undefined` when the entry is absent. */
+  value: string | undefined
+  noBinding?: boolean
+  onChange: (next: string | undefined) => void
+}) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const current = value === undefined || value === '' ? undefined : value
+  const missing = current !== undefined && !names.includes(current)
+  const options = [
+    ...(noBinding ? [{ value: '', label: t('shell.studio.binding.noBinding') }] : []),
+    ...(missing ? [{ value: current, label: current }] : []),
+    ...names.map((entry) => ({ value: entry, label: entry })),
+  ]
+  const selected = current ?? (noBinding && value === undefined ? '' : undefined)
+  return (
+    <Flex vertical gap={spacing.xs}>
+      <Select
+        aria-label={name}
+        showSearch
+        optionFilterProp="label"
+        virtual={false}
+        style={{ minWidth: 240 }}
+        value={selected}
+        options={options}
+        onChange={(next: string) => onChange(next === '' ? undefined : next)}
+      />
+      {missing && (
+        <WarningLine testId="studio-tenant-binding-missing">{t('shell.studio.binding.notInTenant')}</WarningLine>
+      )}
+    </Flex>
   )
 }

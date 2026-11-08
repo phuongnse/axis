@@ -1,5 +1,8 @@
 import { Button, Card, Checkbox, Flex, Input, Select, Typography } from 'antd'
+import { useContext } from 'react'
+import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
+import { BindingSelect } from './CatalogControls'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 
@@ -43,12 +46,14 @@ function bindingName(value: unknown): string {
 
 /**
  * The editor of a connector. It shows the base URL binding, the auth type and its bindings, the timeout, the
- * idempotency header and the operations. A binding is only a name: the box neither shows nor writes a value, because
- * values live in tenant settings. The editor edits the draft through `onChange`, so a key it does not show, in the
+ * idempotency header and the operations. A binding is only a name: the field neither shows nor writes a value, because
+ * values live in tenant settings. A binding is chosen from the tenant's names of its kind once they load, and is a name box
+ * until then. The editor edits the draft through `onChange`, so a key it does not show, in the
  * file, in an operation or in `auth`, stays as it is.
  */
 export function ConnectorEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const bindings = useContext(StudioBindingsContext)
   const auth = isContent(value.auth) ? value.auth : undefined
   const authType = typeof auth?.type === 'string' ? auth.type : undefined
   const operations = Array.isArray(value.operations) ? value.operations : []
@@ -97,15 +102,24 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
     )
   }
 
-  function bindingField(pointer: string, label: string, current: unknown) {
+  function bindingField(pointer: string, label: string, current: unknown, kind: 'url' | 'secret') {
     return (
       <div data-testid={`studio-field-${pointer}`}>
         <div>{label}</div>
-        <Input
-          aria-label={label}
-          value={bindingName(current)}
-          onChange={(event) => onChange(pointer, event.target.value)}
-        />
+        {bindings === undefined ? (
+          <Input
+            aria-label={label}
+            value={bindingName(current)}
+            onChange={(event) => onChange(pointer, event.target.value)}
+          />
+        ) : (
+          <BindingSelect
+            name={label}
+            names={bindings[kind]}
+            value={bindingName(current)}
+            onChange={(next) => onChange(pointer, next)}
+          />
+        )}
         <Typography.Text type="secondary">{t('shell.studio.connector.bindingHint')}</Typography.Text>
       </div>
     )
@@ -114,7 +128,7 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
   return (
     <Flex vertical gap="small" data-testid="studio-connector-editor">
       {textField('/name', t('shell.studio.connector.name'), value.name, true)}
-      {bindingField('/baseUrl/binding', t('shell.studio.connector.urlBinding'), value.baseUrl)}
+      {bindingField('/baseUrl/binding', t('shell.studio.connector.urlBinding'), value.baseUrl, 'url')}
       <div data-testid="studio-field-/auth">
         <div data-testid="studio-field-/auth/type">
           <div>{t('shell.studio.connector.authType')}</div>
@@ -129,11 +143,11 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
           />
         </div>
         {authType === 'bearer' &&
-          bindingField('/auth/token/binding', t('shell.studio.connector.secretBinding'), auth?.token)}
+          bindingField('/auth/token/binding', t('shell.studio.connector.secretBinding'), auth?.token, 'secret')}
         {authType === 'header' && (
           <>
             {textField('/auth/name', t('shell.studio.connector.headerName'), auth?.name, true)}
-            {bindingField('/auth/value/binding', t('shell.studio.connector.secretBinding'), auth?.value)}
+            {bindingField('/auth/value/binding', t('shell.studio.connector.secretBinding'), auth?.value, 'secret')}
           </>
         )}
         {authType === 'oauth2' && (
@@ -142,16 +156,19 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
               '/auth/tokenUrl/binding',
               `${t('shell.studio.connector.tokenUrl')} (${t('shell.studio.connector.urlBinding')})`,
               auth?.tokenUrl,
+              'url',
             )}
             {bindingField(
               '/auth/clientId/binding',
               `${t('shell.studio.connector.clientId')} (${t('shell.studio.connector.secretBinding')})`,
               auth?.clientId,
+              'secret',
             )}
             {bindingField(
               '/auth/clientSecret/binding',
               `${t('shell.studio.connector.clientSecret')} (${t('shell.studio.connector.secretBinding')})`,
               auth?.clientSecret,
+              'secret',
             )}
             {textField('/auth/scope', t('shell.studio.connector.scope'), auth?.scope, false)}
             {textField('/auth/audience', t('shell.studio.connector.audience'), auth?.audience, false)}

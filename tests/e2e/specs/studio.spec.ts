@@ -501,7 +501,7 @@ test.describe('Studio on a copy of its own', () => {
 
     try {
       await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${connector.id}`)
-      await expect(page.getByRole('textbox', { name: 'URL binding', exact: true })).toHaveValue('PurchasingSystemUrl')
+      await expect(page.getByTestId('studio-field-/baseUrl/binding')).toContainText('PurchasingSystemUrl')
       await page.getByRole('button', { name: 'Add operation', exact: true }).click()
       const added = before.operations.length
       await page.getByTestId(`studio-field-/operations/${added}/name`).getByRole('textbox').fill(name)

@@ -348,11 +348,11 @@ test.describe('Studio creates a resource from a starter', () => {
     await openFormTab(page)
     await expect(page.getByTestId('studio-resource-details')).toContainText('connectors/warehouse-shipping.json')
 
-    await textbox('URL binding').fill('ShippingUrl')
+    await pick(page, 'studio-field-/baseUrl/binding', 'PurchasingSystemUrl')
     await pick(page, 'studio-field-/auth/type', 'oauth2')
-    await textbox('Token URL (URL binding)').fill('ShippingTokenUrl')
-    await textbox('Client id (Secret binding)').fill('ShippingClientId')
-    await textbox('Client secret (Secret binding)').fill('ShippingClientSecret')
+    await pick(page, 'studio-field-/auth/tokenUrl/binding', 'PurchasingSystemTokenUrl')
+    await pick(page, 'studio-field-/auth/clientId/binding', 'PurchasingSystemClientId')
+    await pick(page, 'studio-field-/auth/clientSecret/binding', 'PurchasingSystemClientSecret')
     await textbox('Scope').fill('shipments.write')
     await expect(textbox('Audience')).toHaveValue('')
 

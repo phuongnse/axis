@@ -1091,6 +1091,8 @@
   "shell.studio.versionRange.fixes": "Fixes only ({major}.{minor}.x)",
   "shell.studio.versionRange.exact": "This version only",
   "shell.studio.versionRange.notInstalled": "This version is no longer installed. Choose an installed one.",
+  "shell.studio.binding.noBinding": "The tenant's database, with no binding",
+  "shell.studio.binding.notInTenant": "The tenant has no binding of this kind with this name. Activation will refuse it.",
   "shell.studio.versionRange.words.compatible": "{version} and later {major}.x",
   "shell.studio.versionRange.words.fixes": "{version} and later {major}.{minor}.x",
   "shell.studio.versionRange.words.exact": "{version} only",

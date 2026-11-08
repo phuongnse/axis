@@ -33,19 +33,21 @@ import { seedColumns, seedFieldsOf, seedProblems, type SeedField } from '../plat
 import {
   deleteStudioResource,
   fetchResourceReferences,
+  fetchStudioBindings,
   fetchStudioCatalog,
   fetchStudioResource,
   patchStudioResource,
   putStudioTexts,
   saveStudioChanges,
   ServerUnreachableError,
+  type StudioBindings,
   type StudioCatalog,
   type StudioDiagnostic,
   type StudioResourceItem,
   writeStudioText,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
-import { StudioCatalogContext } from '../platform/studioCatalog'
+import { StudioBindingsContext, StudioCatalogContext } from '../platform/studioCatalog'
 import { StudioNamesContext, textsOf } from '../platform/studioNames'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
@@ -380,6 +382,22 @@ export function StudioEditor({
     })
     return () => controller.abort()
   }, [choosesFromCatalog, generation])
+
+  // The settings, a webhook and a connector choose their bindings from the tenant's names, with the same fallback.
+  const [bindings, setBindings] = useState<StudioBindings>()
+  const choosesBindings = item.kind === 'application' || item.kind === 'webhook' || item.kind === 'connector'
+  useEffect(() => {
+    if (!choosesBindings) {
+      return
+    }
+    const controller = new AbortController()
+    fetchStudioBindings(controller.signal).then(setBindings, (error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the Studio bindings failed', error)
+      }
+    })
+    return () => controller.abort()
+  }, [choosesBindings, generation])
 
   // Studio takes the undo keys before the browser's own undo and CodeMirror's. They work inside the editor and when
   // nothing has focus, which is where a mouse drop leaves it.
@@ -966,70 +984,49 @@ export function StudioEditor({
 
   return (
     <StudioCatalogContext.Provider value={catalog}>
-      <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef} onBlur={() => setHistory(endStep)}>
-        {messageHolder}
-        <ExpressionCheckContext.Provider value={checkContext}>
-          <LabelTextsContext.Provider value={labelContext}>
-            <Tabs
-              activeKey={tab}
-              onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'usedBy')}
-              tabBarExtraContent={
-                tab === 'json' ? (
-                  <AxisActionRow align="center">
-                    {jsonProblems > 0 && (
+      <StudioBindingsContext.Provider value={bindings}>
+        <Flex vertical gap="small" data-testid="studio-editor" ref={rootRef} onBlur={() => setHistory(endStep)}>
+          {messageHolder}
+          <ExpressionCheckContext.Provider value={checkContext}>
+            <LabelTextsContext.Provider value={labelContext}>
+              <Tabs
+                activeKey={tab}
+                onChange={(key) => setTab(key as 'design' | 'form' | 'json' | 'usedBy')}
+                tabBarExtraContent={
+                  tab === 'json' ? (
+                    <AxisActionRow align="center">
+                      {jsonProblems > 0 && (
+                        <AxisButton
+                          role="plain"
+                          style={{ color: colour.dangerText }}
+                          onClick={() => jsonViewRef.current?.nextProblem()}
+                        >
+                          {jsonProblems === 1
+                            ? t('shell.studio.jsonView.problem')
+                            : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
+                        </AxisButton>
+                      )}
                       <AxisButton
-                        role="plain"
-                        style={{ color: colour.dangerText }}
-                        onClick={() => jsonViewRef.current?.nextProblem()}
-                      >
-                        {jsonProblems === 1
-                          ? t('shell.studio.jsonView.problem')
-                          : t('shell.studio.jsonView.problems').replace('{count}', String(jsonProblems))}
-                      </AxisButton>
-                    )}
-                    <AxisButton
-                      role="icon"
-                      nameKey="shell.studio.json.find"
-                      icon={<SearchOutlined />}
-                      onClick={() => jsonViewRef.current?.openFind()}
-                    />
-                    <AxisButton
-                      role="icon"
-                      nameKey="shell.studio.json.format"
-                      icon={<AlignLeftOutlined />}
-                      disabled={jsonInvalid}
-                      onClick={format}
-                    />
-                    <AxisButton role="icon" nameKey="shell.studio.json.copy" icon={<CopyOutlined />} onClick={copy} />
-                  </AxisActionRow>
-                ) : undefined
-              }
-              items={[
-                // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
-                // guard on return, and clears the guard when the author leaves. Its code loads on first use.
-                ...(item.kind === 'page' && schema
-                  ? [
-                      {
-                        key: 'design',
-                        label: t('shell.studio.design'),
-                        children:
-                          tab === 'design'
-                            ? editable(
-                                <Suspense fallback={null}>
-                                  <LazyStudioPageDesign
-                                    application={application}
-                                    resourceId={item.id}
-                                    draft={draft}
-                                    selected={widgetPath}
-                                    onSelect={setWidgetPath}
-                                    onChange={change}
-                                  />
-                                </Suspense>,
-                              )
-                            : null,
-                      },
-                    ]
-                  : item.kind === 'form' && schema
+                        role="icon"
+                        nameKey="shell.studio.json.find"
+                        icon={<SearchOutlined />}
+                        onClick={() => jsonViewRef.current?.openFind()}
+                      />
+                      <AxisButton
+                        role="icon"
+                        nameKey="shell.studio.json.format"
+                        icon={<AlignLeftOutlined />}
+                        disabled={jsonInvalid}
+                        onClick={format}
+                      />
+                      <AxisButton role="icon" nameKey="shell.studio.json.copy" icon={<CopyOutlined />} onClick={copy} />
+                    </AxisActionRow>
+                  ) : undefined
+                }
+                items={[
+                  // The canvas is mounted only while its tab is active, so it posts again and sets the placeholder
+                  // guard on return, and clears the guard when the author leaves. Its code loads on first use.
+                  ...(item.kind === 'page' && schema
                     ? [
                         {
                           key: 'design',
@@ -1038,22 +1035,20 @@ export function StudioEditor({
                             tab === 'design'
                               ? editable(
                                   <Suspense fallback={null}>
-                                    <LazyStudioFormDesign
+                                    <LazyStudioPageDesign
                                       application={application}
                                       resourceId={item.id}
                                       draft={draft}
-                                      selected={formPath}
-                                      onSelect={setFormPath}
+                                      selected={widgetPath}
+                                      onSelect={setWidgetPath}
                                       onChange={change}
-                                      usedOn={usedOn}
-                                      onOpen={onOpen}
                                     />
                                   </Suspense>,
                                 )
                               : null,
                         },
                       ]
-                    : item.kind === 'process' && schema
+                    : item.kind === 'form' && schema
                       ? [
                           {
                             key: 'design',
@@ -1062,230 +1057,260 @@ export function StudioEditor({
                               tab === 'design'
                                 ? editable(
                                     <Suspense fallback={null}>
-                                      <LazyStudioProcessDesign
-                                        schema={schema}
+                                      <LazyStudioFormDesign
+                                        application={application}
+                                        resourceId={item.id}
                                         draft={draft}
-                                        diagnosticPaths={diagnosticPaths}
-                                        selected={processStep}
-                                        onSelect={setProcessStep}
+                                        selected={formPath}
+                                        onSelect={setFormPath}
                                         onChange={change}
+                                        usedOn={usedOn}
+                                        onOpen={onOpen}
                                       />
                                     </Suspense>,
                                   )
                                 : null,
                           },
                         ]
-                      : []),
-                {
-                  key: 'form',
-                  label: t('shell.studio.form'),
-                  children: (
-                    <Drawn onDrawn={setFormDrawn}>
-                      {editable(
-                        seedSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={seedSchema} value={draft} onChange={change} />
-                            <SeedGrid
-                              fields={seedFields!}
-                              records={draft.records}
-                              problems={problems}
+                      : item.kind === 'process' && schema
+                        ? [
+                            {
+                              key: 'design',
+                              label: t('shell.studio.design'),
+                              children:
+                                tab === 'design'
+                                  ? editable(
+                                      <Suspense fallback={null}>
+                                        <LazyStudioProcessDesign
+                                          schema={schema}
+                                          draft={draft}
+                                          diagnosticPaths={diagnosticPaths}
+                                          selected={processStep}
+                                          onSelect={setProcessStep}
+                                          onChange={change}
+                                        />
+                                      </Suspense>,
+                                    )
+                                  : null,
+                            },
+                          ]
+                        : []),
+                  {
+                    key: 'form',
+                    label: t('shell.studio.form'),
+                    children: (
+                      <Drawn onDrawn={setFormDrawn}>
+                        {editable(
+                          seedSchema ? (
+                            <Flex vertical gap="middle">
+                              <SchemaForm schema={seedSchema} value={draft} onChange={change} />
+                              <SeedGrid
+                                fields={seedFields!}
+                                records={draft.records}
+                                problems={problems}
+                                onChange={update}
+                              />
+                            </Flex>
+                          ) : item.kind === 'scenario' ? (
+                            <ScenarioEditor value={draft} onChange={update} />
+                          ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
+                            <TextTable
+                              columns={resources
+                                .filter((resource) => resource.kind === 'text')
+                                .map((resource) =>
+                                  resource.id === item.id
+                                    ? {
+                                        id: item.id,
+                                        locale: String(loaded.content.locale),
+                                        texts: draft.texts as Record<string, unknown>,
+                                        editable: true,
+                                      }
+                                    : otherTexts.find((column) => column.id === resource.id),
+                                )
+                                .filter((column): column is TextColumn => column !== undefined)}
                               onChange={update}
+                              onAdd={addTextKey}
                             />
-                          </Flex>
-                        ) : item.kind === 'scenario' ? (
-                          <ScenarioEditor value={draft} onChange={update} />
-                        ) : item.kind === 'text' && schema && isContent(draft.texts) && otherTexts ? (
-                          <TextTable
-                            columns={resources
-                              .filter((resource) => resource.kind === 'text')
-                              .map((resource) =>
-                                resource.id === item.id
-                                  ? {
-                                      id: item.id,
-                                      locale: String(loaded.content.locale),
-                                      texts: draft.texts as Record<string, unknown>,
-                                      editable: true,
-                                    }
-                                  : otherTexts.find((column) => column.id === resource.id),
-                              )
-                              .filter((column): column is TextColumn => column !== undefined)}
-                            onChange={update}
-                            onAdd={addTextKey}
-                          />
-                        ) : item.kind === 'entity' && schema ? (
-                          <EntityDesigner
-                            value={draft}
-                            onChange={change}
-                            origins={origins}
-                            warnings={fieldWarnings(loaded.content, draft, origins)}
-                            onOriginsChange={(next, removed) => {
-                              setOrigins(next)
-                              if (removed) {
-                                touch(removed)
-                              }
-                            }}
-                          />
-                        ) : item.kind === 'connector' && schema ? (
-                          <ConnectorEditor value={draft} onChange={change} />
-                        ) : item.kind === 'identityProvider' && schema ? (
-                          <IdentityProviderEditor value={draft} onChange={change} />
-                        ) : processSchema ? (
-                          <ProcessEditor schema={processSchema} value={draft} onChange={change} />
-                        ) : item.kind === 'page' && schema ? (
-                          <PageEditor value={draft} onChange={change} selected={widgetPath} onSelect={setWidgetPath} />
-                        ) : endpointSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
-                            <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
-                            <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
-                          </Flex>
-                        ) : siteSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={siteSchema} value={draft} onChange={change} />
-                            <SiteSignIn
-                              providers={resources
-                                .filter((resource) => resource.kind === 'identityProvider' && resource.name)
-                                .map((resource) => resource.name!)}
-                              value={draft.signIn}
+                          ) : item.kind === 'entity' && schema ? (
+                            <EntityDesigner
+                              value={draft}
+                              onChange={change}
+                              origins={origins}
+                              warnings={fieldWarnings(loaded.content, draft, origins)}
+                              onOriginsChange={(next, removed) => {
+                                setOrigins(next)
+                                if (removed) {
+                                  touch(removed)
+                                }
+                              }}
+                            />
+                          ) : item.kind === 'connector' && schema ? (
+                            <ConnectorEditor value={draft} onChange={change} />
+                          ) : item.kind === 'identityProvider' && schema ? (
+                            <IdentityProviderEditor value={draft} onChange={change} />
+                          ) : processSchema ? (
+                            <ProcessEditor schema={processSchema} value={draft} onChange={change} />
+                          ) : item.kind === 'page' && schema ? (
+                            <PageEditor
+                              value={draft}
+                              onChange={change}
+                              selected={widgetPath}
+                              onSelect={setWidgetPath}
+                            />
+                          ) : endpointSchema ? (
+                            <Flex vertical gap="middle">
+                              <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
+                              <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                              <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
+                            </Flex>
+                          ) : siteSchema ? (
+                            <Flex vertical gap="middle">
+                              <SchemaForm schema={siteSchema} value={draft} onChange={change} />
+                              <SiteSignIn
+                                providers={resources
+                                  .filter((resource) => resource.kind === 'identityProvider' && resource.name)
+                                  .map((resource) => resource.name!)}
+                                value={draft.signIn}
+                                onChange={change}
+                              />
+                            </Flex>
+                          ) : formSchema ? (
+                            <Flex vertical gap="middle">
+                              <SchemaForm schema={formSchema} value={draft} onChange={change} />
+                              <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
+                            </Flex>
+                          ) : schema ? (
+                            <SchemaForm
+                              schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
+                              value={draft}
                               onChange={change}
                             />
-                          </Flex>
-                        ) : formSchema ? (
-                          <Flex vertical gap="middle">
-                            <SchemaForm schema={formSchema} value={draft} onChange={change} />
-                            <FormSteps steps={draft.steps} sections={draft.sections} onChange={change} />
-                          </Flex>
-                        ) : schema ? (
-                          <SchemaForm
-                            schema={item.kind === 'trigger' ? triggerSchema(schema, draft) : schema}
-                            value={draft}
-                            onChange={change}
-                          />
-                        ) : (
-                          <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
-                        ),
-                      )}
-                    </Drawn>
-                  ),
-                },
-                {
-                  key: 'json',
-                  label: t('shell.studio.json'),
-                  children: (
-                    <Suspense fallback={null}>
-                      <LazyJsonView
-                        ref={jsonViewRef}
-                        label={t('shell.studio.json')}
-                        value={shownJson}
-                        onChange={changeJson}
-                        boundary={rootRef}
-                        kind={item.kind}
-                        onProblems={setJsonProblems}
-                        findTexts={{
-                          field: t('shell.studio.json.findField'),
-                          count: t('shell.studio.json.findCount'),
-                          none: t('shell.studio.json.findNone'),
-                        }}
-                      />
-                    </Suspense>
-                  ),
-                },
-                ...(item.kind === 'application'
-                  ? []
-                  : [
-                      {
-                        key: 'usedBy',
-                        label: t('shell.studio.usedBy'),
-                        children:
-                          tab === 'usedBy' ? (
-                            <StudioUsedBy application={application} resourceId={item.id} resources={resources} />
-                          ) : null,
-                      },
-                    ]),
-              ]}
-            />
-          </LabelTextsContext.Provider>
-        </ExpressionCheckContext.Provider>
-        {conflict && (
-          <Alert
-            data-testid="studio-conflict"
-            type="warning"
-            title={t('shell.studio.conflict')}
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
-          />
-        )}
-        {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
-        {deleteFailed && (
-          <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />
-        )}
-        <AxisActionRow align="center">
-          {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
-        </AxisActionRow>
-        {item.kind === 'application' && <StudioAutoAccept application={application} publisher={publisher} />}
-        {questions && (
-          <EntityMigrationQuestions
-            questions={questions}
-            onDone={(answers) => answered(questions, answers)}
-            onCancel={() => setQuestions(undefined)}
-          />
-        )}
-        <Modal
-          open={deleteOpen}
-          width={size.dialog.small}
-          title={t('shell.studio.deleteConfirm')}
-          okText={t('shell.studio.delete')}
-          okButtonProps={{ danger: true }}
-          cancelText={t('shell.studio.cancel')}
-          confirmLoading={deleting}
-          onOk={remove}
-          onCancel={() => setDeleteOpen(false)}
-        >
-          {item.usedBy > 0 && (
+                          ) : (
+                            <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
+                          ),
+                        )}
+                      </Drawn>
+                    ),
+                  },
+                  {
+                    key: 'json',
+                    label: t('shell.studio.json'),
+                    children: (
+                      <Suspense fallback={null}>
+                        <LazyJsonView
+                          ref={jsonViewRef}
+                          label={t('shell.studio.json')}
+                          value={shownJson}
+                          onChange={changeJson}
+                          boundary={rootRef}
+                          kind={item.kind}
+                          onProblems={setJsonProblems}
+                          findTexts={{
+                            field: t('shell.studio.json.findField'),
+                            count: t('shell.studio.json.findCount'),
+                            none: t('shell.studio.json.findNone'),
+                          }}
+                        />
+                      </Suspense>
+                    ),
+                  },
+                  ...(item.kind === 'application'
+                    ? []
+                    : [
+                        {
+                          key: 'usedBy',
+                          label: t('shell.studio.usedBy'),
+                          children:
+                            tab === 'usedBy' ? (
+                              <StudioUsedBy application={application} resourceId={item.id} resources={resources} />
+                            ) : null,
+                        },
+                      ]),
+                ]}
+              />
+            </LabelTextsContext.Provider>
+          </ExpressionCheckContext.Provider>
+          {conflict && (
             <Alert
-              data-testid="studio-delete-warning"
+              data-testid="studio-conflict"
               type="warning"
-              title={
-                <>
-                  {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
-                </>
-              }
-              action={
-                <AxisButton
-                  role="secondary"
-                  onClick={() => {
-                    setDeleteOpen(false)
-                    setTab('usedBy')
-                  }}
-                >
-                  {t('shell.studio.deleteSeeUses')}
-                </AxisButton>
-              }
+              title={t('shell.studio.conflict')}
+              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+              action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
             />
           )}
-        </Modal>
-        <SaveBar
-          unsaved={unsaved}
-          undoable={history.past.length > 0}
-          redoable={history.future.length > 0}
-          saveable={
-            (patch.length > 0 || changedTexts.length > 0) &&
-            !jsonInvalid &&
-            problems.size === 0 &&
-            !conflict &&
-            !saving &&
-            !reconnecting
-          }
-          busy={saving}
-          onUndo={undo}
-          onRedo={redo}
-          onDiscard={() => {
-            adopt(loaded)
-            messageApi.destroy('studio-removed')
-          }}
-          onSave={save}
-        />
-      </Flex>
+          {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
+          {deleteFailed && (
+            <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />
+          )}
+          <AxisActionRow align="center">
+            {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
+          </AxisActionRow>
+          {item.kind === 'application' && <StudioAutoAccept application={application} publisher={publisher} />}
+          {questions && (
+            <EntityMigrationQuestions
+              questions={questions}
+              onDone={(answers) => answered(questions, answers)}
+              onCancel={() => setQuestions(undefined)}
+            />
+          )}
+          <Modal
+            open={deleteOpen}
+            width={size.dialog.small}
+            title={t('shell.studio.deleteConfirm')}
+            okText={t('shell.studio.delete')}
+            okButtonProps={{ danger: true }}
+            cancelText={t('shell.studio.cancel')}
+            confirmLoading={deleting}
+            onOk={remove}
+            onCancel={() => setDeleteOpen(false)}
+          >
+            {item.usedBy > 0 && (
+              <Alert
+                data-testid="studio-delete-warning"
+                type="warning"
+                title={
+                  <>
+                    {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
+                  </>
+                }
+                action={
+                  <AxisButton
+                    role="secondary"
+                    onClick={() => {
+                      setDeleteOpen(false)
+                      setTab('usedBy')
+                    }}
+                  >
+                    {t('shell.studio.deleteSeeUses')}
+                  </AxisButton>
+                }
+              />
+            )}
+          </Modal>
+          <SaveBar
+            unsaved={unsaved}
+            undoable={history.past.length > 0}
+            redoable={history.future.length > 0}
+            saveable={
+              (patch.length > 0 || changedTexts.length > 0) &&
+              !jsonInvalid &&
+              problems.size === 0 &&
+              !conflict &&
+              !saving &&
+              !reconnecting
+            }
+            busy={saving}
+            onUndo={undo}
+            onRedo={redo}
+            onDiscard={() => {
+              adopt(loaded)
+              messageApi.destroy('studio-removed')
+            }}
+            onSave={save}
+          />
+        </Flex>
+      </StudioBindingsContext.Provider>
     </StudioCatalogContext.Provider>
   )
 }

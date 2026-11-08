@@ -5,10 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import oauth2Fixture from '../../../tests/e2e/fixtures/studio-connector-oauth2.json'
 import { setAt } from '../platform/jsonPatch'
+import type { StudioBindings } from '../platform/studio'
+import { StudioBindingsContext } from '../platform/studioCatalog'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
-import { chooseOption, clearSelect, optionTexts, selectRoot, shownDropdown } from '../test/antd'
+import { chooseOption, clearSelect, openDropdown, optionTexts, selectRoot, shownDropdown } from '../test/antd'
 import { ConnectorEditor } from './ConnectorEditor'
 
 const connector = {
@@ -47,12 +49,14 @@ function ThemeRoot({ children }: { children: ReactNode }) {
   return <div data-theme-mode={useThemeMode().mode}>{children}</div>
 }
 
-function renderEditor(value: Record<string, unknown> = connector, onChange = vi.fn()) {
+function renderEditor(value: Record<string, unknown> = connector, onChange = vi.fn(), bindings?: StudioBindings) {
   render(
     <ThemeModeProvider>
       <ThemeRoot>
         <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <ConnectorEditor value={value} onChange={onChange} />
+          <StudioBindingsContext.Provider value={bindings}>
+            <ConnectorEditor value={value} onChange={onChange} />
+          </StudioBindingsContext.Provider>
         </TextProvider>
       </ThemeRoot>
     </ThemeModeProvider>,
@@ -264,11 +268,14 @@ describe('ConnectorEditor', () => {
     })
     const user = userEvent.setup()
 
-    await user.type(screen.getByRole('textbox', { name: 'URL binding' }), 'ShippingUrl')
+    await user.type(screen.getByRole('textbox', { name: 'URL binding' }), 'PurchasingSystemUrl')
     await chooseOption('oauth2', screen.getByTestId('studio-field-/auth/type'))
-    await user.type(screen.getByRole('textbox', { name: 'Token URL (URL binding)' }), 'ShippingTokenUrl')
-    await user.type(screen.getByRole('textbox', { name: 'Client id (Secret binding)' }), 'ShippingClientId')
-    await user.type(screen.getByRole('textbox', { name: 'Client secret (Secret binding)' }), 'ShippingClientSecret')
+    await user.type(screen.getByRole('textbox', { name: 'Token URL (URL binding)' }), 'PurchasingSystemTokenUrl')
+    await user.type(screen.getByRole('textbox', { name: 'Client id (Secret binding)' }), 'PurchasingSystemClientId')
+    await user.type(
+      screen.getByRole('textbox', { name: 'Client secret (Secret binding)' }),
+      'PurchasingSystemClientSecret',
+    )
     await user.type(screen.getByRole('textbox', { name: 'Scope' }), 'shipments.write')
     expect(screen.getByRole('textbox', { name: 'Audience' })).toHaveValue('')
 
@@ -347,11 +354,30 @@ describe('ConnectorEditor', () => {
     ])
   })
 
+  it("lists only the tenant's URL bindings for the base URL, and its secret bindings for the token", async () => {
+    const bindings = { url: ['ShopUrl', 'ShopTokenUrl'], secret: ['ShopToken'], storage: ['Files'] }
+    const onChange = renderEditor(
+      { ...connector, baseUrl: { binding: 'ShopUrl' }, auth: { type: 'bearer', token: { binding: 'ShopToken' } } },
+      vi.fn(),
+      bindings,
+    )
+
+    expect(screen.queryByRole('textbox', { name: 'URL binding' })).toBeNull()
+    await userEvent.click(screen.getByRole('combobox', { name: 'URL binding' }))
+    expect(optionTexts(await openDropdown())).toEqual(['ShopUrl', 'ShopTokenUrl'])
+    await chooseOption('ShopTokenUrl')
+    expect(onChange).toHaveBeenLastCalledWith('/baseUrl/binding', 'ShopTokenUrl')
+    expect(screen.queryByTestId('studio-tenant-binding-missing')).toBeNull()
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Secret binding' }))
+    expect(optionTexts(await openDropdown('ShopToken'))).toEqual(['ShopToken'])
+  })
+
   it('removes the scope key when the box is cleared', async () => {
     const onChange = renderEditor({ ...connector, auth: oauth2Fixture.auth })
 
-    expect(screen.getByRole('textbox', { name: 'Token URL (URL binding)' })).toHaveValue('ShippingTokenUrl')
-    expect(screen.getByRole('textbox', { name: 'Client id (Secret binding)' })).toHaveValue('ShippingClientId')
+    expect(screen.getByRole('textbox', { name: 'Token URL (URL binding)' })).toHaveValue('PurchasingSystemTokenUrl')
+    expect(screen.getByRole('textbox', { name: 'Client id (Secret binding)' })).toHaveValue('PurchasingSystemClientId')
     expect(screen.queryByRole('textbox', { name: 'Secret binding' })).toBeNull()
     await userEvent.clear(screen.getByRole('textbox', { name: 'Scope' }))
     expect(onChange).toHaveBeenLastCalledWith('/auth/scope', undefined)

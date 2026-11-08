@@ -1,17 +1,19 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ComponentProps } from 'react'
+import { useEffect, useState, type ComponentProps } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { designTokensFor } from '../platform/designTokens'
+import { setAt } from '../platform/jsonPatch'
 import { policyKeyedLists } from '../platform/layerMarks'
-import type { StudioCatalog, StudioNames } from '../platform/studio'
-import { StudioCatalogContext } from '../platform/studioCatalog'
+import type { StudioBindings, StudioCatalog, StudioNames } from '../platform/studio'
+import { StudioBindingsContext, StudioCatalogContext } from '../platform/studioCatalog'
 import { StudioNamesContext } from '../platform/studioNames'
 import { loadKindSchema, resolveSchema, type JsonSchema } from '../platform/studioSchemas'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { chooseOption, openDropdown, optionTexts } from '../test/antd'
 import { LabelTextsContext } from './labelTextsContext'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
@@ -69,17 +71,23 @@ function renderForm(
   schema: JsonSchema,
   value: Record<string, unknown>,
   onChange: ChangeHandler = vi.fn(),
-  extra: Partial<ComponentProps<typeof SchemaForm>> & { names?: StudioNames; catalog?: StudioCatalog } = {},
+  extra: Partial<ComponentProps<typeof SchemaForm>> & {
+    names?: StudioNames
+    catalog?: StudioCatalog
+    bindings?: StudioBindings
+  } = {},
 ) {
-  const { names: shownNames = names, catalog, ...formProps } = extra
+  const { names: shownNames = names, catalog, bindings, ...formProps } = extra
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioNamesContext.Provider value={shownNames}>
           <StudioCatalogContext.Provider value={catalog}>
-            <LabelTextsContext.Provider value={labelContext}>
-              <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
-            </LabelTextsContext.Provider>
+            <StudioBindingsContext.Provider value={bindings}>
+              <LabelTextsContext.Provider value={labelContext}>
+                <SchemaForm schema={schema} value={value} onChange={onChange} {...formProps} />
+              </LabelTextsContext.Provider>
+            </StudioBindingsContext.Provider>
           </StudioCatalogContext.Provider>
         </StudioNamesContext.Provider>
       </TextProvider>
@@ -353,6 +361,72 @@ describe('SchemaForm sections', () => {
     expect(within(section).getByTestId('studio-field-/fileStorage/binding')).toBeVisible()
     expect(screen.queryByTestId('studio-group-/fileStorage')).toBeNull()
     expect(within(section).queryByText(english['shell.studio.field.application.fileStorage.help'])).toBeNull()
+  })
+
+  it('keeps a webhook URL binding that the tenant lacks selected, with the line that activation will refuse it', async () => {
+    renderForm((await loadKindSchema('webhook'))!, { kind: 'webhook', url: { binding: 'Gone' } }, vi.fn(), {
+      bindings: { url: ['ShopUrl'], secret: [], storage: [] },
+    })
+
+    const field = screen.getByTestId('studio-field-/url/binding')
+    expect(within(field).getByRole('combobox')).toBeVisible()
+    expect(within(field).getByText('Gone')).toBeVisible()
+    expect(within(field).getByTestId('studio-tenant-binding-missing')).toHaveTextContent(
+      english['shell.studio.binding.notInTenant'],
+    )
+    await userEvent.click(within(field).getByRole('combobox'))
+    expect(optionTexts(await openDropdown())).toEqual(['Gone', 'ShopUrl'])
+  })
+
+  it('removes the whole fileStorage entry when no binding is chosen', async () => {
+    let latest: Record<string, unknown> = {}
+    const schema = (await loadKindSchema('application'))!
+    function Harness() {
+      const [draft, setDraft] = useState<Record<string, unknown>>({
+        kind: 'application',
+        name: 'Shop',
+        fileStorage: { binding: 'Files' },
+      })
+      useEffect(() => {
+        latest = draft
+      }, [draft])
+      return (
+        <SchemaForm
+          schema={schema}
+          value={draft}
+          onChange={(pointer, next) => setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)}
+        />
+      )
+    }
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <StudioNamesContext.Provider value={names}>
+            <StudioBindingsContext.Provider value={{ url: [], secret: [], storage: ['Files', 'Archive'] }}>
+              <LabelTextsContext.Provider value={labelContext}>
+                <Harness />
+              </LabelTextsContext.Provider>
+            </StudioBindingsContext.Provider>
+          </StudioNamesContext.Provider>
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    const field = screen.getByTestId('studio-field-/fileStorage/binding')
+    expect(within(field).getByText('Files')).toBeVisible()
+    await userEvent.click(within(field).getByRole('combobox'))
+    expect(optionTexts(await openDropdown())).toEqual([english['shell.studio.binding.noBinding'], 'Files', 'Archive'])
+
+    await chooseOption(english['shell.studio.binding.noBinding'])
+
+    expect(latest).not.toHaveProperty('fileStorage')
+    expect(
+      within(screen.getByTestId('studio-field-/fileStorage/binding')).getByTitle(
+        english['shell.studio.binding.noBinding'],
+      ),
+    ).toBeVisible()
+
+    await chooseOption('Archive', screen.getByTestId('studio-field-/fileStorage/binding'))
+    expect(latest.fileStorage).toEqual({ binding: 'Archive' })
   })
 
   it('draws a section as a surface panel with a subtle border, spacing-md apart', async () => {

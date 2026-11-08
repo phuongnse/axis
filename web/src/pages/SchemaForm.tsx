@@ -4,8 +4,10 @@ import type { StudioCatalog, StudioNames } from '../platform/studio'
 import { setAt } from '../platform/jsonPatch'
 import { keyPropertyOf, markOf, type KeyedLists } from '../platform/layerMarks'
 import {
+  bindingKindOf,
   catalogControlOf,
   parseVersionRange,
+  StudioBindingsContext,
   StudioCatalogContext,
   versionRangeWords,
   type CatalogControl,
@@ -16,7 +18,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { AxisButton } from '../platform/AxisButton'
 import { PlatformContext } from './context'
-import { CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
+import { BindingSelect, CatalogChoice, ModuleSlots, TimeZoneSelect, VersionRangeInput } from './CatalogControls'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
@@ -344,6 +346,7 @@ function SchemaNode({
   const inDialog = useContext(ItemDialogContext)
   const names = useContext(StudioNamesContext)
   const catalog = useContext(StudioCatalogContext)
+  const bindings = useContext(StudioBindingsContext)
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const check = useContext(ExpressionCheckContext)
   const label = useContext(LabelTextsContext)
@@ -352,6 +355,7 @@ function SchemaNode({
   const control = readOnly
     ? undefined
     : usableControl(catalogControlOf(root.properties?.kind?.const, path), catalog, names, rootValue, pointer, value)
+  const bindingKind = readOnly || bindings === undefined ? undefined : bindingKindOf(root.properties?.kind?.const, path)
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
@@ -377,6 +381,20 @@ function SchemaNode({
     )
   } else if (schema.const !== undefined || readOnly) {
     input = <Typography.Text>{String(schema.const ?? value ?? '')}</Typography.Text>
+  } else if (bindingKind !== undefined && bindings !== undefined) {
+    // File storage is the one binding that may be absent: no binding removes the whole entry, not only its name.
+    const noBinding = path === 'fileStorage.binding'
+    const parent = pointer.slice(0, pointer.lastIndexOf('/'))
+    const absent = noBinding && getAt(rootValue, parent) === undefined
+    input = (
+      <BindingSelect
+        name={name}
+        names={bindings[bindingKind]}
+        value={absent ? undefined : typeof value === 'string' ? value : ''}
+        noBinding={noBinding}
+        onChange={(next) => (next === undefined && noBinding ? onChange(parent, undefined) : onChange(pointer, next))}
+      />
+    )
   } else if (control !== undefined && catalog !== undefined) {
     input = catalogInput({ control, catalog, names, name, locale, rootValue, pointer, value, onChange })
   } else if (schema.enum !== undefined) {
