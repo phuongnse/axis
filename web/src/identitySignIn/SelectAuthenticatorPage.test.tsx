@@ -46,6 +46,18 @@ describe('SelectAuthenticatorPage', () => {
     expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute('href', '/restart?code=1')
   })
 
+  it("lines up a short help line with a long one at the row's start", () => {
+    const methods = [
+      { id: 'otp', label: 'Authenticator app', help: 'Enter a verification code from your authenticator app.' },
+      { id: 'password', label: 'Password', help: 'Short.' },
+    ]
+    render(<SelectAuthenticatorPage context={{ ...context, methods }} />, { wrapper: ThemeModeProvider })
+
+    for (const name of [/Authenticator app/, /Password/]) {
+      expect(screen.getByRole('button', { name })).toHaveStyle({ justifyContent: 'flex-start', textAlign: 'left' })
+    }
+  })
+
   it('shows a method without a help line', () => {
     render(<SelectAuthenticatorPage context={{ ...context, methods: [{ id: 'x', label: 'Security key' }] }} />, {
       wrapper: ThemeModeProvider,
