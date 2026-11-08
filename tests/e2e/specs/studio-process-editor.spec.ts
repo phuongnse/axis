@@ -13,6 +13,7 @@ import {
   jsonViewText,
   openFormTab,
   openProblems,
+  saveResource,
 } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
@@ -125,9 +126,7 @@ test.describe("Studio edits a process in the process editor", () => {
     await pick(page, "/steps/11/branches/0/next", "managerApproval");
     await pick(page, "/steps/11/otherwise", "markRejected");
     await pick(page, "/steps/0/next", "checkTotal");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-
-    await expect(page.getByTestId("studio-saved")).toBeVisible();
+    await saveResource(page);
     expect(await diagnostics(page)).toEqual(before);
     const saved = JSON.parse(await readFile(path.join(copy, file), "utf8")) as {
       steps: Record<string, unknown>[];
@@ -164,9 +163,7 @@ test.describe("Studio edits a process in the process editor", () => {
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.type("'returned'");
     await expect(expression).toHaveText("'returned'");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-
-    await expect(page.getByTestId("studio-saved")).toBeVisible();
+    await saveResource(page);
     expect(await diagnostics(page)).toEqual(before);
     const expected = JSON.parse(original) as {
       steps: { set: Record<string, string> }[];
@@ -199,9 +196,7 @@ test.describe("Studio edits a process in the process editor", () => {
       .getByRole("textbox")
       .fill("P5D");
     await pick(page, "/steps/3/outcomes/1/next", "markRejected");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-
-    await expect(page.getByTestId("studio-saved")).toBeVisible();
+    await saveResource(page);
     const expected = structuredClone(before);
     expected.steps[3].dueIn = "P5D";
     expected.steps[3].outcomes[1].next = "markRejected";
@@ -235,8 +230,7 @@ test.describe("Studio edits a process in the process editor", () => {
       await expect(name).not.toHaveValue("markApproved", { timeout: 2_000 });
       await expect(save).toBeEnabled({ timeout: 2_000 });
     }).toPass({ timeout: 20_000 });
-    await save.click();
-    await expect(page.getByTestId("studio-saved")).toBeVisible();
+    await saveResource(page);
 
     const diagnostic = (await openProblems(page))
       .getByRole("button")
@@ -280,9 +274,7 @@ test.describe("Studio edits a process in the process editor", () => {
       };
       draft.steps[i].next = "noSuchStep";
       await textarea.fill(JSON.stringify(draft, null, 2));
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       await page.getByRole("tab", { name: "Design", exact: true }).click();
       const node = page.getByTestId(`studio-graph-node-${i}`);
       await expect(node).toHaveAttribute("data-marked", "true");
@@ -337,8 +329,7 @@ test.describe("Studio edits a process in the process editor", () => {
         page.getByTestId(`studio-graph-node-${content.steps.length - 1}`),
       ).toHaveCount(0);
 
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       await expect(await openProblems(page)).toContainText(
         "AXC0070",
       );
@@ -437,8 +428,7 @@ test.describe("Studio edits a process in the process editor", () => {
         "Step raiseEvent1 added after updateRecord1",
       );
 
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: Record<string, unknown>[];
       };
@@ -533,8 +523,7 @@ test.describe("Studio edits a process in the process editor", () => {
         "managerApproval to done, approve",
       );
 
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       const saved = JSON.parse(
         await readFile(target, "utf8"),
       ) as typeof content;
@@ -583,9 +572,7 @@ test.describe("Studio edits a process in the process editor", () => {
         .fill("PT4H");
       await pick(page, `/steps/${added}/next`, "done");
       await pick(page, `/steps/${rejected}/next`, "coolDown");
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       expect(await diagnostics(page)).toEqual(before);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: Record<string, unknown>[];
@@ -660,9 +647,7 @@ test.describe("Studio edits a process in the process editor", () => {
       await pick(page, `/steps/${wait}/timeout/next`, "chase");
       await pick(page, `/steps/${wait}/next`, "done");
       await pick(page, `/steps/${rejected}/next`, "awaitPayment");
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       expect(await diagnostics(page)).toEqual(before);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: Record<string, unknown>[];
@@ -765,9 +750,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
       await pick(page, `/steps/${added}/next`, "done");
       await pick(page, `/steps/${rejected}/next`, "tellRequester");
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       expect(await diagnostics(page)).toEqual(before);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: {
@@ -896,9 +879,7 @@ test.describe("Studio edits a process in the process editor", () => {
         "A request has waited a day for the finance review",
         "Một yêu cầu đã chờ tài chính một ngày",
       );
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       expect(await diagnostics(page)).toEqual(beforeDiagnostics);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: {
@@ -990,9 +971,7 @@ test.describe("Studio edits a process in the process editor", () => {
           .fill(name);
       }
       await expect(row.getByTestId("studio-json-only")).toHaveCount(0);
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-
-      await expect(page.getByTestId("studio-saved")).toBeVisible();
+      await saveResource(page);
       expect(await diagnostics(page)).toEqual(before);
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: { input: Record<string, unknown> }[];
