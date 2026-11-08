@@ -100,6 +100,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     private const string ConsentTextAttribute = "consent.screen.text";
     private const string DisplayOnConsentAttribute = "display.on.consent.screen";
 
+    /// <summary>The component type of Keycloak's client registration policies, which <c>TenantRealm</c> and the sync both read.</summary>
+    public const string RegistrationPolicyType = "org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy";
+
     private const string AuthoringAudiencePrefix = "mcp audience ";
     private const string AudienceMapper = "oidc-audience-mapper";
     private const string OfflineAccessScope = "offline_access";
@@ -187,7 +190,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <c>mcp audience &lt;host&gt;</c> for each host, whose audience is <see cref="AuthoringAudiences"/> of the hosts, and removes the
     /// mappers with that name prefix whose host is gone. It sets the scope's consent text to the theme message
     /// <c>axisAuthoringScopeConsentText</c>, whether the scope is new or already exists. It makes the scope a default optional scope of the realm,
-    /// so a client made from then on can ask for it, and takes <c>offline_access</c> out of them.
+    /// so a client made from then on can ask for it, and takes <c>offline_access</c> out of them. Last, it makes the anonymous registration policy Allowed Client Scopes
+    /// allow the scope and the realm's default client scopes only (<c>docs/reference/mcp-server.md#client-registration</c>). It follows the scope's creation, because Keycloak refuses a scope that does not exist.
     /// </para>
     /// </summary>
     public async Task SyncPlatformAddressesAsync(
@@ -301,6 +305,51 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             using var removed = await SendAsync(token, HttpMethod.Delete, $"{defaultsPath}/{offlineId}", null, cancellationToken);
             EnsureSuccess(removed, $"take '{OfflineAccessScope}' out of the default optional client scopes");
         }
+
+        await SyncRegistrationScopesAsync(token, realmPath, cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes the anonymous registration policy Allowed Client Scopes allow <see cref="AuthoringScope"/> and the realm's default client scopes, and not allow
+    /// the default scopes of any other client. The policy is added when the realm lacks it. Every other registration policy stays as it is.
+    /// </summary>
+    private async Task SyncRegistrationScopesAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        using var defaults = await SendAsync(token, HttpMethod.Get, $"{realmPath}/default-default-client-scopes", null, cancellationToken);
+        EnsureSuccess(defaults, "list the default client scopes");
+        var allowed = new List<string> { AuthoringScope };
+        allowed.AddRange((await defaults.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Select(scope => scope.GetProperty("name").GetString()!)
+            .Where(name => name != AuthoringScope));
+        var config = new Dictionary<string, string[]> { ["allowed-client-scopes"] = [.. allowed], ["allow-default-scopes"] = ["false"] };
+
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/components?type={Uri.EscapeDataString(RegistrationPolicyType)}", null, cancellationToken);
+        EnsureSuccess(listed, "list the registration policies");
+        var policy = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Where(component => component.TryGetProperty("subType", out var subType) && subType.GetString() == "anonymous")
+            .FirstOrDefault(component => component.GetProperty("providerId").GetString() == "allowed-client-templates");
+        if (policy.ValueKind == JsonValueKind.Object)
+        {
+            var body = policy.Deserialize<Dictionary<string, JsonElement>>()!;
+            body["config"] = JsonSerializer.SerializeToElement(config);
+            using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/components/{policy.GetProperty("id").GetString()}", body, cancellationToken);
+            EnsureSuccess(updated, "set the allowed client scopes of registration");
+            return;
+        }
+
+        using var realm = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
+        EnsureSuccess(realm, "read the realm");
+        var component = new Dictionary<string, object?>
+        {
+            ["name"] = "Allowed Client Scopes",
+            ["providerId"] = "allowed-client-templates",
+            ["providerType"] = RegistrationPolicyType,
+            ["parentId"] = (await realm.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetString(),
+            ["subType"] = "anonymous",
+            ["config"] = config,
+        };
+        using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/components", component, cancellationToken);
+        EnsureSuccess(created, "add the allowed client scopes policy of registration");
     }
 
     /// <summary>Sets the consent text of the scope, and shows the scope on the consent screen, when either differs. Every other attribute of the scope stays.</summary>

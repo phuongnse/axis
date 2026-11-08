@@ -72,25 +72,42 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
 
 ## Client registration
 
-_(planned for M35)_
-
 A client registers as the pinned specification prefers, and a tenant administrator decides which
 clients may connect at all.
 
-- **Client ID Metadata Documents.** A client may use the URL of its metadata document as its client
-  id. The realm fetches the document, checks that its redirect URIs are `https` or a loopback address,
-  and shows its name on the consent screen.
-- **Dynamic client registration.** A client that has no metadata document registers through the
-  realm's registration endpoint. The realm's registration policies allow only public clients, the
-  authorization code flow, `https` or loopback redirect URIs and the scope `axis:authoring`, and
-  require consent.
-- **The agent host** is a confidential client of each realm, which `tenant create` sets up. It takes
+- **Client ID Metadata Documents** _(planned for M35)_. A client may use the URL of its metadata
+  document as its client id. The realm fetches the document, checks that its redirect URIs are
+  `https` or a loopback address, and shows its name on the consent screen.
+- **Dynamic client registration.** A client registers without a token at the registration endpoint
+  that the realm's metadata names as `registration_endpoint`. The realm makes it a public client
+  that requires consent, and its token's scope is limited to what the client asked for, because the
+  full scope is off. The consent screen names the client by the name it registered. The realm
+  accepts a registration only when all of these hold, and otherwise answers `403` with the error
+  `insufficient_scope`, the reason in `error_description`, and creates no client:
+  - the client authenticates with no secret and no key, so it is public. Any client authentication
+    method but `none` is refused;
+  - its grant types hold neither the implicit flow nor the password flow;
+  - each redirect address is `https`, or `http` on a loopback address: `127.0.0.1` or `[::1]`, with
+    any port and path. An `http` address on any other host, including `localhost`, a private-use
+    scheme and a wildcard are refused, and an address with a fragment is refused with `400` and the
+    error `invalid_redirect_uri`;
+  - its scope is `axis:authoring` and the realm's default client scopes, and no other.
+
+  The same rules hold when the client changes its own registration with the registration access token
+  that the registration returns: the realm refuses each change that a registration would refuse.
+
+  Registration does not refuse the device authorization grant, but consent and the scope rules hold
+  for it too. Keycloak's own limits stay: a realm holds at most 200 clients, those of the realm
+  included, and a registered client may use only the mapper types that Keycloak allows an anonymous
+  client. The realm drops Keycloak's Trusted Hosts policy, which ties registration to the caller's
+  address and so refuses every outside client.
+- **The agent host** _(planned for M35)_ is a confidential client of each realm, which `tenant create` sets up. It takes
   no outside registration.
-- **The administrator's switch.** The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
+- **The administrator's switch** _(planned for M35)_. The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
   and `none`, decides which outside clients may connect, and `none` is the default of a new tenant.
   Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. A client that the
   switch does not allow is refused at the realm, before any token is issued.
-- **Connected apps.** A tenant administrator changes both settings on the
+- **Connected apps** _(planned for M35)_. A tenant administrator changes both settings on the
   [users page](user-administration.md), in a Connected apps tab that lists each client with consent,
   the people who consented and the last use, and revokes a client's consent there. Each change writes a
   platform audit record.
