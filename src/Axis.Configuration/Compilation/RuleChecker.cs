@@ -369,7 +369,7 @@ internal static class RuleChecker
             }
 
             var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values.Concat(moduleRules), modules: modules, undeclaredModuleIsUnknown: undeclaredModuleIsUnknown), rule.ResultType);
-            references?.RecordExpression(resource, "/expression", check.Type, check.Diagnostic);
+            references?.RecordExpression(resource, "/expression", check.Type, check.Diagnostic, check.Place);
             if (!check.Succeeded)
             {
                 diagnostics.Add(new Diagnostic(check.Diagnostic.Code, check.Diagnostic.Message, resource.File, "/expression", resource.Id));

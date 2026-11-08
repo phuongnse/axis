@@ -284,8 +284,8 @@ internal static class MigrationChecker
 
             if (change.Type is "fill" or "convert")
             {
-                var problem = CheckValue(change, migration.Entity, before[k], after[k], missingAfter || droppedBefore[k], out var type);
-                references.RecordExpression(migration, $"/changes/{index}/value", type, problem);
+                var problem = CheckValue(change, migration.Entity, before[k], after[k], missingAfter || droppedBefore[k], out var type, out var place);
+                references.RecordExpression(migration, $"/changes/{index}/value", type, problem, place);
                 if (problem is not null)
                 {
                     Report(problem.Code, problem.Message, $"/changes/{index}/value");
@@ -334,6 +334,7 @@ internal static class MigrationChecker
     /// type-checked against the field's type when <paramref name="untyped"/> is false and the
     /// types of the field and of every field the value names are known. Returns the first problem.
     /// <paramref name="type"/> is the value's type when that check ran and succeeded, and null otherwise.
+    /// <paramref name="place"/> is what that check was given, and null when it did not run.
     /// A value that reads a sensitive field is refused, because it runs as SQL over the stored value, which is encrypted.
     /// </summary>
     private static ExpressionDiagnostic? CheckValue(
@@ -342,9 +343,11 @@ internal static class MigrationChecker
         Dictionary<string, FieldDefinition?>? before,
         Dictionary<string, FieldDefinition?>? after,
         bool untyped,
-        out ExpressionType? type)
+        out ExpressionType? type,
+        out ExpressionPlace? place)
     {
         type = null;
+        place = null;
         var parsed = ExpressionParser.Parse(change.Value!);
         if (!parsed.Succeeded)
         {
@@ -372,6 +375,7 @@ internal static class MigrationChecker
             var scope = ExpressionScopes.ForMigration(
                 before.Where(pair => pair.Value is not null).Select(pair => (pair.Key, pair.Value!)));
             var check = ExpressionTypeChecker.Check(expression, scope, ExpressionScopes.TypeOf(field)!);
+            place = check.Place;
             if (!check.Succeeded)
             {
                 return check.Diagnostic;
