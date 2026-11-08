@@ -61,11 +61,11 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
             git.Refs.Add("HEAD", Branch, allowOverwrite: true);
             if (git.Refs[Branch]?.ResolveToDirectReference().Target is not Commit)
             {
-                WriteCommit(git, server, "Start of history", onlyWhenChanged: false);
+                WriteCommit(git, folder, server, "Start of history", onlyWhenChanged: false);
             }
             else
             {
-                WriteCommit(git, server, "Outside change", onlyWhenChanged: true);
+                WriteCommit(git, folder, server, "Outside change", onlyWhenChanged: true);
             }
         }
         catch (Exception exception) when (exception is LibGit2SharpException or IOException or UnauthorizedAccessException)
@@ -83,7 +83,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         try
         {
             using var git = new Repository(repository);
-            WriteCommit(git, Author(userId, displayName), $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {client}\n", onlyWhenChanged: true);
+            WriteCommit(git, folder, Author(userId, displayName), Message(summary, userId, client, null), onlyWhenChanged: true);
         }
         catch (Exception exception) when (exception is LibGit2SharpException or IOException or UnauthorizedAccessException)
         {
@@ -222,7 +222,14 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
             ? file[Customizations.Length..^".json".Length]
             : null;
 
-    private static StudioRevision Describe(Commit commit)
+    /// <summary>
+    /// The message of a revision: the summary and the trailers <c>Axis-User-Id</c> and <c>Axis-Client</c>, and
+    /// <c>Axis-Request</c> when the revision names an authoring request.
+    /// </summary>
+    internal static string Message(string summary, string userId, string client, Guid? request) =>
+        $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {client}\n" + (request is { } id ? $"Axis-Request: {id:D}\n" : "");
+
+    internal static StudioRevision Describe(Commit commit)
     {
         string? Trailer(string name) =>
             commit.Message.Split('\n').FirstOrDefault(line => line.StartsWith(name + ": ", StringComparison.Ordinal)) is { } line
@@ -230,7 +237,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
                 : null;
 
         return new StudioRevision(
-            commit.Sha, commit.MessageShort, commit.Author.Name, Trailer("Axis-User-Id"), Trailer("Axis-Client"), null, commit.Author.When);
+            commit.Sha, commit.MessageShort, commit.Author.Name, Trailer("Axis-User-Id"), Trailer("Axis-Client"), Trailer("Axis-Request"), commit.Author.When);
     }
 
     private static string? Text(Tree? tree, string path) => (tree?[path]?.Target as Blob)?.GetContentText();
@@ -272,8 +279,9 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         }
     }
 
-    // Commits the files of the folder to main. With onlyWhenChanged, nothing is committed when the tree is the tip's.
-    private void WriteCommit(Repository git, Signature signature, string message, bool onlyWhenChanged)
+    // Commits the files of the folder to main and returns the commit. With onlyWhenChanged, nothing is committed, and the
+    // result is null, when the tree is the tip's.
+    internal static Commit? WriteCommit(Repository git, string folder, Signature signature, string message, bool onlyWhenChanged)
     {
         var tip = git.Refs[Branch]?.ResolveToDirectReference().Target as Commit;
         var definition = new TreeDefinition();
@@ -286,12 +294,13 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
         var tree = git.ObjectDatabase.CreateTree(definition);
         if (onlyWhenChanged && tip is not null && tip.Tree.Sha == tree.Sha)
         {
-            return;
+            return null;
         }
 
         var commit = git.ObjectDatabase.CreateCommit(
             signature, signature, message, tree, tip is null ? [] : [tip], prettifyMessage: false);
         git.Refs.Add(Branch, commit.Id, allowOverwrite: true);
+        return commit;
     }
 
     /// <summary>The git signature of a commit by the user, named by the display name or else the user id.</summary>
@@ -318,7 +327,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
     private static partial void Failed(ILogger logger, string repository, string exception);
 }
 
-/// <summary>One revision: its commit id, summary, author name, the user id and client of its trailers, the authoring request (always null for now) and its time.</summary>
+/// <summary>One revision: its commit id, summary, author name, the user id and client of its trailers, the authoring request of its <c>Axis-Request</c> trailer, or null, and its time.</summary>
 internal sealed record StudioRevision(string Id, string Summary, string Author, string? UserId, string? Client, string? Request, DateTimeOffset Time);
 
 /// <summary>

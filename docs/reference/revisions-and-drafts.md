@@ -47,7 +47,7 @@ A revision is one commit on the repository's `main` branch, and every change to 
   trailers `Axis-User-Id` with the user id and `Axis-Client` with the client, which is `studio`.
   The commit time is the time of the write.
 - **Agent clients.** _(planned for M35)_ The client can also be the agent host or an outside client id,
-  and a revision from an accept names the authoring request.
+  and a revision from an accept names the authoring request in the trailer `Axis-Request`.
 - **Outside changes.** A change made on disk outside the authoring API, such as a hand edit under
   `scripts/dev.sh`, is committed as "Outside change" before the next write, so the next revision holds
   only its own change. "Start of history" and "Outside change" name the server (`Axis`) as author,

@@ -16,7 +16,8 @@ diff and the undo answer `404`.
 ## List
 
 `200` with `{ items: [{ id, summary, author, userId, client, request, time }] }`, newest first and not
-paged. `userId` and `client` are `null` for a revision the server made, and `request` is `null`.
+paged. `userId` and `client` are `null` for a revision the server made. `request` is the authoring request a revision from an
+accept names, and `null` for any other.
 
 ## Diff
 
