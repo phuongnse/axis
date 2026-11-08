@@ -2603,7 +2603,9 @@ function stubApplication(catalog: unknown) {
   vi.stubGlobal('fetch', (input: string, init?: RequestInit) =>
     input === '/api/studio/catalog'
       ? Promise.resolve(catalog === null ? new Response(null, { status: 500 }) : json(catalog))
-      : fetchMock(input, init),
+      : input.endsWith('/relaxed')
+        ? Promise.resolve(json({ items: [] }))
+        : fetchMock(input, init),
   )
   return fetchMock
 }

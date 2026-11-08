@@ -1,8 +1,13 @@
 import { createContext } from 'react'
-import type { StudioCatalog, StudioCatalogSlot } from './studio'
+import type { StudioCatalog, StudioCatalogSlot, StudioFolderRelaxedPoint } from './studio'
 
 /** What the installed server offers the resource form, or `undefined` until it loads or when it fails to load. */
 export const StudioCatalogContext = createContext<StudioCatalog | undefined>(undefined)
+
+/** The relaxed points of an application's saved `application.json`, or `undefined` until they load or when they fail to load. */
+export const StudioRelaxedContext = createContext<
+  { application: string; points: StudioFolderRelaxedPoint[] } | undefined
+>(undefined)
 
 /** The control a field draws from the catalog, see docs/reference/studio-resource-form.md#controls-that-know-what-they-hold. */
 export type CatalogControl =
@@ -66,6 +71,22 @@ export function versionRangeWords(text: string, t: (key: string) => string): str
     .replace('{version}', range.version)
     .replace('{major}', major)
     .replace('{minor}', minor)
+}
+
+/**
+ * The fields that a table shows and its dialog leaves out, by kind and field path as `catalogFieldsByKind` writes it. A
+ * module's relaxed points are changed on their contract's page, see
+ * docs/reference/studio-resource-form.md#relaxed-points-in-settings.
+ */
+export const tableOnlyFieldsByKind: Record<string, string[]> = {
+  application: ['modules.relax'],
+}
+
+/** Whether a field is shown in the table only. */
+export function isTableOnlyField(kind: unknown, path: string): boolean {
+  return (
+    typeof kind === 'string' && Object.hasOwn(tableOnlyFieldsByKind, kind) && tableOnlyFieldsByKind[kind].includes(path)
+  )
 }
 
 /** A time zone as the select shows it, such as "(UTC+07:00) Asia/Ho Chi Minh". `offset` is minutes from UTC. */
