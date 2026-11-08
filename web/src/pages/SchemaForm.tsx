@@ -39,6 +39,7 @@ const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 /** Whether the node is drawn inside an item's dialog, where a nested list is rows of inputs and never a table. */
 const ItemDialogContext = createContext(false)
+const ItemProblemContext = createContext<(pointer: string) => ReactNode>(() => null)
 
 /** Called with the JSON Pointer of the value that changed. `undefined` removes the value. */
 export type ChangeHandler = (pointer: string, next: unknown) => void
@@ -350,6 +351,7 @@ function SchemaNode({
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const inDialog = useContext(ItemDialogContext)
+  const problemAt = useContext(ItemProblemContext)
   const names = useContext(StudioNamesContext)
   const catalog = useContext(StudioCatalogContext)
   const bindings = useContext(StudioBindingsContext)
@@ -601,6 +603,7 @@ function SchemaNode({
       {showsLabel && <div style={labelStyle}>{name}</div>}
       {showsLabel && helpNode}
       {input}
+      {problemAt(pointer)}
     </div>
   )
 }
@@ -961,6 +964,7 @@ function ObjectList({
     const resolved = resolveSchema(child, root)
     return resolved.type === 'array' || (resolved.type === 'object' && resolved.properties === undefined)
   })
+  const requiredShown = (itemSchema.required ?? []).filter((name) => Object.hasOwn(dialogSchema.properties ?? {}, name))
 
   return (
     <>
@@ -969,7 +973,7 @@ function ObjectList({
         items={items}
         columns={columns}
         itemName={itemNameOf(t, kind, path)}
-        required={itemSchema.required ?? []}
+        required={requiredShown}
         large={large}
         newItem={() => defaultFor(itemSchema, root) as Record<string, unknown>}
         addIn={addIn}
@@ -987,7 +991,7 @@ function ObjectList({
             <LayerMarkTag layer={layer.designer} list={pointer} index={index} name={key} />
           ) : null
         }}
-        fields={(copy, change, index) => {
+        fields={(copy, change, index, problem) => {
           const itemPointer = `${pointer}/${index}`
           const view = setAt(rootValue, pointer, index < items.length ? items.with(index, copy) : [...items, copy])
           const changeItem: ChangeHandler = (changed, next) => {
@@ -995,18 +999,24 @@ function ObjectList({
               change(changed.slice(itemPointer.length), next)
             }
           }
+          const problemAt = (at: string) => {
+            const name = requiredShown.find((required) => `${itemPointer}/${escapeSegment(required)}` === at)
+            return name === undefined ? null : problem(name)
+          }
           const fields = (
             <ExpressionCheckContext.Provider value={check && { ...check, draft: view as Record<string, unknown> }}>
               <ItemDialogContext.Provider value>
-                <Properties
-                  node={dialogSchema}
-                  root={root}
-                  rootValue={view}
-                  pointer={itemPointer}
-                  path={path}
-                  value={copy}
-                  onChange={changeItem}
-                />
+                <ItemProblemContext.Provider value={problemAt}>
+                  <Properties
+                    node={dialogSchema}
+                    root={root}
+                    rootValue={view}
+                    pointer={itemPointer}
+                    path={path}
+                    value={copy}
+                    onChange={changeItem}
+                  />
+                </ItemProblemContext.Provider>
               </ItemDialogContext.Provider>
             </ExpressionCheckContext.Provider>
           )
