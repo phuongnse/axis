@@ -1,8 +1,7 @@
-import { Button, Checkbox, Flex, Input, Radio, Typography } from 'antd'
+import { Button, Checkbox, Flex, Radio, Typography } from 'antd'
 import { useContext } from 'react'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
-import { LabelTextsContext } from './labelTextsContext'
 import { LabelTexts } from './LabelTexts'
 import { MappingRows } from './MappingRows'
 import { Expression, NamePicker } from './ProcessFields'
@@ -157,24 +156,6 @@ function Channels({ pointer, value, onChange }: { pointer: string; value: unknow
   )
 }
 
-/** A text reference as a key and a text box per locale, or as the plain key until the names are loaded. */
-function TextReference({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
-  const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
-
-  if (names !== undefined && label !== null) {
-    return <LabelTexts key={pointer} pointer={pointer} value={value} onChange={onChange} />
-  }
-  return (
-    <Input
-      aria-label={t('shell.studio.labelKey')}
-      value={text(isContent(value) ? value.textKey : undefined)}
-      onChange={(event) => onChange(`${pointer}/textKey`, event.target.value)}
-    />
-  )
-}
-
 /** The subject and body, which are text references, and the placeholder values that fill the `{name}` in them. */
 function Message({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
   const t = useText()
@@ -188,11 +169,16 @@ function Message({ pointer, value, onChange }: { pointer: string; value: unknown
       <Flex vertical gap="small">
         <div data-testid={`studio-field-${pointer}/subject`}>
           <div>{t('shell.studio.process.notifySubject')}</div>
-          <TextReference pointer={`${pointer}/subject`} value={message.subject} onChange={onChange} />
+          <LabelTexts
+            key={`${pointer}/subject`}
+            pointer={`${pointer}/subject`}
+            value={message.subject}
+            onChange={onChange}
+          />
         </div>
         <div data-testid={`studio-field-${pointer}/body`}>
           <div>{t('shell.studio.process.notifyBody')}</div>
-          <TextReference pointer={`${pointer}/body`} value={message.body} onChange={onChange} />
+          <LabelTexts key={`${pointer}/body`} pointer={`${pointer}/body`} value={message.body} onChange={onChange} />
         </div>
         <MappingRows
           pointer={`${pointer}/values`}

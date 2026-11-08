@@ -29,7 +29,6 @@ import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
-import { LabelTextsContext } from './labelTextsContext'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
@@ -207,8 +206,6 @@ export function EntityDesigner({
   layer?: DesignerLayer
 }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
   const fields = Array.isArray(value.fields) ? value.fields : undefined
   const fieldNames = (fields ?? []).flatMap((field) =>
     isContent(field) && typeof field.name === 'string' && field.name !== '' ? [field.name] : [],
@@ -226,17 +223,7 @@ export function EntityDesigner({
       </div>
       <div data-testid="studio-field-/label">
         <div>{t('shell.studio.entity.label')}</div>
-        {names !== undefined && label !== null && !readOnly ? (
-          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-        ) : (
-          <div data-testid="studio-field-/label/textKey">
-            <Input
-              aria-label={t('shell.studio.labelKey')}
-              value={text(isContent(value.label) ? value.label.textKey : undefined)}
-              onChange={(event) => onChange('/label/textKey', event.target.value)}
-            />
-          </div>
-        )}
+        <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
       </div>
       <Picker
         pointer="/displayField"

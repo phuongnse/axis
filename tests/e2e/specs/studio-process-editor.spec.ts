@@ -14,6 +14,7 @@ import {
   openFormTab,
   openProblems,
   saveResource,
+  writeLabel,
 } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
@@ -682,9 +683,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
     // A save writes the texts files too, so the journey restores them as well.
     async function fillTexts(field: string, en: string, vi: string) {
-      const label = page.getByTestId(field);
-      await label.getByRole("textbox", { name: "en", exact: true }).fill(en);
-      await label.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
+      await writeLabel(page, field, { en, vi });
     }
 
     try {
@@ -803,9 +802,7 @@ test.describe("Studio edits a process in the process editor", () => {
 
     // A save writes the texts files too, so the journey restores them as well.
     async function fillTexts(field: string, en: string, vi: string) {
-      const label = page.getByTestId(field);
-      await label.getByRole("textbox", { name: "en", exact: true }).fill(en);
-      await label.getByRole("textbox", { name: "vi", exact: true }).fill(vi);
+      await writeLabel(page, field, { en, vi });
     }
 
     try {

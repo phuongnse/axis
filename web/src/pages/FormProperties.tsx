@@ -3,13 +3,11 @@ import { lazy, Suspense, useContext, useState } from 'react'
 import { renameSection } from '../platform/formLayout'
 import { getAt } from '../platform/jsonPatch'
 import type { FieldMetadata } from '../platform/site'
-import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { moveSectionTo, removeField, removeSectionAt, removeStepAt } from './formPaletteSupport'
-import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
@@ -356,22 +354,11 @@ function StepProperties({
 /** The title of a section or a step. The label editor keeps its key in state, so the pointer is its key. */
 function TitleEditor({ pointer, element, onChange }: { pointer: string; element: Content; onChange: ChangeHandler }) {
   const t = useText()
-  const names = useContext(StudioNamesContext)
-  const label = useContext(LabelTextsContext)
   const title = `${pointer}/title`
-  const textKey = isContent(element.title) && typeof element.title.textKey === 'string' ? element.title.textKey : ''
   return (
     <div data-testid={`studio-field-${title}`}>
       <div>{t('shell.studio.design.title')}</div>
-      {names !== undefined && label !== null ? (
-        <LabelTexts key={title} pointer={title} value={element.title} onChange={onChange} />
-      ) : (
-        <Input
-          aria-label={t('shell.studio.design.title')}
-          value={textKey}
-          onChange={(event) => onChange(title, { textKey: event.target.value })}
-        />
-      )}
+      <LabelTexts key={title} pointer={title} value={element.title} onChange={onChange} />
     </div>
   )
 }

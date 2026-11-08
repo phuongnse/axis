@@ -259,7 +259,7 @@ describe('EntityDesigner', () => {
     renderDesigner(entity())
 
     expect(screen.getByRole('textbox', { name: 'Entity name' })).toHaveValue('Invoice')
-    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox', { name: 'en' })).toHaveValue(
+    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox', { name: 'English' })).toHaveValue(
       'Invoice',
     )
     expect(within(screen.getByTestId('studio-field-/displayField')).getByText('code')).toBeInTheDocument()
@@ -789,7 +789,7 @@ describe('EntityDesigner', () => {
     for (const input of inputs) {
       expect(input).toBeDisabled()
     }
-    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('entity.invoice')
+    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toHaveValue('Invoice')
     for (const name of ['Add field', 'Remove field', 'Move up', 'Move down', 'Remove validation', 'Add validation']) {
       expect(screen.queryByRole('button', { name })).toBeNull()
     }
@@ -798,7 +798,7 @@ describe('EntityDesigner', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('shows plain boxes until the names have loaded', () => {
+  it('shows a disabled label box and plain boxes for the rest until the names have loaded', () => {
     renderDesigner(
       entity({
         validations: [{ name: 'totalPositive', expression: 'total > 0', message: { textKey: 'v' }, field: 'total' }],
@@ -807,7 +807,8 @@ describe('EntityDesigner', () => {
       null,
     )
 
-    expect(within(screen.getByTestId('studio-field-/label/textKey')).getByRole('textbox')).toHaveValue('entity.invoice')
+    expect(within(screen.getByTestId('studio-field-/label')).getByRole('textbox')).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: 'Text key' })).toBeNull()
     expect(within(screen.getByTestId('studio-field-/fields/0/label')).getByRole('textbox')).toHaveValue('field.total')
     expect(within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('textbox')).toHaveValue(
       'v',

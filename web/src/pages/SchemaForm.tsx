@@ -341,8 +341,8 @@ function SchemaNode({
   const reference = node['x-axis-reference'] ?? schema['x-axis-reference']
   const isObject = schema.type === 'object' && schema.properties !== undefined
   const isArray = schema.type === 'array' && schema.items !== undefined
-  // A label is an object whose only property is `textKey`. It needs the names and the resource to show its texts.
-  const isLabel = isObject && label !== null && names !== undefined && isLabelSchema(schema)
+  // A label is an object whose only property is `textKey`. It needs the resource to show its texts.
+  const isLabel = isObject && label !== null && isLabelSchema(schema)
   const keyMark = schema.propertyNames?.['x-axis-reference']
   const isMarkedMap =
     schema.type === 'object' && schema.properties === undefined && keyMark !== undefined && names !== undefined

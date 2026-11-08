@@ -1480,7 +1480,8 @@ export function resourceTitle(item: StudioResourceItem, locale: string, t: (key:
   return titles[locale] ?? titles.en ?? item.name ?? kindSingular(item.kind, t)
 }
 
-function languageName(tag: string, locale: string): string {
+/** The name of the language `tag` in `locale`, such as "Vietnamese", or the tag itself when it has no name. */
+export function languageName(tag: string, locale: string): string {
   try {
     return new Intl.DisplayNames([locale], { type: 'language' }).of(tag) ?? tag
   } catch (error) {

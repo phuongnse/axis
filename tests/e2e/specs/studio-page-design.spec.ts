@@ -8,7 +8,7 @@ import { waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
-import { jsonViewText, openTab } from "../studio-resources";
+import { jsonViewText, openTab, writeLabel } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -792,13 +792,10 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       panel.getByTestId(`${action}/page`).getByRole("combobox"),
       "TicketDetail",
     );
-    const label = panel.getByTestId(`${action}/label`);
-    await label
-      .getByRole("textbox", { name: "en", exact: true })
-      .fill("Inspect");
-    await label
-      .getByRole("textbox", { name: "vi", exact: true })
-      .fill("Xem kỹ");
+    await writeLabel(panel, `${action}/label`, {
+      en: "Inspect",
+      vi: "Xem kỹ",
+    });
     const parameter = panel.getByTestId(`${action}/parameters/ticket`);
     await expect(parameter).toContainText("ticket");
     await parameter.getByRole("textbox").fill("id");
