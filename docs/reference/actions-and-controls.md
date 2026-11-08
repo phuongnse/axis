@@ -155,10 +155,10 @@ be kept right.
   on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number
   or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
-  them itself, and the filter lives in the address as `filter`, in the shape of
-  [the record API's filter](record-api.md#paging-and-sorting).
-- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, and a table
-  paged on the server sends its filter to the server as the record API's `filter`.
+  them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
+  filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, a data source
+  table's included.
 - **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
   orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
   still searched and filtered on. The platform keeps each person's choice.

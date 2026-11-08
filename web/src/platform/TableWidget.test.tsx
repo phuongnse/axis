@@ -13,8 +13,9 @@ import type {
   WidgetAccess,
   WidgetMetadata,
 } from './site'
-import { isSortableHeader, tabTo } from '../test/antd'
+import { chooseOption, isSortableHeader, optionTexts, shownDropdown, tabTo } from '../test/antd'
 import { hostileMarkup } from '../test/hostile'
+import { clickInDialog, dialog, filterTexts, pick } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
@@ -226,6 +227,10 @@ const texts = {
   'filter.dueFrom': 'Due from',
   'filter.status': 'State',
   'filter.category': 'In category',
+  'note.status': 'Status',
+  'note.statusOpen': 'Open',
+  'note.statusDone': 'Done',
+  ...filterTexts,
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -1253,7 +1258,7 @@ describe('TableWidget', () => {
       const refresh = await screen.findByRole('button', { name: 'Refresh' })
       await tabTo(refresh)
 
-      expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')
+      await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Refresh'))
     })
 
     it('draws Refresh as a borderless icon button', async () => {
@@ -1529,6 +1534,74 @@ describe('TableWidget', () => {
 
       expect(within(row).queryByRole('button', { name: 'Delete note' })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('TableWidget filter', () => {
+  const statusField: FieldMetadata = {
+    ...field('status', 'enum', 'note.status'),
+    values: ['open', 'done'],
+    valueLabelKeys: { open: 'note.statusOpen', done: 'note.statusDone' },
+  }
+  const filterWidget: WidgetMetadata = {
+    ...noteWidget,
+    entity: {
+      ...noteWidget.entity!,
+      displayField: 'title',
+      fields: [
+        field('title', 'text', 'note.title'),
+        statusField,
+        field('done', 'boolean', 'note.done'),
+        field('dueAt', 'date-time', 'note.dueAt'),
+        noteWidget.entity!.fields.find((candidate) => candidate.name === 'category')!,
+        receipt,
+      ],
+    },
+  }
+
+  /** The filter the last record request carried, or null when it carried none. */
+  const filterOfLastRequest = (urls: () => string[]) => new URLSearchParams(urls().at(-1)!.split('?')[1]).get('filter')
+
+  it('sends the filter the builder applies to the record API, keeps it in the address and starts at page 1', async () => {
+    const urls = stubRecords()
+    renderWidget('?page=3', filterWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'paper')
+    await clickInDialog('Apply')
+
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    await waitFor(() => expect(filterOfLastRequest(urls)).toBe(filter))
+    expect(new URLSearchParams(search()!).get('filter')).toBe(filter)
+    expect(new URLSearchParams(search()!).has('page')).toBe(false)
+  })
+
+  it('offers only the text, enum, number and date columns, and an enum column by its labels', async () => {
+    stubRecords()
+    renderWidget('', filterWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Title', 'Status'])
+
+    await chooseOption('Status')
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Value' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Open', 'Done'])
+  })
+
+  it('has no Filter button on a data source table, with or without parameters', async () => {
+    stubRecords()
+    const { unmount } = renderWidget('', noteListWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    unmount()
+
+    renderWidget('', filteredWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
   })
 })
 
@@ -1893,6 +1966,25 @@ describe('TableWidget export', () => {
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:notes')
     expect(screen.queryByTestId('table-export-truncated')).not.toBeInTheDocument()
     expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+    click.mockRestore()
+  })
+
+  it('exports the rows with the filter they are sent with, beside the search, sort and format', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    renderWidget(`?${new URLSearchParams({ search: 'pap', filter, sort: '-title' })}`, exportWidget)
+
+    await chooseExport('CSV')
+
+    await waitFor(() => expect(exported()).toHaveLength(1))
+    expect([...new URLSearchParams(exported()[0].split('?')[1])]).toEqual([
+      ['search', 'pap'],
+      ['filter', filter],
+      ['sort', '-title'],
+      ['format', 'csv'],
+    ])
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
     click.mockRestore()
   })
 

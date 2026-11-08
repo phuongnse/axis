@@ -37,13 +37,14 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
   /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
   sortValue?: (row: T) => string | number | null
   /**
-   * What the column filters on, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables:
-   * its kind of value, how a row gives it (null is empty) and, for an enum, its options. A column without it has no
-   * filter. Dates compare as ISO text.
+   * What the column filters on, see docs/reference/actions-and-controls.md#tables: its kind of value and, for an enum,
+   * its options. A column that gives it has a filter in the builder of any table with a view. Only a table that holds
+   * its rows reads `value`, how a row gives the value (null is empty), so a table paged on the server may leave it out.
+   * A column without `filter` has no filter. Dates compare as ISO text.
    */
   filter?: {
     kind: FilterKind
-    value: (row: T) => string | number | null
+    value?: (row: T) => string | number | null
     options?: { value: string; label: string }[]
   }
 }
@@ -265,20 +266,21 @@ export function AxisTable<T extends object>({
   const local = view !== undefined && view.total === undefined
   const searchColumns = columns.filter((column) => column.searchText !== undefined)
   const searchable = view !== undefined && (view.search === true || (local && searchColumns.length > 0))
-  const filterColumns: FilterColumn[] = local
-    ? columns.flatMap((column) =>
-        column.filter
-          ? [
-              {
-                key: column.key,
-                title: typeof column.title === 'string' ? column.title : column.key,
-                kind: column.filter.kind,
-                options: column.filter.options,
-              },
-            ]
-          : [],
-      )
-    : []
+  const filterColumns: FilterColumn[] =
+    view !== undefined
+      ? columns.flatMap((column) =>
+          column.filter
+            ? [
+                {
+                  key: column.key,
+                  title: typeof column.title === 'string' ? column.title : column.key,
+                  kind: column.filter.kind,
+                  options: column.filter.options,
+                },
+              ]
+            : [],
+        )
+      : []
   const filterable = filterColumns.length > 0
   let pageRows = dataSource
   let total = 0
@@ -454,7 +456,15 @@ function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: T
   const { filter } = query
   const filtered = filter
     ? rows.filter((row) =>
-        matchesFilter(row, filter, (field) => columns.find((column) => column.key === field)?.filter, locale),
+        matchesFilter(
+          row,
+          filter,
+          (field) => {
+            const column = columns.find((candidate) => candidate.key === field)?.filter
+            return column?.value ? { kind: column.kind, value: column.value } : undefined
+          },
+          locale,
+        ),
       )
     : rows
   const needle = query.search?.trim().toLocaleLowerCase(locale)

@@ -4,7 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import type { HTMLAttributes } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { tabTo } from '../test/antd'
+import { chooseOption, tabTo } from '../test/antd'
+import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
@@ -29,6 +30,7 @@ const texts = {
   'row.open': 'Open',
   'row.close': 'Close',
   'shell.empty.noData': 'No data yet.',
+  ...filterTexts,
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -457,5 +459,36 @@ describe('AxisTable', () => {
     const { container } = renderTable({ loading: true })
 
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('shows the Filter button on a table paged on the server and applies the filter from page 1 without changing the rows', async () => {
+    const onChange = vi.fn()
+    const filterable: AxisColumn<Row> = {
+      key: 'name',
+      title: 'Name',
+      dataIndex: 'name',
+      kind: 'freeText',
+      filter: { kind: 'text' },
+    }
+    renderTable({
+      columns: [filterable, amountColumn],
+      view: { query: { page: 3, pageSize: 20, sort: null }, onChange, total: 60 },
+      pagination: undefined,
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Operator' }))
+    await chooseOption('contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'pa')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Apply' }))
+
+    expect(onChange).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      sort: null,
+      filter: { all: [{ field: 'name', op: 'contains', value: 'pa' }] },
+    })
+    expect(screen.getByRole('row', { name: /Buy paper/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(2)
   })
 })
