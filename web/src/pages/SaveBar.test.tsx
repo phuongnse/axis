@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
+import { followLink, renderGuarded } from '../test/leaveGuard'
 import { SaveBar } from './SaveBar'
 
 function renderBar(props: Partial<ComponentProps<typeof SaveBar>> = {}) {
@@ -22,6 +23,47 @@ function renderBar(props: Partial<ComponentProps<typeof SaveBar>> = {}) {
 }
 
 describe('SaveBar', () => {
+  describe('leaving unsaved changes', () => {
+    function renderGuardedBar(props: Partial<ComponentProps<typeof SaveBar>>) {
+      return renderGuarded(
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <main>
+            <SaveBar
+              unsaved
+              undoable
+              redoable={false}
+              saveable
+              busy={false}
+              onUndo={vi.fn()}
+              onRedo={vi.fn()}
+              onDiscard={vi.fn()}
+              onSave={vi.fn()}
+              {...props}
+            />
+          </main>
+        </TextProvider>,
+      )
+    }
+
+    it('makes the guard ask while there are unsaved changes', async () => {
+      const router = renderGuardedBar({})
+
+      await followLink()
+
+      expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/studio')
+    })
+
+    it('does not make the guard ask with only a step to redo', async () => {
+      const router = renderGuardedBar({ unsaved: false, undoable: false, redoable: true, saveable: false })
+
+      await followLink()
+
+      expect(router.state.location.pathname).toBe('/elsewhere')
+      expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+    })
+  })
+
   it('is not drawn when nothing is unsaved and nothing can be redone', () => {
     renderBar({ unsaved: false, undoable: true, saveable: false })
 

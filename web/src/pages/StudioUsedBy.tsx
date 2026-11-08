@@ -13,6 +13,7 @@ import {
   type StudioResourceReferences,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { kindSingular, sidebarRank } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { PlatformContext } from './context'
@@ -122,11 +123,7 @@ export function StudioUsedBy({
       key: 'label',
       kind: 'freeText',
       title: t('shell.studio.usedBy.name'),
-      render: (_value, row) => (
-        <Link to={`/studio?${new URLSearchParams({ app: application, resource: row.id, path: row.path })}`}>
-          {row.label}
-        </Link>
-      ),
+      render: (_value, row) => <Link to={studioResourceAddress(application, row.id, row.path)}>{row.label}</Link>,
     },
     {
       key: 'kind',

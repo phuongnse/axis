@@ -461,9 +461,9 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
 The SPA routes on the client with `react-router` v7. The server answers every other path with the SPA, so each address
 below answers `200`.
 
-- **A data router** _(planned for M31)_. The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward
-  with [Leave without saving?](studio.md#editor), and `<ScrollRestoration>` returns a person to where they were on a
-  long page.
+- **A data router.** The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward with
+  [Leave without saving?](studio.md#editor).
+- **Scroll restoration** _(planned for M31)_. `<ScrollRestoration>` returns a person to where they were on a long page.
 
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

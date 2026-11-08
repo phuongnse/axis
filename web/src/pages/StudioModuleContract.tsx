@@ -19,6 +19,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { type ContractView, contractView } from './contractView'
 import {
   moduleIndex,
@@ -492,6 +493,9 @@ export function StudioModuleContract({
     return () => controller.abort()
   }, [application, module, id, generation, lost])
 
+  const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
+  useUnsavedChanges(patch.length > 0)
+
   if (loadFailed) {
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
@@ -499,7 +503,6 @@ export function StudioModuleContract({
     return null
   }
 
-  const patch = diffPatch(loaded.content, draft)
   const hasLifecycle = typeof draft.lifecycle === 'object' && draft.lifecycle !== null
   const elements = layerMarks(loaded.content, loaded.marks, loaded.removed, lifecycleLists)
 

@@ -1,9 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import { App } from '../App'
+import { appRoutes } from '../appRoutes'
 import { assignLocation } from '../platform/navigation'
 import { ThemeModeProvider } from '../platform/theme'
 import type { SiteMetadata } from '../platform/site'
@@ -47,12 +47,11 @@ function stubServer(session: number, jobsStatus = 200) {
 }
 
 function renderApp(path: string) {
+  const router = createMemoryRouter(appRoutes(false), { initialEntries: [path] })
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <ThemeModeProvider>
-        <App development={false} />
-      </ThemeModeProvider>
-    </MemoryRouter>,
+    <ThemeModeProvider>
+      <RouterProvider router={router} />
+    </ThemeModeProvider>,
   )
 }
 

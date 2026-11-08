@@ -82,7 +82,7 @@ export function StudioOverview({
           ) : loaded.changes.length === 0 ? (
             <Typography.Text>{t('shell.studio.overview.changes.allLive')}</Typography.Text>
           ) : (
-            <StudioChangeList rows={changeRows(loaded.changes, resources, locale, t)} address={address} />
+            <StudioChangeList rows={changeRows(loaded.changes, resources, locale, t)} application={application} />
           )}
           <Link to={address({ view: 'releases' })}>{t('shell.studio.overview.changes.releases')}</Link>
         </OverviewBlock>

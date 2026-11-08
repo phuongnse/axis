@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useUnsavedChanges } from '../platform/unsavedChanges'
 
 /**
  * The save bar of a Studio resource, see docs/reference/studio-resource-form.md#save-bar. It stays at the foot of the
@@ -41,6 +42,7 @@ export function SaveBar({
   const [frame, setFrame] = useState<{ left: number; width: number }>()
   const [discardOpen, setDiscardOpen] = useState(false)
   const shown = unsaved || redoable
+  useUnsavedChanges(unsaved)
 
   // The bar spans the content, which is the nearest main, so it leaves the sidebar uncovered.
   useLayoutEffect(() => {
