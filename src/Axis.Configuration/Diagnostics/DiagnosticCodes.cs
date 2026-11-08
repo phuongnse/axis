@@ -358,4 +358,5 @@ public static class DiagnosticCodes
     public const string RemovedResourceCoveredByContract = "AXC0374";
     public const string RemovedFieldStillRead = "AXC0375";
     public const string MissingContractLabel = "AXC0376";
+    public const string AcceptConflict = "AXC0377";
 }

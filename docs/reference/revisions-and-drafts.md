@@ -40,14 +40,14 @@ A revision is one commit on the repository's `main` branch, and every change to 
   commit is made under the same platform lock as the write, after the files are written, so the
   history follows the folder in the same order. A write that leaves every file byte for byte the same
   makes no revision, and a refused write makes none.
-- **Accepts.** _(planned for M35)_ Each accept makes one revision, see
-  [accepting a draft](#accepting-a-draft).
+- **Accepts.** Each accept makes one revision, "Accept draft", see
+  [accepting a draft](#accepting-a-draft). It names the person who asked, the request's client and the
+  request in the trailer `Axis-Request`. It is made even when the applied files match `main`.
 - **What it names.** The git author and committer are the user's display name at the time. The commit
   message is a short summary of the change, such as "Change process RequestApproval", then the
   trailers `Axis-User-Id` with the user id and `Axis-Client` with the client, which is `studio`.
   The commit time is the time of the write.
-- **Agent clients.** _(planned for M35)_ The client can also be the agent host or an outside client id,
-  and a revision from an accept names the authoring request in the trailer `Axis-Request`.
+- **Agent clients.** _(planned for M35)_ The client can also be the agent host or an outside client id.
 - **Outside changes.** A change made on disk outside the authoring API, such as a hand edit under
   `scripts/dev.sh`, is committed as "Outside change" before the next write, so the next revision holds
   only its own change. "Start of history" and "Outside change" name the server (`Axis`) as author,
@@ -84,24 +84,32 @@ from every other draft.
   cursor that keeps the draft commit the first page was read at, so a later write does not shift the
   pages. The route is in [the authoring API](authoring-revisions.md#draft-diff).
 - **Dropping.** Dropping a draft deletes its branch and its record.
-- **Ending by accept.** _(planned for M35)_ An accepted draft's branch is deleted, and its accept stays
+- **Ending by accept.** An accepted draft's branch and record are deleted, and its accept stays
   as a revision.
 
 ## Accepting a draft
 
-_(planned for M35)_
-
 The publisher runs an accept as a publish request of the kind `accept`, see
-[accepting](authoring-requests.md#accepting), in these steps:
+[accepting](authoring-requests.md#accepting), in these steps. The request names the draft, the
+application's folder by the application name, and the client. The publisher holds the folder's write
+lock from the first step to the last, so Studio writes to that folder wait.
 
-1. It takes the application's write lock.
-2. It compares each version the draft recorded with the version on `main` now. Any difference is a
-   conflict, and nothing is written.
-3. It applies the draft's changes to a scratch copy of the working folder and runs the compiler and
-   the scenarios on it, as a validate and a test request do.
-4. On success it writes the changed files to the working folder, as the authoring API writes them,
-   and commits them as one revision.
-5. On any failure the working folder and `main` are unchanged, and the request answers the failure.
+1. It finds the folder as Studio does and takes the folder's write lock. A folder whose manifest `id` is
+   not the request's application, or a lock that cannot be taken, fails the request.
+2. It records any outside change in the folder as "Outside change", so the accept's revision holds only
+   the draft's changes.
+3. It loads the draft as the person who asked. Another person's draft, and an unknown draft, are not
+   found, and the request fails.
+4. It compares each version the draft recorded with the version on `main` now. Each resource that
+   differs is a conflict, answered as one `AXC0377` diagnostic with the resource id, its file and its
+   new version, and nothing is written.
+5. It applies the draft's changes to the folder's files in memory and runs the steps of a validate on
+   the result: the compiler, the contract scenarios and every activation check, rolled back. The
+   application's own test scenarios do not run.
+6. On success it writes the changed files to the folder, as the authoring API writes them, and commits
+   them as one revision. It then deletes the draft.
+7. On any failure the folder and `main` are unchanged, and the request ends `failed` with its
+   diagnostics.
 
 ## Undo
 

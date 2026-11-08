@@ -257,13 +257,25 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("claims");
 
+                    b.Property<string>("Client")
+                        .HasColumnType("text")
+                        .HasColumnName("client");
+
                     b.Property<string>("Diagnostics")
                         .HasColumnType("jsonb")
                         .HasColumnName("diagnostics");
 
+                    b.Property<Guid?>("DraftId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("draft_id");
+
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");
+
+                    b.Property<string>("Folder")
+                        .HasColumnType("text")
+                        .HasColumnName("folder");
 
                     b.Property<string>("Kind")
                         .IsRequired()

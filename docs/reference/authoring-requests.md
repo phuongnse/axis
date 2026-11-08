@@ -130,12 +130,10 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 
 ## Accepting
 
-_(planned for M35)_
-
 Accepting moves a draft's changes into the working folder as one revision. It never puts them live:
 only [publishing](authoring.md#publishing) does.
 
-- **Who.** The author of the request accepts or drops the draft in Studio. The agent may accept it
+- **Who.** _(planned for M35)_ The author of the request accepts or drops the draft in Studio. The agent may accept it
   through `accept_draft` only when all of these hold:
   - the application's auto-accept setting is on, see
     [AI authoring in Studio](ai-authoring-in-studio.md#auto-accept);
@@ -145,15 +143,17 @@ only [publishing](authoring.md#publishing) does.
 - **Through the publisher.** An accept is a [publish request](authoring.md#publishing) of the kind
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
   interleave.
-- **All or nothing.** The publisher checks that every resource the draft changes still has the version
-  the draft recorded, applies the draft to the working folder as it is now, runs the compiler and the
-  scenarios on the result, and commits it as a revision, see
+- **All or nothing.** The publisher checks that every resource the draft read or changed still has the version
+  the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
+  contract scenarios on the result, and commits it as a revision, see
   [revisions and drafts](revisions-and-drafts.md#accepting-a-draft). So two changes that pass alone
   cannot break the application together, and on any failure nothing is written.
 - **Conflicts.** A resource that changed since the draft recorded it is a conflict, and the accept
-  answers it with the resources and their new versions. The agent then reads the folder again, makes
-  the change on a new draft and runs the checks again, within the request's budgets. Studio shows a
-  conflict to a person, who decides.
+  answers it with one `AXC0377` diagnostic for each resource, naming the resource, its file and its
+  new version.
+- **Retrying a conflict** _(planned for M35)_. The agent then reads the folder again, makes the change
+  on a new draft and runs the checks again, within the request's budgets. Studio shows a conflict to a
+  person, who decides.
 
 ## Audit
 
