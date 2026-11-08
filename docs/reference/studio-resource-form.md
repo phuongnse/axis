@@ -74,11 +74,12 @@ values keeps its rows of inputs.
   [undo rather than confirm](actions-and-controls.md#undo-rather-than-confirm).
 - **The dialog edits a copy.** It is `medium` for plain values and `large` for an item that holds a list
   or a map. It is titled by the verb that opened it: "Add module", because it adds an installed module
-  and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`.
-  The dialog's fields are the item's fields at their real pointers. Done writes the copy to the list as one
-  step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so Add… adds no
-  row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a dialog never
-  opens another.
+  and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`,
+  which every list of objects in a kind with field texts has. A list without one reads "item", as in
+  Add item…. The dialog's fields are the item's fields at their real pointers. Done writes the copy to the
+  list as one step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so
+  Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
+  dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
   writes them with the item, in the same step to undo, and Cancel drops them, so the label's texts stay as
   they were.
