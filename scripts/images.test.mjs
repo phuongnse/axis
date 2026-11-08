@@ -238,6 +238,26 @@ test('the agent host starts read-only and answers /health/live', { timeout }, as
   await waitLive(startReadOnly('axis-agent', writeSecrets('agent', {}), 5209, ['-e', 'Health__Urls=http://0.0.0.0:5209']))
 })
 
+test('the agent host starts read-only with AI authoring on and its settings in /run/secrets', { timeout }, async () => {
+  const secrets = writeSecrets('agent-ai', {
+    ConnectionStrings__Platform: connection('axis_runtime'),
+    Platform__SecretKey: secretKey,
+  })
+  // It is live while the first read of the tenant directory retries.
+  await waitLive(
+    startReadOnly('axis-agent', secrets, 5209, [
+      '-e',
+      'Ai__Bindings__main__Kind=anthropic',
+      '-e',
+      'Ai__Bindings__main__Model=model-1',
+      '-e',
+      'Ai__DefaultBinding=main',
+      '-e',
+      'Health__Urls=http://0.0.0.0:5209',
+    ]),
+  )
+})
+
 test('the control plane starts read-only with its connection string in /run/secrets', { timeout }, async () => {
   const secrets = writeSecrets('controlplane', {
     ControlPlane__ConnectionString: `Host=${postgres};Database=axis;Username=axis;Password=images-test${verifyFull('/run/test-ca/ca.crt')}`,

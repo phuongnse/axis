@@ -94,7 +94,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(QuotaDefaults.Load(configuration, cell));
         services.AddSingleton<TenantQuotas>();
 
-        WorkerTenantCatalog catalog;
+        BackgroundTenantCatalog catalog;
         ITenantKeySource keySource;
         if (TenancySettings.Source(configuration) == TenancySource.Directory)
         {
@@ -114,7 +114,7 @@ public static class WorkerServiceCollectionExtensions
 
             // The worker reads the directory when it runs, retries until a read works, and reads it again every
             // refresh interval. It ignores a Tenants section.
-            catalog = WorkerTenantCatalog.FromDirectory(
+            catalog = BackgroundTenantCatalog.FromDirectory(
                 platformConnectionString,
                 cipher,
                 refreshInterval,
@@ -145,7 +145,7 @@ public static class WorkerServiceCollectionExtensions
         }
         else
         {
-            catalog = WorkerTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
+            catalog = BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
             keySource = new ConfigurationTenantKeySource(configuration);
         }
 

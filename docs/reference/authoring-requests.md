@@ -18,8 +18,9 @@ no shortcut of its own.
 - **One client of the MCP server** _(planned for M35)_. It calls the [MCP server](mcp-server.md) over HTTP, like any
   client, and has no other way into a tenant. It never opens a tenant database for an application's
   resources, and never reads a record.
-- **Its own state** _(planned for M35)_. It reads and writes the request tables below in each tenant database, with the
-  tenant's runtime role, as the worker does.
+- **Its own state.** It reads its tenants as the worker does, see [AI settings](host-settings.md#ai-settings),
+  and reads the request tables below in each tenant database with the tenant's runtime role. It refuses a
+  tenant whose role can change the schema. _(Writing them is planned for M35.)_
 - **Models** _(planned for M35)_. It calls a model through an adapter, by the binding the request uses, see
   [model bindings](model-bindings.md).
 

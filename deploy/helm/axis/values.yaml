@@ -29,7 +29,8 @@ worker:
   replicas: 1
   resources: {}
 
-# The agent host gets no Secret, so AI authoring stays off.
+# The agent host gets the platform connection and the installation key, and no other Secret. It reads them only
+# when AI authoring is on.
 agent:
   repository: axis-agent
   replicas: 1
@@ -234,7 +235,7 @@ forwardedHeaders:
 # key inside it. The schema rejects any other field.
 secrets:
   # ConnectionStrings:Platform, the read-only platform database role.
-  # Used by the server and the worker.
+  # Used by the server, the worker and the agent host.
   platformConnection:
     name: ""
     key: ConnectionStrings__Platform

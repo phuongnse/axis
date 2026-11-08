@@ -199,10 +199,10 @@ database.
 | Setting                            | Default         | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ---------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Tenancy:Source`                   | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start.                                                                                                                                                                                                                                                                                                                                                                                       |
-| `Tenancy:RefreshInterval`          | `00:00:30`      | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting.                                                                                                                                                                                                                                                                                                       |
-| `Platform:SecretKey`               | none            | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start.                                                                                                                                                                                  |
-| `Platform:PreviousSecretKey`       | none            | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key).                                                                                           |
-| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. Both hosts need it under `directory`. Outside Development and Testing the server, and the worker under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `Tenancy:RefreshInterval`          | `00:00:30`      | How often the server and the worker read the tenant directory again, and the agent host as [AI settings](#ai-settings) say. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, and of the agent host as [AI settings](#ai-settings) say, naming the setting.                                                                                                                                                                                                                                                                                                       |
+| `Platform:SecretKey`               | none            | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, by the worker and `Axis.Admin` under `directory`, and by the agent host as [AI settings](#ai-settings) say. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start.                                                                                                                                                                                  |
+| `Platform:PreviousSecretKey`       | none            | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it, and the agent host as [AI settings](#ai-settings) say. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key).                                                                                           |
+| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. The server and the worker need it under `directory`, and the agent host as [AI settings](#ai-settings) say. Outside Development and Testing the server, and the worker and the agent host under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 | `ConnectionStrings:PlatformSchema` | none            | The role that owns the `platform` schema. The server reads it at start for the platform migrations, under both sources, and for each `PUT /api/cell/tenants/{id}/quotas`, which opens an unpooled connection for that write alone. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls).                                                   |
 
 As environment variables they are `Tenancy__Source`, `Tenancy__RefreshInterval`,
@@ -210,7 +210,7 @@ As environment variables they are `Tenancy__Source`, `Tenancy__RefreshInterval`,
 `ConnectionStrings__PlatformSchema`.
 
 - **Values.** `Tenancy:Source` matches exactly, in lower case. A blank value counts as unset. Any
-  other value stops the start of the server and of the worker, naming the setting.
+  other value stops the start of the server and of the worker, and of the agent host as [AI settings](#ai-settings) say, naming the setting.
 - **Default source.** Development, `scripts/dev.sh`, Docker Compose and the tests keep
   `Tenancy:Source=configuration`.
 - **The server under both sources.** The server applies the platform migrations at start over
@@ -237,7 +237,7 @@ As environment variables they are `Tenancy__Source`, `Tenancy__RefreshInterval`,
   directory again every `Tenancy:RefreshInterval`, keeps the last good read when a refresh fails, and
   reports `/health/ready` Degraded until a refresh works.
 - **No tenant schema connection.** Under `directory`, a tenant has no `SchemaConnectionString`. The
-  server and the worker hold only the runtime database role of each tenant, and `Axis.Admin` migrates
+  server, the worker and the agent host hold only the runtime database role of each tenant, and `Axis.Admin` migrates
   and activates tenant databases, see [database roles](storage.md#database-roles). The platform
   schema connection of the server is not a tenant schema connection. `ActivateOnStartup` must be
   empty under `directory`, see [startup activation](#startup-activation).
@@ -469,6 +469,24 @@ minute for one replica. The rules of the limits are in
 
 The agent host reads the `Ai` settings: the model bindings and the default and review bindings. Their
 table is in [model bindings](model-bindings.md#bindings).
+
+With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the worker does under
+[tenancy settings](#tenancy-settings). With it unset, AI authoring is off and the agent host starts
+idle, reading none of the settings below.
+
+- **What it reads.** `Tenancy:Source`, `Tenancy:RefreshInterval`, `ConnectionStrings:Platform`,
+  `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of the tenancy settings. Under
+  `directory` it needs `ConnectionStrings:Platform` and `Platform:SecretKey`, and never reads
+  `ConnectionStrings:PlatformSchema`. Under `configuration` it reads the `Tenants` section.
+- **The tenant directory.** It reads its `active` tenants over `ConnectionStrings:Platform`. If its first
+  read fails, it retries every `Tenancy:RefreshInterval`. Then it reads the directory again every
+  interval and keeps the last good read when a refresh fails. It leaves out a read-only tenant, as the
+  worker does. Its readiness does not show the directory read.
+- **The tenant role.** It opens a tenant database only with the tenant's runtime role, and refuses a
+  tenant whose role fails the [runtime role check](storage.md#database-roles). The error names the
+  tenant and the role and never a connection string.
+- **A bad setting** stops the start, and the message names the setting and never a connection value.
+  With AI authoring off, a missing platform connection does not stop the agent host.
 
 **Tenant keys and the budgets of a request** _(planned for M35)_ are settings of the same section and
 of the same table.

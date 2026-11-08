@@ -1,3 +1,4 @@
+using Axis.Tenancy;
 using Npgsql;
 
 namespace Axis.Data.Storage;
@@ -7,11 +8,32 @@ namespace Axis.Data.Storage;
 /// rows. The role must not be a superuser or a member of a superuser role, must not own the <c>axis</c> or
 /// <c>entities</c> schema or be a member of the role that owns it, and must not have <c>CREATE</c> on either
 /// schema or be a member of a role that has it. Membership counts whatever its <c>INHERIT</c> option, because
-/// the role can <c>SET ROLE</c> to the other role. The server and the worker run it at start. The first failed check stops the start, in that order, with <c>axis</c> before
+/// the role can <c>SET ROLE</c> to the other role. The server and the worker run it at start, and the agent host before it reads a tenant. The first failed check stops the start, in that order, with <c>axis</c> before
 /// <c>entities</c>. The message names the tenant and the role, never the connection string.
 /// </summary>
 public static class RuntimeRoleCheck
 {
+    /// <summary>
+    /// Opens a throwaway connection with the connection string of <paramref name="entry"/> and runs <see cref="CheckAsync"/>.
+    /// It returns null when the check passes, the message of the failed check, or a fixed text when the database cannot be
+    /// reached, because the text of a connection failure may name the database host.
+    /// </summary>
+    public static async Task<string?> RefusalAsync(TenantEntry entry, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        try
+        {
+            await using var source = NpgsqlDataSource.Create(entry.ConnectionString.Reveal());
+            await using var connection = await source.OpenConnectionAsync(cancellationToken);
+            await CheckAsync(connection, entry.Id, cancellationToken);
+            return null;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or NpgsqlException)
+        {
+            return exception is InvalidOperationException ? exception.Message : "The tenant database could not be reached.";
+        }
+    }
+
     /// <summary>
     /// Runs the check over <paramref name="connection"/>, which must be the runtime connection, because
     /// the check reads <c>current_user</c>. A schema that does not exist yet fails no check. It throws

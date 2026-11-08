@@ -40,7 +40,9 @@ public sealed class ModelAdapterKeyTests : IDisposable
             ["Ai:Bindings:main:Model"] = "model-1",
             ["Ai:Bindings:main:KeyFile"] = keyFile,
             ["Ai:DefaultBinding"] = "main",
-        }).Build());
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=unused",
+        }).Build(), new TestEnvironment());
         services.AddHttpClient(ModelAdapters.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler);
         await using var provider = services.BuildServiceProvider();
         var adapter = provider.GetRequiredService<ModelAdapters>().For("main");

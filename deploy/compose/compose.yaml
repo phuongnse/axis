@@ -181,7 +181,8 @@ services:
       - ConnectionStrings__Platform
       - Platform__SecretKey
 
-  # The agent host. It needs no database yet and starts idle, so it gets no secret, volume or tenant setting.
+  # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on.
+  # It gets no extension or module folder, and never the schema connection string.
   agent:
     image: ${AXIS_IMAGE_PREFIX:-}axis-agent:${AXIS_VERSION:?Set AXIS_VERSION}
     restart: unless-stopped
@@ -189,10 +190,14 @@ services:
     tmpfs:
       - /tmp
     environment:
+      Tenancy__Source: directory
       # All interfaces inside the container. The published port stays on 127.0.0.1.
       Health__Urls: http://0.0.0.0:5209
     ports:
       - "127.0.0.1:${AXIS_AGENT_HEALTH_PORT:-5209}:5209"
+    secrets:
+      - ConnectionStrings__Platform
+      - Platform__SecretKey
 
   # Runs the publish requests that Studio stores. It listens on no port.
   publisher:

@@ -346,7 +346,10 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
   - sets the token rules of the MCP sign-in, the access token lifetime and the single-use refresh
     tokens, and the client policy `axis-public-pkce` that requires PKCE of public clients, see
     [sign-in](mcp-server.md#sign-in). The client scope `axis:authoring` comes with the
-    [redirect addresses](#keeping-the-realm-in-step), because its audiences come from the hosts.
+    [redirect addresses](#keeping-the-realm-in-step), because its audiences come from the hosts;
+  - lets an outside MCP client register itself without a token, with the client policy
+    `axis-mcp-registration` and the realm's anonymous registration policies, under the rules of
+    [client registration](mcp-server.md#client-registration).
 
   A second run updates the realm, brings it up to the account rules and the token rules and sets its
   login theme and its email theme to `axis` again. When the identity provider answers a server error (5xx), the realm step

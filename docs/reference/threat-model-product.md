@@ -386,7 +386,7 @@ flowchart LR
         Mcp[MCP server at /mcp]
         Api[Authoring API]
     end
-    Tool -->|registers by metadata document or dynamic registration| Consent
+    Tool -->|registers by dynamic registration| Consent
     Consent -->|token for the tenant's /mcp audience| Tool
     Tool -->|POST /mcp with the token| Mcp
     Mcp -->|checks Origin, audience and the author role| Api
@@ -443,7 +443,7 @@ flowchart LR
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | P117 | A token for another resource or tenant is accepted. | Outside client and MCP server | Spoofing | Critical | **Mitigated** | `McpServerTests` shows that a token without the `/mcp` audience, and a token for another tenant's `/mcp` URL sent to a host, answer `401` with a challenge that points to the metadata, and that a session opens only for a token whose audience is that host's URL. See [sign-in](mcp-server.md#sign-in). |
-| P118 | A malicious client registers under a misleading name or redirect URI and asks for consent. | Outside client and MCP server | Spoofing | High | **Gap** | [#2530](https://github.com/phuongnse/axis/issues/2530) allows only `https` or loopback redirect URIs, and its consent screen shows the client's name. [#2529](https://github.com/phuongnse/axis/issues/2529) shows the client and the scope on the consent screen and issues no token when the person declines. |
+| P118 | A malicious client registers under a misleading name or redirect URI and asks for consent. | Outside client and MCP server | Spoofing | High | **Mitigated** | `TenantRealmAuthoringTests` shows that the realm accepts only `https` and loopback redirect addresses at registration, and that a registered client's sign-in stops at the consent screen, which names the client by its registered name. See [client registration](mcp-server.md#client-registration) and [consent](mcp-server.md#sign-in). |
 | P119 | A client that the `Ai:OutsideClients` setting does not allow gets a token. | Outside client and MCP server | Elevation of privilege | High | **Gap** | Closed by [#2531](https://github.com/phuongnse/axis/issues/2531), which allows no outside client by default and gives no token to a client that is not allowed. See [client registration](mcp-server.md#client-registration). |
 | P120 | A page on another origin drives `/mcp` through DNS rebinding. | Outside client and MCP server | Tampering | Medium | **Mitigated** | `McpServerTests` shows that a request with a foreign `Origin` answers `403` before any method runs. See [route and transport](mcp-server.md#route-and-transport). |
 | P121 | A tool reads a record, a file, a secret or a binding value, or publishes a release. | Outside client and MCP server | Information disclosure | High | **Mitigated** | `McpToolsDocumentationTests` (the tools table lists exactly the tools the server serves and offers), `McpToolOutputTests` (no output of any tool holds a seeded record value, secret binding, url binding or sign-in client secret), `McpToolGuardSelfTests` (the guard reports a leaking output, a tool with no input and a tool error). See [tools](mcp-server.md#tools). |
@@ -464,6 +464,7 @@ flowchart LR
 | P136 | The model provider keeps or trains on the configuration Axis sends. | Agent host and model provider | Information disclosure | Medium | **Delegated** | The operator chooses the binding and its provider, and so the provider's terms. See [model bindings](model-bindings.md#bindings). |
 | P137 | A forged, another tenant's or another person's `Mcp-Session-Id` is accepted. | Outside client and MCP server | Spoofing | Medium | **Mitigated** | `McpServerTests` shows that an altered session id answers `404`, and `McpSessionTests` that a session id of one tenant does not read on another. A session id also holds the person's subject and client id, which must match the token. See [sessions](mcp-server.md#route-and-transport). |
 | P138 | A preview tenant serves the MCP server. | Outside client and MCP server | Elevation of privilege | Medium | **Mitigated** | `McpServerTests` shows that a preview tenant's host answers `404` on `/mcp` and on its metadata. See [route and transport](mcp-server.md#route-and-transport). |
+| P140 | An anonymous registration gets a confidential client, another flow, a redirect address that is `http` and not loopback, or another scope. | Outside client and MCP server | Elevation of privilege | High | **Mitigated** | `TenantRealmAuthoringTests` shows that the realm refuses each of these at registration and creates no client, and that a rerun of `tenant create` repairs the rules when they were changed by hand. See [client registration](mcp-server.md#client-registration). |
 
 Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
 
