@@ -150,6 +150,24 @@ export async function waitForExpressions(page: Page) {
 }
 
 /**
+ * Clicks Save and waits for the save to finish. A save waits for the Studio write lock, which can take up to 10 seconds,
+ * and the server then compiles the application, so this waits up to 30 seconds. A save error or a conflict fails at once
+ * with the alert's text.
+ */
+export async function saveResource(page: Page) {
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  const saved = page.getByTestId('studio-saved')
+  const error = page.getByTestId('studio-save-error')
+  const conflict = page.getByTestId('studio-conflict')
+  await expect(saved.or(error).or(conflict)).toBeVisible({ timeout: 30_000 })
+  for (const failure of [error, conflict]) {
+    if (await failure.isVisible()) {
+      throw new Error(`The save failed: ${await failure.textContent()}`)
+    }
+  }
+}
+
+/**
  * Opens the dialog that adds an item to a list of objects, by the list's Add…, such as Add module…, and returns the
  * dialog. `list` is the list's JSON Pointer. A list that is the only one in its section has its Add… in the section's
  * heading, and any other list has it above its table. The fields of the new item sit at the pointer after the last row.
