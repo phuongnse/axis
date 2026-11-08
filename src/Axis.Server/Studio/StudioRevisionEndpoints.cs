@@ -27,7 +27,7 @@ internal static class StudioRevisionEndpoints
 {
     private const string NoRevision = "The application has no revision with this id.";
 
-    private const string NoDraft = "The application has no draft with this id.";
+    internal const string NoDraft = "The application has no draft with this id.";
 
     public static void MapStudioRevisionEndpoints(this IEndpointRouteBuilder endpoints)
     {

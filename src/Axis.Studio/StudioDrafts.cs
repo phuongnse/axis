@@ -69,6 +69,18 @@ internal sealed class StudioDrafts(string repository, string userId, string disp
         InDraftAsync(id, (_, _, tip) => StudioDraftOutcome<IReadOnlyList<StudioFile>>.Of(Resources(tip)), ct);
 
     /// <summary>
+    /// The path and bytes of every <c>*.json</c> file of the draft's branch, as its tree holds them, so a compile reads the draft
+    /// as it reads a folder. Records no version.
+    /// </summary>
+    public Task<StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>> FilesAsync(string id, CancellationToken ct) =>
+        InDraftAsync(id, (_, _, tip) =>
+        {
+            var files = new List<(string File, byte[] Bytes)>();
+            Walk(tip.Tree, "", files);
+            return StudioDraftOutcome<IReadOnlyList<(string File, byte[] Bytes)>>.Of(files);
+        }, ct);
+
+    /// <summary>
     /// The files the draft added, changed or removed since the <c>main</c> commit it started at, as a page of whole entries
     /// that serializes to at most <see cref="DiffPageBytes"/>, or one larger entry alone. Without a <paramref name="cursor"/>
     /// the page starts at the first entry and reads the branch tip. A cursor names the commit the first page was read at and

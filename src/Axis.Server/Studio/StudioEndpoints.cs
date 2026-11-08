@@ -80,6 +80,8 @@ namespace Axis.Server.Studio;
 /// object and 503 when the write lock cannot be taken. It takes no <c>If-Match</c>.
 /// <c>POST /api/studio/apps/{application}/changes</c> applies 1 to 20 creates and patches in one call under one write
 /// lock, checks every change before it writes any, and answers <c>{ items: [{ id, version }], diagnostics }</c>.
+/// The read routes above build their answers in <see cref="ListResources"/>, <see cref="ReadResource"/> and
+/// <see cref="ReadModuleResource"/>, which the read tools of the MCP server also call, so a tool and its route answer alike.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, the revision list, diff and undo are in
 /// <see cref="StudioRevisionEndpoints"/>, and the expression check is in
 /// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
@@ -161,12 +163,20 @@ internal static class StudioEndpoints
             return refusal!;
         }
 
-        var usedBy = StudioReferences.Compile(folder, packages, modules).Edges
+        return Results.Ok(ListResources(StudioFolder.List(folder), StudioReferences.Compile(folder, packages, modules)));
+    }
+
+    /// <summary>
+    /// The resource list of <paramref name="files"/> with the <c>usedBy</c> counts of <paramref name="references"/>, which
+    /// <c>GET .../resources</c> and the MCP tool <c>list_resources</c> both answer.
+    /// </summary>
+    internal static StudioResourceListResponse ListResources(IReadOnlyList<StudioFile> files, ReferenceIndex references)
+    {
+        var usedBy = references.Edges
             .Select(edge => edge.To)
             .OfType<ResourceNode>()
             .GroupBy(node => node.Id)
             .ToDictionary(group => group.Key, group => group.Count());
-        var files = StudioFolder.List(folder);
         var titles = StudioResourceTitles.Read(files);
         var items = files
             .Select(file => new StudioResourceItem(
@@ -179,7 +189,7 @@ internal static class StudioEndpoints
                 titles[file.Id].Titles,
                 titles[file.Id].Locale))
             .ToList();
-        return Results.Ok(new StudioResourceListResponse(items));
+        return new StudioResourceListResponse(items);
     }
 
     private static async Task<IResult> ResourceReferencesAsync(
@@ -243,10 +253,16 @@ internal static class StudioEndpoints
             return NotFound(NoResource);
         }
 
-        using var content = JsonDocument.Parse(found.Bytes);
         httpContext.Response.Headers.ETag = $"\"{found.Version}\"";
-        return Results.Ok(new StudioResourceResponse(
-            found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone()));
+        return Results.Ok(ReadResource(found));
+    }
+
+    /// <summary>The answer to a resource read for <paramref name="found"/>, which <c>GET .../resources/{id}</c> and the MCP tool <c>read_resource</c> both give.</summary>
+    internal static StudioResourceResponse ReadResource(StudioFile found)
+    {
+        using var content = JsonDocument.Parse(found.Bytes);
+        return new StudioResourceResponse(
+            found.Id.ToString("D"), found.Kind, found.Name, found.File, found.Version, content.RootElement.Clone());
     }
 
     private static async Task<IResult> ModuleResourceAsync(
@@ -264,14 +280,20 @@ internal static class StudioEndpoints
             return refusal!;
         }
 
+        var (resource, notFound) = ReadModuleResource(folder, module, id, packages, modules);
+        return resource is null ? notFound! : Results.Ok(resource);
+    }
+
+    /// <summary>
+    /// The module resource <paramref name="id"/> of the module version the folder pins, with the folder's layer applied, or
+    /// the 404 problem. <c>GET .../modules/{module}/resources/{id}</c> and the MCP tool <c>read_module_resource</c> both answer it.
+    /// </summary>
+    internal static (StudioModuleResourceResponse? Resource, IResult? NotFound) ReadModuleResource(
+        string folder, string module, string id, PackageCatalog packages, ModuleCatalog modules)
+    {
         var (found, notFound) = FindModuleFile(
             ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
-        if (found is null)
-        {
-            return notFound!;
-        }
-
-        return Results.Ok(StudioModuleLayers.Read(folder, module, found));
+        return found is null ? (null, notFound) : (StudioModuleLayers.Read(folder, module, found), null);
     }
 
     /// <summary>One file of an installed module version: its file id, kind, name, path, text and parsed root.</summary>
@@ -1065,14 +1087,21 @@ internal static class StudioEndpoints
 
     internal const string NoResource = "The application has no resource with this id.";
 
+    internal const string NoApplication = "No Studio folder holds an application with this name.";
+
     private const string NoModuleResource = "The module has no resource with this id.";
 
     private const string NoTextKey = "The application has no text key with this name.";
 
-    private static StudioFile? FindResource(string folder, string id) =>
-        id is { Length: 36 } && Guid.TryParseExact(id, "D", out var guid)
-            ? StudioFolder.List(folder).FirstOrDefault(file => file.Id == guid)
-            : null;
+    private static StudioFile? FindResource(string folder, string id) => FindResource(StudioFolder.List(folder), id);
+
+    /// <summary>The file of <paramref name="files"/> whose id is <paramref name="id"/>, written as 36 characters, or null.</summary>
+    internal static StudioFile? FindResource(IReadOnlyList<StudioFile> files, string id) =>
+        ParseResourceId(id) is { } guid ? files.FirstOrDefault(file => file.Id == guid) : null;
+
+    /// <summary>The resource id that <paramref name="id"/> writes in the 36-character form, or null.</summary>
+    internal static Guid? ParseResourceId(string id) =>
+        id is { Length: 36 } && Guid.TryParseExact(id, "D", out var guid) ? guid : null;
 
     // The session and role checks every route shares: the problem that refuses the request, or null. A route that
     // publishes also needs the publisher role, which is checked right after the author role.
@@ -1105,11 +1134,14 @@ internal static class StudioEndpoints
             return (null, refusal);
         }
 
-        var tenantId = httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current?.TenantId;
-        return StudioFolder.Find(options, tenantId, application) is { } folder
-            ? (folder, null)
-            : (null, NotFound("No Studio folder holds an application with this name."));
+        return FindFolder(ForRequest(httpContext, options), application);
     }
+
+    /// <summary>The folder of <paramref name="application"/> in the options of one tenant, or the 404 problem, for a caller that has checked the person itself.</summary>
+    internal static (string? Folder, IResult? Refusal) FindFolder(StudioOptions tenantOptions, string application) =>
+        StudioFolder.Find(tenantOptions, application) is { } folder
+            ? (folder, null)
+            : (null, NotFound(NoApplication));
 
     // The revisions of a write to the folder, by the signed-in user, or null when the server keeps no revisions. The
     // routes call it after FindFolderAsync, which has checked the session.
