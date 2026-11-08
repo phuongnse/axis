@@ -558,13 +558,27 @@ describe('AxisTable', () => {
       expect(lines.getByRole('checkbox', { name: 'Name' })).toBeDisabled()
       expect(lines.queryByRole('button', { name: /Move (up|down) Name/ })).not.toBeInTheDocument()
       await userEvent.click(lines.getByRole('button', { name: 'Move up Note' }))
-      await userEvent.click(lines.getByRole('checkbox', { name: 'Amount' }))
       await userEvent.click(lines.getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note', 'Amount'])
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
 
       expect(headers()).toEqual(['Name', 'Note'])
       await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
       expect(within(columnsDialog()).getByRole('checkbox', { name: 'Name' })).toBeDisabled()
       expect(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' })).not.toBeChecked()
+    })
+
+    it('moves a column down', async () => {
+      render(<Harness />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Move down Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note', 'Amount'])
     })
 
     it('puts a column that is shown again last', async () => {
