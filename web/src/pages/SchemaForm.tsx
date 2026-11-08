@@ -1,11 +1,12 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
+import { lazy, Suspense, useContext, useId, type ReactNode } from 'react'
 import type { StudioNames } from '../platform/studio'
 import { keyPropertyOf, type KeyedLists } from '../platform/layerMarks'
 import { parameterType, referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { AxisButton } from '../platform/AxisButton'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
@@ -13,6 +14,7 @@ import { LabelTextsContext } from './labelTextsContext'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaLayerContext } from './schemaLayerContext'
+import { sectionsByKind } from './schemaFormSections'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -50,16 +52,7 @@ export function SchemaForm({
 }) {
   return (
     <SchemaLayerContext.Provider value={layer && keyedLists && { designer: layer, keyedLists }}>
-      <Properties
-        node={schema}
-        root={schema}
-        rootValue={value}
-        pointer=""
-        path=""
-        value={value}
-        onChange={onChange}
-        readOnlyNames={readOnlyNames}
-      />
+      <Sections schema={schema} value={value} onChange={onChange} readOnlyNames={readOnlyNames} />
     </SchemaLayerContext.Provider>
   )
 }
@@ -75,7 +68,124 @@ interface NodeProps {
   onChange: ChangeHandler
 }
 
-function Properties({
+/**
+ * The root properties in sections, see docs/reference/studio-resource-form.md#sections. A property that no section
+ * names goes to a last section with no heading.
+ */
+function Sections({
+  schema,
+  value,
+  onChange,
+  readOnlyNames,
+}: {
+  schema: JsonSchema
+  value: Record<string, unknown>
+  onChange: ChangeHandler
+  readOnlyNames?: Set<string>
+}) {
+  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
+  const headingId = useId()
+  const kind = schema.properties?.kind?.const
+  const shown = Object.keys(schema.properties ?? {}).filter((name) => !hiddenRootProperties.has(name))
+  const mapped = typeof kind === 'string' && Object.hasOwn(sectionsByKind, kind) ? sectionsByKind[kind] : []
+  const named = new Set(mapped.flatMap((section) => section.properties))
+  const groups = [
+    ...mapped.map((section) => ({
+      name: section.name as string | undefined,
+      properties: section.properties.filter((name) => shown.includes(name)),
+    })),
+    { name: undefined, properties: shown.filter((name) => !named.has(name)) },
+  ].filter((group) => group.properties.length > 0)
+  const panel = {
+    background: colour.surface,
+    border: `1px solid ${colour.borderSubtle}`,
+    borderRadius: radius.base,
+    padding: spacing.md,
+  }
+
+  return (
+    <Flex vertical gap={spacing.md}>
+      {groups.map((group) => {
+        const single = group.name !== undefined && group.properties.length === 1 ? group.properties[0] : undefined
+        const singleSchema = single === undefined ? undefined : resolveSchema(schema.properties![single], schema)
+        const itemSchema = singleSchema?.type === 'array' ? singleSchema.items : undefined
+        const items = single === undefined ? undefined : (value[single] as unknown)
+        const fields = (
+          <Flex vertical gap="small">
+            {group.properties.map((name) =>
+              renderProperty({
+                name,
+                child: schema.properties![name],
+                node: schema,
+                root: schema,
+                rootValue: value,
+                pointer: '',
+                path: '',
+                value,
+                onChange,
+                readOnlyNames,
+                t,
+                kind,
+                named: name === single,
+              }),
+            )}
+          </Flex>
+        )
+        if (group.name === undefined) {
+          return (
+            <div key="rest" data-testid="studio-section-rest" style={panel}>
+              {fields}
+            </div>
+          )
+        }
+        const id = `${headingId}-${group.name}`
+        const prefix = `shell.studio.section.${String(kind)}.${group.name}`
+        return (
+          <section key={group.name} aria-labelledby={id} data-testid={`studio-section-${group.name}`} style={panel}>
+            <Flex justify="space-between" align="flex-start" gap="small" style={{ marginBottom: spacing.sm }}>
+              <div>
+                <Typography.Title id={id} level={5} style={{ margin: 0 }}>
+                  {t(prefix)}
+                </Typography.Title>
+                <Typography.Text type="secondary">{t(`${prefix}.line`)}</Typography.Text>
+              </div>
+              {single !== undefined && itemSchema !== undefined && (
+                <AxisButton
+                  role="secondary"
+                  onClick={() =>
+                    onChange(`/${escapeSegment(single)}`, [
+                      ...(Array.isArray(items) ? items : []),
+                      defaultFor(itemSchema, schema),
+                    ])
+                  }
+                >
+                  {t('shell.studio.addItem')}
+                </AxisButton>
+              )}
+            </Flex>
+            {fields}
+          </section>
+        )
+      })}
+    </Flex>
+  )
+}
+
+interface PropertyContext extends NodeProps {
+  name: string
+  child: JsonSchema
+  readOnlyNames?: Set<string>
+  t: (key: string) => string
+  kind: unknown
+  /** Whether the heading of a section names this property, see {@link SchemaNode}. */
+  named?: boolean
+}
+
+/** The node of one property of an object, with its label and help from the kind's field texts. */
+function renderProperty({
+  name,
+  child,
   node,
   root,
   rootValue,
@@ -84,34 +194,39 @@ function Properties({
   value,
   onChange,
   readOnlyNames,
-}: NodeProps & { readOnlyNames?: Set<string> }) {
+  t,
+  kind,
+  named,
+}: PropertyContext): ReactNode {
+  const childPath = path === '' ? name : `${path}.${name}`
+  const { label, help } = fieldTexts(t, kind, childPath, name)
+  return (
+    <SchemaNode
+      key={name}
+      node={child}
+      root={root}
+      rootValue={rootValue}
+      pointer={`${pointer}/${escapeSegment(name)}`}
+      path={childPath}
+      name={label}
+      help={help}
+      value={(value as Record<string, unknown> | undefined)?.[name]}
+      required={new Set(node.required).has(name)}
+      readOnly={readOnlyNames?.has(name) ?? false}
+      named={named}
+      onChange={onChange}
+    />
+  )
+}
+
+function Properties({ node, root, rootValue, pointer, path, value, onChange }: NodeProps) {
   const t = useText()
-  const required = new Set(node.required)
   const kind = root.properties?.kind?.const
   return (
     <Flex vertical gap="small">
-      {Object.entries(node.properties ?? {})
-        .filter(([name]) => pointer !== '' || !hiddenRootProperties.has(name))
-        .map(([name, child]) => {
-          const childPath = path === '' ? name : `${path}.${name}`
-          const { label, help } = fieldTexts(t, kind, childPath, name)
-          return (
-            <SchemaNode
-              key={name}
-              node={child}
-              root={root}
-              rootValue={rootValue}
-              pointer={`${pointer}/${escapeSegment(name)}`}
-              path={childPath}
-              name={label}
-              help={help}
-              value={(value as Record<string, unknown> | undefined)?.[name]}
-              required={required.has(name)}
-              readOnly={readOnlyNames?.has(name) ?? false}
-              onChange={onChange}
-            />
-          )
-        })}
+      {Object.entries(node.properties ?? {}).map(([name, child]) =>
+        renderProperty({ name, child, node, root, rootValue, pointer, path, value, onChange, t, kind }),
+      )}
     </Flex>
   )
 }
@@ -146,8 +261,17 @@ function SchemaNode({
   required,
   readOnly = false,
   item = false,
+  named = false,
   onChange,
-}: NodeProps & { name: string; help?: string; required: boolean; readOnly?: boolean; item?: boolean }) {
+}: NodeProps & {
+  name: string
+  help?: string
+  required: boolean
+  readOnly?: boolean
+  item?: boolean
+  /** Whether the heading of a section names this field, so it shows no label, help or group of its own. */
+  named?: boolean
+}) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext)
@@ -277,6 +401,18 @@ function SchemaNode({
         </div>
       </fieldset>
     )
+  } else if (isObject && named) {
+    input = (
+      <Properties
+        node={schema}
+        root={root}
+        rootValue={rootValue}
+        pointer={pointer}
+        path={path}
+        value={value}
+        onChange={onChange}
+      />
+    )
   } else if (isObject) {
     input = (
       <fieldset style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
@@ -335,17 +471,19 @@ function SchemaNode({
           </Flex>
         ))}
         {keyProperty !== undefined && <RemovedRows layer={layer!.designer} list={pointer} />}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
-            {t('shell.studio.addItem')}
-          </Button>
-        </div>
+        {!named && (
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button onClick={() => onChange(pointer, [...items, defaultFor(itemSchema, root)])}>
+              {t('shell.studio.addItem')}
+            </Button>
+          </div>
+        )}
       </Flex>
     )
   }
 
-  const showsLabel = !isObject
+  const showsLabel = !isObject && !named
   return (
     <div data-testid={`studio-field-${pointer}`}>
       {showsLabel && <div style={labelStyle}>{name}</div>}

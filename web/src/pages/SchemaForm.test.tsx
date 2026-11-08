@@ -1,4 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
@@ -9,7 +10,7 @@ import { loadKindSchema, resolveSchema, type JsonSchema } from '../platform/stud
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { LabelTextsContext } from './labelTextsContext'
-import { SchemaForm } from './SchemaForm'
+import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
 const english: Record<string, string> = platformEnglish
 const vietnamese: Record<string, string> = platformVietnamese
@@ -61,13 +62,13 @@ const formKinds: Record<string, string[]> = {
 }
 const hiddenRootProperties = ['id', 'kind', 'formatVersion']
 
-function renderForm(schema: JsonSchema, value: Record<string, unknown>) {
+function renderForm(schema: JsonSchema, value: Record<string, unknown>, onChange: ChangeHandler = vi.fn()) {
   render(
     <ThemeModeProvider>
       <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
         <StudioNamesContext.Provider value={names}>
           <LabelTextsContext.Provider value={labelContext}>
-            <SchemaForm schema={schema} value={value} onChange={vi.fn()} />
+            <SchemaForm schema={schema} value={value} onChange={onChange} />
           </LabelTextsContext.Provider>
         </StudioNamesContext.Provider>
       </TextProvider>
@@ -204,6 +205,100 @@ describe('SchemaForm field texts', () => {
     expect(screen.getByTestId('studio-group-/grants/0')).toHaveStyle({
       borderInlineStart: `1px solid ${colour.borderSubtle}`,
     })
+  })
+})
+
+describe('SchemaForm sections', () => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', 'light'))
+
+  const applicationValue = { name: 'Shop', modules: [{ id: 'Sales', version: '^1.0.0' }] }
+
+  function expectHeading(section: HTMLElement, key: string) {
+    expect(within(section).getByRole('heading', { name: english[key] })).toBeVisible()
+    expect(within(section).getByText(english[`${key}.line`])).toBeVisible()
+  }
+
+  it('shows a role in a General section with its heading, line, name and label', async () => {
+    renderForm((await loadKindSchema('role'))!, { name: 'Approver', label: { textKey: 'roles.approver' } })
+
+    const section = screen.getByTestId('studio-section-general')
+    expectHeading(section, 'shell.studio.section.role.general')
+    expect(within(section).getByTestId('studio-field-/name')).toBeVisible()
+    expect(within(section).getByTestId('studio-field-/label')).toBeVisible()
+    expect(screen.queryByTestId('studio-section-rest')).toBeNull()
+  })
+
+  it('shows the application in General, Modules, Packages and File storage, in that order', async () => {
+    renderForm((await loadKindSchema('application'))!, applicationValue)
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(sections.map((section) => section.dataset.testid)).toEqual([
+      'studio-section-general',
+      'studio-section-modules',
+      'studio-section-packages',
+      'studio-section-fileStorage',
+    ])
+    const keys = ['general', 'modules', 'packages', 'fileStorage']
+    sections.forEach((section, index) => expectHeading(section, `shell.studio.section.application.${keys[index]}`))
+  })
+
+  it('puts a property that no section names in a last section with no heading', async () => {
+    const schema = (await loadKindSchema('role'))!
+    renderForm(
+      { ...schema, properties: { ...schema.properties, extra: { type: 'string' } } },
+      { name: 'Approver', extra: 'x' },
+    )
+
+    const rest = screen.getByTestId('studio-section-rest')
+    expect(within(rest).getByTestId('studio-field-/extra')).toBeVisible()
+    expect(within(rest).queryByRole('heading')).toBeNull()
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(sections[sections.length - 1]).toBe(rest)
+  })
+
+  it('shows one panel with no heading for a kind that has no sections', async () => {
+    renderForm((await loadKindSchema('trigger'))!, { kind: 'trigger', name: 'Daily', formatVersion: 1, parameters: {} })
+
+    expect(screen.getAllByTestId(/^studio-section-/).map((section) => section.dataset.testid)).toEqual([
+      'studio-section-rest',
+    ])
+    expect(screen.queryByRole('heading')).toBeNull()
+  })
+
+  it('puts the Add of the Modules list in the section heading', async () => {
+    const onChange = vi.fn()
+    renderForm((await loadKindSchema('application'))!, applicationValue, onChange)
+
+    const section = screen.getByTestId('studio-section-modules')
+    // The Add of the heading comes before the list and its items' own buttons.
+    await userEvent.click(within(section).getAllByRole('button', { name: 'Add' })[0])
+
+    expect(onChange).toHaveBeenCalledWith('/modules', [{ id: 'Sales', version: '^1.0.0' }, {}])
+  })
+
+  it('leaves the Add out of the Modules list itself', async () => {
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop', modules: [] })
+
+    expect(within(screen.getByTestId('studio-field-/modules')).queryByRole('button', { name: 'Add' })).toBeNull()
+    expect(within(screen.getByTestId('studio-section-modules')).getAllByRole('button', { name: 'Add' })).toHaveLength(1)
+  })
+
+  it('shows the fields of the File storage object without a label or group of its own', async () => {
+    renderForm((await loadKindSchema('application'))!, { name: 'Shop', fileStorage: {} })
+
+    const section = screen.getByTestId('studio-section-fileStorage')
+    expect(within(section).getByTestId('studio-field-/fileStorage/binding')).toBeVisible()
+    expect(screen.queryByTestId('studio-group-/fileStorage')).toBeNull()
+    expect(within(section).queryByText(english['shell.studio.field.application.fileStorage.help'])).toBeNull()
+  })
+
+  it('draws a section as a surface panel with a subtle border, spacing-md apart', async () => {
+    renderForm((await loadKindSchema('application'))!, applicationValue)
+
+    const { colour, spacing } = designTokensFor('light')
+    const section = screen.getByTestId('studio-section-modules')
+    expect(section).toHaveStyle({ background: colour.surface, border: `1px solid ${colour.borderSubtle}` })
+    expect(section.parentElement).toHaveStyle({ gap: `${spacing.md}px` })
   })
 })
 
