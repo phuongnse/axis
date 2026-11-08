@@ -2,6 +2,12 @@
   "$comment": "The terms that wait for the owner's approval, by locale. The owner approves a term by moving it to ui-glossary.json. See docs/reference/ui-writing.md#the-glossary. status: proposed or decide.",
   "terms": [
     {
+      "concept": "Application template",
+      "en": "template",
+      "vi": "mẫu",
+      "status": "proposed"
+    },
+    {
       "concept": "Action: Apply",
       "en": "Apply",
       "vi": "Áp dụng",

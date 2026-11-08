@@ -9,7 +9,7 @@ export type AxisFieldProps = {
   /** Required: every platform field has help, see docs/reference/frontend.md#platform-field-help. */
   help: string
   name: NonNullable<FormItemProps['name']>
-  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. */
+  /** The message under the field when it is empty, such as "Enter a name.". It marks the field required and checks it. A multiple select is empty when nothing is chosen. */
   requiredMessage?: string
   /** More rules of Ant Design's form, checked after the required one. */
   rules?: FormItemProps['rules']
@@ -32,7 +32,17 @@ export function AxisField({ label, help, name, requiredMessage, rules, children 
       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{label}</span>}
       required={requiredMessage !== undefined}
       rules={[
-        ...(requiredMessage === undefined ? [] : [{ required: true, whitespace: true, message: requiredMessage }]),
+        ...(requiredMessage === undefined
+          ? []
+          : [
+              {
+                required: true,
+                whitespace: true,
+                message: requiredMessage,
+                // A multiple select holds an array, which is empty when nothing is chosen. The rule reads text, so it reads the joined values.
+                transform: (value: unknown) => (Array.isArray(value) ? value.join('') : value),
+              },
+            ]),
         ...(rules ?? []),
       ]}
     >
