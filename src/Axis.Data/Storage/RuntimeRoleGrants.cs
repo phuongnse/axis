@@ -51,6 +51,7 @@ public static class RuntimeRoleGrants
         "sessions",
         "given_roles",
         "application_settings",
+        "resource_writes",
         "files",
         "file_contents",
         "record_imports",

@@ -129,8 +129,9 @@ The tab is the [standard table](actions-and-controls.md#tables), flat, with sear
 2. Kind, as wide as its content.
 3. How it is used, in words, such as "A field refers to it", with one text for each relation of the compiler.
 
-No file, path or relation code shows. It sorts by kind in
-the sidebar's order, then by name. The same resource used the same way shows once. With none, the table
+No file, path or relation code shows. Name and Kind sort from their headers, Kind in the sidebar's order, and
+search looks in the name. Until a person sorts, the rows are by kind in the sidebar's order, then by name. The
+same resource used the same way shows once. With none, the table
 says so.
 
 ## Save bar
@@ -197,17 +198,24 @@ release routes are in [release page](studio-workspace.md#release-page).
 
 ### Resource activity
 
-_(planned for M31)_
-
 `GET .../resource-activity` answers `{ items }`, one for each resource of the folder and of the modules the
-application uses. It is a route of its own, so the resource list stays free of the database. Studio's
-[kind lists](studio.md#kind-lists-and-module-resources) read it.
+application uses, each `{ id, module, status, titles, descriptions, modifiedBy, modifiedAt }`. It is a route of
+its own, so the resource list stays free of the database. Studio's [kind lists](studio.md#kind-lists-and-module-resources)
+read it. Like every Studio route it answers `401` without a session and `403` without the author role.
 
-- **`status`** is `new`, `changed` or `published`, against the live release. A file the release does not
-  hold is new, and with no live release every file is. A file it holds that no longer loads is changed. A
-  module's resource changes with a new module version or a layer.
+- **`status`** is `new`, `changed` or `published`, against the live release, comparing each file as canonical
+  JSON. A file the release does not hold is new, and with no live release every file is. A file it holds that
+  no longer loads is changed, and is listed with the id the release gives it. A scenario has no status,
+  because a release never stores scenarios, so it is null. A module's resource is changed when its file in the
+  module version the application pins differs from the release's copy, or when the application's layer for it
+  differs from the release's layer. A new module version that leaves a file the same changes nothing.
+- **`module`** is the module's id for a module's resource, else null.
 - **`titles` and `descriptions`** go with a module's resource: its label and description by locale, from
-  the module's own texts.
-- **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a resource and when, with the version
-  the write left, and a module's layer write counts too. The route answers them only while the file still
-  has that version, so a file changed in git shows the dash rather than the wrong person.
+  the module's own texts. A resource of the folder has them null, because the resource list gives them.
+- **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a file and when, with the version
+  the write left, and a module's layer write counts too. The create, patch, `changes`, text write and module
+  resource save and reset routes record, and undo, accepting an authoring request and creating an
+  application do not. The route answers them only while the file still has that version, so a file changed in
+  git or by hand shows the dash rather than the wrong person. A module resource's writer is whoever last
+  wrote its layer. `modifiedBy` is the user's current profile name, else the name stored with the write.
+  A record that fails is logged and never fails the write.

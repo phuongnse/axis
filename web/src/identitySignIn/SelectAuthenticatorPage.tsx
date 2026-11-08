@@ -23,7 +23,13 @@ export function SelectAuthenticatorPage({ context }: { context: SelectAuthentica
               htmlType="submit"
               name="authenticationExecution"
               value={method.id}
-              style={{ height: 'auto', textAlign: 'left', whiteSpace: 'normal', padding: '8px 16px' }}
+              style={{
+                height: 'auto',
+                justifyContent: 'flex-start',
+                textAlign: 'left',
+                whiteSpace: 'normal',
+                padding: '8px 16px',
+              }}
             >
               <Flex vertical>
                 <Typography.Text strong>{method.label}</Typography.Text>

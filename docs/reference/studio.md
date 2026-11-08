@@ -57,7 +57,7 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   author can type to narrow it. The dialog then asks for a name, or for a locale when the kind is
   `text`. A `409`, when the id or the file exists, or a `400`, when the name or the locale is refused,
   shows under the field and keeps the dialog open.
-- **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
+- **Its fields.** Kind and Name, or Locale, are marked required and have help. Create
   stays on, and a click [checks the fields](actions-and-controls.md#fields).
 - **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's
   schema except at the references the author must still choose, with an id from
@@ -145,13 +145,15 @@ what changed.
   the editor carries on from the new version.
 - **A stale version** is a `409`. The editor keeps the author's draft on screen and offers Reload,
   which reads the resource again and drops the draft.
-- **Leave without saving** _(planned for M31)_. One guard around the shell asks "Leave without saving?", with
+- **Leave without saving.** One guard around the shell asks "Leave without saving?", with
   Stay and Leave, before a link in the shell is followed and before a move that the workspace starts by
   itself, such as opening a reference or a problem. It guards Back and Forward too, through the
   [data router](frontend.md#routing). An editor counts itself in through `useUnsavedChanges`, which
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
-  asked about.
+  asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
+  A move that only changes the `search`, `sort`, `page` or `pageSize` of a [table](actions-and-controls.md#tables)
+  is not asked about either, because the editor stays on screen.
 
 ## References
 

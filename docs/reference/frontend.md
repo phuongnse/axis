@@ -461,9 +461,9 @@ and which fields each write action covers. A `taskInbox`, a `processInspector`, 
 The SPA routes on the client with `react-router` v7. The server answers every other path with the SPA, so each address
 below answers `200`.
 
-- **A data router** _(planned for M31)_. The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward
-  with [Leave without saving?](studio.md#editor), and `<ScrollRestoration>` returns a person to where they were on a
-  long page.
+- **A data router.** The SPA uses `createBrowserRouter`, so `useBlocker` guards Back and Forward with
+  [Leave without saving?](studio.md#editor).
+- **Scroll restoration** _(planned for M31)_. `<ScrollRestoration>` returns a person to where they were on a long page.
 
 | Address                                | Shows                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -563,9 +563,9 @@ right.
 - **When.** An entity table has a search box when the entity's display field is among the fields the user may read,
   that is in the widget's `entity.fields`. A data source table has one when the data source's metadata has
   `"search": true`.
-- **Applying.** The text applies on Enter, on the search button and when the box is cleared, so typing does not
-  request rows and add a history entry for every key. It lives in the URL as `search`. A new search starts again at
-  page 1 and adds a history entry, and paging and sorting keep it.
+- **Applying.** The box applies as [tables](actions-and-controls.md#tables) says, so typing does not request rows
+  for every key. The text lives in the URL as `search`, a new search adds a history entry, and paging and sorting
+  keep it.
 - **The text.** The text is sent to the rows request as typed, without trimming. An empty text means no search, so
   clearing the box removes `search` from the URL. The box takes at most 200 characters, the limit of the rows routes.
 - **No search.** On a table that cannot search, a `search` in the URL is ignored and removed without a history entry,
@@ -869,7 +869,7 @@ narrow one.
 Every field of the platform's own screens has help text, enforced three ways, because in an application
 builder help is not optional.
 
-- **`AxisField` requires `help`,** _(planned for M31)_ so a screen cannot leave it out.
+- **`AxisField` requires `help`,** so a screen cannot leave it out.
 - **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
   that are not fields, such as `modules.addTitle`, move out of it.
 - **Every editor draws its labels through `AxisField`,** _(planned for M31)_ those that draw their own today

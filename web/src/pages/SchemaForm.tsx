@@ -17,6 +17,7 @@ import {
   type CatalogControl,
 } from '../platform/studioCatalog'
 import { getAt, parameterType, referenceOptions, StudioNamesContext, textsOf } from '../platform/studioNames'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { resolveSchema, type JsonSchema, type ReferenceMark } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
@@ -831,9 +832,7 @@ function RelaxedPointLines({ application, points }: { application: string; point
             {point.contractId === null ? (
               <span>{label}</span>
             ) : (
-              <Link to={`/studio?${new URLSearchParams({ app: application, resource: point.contractId })}`}>
-                {label}
-              </Link>
+              <Link to={studioResourceAddress(application, point.contractId)}>{label}</Link>
             )}
             <span>{point.reason}</span>
           </Flex>

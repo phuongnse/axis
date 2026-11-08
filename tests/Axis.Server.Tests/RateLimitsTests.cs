@@ -132,10 +132,11 @@ public sealed partial class RateLimitsTests
         var counts = new Dictionary<string, long>(StringComparer.Ordinal);
         var keys = new HashSet<string>(StringComparer.Ordinal);
         using var services = new ServiceCollection().AddMetrics().BuildServiceProvider();
+        var meterFactory = services.GetRequiredService<IMeterFactory>();
         using var listener = new MeterListener();
         listener.InstrumentPublished = (instrument, meterListener) =>
         {
-            if (instrument.Meter.Name == AxisMetrics.MeterName && instrument.Name == AxisMetrics.RateLimitRefusals)
+            if (ReferenceEquals(instrument.Meter.Scope, meterFactory) && instrument.Name == AxisMetrics.RateLimitRefusals)
             {
                 meterListener.EnableMeasurementEvents(instrument);
             }
@@ -149,7 +150,7 @@ public sealed partial class RateLimitsTests
             }
         });
         listener.Start();
-        var refusals = new RateLimitRefusals(services.GetRequiredService<IMeterFactory>());
+        var refusals = new RateLimitRefusals(meterFactory);
 
         refusals.Record(Partition.SignIn);
         refusals.Record(Partition.Session);

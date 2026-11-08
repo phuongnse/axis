@@ -48,6 +48,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
 
     public DbSet<ApplicationSettingsRow> ApplicationSettings => Set<ApplicationSettingsRow>();
 
+    public DbSet<ResourceWriteRow> ResourceWrites => Set<ResourceWriteRow>();
+
     public DbSet<AuthoringRequest> AuthoringRequests => Set<AuthoringRequest>();
 
     public DbSet<AuthoringRequestStep> AuthoringRequestSteps => Set<AuthoringRequestStep>();
@@ -217,6 +219,18 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             settings.HasKey(s => s.ApplicationId).HasName("pk_application_settings");
             settings.Property(s => s.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
             settings.Property(s => s.AutoAccept).HasColumnName("auto_accept").HasDefaultValue(false);
+        });
+
+        modelBuilder.Entity<ResourceWriteRow>(write =>
+        {
+            write.ToTable("resource_writes");
+            write.HasKey(w => new { w.ApplicationId, w.File }).HasName("pk_resource_writes");
+            write.Property(w => w.ApplicationId).HasColumnName("application_id").ValueGeneratedNever();
+            write.Property(w => w.File).HasColumnName("file");
+            write.Property(w => w.Version).HasColumnName("version");
+            write.Property(w => w.UserId).HasColumnName("user_id");
+            write.Property(w => w.UserName).HasColumnName("user_name");
+            write.Property(w => w.WrittenAt).HasColumnName("written_at");
         });
 
         modelBuilder.Entity<AuthoringRequest>(request =>

@@ -182,7 +182,6 @@ function ReleaseContent({
   const { spacing } = useDesignTokens()
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const format = (value: string) => time.format(new Date(value))
-  const address = (extra: Record<string, string>) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
 
   const sorted = [...history.items].sort((left, right) => Date.parse(left.activatedAt) - Date.parse(right.activatedAt))
   const ownIndexes = sorted.flatMap((item, index) => (item.number === release.number ? [index] : []))
@@ -294,7 +293,7 @@ function ReleaseContent({
               plainChanged
               rows={changeRows(release.changes, resources, locale, t)}
               parts={release.partChanges ?? []}
-              address={address}
+              application={application}
             />
           </>
         )}

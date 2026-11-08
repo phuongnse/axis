@@ -1,6 +1,6 @@
 import { Alert, Button, Descriptions, Flex, Result, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { AxisActionRow } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
@@ -28,9 +28,11 @@ import {
 } from '../platform/studio'
 import { StudioConnectionContext, useStudioConnection } from '../platform/studioConnection'
 import { kindName, kindSingular } from '../platform/studioKinds'
+import { studioResourceAddress } from '../platform/studioAddress'
 import { starterKinds } from '../platform/studioStarters'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { leaveWithoutAsking } from '../platform/unsavedChanges'
 import { useDesignTokens } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { useHomeGrid } from './homeGrid'
@@ -229,6 +231,7 @@ function StudioWorkspace() {
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { generation, reconnecting, lost } = useStudioConnection()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const application = params.get('app')
   const resourceId = params.get('resource')
   const path = params.get('path')
@@ -408,7 +411,7 @@ function StudioWorkspace() {
   }
 
   function selectResource(id: string) {
-    setParams({ app: application!, resource: id })
+    navigate(studioResourceAddress(application!, id))
   }
 
   function onCreated(item: StudioResourceItem, diagnostics: StudioDiagnostic[]) {
@@ -418,7 +421,7 @@ function StudioWorkspace() {
         : current,
     )
     setFolderRevision((value) => value + 1)
-    setParams({ app: application!, resource: item.id })
+    navigate(studioResourceAddress(application!, item.id))
   }
 
   function onWritten(diagnostics: StudioDiagnostic[], created?: StudioResourceItem) {
@@ -480,7 +483,7 @@ function StudioWorkspace() {
   }
 
   function openReference(id: string, referencePath: string | null) {
-    setParams({ app: application!, resource: id, ...(referencePath ? { path: referencePath } : {}) })
+    navigate(studioResourceAddress(application!, id, referencePath))
   }
 
   function selectDiagnostic(id: string, diagnosticPath: string) {
@@ -611,7 +614,7 @@ function StudioWorkspace() {
                     application={application!}
                     folderRevision={folderRevision}
                     names={names}
-                    onOpenPolicy={(id) => setParams({ app: application!, resource: id })}
+                    onOpenPolicy={(id) => navigate(studioResourceAddress(application!, id))}
                     onWritten={onWritten}
                   />
                 </Flex>
@@ -683,7 +686,9 @@ function StudioWorkspace() {
                             diagnostics,
                           })
                           setFolderRevision((value) => value + 1)
-                          setParams({ app: application! })
+                          navigate(`/studio?${new URLSearchParams({ app: application! })}`, {
+                            state: leaveWithoutAsking,
+                          })
                         }}
                       />
                     </StudioNamesContext.Provider>
