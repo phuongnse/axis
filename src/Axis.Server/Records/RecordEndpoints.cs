@@ -45,7 +45,7 @@ namespace Axis.Server.Records;
 /// A grant with <c>fields</c> covers only those fields. A record, in a list, a single read or the
 /// response of a create or update, holds only the values the user's <c>read</c> grants cover, and a
 /// reference label only when the user may also read the target's display field. A history leaves
-/// the other field names out of the details. A sort by a field the user may not read is a 400, as
+/// the other field names out of the details. A sort or a filter by a field the user may not read is a 400, as
 /// is a search when they may not read the display field. A search skips a searchable field they may
 /// not read.
 /// A create or update writes the record and its child rows in one transaction. A create sets the
@@ -74,8 +74,8 @@ namespace Axis.Server.Records;
 /// makes a list, a single read and a history a 409 that names no field or policy. It comes before
 /// the query and before any 404, so it also covers an unknown id. An update or a delete is the same
 /// 409 before its 404 for a <c>read</c> filter, and after the 404 and before the 403 for an
-/// <c>update</c> or <c>delete</c> filter. Nothing is written. A list whose valid <c>sort</c> or
-/// <c>search</c> looks in such a field is a 409 with the problem at <c>sort</c> or <c>search</c>. The
+/// <c>update</c> or <c>delete</c> filter. Nothing is written. A list whose valid <c>sort</c>,
+/// <c>search</c> or <c>filter</c> looks in such a field is a 409 with the problem at <c>sort</c>, <c>search</c> or <c>filter</c>. The
 /// problem titles never contain text from the request.
 /// An entity of a module is written <c>{module id}/{entity name}</c>, as two path segments, for
 /// example <c>entities/departments/Department/records</c>. It has the same routes and checks as
@@ -112,6 +112,7 @@ internal static class RecordEndpoints
         string? pageSize,
         string? sort,
         string? search,
+        string? filter,
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -157,13 +158,13 @@ internal static class RecordEndpoints
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
 
-        var (order, searched) = ReadQuery(sort, search, request, model, fields, errors);
+        var (order, searched, listFilter) = ReadQuery(sort, search, filter, request, model, fields, errors);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
-        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, searched, cancellationToken) is { } pendingQuery)
+        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, searched, listFilter, cancellationToken) is { } pendingQuery)
         {
             return pendingQuery;
         }
@@ -171,13 +172,13 @@ internal static class RecordEndpoints
         var condition = read.Filters is { } filters
             ? await RecordFilters.ConditionAsync(application!, model, Expressions(filters), user.Id, Cipher(sensitive, tenants), cancellationToken)
             : null;
-        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, searched, condition, Cipher(sensitive, tenants), cancellationToken) is not { } result)
+        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, searched, condition, listFilter, Cipher(sensitive, tenants), cancellationToken) is not { } result)
         {
             // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
             var logger = Logger(loggerFactory);
-            foreach (var filter in read.Filters!)
+            foreach (var grantFilter in read.Filters!)
             {
-                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
+                RecordFilterLog.ListFailed(logger, grantFilter.Policy, grantFilter.Grant, model.Name);
             }
 
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
@@ -194,6 +195,7 @@ internal static class RecordEndpoints
         string entity,
         string? sort,
         string? search,
+        string? filter,
         string? format,
         HttpRequest request,
         ActiveApplicationResolver resolver,
@@ -239,14 +241,14 @@ internal static class RecordEndpoints
 
         var fields = RecordFieldAccess.Read(application!, user.RolesIn(application!), model);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var (order, searched) = ReadQuery(sort, search, request, model, fields, errors);
+        var (order, searched, listFilter) = ReadQuery(sort, search, filter, request, model, fields, errors);
         ExportFile.TryParseFormat(format, errors, out var exportFormat);
         if (errors.Count > 0)
         {
             return Results.ValidationProblem(errors);
         }
 
-        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, searched, cancellationToken) is { } pendingQuery)
+        if (await PendingQueryAsync(connection, database.ReadTransaction, model, order, searched, listFilter, cancellationToken) is { } pendingQuery)
         {
             return pendingQuery;
         }
@@ -273,7 +275,7 @@ internal static class RecordEndpoints
                 exportFormat,
                 model.Name,
                 [.. columns.Select(column => new ExportColumn(column.Name, column.Type))],
-                RecordQueries.ReadAllAsync(connection, model, order, searched, condition, export.MaxRows + 1, Cipher(sensitive, tenants), cancellationToken),
+                RecordQueries.ReadAllAsync(connection, model, order, searched, condition, listFilter, export.MaxRows + 1, Cipher(sensitive, tenants), cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(
@@ -290,9 +292,9 @@ internal static class RecordEndpoints
         {
             // Class 22 is a data exception. PostgreSQL cannot fail one branch of an OR, so every filter is named.
             var logger = Logger(loggerFactory);
-            foreach (var filter in read.Filters!)
+            foreach (var grantFilter in read.Filters!)
             {
-                RecordFilterLog.ListFailed(logger, filter.Policy, filter.Grant, model.Name);
+                RecordFilterLog.ListFailed(logger, grantFilter.Policy, grantFilter.Grant, model.Name);
             }
 
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
@@ -300,13 +302,14 @@ internal static class RecordEndpoints
     }
 
     // A field the user may not read is no sort, and a hidden display field is no search. A hidden
-    // searchable field is left out of the search, so neither can probe a hidden value. Every
-    // invalid parameter adds an error.
-    private static (RecordSort? Order, RecordSearch? Search) ReadQuery(
-        string? sort, string? search, HttpRequest request, EntityModel model, RecordFieldAccess fields, SortedDictionary<string, string[]> errors)
+    // searchable field is left out of the search, so neither can probe a hidden value. A filter on a
+    // field the user may not read is refused like one on an unknown field. Every invalid parameter adds an error.
+    private static (RecordSort? Order, RecordSearch? Search, RecordListFilter? Filter) ReadQuery(
+        string? sort, string? search, string? filter, HttpRequest request, EntityModel model, RecordFieldAccess fields, SortedDictionary<string, string[]> errors)
     {
         RecordSort? order = null;
         RecordSearch? searched = null;
+        RecordListFilter? listFilter = null;
         if (sort is not null && (!RecordSort.TryParse(sort, model, out order) || !fields.CanRead(order.Field.Name)))
         {
             errors["sort"] = ["Must be a declared field name that is not sensitive, optionally preceded by '-'."];
@@ -336,12 +339,24 @@ internal static class RecordEndpoints
             }
         }
 
-        return (order, searched);
+        if (request.Query["filter"].Count > 1)
+        {
+            errors["filter"] = SearchQuery.RepeatedError;
+        }
+        else if (!string.IsNullOrEmpty(filter))
+        {
+            if (!RecordListFilter.TryParse(filter, model, fields.CanRead, out listFilter, out var invalid))
+            {
+                errors["filter"] = [invalid];
+            }
+        }
+
+        return (order, searched, listFilter);
     }
 
-    // A sort or a search on a computed field that is being recomputed would order or match by a stale stored value.
+    // A sort, a search or a filter on a computed field that is being recomputed would order or match by a stale stored value.
     private static async Task<IResult?> PendingQueryAsync(
-        NpgsqlConnection connection, NpgsqlTransaction? transaction, EntityModel model, RecordSort? order, RecordSearch? search, CancellationToken cancellationToken)
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, EntityModel model, RecordSort? order, RecordSearch? search, RecordListFilter? filter, CancellationToken cancellationToken)
     {
         var pending = await PendingComputedFields.ReadAsync(connection, transaction, [model.Id], cancellationToken);
         if (!pending.TryGetValue(model.Id, out var pendingNames))
@@ -359,6 +374,12 @@ internal static class RecordEndpoints
             && search.Fields.Where(field => pendingNames.Contains(field.Name)).Select(field => $"The field '{field.Name}' is being recomputed.").ToArray() is { Length: > 0 } pendingSearched)
         {
             errors["search"] = pendingSearched;
+        }
+
+        if (filter is not null
+            && filter.Fields.Where(field => pendingNames.Contains(field.Name)).Select(field => $"The field '{field.Name}' is being recomputed.").ToArray() is { Length: > 0 } pendingFiltered)
+        {
+            errors["filter"] = pendingFiltered;
         }
 
         return errors.Count > 0

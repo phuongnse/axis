@@ -46,10 +46,10 @@ public sealed class SearchPerformanceTests(DataDatabaseFixture fixture) : IClass
         var search = new RecordSearch(Search, RecordSearch.Searched(article, _ => true));
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
-        await RecordQueries.ListAsync(connection, null, article, 1, PageSize, null, search, null, CancellationToken);
+        await RecordQueries.ListAsync(connection, null, article, 1, PageSize, null, search, null, null, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await RecordQueries.ListAsync(connection, null, article, 1, PageSize, null, search, null, CancellationToken);
+        var page = await RecordQueries.ListAsync(connection, null, article, 1, PageSize, null, search, null, null, CancellationToken);
         stopwatch.Stop();
 
         TestContext.Current.TestOutputHelper?.WriteLine($"The record search took {stopwatch.Elapsed}.");
@@ -58,7 +58,7 @@ public sealed class SearchPerformanceTests(DataDatabaseFixture fixture) : IClass
         Assert.Equal(Matches, page.TotalCount);
         Assert.Equal(PageSize, page.Items.Count);
 
-        var statement = RecordQueries.ListStatement(article, null, search, null);
+        var statement = RecordQueries.ListStatement(article, null, search, null, null);
         var indexes = SearchApp.TrigramIndexes(article);
         AssertUsesTrigramIndexes(indexes, await QueryPlans.ExplainAsync(dataSource, statement.CountSql, search.AddTo, CancellationToken));
         AssertUsesTrigramIndexes(indexes, await QueryPlans.ExplainAsync(

@@ -469,6 +469,10 @@ public static partial class RecordInputParser
         }
     }
 
+    /// <summary>Reads a value that a list filter compares with <paramref name="field"/>: of the field's type, without its limits.</summary>
+    internal static string? ReadComparedValue(JsonElement element, FieldModel field, out object? value) =>
+        ReadValue(element, field with { Required = false, Min = null, Max = null, MinLength = null, MaxLength = null, Precision = null, Scale = null }, out value);
+
     /// <summary>Reads one field value; returns the error message, or null when the value is valid.</summary>
     private static string? ReadValue(JsonElement element, FieldModel field, out object? value)
     {

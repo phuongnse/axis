@@ -43,6 +43,36 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_list_and_an_export_filtered_by_a_pending_field_are_409_with_an_error_at_filter_and_succeed_after_the_backfill()
+    {
+        await fixture.InsertRequestAsync(TenantA, null, divisor: 7);
+        await ActivateAsync(TenantA, "divisor * 2", "divisor * 3", FinanceExports);
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        var onPending = Uri.EscapeDataString("""{"all":[{"field":"doubled","op":"gt","value":0}]}""");
+        var onStored = Uri.EscapeDataString("""{"all":[{"field":"divisor","op":"gt","value":0}]}""");
+
+        using var refused = await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={onPending}", TenantA);
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using var problem = await ReadAsync(refused);
+        Assert.Equal("A field is being recomputed.", problem.RootElement.GetProperty("title").GetString());
+        Assert.Contains("doubled", problem.RootElement.GetProperty("errors").GetProperty("filter")[0].GetString(), StringComparison.Ordinal);
+        using var refusedExport = await SendAsync(maria, HttpMethod.Get, $"{Records}/export?format=csv&filter={onPending}", TenantA);
+        Assert.Equal(HttpStatusCode.Conflict, refusedExport.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={onStored}", TenantA)).StatusCode);
+        foreach (var op in new[] { "empty", "notEmpty" })
+        {
+            var withoutValue = Uri.EscapeDataString("{\"all\":[{\"field\":\"doubled\",\"op\":\"" + op + "\"}]}");
+            using var refusedWithoutValue = await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={withoutValue}", TenantA);
+            Assert.Equal(HttpStatusCode.Conflict, refusedWithoutValue.StatusCode);
+        }
+
+        await BackfillAsync(TenantA);
+
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, HttpMethod.Get, $"{Records}?filter={onPending}", TenantA)).StatusCode);
+    }
+
+    [Fact]
     public async Task A_read_filter_on_a_pending_field_is_409_for_a_list_a_single_read_and_a_history_and_not_for_a_user_without_it()
     {
         var id = await fixture.InsertRequestAsync(TenantA, null, divisor: 7);
@@ -166,6 +196,14 @@ public sealed class PendingComputedRefusalTests(TaskApiFixture fixture) : IClass
             ? ReviewerReadsDoubled(path, content).Replace(
                 """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }""",
                 """{ "name": "requestRead", "entity": "Request", "actions": ["read"], "filter": "doubled > 0" }, { "name": "decideStart", "process": "Decide", "actions": ["start", "inspect"] }""",
+                StringComparison.Ordinal)
+            : content;
+
+    private static string FinanceExports(string path, string content) =>
+        path == Path.Combine("policies", "finance-access.json")
+            ? content.Replace(
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete"] },""",
+                """{ "name": "requestRead", "entity": "Request", "actions": ["read", "create", "delete", "export"] },""",
                 StringComparison.Ordinal)
             : content;
 

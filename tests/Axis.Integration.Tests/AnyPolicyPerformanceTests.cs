@@ -51,10 +51,10 @@ public sealed class AnyPolicyPerformanceTests(DataDatabaseFixture fixture) : ICl
         var condition = await AssigneeCondition(model, ticket);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
-        await RecordQueries.ListAsync(connection, null, ticket, 1, PageSize, null, null, condition, CancellationToken);
+        await RecordQueries.ListAsync(connection, null, ticket, 1, PageSize, null, null, condition, null, CancellationToken);
 
         var stopwatch = Stopwatch.StartNew();
-        var page = await RecordQueries.ListAsync(connection, null, ticket, 1, PageSize, null, null, condition, CancellationToken);
+        var page = await RecordQueries.ListAsync(connection, null, ticket, 1, PageSize, null, null, condition, null, CancellationToken);
         stopwatch.Stop();
 
         TestContext.Current.TestOutputHelper?.WriteLine($"The record list took {stopwatch.Elapsed}.");
@@ -64,7 +64,7 @@ public sealed class AnyPolicyPerformanceTests(DataDatabaseFixture fixture) : ICl
         Assert.Equal(assigned, page.TotalCount);
         Assert.Equal(PageSize, page.Items.Count);
 
-        var statement = RecordQueries.ListStatement(ticket, null, null, condition);
+        var statement = RecordQueries.ListStatement(ticket, null, null, condition, null);
 
         // The count reads the whole child table once with a hash join, which is the right plan for
         // a pass over every ticket, so only the page's plan is checked.

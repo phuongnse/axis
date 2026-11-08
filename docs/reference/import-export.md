@@ -32,8 +32,8 @@ and hidden fields as the route it mirrors.
 | `GET /api/apps/{app}/data-sources/{module}/{dataSource}/export?format=` | `200` with the file of a module data source, see [endpoint](data-sources.md#endpoint) |
 | `GET /api/apps/{app}/entities/{module}/{entity}/records/export?format=` | `200` with the file of a module entity, see [routes](record-api.md#routes)            |
 
-- **Query.** Each route takes the query of its rows or list route, such as parameters, `sort` and
-  `search`, without `page` and `pageSize`. `format` is `csv` or `xlsx`. A missing or unknown
+- **Query.** Each route takes the query of its rows or list route, such as parameters, `sort`,
+  `filter` and `search`, without `page` and `pageSize`. `format` is `csv` or `xlsx`. A missing or unknown
   `format` is a `400` at `format`, found after the grants.
 - **Same checks.** The session, the grant, the root read filters and the field check run as for the
   rows or list route. A missing `export` grant is a `403`. Read filters hide rows and field lists

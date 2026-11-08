@@ -985,19 +985,22 @@ public static class RecordCommands
             return $"@{name}";
         }
 
-        var type = value.Field.Type switch
-        {
-            FieldType.Text or FieldType.Enum or FieldType.Decimal or FieldType.Money => NpgsqlDbType.Text,
-            FieldType.Integer => NpgsqlDbType.Bigint,
-            FieldType.Boolean => NpgsqlDbType.Boolean,
-            FieldType.Date => NpgsqlDbType.Date,
-            FieldType.DateTime => NpgsqlDbType.TimestampTz,
-            FieldType.Reference or FieldType.File => NpgsqlDbType.Uuid,
-            _ => throw new ArgumentOutOfRangeException(nameof(value), value.Field.Type, "Unknown field type."),
-        };
+        var type = ParameterType(value.Field.Type);
         command.Parameters.Add(new NpgsqlParameter(name, type) { Value = value.Value ?? DBNull.Value });
         return FieldTypes.HoldsDecimal(value.Field.Type) ? $"@{name}::numeric" : $"@{name}";
     }
+
+    /// <summary>The parameter type that binds a value of <paramref name="type"/>. A decimal and money are text that the SQL casts to <c>numeric</c>.</summary>
+    internal static NpgsqlDbType ParameterType(FieldType type) => type switch
+    {
+        FieldType.Text or FieldType.Enum or FieldType.Decimal or FieldType.Money => NpgsqlDbType.Text,
+        FieldType.Integer => NpgsqlDbType.Bigint,
+        FieldType.Boolean => NpgsqlDbType.Boolean,
+        FieldType.Date => NpgsqlDbType.Date,
+        FieldType.DateTime => NpgsqlDbType.TimestampTz,
+        FieldType.Reference or FieldType.File => NpgsqlDbType.Uuid,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown field type."),
+    };
 
     private static RecordWriteResult Failure(RecordWriteOutcome outcome, string key, string message) =>
         new(outcome, Errors: new SortedDictionary<string, string[]>(StringComparer.Ordinal) { [key] = [message] });

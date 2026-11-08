@@ -184,7 +184,7 @@ on the spot, and requests that would sort, search or filter on stale values are 
   computed value only for a field with the same name and type in both releases.
 - **Stored values.** A list, a data source and a projection show the stored value, and so do the
   inbound endpoint's output and the test scenario runner.
-- **Record API and processes.** A record list sort or search that names a pending field is refused
+- **Record API and processes.** A record list sort, search or filter that names a pending field is refused
   with `409`. A policy `read` filter that reads one is refused too, for a list, a single read, a
   history, a process start, the process instance list, the instance detail and an operator cancel
   or retry, and so is an `update` or `delete` filter. The check reads the pending state of the

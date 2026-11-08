@@ -38,7 +38,7 @@ public sealed class RecordSearchTests
     {
         var search = new RecordSearch("zeph", RecordSearch.Searched(_entity, _ => true));
 
-        var statement = RecordQueries.ListStatement(_entity, null, search, null);
+        var statement = RecordQueries.ListStatement(_entity, null, search, null, null);
 
         foreach (var sql in new[] { statement.CountSql, statement.PageSql })
         {

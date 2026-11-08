@@ -28,7 +28,7 @@ public sealed class SearchIndexTests(DataDatabaseFixture fixture) : IClassFixtur
         var model = await SeedAsync();
         Assert.True(model.TryGetEntity("Article", out var article));
         var search = new RecordSearch(SearchApp.RareWord, RecordSearch.Searched(article, _ => true));
-        var statement = RecordQueries.ListStatement(article, null, search, null);
+        var statement = RecordQueries.ListStatement(article, null, search, null, null);
         var indexes = SearchApp.TrigramIndexes(article);
 
         AssertUsesTrigramIndexes(indexes, await ExplainAsync(statement.CountSql, search.AddTo));
