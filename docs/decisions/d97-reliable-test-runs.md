@@ -18,7 +18,7 @@ take a large part of the integration job and mark the functional suites red when
   makes a pull request wait while `main` fails the same way.
 - **The performance tests run in a workflow of their own,** outside CI's integration job, and a
   failure that repeats opens a `bug` issue. When NexKit starts it is
-  [D139](d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)'s choice.
+  [D146](d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md)'s choice.
 - **End-to-end tests run without motion.** The SPA turns off its animations when the browser asks
   for reduced motion, and Playwright asks for it.
 - **CI runs the end-to-end tests on several machines at once,** as shards, and NexKit's checks run

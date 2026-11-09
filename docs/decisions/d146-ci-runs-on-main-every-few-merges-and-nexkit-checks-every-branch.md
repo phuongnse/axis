@@ -1,4 +1,4 @@
-# D139. CI runs on main alone, and NexKit checks every branch
+# D146. CI runs on main every few merges, and NexKit checks every branch
 
 Status: **Agreed**
 
@@ -19,10 +19,14 @@ request on request, with the same scripts that CI runs, and sets the statuses th
 
 ## Decision
 
-- **NexKit starts the workflows on `main` by a count of its merges:** CI once every 5 merges, CodeQL
-  once every 32 and the performance workflow once every 62. NexKit counts the commits on `main` since
-  a workflow's latest run there. 32 and 62 are not multiples of 5, so the three seldom start at the
-  same merge.
+- **NexKit starts the workflows on `main` by a count of its merges,** with its
+  `merge.after_workflows` setting, which holds how many merges each workflow waits. NexKit counts the
+  commits on `main` since a workflow's latest run there. CI waits the fewest merges, because it finds
+  most of what breaks `main`. CodeQL waits more, and the performance workflow more again, because
+  their findings change little from one merge to the next. No count is a multiple of another, so the
+  workflows seldom start at the same merge. The owner tunes the counts in `.nexkit/config.json`
+  alone, as [D145](d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees for every
+  NexKit setting.
 - **No push to `main` starts them, and CI's only schedule is its weekly scan.** A push trigger for
   `main` would run them after every merge as well. Each runs on demand. The weekly run covers the
   dependency and image scans alone, as
@@ -42,11 +46,11 @@ The settings are in [delivery](../delivery.md#decisions).
 
 ## Consequences
 
-- At about 60 merges a day, CI runs about every two hours, CodeQL about twice a day and the
-  performance tests about once a day. The performance tests change little from one merge to the next
-  and depend on the runner's load, so a run that covers many merges is a fair measure.
-- A flaky test, or a check that skipped work it should have done, shows up to five merges after the
-  merge that caused it, a CodeQL alert up to 32 and a performance regression up to 62.
+- CI runs on `main` several times a day, CodeQL less often and the performance tests least. The
+  performance tests depend on the runner's load, so a run that covers many merges is a fair measure.
+- A flaky test, or a check that skipped work it should have done, shows up within CI's count of
+  merges after the merge that caused it, a CodeQL alert within CodeQL's count and a performance
+  regression within the performance workflow's count.
 - The last merges before a quiet spell wait for the next merges before `main` checks them.
 - The owner's merge of a hand-made pull request does not start CI on `main`. NexKit's checks ran on
   the pull request, and the next count of NexKit's merges runs CI on `main`.

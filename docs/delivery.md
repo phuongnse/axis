@@ -78,8 +78,8 @@ that holds it.
   request. Any other issue waits until the owner reads it and comments
   [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
-  because its [`dependabot`][nexkit-dependabot] setting is `high`, as
-  [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
+  as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
+  Its [`dependabot`][nexkit-dependabot] setting holds the lowest severity it takes.
   NexKit's App reads the alerts with its *Dependabot alerts: read* permission.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
   recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
@@ -87,9 +87,9 @@ that holds it.
   `/nexkit fix` on the pull request.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
   [`request` skill][nexkit-request]. A milestone ends in two waves, which the `labels` setting gives to
-  two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
-  milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
-  journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
+  two labels, the journey's first: its journey carries `journey`, so it starts once every other issue
+  of the milestone is closed, and its docs sweep carries `docs-sweep`, so it starts once the journey
+  is closed too. Issues opened later and the parts of a split count without any *blocked by*
   mark. Autopilot's `max_parallel` setting caps how many issues run at once, so that their agent
   sessions fit in the Claude usage limits and their rounds of checks in the runner jobs. The owner
   tunes it, as [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees.
@@ -141,8 +141,10 @@ that holds it.
 
 - **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
   merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
-  [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) and
-  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agree.
+  [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) and
+  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agree. CI waits
+  the fewest, then CodeQL and the performance workflow. The docs audit waits the most, because each
+  run costs a model session and its issues add to NexKit's queue.
   None of them runs on a push to `main` or has a schedule of its own for this, so a merge does not
   start them too, and without the setting nothing would test `main`. CI also runs on demand, and on a
   pull request that changes its own workflow file. No push to another branch starts it, because
@@ -327,7 +329,7 @@ change, a design review and a sync are in the
   in the [widget previews](reference/widget-previews.md), on fixtures. A review covers one screen
   or one group of screens, and what it finds outside them becomes an issue. The branch is pushed, so
   the review can go on from any machine, and is never merged. No push to a branch starts CI, as
-  [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)
+  [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md)
   agrees. A prototype is never merged, and it never gets `/nexkit review`, because it changes the widgets
   without their tests. When the review ends, the branch's last commit gets a
   `design-review/<yyyy-mm-dd>-<topic>` tag with the same date and topic, which is pushed and never

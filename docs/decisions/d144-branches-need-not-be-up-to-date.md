@@ -29,7 +29,7 @@ Each pull request takes one round of checks for its own change.
 
 The tree that NexKit squash-merges is not the tree its checks passed, so two pull requests that pass
 alone can still break `main` together. CI on `main` finds such a break, as
-[D139](d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) agrees. More issues at once
+[D146](d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) agrees. More issues at once
 make such a break more likely.
 
 ## Alternatives
