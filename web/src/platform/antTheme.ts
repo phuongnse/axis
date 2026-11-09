@@ -21,8 +21,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   // the mode keeps the light seed, as the dark value is already a shade. Any other colour is the seed itself.
   const seed = (name: ColourName) =>
     colour[name].toLowerCase() === colourTokens[name][mode] ? colourTokens[name].light : colour[name]
-  // A field with an error draws its border in the text colour, which meets 3:1 contrast in both modes.
+  // A field with an error or a warning draws its border in the text colour, which meets 3:1 contrast in both modes.
   const errorBorder = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
+  const warningBorder = { colorWarning: colour.warningText, colorWarningBorderHover: colour.warningText }
+  const fieldBorder = { ...errorBorder, ...warningBorder }
   return {
     algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
     token: {
@@ -79,14 +81,14 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       ...(reducedMotion && { motion: false }),
     },
     components: {
-      Form: { colorError: colour.dangerText },
-      Input: errorBorder,
-      InputNumber: errorBorder,
-      Select: errorBorder,
-      DatePicker: errorBorder,
-      Mentions: errorBorder,
-      Cascader: errorBorder,
-      TreeSelect: errorBorder,
+      Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
+      Input: fieldBorder,
+      InputNumber: fieldBorder,
+      Select: fieldBorder,
+      DatePicker: fieldBorder,
+      Mentions: fieldBorder,
+      Cascader: fieldBorder,
+      TreeSelect: fieldBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
       Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText, paddingXXS: spacing.xs },
