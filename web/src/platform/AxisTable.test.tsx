@@ -168,6 +168,12 @@ describe('AxisTable', () => {
     expect(screen.getAllByRole('columnheader')[0].closest('tr')).toHaveStyle({ height: `${tableRow}px` })
   })
 
+  it('makes the sideways-scrolling region of the table reachable by keyboard', () => {
+    const { container } = renderTable()
+
+    expect(container.querySelector('.ant-table-content')).toHaveAttribute('tabindex', '0')
+  })
+
   it('shows the empty text when there are no rows', () => {
     renderTable({ dataSource: [] })
 
