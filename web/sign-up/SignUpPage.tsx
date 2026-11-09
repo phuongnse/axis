@@ -240,6 +240,19 @@ export function SignUpPage({
               }}
             />
           </AxisField>
+          <AxisField
+            name="language"
+            label={t('signUp.language')}
+            help={t('signUp.language.help')}
+            requiredMessage={t('signUp.language.required')}
+          >
+            <Select
+              options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
+              onChange={() => {
+                languageEdited.current = true
+              }}
+            />
+          </AxisField>
           {/* Proposed: a person starts from Blank or a built-in application, as Studio's New application offers. */}
           <StartFromField
             name="application"
@@ -259,19 +272,6 @@ export function SignUpPage({
                 : applications
             }
           />
-          <AxisField
-            name="language"
-            label={t('signUp.language')}
-            help={t('signUp.language.help')}
-            requiredMessage={t('signUp.language.required')}
-          >
-            <Select
-              options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
-              onChange={() => {
-                languageEdited.current = true
-              }}
-            />
-          </AxisField>
           {/* Proposed: the business accepts its two agreements; the privacy policy is told, not accepted. */}
           <AcceptTermsField
             name="terms"
