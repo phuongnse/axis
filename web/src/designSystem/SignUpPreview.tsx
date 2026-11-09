@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextContext } from '../platform/texts'
 import { SignUpPage } from '../../sign-up/SignUpPage'
+import { VerifyPage } from '../../sign-up/VerifyPage'
 import { signUpTexts, type SignUpLocale } from '../../sign-up/texts'
 
 /** Types `value` into the input with `id`, as a person would, so the page's own change handlers run. */
@@ -64,6 +65,36 @@ export function SignUpPreview({ businessName, send }: { businessName?: string; s
     <div ref={wrapper}>
       <TextContext.Provider value={text}>
         <SignUpPage locale={locale} onLocaleChange={setLocale} />
+      </TextContext.Provider>
+    </div>
+  )
+}
+
+/**
+ * The verify page with the sign-up texts, on a sample token. A state may press Confirm once the link's check answers,
+ * so a failed confirm shows. Confirm's success goes nowhere here, as the progress page is a step of its own.
+ */
+export function VerifyPreview({ confirm }: { confirm?: boolean }) {
+  const [locale, setLocale] = useState<SignUpLocale>('en')
+  const wrapper = useRef<HTMLDivElement>(null)
+  const text = useCallback(
+    (key: string) => signUpTexts[locale][key as keyof (typeof signUpTexts)[SignUpLocale]] ?? key,
+    [locale],
+  )
+  useEffect(() => {
+    if (!confirm) {
+      return
+    }
+    const timer = setTimeout(
+      () => wrapper.current?.querySelector<HTMLButtonElement>('button.ant-btn-primary')?.click(),
+      600,
+    )
+    return () => clearTimeout(timer)
+  }, [confirm])
+  return (
+    <div ref={wrapper}>
+      <TextContext.Provider value={text}>
+        <VerifyPage token="t-5b2f" locale={locale} onLocaleChange={setLocale} onConfirmed={() => {}} />
       </TextContext.Provider>
     </div>
   )

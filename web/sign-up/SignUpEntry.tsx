@@ -2,13 +2,17 @@ import { StrictMode, useCallback, useEffect, useState } from 'react'
 import { TextContext } from '../src/platform/texts'
 import { ThemeModeProvider } from '../src/platform/theme'
 import { SignUpPage } from './SignUpPage'
+import { VerifyPage } from './VerifyPage'
 import { signUpTexts, type SignUpLocale } from './texts'
 
 function browserLocale(): SignUpLocale {
   return navigator.language.toLowerCase().startsWith('vi') ? 'vi' : 'en'
 }
 
-/** The sign-up page with the SPA's theme provider and its own two-language texts. It starts in `vi` for a Vietnamese browser. */
+/**
+ * The sign-up pages with the SPA's theme provider and their own two-language texts. It starts in `vi` for a Vietnamese
+ * browser. Proposed: `/sign-up/verify#<token>` draws the verify page, and any other path the sign-up page.
+ */
 export function SignUpEntry() {
   const [locale, setLocale] = useState<SignUpLocale>(browserLocale)
   useEffect(() => {
@@ -22,7 +26,17 @@ export function SignUpEntry() {
     <StrictMode>
       <ThemeModeProvider>
         <TextContext.Provider value={text}>
-          <SignUpPage locale={locale} onLocaleChange={setLocale} />
+          {window.location.pathname.endsWith('/sign-up/verify') ? (
+            <VerifyPage
+              token={window.location.hash.slice(1)}
+              locale={locale}
+              onLocaleChange={setLocale}
+              // Proposed: the progress page takes the id and its secret in the fragment too, so no log carries them.
+              onConfirmed={({ id, secret }) => window.location.assign(`/sign-up/progress#${id}.${secret}`)}
+            />
+          ) : (
+            <SignUpPage locale={locale} onLocaleChange={setLocale} />
+          )}
         </TextContext.Provider>
       </ThemeModeProvider>
     </StrictMode>

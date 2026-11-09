@@ -86,3 +86,23 @@ export const signUpFixtures = {
   },
   resendFailed: { ...page, [subdomainPath]: free, [sendPath]: accepted, [resendPath]: unavailable },
 } satisfies Record<string, Record<string, () => unknown>>
+
+const verificationPath = '/api/sign-up/verification'
+const confirmPath = '/api/sign-up/confirm'
+const pending = () => ({
+  state: 'pending',
+  email: 'alex.morgan@contoso.example',
+  businessName: signUpBusinessName,
+  address: `${suggestSubdomain(signUpBusinessName)}.vn.example.com`,
+})
+/** What every verify state answers the same: the region's documents, for the legal line. */
+const verifyPage = { [documentsPath]: documents }
+
+export const verifyFixtures = {
+  confirm: { ...verifyPage, [verificationPath]: pending },
+  checking: { ...verifyPage, [verificationPath]: () => new Promise<never>(() => {}) },
+  checkFailed: { ...verifyPage, [verificationPath]: unavailable },
+  confirmFailed: { ...verifyPage, [verificationPath]: pending, [confirmPath]: unavailable },
+  confirmed: { ...verifyPage, [verificationPath]: () => ({ state: 'confirmed' }) },
+  expired: { ...verifyPage, [verificationPath]: () => ({ state: 'expired' }) },
+} satisfies Record<string, Record<string, () => unknown>>

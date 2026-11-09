@@ -1,6 +1,8 @@
 import { Checkbox, Form, Typography } from 'antd'
 import type { FormItemProps } from 'antd'
-import { Fragment } from 'react'
+import type { ReactNode } from 'react'
+import { FilledText } from './FilledText'
+import { setOwn } from './ownProperty'
 import { useDesignTokens } from './themeMode'
 
 /** A document that a sentence names: its label and its address. Without an address the label shows as plain text. */
@@ -10,35 +12,31 @@ export interface DocumentLink {
 }
 
 /**
- * Proposed: a sentence whose `{name}` placeholders name documents as links, which open in a new tab so the person keeps
- * the page. A placeholder whose document has no address shows the document's label as plain text.
+ * Proposed: a sentence that names documents as links, which open in a new tab so the person keeps the page, through
+ * `FilledText`. A document with no address shows its label as plain text.
  */
 export function TextWithLinks({ text, links }: { text: string; links: Record<string, DocumentLink> }) {
   const { colour } = useDesignTokens()
-  return (
-    <>
-      {text.split(/(\{\w+\})/).map((part, index) => {
-        const link = /^\{(\w+)\}$/.exec(part)?.[1]
-        const document = link === undefined ? undefined : links[link]
-        if (document === undefined) {
-          return <Fragment key={index}>{part}</Fragment>
-        }
-        return document.href ? (
-          <Typography.Link
-            key={index}
-            href={document.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: colour.primaryText }}
-          >
-            {document.label}
-          </Typography.Link>
-        ) : (
-          <Fragment key={index}>{document.label}</Fragment>
-        )
-      })}
-    </>
-  )
+  const parts: Record<string, ReactNode> = {}
+  for (const [name, document] of Object.entries(links)) {
+    setOwn(
+      parts,
+      name,
+      document.href ? (
+        <Typography.Link
+          href={document.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: colour.primaryText }}
+        >
+          {document.label}
+        </Typography.Link>
+      ) : (
+        document.label
+      ),
+    )
+  }
+  return <FilledText text={text} parts={parts} />
 }
 
 /**

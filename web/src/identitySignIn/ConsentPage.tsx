@@ -1,5 +1,6 @@
 import { Alert, Typography } from 'antd'
 import { AxisButton } from '../platform/AxisButton'
+import { FilledText } from '../platform/FilledText'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
 import type { ConsentContext } from './signInContext'
@@ -14,14 +15,12 @@ import type { ConsentContext } from './signInContext'
 export function ConsentPage({ context }: { context: ConsentContext }) {
   const { texts, error, oauthAction, code, clientName, homeUrl, scopes } = context
   const { colour } = useDesignTokens()
-  const intro = texts.intro.split('{client}').flatMap((part, index) => {
-    const text = <span key={`text-${index}`}>{part}</span>
-    return index === 0 ? [text] : [<strong key={`client-${index}`}>{clientName}</strong>, text]
-  })
   return (
     <IdentityFrame title={texts.title} frame={context}>
       {error && <Alert type="error" showIcon title={error} />}
-      <Typography.Paragraph style={{ margin: 0 }}>{intro}</Typography.Paragraph>
+      <Typography.Paragraph style={{ margin: 0 }}>
+        <FilledText text={texts.intro} parts={{ client: <strong>{clientName}</strong> }} />
+      </Typography.Paragraph>
       {homeUrl && (
         <Typography.Link href={homeUrl} target="_blank" rel="noopener noreferrer" style={{ color: colour.primaryText }}>
           {homeUrl}
