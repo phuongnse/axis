@@ -1105,7 +1105,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
     }
 
     [Fact]
-    public async Task An_operator_reads_the_cell_with_its_tenants_without_previews_and_its_cap()
+    public async Task An_operator_reads_the_cell_with_the_count_the_cap_checks_and_its_cap()
     {
         await using (var factory = await StartAsync())
         {
@@ -1118,7 +1118,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             var cell = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
             Assert.Equal("vn-1", cell.GetProperty("id").GetString());
             Assert.Equal("vn", cell.GetProperty("region").GetString());
-            Assert.Equal(3, cell.GetProperty("tenants").GetInt32());
+            Assert.Equal(4, cell.GetProperty("tenants").GetInt32());
             Assert.Equal(JsonValueKind.Null, cell.GetProperty("cap").ValueKind);
             Assert.Equal(JsonValueKind.Null, cell.GetProperty("restoreCheck").ValueKind);
 
@@ -1143,8 +1143,14 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
 
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var cell = await read.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
-            Assert.Equal(3, cell.GetProperty("tenants").GetInt32());
+            Assert.Equal(4, cell.GetProperty("tenants").GetInt32());
             Assert.Equal(10, cell.GetProperty("cap").GetInt32());
+
+            using var queued = await PostJobAsync(client, "/api/cell/tenants", token, "count-d", CreateBody("d"));
+            using var afterQueue = await GetAsync(client, "/api/cell", token);
+
+            Assert.Equal(HttpStatusCode.Accepted, queued.StatusCode);
+            Assert.Equal(5, (await afterQueue.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("tenants").GetInt32());
         }
     }
 
