@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { FormCanvasContext } from './formCanvas'
-import { FormStepsBar } from './FormStepsBar'
 import type { FormMetadata } from './site'
+import { StepsBar } from './StepsBar'
 import { useText } from './texts'
 import type { Section, useRecordForm } from './useRecordForm'
 
@@ -89,7 +89,7 @@ export function useFormSteps(
   }
 
   const progress: ReactNode = active && (
-    <FormStepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
+    <StepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
   )
 
   const fields: ReactNode = active ? (

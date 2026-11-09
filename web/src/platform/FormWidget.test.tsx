@@ -1884,7 +1884,7 @@ describe('FormWidget', () => {
       expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
       expect(screen.getByLabelText('Code')).toBeInTheDocument()
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
-      const progress = screen.getByTestId('form-steps')
+      const progress = screen.getByTestId('steps-bar')
       expect(within(progress).getByText('Step one')).toBeInTheDocument()
       expect(within(progress).getByText('Step two')).toBeInTheDocument()
       expect(progress.querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
@@ -1903,7 +1903,7 @@ describe('FormWidget', () => {
 
       expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('form-steps').querySelector('[aria-current="step"]')).toHaveTextContent('Step two')
+      expect(screen.getByTestId('steps-bar').querySelector('[aria-current="step"]')).toHaveTextContent('Step two')
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument()
@@ -1990,7 +1990,7 @@ describe('FormWidget', () => {
 
       expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Too long.')
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
-      expect(screen.getByTestId('form-steps').querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
+      expect(screen.getByTestId('steps-bar').querySelector('[aria-current="step"]')).toHaveTextContent('Step one')
     })
 
     it('skips a step whose fields the answer hides', async () => {

@@ -393,7 +393,7 @@ for (const mode of modes) {
     await expect(fieldValue(locked, "amount")).toBeVisible();
     await expect(locked.locator("input#amount")).toHaveCount(0);
     const wizard = figure(page, "Wizard steps");
-    await expect(wizard.getByTestId("form-steps")).toBeVisible();
+    await expect(wizard.getByTestId("steps-bar")).toBeVisible();
     await wizard.getByRole("button", { name: "Next", exact: true }).click();
     await expect(wizard.locator("#quantity")).toBeVisible();
     // Fields of several widths share rows, and some of them show messages.
@@ -409,7 +409,7 @@ for (const mode of modes) {
     expect(await top("title")).toBe(await top("status"));
     // A wizard with seven steps shows the number of each step.
     const many = figure(page, "Many steps");
-    const steps = many.getByTestId("form-steps");
+    const steps = many.getByTestId("steps-bar");
     await expect(steps).toBeVisible();
     await expect(steps.locator("li")).toHaveCount(7);
     await expect(steps.getByText("2", { exact: true })).toBeVisible();
@@ -798,6 +798,31 @@ test("the studio preview replaces one state's page with the next one picked in t
   await fixtures.getByText("Access denied", { exact: true }).click();
   await expect(page.getByTestId("studio-forbidden")).toBeVisible();
   await expect(page.getByTestId("studio-load-error")).toHaveCount(0);
+  expect(recording.errors).toEqual([]);
+});
+
+test("the Fixtures control wraps its captions onto more lines in a narrow frame", async ({
+  page,
+}) => {
+  const recording = await openHarness(page, "?preview=studio&mode=light", {
+    sandboxed: true,
+    frameWidth: 360,
+  });
+  const frame = page.frameLocator("iframe");
+  const fixtures = frame.getByRole("radiogroup", {
+    name: "Fixtures",
+    exact: true,
+  });
+  const first = (await fixtures
+    .getByText("Typical", { exact: true })
+    .boundingBox())!;
+  const last = (await fixtures
+    .getByText("Access denied", { exact: true })
+    .boundingBox())!;
+  const group = (await fixtures.boundingBox())!;
+  const framed = (await page.locator("iframe").boundingBox())!;
+  expect(last.y).toBeGreaterThan(first.y);
+  expect(group.x + group.width).toBeLessThanOrEqual(framed.x + framed.width);
   expect(recording.errors).toEqual([]);
 });
 

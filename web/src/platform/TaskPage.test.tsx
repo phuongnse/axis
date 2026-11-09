@@ -872,8 +872,8 @@ describe('TaskPage', () => {
 
       expect(await screen.findByLabelText('Comments')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step one')
-      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step two')
+      expect(screen.getByTestId('steps-bar')).toHaveTextContent('Step one')
+      expect(screen.getByTestId('steps-bar')).toHaveTextContent('Step two')
       expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Next'])
       await waitFor(() => expect(api.stateRequests()).toHaveLength(1))
 
