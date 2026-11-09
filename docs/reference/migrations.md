@@ -29,14 +29,16 @@ definitions, so Axis can tell which rows are out of date without computing them.
   cheap on a large table, because it is nullable and has no default.
   - A create stamps the release it ran with. So does an update that sends, and so recomputes, every
     child collection whose child entity has computed fields. That includes a record API write, an
-    inbound endpoint create, a step of a process pinned to an older release, a connector or package
-    result write, a task completion and seed data. Work pinned to an older release stamps that
-    release, not the active one. A row written before the column existed has no stamp.
+    inbound endpoint create, a process step update or `createRecord` step pinned to an older release,
+    a connector or package result write, a task completion, an operator's call
+    [resolve](process-inspection.md#resolve) and seed data. Work pinned to an older release stamps
+    that release, not the active one. A row written before the column existed has no stamp.
   - An update that leaves out such a collection did not recompute its rows, so it keeps the stamp
-    only when the stamp already names the update's release, and otherwise sets it to `NULL`. A step,
-    a connector or package result write and a task completion never send child rows, so they clear
-    the stamp of a row that has child rows with computed fields, unless it already names their
-    release. A collection whose child entity has no computed field does not count.
+    only when the stamp already names the update's release, and otherwise sets it to `NULL`. A
+    process step update, a connector or package result write, a task completion and an operator's
+    call [resolve](process-inspection.md#resolve) never send child rows, so they clear the stamp of a
+    row that has child rows with computed fields, unless it already names their release. A
+    collection whose child entity has no computed field does not count.
   - Child rows recompute with their owner and carry no stamp.
   - A `fill` or `convert` sets the stamp to `NULL` on every row it changes and on the owner row of
     every changed child row, because their computed inputs changed and the old stamp no longer
@@ -125,9 +127,10 @@ its entity pending again.
 - **The check.** A write whose release has a different fingerprint from the active release's
   inserts the pending row and the `computed.backfill` work item in its own transaction, when they
   are missing. It compares two stored fingerprints, so the check is cheap.
-- **Who checks.** Four paths can write under a release that is not the active one: a task
-  completion, a process step update, and a connector or package result write. Each calls the check
-  right after its record write. A write on the active release, such as the record API, an inbound
+- **Who checks.** Six paths can write under a release that is not the active one: a task
+  completion, a process step update, a process `createRecord` step, a connector result write, a
+  package result write, and an operator's call resolve. Each calls the check right after its record
+  write. A write on the active release, such as the record API, an inbound
   endpoint or seed data, adds nothing, and neither does a write whose release stores the same
   fingerprint as the active release. A release with no stored fingerprint counts as different.
 - **Locks.** The write takes a `FOR KEY SHARE` lock on the pending row, after it locked the record
