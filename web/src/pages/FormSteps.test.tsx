@@ -141,7 +141,9 @@ describe('FormSteps', () => {
     const onChange = renderSteps(steps)
     const card = screen.getByTestId('studio-field-/steps/0')
 
-    await userEvent.click(within(card).getByRole('combobox', { name: 'Sections' }))
+    const sections = within(card).getByRole('combobox', { name: 'Sections' })
+    expect(sections).toHaveAccessibleDescription(platformEnglish['shell.studio.field.form.steps.sections.help'])
+    await userEvent.click(sections)
     await waitFor(() => expect(optionTexts(shownDropdown()!)).toEqual(['request', 'decision']))
     await chooseOption('decision')
 
@@ -166,6 +168,9 @@ describe('FormSteps', () => {
     renderSteps(steps)
 
     const card = screen.getByTestId('studio-field-/steps/1')
+    expect(within(card).getByRole('group', { name: 'Title' })).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.field.form.steps.title.help'],
+    )
     expect(within(card).getByRole('textbox', { name: 'English' })).toHaveValue('Decision')
   })
 

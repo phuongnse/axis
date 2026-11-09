@@ -13,7 +13,9 @@ import {
   DatePicker,
 } from 'antd'
 import dayjs from 'dayjs'
-import { lazy, Suspense, useContext } from 'react'
+import { useContext } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
   changeFieldType,
@@ -26,16 +28,13 @@ import type { FieldOrigin, FieldWarning } from '../platform/entityMigrations'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { type DesignerLayer, LayerMarkTag, RemovedRows } from './LayerMarkViews'
+import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
 import { setOwn } from '../platform/ownProperty'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -76,44 +75,15 @@ function JsonOnly() {
   return <span data-testid="studio-json-only">{t('shell.studio.editInJson')}</span>
 }
 
-/** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
-function Expression({
-  pointer,
-  name,
-  value,
-  required,
-  readOnly,
-  onChange,
-}: {
-  pointer: string
-  name: string
-  value: string
-  required: boolean
-  readOnly: boolean
-  onChange: ChangeHandler
-}) {
-  const check = useContext(ExpressionCheckContext)
+/** The label and the help of an entity's input, from `shell.studio.field.entity.<path>`, see docs/reference/frontend.md#platform-field-help. */
+function fieldTexts(t: (key: string) => string, path: string) {
+  return { label: t(`shell.studio.field.entity.${path}`), help: t(`shell.studio.field.entity.${path}.help`) }
+}
 
-  return check && !readOnly ? (
-    <Suspense fallback={<Input aria-label={name} value={value} readOnly aria-busy="true" />}>
-      <LazyExpressionEditor
-        application={check.application}
-        resourceId={check.resourceId}
-        path={pointer}
-        name={name}
-        value={value}
-        required={required}
-        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-        onChange={onChange}
-      />
-    </Suspense>
-  ) : (
-    <Input
-      aria-label={name}
-      value={value}
-      onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
-    />
-  )
+/** The title and the help of an entity's group of inputs, which has no one input to label. */
+function groupTexts(t: (key: string) => string, path: string) {
+  const { label, help } = fieldTexts(t, path)
+  return { title: label, help }
 }
 
 /**
@@ -123,6 +93,7 @@ function Expression({
 function Picker({
   pointer,
   label,
+  help,
   kind,
   options,
   value,
@@ -131,6 +102,7 @@ function Picker({
 }: {
   pointer: string
   label: string
+  help: string
   kind?: string
   options?: string[]
   value: unknown
@@ -144,22 +116,22 @@ function Picker({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <div>{label}</div>
-      {choices === undefined ? (
-        <Input
-          aria-label={label}
-          value={text(value)}
-          onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
-        />
-      ) : (
-        <ReferencePicker
-          name={label}
-          value={typeof value === 'string' ? value : undefined}
-          required={required}
-          options={choices}
-          onChange={onPick}
-        />
-      )}
+      <AxisField label={label} help={help}>
+        {choices === undefined ? (
+          <Input
+            value={text(value)}
+            onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
+          />
+        ) : (
+          <ReferencePicker
+            name={label}
+            value={typeof value === 'string' ? value : undefined}
+            required={required}
+            options={choices}
+            onChange={onPick}
+          />
+        )}
+      </AxisField>
     </div>
   )
 }
@@ -214,24 +186,23 @@ export function EntityDesigner({
   const designer = (
     <Flex vertical gap="middle" data-testid="studio-entity-designer">
       <div data-testid="studio-field-/name">
-        <div>{t('shell.studio.entity.name')}</div>
-        <Input
-          aria-label={t('shell.studio.entity.name')}
-          value={text(value.name)}
-          onChange={(event) => onChange('/name', event.target.value)}
-        />
+        <AxisField {...fieldTexts(t, 'name')}>
+          <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
+        </AxisField>
       </div>
       <div data-testid="studio-field-/label">
-        <div>{t('shell.studio.entity.label')}</div>
-        <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+        <AxisFieldGroup {...groupTexts(t, 'label')}>
+          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+        </AxisFieldGroup>
       </div>
       <div data-testid="studio-field-/description">
-        <div>{t('shell.studio.entity.description')}</div>
-        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+        <AxisFieldGroup {...groupTexts(t, 'description')}>
+          <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+        </AxisFieldGroup>
       </div>
       <Picker
         pointer="/displayField"
-        label={t('shell.studio.entity.displayField')}
+        {...fieldTexts(t, 'displayField')}
         options={fieldNames}
         value={value.displayField}
         required={false}
@@ -403,12 +374,14 @@ function Fields({
       title: t('shell.studio.entity.settings'),
       render: (_, { field, index }) => (
         <Flex vertical gap="small">
-          <FieldLabel
-            name={t('shell.studio.entity.help')}
-            pointer={`/fields/${index}/help`}
-            value={isContent(field) ? field.help : undefined}
-            onChange={onChange}
-          />
+          <AxisField {...fieldTexts(t, 'fields.helpText')}>
+            <FieldLabel
+              name={fieldTexts(t, 'fields.helpText').label}
+              pointer={`/fields/${index}/help`}
+              value={isContent(field) ? field.help : undefined}
+              onChange={onChange}
+            />
+          </AxisField>
           <Settings
             index={index}
             field={isContent(field) ? field : {}}
@@ -484,11 +457,15 @@ function Fields({
 /** The text key picker of a field's label or help, named `name`. Clearing it removes the text. */
 function FieldLabel({
   name,
+  id,
+  'aria-describedby': describedBy,
   pointer,
   value,
   onChange,
 }: {
   name: string
+  id?: string
+  'aria-describedby'?: string
   pointer: string
   value: unknown
   onChange: ChangeHandler
@@ -501,6 +478,8 @@ function FieldLabel({
       {names === undefined ? (
         <Input
           aria-label={name}
+          id={id}
+          aria-describedby={describedBy}
           value={text(key)}
           onChange={(event) =>
             event.target.value === ''
@@ -511,6 +490,8 @@ function FieldLabel({
       ) : (
         <ReferencePicker
           name={name}
+          id={id}
+          aria-describedby={describedBy}
           value={key}
           required={false}
           options={referenceOptions(names, 'text', undefined, pointer)}
@@ -570,12 +551,11 @@ function Settings({
   const taken = editableSettings(field)
   const shown = settingColumns.filter((setting) => taken.includes(setting))
 
-  const labelOf = (setting: FieldSetting) => t(`shell.studio.entity.${setting}`)
+  const settingTexts = (setting: FieldSetting) => fieldTexts(t, `fields.${setting}`)
 
   function number(setting: 'maxLength' | 'minLength' | 'precision' | 'scale' | 'maxSize') {
     return (
       <InputNumber
-        aria-label={labelOf(setting)}
         precision={0}
         min={setting === 'maxSize' || setting === 'minLength' ? 1 : 0}
         value={typeof field[setting] === 'number' ? field[setting] : null}
@@ -587,7 +567,6 @@ function Settings({
   function flag(setting: 'creator' | 'sensitive' | 'exactLookup') {
     return (
       <Checkbox
-        aria-label={labelOf(setting)}
         checked={field[setting] === true}
         // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it.
         onChange={(event) =>
@@ -615,7 +594,6 @@ function Settings({
       case 'searchable':
         return (
           <Switch
-            aria-label={labelOf(setting)}
             checked={field.searchable === true}
             onChange={(checked) => onChange(`${pointer}/searchable`, checked ? true : undefined)}
           />
@@ -626,7 +604,6 @@ function Settings({
           <Limit
             type={text(field.type)}
             value={field[setting]}
-            label={labelOf(setting)}
             onChange={(next) => onChange(`${pointer}/${setting}`, next)}
           />
         )
@@ -634,7 +611,7 @@ function Settings({
         return (
           <Expression
             pointer={`${pointer}/default`}
-            name={labelOf(setting)}
+            name={settingTexts(setting).label}
             value={text(field.default)}
             required={false}
             readOnly={readOnly}
@@ -645,7 +622,6 @@ function Settings({
         return (
           <Select
             mode="tags"
-            aria-label={labelOf(setting)}
             virtual={false}
             style={{ minWidth: 200 }}
             value={Array.isArray(field.values) ? field.values.filter((item) => typeof item === 'string') : []}
@@ -656,7 +632,6 @@ function Settings({
         return (
           <Select
             mode="tags"
-            aria-label={labelOf(setting)}
             virtual={false}
             style={{ minWidth: 200 }}
             value={Array.isArray(field.accept) ? field.accept.filter((item) => typeof item === 'string') : []}
@@ -669,7 +644,7 @@ function Settings({
         return (
           <Expression
             pointer={`${pointer}/expression`}
-            name={labelOf(setting)}
+            name={settingTexts(setting).label}
             value={text(field.expression)}
             required={false}
             readOnly={readOnly}
@@ -679,6 +654,11 @@ function Settings({
       default:
         return null
     }
+  }
+
+  function labelled(setting: FieldSetting) {
+    const control = input(setting)
+    return control && <AxisField {...settingTexts(setting)}>{control}</AxisField>
   }
 
   return (
@@ -704,7 +684,7 @@ function Settings({
           <Picker
             key={setting}
             pointer={`${pointer}/${setting}`}
-            label={labelOf(setting)}
+            {...settingTexts(setting)}
             kind={setting === 'target' ? 'entity' : 'sequence'}
             value={field[setting]}
             required={setting === 'target'}
@@ -712,8 +692,7 @@ function Settings({
           />
         ) : (
           <div key={setting} data-testid={`studio-field-${pointer}/${setting}`}>
-            <div>{labelOf(setting)}</div>
-            {input(setting)}
+            {setting === 'valueLabels' ? input(setting) : labelled(setting)}
           </div>
         ),
       )}
@@ -728,18 +707,21 @@ function Settings({
 function Limit({
   type,
   value,
-  label,
+  id,
+  'aria-describedby': describedBy,
   onChange,
 }: {
   type: string
   value: unknown
-  label: string
+  id?: string
+  'aria-describedby'?: string
   onChange: (next: number | string | undefined) => void
 }) {
   if (type === 'date') {
     return (
       <DatePicker
-        aria-label={label}
+        id={id}
+        aria-describedby={describedBy}
         value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
         onChange={(date) => onChange(date ? date.format('YYYY-MM-DD') : undefined)}
       />
@@ -748,7 +730,8 @@ function Limit({
   if (type === 'date-time') {
     return (
       <DatePicker
-        aria-label={label}
+        id={id}
+        aria-describedby={describedBy}
         showTime
         format="YYYY-MM-DD HH:mm:ss"
         value={typeof value === 'string' && dayjs(value).isValid() ? dayjs(value) : null}
@@ -761,7 +744,8 @@ function Limit({
   }
   return (
     <InputNumber
-      aria-label={label}
+      id={id}
+      aria-describedby={describedBy}
       precision={type === 'integer' ? 0 : undefined}
       value={typeof value === 'number' ? value : null}
       onChange={(next) => onChange(typeof next === 'number' ? next : undefined)}
@@ -786,6 +770,7 @@ function CurrencySource({
 }) {
   const t = useText()
   const fromField = Object.hasOwn(field, 'currencyField')
+  const source = fieldTexts(t, 'fields.currencySource')
 
   function switchTo(next: 'code' | 'field') {
     if ((next === 'field') === fromField) {
@@ -805,22 +790,21 @@ function CurrencySource({
 
   return (
     <Flex vertical gap="small">
-      <div>
-        <div>{t('shell.studio.entity.currencySource')}</div>
+      <AxisField {...source}>
         <Radio.Group
           role="radiogroup"
-          aria-label={t('shell.studio.entity.currencySource')}
+          aria-label={source.label}
           value={fromField ? 'field' : 'code'}
           onChange={(event) => switchTo(event.target.value)}
         >
           <Radio value="code">{t('shell.studio.entity.currencyFixed')}</Radio>
           <Radio value="field">{t('shell.studio.entity.currencyFromField')}</Radio>
         </Radio.Group>
-      </div>
+      </AxisField>
       {fromField ? (
         <Picker
           pointer={`${pointer}/currencyField`}
-          label={t('shell.studio.entity.currencyField')}
+          {...fieldTexts(t, 'fields.currencyField')}
           options={currencyFields}
           value={field.currencyField}
           required
@@ -828,14 +812,17 @@ function CurrencySource({
         />
       ) : (
         <div data-testid={`studio-field-${pointer}/currency`}>
-          <div>{t('shell.studio.entity.currency')}</div>
-          <Input
-            aria-label={t('shell.studio.entity.currency')}
-            value={text(field.currency)}
-            onChange={(event) =>
-              onChange(`${pointer}/currency`, event.target.value === '' ? undefined : event.target.value.toUpperCase())
-            }
-          />
+          <AxisField {...fieldTexts(t, 'fields.currency')}>
+            <Input
+              value={text(field.currency)}
+              onChange={(event) =>
+                onChange(
+                  `${pointer}/currency`,
+                  event.target.value === '' ? undefined : event.target.value.toUpperCase(),
+                )
+              }
+            />
+          </AxisField>
         </div>
       )}
     </Flex>
@@ -869,33 +856,35 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
   }
 
   return (
-    <Flex vertical gap="small">
-      {values.map((value) => {
-        const name = `${t('shell.studio.entity.valueLabel')} ${value}`
-        const current = labels[value]
-        const key = isContent(current) && typeof current.textKey === 'string' ? current.textKey : undefined
-        return (
-          <div key={value} data-testid={`studio-field-${pointer}/${escapePointerSegment(value)}`}>
-            <div>{name}</div>
-            {names === undefined ? (
-              <Input
-                aria-label={name}
-                value={text(key)}
-                onChange={(event) => write(value, event.target.value === '' ? undefined : event.target.value)}
-              />
-            ) : (
-              <ReferencePicker
-                name={name}
-                value={key}
-                required={false}
-                options={referenceOptions(names, 'text', undefined, pointer)}
-                onChange={(next) => write(value, next)}
-              />
-            )}
-          </div>
-        )
-      })}
-    </Flex>
+    <AxisFieldGroup {...groupTexts(t, 'fields.valueLabels')}>
+      <Flex vertical gap="small">
+        {values.map((value) => {
+          const name = `${t('shell.studio.entity.valueLabel')} ${value}`
+          const current = labels[value]
+          const key = isContent(current) && typeof current.textKey === 'string' ? current.textKey : undefined
+          return (
+            <div key={value} data-testid={`studio-field-${pointer}/${escapePointerSegment(value)}`}>
+              <AxisField label={name} help="">
+                {names === undefined ? (
+                  <Input
+                    value={text(key)}
+                    onChange={(event) => write(value, event.target.value === '' ? undefined : event.target.value)}
+                  />
+                ) : (
+                  <ReferencePicker
+                    name={name}
+                    value={key}
+                    required={false}
+                    options={referenceOptions(names, 'text', undefined, pointer)}
+                    onChange={(next) => write(value, next)}
+                  />
+                )}
+              </AxisField>
+            </div>
+          )
+        })}
+      </Flex>
+    </AxisFieldGroup>
   )
 }
 
@@ -961,25 +950,26 @@ function Indexes({
               </Typography.Text>
               {layer && <LayerMarkTag layer={layer} list="/indexes" index={position} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/fields`} style={{ flex: 1, minWidth: 240 }}>
-                <div>{t('shell.studio.entity.indexFields')}</div>
-                <Select
-                  mode="multiple"
-                  aria-label={t('shell.studio.entity.indexFields')}
-                  virtual={false}
-                  style={{ width: '100%' }}
-                  value={Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []}
-                  options={choices.map((name) => ({ value: name, label: name }))}
-                  onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
-                />
+                <AxisField {...fieldTexts(t, 'indexes.fields')}>
+                  <Select
+                    mode="multiple"
+                    virtual={false}
+                    style={{ width: '100%' }}
+                    value={
+                      Array.isArray(content.fields) ? content.fields.filter((item) => typeof item === 'string') : []
+                    }
+                    options={choices.map((name) => ({ value: name, label: name }))}
+                    onChange={(next: string[]) => onChange(`${pointer}/fields`, next)}
+                  />
+                </AxisField>
               </div>
               <div data-testid={`studio-field-${pointer}/unique`}>
-                <Checkbox
-                  aria-label={t('shell.studio.entity.indexUnique')}
-                  checked={content.unique === true}
-                  onChange={(event) => onChange(`${pointer}/unique`, event.target.checked ? true : undefined)}
-                >
-                  {t('shell.studio.entity.indexUnique')}
-                </Checkbox>
+                <AxisField {...fieldTexts(t, 'indexes.unique')}>
+                  <Checkbox
+                    checked={content.unique === true}
+                    onChange={(event) => onChange(`${pointer}/unique`, event.target.checked ? true : undefined)}
+                  />
+                </AxisField>
               </div>
               {readOnly ? null : (
                 <Flex gap="small">
@@ -1046,7 +1036,7 @@ function Validations({
         {list.map((validation, index) => {
           const pointer = `/validations/${index}`
           const content = isContent(validation) ? validation : {}
-          const name = t('shell.studio.entity.validationExpression')
+          const expression = fieldTexts(t, 'validations.expression')
           return (
             <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
               <Typography.Text code data-testid={`studio-field-${pointer}/name`}>
@@ -1054,19 +1044,20 @@ function Validations({
               </Typography.Text>
               {layer && <LayerMarkTag layer={layer} list="/validations" index={index} name={text(content.name)} />}
               <div data-testid={`studio-field-${pointer}/expression`} style={{ flex: 1, minWidth: 240 }}>
-                <div>{name}</div>
-                <Expression
-                  pointer={`${pointer}/expression`}
-                  name={name}
-                  value={text(content.expression)}
-                  required
-                  readOnly={readOnly}
-                  onChange={onChange}
-                />
+                <AxisField {...expression}>
+                  <Expression
+                    pointer={`${pointer}/expression`}
+                    name={expression.label}
+                    value={text(content.expression)}
+                    required
+                    readOnly={readOnly}
+                    onChange={onChange}
+                  />
+                </AxisField>
               </div>
               <Picker
                 pointer={`${pointer}/message/textKey`}
-                label={t('shell.studio.entity.validationMessage')}
+                {...fieldTexts(t, 'validations.message')}
                 kind="text"
                 value={isContent(content.message) ? content.message.textKey : undefined}
                 required
@@ -1074,7 +1065,7 @@ function Validations({
               />
               <Picker
                 pointer={`${pointer}/field`}
-                label={t('shell.studio.entity.validationField')}
+                {...fieldTexts(t, 'validations.field')}
                 options={fieldNames}
                 value={content.field}
                 required

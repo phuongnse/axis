@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useState, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import {
   editableSettings,
   fieldSettingNames,
@@ -22,6 +23,46 @@ import { chooseOption, clearPicker, clearSelect, openDropdown, optionTexts, remo
 import { EntityDesigner } from './EntityDesigner'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { LabelTextsContext } from './labelTextsContext'
+
+const english: Record<string, string> = platformEnglish
+
+const labelOf = (path: string) => english[`shell.studio.field.entity.${path}`]
+const helpOf = (path: string) => english[`shell.studio.field.entity.${path}.help`]
+
+/** The paths under `shell.studio.field.entity.` that the designer draws, each with a label and a help. */
+const drawnPaths = [
+  'name',
+  'label',
+  'description',
+  'displayField',
+  'fields.helpText',
+  'fields.maxLength',
+  'fields.minLength',
+  'fields.min',
+  'fields.max',
+  'fields.precision',
+  'fields.scale',
+  'fields.maxSize',
+  'fields.accept',
+  'fields.target',
+  'fields.currencySource',
+  'fields.currency',
+  'fields.currencyField',
+  'fields.values',
+  'fields.valueLabels',
+  'fields.expression',
+  'fields.default',
+  'fields.sequence',
+  'fields.creator',
+  'fields.searchable',
+  'fields.sensitive',
+  'fields.exactLookup',
+  'indexes.fields',
+  'indexes.unique',
+  'validations.expression',
+  'validations.message',
+  'validations.field',
+]
 
 const names = {
   locales: ['en', 'vi'],
@@ -273,6 +314,102 @@ describe('EntityDesigner', () => {
     expect(within(screen.getByTestId('studio-field-/displayField')).getByText('code')).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')).toHaveValue('20')
     expect(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('total')
+  })
+
+  it('names each entity input by its label and describes it by its help', () => {
+    renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
+
+    expect(screen.getByRole('textbox', { name: labelOf('name') })).toHaveAccessibleDescription(helpOf('name'))
+    expect(screen.getByRole('group', { name: labelOf('label') })).toHaveAccessibleDescription(helpOf('label'))
+    expect(screen.getByRole('group', { name: labelOf('description') })).toHaveAccessibleDescription(
+      helpOf('description'),
+    )
+    expect(
+      within(screen.getByTestId('studio-field-/displayField')).getByRole('combobox', {
+        name: labelOf('displayField'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('displayField'))
+    expect(
+      within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton', {
+        name: labelOf('fields.maxLength'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('fields.maxLength'))
+  })
+
+  it('names the currency inputs by their labels and describes them by their help', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'code', type: 'text' },
+          { name: 'fixed', type: 'money', currency: 'USD' },
+          { name: 'variable', type: 'money', currencyField: 'code' },
+        ],
+      }),
+    )
+
+    const fixed = within(screen.getByTestId('studio-field-/fields/1'))
+    expect(fixed.getByRole('radiogroup', { name: labelOf('fields.currencySource') })).toHaveAccessibleDescription(
+      helpOf('fields.currencySource'),
+    )
+    expect(fixed.getByRole('textbox', { name: labelOf('fields.currency') })).toHaveAccessibleDescription(
+      helpOf('fields.currency'),
+    )
+    expect(
+      within(screen.getByTestId('studio-field-/fields/2')).getByRole('combobox', {
+        name: labelOf('fields.currencyField'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('fields.currencyField'))
+  })
+
+  it('names the index inputs by their labels and describes them by their help', () => {
+    renderDesigner(entity({ indexes: [{ name: 'index1', fields: ['code'], unique: true }] }))
+
+    const index = within(screen.getByTestId('studio-field-/indexes/0'))
+    expect(index.getByRole('combobox', { name: labelOf('indexes.fields') })).toHaveAccessibleDescription(
+      helpOf('indexes.fields'),
+    )
+    expect(index.getByRole('checkbox', { name: labelOf('indexes.unique') })).toHaveAccessibleDescription(
+      helpOf('indexes.unique'),
+    )
+  })
+
+  it('names the validation inputs by their labels and shows the help of the expression', () => {
+    renderDesigner(
+      entity({
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const row = within(screen.getByTestId('studio-field-/validations/0'))
+    expect(
+      within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('combobox', {
+        name: labelOf('validations.message'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('validations.message'))
+    expect(
+      within(screen.getByTestId('studio-field-/validations/0/field')).getByRole('combobox', {
+        name: labelOf('validations.field'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('validations.field'))
+    expect(row.getByRole('textbox', { name: labelOf('validations.expression') })).toHaveAccessibleDescription(
+      helpOf('validations.expression'),
+    )
+    expect(row.getByText(helpOf('validations.expression'))).toBeVisible()
+  })
+
+  it('shows the help of a computed field expression', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'total', type: 'integer' },
+          { name: 'double', type: 'integer', expression: 'total * 2' },
+        ],
+      }),
+    )
+
+    expect(within(screen.getByTestId('studio-field-/fields/1')).getByText(helpOf('fields.expression'))).toBeVisible()
   })
 
   it('shows the description after the name and the label and writes its texts', async () => {
@@ -838,6 +975,15 @@ describe('EntityDesigner', () => {
     expect(within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('textbox')).toHaveValue(
       'v',
     )
+  })
+})
+
+describe('the texts of the entity designer', () => {
+  it.each(drawnPaths)('has a label and a help for %s in English and Vietnamese', (path) => {
+    for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+      expect(catalogue[`shell.studio.field.entity.${path}`]).toBeTruthy()
+      expect(catalogue[`shell.studio.field.entity.${path}.help`]).toBeTruthy()
+    }
   })
 })
 

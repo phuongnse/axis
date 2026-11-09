@@ -16,7 +16,7 @@ function text(value: unknown): string {
 /**
  * The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. The
  * `id` and `aria-describedby` that `AxisField` gives its input reach the plain box only, as the expression editor does
- * not take them yet. It keeps its own name.
+ * not take them yet. It keeps its own name. A `readOnly` expression is always the plain box.
  */
 export function Expression({
   pointer,
@@ -25,6 +25,7 @@ export function Expression({
   'aria-describedby': describedBy,
   value,
   required = true,
+  readOnly = false,
   onChange,
 }: {
   pointer: string
@@ -33,11 +34,12 @@ export function Expression({
   'aria-describedby'?: string
   value: string
   required?: boolean
+  readOnly?: boolean
   onChange: ChangeHandler
 }) {
   const check = useContext(ExpressionCheckContext)
 
-  return check ? (
+  return check && !readOnly ? (
     <Suspense
       fallback={
         <Input aria-label={name} id={id} aria-describedby={describedBy} value={value} readOnly aria-busy="true" />
