@@ -426,7 +426,7 @@ describe('TaskPage', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
 
       const error = await screen.findByTestId('form-error')
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([error])
       expect(error).toHaveFocus()
       expect(within(error).getByRole('alert')).toHaveTextContent("Must be one of the step's outcomes.")

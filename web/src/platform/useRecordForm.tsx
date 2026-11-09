@@ -652,12 +652,13 @@ export function useRecordForm(
     </div>
   )
 
-  // Each refusal sets a new list of errors, so a repeated refusal scrolls and focuses again.
+  // Each refusal sets a new list of errors, so a repeated refusal scrolls and focuses again. The error is
+  // centred, because the shell's sticky header would cover it at the top of the window.
   useEffect(() => {
     if (formErrors.length === 0) {
       return
     }
-    formErrorRef.current?.scrollIntoView?.({ block: 'nearest' })
+    formErrorRef.current?.scrollIntoView?.({ block: 'center' })
     formErrorRef.current?.focus({ preventScroll: true })
   }, [formErrors])
 

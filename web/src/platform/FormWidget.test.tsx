@@ -771,7 +771,7 @@ describe('FormWidget', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
       const error = await screen.findByTestId('form-error')
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([error])
       expect(error).toHaveFocus()
       expect(within(error).getByRole('alert')).toHaveTextContent('Must be a JSON object.')
