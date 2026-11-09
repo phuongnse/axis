@@ -703,6 +703,18 @@ describe('AxisTable', () => {
       expect(movedLines(container).map((row) => row.textContent)).toEqual(['Amount: 12Note: Buy paper'])
     })
 
+    it('leaves the cells that stay room under their content for the moved lines', () => {
+      fakeWidth(450)
+      const { container } = renderTable({ columns })
+
+      const row = container.querySelector('[data-moved-cells]')!.closest('tr')!
+      const [name, note] = row.querySelectorAll('td')
+      expect(note.style.paddingBottom).toContain('var(--axis-moved-height')
+      // The identifying cell holds the lines itself and needs no room.
+      expect(name.style.paddingBottom).toBe('')
+      expect(row.style.getPropertyValue('--axis-moved-height')).toBe('0px')
+    })
+
     it('shows every column and no moved lines when the columns fit', () => {
       fakeWidth(1000)
       const { container } = renderTable({ columns })

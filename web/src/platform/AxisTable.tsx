@@ -163,6 +163,8 @@ const actionsKey = '$actions'
 
 /** A width of 1 % makes an auto-layout column as narrow as its content, which `nowrap` keeps on one line. */
 const fitContent = '1%'
+/** The height of the moved lines of a row, set on the row for the cells that stay. */
+const movedHeight = '--axis-moved-height'
 
 function sameSort(a: TableSort | null, b: TableSort | null): boolean {
   return a?.field === b?.field && a?.descending === b?.descending
@@ -355,6 +357,8 @@ export function AxisTable<T extends object>({
   }
 
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
+  // The cells that stay leave room under their content for the moved lines, which run across the whole row.
+  const staysRoom: CSSProperties = { paddingBottom: `calc(${tokens.spacing.xs}px + var(${movedHeight}, 0px))` }
   const antColumns: TableColumnType<T>[] = shown
     .filter((column) => !room.moved.includes(column.key))
     .map(
@@ -392,7 +396,7 @@ export function AxisTable<T extends object>({
           },
           onCell: (row, index) => {
             const own = onCell?.(row, index)
-            return { ...own, style: { ...sizing, ...own?.style } }
+            return { ...own, style: { ...sizing, ...(position === 0 ? {} : staysRoom), ...own?.style } }
           },
           render: (_value: unknown, row: T, index: number) => {
             const content = contentOf(original, row, index)
@@ -437,6 +441,7 @@ export function AxisTable<T extends object>({
       // A header without text fails the accessibility check, so the column is named for screen readers only.
       title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
       onHeaderCell: () => ({ ...cell, 'data-column-key': actionsKey }),
+      onCell: () => ({ style: staysRoom }),
       render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
     })
   }
@@ -571,6 +576,7 @@ export function AxisTable<T extends object>({
                       onChange: (keys) => setSelectedKeys(keys),
                       getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
                       fixed: room.scrolls,
+                      onCell: () => ({ style: staysRoom }),
                     }
                   : undefined
               }
@@ -679,9 +685,31 @@ function MovedCells({
   lines: { key: string; title: ReactNode; content: ReactNode }[]
   width: number
 }) {
+  const box = useRef<HTMLDivElement>(null)
+  // The cells that stay leave this much room, so a wrapped line of theirs never runs under the moved lines.
+  useLayoutEffect(() => {
+    const element = box.current
+    const row = element?.closest('tr')
+    if (!element || !row) {
+      return
+    }
+    const publish = () => row.style.setProperty(movedHeight, `${element.offsetHeight}px`)
+    publish()
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(publish)
+    observer?.observe(element)
+    return () => {
+      observer?.disconnect()
+      row.style.removeProperty(movedHeight)
+    }
+  }, [])
   return (
     <div style={{ width: 0 }}>
-      <Flex vertical data-moved-cells style={{ position: 'relative', width: width || undefined, whiteSpace: 'normal' }}>
+      <Flex
+        ref={box}
+        vertical
+        data-moved-cells
+        style={{ position: 'relative', width: width || undefined, whiteSpace: 'normal' }}
+      >
         {lines.map((moved) => (
           <div key={moved.key}>
             <span>{moved.title}</span>: {moved.content}

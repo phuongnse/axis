@@ -123,7 +123,7 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
         var provider = (await GetAsync(id, "identity-provider/instances/oidc-issuer"));
         Assert.Equal("${axisProvider.oidc-issuer}", provider.GetProperty("displayName").GetString());
         var context = await SignInContextAsync(id, "site-sales", "vi");
-        Assert.Equal("Tiếp tục với {provider}", context.GetProperty("texts").GetProperty("continueWith").GetString());
+        Assert.Equal("Đăng nhập bằng {provider}", context.GetProperty("texts").GetProperty("continueWith").GetString());
         var label = context.GetProperty("providers").EnumerateArray().Single(entry => entry.GetProperty("alias").GetString() == "oidc-issuer");
         Assert.Equal("Công ty", label.GetProperty("label").GetString());
         var english = await SignInContextAsync(id, "site-sales", "en");
