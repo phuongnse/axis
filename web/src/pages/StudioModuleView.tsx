@@ -15,6 +15,7 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
   const { content, loadFailed } = useStudioModuleContent(application, module, id)
 
   if (loadFailed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
   if (!content) {

@@ -133,6 +133,7 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
             </AxisField>
           </Form>
         )}
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {error && <Alert data-testid="cell-tenant-host-error" type="error" title={error} />}
       </Flex>
     </Modal>

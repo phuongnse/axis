@@ -112,6 +112,7 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
           onChange={(value) => setApplication(value || undefined)}
         />
         {load.failed && !loading ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="console-schedules-error" type="error" title={t('shell.console.schedules.loadFailed')} />
         ) : (
           <AxisTable<ConsoleScheduleItem>

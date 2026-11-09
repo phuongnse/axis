@@ -309,6 +309,7 @@ export function StudioPublishing({
       </StudioBand>
       <Flex gap="middle" align="flex-start">
         <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
           {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
           {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (

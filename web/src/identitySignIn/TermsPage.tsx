@@ -38,6 +38,7 @@ export function TermsPage({ context }: { context: TermsContext }) {
     })
   return (
     <IdentityFrame title={texts.title} frame={context}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {error && <Alert type="error" showIcon title={error} />}
       <Form
         name={formId}

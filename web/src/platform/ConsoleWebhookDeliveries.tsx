@@ -156,6 +156,7 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
           />
         </Flex>
         {load.failed && !loading ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="console-webhook-deliveries-error"
             type="error"

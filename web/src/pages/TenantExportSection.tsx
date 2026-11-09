@@ -161,11 +161,13 @@ export function TenantExportSection() {
         <Typography.Title level={3} id={headingId}>
           {t('shell.users.export.title')}
         </Typography.Title>
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         <Alert type="warning" showIcon title={t('shell.users.export.warning')} />
         {running && (
           <Typography.Text data-testid="tenant-export-running">{t('shell.users.export.running')}</Typography.Text>
         )}
         {exported?.state === 'failed' && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="tenant-export-failed" type="error" title={t('shell.users.export.failed')} />
         )}
         {exported?.state === 'succeeded' && (
@@ -183,6 +185,7 @@ export function TenantExportSection() {
             </AxisButton>
           </Flex>
         )}
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {notice && <Alert data-testid="tenant-export-notice" type="error" title={t(`shell.users.export.${notice}`)} />}
         {offerStart && (
           <div>

@@ -371,6 +371,7 @@ function OwnGrants({
   )
 
   if (state === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert type="error" title={t('shell.studio.matrix.loadFailed')} />
   }
   if (state === undefined) {
@@ -524,9 +525,11 @@ function OwnGrants({
         </Button>
       </Flex>
       {saved && !changed && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="studio-matrix-saved" type="success" showIcon title={t('shell.studio.matrix.saved')} />
       )}
       {conflict && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert
           data-testid="studio-matrix-conflict"
           type="warning"
@@ -537,6 +540,7 @@ function OwnGrants({
         />
       )}
       {failed && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="studio-matrix-invalid" type="error" showIcon title={t('shell.studio.matrix.invalid')} />
       )}
     </Flex>
@@ -587,6 +591,7 @@ export function StudioPolicyMatrix({
     return null
   }
   if (state.matrix === null) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="studio-matrix-load-error" type="error" title={t('shell.studio.matrix.loadFailed')} />
   }
   return (

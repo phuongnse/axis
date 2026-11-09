@@ -104,6 +104,7 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
               </Flex>
             )
           })}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {error && <Alert data-testid="cell-tenant-quotas-error" type="error" title={error} />}
         </Flex>
       </Form>

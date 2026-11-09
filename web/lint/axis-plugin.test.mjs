@@ -175,6 +175,41 @@ describe('axis/no-antd-button', () => {
   })
 })
 
+describe('axis/no-antd-alert', () => {
+  const rules = { 'axis/no-antd-alert': 'error' }
+
+  it('reports each Alert imported from antd, also under another name', () => {
+    const source = [
+      "import { Alert, Alert as Note } from 'antd'",
+      'const a = <Alert title="a" />',
+      'const b = (',
+      '  <Note',
+      '    type="info"',
+      '  />',
+      ')',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual(['axis(no-antd-alert):2', 'axis(no-antd-alert):4'])
+  })
+
+  it('allows AxisAlert, Space and an Alert from elsewhere', () => {
+    const source = [
+      "import { Alert } from './elsewhere'",
+      "import { Space } from 'antd'",
+      'const a = <Alert title="a" />',
+      'const b = <AxisAlert kind="info" message="b" />',
+      'const c = <Space />',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([])
+  })
+
+  it('does not report a comment that names an Alert', () => {
+    const source = "import { Alert } from 'antd'\n// <Alert title=\"a\" />\nconst a = '<Alert>'\n"
+    expect(lint(source, { rules })).toEqual([])
+  })
+})
+
 describe('axis/exact-locators', () => {
   const rules = { 'axis/exact-locators': 'error' }
   const reported = (source, options = rules) => lint(source, { rules: options, extension: 'ts' })
@@ -310,6 +345,23 @@ describe('the rules of web/.oxlintrc.json', () => {
     expect(
       lint('const el = document.body\nel["inner" + "HTML"] = value\n', { config: realConfig, extension: 'ts' }),
     ).toEqual(['axis(no-computed-key-write):2'])
+  })
+
+  it('refuses an Alert outside AxisAlert.tsx and allows it inside', () => {
+    const copy = path.join(folder, 'real-config')
+    mkdirSync(path.join(copy, 'src/platform'), { recursive: true })
+    mkdirSync(path.join(copy, 'src/pages'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    const source = 'import { Alert } from \'antd\'\nexport function Page() {\n  return <Alert title="x" />\n}\n'
+    writeFileSync(configFile, JSON.stringify(realConfig))
+    writeFileSync(path.join(copy, 'src/platform/AxisAlert.tsx'), source)
+    writeFileSync(path.join(copy, 'src/pages/Other.tsx'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('src/platform/AxisAlert.tsx')).toEqual([])
+    expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-alert)'])
   })
 
   it('reports Object.assign, DOMParser and a Table imported from antd', () => {

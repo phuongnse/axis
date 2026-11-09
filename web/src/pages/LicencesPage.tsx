@@ -66,6 +66,7 @@ export function LicencesPage() {
           {t('shell.licences.source')}
         </a>
       </Flex>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {loadFailed && <Alert data-testid="licences-error" type="error" title={t('shell.licences.loadFailed')} />}
       {licences && (
         <>

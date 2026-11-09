@@ -5,6 +5,7 @@ import { useText } from '../platform/texts'
 export function StudioModuleReadOnly() {
   const t = useText()
   return (
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     <Alert role="alert" data-testid="studio-module-read-only" type="info" title={t('shell.studio.moduleReadOnly')} />
   )
 }

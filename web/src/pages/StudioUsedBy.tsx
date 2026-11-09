@@ -156,6 +156,7 @@ export function StudioUsedBy({
       view={{ query: view, onChange: setView }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
+      // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
       failure={failed ? <Alert type="error" title={t('shell.studio.referencesFailed')} /> : undefined}
       toolbar={{
         view: (

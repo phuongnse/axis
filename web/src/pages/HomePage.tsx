@@ -62,6 +62,7 @@ export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCar
             {t(refused ? 'shell.home.signIn.title' : 'shell.home.signedOut.title')}
           </Typography.Title>
           {refused ? (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert
               data-testid={declined ? 'sign-in-declined' : 'sign-in-failed'}
               role="alert"
@@ -242,6 +243,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
 
   let body: ReactNode
   if (sites === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     body = <Alert data-testid="applications-error" type="error" title={t('shell.home.applications.loadFailed')} />
   } else if (groups.length === 0) {
     body = <EmptyState text={t('shell.home.applications.empty')} />

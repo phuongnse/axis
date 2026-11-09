@@ -110,6 +110,7 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
   if (loading) {
     content = t('shell.chart.loading')
   } else if (failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     content = <Alert data-testid="chart-error" type="error" title={t('shell.chart.loadFailed')} />
   } else if (rows.length === 0) {
     content = <div data-testid="chart-empty">{t('shell.chart.empty')}</div>
@@ -118,6 +119,7 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
       <>
         <Chart title={title} kind={kind} categories={categories} series={series} />
         {state.totalCount > maxGroups && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="chart-truncated" type="info" title={t('shell.chart.truncated')} />
         )}
         <table style={visuallyHidden}>

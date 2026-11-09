@@ -171,6 +171,7 @@ function JsonValues({ pointer, values, onChange }: { pointer: string; values: un
           }
         }}
       />
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {invalid && <Alert type="error" title={t('shell.studio.scenario.notJson')} />}
     </Flex>
   )

@@ -155,6 +155,7 @@ function Point({ value }: { value: string }) {
         </>
       )}
       {conflict && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert
           data-testid="studio-contract-relax-conflict"
           type="warning"
@@ -548,6 +549,7 @@ export function StudioModuleContract({
   useUnsavedChanges(patch.length > 0)
 
   if (loadFailed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
   if (!loaded) {
@@ -673,6 +675,7 @@ export function StudioModuleContract({
   return (
     <RelaxContextValue.Provider value={relax}>
       <Flex vertical gap="middle">
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         <Alert data-testid="studio-contract-add-only" type="info" title={t('shell.studio.contract.addOnly')} />
         {view.states.length > 0 && (
           <Suspense fallback={null}>
@@ -823,6 +826,7 @@ export function StudioModuleContract({
           ]}
         />
         {conflict && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="studio-conflict"
             type="warning"
@@ -831,6 +835,7 @@ export function StudioModuleContract({
             action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
           />
         )}
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
         <AxisActionRow align="center">
           <AxisButton

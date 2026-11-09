@@ -127,6 +127,7 @@ export function UserPage() {
               {t('shell.users.email')}: {roles.email ?? t('shell.value.notSet')}
             </Typography.Text>
           )}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {problem && <Alert data-testid="user-roles-problem" type="error" title={t(`shell.users.roles.${problem}`)} />}
           {sections.map((section) => (
             <section key={section.key} data-testid="user-roles-section" aria-label={section.title}>

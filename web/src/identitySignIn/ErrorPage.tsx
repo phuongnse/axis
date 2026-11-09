@@ -7,6 +7,7 @@ export function ErrorPage({ context }: { context: ErrorContext }) {
   const { title, error, backUrl, texts } = context
   return (
     <IdentityFrame title={title} frame={context}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       <Alert type="error" showIcon title={error} />
       {backUrl && <Typography.Link href={backUrl}>{texts.backToApplication}</Typography.Link>}
     </IdentityFrame>
