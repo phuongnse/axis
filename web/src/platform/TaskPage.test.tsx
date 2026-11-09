@@ -693,6 +693,24 @@ describe('TaskPage', () => {
       expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent('Choose one target.')
     })
 
+    it('shows a message on the role above the form while Person is chosen', async () => {
+      stubTaskApi({
+        reads,
+        users: people,
+        reassign: { status: 400, body: { title: 'Invalid.', status: 400, errors: { '/role': ['Not a role.'] } } },
+      })
+      renderPage()
+      const dialog = await openDialog()
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
+      await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }))
+      await userEvent.click(await screen.findByTitle('Ann Lee'))
+      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
+
+      expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent('Not a role.')
+    })
+
     it('closes the dialog, loads the task again and shows the refusal on a 409 or 403', async () => {
       for (const status of [409, 403]) {
         const api = stubTaskApi({

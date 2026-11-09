@@ -108,8 +108,9 @@ call that is not resolvable has none, because the server decides what may be res
   the API takes it. The values go out typed: an integer or decimal keeps every digit, a boolean is
   `true` or `false`, and an empty optional output is left out. A `failed` outcome sends no output.
 - **Answer.** On success, the dialog closes and the page reads the instance again. On a `400`, the
-  message of each `/output/{name}` error shows under that output's field, and the problem's title shows
-  in the dialog. Any other refusal shows its title, and any other failure shows a generic text.
+  message of each `/reason`, `/outcome` and declared `/output/{name}` error shows under its field. The
+  problem's title shows in the dialog, and the message of any other key follows it there. Any other
+  refusal shows its title, and any other failure shows a generic text.
 
 ## Dead letters
 
