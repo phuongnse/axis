@@ -2,7 +2,8 @@
 
 1. Audit the prototype for one concern with two mechanisms: have an agent read
    `web/src` and the server for copies, forks and second ways to the same
-   result, and put what it finds in a comment on the design issue.
+   result. Add what it finds to the design issue's body as build notes, and set
+   the body with `gh issue edit <n> --body-file <file>`.
 2. Tag the prototype's last commit and push the tag, then delete the branch:
    `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"`,
    `git push origin design-review/<yyyy-mm-dd>-<topic>`, then
