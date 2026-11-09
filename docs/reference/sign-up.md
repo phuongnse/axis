@@ -56,7 +56,7 @@ sends nothing outside the region.
 
 ### Start from
 
-A new tenant starts from Blank or a built-in application, because the platform does not require an
+The person chooses what the new tenant starts from, because the platform does not require an
 application, as [D51](../decisions/d51-creating-applications-and-resources-from-studio.md) starts one blank
 or from a template.
 
@@ -74,8 +74,7 @@ or from a template.
 
 ### The terms box
 
-The box accepts the business's agreements and tells the person of the privacy policy, which needs no
-acceptance.
+The box accepts the business's agreements.
 
 - **The box** _(planned for M33)_. `AcceptTermsField` reads "On behalf of my business, I accept the Terms
   of service and the Data processing agreement.", in `vi` "Tôi thay mặt doanh nghiệp đồng ý với Điều
@@ -86,8 +85,6 @@ acceptance.
   policy as a link and has no box: the person's name and email are used to run the contract, which needs
   no separate consent. A lawyer confirms this before sign-up opens. If Vietnamese law needs an explicit
   consent, it is a box of its own, never joined to the terms.
-- **What is recorded.** The acceptance row records the version of each document that was shown, the
-  Privacy policy's included, see [terms acceptance](#terms-acceptance).
 
 ### The documents
 
