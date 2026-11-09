@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
+import { Announcement } from '../platform/Announcement'
 import { getAt } from '../platform/jsonPatch'
 import {
   addableTypes,
@@ -10,7 +11,7 @@ import {
   widgetPointerOf,
 } from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
-import { landedText, paletteReasons, usePartLabel, visuallyHidden } from './pagePaletteSupport'
+import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -76,9 +77,7 @@ export function PagePalette({
             />
           ))}
         </Flex>
-        <div role="status" aria-live="polite" data-testid="studio-palette-announcement" style={visuallyHidden}>
-          {announcement}
-        </div>
+        <Announcement testId="studio-palette-announcement">{announcement}</Announcement>
       </Flex>
     </div>
   )

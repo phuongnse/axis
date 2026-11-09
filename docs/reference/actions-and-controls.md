@@ -80,6 +80,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   tree select with an error, and an unticked checkbox or radio in a field with an error, take
   `dangerText` for their border, the colour of the field's message. The `danger` fill stays for fills
   such as a danger button, whose white text needs it.
+- **A warning takes the warning text colour.** A field's warning message and the
+  border of a field with a warning take `warningText`, as an error's take `dangerText`, so both pass
+  contrast.
 - **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
   names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
 - **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
@@ -89,6 +92,14 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
   group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
   field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+- **A field's status.** A field inside a form takes a `status`, what the screen found about the
+  field beyond its rules: a check run while the person types, such as whether a subdomain is free, or
+  choices that could not load. Running shows the input busy. A status that passed leaves the field as it
+  is, with no tick and no text, since no error is all the person needs, and a status region tells a
+  screen reader its message. A refused one shows its message as an error, and something that could not
+  be done shows its message as a warning, under the input where an error shows, never in an alert of its
+  own. While a status is shown it takes the place of the field's own errors. A field outside a form takes
+  no status, because the form item is what draws the message, the border and the spinner.
 - **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
   a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
   with its help.

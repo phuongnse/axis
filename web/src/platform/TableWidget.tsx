@@ -473,6 +473,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       align: isNumeric(field.type) ? 'right' : undefined,
+      // The author's priority decides which columns move under the row first when room runs out.
+      priority: widget.priorities[field.name],
       filter: filterOf(field),
       // Digits of equal width line up in a column.
       onCell: () => (isNumeric(field.type) ? { style: { fontVariantNumeric: 'tabular-nums' } } : {}),
@@ -488,7 +490,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, filterable, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
+  }, [fields, filterable, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas, widget.priorities])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen

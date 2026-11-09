@@ -1,6 +1,7 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Col, Form, Input, Row, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { NotSet } from './EmptyValue'
@@ -10,6 +11,7 @@ import { FormCanvasContext } from './formCanvas'
 import { fieldRows } from './formLayout'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
+import { placeProblemErrors } from './problemErrors'
 import { buildFormStateBody } from './recordBody'
 import {
   isFileValue,
@@ -101,6 +103,9 @@ interface StateRequest {
 }
 
 const fieldPointer = '/values/'
+
+/** The field a refused request's message goes to: a field the form shows, or a cell of a child collection. */
+type Target = { name: string } | { collection: string; key: string }
 
 // Typing sends many changes, so a text or number input and a child collection wait for a pause. A
 // choice is one change, so it asks at once.
@@ -194,6 +199,7 @@ export function useRecordForm(
   // The errors of each child collection's cells, keyed by collection, then by `<index>/<field>`.
   const [cellErrors, setCellErrors] = useState<Record<string, Record<string, string[]>>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
+  const formErrorRef = useRef<HTMLDivElement>(null)
   const asking = conditions !== undefined
   // The fields the user has changed or left.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
@@ -272,15 +278,13 @@ export function useRecordForm(
     return entry !== undefined && hiddenOf(entry.field)
   }
 
-  // A pointer such as `lines/1/quantity` names a cell when the collection, its row and the child
+  // A pointer such as `/values/lines/1/quantity` names a cell when the collection, its row and the child
   // field all exist.
-  const cellOf = (name: string) => {
-    const [collection, index, child, ...rest] = name.split('/')
+  const cellOf = (collection: string, index: string, child: string) => {
     const field = shown.find((candidate) => candidate.field.name === collection)?.field
     if (
-      rest.length > 0 ||
       field?.type !== 'child-collection' ||
-      !/^(0|[1-9]\d*)$/.test(index ?? '') ||
+      !/^(0|[1-9]\d*)$/.test(index) ||
       Number(index) >= rowsOf(values[collection]).length ||
       !field.fields?.some((candidate) => candidate.name === child)
     ) {
@@ -292,28 +296,32 @@ export function useRecordForm(
   // Returns the names of the fields and collections that got a message, so a wizard can open the
   // step that has them.
   const showProblem = (problem: RecordProblem): string[] => {
+    const placed = placeProblemErrors<Target>(problem.errors, ([root, name, index, child, ...rest]) => {
+      if (root !== 'values' || name === undefined || rest.length > 0) {
+        return null
+      }
+      if (index === undefined) {
+        return shown.some(({ field }) => field.name === name) ? { name } : null
+      }
+      return child === undefined ? null : cellOf(name, index, child)
+    })
     const onFields: Record<string, string[]> = {}
     const onCells: Record<string, Record<string, string[]>> = {}
-    const onForm: string[] = []
     const named = new Set<string>()
-    for (const pointer of Object.keys(problem.errors)) {
-      const name = pointer.startsWith(fieldPointer) ? pointer.slice(fieldPointer.length) : null
-      const cell = name === null ? null : cellOf(name)
-      // A failed validation's message is a text key. A fixed message is no key, so it shows as is.
-      const messages = problem.errors[pointer].map((message) => t(message))
-      if (cell) {
-        setOwn(onCells, cell.collection, { ...onCells[cell.collection], [cell.key]: messages })
-        named.add(cell.collection)
-      } else if (name !== null && shown.some(({ field }) => field.name === name)) {
-        setOwn(onFields, name, messages)
-        named.add(name)
+    // A failed validation's message is a text key. A fixed message is no key, so it shows as is.
+    for (const { field, messages } of placed.fields) {
+      const texts = messages.map((message) => t(message))
+      if ('collection' in field) {
+        setOwn(onCells, field.collection, { ...onCells[field.collection], [field.key]: texts })
+        named.add(field.collection)
       } else {
-        onForm.push(...messages)
+        setOwn(onFields, field.name, texts)
+        named.add(field.name)
       }
     }
     setFieldErrors(onFields)
     setCellErrors(onCells)
-    setFormErrors(onForm)
+    setFormErrors(placed.form.map((message) => t(message)))
     return [...named]
   }
 
@@ -637,6 +645,23 @@ export function useRecordForm(
 
   const fields = fieldsFor(null)
 
+  // The wrapper takes focus because Ant Design's Alert does not pass tabIndex through. See docs/reference/form-widget.md#saving.
+  const formError: ReactNode = formErrors.length > 0 && (
+    <div ref={formErrorRef} tabIndex={-1} data-testid="form-error">
+      <AxisAlert kind="error" message={formErrors.join(' ')} />
+    </div>
+  )
+
+  // Each refusal sets a new list of errors, so a repeated refusal scrolls and focuses again. The error is
+  // centred, because the shell's sticky header would cover it at the top of the window.
+  useEffect(() => {
+    if (formErrors.length === 0) {
+      return
+    }
+    formErrorRef.current?.scrollIntoView?.({ block: 'center' })
+    formErrorRef.current?.focus({ preventScroll: true })
+  }, [formErrors])
+
   // The newest body is read when the timer fires. A write in an effect keeps the render pure.
   useEffect(() => {
     draft.current = conditions
@@ -693,7 +718,7 @@ export function useRecordForm(
     version: snapshot.version,
     showProblem,
     clearErrors,
-    formErrors,
+    formError,
     setFormErrors,
   }
 }

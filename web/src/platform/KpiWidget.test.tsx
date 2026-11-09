@@ -39,6 +39,7 @@ function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
     rowActions: [],
     toolbarActions: [],
     parameters: {},
+    priorities: {},
     access: null,
     detail: null,
     kpi,

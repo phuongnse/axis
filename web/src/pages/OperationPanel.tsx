@@ -1,9 +1,12 @@
 import { Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { useContext, useState } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import type { StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ConnectorInputRows } from './ConnectorInputRows'
+import { useFieldTexts } from './fieldTexts'
 import { MappingRows } from './MappingRows'
 import { NotifyFields } from './NotifyFields'
 import { builtInOperations, forbiddenByOperation, packageChoice, withOperation, without } from './operationKeys'
@@ -37,13 +40,14 @@ export function OperationPanel({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const names = useContext(ExpressionCheckContext)?.names ?? null
   const operation = text(step.operation)
   const [packageMode, setPackageMode] = useState(false)
   const isPackage = !builtInOperations.includes(operation) && (packageMode || operation.includes('/'))
   const fields = names?.entities
     .find((item) => item.name.toLowerCase() === entity.toLowerCase())
-    ?.fields.map((field) => field.name)
+    ?.fields.map((item) => item.name)
 
   function choose(next: string) {
     if (next === packageChoice) {
@@ -58,34 +62,34 @@ export function OperationPanel({
   return (
     <>
       <div data-testid={`studio-field-${pointer}/operation`}>
-        <div>{t('shell.studio.process.operation')}</div>
         <Flex gap="small" wrap>
-          <Select
-            aria-label={t('shell.studio.process.operation')}
-            style={{ minWidth: 240 }}
-            virtual={false}
-            value={isPackage ? packageChoice : operation === '' ? undefined : operation}
-            options={[
-              ...builtInOperations.map((option) => ({ value: option, label: option })),
-              { value: packageChoice, label: t('shell.studio.process.packageOperation') },
-            ]}
-            onChange={choose}
-          />
-          {isPackage && (
-            <Input
-              aria-label={t('shell.studio.process.packageOperation')}
-              placeholder="<package>/<operation>"
-              style={{ width: 280 }}
-              value={operation}
-              onChange={(event) => onChange(`${pointer}/operation`, event.target.value)}
+          <AxisField {...field('steps.operation')}>
+            <Select
+              style={{ minWidth: 240 }}
+              virtual={false}
+              value={isPackage ? packageChoice : operation === '' ? undefined : operation}
+              options={[
+                ...builtInOperations.map((option) => ({ value: option, label: option })),
+                { value: packageChoice, label: t('shell.studio.process.packageOperation') },
+              ]}
+              onChange={choose}
             />
+          </AxisField>
+          {isPackage && (
+            <AxisField {...field('steps.packageOperation')}>
+              <Input
+                style={{ width: 280 }}
+                value={operation}
+                onChange={(event) => onChange(`${pointer}/operation`, event.target.value)}
+              />
+            </AxisField>
           )}
         </Flex>
       </div>
       {operation === 'updateRecord' && (
         <MappingRows
           pointer={`${pointer}/set`}
-          title={t('shell.studio.process.set')}
+          {...group('steps.set')}
           value={step.set}
           keyLabel={t('shell.studio.process.field')}
           keyOptions={fields}
@@ -103,7 +107,7 @@ export function OperationPanel({
       {operation === 'createRecord' && (
         <CreateEntityChoice pointer={pointer} step={step} names={names} onChange={onChange} />
       )}
-      {operation === 'notify' && <NotifyFields pointer={pointer} value={step} onChange={onChange} />}
+      {operation === 'notify' && <NotifyFields pointer={pointer} path="steps" value={step} onChange={onChange} />}
       {isPackage && (
         <ConnectorMappings
           pointer={pointer}
@@ -131,14 +135,16 @@ function ConnectorChoice({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const connectorPointer = `${pointer}/connector`
   if (value !== undefined && !isContent(value)) {
     return (
       <div data-testid={`studio-field-${connectorPointer}`}>
-        <div>{t('shell.studio.process.connector')}</div>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
+        <AxisFieldGroup {...group('steps.connector')}>
+          <Typography.Text type="secondary" data-testid="studio-json-only">
+            {t('shell.studio.editInJson')}
+          </Typography.Text>
+        </AxisFieldGroup>
       </div>
     )
   }
@@ -149,45 +155,42 @@ function ConnectorChoice({
       .find((item) => item.name.toLowerCase() === name.toLowerCase())
       ?.operations.map((operation) => operation.name) ?? (names === null ? undefined : [])
 
-  const connectorLabel = t('shell.studio.process.connector')
-  const operationLabel = t('shell.studio.process.connectorOperation')
+  const nameField = field('steps.connector.name')
+  const operationField = field('steps.connector.operation')
   return (
-    <Flex gap="small" wrap>
+    <Flex vertical gap="small">
       <div data-testid={`studio-field-${connectorPointer}/name`}>
-        <div>{connectorLabel}</div>
-        {names === null ? (
-          <Input
-            aria-label={connectorLabel}
-            value={name}
-            onChange={(event) => onChange(`${connectorPointer}/name`, event.target.value)}
-          />
-        ) : (
-          <ReferencePicker
-            name={connectorLabel}
-            value={name}
-            required
-            options={names.connectors.map((item) => item.name)}
-            onChange={(next) => onChange(`${connectorPointer}/name`, next ?? '')}
-          />
-        )}
+        <AxisField {...nameField}>
+          {names === null ? (
+            <Input value={name} onChange={(event) => onChange(`${connectorPointer}/name`, event.target.value)} />
+          ) : (
+            <ReferencePicker
+              name={nameField.label}
+              value={name}
+              required
+              options={names.connectors.map((item) => item.name)}
+              onChange={(next) => onChange(`${connectorPointer}/name`, next ?? '')}
+            />
+          )}
+        </AxisField>
       </div>
       <div data-testid={`studio-field-${connectorPointer}/operation`}>
-        <div>{operationLabel}</div>
-        {operations === undefined ? (
-          <Input
-            aria-label={operationLabel}
-            value={text(connector.operation)}
-            onChange={(event) => onChange(`${connectorPointer}/operation`, event.target.value)}
-          />
-        ) : (
-          <ReferencePicker
-            name={operationLabel}
-            value={text(connector.operation)}
-            required
-            options={operations}
-            onChange={(next) => onChange(`${connectorPointer}/operation`, next ?? '')}
-          />
-        )}
+        <AxisField {...operationField}>
+          {operations === undefined ? (
+            <Input
+              value={text(connector.operation)}
+              onChange={(event) => onChange(`${connectorPointer}/operation`, event.target.value)}
+            />
+          ) : (
+            <ReferencePicker
+              name={operationField.label}
+              value={text(connector.operation)}
+              required
+              options={operations}
+              onChange={(next) => onChange(`${connectorPointer}/operation`, next ?? '')}
+            />
+          )}
+        </AxisField>
       </div>
     </Flex>
   )
@@ -206,36 +209,34 @@ function EventChoice({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const eventPointer = `${pointer}/event`
   const event = text(step.event)
-  const eventLabel = t('shell.studio.process.event')
+  const eventField = field('steps.event')
   const payload = names?.events
     .find((item) => item.name.toLowerCase() === event.toLowerCase())
-    ?.fields.map((field) => field.name)
+    ?.fields.map((item) => item.name)
 
   return (
     <>
       <div data-testid={`studio-field-${eventPointer}`}>
-        <div>{eventLabel}</div>
-        {names === null ? (
-          <Input
-            aria-label={eventLabel}
-            value={event}
-            onChange={(input) => onChange(eventPointer, input.target.value)}
-          />
-        ) : (
-          <ReferencePicker
-            name={eventLabel}
-            value={event}
-            required
-            options={names.events.map((item) => item.name)}
-            onChange={(next) => onChange(eventPointer, next ?? '')}
-          />
-        )}
+        <AxisField {...eventField}>
+          {names === null ? (
+            <Input value={event} onChange={(input) => onChange(eventPointer, input.target.value)} />
+          ) : (
+            <ReferencePicker
+              name={eventField.label}
+              value={event}
+              required
+              options={names.events.map((item) => item.name)}
+              onChange={(next) => onChange(eventPointer, next ?? '')}
+            />
+          )}
+        </AxisField>
       </div>
       <MappingRows
         pointer={`${pointer}/fields`}
-        title={t('shell.studio.process.eventFields')}
+        {...group('steps.fields')}
         value={step.fields}
         keyLabel={t('shell.studio.process.eventField')}
         keyOptions={payload}
@@ -259,36 +260,34 @@ function CreateEntityChoice({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const entityPointer = `${pointer}/entity`
   const entity = text(step.entity)
-  const entityLabel = t('shell.studio.process.createEntity')
+  const entityField = field('steps.entity')
   const fields = names?.entities
     .find((item) => item.name.toLowerCase() === entity.toLowerCase())
-    ?.fields.map((field) => field.name)
+    ?.fields.map((item) => item.name)
 
   return (
     <>
       <div data-testid={`studio-field-${entityPointer}`}>
-        <div>{entityLabel}</div>
-        {names === null ? (
-          <Input
-            aria-label={entityLabel}
-            value={entity}
-            onChange={(input) => onChange(entityPointer, input.target.value)}
-          />
-        ) : (
-          <ReferencePicker
-            name={entityLabel}
-            value={entity}
-            required
-            options={names.entities.map((item) => item.name)}
-            onChange={(next) => onChange(entityPointer, next ?? '')}
-          />
-        )}
+        <AxisField {...entityField}>
+          {names === null ? (
+            <Input value={entity} onChange={(input) => onChange(entityPointer, input.target.value)} />
+          ) : (
+            <ReferencePicker
+              name={entityField.label}
+              value={entity}
+              required
+              options={names.entities.map((item) => item.name)}
+              onChange={(next) => onChange(entityPointer, next ?? '')}
+            />
+          )}
+        </AxisField>
       </div>
       <MappingRows
         pointer={`${pointer}/set`}
-        title={t('shell.studio.process.set')}
+        {...group('steps.set')}
         value={step.set}
         keyLabel={t('shell.studio.process.field')}
         keyOptions={fields}
@@ -319,12 +318,13 @@ function ConnectorMappings({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { group } = useFieldTexts('process')
   return (
     <>
       {nested ? (
         <ConnectorInputRows
           pointer={`${pointer}/input`}
-          title={t('shell.studio.process.input')}
+          {...group('steps.input')}
           keyLabel={t('shell.studio.process.inputName')}
           value={step.input}
           entity={entity}
@@ -333,7 +333,7 @@ function ConnectorMappings({
       ) : (
         <MappingRows
           pointer={`${pointer}/input`}
-          title={t('shell.studio.process.input')}
+          {...group('steps.input')}
           value={step.input}
           keyLabel={t('shell.studio.process.inputName')}
           target={{ kind: 'expression' }}
@@ -342,7 +342,7 @@ function ConnectorMappings({
       )}
       <MappingRows
         pointer={`${pointer}/output`}
-        title={t('shell.studio.process.output')}
+        {...group('steps.output')}
         value={step.output}
         keyLabel={t('shell.studio.process.connectorOutput')}
         target={{ kind: 'field', label: t('shell.studio.process.entityField'), options: fields }}
@@ -356,14 +356,16 @@ function ConnectorMappings({
 /** The retry policy of a step. An empty value removes its key, and the last key removed takes `retry` with it. */
 function Retry({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const retryPointer = `${pointer}/retry`
   if (value !== undefined && !isContent(value)) {
     return (
       <div data-testid={`studio-field-${retryPointer}`}>
-        <div>{t('shell.studio.process.retry')}</div>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
+        <AxisFieldGroup {...group('steps.retry')}>
+          <Typography.Text type="secondary" data-testid="studio-json-only">
+            {t('shell.studio.editInJson')}
+          </Typography.Text>
+        </AxisFieldGroup>
       </div>
     )
   }
@@ -381,30 +383,25 @@ function Retry({ pointer, value, onChange }: { pointer: string; value: unknown; 
 
   return (
     <div data-testid={`studio-field-${retryPointer}`}>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.process.retry')}</Typography.Text>
+      <AxisFieldGroup {...group('steps.retry')}>
         <Flex gap="small" wrap>
-          <div>
-            <div>{t('shell.studio.process.attempts')}</div>
+          <AxisField {...field('steps.retry.attempts')}>
             <InputNumber
-              aria-label={t('shell.studio.process.attempts')}
               min={1}
               max={10}
               precision={0}
               value={typeof retry.attempts === 'number' ? retry.attempts : null}
               onChange={(next) => set('attempts', next ?? undefined)}
             />
-          </div>
-          <div>
-            <div>{t('shell.studio.process.backoff')}</div>
+          </AxisField>
+          <AxisField {...field('steps.retry.backoff')}>
             <Input
-              aria-label={t('shell.studio.process.backoff')}
               value={text(retry.backoff)}
               onChange={(event) => set('backoff', event.target.value === '' ? undefined : event.target.value)}
             />
-          </div>
+          </AxisField>
         </Flex>
-      </Flex>
+      </AxisFieldGroup>
     </div>
   )
 }

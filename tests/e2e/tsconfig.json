@@ -28,6 +28,8 @@
     "policy-violations.ts",
     "policy-violations.test.ts",
     "test.ts",
+    "contrast.test.ts",
+    "design-system.ts",
     "folder-comparison.test.ts",
     "specs"
   ]

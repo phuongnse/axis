@@ -3408,10 +3408,26 @@ public static partial class ApplicationCompiler
                 RowActions = BuildActions(widget.RowActions, entity),
                 ToolbarActions = BuildActions(widget.ToolbarActions, null),
                 Parameters = BuildParameters(widget),
+                Priorities = BuildPriorities(widget, entity, dataSource),
                 Kpi = BuildKpi(widget, dataSource),
                 Chart = BuildChart(widget, dataSource),
                 Detail = BuildDetail(widget),
             };
+        }
+
+        // The checker has matched each key to a column the table shows, ignoring letter case. The model keeps the
+        // declared names, so a client never fixes the case itself.
+        IReadOnlyDictionary<string, ColumnPriority> BuildPriorities(WidgetDefinition widget, EntityResource? entity, DataSourceResource? source)
+        {
+            if (widget.Priorities is not { Count: > 0 } priorities)
+            {
+                return WidgetModel.NoPriorities;
+            }
+
+            var columns = PresentationChecker.TableColumns(source is null ? entity : null, source);
+            return priorities.ToDictionary(
+                pair => columns.First(column => string.Equals(column, pair.Key, StringComparison.OrdinalIgnoreCase)),
+                pair => pair.Value == "high" ? ColumnPriority.High : ColumnPriority.Low);
         }
 
         // The checker has matched the record to a parameter of the page, ignoring letter case. The model keeps the

@@ -218,9 +218,10 @@ test.describe("Studio edits a process in the process editor", () => {
     const card = page.getByTestId("studio-step-4");
     const name = card.getByRole("textbox", { name: "Step name", exact: true });
     await expect(name).toHaveValue("markApproved");
-    // The release history loads above the editor and moves it down, so a click during that shift can miss. The journey
-    // waits for the history, and clicks again only while the step is still there, so a second step is never removed.
-    await expect(page.getByTestId("studio-releases")).toBeVisible();
+    // The release history loads in the band above the editor and moves it down, so a click during that shift can miss.
+    // The journey waits for the band's release state, and clicks again only while the step is still there, so a second
+    // step is never removed.
+    await expect(page.getByTestId("studio-band")).toContainText(/is live|Changes not live|Not published yet/);
     const save = page.getByRole("button", { name: "Save", exact: true });
     await expect(async () => {
       if ((await name.inputValue()) === "markApproved") {
@@ -486,8 +487,10 @@ test.describe("Studio edits a process in the process editor", () => {
       expect(before).not.toBeNull();
       expect(before).not.toBe("managerApproval to done, approve");
 
-      // The mouse works in viewport coordinates, and the graph starts below the release table.
+      // The mouse works in viewport coordinates. A short page cannot scroll the graph under the band, so the target
+      // node is brought into view as well.
       await scrollBelowHeader(page.getByTestId("studio-process-graph"));
+      await page.getByTestId(`studio-graph-node-${done}`).scrollIntoViewIfNeeded();
       const handle = (await page
         .getByTestId(`studio-graph-handle-${task}`)
         .boundingBox())!;

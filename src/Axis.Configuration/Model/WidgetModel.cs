@@ -10,7 +10,7 @@ namespace Axis.Configuration.Model;
 /// <see cref="Actions"/> is empty on every widget but a form widget that declares
 /// actions, and <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table
 /// that declares them. <see cref="Parameters"/> is empty on every widget but a table over a data source that binds
-/// page parameters. <see cref="Process"/> is set only on a process inspector, which has no other reference.
+/// page parameters. <see cref="Priorities"/> is empty on every widget but a table that sets it. <see cref="Process"/> is set only on a process inspector, which has no other reference.
 /// A <c>columns</c>, <c>tabs</c> or <c>section</c> widget is a container with no reference of its own: it holds
 /// <see cref="Columns"/>, <see cref="Tabs"/> or <see cref="Widgets"/>, and every other widget leaves those empty.
 /// A <c>kpi</c> widget sets <see cref="DataSource"/> and <see cref="Kpi"/>, and no other reference. A <c>chart</c> widget
@@ -41,6 +41,15 @@ public sealed record WidgetModel(
     /// </summary>
     public IReadOnlyDictionary<string, string> Parameters { get; init; } = NavigateActionModel.NoParameters;
 
+    /// <summary>The empty <see cref="Priorities"/>, shared so that equal widgets stay equal.</summary>
+    public static readonly IReadOnlyDictionary<string, ColumnPriority> NoPriorities = new Dictionary<string, ColumnPriority>();
+
+    /// <summary>
+    /// The priority of each column of a <c>table</c> widget, keyed by the declared name of the field or data source
+    /// column. A column that is not in the map has no priority.
+    /// </summary>
+    public IReadOnlyDictionary<string, ColumnPriority> Priorities { get; init; } = NoPriorities;
+
     /// <summary>The columns of a <c>columns</c> widget, in page file order.</summary>
     public IReadOnlyList<WidgetColumnModel> Columns { get; init; } = [];
 
@@ -64,6 +73,13 @@ public sealed record WidgetModel(
 
     /// <summary>What a <c>detail</c> widget shows, or null on any other widget.</summary>
     public DetailModel? Detail { get; init; }
+}
+
+/// <summary>Which columns of a <c>table</c> widget move under the row last (<c>High</c>) or first (<c>Low</c>) when room runs out.</summary>
+public enum ColumnPriority
+{
+    High,
+    Low,
 }
 
 /// <summary>

@@ -48,6 +48,10 @@ title and description in the UI locale and `en` as the fallback, and a built-in 
 sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
+- **One field to start from** _(planned for M33)_. `StartFromField` draws the choice, as the
+  [sign-up page](sign-up.md#start-from) does: Blank first, then the templates. When the list does not
+  load, its warning status says under the choices that Blank is still there.
+
 ## New resource
 
 New resource… creates a resource from its kind's starter, so a new resource opens with as few
@@ -466,7 +470,7 @@ Each kind opens in the editor that fits it: a designer, a typed editor or the [g
 | `identityProvider` | The [identity provider editor](#identity-provider-editor)                                      |
 | `scenario`         | The [scenario editor](#scenario-editor)                                                        |
 | `seed`             | The [seed editor](#seed-editor)                                                                |
-| `text`             | The [text editor](#text-editor)                                                                |
+| `text`             | The [text editor](text-editor.md)                                                              |
 
 Every other kind, `application`, `rule`, `sequence`, `role`, `policy`, `dataSource`, `event`,
 `trigger`, `webhook` and `migration`, opens in the generic form. Every editor shows all of its kind's
@@ -479,8 +483,10 @@ The page editor's Form tab edits a page's title, parameters and widgets, with a 
 and the JSON view stays as the second view of the same draft. The [page designer](#page-designer)
 edits the same draft on a canvas.
 
-- **The page.** The Form tab shows the page's name, its [title](studio-resource-form.md#labels), its
-  [description](#editor), its [parameters](#page-parameters) and its [widget tree](#widget-tree).
+- **The page.** The Form tab shows three [sections](studio-resource-form.md#sections): General, with the
+  page's name, its [title](studio-resource-form.md#labels) and its [description](#editor); the
+  [parameters](#page-parameters); and Widgets, with the [widget tree](#widget-tree). Each page field and
+  each widget name picker has a label and help, named by its path in the page.
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -555,7 +561,8 @@ because a page may open itself with other parameters.
 
 ### Page parameters
 
-A Parameters list sits between the title and the widgets. Each parameter has a name, a type picker over
+The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
+heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
 `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
 and Remove, and Add parameter appends a `text` parameter with an empty name. A `reference` parameter
 also has a target entity picker, and an `enum` parameter its values. A type change removes the `target`
@@ -658,16 +665,16 @@ panel, its undo and its drag and drop.
   [widget tree](resource-files.md#resource-file-shape), is off, cannot be dragged, and shows its
   reason: a second table, a second form, task inbox or process inspector, or a container past 4
   levels. A drop that a limit forbids inserts nothing, and the live region gives the same reason.
-- **Data panel.** Between the palette and the widget tree, the side pane lists every entity and every
-  data source, module ones too. A drop lands where a palette drop lands, and opens a dialog with one
-  button for each widget that can show the name: a table, a form or a detail for an entity, and a
-  table, a chart with one group field or a KPI with a total row for a data source. A widget that a page
-  limit forbids is off with the palette's reason. Enter, Space or a click on a name opens the same
-  dialog, and the widget goes after the selected widget. A detail takes as its record the first
-  required `reference` parameter that targets the entity, or none, because the designer adds no page
-  parameter. A chart takes the group field as its category, the `bar` kind and the first numeric
-  measure, and a KPI the first measure. A measure has no label, so a chart and a KPI start with empty
-  text keys and draw as placeholders until the author writes them.
+- **Data panel.** Between the palette and the widget tree, the side pane lists every entity and every data
+  source, module ones too. Each list has a title and a help line, and a list with no names says so in one
+  line. A drop lands where a palette drop lands, and opens a dialog with one button for each widget that
+  can show the name: a table, a form or a detail for an entity, and a table, a chart with one group field
+  or a KPI with a total row for a data source. A widget that a page limit forbids is off with the palette's
+  reason. Enter, Space or a click on a name opens the same dialog, and the widget goes after the selected
+  widget. A detail takes as its record the first required `reference` parameter that targets the entity, or
+  none, because the designer adds no page parameter. A chart takes the group field as its category, the
+  `bar` kind and the first numeric measure, and a KPI the first measure. A measure has no label, so a chart
+  and a KPI start with empty text keys and draw as placeholders until the author writes them.
 - **Moves.** The author can drag any widget of the canvas, and the innermost widget under the pointer
   drags, so a press on a KPI in a column moves the KPI. It drops on the same targets as a palette type.
   Alt+ArrowDown and Alt+ArrowUp move the selected widget to the next or previous allowed place,
@@ -815,10 +822,13 @@ remove. An empty list removes `signIn`, so the site allows every provider, and t
 
 ## Scenario editor
 
-The scenario editor's Form tab shows the scenario's name, its [description](#editor) and `now`, then its users with their roles,
-its stubs, and its steps as a list with a panel for each step type, and the JSON view stays as the
-second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
+The scenario editor's Form tab has four sections: General, with the scenario's name, its [description](#editor)
+and `now`; Users, with their roles; Stubs; and Steps, a list with a panel for each step type. Add user,
+Add stub and Add step sit on their section's heading. The JSON view stays as the second view of the same
+draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
+- **Field names.** Every field, stub and step property shows a label and help text in the app's
+  languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
   the others, and keys the editor does not show stay in the file. A step can be removed or moved up or
   down.
@@ -855,33 +865,12 @@ second view of the same draft.
   case. When it is not there, as for a module entity or a typo, the seed uses the generic form and the
   JSON view.
 
-## Text editor
-
-A `text` resource opens as one table of keys, with a column for each locale and a search box, and the
-JSON view stays as the second view of the same draft.
-
-- **Columns.** There is a row for each key, sorted by key, and a column for each locale in the order of
-  the folder's `text` resources. Only the open resource's column is editable. The other locales show
-  beside it as read-only text, read from their files, and the author opens another locale's `text`
-  resource to edit it.
-- **Missing keys.** A key that the open locale lacks shows an empty cell marked missing, and typing in
-  it adds the key to this locale. Another locale that lacks the key shows a missing mark in place of
-  the text.
-- **Search.** The box keeps the rows whose key, or text in any locale, contains the search, ignoring
-  letter case.
-- **Cells.** A cell edit goes into the draft, and Save sends one JSON Patch for the open resource only.
-  Clearing a cell saves an empty string and keeps the key, because every locale holds the same keys
-  (`AXC0027`).
-- **Add key.** The row below the table takes a key and a text for each locale, and writes the key to
-  every locale at once through the [text write route](authoring.md#text-writes). The key cannot be
-  empty, cannot contain `/`, and cannot already be in the table. The editor takes the open file's new
-  version from the answer and adds the key to its loaded copy and its draft, so unsaved cell edits stay
-  and the next Save does not meet a stale version. The diagnostics and the names load again.
-
 ## Endpoint rows
 
 An endpoint keeps the generic form for its entity, process, input and output, and shows its `values`
-as rows of a field and an expression in the [expression editor](#expression-editor).
+as rows of a field and an expression in the [expression editor](#expression-editor). The rows sit in a
+titled group, with help that says what they are. An endpoint with no values says so in one line, above
+Add mapping.
 
 The field is picked from the fields of the endpoint's entity, found by name among the application's
 names, and is typed while those are unknown. Add mapping lists the fields that have no row. Renaming a

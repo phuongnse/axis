@@ -240,8 +240,9 @@ The [task inbox widget](task-inbox-widget.md) and the task page use these fields
     `tasksPath`, by replacing the trailing `/tasks` with `/users`. If the picker cannot load, its list
     stays empty and choosing a role still works.
   - On success the page goes to the inbox page's plain address.
-  - A `400` shows each message under the role, person or reason field its pointer names, and a
-    problem keyed `""` above the form. The dialog stays open.
+  - A `400` shows each message under the role, person or reason field its pointer names. Any other
+    key shows above the form, such as `""`, or the role while Person is chosen. The dialog stays
+    open.
   - A `403` or `409` closes the dialog, loads the task again and shows the same message as Claim and
     Release.
   - Any other failure shows a generic message in the dialog and keeps what the user typed.

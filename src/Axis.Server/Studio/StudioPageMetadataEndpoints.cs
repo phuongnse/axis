@@ -317,6 +317,7 @@ internal static partial class StudioPageMetadataEndpoints
             [],
             [],
             new Dictionary<string, string>(),
+            new Dictionary<string, string>(),
             new WidgetAccess(["read", "create", "update", "delete"], fields, fields),
             null,
             null,

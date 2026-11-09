@@ -31,6 +31,8 @@ builder.Services.AddSingleton(_ => NpgsqlDataSource.Create(options.ConnectionStr
 // After the migration start, whose StartingAsync runs before any hosted service starts. The runner claims only the kinds below.
 builder.Services.AddSingleton(new JobRunnerOptions());
 builder.Services.AddSingleton<IJobHandler, SendEmailJobHandler>();
+builder.Services.AddSingleton<IJobHandler, SignUpConfirmJobHandler>();
+builder.Services.AddSingleton<IJobHandler, SignUpExpiry>();
 builder.Services.AddHostedService<JobRunner>();
 
 // The clock of the job schedule. AddCellClients registers it too, whichever comes first.
@@ -58,8 +60,11 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
     // The jobs that write and remove a tenant's record. The options guarantee an IDnsRecords whenever the directory is set.
     builder.Services.AddSingleton<IJobHandler, WriteTenantRecordJobHandler>();
     builder.Services.AddSingleton<IJobHandler, RemoveTenantRecordJobHandler>();
-    builder.Services.AddSingleton(sp => new SubdomainCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), options));
+    builder.Services.AddSingleton(sp => new SubdomainCheck(sp.GetRequiredKeyedService<NpgsqlDataSource>("directory"), sp.GetRequiredService<NpgsqlDataSource>(), options));
 }
+
+// The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
+builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
 
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cells.Count > 0)

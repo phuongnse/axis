@@ -10,6 +10,7 @@
   "specs/containers.spec.ts": 7,
   "specs/data-source-policies.spec.ts": 2,
   "specs/delete-row-action.spec.ts": 3,
+  "specs/design-system-contrast.spec.ts": 110,
   "specs/design-system.spec.ts": 97,
   "specs/detail.spec.ts": 4,
   "specs/enum-labels.spec.ts": 9,

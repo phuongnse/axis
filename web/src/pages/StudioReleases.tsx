@@ -178,22 +178,19 @@ export function StudioActivateDialog({
  * published, who published it and the note, from the release's first activation. An empty label or note shows the em
  * dash, and Published by is a name, never an id. When `canActivate`, every row but the live one has an Activate… icon
  * button, off while `busy`. The button opens a dialog that says which release replaces the live one, or why it cannot, and its
- * confirmation calls `onActivate`. The list has a level-5 title unless `titled` is false, where the page's own heading
- * names it.
+ * confirmation calls `onActivate`.
  */
 export function StudioReleasesList({
   application,
   history,
   canActivate,
   busy,
-  titled = true,
   onActivate,
 }: {
   application: string
   history: StudioReleases
   canActivate: boolean
   busy: boolean
-  titled?: boolean
   onActivate: (row: StudioReleaseListRow) => void
 }) {
   const t = useText()
@@ -246,7 +243,6 @@ export function StudioReleasesList({
   return (
     <section data-testid="studio-releases">
       <Flex vertical gap="small">
-        {titled && <Typography.Title level={5}>{t('shell.studio.releases')}</Typography.Title>}
         <AxisTable<StudioReleaseListRow>
           columns={columns}
           rowKey={(row) => row.releaseId}

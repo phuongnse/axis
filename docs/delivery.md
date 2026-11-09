@@ -13,7 +13,7 @@ models, are not copied here: look them up where they live.
 
 ## Who does what
 
-Four actors take part in the work, and each has its own part.
+Three actors take part in the work, the owner, the local agent session and NexKit, and each has its own part.
 
 - **The owner** decides **Proposed** design points, questions that nothing in the plan, the issue or
   the docs settles, whether NexKit merges its own pull requests, and when a milestone closes. The
@@ -23,18 +23,14 @@ Four actors take part in the work, and each has its own part.
 - **The local agent session** works for the owner when the owner asks. It writes issues and their
   order, checks whether a milestone is ready and breaks it down, proposes changes to the NexKit
   settings as hand-made pull requests, runs design reviews and publishes the Design System artifact in
-  Claude from the repository, as [design changes](#design-changes) describes. Its runbooks are the
+  Claude from the repository, as [design changes](#design-changes) describes. When the owner asks, it
+  also lists what waits for the owner, merges by hand the conflicts in paths NexKit may not change, and
+  makes the hand-made changes that a plan lists under *Needs a hand-made change*, opening their pull
+  requests. It asks the owner before it pushes, and it never approves or merges. Its runbooks are the
   [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
   [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not review plans or merged
   pull requests, because NexKit's review stage does.
-- **The hourly driver** is a Claude Code routine that follows NexKit's [`drive` skill][nexkit-drive]
-  with the [`axis-nexkit-routine` skill](../.claude/skills/axis-nexkit-routine/SKILL.md). It acts for
-  the owner where NexKit stops for a person, and may take every option that NexKit, the plan, the
-  issue or the docs recommend or support, because the owner has accepted those in advance. It merges
-  by hand the conflicts in paths NexKit may not change, makes the hand-made changes that a plan puts
-  in those paths, and opens their pull requests. It never approves or merges, and it hands the owner only
-  what the owner alone can decide.
-- **The docs audit** is the `docs-audit.yml` workflow, which follows the
+- **The docs audit** is a workflow that opens NexKit issues. It is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs,
   the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
   of findings that no open issue covers, code and test fixes first and at most ten a run, as
@@ -56,16 +52,23 @@ that holds it.
   [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
-  same milestone or across milestones. A `bug` issue for CI on `main`, an issue for a Dependabot
-  advisory and an issue of the docs audit are in no milestone.
+  same milestone or across milestones.
+- **Some issues are in no milestone.** Every other issue is in the milestone that delivers it. No
+  milestone delivers these kinds, and a milestone groups work but does not order it, as
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees. They are a `bug` issue
+  for CI on `main`, an issue NexKit opens for a flaky test, an issue for a Dependabot advisory, an
+  issue of the docs audit, a `process` issue, a [design issue](#design-changes) and a `refactor`
+  issue, such as one that a design review finds.
 - **Bugs go first, then the work on how Axis is built.** Autopilot's [`priority`][nexkit-labels]
   setting lists the labels whose issues start before the others, in this order: `nexkit:ci` for a
   failure of CI on `main`, `nexkit:dependabot` for an advisory, `bug`, `nexkit:flaky` for a flaky
-  test, and `process`. NexKit labels the issues it opens. A `bug` issue that a person opens goes
-  first too, with or without a milestone, so a broken `main` never waits behind a milestone's
-  features. A `process` issue improves how Axis is built: the docs standard, the checks, CI, the
-  delivery workflow or the agent instructions. It goes before the milestones' features, because every
-  later issue is built with what it changes.
+  test, `process`, and `refactor`. NexKit labels the issues it opens. A `bug` issue that a person
+  opens goes first too, with or without a milestone, so a broken `main` never waits behind a
+  milestone's features. A `process` issue improves how Axis is built: the docs standard, the checks,
+  CI, the delivery workflow or the agent instructions. A `refactor` issue moves one concern to one
+  shared mechanism and keeps its behaviour. Both go before the milestones' features, because every
+  later issue is built with what they change, and a feature built first would add one more copy to
+  move.
 - **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
   makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
   issue to stop work on it without closing it. A [design issue](#design-changes) is held until its
@@ -135,7 +138,7 @@ that holds it.
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
   NexKit merges changes to `.github/workflows/` itself. Its agents still may not change `.github/` or
   `.nexkit/`, and the jobs that run an agent or Axis's code hold neither the key nor a token. The
-  hourly driver merges by hand only a conflict in those paths.
+  local agent session merges by hand only a conflict in those paths, when the owner asks.
 
 ### CI on main
 
@@ -195,7 +198,7 @@ that holds it.
   name, for example a NexKit version bump. Hand-made pull requests are only for those paths. A design
   change and the docs change that ends a design review are NexKit issues, see
   [design changes](#design-changes). Work that waits for one follows [follow-ups](#the-life-of-an-issue).
-  The owner or the hourly driver opens them, and the owner merges them.
+  The owner or the local agent session opens them, and the owner merges them.
 - **NexKit checks and reviews them on request.** Whoever pushes to one comments
   [`/nexkit review`][nexkit-person-review] on it after the push. NexKit runs its checks and its review
   on the head and sets the two statuses that the rules on `main` require, and it pushes nothing and
@@ -240,7 +243,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   longer than 90 s" can be verified, while "Axis.Server.Tests finishes under 90 s" cannot, because
   no check reports the time against the limit.
 - **Docs and concepts.** The issue links to the doc sections it implements, is in the milestone that
-  delivers it, and names the concepts it touches in its own text, in the terms of
+  delivers it or in none when [how issues run](#how-issues-run) says so, and names the concepts it
+  touches in its own text, in the terms of
   [concepts.md](domain/concepts.md), so triage can choose the [profile](#profiles). Its plan and its
   pull request then carry the `Docs:` line of
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
@@ -254,8 +258,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
 - **Follow-ups.** Work that must come after other work is opened as an issue when the work it follows
   is agreed, and it is marked *blocked by* that work's issue. A pull request, a comment or a session's
   notes never holds a follow-up. A change in a path NexKit may not change is an issue like any other:
-  its plan lists the change under *Needs a hand-made change*, and the hourly driver makes it as a
-  [hand-made pull request](#hand-made-pull-requests). A hand-made pull request that other work waits
+  its plan lists the change under *Needs a hand-made change*, and the local agent session makes it as a
+  [hand-made pull request](#hand-made-pull-requests) when the owner asks. A hand-made pull request that other work waits
   for closes an issue of its own with the `on-hold` label, which [how issues run](#how-issues-run)
   makes a hold, and the follow-ups are *blocked by* that issue.
 
@@ -320,9 +324,10 @@ change, a design review and a sync are in the
 - **A new screen is designed first,** as
   [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) agrees. A
   new screen or a new way of interacting gets a design review before it is built. A screen made of
-  agreed patterns needs none. Each group of new screens has one design issue with the `on-hold`
-  label, so NexKit does not start it until the review ends, and the issues that build those screens are
-  *blocked by* it. The open design issues are the queue of reviews.
+  agreed patterns needs none. Each group of new screens has one design issue, in no milestone as
+  [how issues run](#how-issues-run) says, with the `on-hold` label, so NexKit does not start it until
+  the review ends, and the issues that build those screens are *blocked by* it. The open design
+  issues are the queue of reviews.
 - **Several changes are a design review.** When the owner reviews the design in words, one change at
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
@@ -408,7 +413,7 @@ issues, pull requests and sub-issues.
   | ------------------------------------- | ---------------------------------------------------------- | -------------- |
   | `nexkit/issue-<number>`               | A NexKit issue's work                                      | NexKit         |
   | `claude/<words>`                      | A Claude session in the cloud                              | The session    |
-  | `ops/<topic>`                         | A change in a path NexKit may not change, such as a NexKit upgrade | A person |
+  | `ops/<topic>`                         | A change in a path NexKit may not change, such as a NexKit upgrade | The owner or the local session |
   | `design/<yyyy-mm-dd>-<topic>`         | A design review's prototype                                | The local session |
   | `design-review/<yyyy-mm-dd>-<topic>`  | The tag on a prototype's last commit, same date and topic  | The local session |
   | `v<version>`                          | A release tag, once Axis has releases                      |                |

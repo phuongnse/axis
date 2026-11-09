@@ -1,6 +1,6 @@
 ---
 name: axis-nexkit
-description: Runbook for the owner's local agent session that works NexKit for Axis when the owner asks (writing issues and their order, breaking a milestone down, proposing NexKit setting changes, upgrading NexKit, looking at a stopped issue). Use when the owner asks to plan, file, split or check work through NexKit, or asks about the state of a NexKit issue or pull request. Not for the hourly driver routine, which uses axis-nexkit-routine, and not for agents running inside the NexKit pipeline.
+description: Runbook for the owner's local agent session that works NexKit for Axis when the owner asks (writing issues and their order, breaking a milestone down, proposing NexKit setting changes, upgrading NexKit, looking at a stopped issue, listing what waits for the owner, hand merges and hand-made changes). Use when the owner asks to plan, file, split or check work through NexKit, or asks about the state of a NexKit issue or pull request. Use when the owner asks, in any language, whether anything waits for them or needs them. Not for agents running inside the NexKit pipeline.
 ---
 
 # Working NexKit for Axis
@@ -11,9 +11,10 @@ at the ref Axis pins. This runbook says only how to apply Axis's rules: where
 the values live, how to write Axis's issues and milestones, and how to upgrade
 NexKit for Axis. It does not repeat either, so follow its links.
 
-Autopilot and the hourly driver keep the work moving. Act when the owner asks.
-Ask the owner first when a choice rests on a **Proposed** decision or only the
-owner can answer it. Never approve, merge or close a pull request yourself.
+Autopilot keeps the work moving, and NexKit mentions the owner when a run needs
+a person. Act when the owner asks. Ask the owner first when a choice rests on a
+**Proposed** decision or only the owner can answer it. Ask the owner before you
+push. Never approve, merge or close a pull request yourself.
 
 ## Where the values live
 
@@ -69,9 +70,11 @@ marks between issues, in NexKit's `request` skill.
    says, and name the concepts it touches in the terms of
    [concepts.md](../../../docs/domain/concepts.md).
 2. Read the labels with `gh label list` and pick every one whose description
-   fits.
+   fits. Every issue gets at least one label.
 3. Create it in the milestone that delivers it:
    `gh issue create --title "<behaviour>" --milestone "<milestone>" --label "<a>,<b>" --body-file <file>`.
+   Leave out `--milestone` for an issue that
+   [how issues run](../../../docs/delivery.md#how-issues-run) puts in no milestone.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
    `journey` label and its docs sweep the `docs-sweep` label, with no
@@ -106,14 +109,18 @@ agrees, and write no issue of a later phase unless the owner asks. On *ready*:
   for writing profiles.
 - Propose any change to the owner as a hand-made pull request.
 
+## What waits for the owner
+
+When the owner asks whether anything waits for them, follow
+[what-waits-for-the-owner.md](what-waits-for-the-owner.md). It answers with one
+table and changes nothing until the owner says yes.
+
 ## Upgrading NexKit
 
 Upgrading is rare. Follow [upgrading-nexkit.md](upgrading-nexkit.md).
 
-## When something stops
+## Hand merges and hand-made changes
 
-The hourly driver handles NexKit's stops, as NexKit's `drive` skill and
-troubleshooting doc say. When the owner asks you to look at one, read
-`nexkit status` and that doc at the pinned ref. A hand merge follows
-[the routine's steps](../axis-nexkit-routine/SKILL.md#hand-merges); ask the
-owner before you push it.
+When the owner asks you to look at a stopped issue, read `nexkit status` and
+NexKit's troubleshooting doc at the pinned ref. For a hand merge or a
+hand-made change, follow [hand-made-changes.md](hand-made-changes.md).

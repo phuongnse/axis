@@ -135,6 +135,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <see cref="Actions"/> is empty on every widget but a form or detail widget that declares actions.
 /// <see cref="RowActions"/> and <see cref="ToolbarActions"/> are empty on every widget but a table that declares them.
 /// <see cref="Parameters"/> is empty on every widget but a table over a data source that binds page parameters.
+/// <see cref="Priorities"/> is empty on every widget but a table that sets the priority of a column.
 /// <see cref="Access"/> is set on a table, form or detail widget and null on a task inbox, a process inspector, a kpi and a chart.
 /// <see cref="Detail"/> is set only on a detail widget, which has an <see cref="Entity"/> and optionally a <see cref="Form"/>.
 /// <see cref="Kpi"/> is set only on a kpi widget, which has a <see cref="DataSource"/> and no entity.
@@ -148,6 +149,7 @@ public sealed record SectionWidgetMetadata(string TitleKey, bool Collapsed, IRea
 /// <param name="RowActions">The <c>startProcess</c> and <c>navigate</c> actions of a table widget on each row, in page file order.</param>
 /// <param name="ToolbarActions">The <c>navigate</c> actions of a table widget above its rows, in page file order.</param>
 /// <param name="Parameters">The name of the page parameter that gives each data source parameter its value, by the data source parameter's name.</param>
+/// <param name="Priorities">The priority of each column of a table, <c>high</c> or <c>low</c>, by the declared column name.</param>
 /// <param name="Access">
 /// What the user may do with the widget's entity, or with the root entity of its data source.
 /// </param>
@@ -167,6 +169,7 @@ public sealed record WidgetMetadata(
     IReadOnlyList<ActionMetadata> RowActions,
     IReadOnlyList<ActionMetadata> ToolbarActions,
     IReadOnlyDictionary<string, string> Parameters,
+    IReadOnlyDictionary<string, string> Priorities,
     WidgetAccess? Access,
     DetailMetadata? Detail,
     KpiMetadata? Kpi,

@@ -46,8 +46,9 @@ const labelContext = {
 }
 
 /**
- * The kinds that SchemaForm draws, with the root properties that a dedicated editor draws instead: StudioEditor's
- * processSchema, siteSchema, endpointSchema and formSchema memos, and ProcessEditor's withoutSubject.
+ * The kinds that SchemaForm draws, with the root properties that the field-text tests leave out because a dedicated
+ * editor draws them with texts of its own, such as StudioEditor's processSchema, siteSchema, endpointSchema and
+ * formSchema memos and ProcessEditor's withoutSubject. The list does not name every property a dedicated editor draws.
  */
 const formKinds: Record<string, string[]> = {
   application: [],
@@ -62,7 +63,7 @@ const formKinds: Record<string, string[]> = {
   migration: [],
   seed: [],
   site: ['signIn'],
-  endpoint: ['values', 'event'],
+  endpoint: ['event'],
   form: ['steps'],
   process: ['entity', 'parameters', 'start', 'steps'],
 }

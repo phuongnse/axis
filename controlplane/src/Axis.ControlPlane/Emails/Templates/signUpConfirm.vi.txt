@@ -1,0 +1,11 @@
+Subject: Xác nhận đăng ký Axis
+
+Chào {{name}},
+
+Mở liên kết này để xác nhận email và bắt đầu dùng thử tại {{tenantAddress}}:
+
+{{confirmLink}}
+
+Liên kết chỉ dùng được một lần, trong 24 giờ. Nếu bạn không đăng ký, hãy bỏ qua email này: đăng ký sẽ tự hết hạn.
+
+Đội ngũ Axis

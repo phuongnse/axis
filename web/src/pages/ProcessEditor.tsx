@@ -7,6 +7,7 @@ import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useFieldTexts } from './fieldTexts'
 import { type DesignerLayer, LayerMarkTag } from './LayerMarkViews'
 import { MappingRows } from './MappingRows'
 import { NotifyFields } from './NotifyFields'
@@ -57,19 +58,6 @@ function withSubject(process: Content, subject: 'entity' | 'parameters'): Conten
   return Object.fromEntries(next)
 }
 
-/**
- * The texts of the fields of a process, by the path of the property from the root, with list indices left out, see
- * docs/reference/studio-resource-form.md#fields: a field's label and help, and a group's title and help.
- */
-function useFieldTexts() {
-  const t = useText()
-  const help = (path: string) => t(`shell.studio.field.process.${path}.help`)
-  return {
-    field: (path: string) => ({ label: t(`shell.studio.field.process.${path}`), help: help(path) }),
-    group: (path: string) => ({ title: t(`shell.studio.field.process.${path}`), help: help(path) }),
-  }
-}
-
 /** The distinct, non-empty step names of a draft, for the pickers of every transition. */
 function stepNames(steps: unknown[]): string[] {
   return [
@@ -99,7 +87,7 @@ export function ProcessEditor({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field } = useFieldTexts()
+  const { field } = useFieldTexts('process')
   const steps = Array.isArray(value.steps) ? value.steps : []
   const names = stepNames(steps)
   const heading = (name: string) => ({
@@ -187,7 +175,7 @@ function withoutSubject(schema: JsonSchema): JsonSchema {
  */
 function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const mode = value.parameters !== undefined && value.entity === undefined ? 'parameters' : 'entity'
   const parameters = Array.isArray(value.parameters) ? value.parameters : []
 
@@ -330,7 +318,7 @@ function Step({
   layer?: DesignerLayer
 }) {
   const t = useText()
-  const { field } = useFieldTexts()
+  const { field } = useFieldTexts('process')
   const pointer = `/steps/${index}`
   const type = typeof step.type === 'string' ? step.type : undefined
 
@@ -422,7 +410,7 @@ function Transition({
   names: string[]
   onChange: ChangeHandler
 }) {
-  const { field } = useFieldTexts()
+  const { field } = useFieldTexts('process')
   return (
     <div data-testid={`studio-field-${pointer}`}>
       <AxisField {...field(path)}>
@@ -470,7 +458,7 @@ function AssigneeEditor({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const assignee = isContent(value) ? value : {}
   const mode = assignee.role !== undefined && assignee.user === undefined ? 'role' : 'user'
 
@@ -538,7 +526,7 @@ function Task({
   names: string[]
   onChange: ChangeHandler
 }) {
-  const { field } = useFieldTexts()
+  const { field } = useFieldTexts('process')
   const label = isContent(step.label) ? step.label : {}
 
   return (
@@ -597,7 +585,7 @@ function Deadline({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const deadlinePointer = `${pointer}/deadline`
   if (step.deadline !== undefined && !isContent(step.deadline)) {
     return <JsonOnlyKeys pointer={pointer} keys={['deadline']} />
@@ -652,7 +640,7 @@ const emptyNotify = { to: [], channels: [], message: { subject: { textKey: '' },
  */
 function Escalations({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const { colour, radius, spacing } = useDesignTokens()
   const escalationsPointer = `${pointer}/escalations`
   if (step.escalations !== undefined && !Array.isArray(step.escalations)) {
@@ -719,7 +707,12 @@ function Escalations({ pointer, step, onChange }: { pointer: string; step: Conte
                 </AxisField>
                 {row.notify !== undefined &&
                   (isContent(row.notify) ? (
-                    <NotifyFields pointer={`${rowPointer}/notify`} value={row.notify} onChange={onChange} />
+                    <NotifyFields
+                      pointer={`${rowPointer}/notify`}
+                      path="steps.escalations.notify"
+                      value={row.notify}
+                      onChange={onChange}
+                    />
                   ) : (
                     <JsonOnlyKeys pointer={rowPointer} keys={['notify']} />
                   ))}
@@ -760,7 +753,7 @@ function Timer({
   names: string[]
   onChange: ChangeHandler
 }) {
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const t = useText()
   const mode = step.until !== undefined && step.wait === undefined ? 'until' : 'wait'
 
@@ -847,7 +840,7 @@ function WaitEvent({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const studioNames = useContext(StudioNamesContext)
   const timeout = isContent(step.timeout) ? step.timeout : undefined
   const timeoutPointer = `${pointer}/timeout`
@@ -978,7 +971,7 @@ function SubProcess({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const studioNames = useContext(StudioNamesContext)
   const childOf = (name: string) =>
     studioNames?.processes.find((process) => process.name.toLowerCase() === name.toLowerCase())
@@ -1014,7 +1007,7 @@ function SubProcess({
       ) : (
         <MappingRows
           pointer={`${pointer}/parameters`}
-          title={t('shell.studio.process.childParameters')}
+          {...group('steps.parameters')}
           value={step.parameters}
           keyLabel={t('shell.studio.process.parameterName')}
           keyOptions={child?.parameters.map((parameter) => parameter.name)}
@@ -1039,7 +1032,7 @@ function Decision({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const branchesPointer = `${pointer}/branches`
   const branches = Array.isArray(step.branches) ? step.branches : []
 
@@ -1118,7 +1111,7 @@ function Outcomes({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const { field, group } = useFieldTexts()
+  const { field, group } = useFieldTexts('process')
   const outcomesPointer = `${pointer}/outcomes`
   const outcomes = Array.isArray(step.outcomes) ? step.outcomes : []
 

@@ -1,5 +1,6 @@
 import { apiFetch } from './api'
 import type { ChartKind } from './chartOption'
+import type { ColumnPriority } from './tableRoom'
 
 /** One navigation entry. The label is a text key. */
 export interface NavigationItem {
@@ -347,6 +348,8 @@ export interface WidgetMetadata {
    * source parameter's name, and `{}` on every other widget. A bound parameter has no filter input.
    */
   parameters: Record<string, string>
+  /** The priority of each column of a table, by column name, and `{}` on every other widget. */
+  priorities: Record<string, ColumnPriority>
   /** What the user may do with a table, form or detail widget's entity, and `null` on a task inbox and a process inspector. */
   access: WidgetAccess | null
   /** What a detail widget shows, and `null` on every other widget. A detail has an `entity` and maybe a `form`. */

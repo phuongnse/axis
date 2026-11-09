@@ -436,8 +436,7 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
   }
   return (
     <Flex vertical gap="middle">
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {form.formErrors.length > 0 && <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />}
+      {form.formError}
       {steps.progress}
       {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
       <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>

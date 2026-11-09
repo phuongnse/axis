@@ -298,7 +298,8 @@
       "nexkit:dependabot",
       "bug",
       "nexkit:flaky",
-      "process"
+      "process",
+      "refactor"
     ],
     "labels": {
       "journey": {

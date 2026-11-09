@@ -154,6 +154,7 @@ const widgetBase: WidgetMetadata = {
   rowActions: [],
   toolbarActions: [],
   parameters: {},
+  priorities: {},
   access: null,
   detail: null,
   kpi: null,

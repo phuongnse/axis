@@ -156,6 +156,24 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     }
   })
 
+  it('draws the border of the same inputs in warningText on a warning, and the form message in warningText', () => {
+    expect(themeConfig?.components?.Form).toMatchObject({ colorWarning: colour.warningText })
+    for (const name of [
+      'Input',
+      'InputNumber',
+      'Select',
+      'DatePicker',
+      'Mentions',
+      'Cascader',
+      'TreeSelect',
+    ] as const) {
+      expect(themeConfig?.components?.[name]).toMatchObject({
+        colorWarning: colour.warningText,
+        colorWarningBorderHover: colour.warningText,
+      })
+    }
+  })
+
   it('sits a checkbox and a radio box at the top, level with the first line of a label that wraps', () => {
     const box = { styles: { icon: { alignSelf: 'flex-start', marginTop: expect.closeTo(3) } } }
     expect(checkbox).toMatchObject(box)

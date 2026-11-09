@@ -1,8 +1,12 @@
 import { Checkbox, Form, type CheckboxProps, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
+import { Announcement } from './Announcement'
 import { useDesignTokens } from './themeMode'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
+
+/** What the screen found about the field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
+export type AxisFieldStatus = { kind: 'running' } | { kind: 'passed' | 'refused' | 'couldNotRun'; message: string }
 
 type FormFieldProps = {
   label: string
@@ -17,6 +21,8 @@ type FormFieldProps = {
   valuePropName?: FormItemProps['valuePropName']
   /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
   getValueFromEvent?: FormItemProps['getValueFromEvent']
+  /** What the screen found about the field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
+  status?: AxisFieldStatus
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -30,6 +36,7 @@ type OwnFieldProps = {
   rules?: never
   valuePropName?: never
   getValueFromEvent?: never
+  status?: never
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
@@ -59,7 +66,7 @@ function isEmpty(value: unknown): boolean {
  * - With a `name`, the field belongs inside a vertical form that takes the shared `requiredMark`, and Ant Design's form
  *   gives the input its value and change handler. A `requiredMessage` marks the field required and adds the rule that
  *   checks it, so the mark and the check never part. The check holds for text, numbers and lists, and blank text is
- *   empty.
+ *   empty. A `status` shows what the screen found about the field, such as a check that is still running.
  * - Without a `name`, the field needs no form: the caller gives the input its `value` and change handler, and the
  *   label still names the input.
  *
@@ -84,6 +91,22 @@ function OwnField({ label, help, children }: OwnFieldProps) {
   )
 }
 
+/** The form item's state for a status. A passed status gives none, so the field keeps its own rule errors. */
+function statusFeedback(
+  status: AxisFieldStatus | undefined,
+): Pick<FormItemProps, 'validateStatus' | 'help' | 'hasFeedback'> {
+  switch (status?.kind) {
+    case 'running':
+      return { validateStatus: 'validating', hasFeedback: true }
+    case 'refused':
+      return { validateStatus: 'error', help: status.message }
+    case 'couldNotRun':
+      return { validateStatus: 'warning', help: status.message }
+    default:
+      return {}
+  }
+}
+
 function FormField({
   label,
   help,
@@ -92,6 +115,7 @@ function FormField({
   rules,
   valuePropName,
   getValueFromEvent,
+  status,
   children,
 }: FormFieldProps) {
   const { colour } = useDesignTokens()
@@ -102,6 +126,7 @@ function FormField({
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
       getValueFromEvent={getValueFromEvent}
+      {...statusFeedback(status)}
       rules={[
         ...(requiredMessage === undefined
           ? []
@@ -117,7 +142,7 @@ function FormField({
       ]}
     >
       {/* Ant Design gives the one child of a named item its value, its change handler and its accessibility props. */}
-      <HelpedInput help={help} input={children} onChange={children.props.onChange} />
+      <HelpedInput help={help} input={children} onChange={children.props.onChange} status={status} />
     </Form.Item>
   )
 }
@@ -125,14 +150,18 @@ function FormField({
 type HelpedInputProps = {
   help: string
   input: FieldInput
+  status?: AxisFieldStatus
   id?: string
   'aria-describedby'?: string
   onChange?: (...args: never[]) => void
 }
 
-/** The help and the input under the label. The help joins the input's description, after the error Ant Design adds. */
+/**
+ * The help and the input under the label. The help joins the input's description, after the error Ant Design adds. A
+ * status region is drawn before its text can arrive, so a screen reader announces the message of a passed status.
+ */
 const HelpedInput = forwardRef(function HelpedInput(
-  { help, input, 'aria-describedby': described, ...control }: HelpedInputProps,
+  { help, input, status, 'aria-describedby': described, ...control }: HelpedInputProps,
   ref: Ref<unknown>,
 ) {
   const { spacing, colour } = useDesignTokens()
@@ -161,7 +190,9 @@ const HelpedInput = forwardRef(function HelpedInput(
         ...control,
         ref,
         'aria-describedby': describedBy,
+        'aria-busy': status?.kind === 'running' ? true : undefined,
       } as object)}
+      {status && <Announcement>{status.kind === 'passed' ? status.message : null}</Announcement>}
     </>
   )
 })
