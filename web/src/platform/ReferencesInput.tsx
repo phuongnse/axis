@@ -66,10 +66,10 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
                 <AxisButton
                   role="destructive"
                   size="small"
-                  aria-label={`${t('shell.form.removeRow')} ${labelAt(index)}`}
+                  aria-label={`${t('shell.form.removeReference')} ${labelAt(index)}`}
                   onClick={() => remove(index)}
                 >
-                  {t('shell.form.removeRow')}
+                  {t('shell.form.removeReference')}
                 </AxisButton>
               </Flex>
             </li>
