@@ -482,7 +482,8 @@ edits the same draft on a canvas.
 - **The page.** The Form tab shows three [sections](studio-resource-form.md#sections): General, with the
   page's name, its [title](studio-resource-form.md#labels) and its [description](#editor); the
   [parameters](#page-parameters); and Widgets, with the [widget tree](#widget-tree). Each page field and
-  each widget name picker has a label and help, named by its path in the page.
+  each widget name picker, and each field of the `table`, `form`, `detail`, `taskInbox` and `processInspector`
+  panels and of their actions, has a label and help, named by its path in the page.
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -540,8 +541,9 @@ a picker and a label, with Add measure and Remove measure, which is off when one
 ### Navigate actions
 
 A navigate action has a page picker, a [label](studio-resource-form.md#labels), an optional `record`
-expression and parameter expressions. The page picker lists every page, the current one included,
-because a page may open itself with other parameters.
+expression and parameter expressions. The page picker, label, record and parameters each show their
+label and help. The page picker lists every page, the current one included, because a page may open
+itself with other parameters.
 
 - **Adding one.** A table offers only Add navigate action, and a form also Add action for
   `startProcess`. A new action is named `<action type><n>`, such as `navigate1`, with the first free
