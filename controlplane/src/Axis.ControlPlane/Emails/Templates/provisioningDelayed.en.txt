@@ -1,9 +1,9 @@
-Subject: Your Axis is taking longer than expected
+Subject: Your Axis trial needs more time to set up
 
 Hello {{name}},
 
-Setting up your Axis is taking longer than we expected. Our team is working on it, and you do not need to do anything.
+Setting up the trial is taking longer than expected. Our team is working on it, and you do not need to do anything.
 
-We will email you again as soon as it is ready.
+We will email you again as soon as you can sign in.
 
 The Axis team
