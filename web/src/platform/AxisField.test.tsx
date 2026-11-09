@@ -184,6 +184,69 @@ describe('AxisField', () => {
     await waitFor(() => expect(screen.queryByText('Choose a state.')).not.toBeInTheDocument())
   })
 
+  it('shows a refused status as its error in place of the required message', async () => {
+    renderForm(
+      <AxisField
+        label="Subdomain"
+        help="It starts the address."
+        name="subdomain"
+        requiredMessage="Enter a subdomain."
+        status={{ state: 'refused', message: 'This subdomain is taken.' }}
+      >
+        <Input />
+      </AxisField>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Subdomain' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+
+    expect(await screen.findByText('This subdomain is taken.')).toBeInTheDocument()
+    expect(screen.queryByText('Enter a subdomain.')).not.toBeInTheDocument()
+    expect(hasFieldError(input)).toBe(true)
+  })
+
+  it('shows a failed status as a warning that is not an error', () => {
+    renderForm(
+      <AxisField
+        label="Subdomain"
+        help="It starts the address."
+        name="subdomain"
+        status={{ state: 'failed', message: 'The subdomain could not be checked.' }}
+      >
+        <Input />
+      </AxisField>,
+    )
+
+    expect(screen.getByText('The subdomain could not be checked.')).toBeInTheDocument()
+    expect(hasFieldError(screen.getByRole('textbox', { name: 'Subdomain' }))).toBe(false)
+  })
+
+  it('puts a passed status in a status region and leaves the field without an error', () => {
+    renderForm(
+      <AxisField
+        label="Subdomain"
+        help="It starts the address."
+        name="subdomain"
+        status={{ state: 'passed', message: 'This subdomain is free.' }}
+      >
+        <Input />
+      </AxisField>,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('This subdomain is free.')
+    expect(hasFieldError(screen.getByRole('textbox', { name: 'Subdomain' }))).toBe(false)
+  })
+
+  it('marks the field busy while a status is running', () => {
+    renderForm(
+      <AxisField label="Subdomain" help="It starts the address." name="subdomain" status={{ state: 'running' }}>
+        <Input />
+      </AxisField>,
+    )
+
+    expect(formItem(screen.getByRole('textbox', { name: 'Subdomain' }))).toHaveClass('ant-form-item-is-validating')
+  })
+
   it('requires a name for a requiredMessage', () => {
     expect(
       // @ts-expect-error A `requiredMessage` belongs to a field with a `name`, which is in an Ant Design form.

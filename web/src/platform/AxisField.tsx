@@ -1,8 +1,12 @@
 import { Form, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
+import { Announcement } from './Announcement'
 import { useDesignTokens } from './themeMode'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
+
+/** What the screen found about a field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
+export type AxisFieldStatus = { state: 'running' } | { state: 'passed' | 'refused' | 'failed'; message: string }
 
 type FormFieldProps = {
   label: string
@@ -17,6 +21,8 @@ type FormFieldProps = {
   valuePropName?: FormItemProps['valuePropName']
   /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
   getValueFromEvent?: FormItemProps['getValueFromEvent']
+  /** What the screen found about the field, such as whether a name is free. It takes the place of the field's own errors while shown. */
+  status?: AxisFieldStatus
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -30,6 +36,7 @@ type OwnFieldProps = {
   rules?: never
   valuePropName?: never
   getValueFromEvent?: never
+  status?: never
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
@@ -63,10 +70,23 @@ function isEmpty(value: unknown): boolean {
  * - Without a `name`, the field needs no form: the caller gives the input its `value` and change handler, and the
  *   label still names the input.
  *
+ * A `status` on a field with a `name` shows a check's result under the input: busy while it runs, a message a screen
+ * reader hears when it passed, and an error or a warning when it refused or failed.
+ *
  * See docs/reference/actions-and-controls.md#fields and docs/reference/frontend.md#platform-field-help.
  */
 export function AxisField(props: AxisFieldProps) {
   return isFormField(props) ? <FormField {...props} /> : <OwnField {...props} />
+}
+
+function statusItemProps(status: AxisFieldStatus | undefined): Pick<FormItemProps, 'validateStatus' | 'help'> {
+  if (status === undefined || status.state === 'passed') {
+    return {}
+  }
+  if (status.state === 'running') {
+    return { validateStatus: 'validating' }
+  }
+  return { validateStatus: status.state === 'refused' ? 'error' : 'warning', help: status.message }
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */
@@ -92,6 +112,7 @@ function FormField({
   rules,
   valuePropName,
   getValueFromEvent,
+  status,
   children,
 }: FormFieldProps) {
   const { colour } = useDesignTokens()
@@ -115,6 +136,12 @@ function FormField({
             ]),
         ...(rules ?? []),
       ]}
+      {...statusItemProps(status)}
+      extra={
+        status === undefined ? undefined : (
+          <Announcement>{status.state === 'passed' ? status.message : undefined}</Announcement>
+        )
+      }
     >
       {/* Ant Design gives the one child of a named item its value, its change handler and its accessibility props. */}
       <HelpedInput help={help} input={children} onChange={children.props.onChange} />
