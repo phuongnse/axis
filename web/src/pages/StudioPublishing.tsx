@@ -22,18 +22,61 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useFollowJob } from '../platform/useFollowJob'
 import { StudioBand } from './StudioBand'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
 import { StudioTestResults } from './StudioTestResults'
 
-/** How long Studio waits between two checks of a request. */
-const pollDelay = 1000
-
 /** What the page calls on this component: a test run of every scenario, or of the named ones, and an activation. */
 export interface StudioPublishingHandle {
   runTests(scenarios?: string[]): void
   activate(releaseId: string): void
+}
+
+async function findReleaseNumber(
+  application: string,
+  ended: StudioRequest,
+  signal: AbortSignal,
+): Promise<number | null> {
+  if (
+    ended.target === 'preview' ||
+    (ended.kind !== 'publish' && ended.kind !== 'activate') ||
+    ended.status !== 'succeeded' ||
+    ended.releaseId === null
+  ) {
+    return null
+  }
+  const releases = await fetchStudioReleases(application, signal)
+  return releases.items.find((item) => item.releaseId === ended.releaseId)?.number ?? null
+}
+
+// The site paths are read from the folder, so a path renamed since the request was sent gives a wrong link.
+async function findPreviewLinks(
+  application: string,
+  previewHost: string | null,
+  sites: StudioResourceItem[],
+  ended: StudioRequest,
+  signal: AbortSignal,
+): Promise<string[]> {
+  if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
+    return []
+  }
+  const links: string[] = []
+  for (const site of sites) {
+    try {
+      const { content } = await fetchStudioResource(application, site.id, signal)
+      if (typeof content.path === 'string') {
+        links.push(previewSiteUrl(previewHost, content.path))
+      }
+    } catch (error) {
+      if (signal.aborted || error instanceof ServerUnreachableError) {
+        throw error
+      }
+      console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
+    }
+  }
+  return links
 }
 
 /**
@@ -142,84 +185,33 @@ export function StudioPublishing({
   const requestId = request?.id
   const running = request !== null && (request.status === 'queued' || request.status === 'running')
 
-  useEffect(() => {
-    if (requestId === undefined || !running) {
-      return
-    }
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout>
-
-    async function check() {
-      try {
-        const next = await fetchStudioRequest(application, requestId!, controller.signal)
-        if (next.status === 'queued' || next.status === 'running') {
-          setRequest(next)
-          timer = setTimeout(check, pollDelay)
-          return
-        }
-        const number = await findReleaseNumber(next, controller.signal)
-        const links = await findPreviewLinks(next, controller.signal)
-        diagnosticsHandler.current(next.diagnostics)
-        setReleaseNumber(number)
-        setPreviewLinks(links)
-        setRequest(next)
-        setHistoryRevision((value) => value + 1)
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return
-        }
-        if (error instanceof ServerUnreachableError) {
-          lost()
-          return
-        }
-        console.warn(`Checking the request '${requestId}' failed`, error)
-        setRequest(null)
-        setSendError(t('shell.studio.request.sendFailed'))
-        setHistoryRevision((value) => value + 1)
+  useFollowJob(running && requestId !== undefined ? `${application}/${requestId}/${generation}` : null, {
+    read: (signal) => fetchStudioRequest(application, requestId!, signal),
+    ends: (next) => next.status !== 'queued' && next.status !== 'running',
+    interval: 1000,
+    waitFirst: true,
+    onAnswer: setRequest,
+    onEnd: async (next, signal) => {
+      const number = await findReleaseNumber(application, next, signal)
+      const links = await findPreviewLinks(application, previewHost, sitesRef.current, next, signal)
+      diagnosticsHandler.current(next.diagnostics)
+      setReleaseNumber(number)
+      setPreviewLinks(links)
+      setHistoryRevision((value) => value + 1)
+      setRequest(next)
+    },
+    onError: (error) => {
+      if (error instanceof ServerUnreachableError) {
+        lost()
+        return 'stop'
       }
-    }
-
-    async function findReleaseNumber(ended: StudioRequest, signal: AbortSignal): Promise<number | null> {
-      if (
-        ended.target === 'preview' ||
-        (ended.kind !== 'publish' && ended.kind !== 'activate') ||
-        ended.status !== 'succeeded' ||
-        ended.releaseId === null
-      ) {
-        return null
-      }
-      const releases = await fetchStudioReleases(application, signal)
-      return releases.items.find((item) => item.releaseId === ended.releaseId)?.number ?? null
-    }
-
-    // The site paths are read from the folder, so a path renamed since the request was sent gives a wrong link.
-    async function findPreviewLinks(ended: StudioRequest, signal: AbortSignal): Promise<string[]> {
-      if (ended.target !== 'preview' || ended.status !== 'succeeded' || previewHost === null) {
-        return []
-      }
-      const links: string[] = []
-      for (const site of sitesRef.current) {
-        try {
-          const { content } = await fetchStudioResource(application, site.id, signal)
-          if (typeof content.path === 'string') {
-            links.push(previewSiteUrl(previewHost, content.path))
-          }
-        } catch (error) {
-          if (signal.aborted || error instanceof ServerUnreachableError) {
-            throw error
-          }
-          console.warn(`Loading the site '${site.id}' for the preview links failed`, error)
-        }
-      }
-      return links
-    }
-
-    timer = setTimeout(check, pollDelay)
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-  }, [application, requestId, running, generation, lost, previewHost, t])
+      console.warn(`Checking the request '${requestId}' failed`, error)
+      setRequest(null)
+      setSendError(t('shell.studio.request.sendFailed'))
+      setHistoryRevision((value) => value + 1)
+      return 'stop'
+    },
+  })
 
   async function send(start: () => Promise<StudioRequest>) {
     setSending(true)
