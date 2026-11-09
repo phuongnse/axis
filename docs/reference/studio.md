@@ -48,6 +48,10 @@ title and description in the UI locale and `en` as the fallback, and a built-in 
 sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
+- **One field to start from** _(planned for M33)_. `StartFromField` draws the choice, as the
+  [sign-up page](sign-up.md#start-from) does: Blank first, then the templates. When the list does not
+  load, its warning status says under the choices that Blank is still there.
+
 ## New resource
 
 New resource… creates a resource from its kind's starter, so a new resource opens with as few

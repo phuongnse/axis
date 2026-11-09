@@ -102,6 +102,12 @@
       "en": "value",
       "vi": "giá trị",
       "status": "proposed"
+    },
+    {
+      "concept": "Billing portal",
+      "en": "billing portal",
+      "vi": "trang thanh toán",
+      "status": "proposed"
     }
   ]
 }

@@ -18,6 +18,11 @@ These principles hold in every language.
   is the source of the keys, not of the sentences.
 - **The person's words.** Name what the person sees and does, in the terms of the people who use the screen. Write
   "The record could not be saved", not the name of the API call that failed.
+- **Axis names the product, never what a business gets** _(planned for M33)_. A text of the sign-up names
+  Axis only as the product the person signs up for, in a title, an email's subject and its sender. It never
+  makes Axis the subject of a help text, which needs none, and never calls what a business gets "your Axis",
+  which reads as the product, an account or an address at once: it names the address the person signs in
+  at, or the trial.
 - **A setting by what it means.** Name a setting by what it is to the person, not by the English word for it: what
   people see as a field's name is its display name, and what a field holds is its data type.
 - **One term for one concept.** Use the glossary's term. Never bring in a synonym, and never change an approved term in
