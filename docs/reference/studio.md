@@ -712,8 +712,8 @@ second view of the same draft. The [process designer](process-designer.md) edits
 graph, with the card of the selected step beside it, and describes the panels of the timer,
 sub-process and wait for event steps and of a task's deadline and escalations.
 
-- **The process.** The Form tab shows the process's name, its [description](#editor), its subject, its
-  optional start condition and its start step.
+- **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
+  and each field has a [field text](studio-resource-form.md#fields).
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
   and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
@@ -759,19 +759,19 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 
 ## Connector editor
 
-The connector editor's Form tab shows the base URL binding, the auth type with its bindings,
-`timeout`, `idempotency` and the operations as a list, and the JSON view stays as the second view of
-the same draft.
+The connector editor's Form tab shows the connector's fields in the four
+[shared sections](studio-resource-form.md#sections) General, Service, Authentication and Operations,
+each field with its label and [help](frontend.md#platform-field-help). Add operation sits on the
+Operations heading, and the JSON view stays as the second view of the same draft.
 
-- **No values.** A binding is a name, labelled as a URL or a secret binding, and no value of a binding
-  is shown or stored: the editor reads the resource and schema routes and the binding names, and
-  writes only the resource, and the values stay in tenant settings.
-- **Bindings from the tenant.** A binding is chosen from the tenant's names of the
-  kind it needs, see
+- **No values.** A binding is a name, named by what it holds, and its help says which kind it is. No
+  value of a binding is shown or stored: the editor reads the resource and schema routes and the
+  binding names, and writes only the resource, and the values stay in tenant settings.
+- **Bindings from the tenant.** A binding is chosen from the tenant's names of the kind it needs, see
   [controls that know what they hold](studio-resource-form.md#controls-that-know-what-they-hold).
 - **Auth.** Choosing a type removes the keys the new type forbids, such as `token` for `header`, and
   adds the keys it requires, with an empty name, and clearing the type removes `auth`. `oauth2` shows a
-  token URL, a URL binding, a client id and a client secret, both secret bindings, and Scope and
+  Token URL, a URL binding, a Client ID and a Client secret, both secret bindings, and Scope and
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required.

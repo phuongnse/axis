@@ -14,12 +14,6 @@
       "status": "proposed"
     },
     {
-      "concept": "Cell",
-      "en": "cell",
-      "vi": "cụm",
-      "status": "proposed"
-    },
-    {
       "concept": "Platform operator",
       "en": "platform operator",
       "vi": "người vận hành nền tảng",
@@ -28,7 +22,7 @@
     {
       "concept": "Cell console",
       "en": "cell console",
-      "vi": "bảng điều khiển cụm",
+      "vi": "bảng điều khiển cell",
       "status": "proposed"
     },
     {
@@ -56,6 +50,30 @@
       "status": "proposed"
     },
     {
+      "concept": "Deadline",
+      "en": "deadline",
+      "vi": "thời hạn chót",
+      "status": "proposed"
+    },
+    {
+      "concept": "Escalation",
+      "en": "escalation",
+      "vi": "leo thang",
+      "status": "proposed"
+    },
+    {
+      "concept": "Outcome (of a task)",
+      "en": "outcome",
+      "vi": "kết quả",
+      "status": "proposed"
+    },
+    {
+      "concept": "Timer (step)",
+      "en": "timer",
+      "vi": "hẹn giờ",
+      "status": "proposed"
+    },
+    {
       "concept": "Result type",
       "en": "result type",
       "vi": "kiểu kết quả",
@@ -77,6 +95,12 @@
       "concept": "Action: Apply",
       "en": "Apply",
       "vi": "Áp dụng",
+      "status": "proposed"
+    },
+    {
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
       "status": "proposed"
     },
     {

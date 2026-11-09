@@ -133,7 +133,9 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
   Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
-- **A time column or label names the event, then "lúc".** "Tạo lúc", "Đăng nhập lúc", "Phát hành lúc".
+- **A time names its event, then "lúc".** A column or label that holds the time of an event names the event and ends
+  with "lúc": "Tạo lúc", "Đăng nhập lúc", "Kích hoạt lúc", "Gửi lúc", "Yêu cầu lúc", "Lỗi lúc", "Phát hành lúc". Never
+  "Thời điểm …".
 - **"Tạo" for an application, "Thêm" for a resource.** A button that makes a new application says "Tạo": "Tạo ứng
   dụng…". A button that makes a new resource of an application says "Thêm", as the resource joins the application:
   "Thêm đối tượng…", "Thêm tài nguyên…". English keeps "New application…" and "New entity…".
