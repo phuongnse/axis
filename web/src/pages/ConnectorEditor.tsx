@@ -1,10 +1,14 @@
 import { Button, Card, Checkbox, Flex, Input, Select, Typography } from 'antd'
-import { useContext } from 'react'
+import { useContext, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioBindingsContext } from '../platform/studioCatalog'
 import { useText } from '../platform/texts'
 import { BindingSelect } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -28,6 +32,17 @@ const forbiddenAuthKeys: Record<string, string[]> = {
   oauth2: ['token', 'name', 'value'],
 }
 
+/** The label and the help of a connector field, from `shell.studio.field.connector.<path>`, see docs/reference/frontend.md#platform-field-help. */
+function fieldTexts(t: (key: string) => string, path: string) {
+  return { label: t(`shell.studio.field.connector.${path}`), help: t(`shell.studio.field.connector.${path}.help`) }
+}
+
+/** The title and the help of a connector group of fields, which has no one input to label. */
+function groupTexts(t: (key: string) => string, path: string) {
+  const { label, help } = fieldTexts(t, path)
+  return { title: label, help }
+}
+
 function isStructured(type: unknown): boolean {
   return type === 'object' || type === 'list'
 }
@@ -46,7 +61,8 @@ function bindingName(value: unknown): string {
 }
 
 /**
- * The editor of a connector. It shows the base URL binding, the auth type and its bindings, the timeout, the
+ * The editor of a connector, in the four sections of docs/reference/studio.md#connector-editor: General, Service,
+ * Authentication and Operations. It shows the base URL binding, the auth type and its bindings, the timeout, the
  * idempotency header and the operations. A binding is only a name: the field neither shows nor writes a value, because
  * values live in tenant settings. A binding is chosen from the tenant's names of its kind once they load, and is a name box
  * until then. The editor edits the draft through `onChange`, so a key it does not show, in the
@@ -88,125 +104,137 @@ export function ConnectorEditor({ value, onChange }: { value: Content; onChange:
     }
   }
 
-  function textField(pointer: string, label: string, current: unknown, required: boolean) {
+  function textField(pointer: string, path: string, current: unknown, required: boolean) {
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <div>{label}</div>
-        <Input
-          aria-label={label}
-          value={text(current)}
-          onChange={(event) =>
-            onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)
-          }
-        />
+        <AxisField {...fieldTexts(t, path)}>
+          <Input
+            value={text(current)}
+            onChange={(event) =>
+              onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)
+            }
+          />
+        </AxisField>
       </div>
     )
   }
 
-  function bindingField(pointer: string, label: string, current: unknown, kind: 'url' | 'secret') {
+  function bindingField(pointer: string, path: string, current: unknown, kind: 'url' | 'secret') {
+    const texts = fieldTexts(t, path)
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <div>{label}</div>
-        {bindings === undefined ? (
-          <Input
-            aria-label={label}
-            value={bindingName(current)}
-            onChange={(event) => onChange(pointer, event.target.value)}
-          />
-        ) : (
-          <BindingSelect
-            name={label}
-            names={bindings[kind]}
-            value={bindingName(current)}
-            onChange={(next) => onChange(pointer, next)}
-          />
-        )}
-        <Typography.Text type="secondary">{t('shell.studio.connector.bindingHint')}</Typography.Text>
+        <AxisField {...texts}>
+          {bindings === undefined ? (
+            <Input value={bindingName(current)} onChange={(event) => onChange(pointer, event.target.value)} />
+          ) : (
+            <BindingSelect
+              name={texts.label}
+              names={bindings[kind]}
+              value={bindingName(current)}
+              onChange={(next) => onChange(pointer, next)}
+            />
+          )}
+        </AxisField>
       </div>
+    )
+  }
+
+  function section(name: string, children: ReactNode, action?: ReactNode) {
+    const prefix = `shell.studio.section.connector.${name}`
+    return (
+      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+        <Flex vertical gap="small">
+          {children}
+        </Flex>
+      </ResourceFormSection>
     )
   }
 
   return (
-    <Flex vertical gap="small" data-testid="studio-connector-editor">
-      {textField('/name', t('shell.studio.connector.name'), value.name, true)}
-      <div data-testid="studio-field-/description">
-        <div>{t('shell.studio.connector.description')}</div>
-        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
-      </div>
-      {bindingField('/baseUrl/binding', t('shell.studio.connector.urlBinding'), value.baseUrl, 'url')}
-      <div data-testid="studio-field-/auth">
-        <div data-testid="studio-field-/auth/type">
-          <div>{t('shell.studio.connector.authType')}</div>
-          <Select
-            virtual={false}
-            aria-label={t('shell.studio.connector.authType')}
-            style={{ minWidth: 240 }}
-            allowClear
-            value={authType}
-            options={authTypes.map((type) => ({ value: type, label: type }))}
-            onChange={(next: string | undefined) => changeAuthType(next)}
-          />
-        </div>
-        {authType === 'bearer' &&
-          bindingField('/auth/token/binding', t('shell.studio.connector.secretBinding'), auth?.token, 'secret')}
-        {authType === 'header' && (
+    <div data-testid="studio-connector-editor">
+      <ResourceFormSections>
+        {section(
+          'general',
           <>
-            {textField('/auth/name', t('shell.studio.connector.headerName'), auth?.name, true)}
-            {bindingField('/auth/value/binding', t('shell.studio.connector.secretBinding'), auth?.value, 'secret')}
-          </>
+            {textField('/name', 'name', value.name, true)}
+            <div data-testid="studio-field-/description">
+              <AxisFieldGroup {...groupTexts(t, 'description')}>
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+          </>,
         )}
-        {authType === 'oauth2' && (
+        {section(
+          'service',
           <>
-            {bindingField(
-              '/auth/tokenUrl/binding',
-              `${t('shell.studio.connector.tokenUrl')} (${t('shell.studio.connector.urlBinding')})`,
-              auth?.tokenUrl,
-              'url',
-            )}
-            {bindingField(
-              '/auth/clientId/binding',
-              `${t('shell.studio.connector.clientId')} (${t('shell.studio.connector.secretBinding')})`,
-              auth?.clientId,
-              'secret',
-            )}
-            {bindingField(
-              '/auth/clientSecret/binding',
-              `${t('shell.studio.connector.clientSecret')} (${t('shell.studio.connector.secretBinding')})`,
-              auth?.clientSecret,
-              'secret',
-            )}
-            {textField('/auth/scope', t('shell.studio.connector.scope'), auth?.scope, false)}
-            {textField('/auth/audience', t('shell.studio.connector.audience'), auth?.audience, false)}
-          </>
+            {bindingField('/baseUrl/binding', 'baseUrl', value.baseUrl, 'url')}
+            {textField('/timeout', 'timeout', value.timeout, false)}
+            {textField('/idempotency', 'idempotency', value.idempotency, false)}
+          </>,
         )}
-      </div>
-      {textField('/timeout', t('shell.studio.connector.timeout'), value.timeout, false)}
-      {textField('/idempotency', t('shell.studio.connector.idempotency'), value.idempotency, false)}
-      <div data-testid="studio-field-/operations">
-        <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.connector.operations')}</Typography.Text>
-          {operations.map((operation, index) => (
-            <Operation
-              key={index}
-              index={index}
-              operation={isContent(operation) ? operation : {}}
-              siblings={operations.flatMap((other, position) =>
-                position !== index && isContent(other) && typeof other.name === 'string' && other.name !== ''
-                  ? [other.name]
-                  : [],
+        {section(
+          'auth',
+          <div data-testid="studio-field-/auth">
+            <Flex vertical gap="small">
+              <div data-testid="studio-field-/auth/type">
+                <AxisField {...fieldTexts(t, 'auth.type')}>
+                  <Select
+                    virtual={false}
+                    style={{ minWidth: 240 }}
+                    allowClear
+                    value={authType}
+                    options={authTypes.map((type) => ({ value: type, label: type }))}
+                    onChange={(next: string | undefined) => changeAuthType(next)}
+                  />
+                </AxisField>
+              </div>
+              {authType === 'bearer' && bindingField('/auth/token/binding', 'auth.token', auth?.token, 'secret')}
+              {authType === 'header' && (
+                <>
+                  {textField('/auth/name', 'auth.name', auth?.name, true)}
+                  {bindingField('/auth/value/binding', 'auth.value', auth?.value, 'secret')}
+                </>
               )}
-              onChange={onChange}
-            />
-          ))}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange('/operations', [...operations, { name: '', method: 'POST', path: '/' }])}>
-              {t('shell.studio.connector.addOperation')}
-            </Button>
-          </div>
-        </Flex>
-      </div>
-    </Flex>
+              {authType === 'oauth2' && (
+                <>
+                  {bindingField('/auth/tokenUrl/binding', 'auth.tokenUrl', auth?.tokenUrl, 'url')}
+                  {bindingField('/auth/clientId/binding', 'auth.clientId', auth?.clientId, 'secret')}
+                  {bindingField('/auth/clientSecret/binding', 'auth.clientSecret', auth?.clientSecret, 'secret')}
+                  {textField('/auth/scope', 'auth.scope', auth?.scope, false)}
+                  {textField('/auth/audience', 'auth.audience', auth?.audience, false)}
+                </>
+              )}
+            </Flex>
+          </div>,
+        )}
+        {section(
+          'operations',
+          <div data-testid="studio-field-/operations">
+            <Flex vertical gap="small">
+              {operations.map((operation, index) => (
+                <Operation
+                  key={index}
+                  index={index}
+                  operation={isContent(operation) ? operation : {}}
+                  siblings={operations.flatMap((other, position) =>
+                    position !== index && isContent(other) && typeof other.name === 'string' && other.name !== ''
+                      ? [other.name]
+                      : [],
+                  )}
+                  onChange={onChange}
+                />
+              ))}
+            </Flex>
+          </div>,
+          <AxisButton
+            role="secondary"
+            onClick={() => onChange('/operations', [...operations, { name: '', method: 'POST', path: '/' }])}
+          >
+            {t('shell.studio.connector.addOperation')}
+          </AxisButton>,
+        )}
+      </ResourceFormSections>
+    </div>
   )
 }
 
@@ -232,46 +260,40 @@ function Operation({
     <Card size="small" data-testid={`studio-operation-${index}`}>
       <Flex vertical gap="small">
         <div data-testid={`studio-field-${pointer}/name`}>
-          <div>{t('shell.studio.connector.operationName')}</div>
-          <Input
-            aria-label={t('shell.studio.connector.operationName')}
-            value={text(operation.name)}
-            onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
-          />
+          <AxisField {...fieldTexts(t, 'operations.name')}>
+            <Input value={text(operation.name)} onChange={(event) => onChange(`${pointer}/name`, event.target.value)} />
+          </AxisField>
         </div>
         <div data-testid={`studio-field-${pointer}/method`}>
-          <div>{t('shell.studio.connector.method')}</div>
-          <Select
-            virtual={false}
-            aria-label={t('shell.studio.connector.method')}
-            style={{ minWidth: 240 }}
-            value={typeof operation.method === 'string' ? operation.method : undefined}
-            options={methods.map((method) => ({ value: method, label: method }))}
-            onChange={(next: string) => onChange(`${pointer}/method`, next)}
-          />
+          <AxisField {...fieldTexts(t, 'operations.method')}>
+            <Select
+              virtual={false}
+              style={{ minWidth: 240 }}
+              value={typeof operation.method === 'string' ? operation.method : undefined}
+              options={methods.map((method) => ({ value: method, label: method }))}
+              onChange={(next: string) => onChange(`${pointer}/method`, next)}
+            />
+          </AxisField>
         </div>
         <div data-testid={`studio-field-${pointer}/path`}>
-          <div>{t('shell.studio.connector.path')}</div>
-          <Input
-            aria-label={t('shell.studio.connector.path')}
-            value={text(operation.path)}
-            onChange={(event) => onChange(`${pointer}/path`, event.target.value)}
-          />
+          <AxisField {...fieldTexts(t, 'operations.path')}>
+            <Input value={text(operation.path)} onChange={(event) => onChange(`${pointer}/path`, event.target.value)} />
+          </AxisField>
         </div>
         <div data-testid={`studio-field-${pointer}/lookup`}>
-          <div>{t('shell.studio.connector.lookup')}</div>
-          <ReferencePicker
-            name={t('shell.studio.connector.lookup')}
-            value={lookup}
-            required={false}
-            options={siblings}
-            onChange={(next) => onChange(`${pointer}/lookup`, next)}
-          />
+          <AxisField {...fieldTexts(t, 'operations.lookup')}>
+            <ReferencePicker
+              name={t('shell.studio.field.connector.operations.lookup')}
+              value={lookup}
+              required={false}
+              options={siblings}
+              onChange={(next) => onChange(`${pointer}/lookup`, next)}
+            />
+          </AxisField>
         </div>
         <FieldRows
           kind="input"
           pointer={`${pointer}/input`}
-          label={t('shell.studio.connector.input')}
           addText={t('shell.studio.connector.addInput')}
           rows={operation.input}
           onChange={onChange}
@@ -284,7 +306,6 @@ function Operation({
         <FieldRows
           kind="output"
           pointer={`${pointer}/output`}
-          label={t('shell.studio.connector.output')}
           addText={t('shell.studio.connector.addOutput')}
           rows={operation.output}
           onChange={onChange}
@@ -329,103 +350,112 @@ function changeFieldType(
 function FieldRows({
   kind,
   pointer,
-  label,
   addText,
   rows,
   onChange,
 }: {
   kind: 'input' | 'output'
   pointer: string
-  label: string
   addText: string
   rows: unknown
   onChange: ChangeHandler
 }) {
   const t = useText()
   const list = Array.isArray(rows) ? rows : []
+  const path = `operations.${kind}`
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{label}</Typography.Text>
-        {list.map((row, index) => {
-          const field = isContent(row) ? row : {}
-          const rowPointer = `${pointer}/${index}`
-          const structured = kind === 'input' && isStructured(field.type)
-          return (
-            <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-              <Flex gap="small" align="center" wrap>
-                <div data-testid={`studio-field-${rowPointer}/name`}>
-                  <Input
-                    aria-label={`${label} ${t('shell.studio.connector.fieldName')}`}
-                    value={text(field.name)}
-                    onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
-                  />
-                </div>
-                <div data-testid={`studio-field-${rowPointer}/type`}>
-                  <Select
-                    virtual={false}
-                    aria-label={`${label} ${t('shell.studio.connector.fieldType')}`}
-                    style={{ minWidth: 140 }}
-                    value={typeof field.type === 'string' ? field.type : undefined}
-                    options={(kind === 'input' ? inputTypes : fieldTypes).map((type) => ({ value: type, label: type }))}
-                    onChange={(next: string) => changeFieldType(onChange, rowPointer, field, next, kind)}
-                  />
-                </div>
-                {kind === 'input' && !structured && (
-                  <div data-testid={`studio-field-${rowPointer}/in`}>
-                    <Select
-                      virtual={false}
-                      aria-label={`${label} ${t('shell.studio.connector.placement')}`}
-                      style={{ minWidth: 120 }}
-                      value={typeof field.in === 'string' ? field.in : 'body'}
-                      options={placements.map((placement) => ({ value: placement, label: placement }))}
-                      // Body is the default, so choosing it removes the key.
-                      onChange={(next: string) => onChange(`${rowPointer}/in`, next === 'body' ? undefined : next)}
-                    />
+      <AxisFieldGroup {...groupTexts(t, path)}>
+        <Flex vertical gap="small">
+          {list.map((row, index) => {
+            const field = isContent(row) ? row : {}
+            const rowPointer = `${pointer}/${index}`
+            const structured = kind === 'input' && isStructured(field.type)
+            return (
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
+                <Flex gap="small" align="flex-end" wrap>
+                  <div data-testid={`studio-field-${rowPointer}/name`}>
+                    <AxisField {...fieldTexts(t, `${path}.name`)}>
+                      <Input
+                        value={text(field.name)}
+                        onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
+                      />
+                    </AxisField>
                   </div>
-                )}
-                <div data-testid={`studio-field-${rowPointer}/required`}>
-                  <Checkbox
-                    checked={field.required === true}
-                    onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
-                  >
-                    {t('shell.studio.connector.required')}
-                  </Checkbox>
-                </div>
-                {kind === 'output' && (
-                  <div data-testid={`studio-field-${rowPointer}/source`}>
-                    <Input
-                      aria-label={`${label} ${t('shell.studio.connector.source')}`}
-                      placeholder={t('shell.studio.connector.source')}
-                      value={text(field.source)}
-                      onChange={(event) =>
-                        onChange(`${rowPointer}/source`, event.target.value === '' ? undefined : event.target.value)
-                      }
-                    />
+                  <div data-testid={`studio-field-${rowPointer}/type`}>
+                    <AxisField {...fieldTexts(t, `${path}.type`)}>
+                      <Select
+                        virtual={false}
+                        style={{ minWidth: 140 }}
+                        value={typeof field.type === 'string' ? field.type : undefined}
+                        options={(kind === 'input' ? inputTypes : fieldTypes).map((type) => ({
+                          value: type,
+                          label: type,
+                        }))}
+                        onChange={(next: string) => changeFieldType(onChange, rowPointer, field, next, kind)}
+                      />
+                    </AxisField>
                   </div>
+                  {kind === 'input' && !structured && (
+                    <div data-testid={`studio-field-${rowPointer}/in`}>
+                      <AxisField {...fieldTexts(t, `${path}.in`)}>
+                        <Select
+                          virtual={false}
+                          style={{ minWidth: 120 }}
+                          value={typeof field.in === 'string' ? field.in : 'body'}
+                          options={placements.map((placement) => ({ value: placement, label: placement }))}
+                          // Body is the default, so choosing it removes the key.
+                          onChange={(next: string) => onChange(`${rowPointer}/in`, next === 'body' ? undefined : next)}
+                        />
+                      </AxisField>
+                    </div>
+                  )}
+                  <div data-testid={`studio-field-${rowPointer}/required`}>
+                    <AxisField {...fieldTexts(t, `${path}.required`)}>
+                      <Checkbox
+                        checked={field.required === true}
+                        onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
+                      />
+                    </AxisField>
+                  </div>
+                  {kind === 'output' && (
+                    <div data-testid={`studio-field-${rowPointer}/source`}>
+                      <AxisField {...fieldTexts(t, `${path}.source`)}>
+                        <Input
+                          value={text(field.source)}
+                          onChange={(event) =>
+                            onChange(`${rowPointer}/source`, event.target.value === '' ? undefined : event.target.value)
+                          }
+                        />
+                      </AxisField>
+                    </div>
+                  )}
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button onClick={() => onChange(rowPointer, undefined)}>
+                    {t('shell.studio.connector.removeField')}
+                  </Button>
+                </Flex>
+                {structured && (
+                  <NestedFields pointer={`${rowPointer}/fields`} rows={field.fields} level={2} onChange={onChange} />
                 )}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(rowPointer, undefined)}>
-                  {t('shell.studio.connector.removeField')}
-                </Button>
               </Flex>
-              {structured && (
-                <NestedFields pointer={`${rowPointer}/fields`} rows={field.fields} level={2} onChange={onChange} />
-              )}
-            </Flex>
-          )
-        })}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>{addText}</Button>
-        </div>
-      </Flex>
+            )
+          })}
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>{addText}</Button>
+          </div>
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 }
 
-/** The fields nested in an `object` or `list` input. `level` is the level of these rows, counting the input as 1. */
+/**
+ * The fields nested in an `object` or `list` input. `level` is the level of these rows, counting the input as 1. The
+ * schema's nested field is one recursive definition, so every level draws the same field texts.
+ */
 function NestedFields({
   pointer,
   rows,
@@ -440,60 +470,69 @@ function NestedFields({
   const t = useText()
   const list = Array.isArray(rows) ? rows : []
   const types = level <= nestingLimit ? inputTypes : fieldTypes
+  const path = 'operations.input.fields'
 
   return (
-    <Flex vertical gap="small" style={{ marginInlineStart: 24 }} data-testid={`studio-field-${pointer}`}>
-      {list.map((row, index) => {
-        const field = isContent(row) ? row : {}
-        const rowPointer = `${pointer}/${index}`
-        return (
-          <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-            <Flex gap="small" align="center" wrap>
-              <div data-testid={`studio-field-${rowPointer}/name`}>
-                <Input
-                  aria-label={t('shell.studio.connector.nestedFieldName')}
-                  value={text(field.name)}
-                  onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
-                />
-              </div>
-              <div data-testid={`studio-field-${rowPointer}/type`}>
-                <Select
-                  virtual={false}
-                  aria-label={t('shell.studio.connector.nestedFieldType')}
-                  style={{ minWidth: 140 }}
-                  value={typeof field.type === 'string' ? field.type : undefined}
-                  options={types.map((type) => ({ value: type, label: type }))}
-                  onChange={(next: string) => changeFieldType(onChange, rowPointer, field, next, 'nested')}
-                />
-              </div>
-              <div data-testid={`studio-field-${rowPointer}/required`}>
-                <Checkbox
-                  checked={field.required === true}
-                  onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
-                >
-                  {t('shell.studio.connector.required')}
-                </Checkbox>
-              </div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.connector.removeField')}</Button>
-            </Flex>
-            {isStructured(field.type) && (
-              <NestedFields
-                pointer={`${rowPointer}/fields`}
-                rows={field.fields}
-                level={level + 1}
-                onChange={onChange}
-              />
-            )}
-          </Flex>
-        )
-      })}
-      <div>
-        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-        <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
-          {t('shell.studio.connector.addNestedField')}
-        </Button>
-      </div>
-    </Flex>
+    <div style={{ marginInlineStart: 24 }} data-testid={`studio-field-${pointer}`}>
+      <AxisFieldGroup {...groupTexts(t, path)}>
+        <Flex vertical gap="small">
+          {list.map((row, index) => {
+            const field = isContent(row) ? row : {}
+            const rowPointer = `${pointer}/${index}`
+            return (
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
+                <Flex gap="small" align="flex-end" wrap>
+                  <div data-testid={`studio-field-${rowPointer}/name`}>
+                    <AxisField {...fieldTexts(t, `${path}.name`)}>
+                      <Input
+                        value={text(field.name)}
+                        onChange={(event) => onChange(`${rowPointer}/name`, event.target.value)}
+                      />
+                    </AxisField>
+                  </div>
+                  <div data-testid={`studio-field-${rowPointer}/type`}>
+                    <AxisField {...fieldTexts(t, `${path}.type`)}>
+                      <Select
+                        virtual={false}
+                        style={{ minWidth: 140 }}
+                        value={typeof field.type === 'string' ? field.type : undefined}
+                        options={types.map((type) => ({ value: type, label: type }))}
+                        onChange={(next: string) => changeFieldType(onChange, rowPointer, field, next, 'nested')}
+                      />
+                    </AxisField>
+                  </div>
+                  <div data-testid={`studio-field-${rowPointer}/required`}>
+                    <AxisField {...fieldTexts(t, `${path}.required`)}>
+                      <Checkbox
+                        checked={field.required === true}
+                        onChange={(event) => onChange(`${rowPointer}/required`, event.target.checked)}
+                      />
+                    </AxisField>
+                  </div>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button onClick={() => onChange(rowPointer, undefined)}>
+                    {t('shell.studio.connector.removeField')}
+                  </Button>
+                </Flex>
+                {isStructured(field.type) && (
+                  <NestedFields
+                    pointer={`${rowPointer}/fields`}
+                    rows={field.fields}
+                    level={level + 1}
+                    onChange={onChange}
+                  />
+                )}
+              </Flex>
+            )
+          })}
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button onClick={() => onChange(pointer, [...list, { name: '', type: 'text' }])}>
+              {t('shell.studio.connector.addNestedField')}
+            </Button>
+          </div>
+        </Flex>
+      </AxisFieldGroup>
+    </div>
   )
 }
