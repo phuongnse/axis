@@ -26,6 +26,7 @@ Each common job has one shared widget or helper:
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | A button                                       | `AxisButton` with a role, never Ant Design's `Button`                                                  |
 | A message on a page, a form or a dialog        | `AxisAlert` with a kind, which always shows the kind's icon, never Ant Design's `Alert`                |
+| A form's messages from a refused request       | `placeProblemErrors`                                                                                   |
 | A table                                        | `AxisTable`, never Ant Design's `Table`                                                                |
 | An empty table or list                         | `EmptyState`, never Ant Design's `Empty`                                                               |
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
@@ -42,6 +43,7 @@ Each common job has one shared widget or helper:
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
+| Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
 
 ## What the build checks
 

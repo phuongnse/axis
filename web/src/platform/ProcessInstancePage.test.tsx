@@ -679,6 +679,34 @@ describe('ProcessInstancePage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
+  it('shows a message on an undeclared output after the title, and keeps the dialog open', async () => {
+    stubApi({
+      detail: { status: 200, body: detailWithResolvable() },
+      resolve: {
+        status: 400,
+        body: JSON.stringify({
+          title: 'The request has errors.',
+          errors: { '/output/unknown': ['Not declared.'] },
+        }),
+      },
+    })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    await userEvent.click(within(dialog).getByLabelText('Succeeded'))
+    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: '12' } })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
+
+    expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
+      'The request has errors. Not declared.',
+    )
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
   it('shows the Resolve button only on a call the server marks resolvable', async () => {
     stubApi({ detail: { status: 200, body: detailWithResolvable() } })
 

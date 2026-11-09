@@ -15,7 +15,8 @@ export function unescapePointerSegment(segment: string): string {
   return segment.replaceAll('~1', '/').replaceAll('~0', '~')
 }
 
-function segmentsOf(pointer: string): string[] {
+/** The unescaped segments of a JSON Pointer, which is empty for the root pointer `""`. */
+export function pointerSegments(pointer: string): string[] {
   return pointer === '' ? [] : pointer.split('/').slice(1).map(unescapePointerSegment)
 }
 
@@ -71,7 +72,7 @@ export function diffPatch(before: unknown, after: unknown, path = ''): JsonPatch
 /** The value at a JSON Pointer, or `undefined` when nothing is there. */
 export function getAt(value: unknown, pointer: string): unknown {
   let current = value
-  for (const segment of segmentsOf(pointer)) {
+  for (const segment of pointerSegments(pointer)) {
     if (Array.isArray(current)) {
       current = current[Number(segment)]
     } else if (isObject(current)) {
@@ -88,7 +89,7 @@ export function getAt(value: unknown, pointer: string): unknown {
  * An `undefined` `next` deletes an object key and removes an array index.
  */
 export function setAt(value: unknown, pointer: string, next: unknown): unknown {
-  return setSegments(value, segmentsOf(pointer), next)
+  return setSegments(value, pointerSegments(pointer), next)
 }
 
 function setSegments(value: unknown, segments: string[], next: unknown): unknown {

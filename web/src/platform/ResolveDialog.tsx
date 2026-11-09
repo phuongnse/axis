@@ -1,6 +1,8 @@
-import { Alert, Flex, Form, Input, Modal, Radio, Select, type FormInstance } from 'antd'
+import { Alert, Flex, Form, Input, Modal, Radio, Select } from 'antd'
 import { useState } from 'react'
 import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
+import { placeProblemErrors } from './problemErrors'
+import type { RecordProblem } from './records'
 import { buildResolveBody } from './recordBody'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -23,19 +25,12 @@ interface ResolveValues {
 
 const reasonMaxLength = 500
 
-type FieldErrors = Parameters<FormInstance<ResolveValues>['setFields']>[0]
-
-/** The name an `/output/{name}` pointer holds: `~1` is `/` and `~0` is `~`, in that order. */
-function pointerName(token: string): string {
-  return token.replaceAll('~1', '/').replaceAll('~0', '~')
-}
-
 /**
  * The dialog that settles an `unknown` call. It asks for a reason and an outcome, and for `succeeded`
- * a value for each declared output, with the required ones marked. A `400` shows each message under
- * the field its pointer names, and the problem title in the dialog. Any other refusal shows its
- * title, and any other failure shows a generic text. The server checks everything, so the client
- * only blocks what it can see is missing.
+ * a value for each declared output, with the required ones marked. A `400` shows the messages of
+ * `/reason`, `/outcome` and each declared output under their fields, and any other message after the
+ * problem title in the dialog. Any other refusal shows its title, and any other failure shows a
+ * generic text. The server checks everything, so the client only blocks what it can see is missing.
  */
 export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClose, onChanged }: ResolveDialogProps) {
   const t = useText()
@@ -45,22 +40,22 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string>()
 
-  const showFieldErrors = (errors: Record<string, string[]>) => {
+  const showProblem = (problem: RecordProblem, chosen: ResolveValues['outcome']) => {
     const declared = new Set(outputs.map((output) => output.name))
-    const fields: FieldErrors = []
-    for (const [pointer, messages] of Object.entries(errors)) {
-      if (pointer === '/reason') {
-        fields.push({ name: 'reason', errors: messages })
-      } else if (pointer === '/outcome') {
-        fields.push({ name: 'outcome', errors: messages })
-      } else if (pointer.startsWith('/output/')) {
-        const name = pointerName(pointer.slice('/output/'.length))
-        if (declared.has(name)) {
-          fields.push({ name: ['output', name], errors: messages })
+    const placed = placeProblemErrors<'reason' | 'outcome' | ['output', string]>(
+      problem.errors,
+      ([head, name, ...rest]) => {
+        if (rest.length > 0) {
+          return null
         }
-      }
-    }
-    form.setFields(fields)
+        if (name === undefined) {
+          return head === 'reason' || head === 'outcome' ? head : null
+        }
+        return head === 'output' && chosen === 'succeeded' && declared.has(name) ? ['output', name] : null
+      },
+    )
+    form.setFields(placed.fields.map(({ field, messages }) => ({ name: field, errors: messages })))
+    setError([problem.title, ...placed.form].join(' '))
   }
 
   const send = async () => {
@@ -74,8 +69,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
         onClose()
         onChanged()
       } else {
-        setError(result.problem.title)
-        showFieldErrors(result.problem.errors)
+        showProblem(result.problem, values.outcome)
       }
     } catch (failure) {
       console.warn(`Resolving the call '${call.id}' of the instance '${instanceId}' failed`, failure)

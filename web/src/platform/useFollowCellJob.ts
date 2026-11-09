@@ -1,8 +1,5 @@
-import { useEffect, useRef } from 'react'
 import { fetchCellJob, type CellJob } from './cell'
-
-/** How long a view waits between two checks of a queued or running job. */
-const pollDelay = 2000
+import { useFollowJob } from './useFollowJob'
 
 /** What a view does with the job that it follows. */
 export interface FollowCellJobHandlers {
@@ -20,48 +17,26 @@ export interface FollowCellJobHandlers {
  * the reads, and a view stops following by giving `null` or by unmounting.
  */
 export function useFollowCellJob(jobId: string | null, handlers: FollowCellJobHandlers) {
-  // The reads use the newest handlers without restarting.
-  const latest = useRef(handlers)
-  useEffect(() => {
-    latest.current = handlers
+  useFollowJob(jobId, {
+    read: (signal) => fetchCellJob(jobId!, signal),
+    ends: (result) => result.kind !== 'ok' || (result.value.state !== 'queued' && result.value.state !== 'running'),
+    interval: 2000,
+    onAnswer: (result) => {
+      if (result.kind === 'ok') {
+        handlers.onJob(result.value)
+      }
+    },
+    onEnd: (result) => {
+      if (result.kind !== 'ok') {
+        handlers.onRefused(result.kind)
+        return
+      }
+      handlers.onJob(result.value)
+      handlers.onEnd(result.value)
+    },
+    onError: (error) => {
+      console.warn('Reading the cell job failed', error)
+      return 'retry'
+    },
   })
-
-  useEffect(() => {
-    if (!jobId) {
-      return
-    }
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    async function check(id: string) {
-      let next: CellJob | undefined
-      try {
-        const result = await fetchCellJob(id, controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        if (result.kind !== 'ok') {
-          latest.current.onRefused(result.kind)
-          return
-        }
-        next = result.value
-        latest.current.onJob(next)
-      } catch (error: unknown) {
-        if (controller.signal.aborted) {
-          return
-        }
-        console.warn('Reading the cell job failed', error)
-      }
-      // A failed read tries again, like a running job.
-      if (!next || next.state === 'queued' || next.state === 'running') {
-        timer = setTimeout(() => void check(id), pollDelay)
-      } else {
-        latest.current.onEnd(next)
-      }
-    }
-    void check(jobId)
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [jobId])
 }
