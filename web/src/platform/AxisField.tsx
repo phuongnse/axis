@@ -17,6 +17,8 @@ type FormFieldProps = {
   valuePropName?: FormItemProps['valuePropName']
   /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
   getValueFromEvent?: FormItemProps['getValueFromEvent']
+  /** Proposed: the answer of a check the screen runs while the person types, such as whether a subdomain is free. */
+  check?: FieldCheck
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -30,9 +32,19 @@ type OwnFieldProps = {
   rules?: never
   valuePropName?: never
   getValueFromEvent?: never
+  check?: never
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
+
+/**
+ * Proposed: the answer of a check that runs while the person types, shown under the input where an error shows. Running
+ * shows the input busy, `passed` and `refused` say what the check found, and `failed` says the check could not run. While a
+ * check is shown it takes the place of the field's own errors, so the screen gives none while the field is empty.
+ */
+export type FieldCheck = { state: 'running' | 'passed' | 'refused' | 'failed'; message: string }
+
+const checkStatus = { running: 'validating', passed: 'success', refused: 'error', failed: 'warning' } as const
 
 /** With a `name`, a field of an Ant Design form. Without one, a field the caller holds the value of. */
 export type AxisFieldProps = FormFieldProps | OwnFieldProps
@@ -92,6 +104,7 @@ function FormField({
   rules,
   valuePropName,
   getValueFromEvent,
+  check,
   children,
 }: FormFieldProps) {
   const { colour } = useDesignTokens()
@@ -102,6 +115,7 @@ function FormField({
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
       getValueFromEvent={getValueFromEvent}
+      {...(check === undefined ? {} : { validateStatus: checkStatus[check.state], help: check.message })}
       rules={[
         ...(requiredMessage === undefined
           ? []

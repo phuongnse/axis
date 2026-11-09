@@ -77,7 +77,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       ...(reducedMotion && { motion: false }),
     },
     components: {
-      Form: { colorError: colour.dangerText },
+      // Proposed: a form's warning message, such as a check that could not run, takes the text colour that passes contrast.
+      Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
       Input: errorBorder,
       InputNumber: errorBorder,
       Select: errorBorder,

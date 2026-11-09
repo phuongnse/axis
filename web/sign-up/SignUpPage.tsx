@@ -2,10 +2,11 @@ import { Checkbox, ConfigProvider, Form, Input, Select } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
+import { AxisField, type FieldCheck } from '../src/platform/AxisField'
 import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
+import { requiredMark } from '../src/platform/requiredMark'
 import { useText } from '../src/platform/texts'
-import { useDesignTokens } from '../src/platform/themeMode'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
 
@@ -42,14 +43,12 @@ export function SignUpPage({
   onLocaleChange: (locale: SignUpLocale) => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
   const [applications, setApplications] = useState<SignUpApplication[]>([])
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
-  const labelStyle = { fontWeight: 500, color: colour.textMuted }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -113,15 +112,15 @@ export function SignUpPage({
     : answer?.name === subdomain
       ? answer.status
       : { state: 'checking' }
-  const subdomainField = {
-    idle: {},
-    checking: { validateStatus: 'validating' as const, help: t('signUp.subdomain.checking') },
-    free: { validateStatus: 'success' as const, help: t('signUp.subdomain.free') },
+  const subdomainCheck: FieldCheck | undefined = {
+    idle: undefined,
+    checking: { state: 'running' as const, message: t('signUp.subdomain.checking') },
+    free: { state: 'passed' as const, message: t('signUp.subdomain.free') },
     refused: {
-      validateStatus: 'error' as const,
-      help: status.state === 'refused' ? t(`signUp.subdomain.${status.reason}`) : undefined,
+      state: 'refused' as const,
+      message: status.state === 'refused' ? t(`signUp.subdomain.${status.reason}`) : '',
     },
-    unavailable: { validateStatus: 'warning' as const, help: t('signUp.subdomain.unavailable') },
+    unavailable: { state: 'failed' as const, message: t('signUp.subdomain.unavailable') },
   }[status.state]
 
   return (
@@ -144,14 +143,36 @@ export function SignUpPage({
           />
         }
       >
-        <Form form={form} name="sign-up" layout="vertical" requiredMark={false} initialValues={{ language: locale }}>
-          <Form.Item name="fullName" label={<span style={labelStyle}>{t('signUp.fullName')}</span>}>
+        {/* Proposed: every field but the terms box is required, marked and helped, as every platform form's are. */}
+        <Form
+          form={form}
+          name="sign-up"
+          layout="vertical"
+          requiredMark={requiredMark}
+          initialValues={{ language: locale }}
+        >
+          <AxisField
+            name="fullName"
+            label={t('signUp.fullName')}
+            help={t('signUp.fullName.help')}
+            requiredMessage={t('signUp.fullName.required')}
+          >
             <Input autoComplete="name" />
-          </Form.Item>
-          <Form.Item name="email" label={<span style={labelStyle}>{t('signUp.email')}</span>}>
+          </AxisField>
+          <AxisField
+            name="email"
+            label={t('signUp.email')}
+            help={t('signUp.email.help')}
+            requiredMessage={t('signUp.email.required')}
+          >
             <Input type="email" autoComplete="email" />
-          </Form.Item>
-          <Form.Item name="businessName" label={<span style={labelStyle}>{t('signUp.businessName')}</span>}>
+          </AxisField>
+          <AxisField
+            name="businessName"
+            label={t('signUp.businessName')}
+            help={t('signUp.businessName.help')}
+            requiredMessage={t('signUp.businessName.required')}
+          >
             <Input
               autoComplete="organization"
               onChange={(event) => {
@@ -160,11 +181,13 @@ export function SignUpPage({
                 }
               }}
             />
-          </Form.Item>
-          <Form.Item
+          </AxisField>
+          <AxisField
             name="subdomain"
-            label={<span style={labelStyle}>{t('signUp.subdomain')}</span>}
-            {...subdomainField}
+            label={t('signUp.subdomain')}
+            help={t('signUp.subdomain.help')}
+            requiredMessage={t('signUp.subdomain.required')}
+            check={subdomainCheck}
           >
             <Input
               autoComplete="off"
@@ -173,23 +196,33 @@ export function SignUpPage({
                 subdomainEdited.current = true
               }}
             />
-          </Form.Item>
-          <Form.Item name="application" label={<span style={labelStyle}>{t('signUp.application')}</span>}>
+          </AxisField>
+          <AxisField
+            name="application"
+            label={t('signUp.application')}
+            help={t('signUp.application.help')}
+            requiredMessage={t('signUp.application.required')}
+          >
             <Select
               options={applications.map((application) => ({
                 value: application.id,
                 label: application.titles[locale],
               }))}
             />
-          </Form.Item>
-          <Form.Item name="language" label={<span style={labelStyle}>{t('signUp.language')}</span>}>
+          </AxisField>
+          <AxisField
+            name="language"
+            label={t('signUp.language')}
+            help={t('signUp.language.help')}
+            requiredMessage={t('signUp.language.required')}
+          >
             <Select
               options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
               onChange={() => {
                 languageEdited.current = true
               }}
             />
-          </Form.Item>
+          </AxisField>
           <Form.Item name="terms" valuePropName="checked" style={{ marginBottom: 0 }}>
             <Checkbox>{t('signUp.terms')}</Checkbox>
           </Form.Item>
