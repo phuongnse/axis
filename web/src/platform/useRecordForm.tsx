@@ -1,6 +1,7 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Col, Form, Input, Row, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { NotSet } from './EmptyValue'
@@ -198,6 +199,7 @@ export function useRecordForm(
   // The errors of each child collection's cells, keyed by collection, then by `<index>/<field>`.
   const [cellErrors, setCellErrors] = useState<Record<string, Record<string, string[]>>>({})
   const [formErrors, setFormErrors] = useState<string[]>([])
+  const formErrorRef = useRef<HTMLDivElement>(null)
   const asking = conditions !== undefined
   // The fields the user has changed or left.
   const [touched, setTouched] = useState<ReadonlySet<string>>(() => new Set())
@@ -643,6 +645,22 @@ export function useRecordForm(
 
   const fields = fieldsFor(null)
 
+  // The wrapper takes focus because Ant Design's Alert does not pass tabIndex through. See docs/reference/form-widget.md#saving.
+  const formError: ReactNode = formErrors.length > 0 && (
+    <div ref={formErrorRef} tabIndex={-1} data-testid="form-error">
+      <AxisAlert kind="error" message={formErrors.join(' ')} />
+    </div>
+  )
+
+  // Each refusal sets a new list of errors, so a repeated refusal scrolls and focuses again.
+  useEffect(() => {
+    if (formErrors.length === 0) {
+      return
+    }
+    formErrorRef.current?.scrollIntoView?.({ block: 'nearest' })
+    formErrorRef.current?.focus({ preventScroll: true })
+  }, [formErrors])
+
   // The newest body is read when the timer fires. A write in an effect keeps the render pure.
   useEffect(() => {
     draft.current = conditions
@@ -699,7 +717,7 @@ export function useRecordForm(
     version: snapshot.version,
     showProblem,
     clearErrors,
-    formErrors,
+    formError,
     setFormErrors,
   }
 }

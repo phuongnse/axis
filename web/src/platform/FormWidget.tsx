@@ -66,7 +66,8 @@ function FooterRow({ children }: { children: ReactNode }) {
  * a field it locks is read-only, and its messages show under the fields the user touched. Create and
  * update send the form's name in `?form=`, so the server enforces the form's `requiredWhen`. On a new
  * record the form fills each empty field the user has not touched from the answer's `defaults`, and
- * does not send a default the user leaves unchanged.
+ * does not send a default the user leaves unchanged. An error above the form scrolls into view and
+ * takes focus, see docs/reference/form-widget.md#saving.
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
@@ -307,10 +308,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         )}
         {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {started && <Alert data-testid="form-started" type="success" title={t('shell.form.processStarted')} />}
-        {form.formErrors.length > 0 && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />
-        )}
+        {form.formError}
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and saves on the last. */}
         <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>

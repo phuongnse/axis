@@ -407,6 +407,34 @@ describe('TaskPage', () => {
     expect(screen.getByTestId('location').textContent).toBe(`/e2e/tasks/${taskId}`)
   })
 
+  it('scrolls a finish error above the form into view and focuses it', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubTaskApi({
+        complete: {
+          status: 400,
+          body: {
+            title: 'One or more validation errors occurred.',
+            status: 400,
+            errors: { '/outcome': ["Must be one of the step's outcomes."] },
+          },
+        },
+      })
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+
+      const error = await screen.findByTestId('form-error')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+      expect(scrollIntoView.mock.contexts).toEqual([error])
+      expect(error).toHaveFocus()
+      expect(within(error).getByRole('alert')).toHaveTextContent("Must be one of the step's outcomes.")
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
   it('shows that the task is assigned to someone else when the read answers 403', async () => {
     stubTaskApi({ reads: [{ status: 403, body: { title: 'This task is assigned to someone else.', status: 403 } }] })
 
