@@ -10,7 +10,7 @@ from the pull requests that are waiting, of the twenty that GitHub Free runs at 
 a schedule did not work: GitHub dropped the schedules in this repository, so `main` went without CI.
 Still, `main` needs these runs: they find flaky tests, suites that a check skipped, and two pull
 requests that pass alone but break `main` together, see
-[D143](d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md).
+[D144](d144-branches-need-not-be-up-to-date.md).
 
 NexKit acts as a GitHub App, so its merges are pushes that start `push` workflows, and the runs it
 starts send `workflow_run` events, as a person's do. NexKit also checks and reviews a person's pull

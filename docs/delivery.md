@@ -90,9 +90,9 @@ that holds it.
   two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
   milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
   journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
-  mark. Autopilot's `max_parallel` setting runs one issue at a time, as
-  [D143](decisions/d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md) agrees, so
-  that the Claude usage limits last for one issue's work.
+  mark. Autopilot's `max_parallel` setting caps how many issues run at once, so that their agent
+  sessions fit in the Claude usage limits and their rounds of checks in the runner jobs. The owner
+  tunes it, as [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees.
 - **A second Claude subscription takes over at the usage limit,** as the fallback agent in
   `agents`, so NexKit pauses only when both are at their limit.
 - **A parent issue closes when its last part does,** with `close_parent_issues` on.
@@ -105,7 +105,7 @@ that holds it.
   hand-made pull request.
 - **NexKit resolves conflicts with `main` by itself,** with `conflicts.auto_resolve` on. The rules on
   `main` do not want a branch to be up to date, as
-  [D143](decisions/d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md) agrees, so a
+  [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees, so a
   pull request merges once its checks pass on its own branch, and a merge does not send the waiting
   pull requests through another round. Two pull requests that pass alone can break `main` together,
   and CI on `main` finds it. `conflicts.max_rounds` is raised above NexKit's default, so a pull

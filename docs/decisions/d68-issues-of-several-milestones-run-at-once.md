@@ -26,8 +26,8 @@ so ordering by milestone adds a wait that the marks do not need.
   what has to exist first. It compares the other planned milestones too, because the
   [roadmap](../roadmap.md#milestones) lets them change order.
 
-How many issues run at once is
-[D143](d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md)'s choice.
+How many issues run at once is autopilot's `max_parallel` setting, see
+[how issues run](../delivery.md#how-issues-run).
 
 ## Consequences
 
