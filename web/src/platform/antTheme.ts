@@ -25,8 +25,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   const errorBorder = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
   // Proposed: a field with a warning draws its border in the warning text colour, as its message is, for the same reason.
   const warningBorder = { colorWarning: colour.warningText, colorWarningBorderHover: colour.warningText }
-  // Proposed: the tick of a check that passed sits in the input, so the input gives it the success text colour.
-  const statusBorder = { ...errorBorder, ...warningBorder, colorSuccess: colour.successText }
+  const statusBorder = { ...errorBorder, ...warningBorder }
   return {
     algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
     token: {
@@ -81,9 +80,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       ...(reducedMotion && { motion: false }),
     },
     components: {
-      // Proposed: a form's warning message, such as a check that could not run, and the mark of a check that passed take
-      // the text colours that pass contrast.
-      Form: { colorError: colour.dangerText, colorWarning: colour.warningText, colorSuccess: colour.successText },
+      // Proposed: a form's warning message, such as a check that could not run, takes the text colour that passes contrast.
+      Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
       Input: statusBorder,
       InputNumber: statusBorder,
       Select: statusBorder,

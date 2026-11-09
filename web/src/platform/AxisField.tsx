@@ -40,13 +40,13 @@ type OwnFieldProps = {
 
 /**
  * Proposed: the answer of a check that runs while the person types. Running shows the input busy. A check that passed
- * marks the input with a tick and tells only a screen reader its message, since nothing needs doing. `refused` and
- * `failed`, a check that could not run, show their message under the input where an error shows. While a check is shown
- * it takes the place of the field's own errors, so the screen gives none while the field is empty.
+ * leaves the field as it is, since no error is all the person needs to see, and tells only a screen reader its message.
+ * `refused` and `failed`, a check that could not run, show their message under the input where an error shows. While a
+ * check is shown it takes the place of the field's own errors, so the screen gives none while the field is empty.
  */
 export type FieldCheck = { state: 'running' | 'passed' | 'refused' | 'failed'; message: string }
 
-const checkStatus = { running: 'validating', passed: 'success', refused: 'error', failed: 'warning' } as const
+const checkStatus = { running: 'validating', refused: 'error', failed: 'warning' } as const
 
 /** With a `name`, a field of an Ant Design form. Without one, a field the caller holds the value of. */
 export type AxisFieldProps = FormFieldProps | OwnFieldProps
@@ -120,7 +120,7 @@ function FormField({
       {...(check === undefined
         ? {}
         : check.state === 'passed'
-          ? { validateStatus: 'success' as const, hasFeedback: true }
+          ? {}
           : { validateStatus: checkStatus[check.state], help: check.message })}
       rules={[
         ...(requiredMessage === undefined
