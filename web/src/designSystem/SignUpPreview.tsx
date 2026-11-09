@@ -15,8 +15,11 @@ function typeInto(root: HTMLElement, id: string, value: string): boolean {
   return true
 }
 
-/** What a state fills in before it presses Sign up: nothing, or every field with this email. */
-export type SignUpSend = { email?: string }
+/**
+ * What a state fills in before it presses Sign up, nothing or every field with this email, and whether it then presses
+ * Send again.
+ */
+export type SignUpSend = { email?: string; resend?: boolean }
 
 /**
  * The sign-up page with its own two-language texts, as `web/sign-up/SignUpEntry.tsx` draws it. A state may type a
@@ -48,7 +51,14 @@ export function SignUpPreview({ businessName, send }: { businessName?: string; s
     }
     // After the subdomain's check and the documents have answered.
     const timer = setTimeout(() => root.querySelector<HTMLButtonElement>('button[type="submit"]')?.click(), 600)
-    return () => clearTimeout(timer)
+    // Once the inbox step shows, a state may press Send again.
+    const again = send.resend
+      ? setTimeout(() => root.querySelector<HTMLButtonElement>('#sign-up-resend')?.click(), 1200)
+      : undefined
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(again)
+    }
   }, [businessName, send])
   return (
     <div ref={wrapper}>

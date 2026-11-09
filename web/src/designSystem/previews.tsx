@@ -320,11 +320,24 @@ export const previews: Record<string, readonly PreviewState[]> = {
         ['Terms changed', signUpFixtures.termsChanged, 'lan.nguyen@anphat.vn'],
         ['Too many sign-ups', signUpFixtures.tooMany, 'lan.nguyen@anphat.vn'],
         ['Send failed', signUpFixtures.sendFailed, 'lan.nguyen@anphat.vn'],
+        ['Check your inbox', signUpFixtures.inbox, 'lan.nguyen@anphat.vn'],
       ] as const
     ).map(([caption, fixtures, email]) => ({
       caption,
       fixtures,
       draw: () => <SignUpPreview businessName={signUpBusinessName} send={{ email }} />,
+    })),
+    ...(
+      [
+        ['Sent again', signUpFixtures.resent],
+        ['Resend failed', signUpFixtures.resendFailed],
+      ] as const
+    ).map(([caption, fixtures]) => ({
+      caption,
+      fixtures,
+      draw: () => (
+        <SignUpPreview businessName={signUpBusinessName} send={{ email: 'lan.nguyen@anphat.vn', resend: true }} />
+      ),
     })),
   ].map((state) => ({ ...state, frameHeight: 850 })),
   identitySignIn: [

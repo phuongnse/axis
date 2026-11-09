@@ -7,6 +7,7 @@ import { suggestSubdomain } from '../../sign-up/suggestSubdomain'
 export const signUpBusinessName = 'An Phát Trading'
 
 const sendPath = '/api/sign-up'
+const resendPath = '/api/sign-up/resend'
 const applicationsPath = '/api/sign-up/applications'
 const documentsPath = '/api/sign-up/documents'
 const regionPath = '/api/sign-up/region'
@@ -40,6 +41,9 @@ const documents = () => ({
 const region = () => ({ tenantDomain: 'vn.example.com' })
 const problem = (status: number, errors: Record<string, string[]>) =>
   new Response(JSON.stringify({ errors }), { status, headers: { 'Content-Type': 'application/problem+json' } })
+// The same answer for a new email and for one that already had a trial.
+const accepted = () =>
+  new Response(JSON.stringify({ resend: 'r-7c1e' }), { status: 202, headers: { 'Content-Type': 'application/json' } })
 const free = () => ({ free: true, reason: null })
 const unavailable = () => new Response(null, { status: 503 })
 
@@ -73,4 +77,12 @@ export const signUpFixtures = {
       }),
   },
   sendFailed: { ...page, [subdomainPath]: free, [sendPath]: unavailable },
+  inbox: { ...page, [subdomainPath]: free, [sendPath]: accepted },
+  resent: {
+    ...page,
+    [subdomainPath]: free,
+    [sendPath]: accepted,
+    [resendPath]: () => new Response(null, { status: 202 }),
+  },
+  resendFailed: { ...page, [subdomainPath]: free, [sendPath]: accepted, [resendPath]: unavailable },
 } satisfies Record<string, Record<string, () => unknown>>

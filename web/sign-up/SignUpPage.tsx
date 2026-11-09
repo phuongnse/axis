@@ -1,4 +1,4 @@
-import { Alert, ConfigProvider, Form, Input, Select, Typography } from 'antd'
+import { Alert, ConfigProvider, Flex, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
@@ -14,7 +14,7 @@ import { useDesignTokens } from '../src/platform/themeMode'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
 
-/** Proposed: a built-in application the region offers to start from, with its title and description in each language. */
+/** Proposed: a built-in application the region offers to start from, with its title and description per language. */
 interface SignUpApplication {
   id: string
   titles: Record<SignUpLocale, string>
@@ -94,6 +94,11 @@ export function SignUpPage({
   const [sending, setSending] = useState(false)
   const [formError, setFormError] = useState<string>()
   const formErrorRef = useRef<HTMLDivElement>(null)
+  const [sent, setSent] = useState<{ email: string; resend: string }>()
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
+  const inboxRef = useRef<HTMLDivElement>(null)
+  // Whether the person came back from the inbox step to change the email, so the email field takes the focus.
+  const changingEmail = useRef(false)
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
   useEffect(() => {
@@ -203,6 +208,15 @@ export function SignUpPage({
   }[status.state]
 
   useEffect(() => {
+    if (sent) {
+      inboxRef.current?.focus()
+    } else if (changingEmail.current) {
+      changingEmail.current = false
+      form.scrollToField('email', { focus: true })
+    }
+  }, [form, sent])
+
+  useEffect(() => {
     if (formError !== undefined) {
       formErrorRef.current?.scrollIntoView({ block: 'center' })
       formErrorRef.current?.focus({ preventScroll: true })
@@ -239,6 +253,10 @@ export function SignUpPage({
         { promptSignInOnUnauthorized: false },
       )
       if (response.ok) {
+        // The answer is the same for a new email and for one that already had a trial, so the page tells neither.
+        const { resend } = (await response.json()) as { resend: string }
+        setSent({ email: values.email, resend })
+        setResendState('idle')
         return
       }
       const problem = ((await response.json().catch(() => ({}))) ?? {}) as SignUpProblem
@@ -282,10 +300,32 @@ export function SignUpPage({
     }
   }
 
+  // Proposed: Send again asks for the same email once more, which counts toward an address's three a day.
+  const resend = async () => {
+    if (!sent) {
+      return
+    }
+    setResendState('sending')
+    try {
+      const response = await apiFetch(
+        '/api/sign-up/resend',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resend: sent.resend }),
+        },
+        { promptSignInOnUnauthorized: false },
+      )
+      setResendState(response.ok ? 'sent' : 'failed')
+    } catch {
+      setResendState('failed')
+    }
+  }
+
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
       <CardPage
-        title={t('signUp.title')}
+        title={sent ? t('signUp.inbox.title') : t('signUp.title')}
         legal={{
           privacyUrl: documents?.privacy.urls[locale],
           termsUrl: documents?.terms.urls[locale],
@@ -305,130 +345,166 @@ export function SignUpPage({
           />
         }
       >
-        {/* Proposed: a refusal that names no field shows above the form, which scrolls to it and focuses it, so a person
-            who pressed Sign up at the foot of the long form sees it. */}
-        {formError !== undefined && (
-          <div ref={formErrorRef} tabIndex={-1} style={{ outline: 'none' }}>
-            <Alert type="error" title={formError} />
-          </div>
-        )}
-        {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
-        <Form
-          form={form}
-          name="sign-up"
-          layout="vertical"
-          requiredMark={requiredMark}
-          initialValues={{ language: locale, application: '' }}
-          scrollToFirstError={{ focus: true }}
-          onFinish={send}
-        >
-          <AxisField
-            name="fullName"
-            label={t('signUp.fullName')}
-            help={t('signUp.fullName.help')}
-            requiredMessage={t('signUp.fullName.required')}
-          >
-            <Input autoComplete="name" />
-          </AxisField>
-          <AxisField
-            name="email"
-            label={t('signUp.email')}
-            help={t('signUp.email.help')}
-            requiredMessage={t('signUp.email.required')}
-            rules={[{ type: 'email', message: t('signUp.email.invalid') }]}
-          >
-            <Input type="email" autoComplete="email" />
-          </AxisField>
-          <AxisField
-            name="businessName"
-            label={t('signUp.businessName')}
-            help={t('signUp.businessName.help')}
-            requiredMessage={t('signUp.businessName.required')}
-          >
-            <Input
-              autoComplete="organization"
-              onChange={(event) => {
-                if (!subdomainEdited.current) {
-                  form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
+        {sent ? (
+          // Proposed: after Sign up the card says where the email went, and offers to send it again or to change the
+          // email, which brings the form back as it was.
+          <Flex vertical gap={spacing.md} ref={inboxRef} tabIndex={-1} style={{ outline: 'none' }}>
+            <Typography.Paragraph style={{ margin: 0 }}>
+              {t('signUp.inbox.sent')
+                .split(/(\{email\})/)
+                .map((part, index) => (part === '{email}' ? <strong key={index}>{sent.email}</strong> : part))}
+            </Typography.Paragraph>
+            <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+              {t('signUp.inbox.notThere')}
+            </Typography.Paragraph>
+            <div role="status">
+              {resendState === 'sent' && (
+                <Typography.Text style={{ color: colour.successText }}>{t('signUp.inbox.resent')}</Typography.Text>
+              )}
+            </div>
+            {resendState === 'failed' && <Alert type="error" title={t('signUp.inbox.resendFailed')} />}
+            <AxisButton id="sign-up-resend" role="secondary" block loading={resendState === 'sending'} onClick={resend}>
+              {t('signUp.inbox.resend')}
+            </AxisButton>
+            <AxisButton
+              role="plain"
+              block
+              onClick={() => {
+                changingEmail.current = true
+                setSent(undefined)
+              }}
+            >
+              {t('signUp.inbox.changeEmail')}
+            </AxisButton>
+          </Flex>
+        ) : (
+          <>
+            {/* Proposed: a refusal that names no field shows above the form, which scrolls to it and focuses it, so a
+                person who pressed Sign up at the foot of the long form sees it. */}
+            {formError !== undefined && (
+              <div ref={formErrorRef} tabIndex={-1} style={{ outline: 'none' }}>
+                <Alert type="error" title={formError} />
+              </div>
+            )}
+            {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
+            <Form
+              form={form}
+              name="sign-up"
+              layout="vertical"
+              requiredMark={requiredMark}
+              initialValues={{ language: locale, application: '' }}
+              scrollToFirstError={{ focus: true }}
+              onFinish={send}
+            >
+              <AxisField
+                name="fullName"
+                label={t('signUp.fullName')}
+                help={t('signUp.fullName.help')}
+                requiredMessage={t('signUp.fullName.required')}
+              >
+                <Input autoComplete="name" />
+              </AxisField>
+              <AxisField
+                name="email"
+                label={t('signUp.email')}
+                help={t('signUp.email.help')}
+                requiredMessage={t('signUp.email.required')}
+                rules={[{ type: 'email', message: t('signUp.email.invalid') }]}
+              >
+                <Input type="email" autoComplete="email" />
+              </AxisField>
+              <AxisField
+                name="businessName"
+                label={t('signUp.businessName')}
+                help={t('signUp.businessName.help')}
+                requiredMessage={t('signUp.businessName.required')}
+              >
+                <Input
+                  autoComplete="organization"
+                  onChange={(event) => {
+                    if (!subdomainEdited.current) {
+                      form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
+                    }
+                  }}
+                />
+              </AxisField>
+              <AxisField
+                name="subdomain"
+                label={t('signUp.subdomain')}
+                help={t('signUp.subdomain.help')}
+                requiredMessage={t('signUp.subdomain.required')}
+                status={subdomainStatus}
+              >
+                {/* Proposed: the region's tenant domain ends the input, so the person reads their whole address. */}
+                <Input
+                  autoComplete="off"
+                  spellCheck={false}
+                  suffix={
+                    tenantDomain === undefined ? undefined : (
+                      <span style={{ color: colour.textMuted }}>.{tenantDomain}</span>
+                    )
+                  }
+                  onChange={() => {
+                    subdomainEdited.current = true
+                  }}
+                />
+              </AxisField>
+              <AxisField
+                name="language"
+                label={t('signUp.language')}
+                help={t('signUp.language.help')}
+                requiredMessage={t('signUp.language.required')}
+              >
+                <Select
+                  options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
+                  onChange={() => {
+                    languageEdited.current = true
+                  }}
+                />
+              </AxisField>
+              {/* Proposed: a person starts from Blank or a built-in application, as Studio's New application does. */}
+              <StartFromField
+                name="application"
+                texts={{
+                  label: t('signUp.startFrom'),
+                  help: t('signUp.startFrom.help'),
+                  blank: t('signUp.startFrom.blank'),
+                  failed: t('signUp.startFrom.failed'),
+                }}
+                applications={
+                  Array.isArray(applications)
+                    ? applications.map((application) => ({
+                        id: application.id,
+                        title: application.titles[locale],
+                        description: application.descriptions[locale],
+                      }))
+                    : applications
                 }
-              }}
-            />
-          </AxisField>
-          <AxisField
-            name="subdomain"
-            label={t('signUp.subdomain')}
-            help={t('signUp.subdomain.help')}
-            requiredMessage={t('signUp.subdomain.required')}
-            status={subdomainStatus}
-          >
-            {/* Proposed: the region's tenant domain ends the input, so the person reads their whole address. */}
-            <Input
-              autoComplete="off"
-              spellCheck={false}
-              suffix={
-                tenantDomain === undefined ? undefined : (
-                  <span style={{ color: colour.textMuted }}>.{tenantDomain}</span>
-                )
-              }
-              onChange={() => {
-                subdomainEdited.current = true
-              }}
-            />
-          </AxisField>
-          <AxisField
-            name="language"
-            label={t('signUp.language')}
-            help={t('signUp.language.help')}
-            requiredMessage={t('signUp.language.required')}
-          >
-            <Select
-              options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
-              onChange={() => {
-                languageEdited.current = true
-              }}
-            />
-          </AxisField>
-          {/* Proposed: a person starts from Blank or a built-in application, as Studio's New application offers. */}
-          <StartFromField
-            name="application"
-            texts={{
-              label: t('signUp.startFrom'),
-              help: t('signUp.startFrom.help'),
-              blank: t('signUp.startFrom.blank'),
-              failed: t('signUp.startFrom.failed'),
-            }}
-            applications={
-              Array.isArray(applications)
-                ? applications.map((application) => ({
-                    id: application.id,
-                    title: application.titles[locale],
-                    description: application.descriptions[locale],
-                  }))
-                : applications
-            }
-          />
-          {/* Proposed: the business accepts its two agreements; the privacy policy is told, not accepted. */}
-          <AcceptTermsField
-            name="terms"
-            label={t('signUp.terms')}
-            links={{
-              terms: { label: t('signUp.terms.termsOfService'), href: documents?.terms.urls[locale] },
-              dpa: { label: t('signUp.terms.dpa'), href: documents?.dpa.urls[locale] },
-            }}
-            requiredMessage={t('signUp.terms.required')}
-          />
-          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
-            <TextWithLinks
-              text={t('signUp.privacyNotice')}
-              links={{
-                privacy: { label: t('signUp.privacyNotice.privacyPolicy'), href: documents?.privacy.urls[locale] },
-              }}
-            />
-          </Typography.Paragraph>
-          <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
-            {t('signUp.send')}
-          </AxisButton>
-        </Form>
+              />
+              {/* Proposed: the business accepts its two agreements; the privacy policy is told, not accepted. */}
+              <AcceptTermsField
+                name="terms"
+                label={t('signUp.terms')}
+                links={{
+                  terms: { label: t('signUp.terms.termsOfService'), href: documents?.terms.urls[locale] },
+                  dpa: { label: t('signUp.terms.dpa'), href: documents?.dpa.urls[locale] },
+                }}
+                requiredMessage={t('signUp.terms.required')}
+              />
+              <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+                <TextWithLinks
+                  text={t('signUp.privacyNotice')}
+                  links={{
+                    privacy: { label: t('signUp.privacyNotice.privacyPolicy'), href: documents?.privacy.urls[locale] },
+                  }}
+                />
+              </Typography.Paragraph>
+              <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
+                {t('signUp.send')}
+              </AxisButton>
+            </Form>
+          </>
+        )}
       </CardPage>
     </ConfigProvider>
   )
