@@ -345,11 +345,16 @@ change, a design review and a sync are in the
   artifact holds its change and its last change note names the issue. A review does not change the
   artifact: it is published once the review's issues are merged, so nothing else in the artifact
   differs from the repository.
-- **A review's agreed rules are comments on its design issue.** The session writes each rule the owner
-  agrees as its own English comment. The comment names the doc page where the rule lives and any API
-  contract the screen needs. A changed rule is a new comment that links the one it replaces. The issue
-  also holds the review's state and what the build must do beyond the docs. There is no docs branch,
-  and no other file holds these rules.
+- **A review's agreed rules are comments on its design issue.** The design issue stays short enough to
+  read in one pass. Its body holds the review's scope and what the build must do beyond the docs,
+  because NexKit plans from the body. One comment holds the review's state: the prototype branch, what
+  is done, what waits for the owner and what comes next. The session edits that comment in place and
+  never adds a second. The rules the owner agrees about one screen, or in one step of the review, share
+  one English comment. Each rule has its own bold heading, the doc page where it lives, any API contract
+  the screen needs and the prototype commit, so NexKit finds each rule. A later rule about the same
+  screen is added to that comment by an edit. A rule that changes while the issue has `on-hold` is
+  edited in its comment. NexKit reads the issue only once the label comes off, and GitHub keeps each
+  comment's edit history. There is no docs branch, and no other file holds these rules.
 - **A review ends when the design issue's `on-hold` label comes off.** Before that, the session tags the
   prototype and comments the tag on each issue that waits for the design issue. A screen that is already
   built has no such issue, so the session first writes one build issue *blocked by* the design issue.
