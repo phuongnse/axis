@@ -250,6 +250,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     {
+      // Proposed: the account menu holds the legal line, as a page with a sidebar has no footer.
+      caption: 'Account menu',
+      draw: () => (
+        <ClickOnMount selector='[data-testid="user-menu"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/sample/requests',
+      frameHeight: 600,
+    },
+    {
       caption: 'Language and theme',
       draw: () => (
         <ClickOnMount selector='button[aria-label="Language and theme"]'>

@@ -774,6 +774,8 @@ export const currentUser: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  // Proposed: Ask AI shows in Studio, see the review on #3263.
+  studioAi: true,
   console: true,
   users: true,
   tenantStatus: 'active',

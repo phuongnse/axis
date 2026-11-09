@@ -148,7 +148,7 @@ export function StudioAskAi({
               )}
             </AxisActionRow>
           </Form>
-          <Typography.Text strong style={{ marginTop: spacing.xs }}>
+          <Typography.Text strong style={{ display: 'block', marginTop: spacing.md }}>
             {t('shell.studio.ai.requests')}
           </Typography.Text>
         </>
@@ -218,8 +218,8 @@ function RequestRow({
     <li
       aria-current={open ? 'page' : undefined}
       style={{
-        padding: `${spacing.xs / 2}px ${spacing.sm}px`,
-        marginInline: -spacing.sm,
+        padding: `${spacing.xs / 2}px ${spacing.md}px`,
+        marginInline: -spacing.md,
         background: open ? selectedItemTint(mode) : undefined,
       }}
     >

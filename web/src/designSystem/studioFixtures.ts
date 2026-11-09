@@ -337,7 +337,6 @@ const aiRequests: StudioAuthoringRequest[] = [
 function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, () => unknown> {
   return {
     ...workspaceRoutes(typicalFolder),
-    '/api/me': () => ({ ...currentUser, studioPublisher: true, studioAi: true }),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
     [`${folderPath}/authoring-requests`]: () => list,
   }

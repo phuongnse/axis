@@ -1,6 +1,6 @@
 import { Layout } from 'antd'
-import { useEffect, useState } from 'react'
-import { fetchAboutVersion } from './about'
+import { useState } from 'react'
+import { useAboutVersion } from './about'
 import { LegalLine } from './LegalLine'
 import type { SiteLegal } from './site'
 import { useText } from './texts'
@@ -15,18 +15,7 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
   const { colour, spacing } = useDesignTokens()
   const t = useText()
   const [year] = useState(() => new Date().getFullYear())
-  // `null` when nobody is signed in, `undefined` while it loads or when loading failed.
-  const [version, setVersion] = useState<string | null | undefined>(undefined)
-
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchAboutVersion(controller.signal).then(setVersion, (error: unknown) => {
-      if (!controller.signal.aborted) {
-        console.warn('Loading the server version failed', error)
-      }
-    })
-    return () => controller.abort()
-  }, [])
+  const version = useAboutVersion()
 
   const copyright = `© ${year} Axis`
 

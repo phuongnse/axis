@@ -12,6 +12,7 @@ import { PreferencesMenu } from './PreferencesMenu'
 import { sizeTokens } from './designTokens'
 import { ShellFooter } from './ShellFooter'
 import { ShellNavigation } from './ShellNavigation'
+import { ShellAsideContext } from './shellAside'
 import { ShellSidebarContext } from './shellSidebarContext'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem, SiteLegal } from './site'
@@ -66,8 +67,9 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
- * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
+ * Proposed: a page without a sidebar has a footer across the bottom, with the copyright at the start and the legal
+ * links at the end. A page with a sidebar has none, so the sidebar and a side panel reach the bottom of the window, and
+ * the account menu holds the legal line. A page can open a side panel in a right column with `ShellAside`.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
@@ -105,6 +107,14 @@ export function Shell({
     return () => setClaims((count) => count - 1)
   }, [])
   const claimed = claims > 0
+  // Proposed: a page claims the right column by rendering ShellAside, which draws its side panel into `asideTarget`.
+  const [asideClaims, setAsideClaims] = useState(0)
+  const [asideTarget, setAsideTarget] = useState<HTMLElement | null>(null)
+  const claimAside = useCallback(() => {
+    setAsideClaims((count) => count + 1)
+    return () => setAsideClaims((count) => count - 1)
+  }, [])
+  const asideContext = useMemo(() => ({ target: asideTarget, claim: claimAside }), [asideTarget, claimAside])
   const sidebarContext = useMemo(
     () => ({ target, collapsed: collapsed && !narrow, claim }),
     [target, collapsed, narrow, claim],
@@ -201,7 +211,7 @@ export function Shell({
                 {bell}
                 {!hasAccount && <AppSwitcher locale={locale} />}
                 {preferences}
-                {hasAccount ? account : <UserMenu />}
+                {hasAccount ? account : <UserMenu legal={legal} />}
               </Flex>
             )}
           </Layout.Header>
@@ -248,11 +258,35 @@ export function Shell({
             <Layout>
               {!hasAccount && <ReadOnlyBanner />}
               <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
-                <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
+                <ShellSidebarContext.Provider value={sidebarContext}>
+                  <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
+                </ShellSidebarContext.Provider>
               </Layout.Content>
-              {sidebar && <ShellFooter legal={legal} />}
             </Layout>
+            {asideClaims > 0 && (
+              // Proposed: the right column, as tall as the page, with its side panel under the header to the window's bottom.
+              <div
+                style={{
+                  flex: 'none',
+                  width: sizeTokens.sidePanel,
+                  background: colour.surface,
+                  borderInlineStart: `1px solid ${colour.borderSubtle}`,
+                }}
+              >
+                <div
+                  ref={setAsideTarget}
+                  style={{
+                    position: 'sticky',
+                    top: headerHeight,
+                    height: `calc(100vh - ${headerHeight}px)`,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                />
+              </div>
+            )}
           </Layout>
+          {/* Proposed: a page with a sidebar has no footer; the legal line is in the account menu. */}
           {!sidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>

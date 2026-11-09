@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
 
 /**
@@ -13,4 +14,19 @@ export async function fetchAboutVersion(signal?: AbortSignal): Promise<string | 
     throw new Error(`Loading the server version failed with status ${response.status}.`)
   }
   return ((await response.json()) as { version: string }).version
+}
+
+/** The server's version for a signed-in person, `null` for nobody signed in, `undefined` while it loads or after it failed. */
+export function useAboutVersion(): string | null | undefined {
+  const [version, setVersion] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchAboutVersion(controller.signal).then(setVersion, (error: unknown) => {
+      if (!controller.signal.aborted) {
+        console.warn('Loading the server version failed', error)
+      }
+    })
+    return () => controller.abort()
+  }, [])
+  return version
 }
