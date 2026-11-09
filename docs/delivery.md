@@ -36,9 +36,9 @@ Four actors take part in the work, and each has its own part.
   what the owner alone can decide.
 - **The docs audit** is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs,
-  the skills and AGENTS.md against the code every hundred merges and opens a NexKit issue for each group
+  the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
   of findings that no open issue covers, code and test fixes first and at most ten a run, as
-  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees and the
+  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees and the
   skill says. It changes no file itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
@@ -142,7 +142,7 @@ that holds it.
 - **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
   merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
   [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) and
-  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agree.
+  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agree.
   None of them runs on a push to `main` or has a schedule of its own for this, so a merge does not
   start them too, and without the setting nothing would test `main`. CI also runs on demand, and on a
   pull request that changes its own workflow file. No push to another branch starts it, because
@@ -163,7 +163,7 @@ that holds it.
   one each. A check round then takes about as long as its slowest job, instead of all of them in a
   row. A check gets a job of its own when sharing one made that job the slowest, and the integration
   and E2E suites are split into shards because one job for either came close to the check's
-  30-minute limit. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
+  `timeout_minutes`. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
   NexKit matches a failed check with the CI job that failed on `main`.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.

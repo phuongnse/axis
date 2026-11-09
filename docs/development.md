@@ -372,11 +372,11 @@ change since NexKit's commit can affect.
 
 ### Shards
 
-NexKit's checks split the E2E and integration tests into three shards each, `e2e-1` to `e2e-3` and
-`integration-1` to `integration-3`, as [D97](decisions/d97-reliable-test-runs.md) says, and
-[CI on main](delivery.md#ci-on-main) runs those checks as its jobs. The whole integration suite in one
-job came close to the check's 30-minute limit. The smoke tests run in a job of their own, so the shards
-hold only their own tests.
+NexKit's checks split the E2E and integration tests into shards, one check each, such as `e2e-1` and
+`integration-1`, as [D97](decisions/d97-reliable-test-runs.md) says, and
+[CI on main](delivery.md#ci-on-main) runs those checks as its jobs. `.nexkit/config.json` holds the
+checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
+The smoke tests run in a job of their own, so the shards hold only their own tests.
 
 - **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not

@@ -19,8 +19,9 @@ often. A decision for each value made every change of a setting a change of deci
   the waiting pull requests through another round. NexKit resolves conflicts with `main` by itself,
   with `conflicts.auto_resolve` on.
 - **How many issues run at once is a setting, not a decision.** Autopilot's `max_parallel` holds it,
-  and the owner changes it with a hand-made pull request to `.nexkit/config.json` alone. The docs name
-  the setting and why it exists, never its value.
+  and the owner changes it with a hand-made pull request to `.nexkit/config.json` alone, as
+  [D145](d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees for every NexKit
+  setting.
 
 ## Consequences
 

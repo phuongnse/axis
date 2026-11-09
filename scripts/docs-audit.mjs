@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// The docs audit of D135, in three commands that the docs-audit workflow runs:
+// The docs audit of D145, in three commands that the docs-audit workflow runs:
 //
 //   node scripts/docs-audit.mjs pages <run>        prints this run's pages, one per line
 //   node scripts/docs-audit.mjs read <run>         asks Claude Code once per group of about eight pages, at most
@@ -108,7 +108,7 @@ function body(text, group, key, runId, criteria) {
     text,
     '',
     `Found by the [docs audit](${repository}/blob/main/.claude/skills/axis-docs-audit/SKILL.md) of ` +
-      `[D135](${repository}/blob/main/docs/decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md), ` +
+      `[D145](${repository}/blob/main/docs/decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md), ` +
       `run [${runId}](${repository}/actions/runs/${runId}).`,
     '',
     '## Acceptance criteria',

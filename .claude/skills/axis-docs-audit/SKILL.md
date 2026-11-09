@@ -1,12 +1,12 @@
 ---
 name: axis-docs-audit
-description: How the docs audit reads Axis's docs, skills and AGENTS.md against the code. The docs-audit.yml workflow follows it every hundred merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for the hourly driver, which uses axis-nexkit-routine, and not for agents inside the NexKit pipeline.
+description: How the docs audit reads Axis's docs, skills and AGENTS.md against the code. The docs-audit.yml workflow follows it every few merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for the hourly driver, which uses axis-nexkit-routine, and not for agents inside the NexKit pipeline.
 ---
 
 # Axis's docs audit
 
 The rules are in [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct)
-and [D135](../../../docs/decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md).
+and [D145](../../../docs/decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md).
 This skill says how to read a page. The audit changes no file.
 
 ## A run of the workflow

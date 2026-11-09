@@ -1,4 +1,4 @@
-# D135. Docs stay true, and an audit reads them every hundred merges
+# D145. Docs stay true, and an audit reads them every few merges
 
 Status: **Agreed**
 
@@ -15,12 +15,16 @@ the existing rules did not stop:
 - **Statements nobody checked,** such as a feature described as offered that no code offers, or a
   decision that promised what nothing builds.
 
+A fourth kind came from NexKit's settings. Their values were copied into the docs and the decisions,
+such as how many issues run at once and how many merges the audit waits. The owner tunes those
+settings, so each change made the docs false, or needed a new decision when a decision held the value.
+
 Sweeping every doc in every pull request would cost much and miss much. The checks have to sit where
 each kind of drift starts, and the audit should run as the repository's other checks of `main` run.
 
 ## Decision
 
-Three layers, each closing one kind of drift. The rules are in
+Three layers, each closing one kind of drift, and one rule for NexKit's settings. The rules are in
 [how the docs stay correct](../writing-docs.md#how-the-docs-stay-correct).
 
 - **Every pull request states its docs.** Its plan and its description name the doc sections it
@@ -31,9 +35,12 @@ Three layers, each closing one kind of drift. The rules are in
   routes, commands, codes, kinds, environment variables, metrics or anything else the code defines has
   a test that compares the list with the code each time it runs. Without one, the doc names the file
   that holds the list instead.
-- **An audit reads the docs against the code every hundred merges.** A workflow, which NexKit starts
-  on `main` once every 100 of its merges as it starts CodeQL and the performance tests, reads a quarter
-  of the pages in turn, so every page is read about once in four hundred merges. Its first job runs
+- **A doc names a NexKit setting, never its value.** The docs, the decisions and the skills say which
+  setting does a job and why it is set as it is. The value lives in `.nexkit/config.json` alone, so
+  the owner tunes it there with no change to the docs or the decisions.
+- **An audit reads the docs against the code every few merges.** A workflow, which NexKit starts on
+  `main` with its `merge.after_workflows` setting as it starts CodeQL and the performance tests, reads
+  a quarter of the pages in turn, so every page is read once in four runs. Its first job runs
   Claude Code with read-only tools and no GitHub token and prints the findings. Its second job runs no
   model and opens a NexKit issue for each group of findings that no open issue covers: a docs fix for
   a statement the code contradicts, and a code fix for an agreed rule the code does not follow. NexKit
@@ -45,9 +52,10 @@ Three layers, each closing one kind of drift. The rules are in
   before it merges.
 - A test reads both sides every run, so it never holds a copy of the values that could go stale.
 - A list that nobody tests is not written, so the docs link the code a little more often.
-- Drift that slips past both is found within about four hundred merges, which is about a week at the
-  current pace, and the milestone docs sweep is the last check before a milestone closes. The audit
-  runs more often when more merges, which is when the docs drift most.
+- Drift that slips past both is found within four runs of the audit, and the milestone docs sweep is
+  the last check before a milestone closes. The audit runs more often when more merges, which is when
+  the docs drift most.
+- A change of a NexKit setting is a change to `.nexkit/config.json` alone.
 - A page that tries to steer the model reaches nothing that can write: the model reads, and a job
   with no model writes.
 - The audit's runs show on the repository's Actions, and its issues add to NexKit's queue.
