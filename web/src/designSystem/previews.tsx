@@ -272,7 +272,25 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
     { caption: 'Long names', fixtures: studioFixtures.longNames, entry: `/studio?app=${application}` },
     { caption: 'Access denied', fixtures: studioFixtures.accessDenied, entry: '/studio' },
-  ].map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 })),
+  ]
+    .map((state) => ({ ...state, draw: () => <ShellPreview />, frameHeight: 640 }))
+    .concat(
+      // Proposed: the request panel, opened from Ask AI on the band.
+      [
+        { caption: 'Ask AI', fixtures: studioFixtures.askAi },
+        { caption: 'Ask AI, first request', fixtures: studioFixtures.askAiFirst },
+        { caption: 'Ask AI, none left', fixtures: studioFixtures.askAiNoneLeft },
+      ].map((state) => ({
+        ...state,
+        entry: `/studio?app=${application}`,
+        draw: () => (
+          <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
+            <ShellPreview />
+          </ClickOnMount>
+        ),
+        frameHeight: 900,
+      })),
+    ),
   signIn: [
     {
       caption: 'Sign-in refused',

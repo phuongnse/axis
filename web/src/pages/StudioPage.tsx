@@ -46,6 +46,7 @@ import { StudioOverview } from './StudioOverview'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
+import { StudioAskAi } from './StudioAskAi'
 import { StudioProblems } from './StudioProblems'
 import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -243,6 +244,7 @@ function StudioWorkspace() {
   const releaseNumber = params.get('release')
   const releasePage = releaseView && releaseNumber !== null
   const historyView = params.get('view') === 'history'
+  const requestsView = params.get('view') === 'requests'
   const revisionId = params.get('revision')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
@@ -256,7 +258,11 @@ function StudioWorkspace() {
   const [manifestReload, setManifestReload] = useState(0)
   const publishing = useRef<StudioPublishingHandle>(null)
   const editor = useRef<StudioEditorHandle>(null)
-  const [problemsOpen, setProblemsOpen] = useState(false)
+  // Proposed: one side panel at a time, the Problems panel or the request panel.
+  const [sidePanel, setSidePanel] = useState<'problems' | 'askAi' | null>(null)
+  const [askAi, setAskAi] = useState(false)
+  const [mcpServer, setMcpServer] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const [requestBusy, setRequestBusy] = useState(false)
 
   useEffect(() => {
@@ -267,6 +273,9 @@ function StudioWorkspace() {
         setCanCreate(user?.studioCreate === true)
         setCanTest(user?.studioTest === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
+        setAskAi(user?.studioAi === true)
+        setMcpServer(user?.studioMcpServer ?? null)
+        setUserId(user?.id ?? null)
       },
       () => {
         if (!controller.signal.aborted) {
@@ -564,16 +573,34 @@ function StudioWorkspace() {
             sites={resources.filter((item) => item.kind === 'site')}
             folderRevision={folderRevision}
             diagnostics={loaded.diagnostics}
-            problemsOpen={problemsOpen}
-            onToggleProblems={() => setProblemsOpen((open) => !open)}
+            problemsOpen={sidePanel === 'problems'}
+            onToggleProblems={() => setSidePanel((open) => (open === 'problems' ? null : 'problems'))}
             newResource={<StudioNewResource application={application!} resources={resources} onCreated={onCreated} />}
-            problems={
-              problemsOpen && (
-                <StudioProblems
-                  diagnostics={loaded.diagnostics}
-                  onSelect={selectDiagnostic}
-                  onClose={() => setProblemsOpen(false)}
+            askAi={
+              askAi
+                ? {
+                    open: sidePanel === 'askAi',
+                    onToggle: () => setSidePanel((open) => (open === 'askAi' ? null : 'askAi')),
+                  }
+                : null
+            }
+            sidePanel={
+              sidePanel === 'askAi' ? (
+                <StudioAskAi
+                  application={application!}
+                  userId={userId}
+                  openRequest={requestsView ? params.get('request') : null}
+                  mcpServer={mcpServer}
+                  onClose={() => setSidePanel(null)}
                 />
+              ) : (
+                sidePanel === 'problems' && (
+                  <StudioProblems
+                    diagnostics={loaded.diagnostics}
+                    onSelect={selectDiagnostic}
+                    onClose={() => setSidePanel(null)}
+                  />
+                )
               )
             }
             releasesView={releasesView}

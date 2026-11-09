@@ -1,17 +1,12 @@
-import { CloseOutlined } from '@ant-design/icons'
 import { Button, Flex, Tag, Typography } from 'antd'
-import { AxisButton } from '../platform/AxisButton'
 import type { StudioDiagnostic } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { problemsPanelId } from './StudioBand'
-
-/** The width of the Problems panel in px. */
-const panelWidth = 320
+import { StudioSidePanel } from './StudioSidePanel'
 
 /**
- * The Problems panel of the open application: a column beside the page, under the header and the band, that is not
- * modal. It lists every error, then every warning, each with its code, message, file and path. A problem that names a
+ * The Problems panel of the open application, in the shared `StudioSidePanel`. It lists every error, then every warning, each with its code, message, file and path. A problem that names a
  * resource is a button, and `onSelect` opens that resource at the problem's path while the panel stays open.
  * `onClose` runs from the close button. With no problem, it says so.
  */
@@ -25,57 +20,33 @@ export function StudioProblems({
   onClose: () => void
 }) {
   const t = useText()
-  const { colour, size, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const ordered = [
     ...diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
     ...diagnostics.filter((diagnostic) => diagnostic.severity !== 'error'),
   ]
-  const top = size.bar * 2 + spacing.md
 
   return (
-    <aside
+    <StudioSidePanel
       id={problemsPanelId}
-      data-testid="studio-diagnostics"
-      aria-label={t('shell.studio.problems.title')}
-      style={{
-        position: 'sticky',
-        top,
-        alignSelf: 'flex-start',
-        flex: 'none',
-        width: panelWidth,
-        maxHeight: `calc(100vh - ${top + spacing.md}px)`,
-        overflowY: 'auto',
-        padding: spacing.sm,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-      }}
+      title={t('shell.studio.problems.title')}
+      closeKey="shell.studio.problems.close"
+      onClose={onClose}
+      testId="studio-diagnostics"
+      closeTestId="studio-problems-close"
     >
-      <Flex vertical gap="small">
-        <Flex justify="space-between" align="center">
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            {t('shell.studio.problems.title')}
-          </Typography.Title>
-          <AxisButton
-            role="icon"
-            nameKey="shell.studio.problems.close"
-            icon={<CloseOutlined />}
-            data-testid="studio-problems-close"
-            onClick={onClose}
-          />
-        </Flex>
-        {ordered.length === 0 ? (
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.problems.none')}</Typography.Text>
-        ) : (
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {ordered.map((diagnostic, index) => (
-              <li key={index}>
-                <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Flex>
-    </aside>
+      {ordered.length === 0 ? (
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.problems.none')}</Typography.Text>
+      ) : (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {ordered.map((diagnostic, index) => (
+            <li key={index}>
+              <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </StudioSidePanel>
   )
 }
 

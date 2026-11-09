@@ -1,5 +1,7 @@
 import type {
   StudioApplication,
+  StudioAuthoringRequest,
+  StudioAuthoringRequestList,
   StudioBindings,
   StudioCatalog,
   StudioDiagnostic,
@@ -9,7 +11,7 @@ import type {
   StudioResource,
   StudioResourceItem,
 } from '../platform/studio'
-import { application, locale } from './fixtures'
+import { application, currentUser, locale } from './fixtures'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -271,6 +273,82 @@ const longFolder: Folder = {
   ],
 }
 
+// Proposed: the request panel's answers. The signed-in author is `currentUser`; another author sent some requests.
+const otherAuthor = '8a2b0c1d-4e5f-4a6b-9c7d-0e1f2a3b4c5d'
+
+function authoringRequest(
+  number: number,
+  state: StudioAuthoringRequest['state'],
+  text: string,
+  sentAt: string,
+  mine: boolean,
+): StudioAuthoringRequest {
+  return {
+    id: `a1e00000-0000-4000-8000-${number.toString(16).padStart(12, '0')}`,
+    application,
+    author: mine ? currentUser.id : otherAuthor,
+    authorName: mine ? currentUser.displayName : 'Linh Tran',
+    text,
+    state,
+    plan: null,
+    round: state === 'fixing' ? 2 : 1,
+    tokens: 0,
+    autoAccept: false,
+    sentAt,
+    approvedAt: null,
+    finishedAt: null,
+  }
+}
+
+const aiRequests: StudioAuthoringRequest[] = [
+  authoringRequest(
+    6,
+    'awaitingApproval',
+    'Add a Supplier field to the purchase request, chosen from the suppliers, and show it on the request list.',
+    '2026-11-09T08:40:00Z',
+    true,
+  ),
+  authoringRequest(
+    5,
+    'checking',
+    'When a request is over 50 million VND, it also needs the finance manager to approve it.',
+    '2026-11-09T07:55:00Z',
+    false,
+  ),
+  authoringRequest(
+    4,
+    'ready',
+    'Send the requester an email when their request is approved or rejected.',
+    '2026-11-08T16:20:00Z',
+    true,
+  ),
+  authoringRequest(3, 'accepted', 'Rename the Category field to Spending category.', '2026-11-07T10:05:00Z', false),
+  authoringRequest(
+    2,
+    'failed',
+    'Import the suppliers from the purchasing system every night and mark the ones that were removed there.',
+    '2026-11-06T14:30:00Z',
+    true,
+  ),
+  authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
+]
+
+const mcpServer = 'https://acme.axis.example/mcp'
+
+/** The routes of the open application with Ask AI on, its requests, whether it allows auto-accept, and the MCP address. */
+function askAiRoutes(
+  list: StudioAuthoringRequestList,
+  autoAccept: boolean,
+  mcp: string | null,
+): Record<string, () => unknown> {
+  return {
+    ...workspaceRoutes(typicalFolder),
+    '/api/me': () => ({ ...currentUser, studioPublisher: true, studioAi: true, studioMcpServer: mcp }),
+    [`${folderPath}/settings`]: () => ({ autoAccept }),
+    [`${folderPath}/authoring-requests`]: () => list,
+  }
+}
+
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
 export const studioFixtures = {
   typical: workspaceRoutes(typicalFolder),
@@ -280,4 +358,7 @@ export const studioFixtures = {
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
+  askAi: askAiRoutes({ items: aiRequests, left: 12 }, true, mcpServer),
+  askAiFirst: askAiRoutes({ items: [], left: null }, false, null),
+  askAiNoneLeft: askAiRoutes({ items: aiRequests.slice(0, 3), left: 0 }, false, mcpServer),
 } satisfies Record<string, Record<string, () => unknown>>

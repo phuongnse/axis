@@ -1661,3 +1661,77 @@ export function moduleResources(names: StudioNames | null, search: string, local
 function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
+
+/** The states of an authoring request, see docs/reference/authoring-requests.md#states. */
+export type StudioAuthoringRequestState =
+  | 'planning'
+  | 'awaitingApproval'
+  | 'working'
+  | 'checking'
+  | 'reviewing'
+  | 'fixing'
+  | 'ready'
+  | 'accepted'
+  | 'dropped'
+  | 'failed'
+
+/** An authoring request as the routes answer it, see docs/reference/authoring-requests.md#routes. */
+export interface StudioAuthoringRequest {
+  id: string
+  application: string
+  author: string
+  authorName: string | null
+  text: string
+  state: StudioAuthoringRequestState
+  plan: string | null
+  round: number
+  tokens: number
+  autoAccept: boolean
+  sentAt: string
+  approvedAt: string | null
+  finishedAt: string | null
+}
+
+/**
+ * Proposed: the list route also answers `left`, the requests the tenant may still send this month, or `null` when the
+ * tenant has no `authoringRequests` quota.
+ */
+export interface StudioAuthoringRequestList {
+  items: StudioAuthoringRequest[]
+  left: number | null
+}
+
+/** Lists the newest requests of an application, newest first, with the requests left this month. */
+export async function fetchAuthoringRequests(
+  application: string,
+  signal?: AbortSignal,
+): Promise<StudioAuthoringRequestList> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioAuthoringRequestList
+}
+
+/** Sends a request, which starts in `planning`. A quota refusal throws a {@link QuotaRefusedError}. */
+export async function sendAuthoringRequest(
+  application: string,
+  text: string,
+  autoAccept: boolean,
+): Promise<StudioAuthoringRequest> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/authoring-requests`
+  const response = await studioFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(autoAccept ? { text, autoAccept } : { text }),
+  })
+  const title = await quotaRefusalTitle(response)
+  if (title !== null) {
+    throw new QuotaRefusedError(title)
+  }
+  if (!response.ok) {
+    throw new Error(`Sending '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioAuthoringRequest
+}

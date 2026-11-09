@@ -22,6 +22,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { askAiPanelId } from './StudioAskAi'
 import { StudioBand } from './StudioBand'
 import { StudioReleasesList } from './StudioReleases'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -77,7 +78,8 @@ export function StudioPublishing({
   problemsOpen,
   onToggleProblems,
   newResource,
-  problems,
+  askAi,
+  sidePanel,
   releasesView,
   releasePage,
   onDiagnostics,
@@ -96,7 +98,10 @@ export function StudioPublishing({
   problemsOpen: boolean
   onToggleProblems: () => void
   newResource: ReactNode
-  problems: ReactNode
+  /** Proposed: Ask AI, just before Publish…, when the person may ask AI for a change; it opens the request panel. */
+  askAi: { open: boolean; onToggle: () => void } | null
+  /** The side panel that is open, the Problems panel or the request panel, beside the page. */
+  sidePanel: ReactNode
   releasesView: boolean
   releasePage: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
@@ -300,6 +305,17 @@ export function StudioPublishing({
               {t('shell.studio.runTests')}
             </AxisButton>
           )}
+          {askAi !== null && (
+            <AxisButton
+              role="secondary"
+              data-testid="studio-ask-ai-open"
+              aria-expanded={askAi.open}
+              aria-controls={askAiPanelId}
+              onClick={askAi.onToggle}
+            >
+              {t('shell.studio.ai.open')}
+            </AxisButton>
+          )}
           {canPublish && (
             <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
               {t('shell.studio.publish')}
@@ -336,7 +352,7 @@ export function StudioPublishing({
             />
           )}
         </Flex>
-        {problems}
+        {sidePanel}
       </Flex>
       <Modal
         open={dialogOpen}
