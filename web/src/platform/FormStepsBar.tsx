@@ -47,7 +47,7 @@ export function FormStepsBar({ titles, current }: { titles: string[]; current: n
           borderRadius: '50%',
           border: isCurrent ? 'none' : `1px solid ${outline}`,
           background: isCurrent ? colour.primary : 'transparent',
-          color: isCurrent ? colour.surface : outline,
+          color: isCurrent ? colour.onPrimary : outline,
           fontSize: 12,
           lineHeight: 1,
         }

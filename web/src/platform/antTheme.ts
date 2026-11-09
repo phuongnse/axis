@@ -44,6 +44,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       colorWarningText: colour.warningText,
       colorErrorText: colour.dangerText,
       colorInfoText: colour.infoText,
+      // Text on a solid primary fill, such as a primary button's label.
+      colorTextLightSolid: colour.onPrimary,
       colorLink: colour.primaryText,
       colorLinkHover: colour.primaryText,
       colorLinkActive: colour.primaryText,

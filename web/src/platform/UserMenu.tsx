@@ -4,7 +4,6 @@ import { Link, useLocation } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
-import { colourTokens } from './designTokens'
 import { assignLocation } from './navigation'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
@@ -74,11 +73,7 @@ export function UserMenu() {
         style={{ display: 'inline-flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, maxWidth: 200 }}
       >
         {/* The avatar is hidden from assistive technology, so the name alone names the button. */}
-        <Avatar
-          aria-hidden
-          size={24}
-          style={{ background: colour.primary, color: colourTokens.surface.light, flex: 'none' }}
-        >
+        <Avatar aria-hidden size={24} style={{ background: colour.primary, color: colour.onPrimary, flex: 'none' }}>
           {initials(user.displayName)}
         </Avatar>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
