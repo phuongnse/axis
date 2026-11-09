@@ -699,6 +699,7 @@ export function StudioEditor({
   })
 
   if (loadFailed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
   if (!loaded) {
@@ -988,6 +989,7 @@ export function StudioEditor({
     }
     return (
       <>
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         <Alert
           data-testid="studio-form-read-only"
           type="warning"
@@ -1260,6 +1262,7 @@ export function StudioEditor({
               </LabelTextsContext.Provider>
             </ExpressionCheckContext.Provider>
             {conflict && (
+              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
               <Alert
                 data-testid="studio-conflict"
                 type="warning"
@@ -1268,8 +1271,10 @@ export function StudioEditor({
                 action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
               />
             )}
+            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
             {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
             {deleteFailed && (
+              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
               <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />
             )}
             <AxisActionRow align="center">
@@ -1295,6 +1300,7 @@ export function StudioEditor({
               onCancel={() => setDeleteOpen(false)}
             >
               {item.usedBy > 0 && (
+                // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
                 <Alert
                   data-testid="studio-delete-warning"
                   type="warning"

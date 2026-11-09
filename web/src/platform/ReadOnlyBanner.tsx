@@ -28,6 +28,7 @@ export function ReadOnlyBanner() {
   }
 
   return (
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     <Alert
       banner
       type="warning"

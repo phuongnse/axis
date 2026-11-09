@@ -96,6 +96,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
   if (loading) {
     content = t('shell.kpi.loading')
   } else if (failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     content = <Alert data-testid="kpi-error" type="error" title={t('shell.kpi.loadFailed')} />
   } else {
     content = (

@@ -110,12 +110,15 @@ export function ProcessInstancePage({
     return null
   }
   if (instance === null) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="inspector-not-found" type="warning" title={t('shell.inspector.notFound')} />
   }
   if (instance === forbidden) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="inspector-forbidden" type="warning" title={t('shell.inspector.forbidden')} />
   }
   if (instance === 'failed' || releaseTexts.failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="inspector-error" type="error" title={t('shell.inspector.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads.
@@ -458,6 +461,7 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
           onChanged={onChanged}
         >
           {open === 'retry' && retryWarns(instance) && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert
               data-testid="inspector-retry-warning"
               type="warning"

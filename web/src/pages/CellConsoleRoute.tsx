@@ -32,6 +32,7 @@ function Refused({ kind }: { kind: 'unauthorized' | 'forbidden' | 'failed' }) {
     )
   }
   if (kind === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="cell-error" type="error" title={t('shell.cell.loadFailed')} />
   }
   return <SignInCard state="refused" onSignIn={() => startSignIn(cellSignInUrl)} />

@@ -170,9 +170,10 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
 }
 
 /**
- * The CSS every Axis form shares, rendered once beside each provider's ConfigProvider. Ant Design has no token for the
- * gap under a message or for an unticked box's error border, so these rules carry them. The border takes the mode's
- * text colour: a page with two modes would give them one colour.
+ * The CSS every Axis form and message shares, rendered once beside each provider's ConfigProvider. Ant Design has no
+ * token for the gap under a message, for an unticked box's error border or for a message's icon, which it draws in the
+ * seed colour, so these rules carry them. The border and the icon take the mode's text colour: a page with two modes
+ * would give them one colour.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
   const { colour, type } = designTokensFor(mode, page)
@@ -181,6 +182,12 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
     '.ant-form-item-margin-offset { display: none; }',
     `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,
+    // The icon of a message takes its kind's text colour, which passes contrast. Naming the alert twice outranks the
+    // seed colour that Ant Design draws the icon in.
+    `.ant-alert.ant-alert-info .ant-alert-icon { color: ${colour.infoText}; }`,
+    `.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`,
+    `.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`,
+    `.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`,
   ].join('\n')
 }
 

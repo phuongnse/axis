@@ -140,6 +140,7 @@ export function UsersPage() {
           <Result status="403" title={t('shell.users.forbidden')} />
         </div>
       )}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {loadFailed && <Alert data-testid="users-error" type="error" title={t('shell.users.loadFailed')} />}
       {list && !refusal && (
         <>
@@ -179,7 +180,9 @@ export function UsersPage() {
             }}
             below={
               <>
+                {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
                 {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
+                {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
                 {problem && <Alert data-testid="users-command-problem" type="error" title={t(problem)} />}
               </>
             }

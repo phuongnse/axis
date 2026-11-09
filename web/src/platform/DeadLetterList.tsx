@@ -113,6 +113,7 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
       <Flex vertical gap="small">
         <Typography.Title level={5}>{t('shell.inspector.deadLetters.title')}</Typography.Title>
         {load.failed && !loading ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="inspector-dead-letters-error"
             type="error"

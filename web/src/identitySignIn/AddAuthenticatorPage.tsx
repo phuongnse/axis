@@ -20,6 +20,7 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {error && <Alert type="error" showIcon title={error} />}
       <Flex vertical align="center" gap={8}>
         <img src={`data:image/png;base64,${qrCode}`} alt={texts.qrCode} width={160} height={160} />

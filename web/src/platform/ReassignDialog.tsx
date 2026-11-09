@@ -125,6 +125,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       destroyOnHidden
     >
       <Flex vertical gap="middle">
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {errors.length > 0 && <Alert data-testid="task-reassign-error" type="error" title={errors.join(' ')} />}
         <Form form={form} layout="vertical" initialValues={{ kind: 'role' }}>
           <Form.Item name="kind" label={t('shell.task.reassignTarget')}>

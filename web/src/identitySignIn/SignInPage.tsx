@@ -23,6 +23,7 @@ function SignInBody({ context }: { context: SignInContext }) {
   const goTo = (url: string) => window.location.assign(url)
   return (
     <>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {notice && <Alert type="info" showIcon title={notice} />}
       {only && (
         <Typography.Paragraph style={{ margin: 0 }}>
@@ -36,6 +37,7 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Button>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {accounts && error && <Alert type="error" showIcon title={error} />}
       {accounts && <AccountForm context={context} />}
     </>

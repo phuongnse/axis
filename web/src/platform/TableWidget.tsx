@@ -632,9 +632,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               locale={locale}
             />
           )}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
           {exportTruncated && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert data-testid="table-export-truncated" type="warning" title={t('shell.table.exportTruncated')} />
           )}
           {importing && (
@@ -666,6 +669,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         </>
       }
       failure={
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         failed ? <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} /> : undefined
       }
     />

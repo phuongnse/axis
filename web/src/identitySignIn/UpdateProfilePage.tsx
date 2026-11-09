@@ -26,7 +26,9 @@ export function UpdateProfilePage({ context }: { context: UpdateProfileContext }
   }, [])
   return (
     <IdentityFrame title={context.title} frame={context}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {notice && <Alert type="info" showIcon title={notice} />}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {error && <Alert type="error" showIcon title={error} />}
       <Form
         form={form}

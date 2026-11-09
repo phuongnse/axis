@@ -1,4 +1,4 @@
-// WCAG 2.x contrast for hex, rgb() and rgba() colours. A translucent colour is blended over what lies under it.
+// WCAG 2.x contrast for hex and CSS red-green-blue colours. A translucent colour is blended over what lies under it.
 
 interface Rgba {
   red: number
@@ -52,10 +52,10 @@ export function contrast(foreground: string, background: string): number {
   return (Math.max(shown, base) + 0.05) / (Math.min(shown, base) + 0.05)
 }
 
-// The opaque rgb() colour behind layers given nearest first. The page's white is the bottom when no layer is opaque.
+// The opaque hex colour behind layers given nearest first. The page's white is the bottom when no layer is opaque.
 export function backgroundOf(layers: readonly string[]): string {
   const { red, green, blue } = layers.reduceRight((below, layer) => blend(parseColour(layer), below), white)
-  return `rgb(${red}, ${green}, ${blue})`
+  return `#${[red, green, blue].map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`
 }
 
 // Large text is 24 px, or 18.66 px and bold (weight 700 or more).

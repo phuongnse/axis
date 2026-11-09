@@ -25,6 +25,7 @@ Each common job has one shared widget or helper:
 | Job                                            | Shared widget                                                                                          |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | A button                                       | `AxisButton` with a role, never Ant Design's `Button`                                                  |
+| A message on a page, a form or a dialog        | `AxisAlert` with a kind, which always shows the kind's icon, never Ant Design's `Alert`                |
 | A table                                        | `AxisTable`, never Ant Design's `Table`                                                                |
 | An empty table or list                         | `EmptyState`, never Ant Design's `Empty`                                                               |
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
@@ -49,13 +50,15 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
 
 - **`axis/no-antd-button`** refuses a `<Button>` imported from `antd`. `AxisButton.tsx` is the one
   file that may use it.
+- **`axis/no-antd-alert`** refuses an `<Alert>` imported from `antd`. `AxisAlert.tsx` is the one file
+  that may use it.
 - **`no-restricted-imports`** refuses a named `Table` import from `antd`. `AxisTable.tsx` is the one
   file that may use it. It does not see an import from a deep path such as `antd/es/table`.
 - **`axis/no-preset-tag-colour`** refuses a `Tag` whose `color` is an Ant Design colour name, with or
   without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
   `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`
   expression. It cannot see a colour picked from a lookup table.
-- **An older use carries its reason.** Each `Button` and `Tag` that predates the rules has an
+- **An older use carries its reason.** Each `Button`, `Alert` and `Tag` that predates the rules has an
   `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
   `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
   older uses only go down.

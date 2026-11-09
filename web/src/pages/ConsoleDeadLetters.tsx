@@ -147,6 +147,7 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
           }}
         />
         {load.failed && !loading ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="console-dead-letters-error"
             type="error"

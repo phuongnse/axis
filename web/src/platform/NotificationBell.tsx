@@ -128,7 +128,9 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
       </span>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
         <Flex vertical gap={spacing.md}>
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {failed && <Alert type="error" showIcon title={t('shell.notifications.loadFailed')} />}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {markFailed && <Alert type="error" showIcon title={t('shell.notifications.markFailed')} />}
           {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>

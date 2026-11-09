@@ -100,7 +100,7 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
   `__proto__` can turn into prototype pollution. Oxlint runs these rules. The exception to a security
   rule is an `overrides` entry in `web/.oxlintrc.json` with its reason, and `scripts/lint.sh` refuses
   a disable comment that names one or names no rule;
-- that `web/` uses `AxisButton`, `AxisTable` and the colour tokens in place of Ant Design's own.
+- that `web/` uses `AxisButton`, `AxisAlert`, `AxisTable` and the colour tokens in place of Ant Design's own.
   Oxlint runs these rules too, and a use that predates them carries a disable comment with its reason, see
   [shared widgets](reference/shared-widgets.md#what-the-build-checks);
 - that no test outside a `*PerformanceTests` class measures elapsed time;

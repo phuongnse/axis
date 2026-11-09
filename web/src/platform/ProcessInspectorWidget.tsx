@@ -179,9 +179,11 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     )
 
   if (load.forbidden && !loading) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="inspector-forbidden" type="warning" title={t('shell.inspector.forbidden')} />
   }
   if (failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="inspector-error" type="error" title={t('shell.inspector.loadFailed')} />
   }
   return (

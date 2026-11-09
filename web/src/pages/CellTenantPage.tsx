@@ -250,6 +250,7 @@ export function CellTenantPage() {
 
   return (
     <PageLayout title={id}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {tenantFailed && <Alert data-testid="cell-tenant-error" type="error" title={t('shell.cell.tenant.loadFailed')} />}
       {tenant && (
         <>
@@ -405,6 +406,7 @@ export function CellTenantPage() {
                 />
               </Flex>
             )}
+            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
             {actionError && <Alert data-testid="cell-tenant-action-error" type="error" title={actionError} />}
           </Flex>
         </Modal>
@@ -423,12 +425,14 @@ export function CellTenantPage() {
         >
           <Flex vertical gap="small">
             <Typography.Text>{t('shell.cell.tenant.downloadBody')}</Typography.Text>
+            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
             {downloadError && <Alert data-testid="cell-tenant-download-error" type="error" title={downloadError} />}
           </Flex>
         </Modal>
       )}
       <Card title={t('shell.cell.tenant.jobs')}>
         {jobsFailed && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="cell-tenant-jobs-error" type="error" title={t('shell.cell.tenant.jobsLoadFailed')} />
         )}
         {jobs && <CellJobTable jobs={jobs} locale={locale} />}

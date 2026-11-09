@@ -26,18 +26,15 @@ test("a 50% black text colour on white blends to the grey it makes", () => {
 });
 
 test("a translucent background layer over an opaque one composites to a grey", () => {
-  assert.equal(
-    backgroundOf(["rgba(0, 0, 0, 0.5)", white]),
-    "rgb(127.5, 127.5, 127.5)",
-  );
+  assert.equal(backgroundOf(["rgba(0, 0, 0, 0.5)", white]), "#808080");
 });
 
 test("a translucent text colour over a translucent background layer uses the blended background", () => {
   const surface = backgroundOf(["rgba(255, 255, 255, 0.5)", "rgb(0, 0, 0)"]);
-  assert.equal(surface, "rgb(127.5, 127.5, 127.5)");
+  assert.equal(surface, "#808080");
   assert.equal(
     contrast("rgba(0, 0, 0, 0.5)", surface),
-    contrast("rgb(63.75, 63.75, 63.75)", surface),
+    contrast("rgb(64, 64, 64)", surface),
   );
 });
 

@@ -20,6 +20,7 @@ export function UpdatePasswordPage({ context }: { context: UpdatePasswordContext
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {error && <Alert type="error" showIcon title={error} />}
       <Form
         name={formId}

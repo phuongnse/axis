@@ -20,6 +20,7 @@ export function ConsentPage({ context }: { context: ConsentContext }) {
   })
   return (
     <IdentityFrame title={texts.title} frame={context}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {error && <Alert type="error" showIcon title={error} />}
       <Typography.Paragraph style={{ margin: 0 }}>{intro}</Typography.Paragraph>
       {homeUrl && (

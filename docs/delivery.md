@@ -348,7 +348,10 @@ change, a design review and a sync are in the
 - **A review's agreed rules are comments on its design issue.** The design issue stays short enough to
   read in one pass. Its body holds the review's scope and what the build must do beyond the docs,
   because NexKit plans from the body. One comment holds the review's state: the prototype branch, what
-  is done, what waits for the owner and what comes next. The session edits that comment in place and
+  is done, what waits for the owner, what comes next and each change's parts list. Before it builds a
+  change, the session lists each visible part with the shared widget, helper or token that draws it, as
+  [which widget](reference/shared-widgets.md#which-widget) shows, and marks **new** each mechanism the
+  change adds, so the owner decides only on what is new. The session edits that comment in place and
   never adds a second. The rules the owner agrees about one screen, or in one step of the review, share
   one English comment. Each rule has its own bold heading, the doc page where it lives, any API contract
   the screen needs and the prototype commit, so NexKit finds each rule. A later rule about the same

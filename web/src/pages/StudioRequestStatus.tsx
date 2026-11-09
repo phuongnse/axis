@@ -63,6 +63,7 @@ export function StudioRequestStatus({
   }
   const pending = request.status === 'queued' || request.status === 'running'
   return (
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     <Alert
       data-testid="studio-request-status"
       data-status={request.status}
