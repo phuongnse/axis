@@ -7,11 +7,11 @@ description: Runbook for the owner's local agent session that keeps the Axis Des
 
 The rules are in [Design changes](../../../docs/delivery.md#design-changes) and
 [D57](../../../docs/decisions/d57-a-design-system-published-from-the-repository.md).
-This runbook gives the steps and commands, so follow its links for the rules.
+This runbook gives the steps and commands.
 
 - **The artifact's link** is in Design changes. Look it up there each time.
 - **The artifact's file layout and how to publish** are in the Design System
-  type's own instructions in Claude. Read them each time and follow them.
+  type's own instructions in Claude. Follow them each time.
 - **Token names and the widget list** are in the
   [frontend reference](../../../docs/reference/frontend.md) under "Design
   tokens and previews". The preview names are in
@@ -57,10 +57,10 @@ another. The rules are under "Several changes are a design review" in Design cha
    It gets no pull request, no CI and no `/nexkit review`, as Design changes
    says.
 3. Post one state comment with `gh issue comment <n> --body-file <file>`. It
-   names the branch, what is done, what waits for the owner and what comes next.
-   Its id is the `#issuecomment-<id>` at the end of the URL. Edit it from then
-   on: `gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> -F
-   body=@<file>`.
+   names the branch, what is done, what waits for the owner, what comes next and
+   each change's parts list. Its id is the `#issuecomment-<id>` at the end of
+   the URL. Edit it from then on: `gh api --method PATCH
+   repos/{owner}/{repo}/issues/comments/<id> -F body=@<file>`.
 
 ### Each change
 
@@ -69,15 +69,15 @@ this one. What the build must do that the docs do not say goes in the design
 issue's body, with `gh issue edit`. What you find outside the review's topic
 becomes an issue.
 
-1. Restate the change in Axis terms: the tokens, the widgets and the previews
-   it touches. Then search for what already does the job and say which one the
-   change extends, as [AGENTS.md](../../../AGENTS.md#working-rules) says. When
-   the change shows a second mechanism already there, tell the owner and merge
-   the two.
+1. Restate the change in Axis terms: the tokens, widgets and previews it
+   touches. Before building, list each visible part with the shared widget,
+   helper or token that draws it, from
+   [which widget](../../../docs/reference/shared-widgets.md#which-widget). Mark
+   **new** each part no widget draws, with the shared place it goes to. Merge
+   any two mechanisms the list shows for one job, and tell the owner.
 2. Make it in the real code under `web/src/platform/` and
    `web/src/designSystem/`, so the artifact shows the real widgets. Mark each
-   new behaviour with a short `Proposed:` comment, so the issue that builds it
-   can find every one.
+   new behaviour with a `Proposed:` comment, so its issue can find each one.
 3. When the change adds a state that changes how a widget looks, add it to the
    widget's preview in the same step.
 4. Run `scripts/design-system.sh`, which writes
@@ -89,7 +89,8 @@ becomes an issue.
    in this step as one comment, as [Design changes](../../../docs/delivery.md#design-changes)
    says. Post it with `gh issue comment <n> --body-file <file>`, or if the screen
    already has a rule comment, edit that one with the PATCH command in Start
-   step 3. Then edit the state comment in place.
+   step 3. Then edit the state comment in place, with this change's parts list
+   from step 1.
 
 When `main` has changed code the prototype touches, follow
 [merging-main.md](merging-main.md) before the next change.
@@ -116,9 +117,9 @@ asks. The rule is "A sync follows the repository" in
    longer defines.
 5. Show that list to the owner and publish only after they confirm, unless the
    sync ends a review and every difference comes from what merged.
-6. Publish the previews and the tokens to the same artifact, keeping the
-   changes of open issues. Add a change note that names the commit you synced
-   from (`git rev-parse --short HEAD`) and the open issues you kept.
+6. Publish the previews and tokens to the same artifact, keeping the changes of
+   open issues. Add a change note with the commit you synced from
+   (`git rev-parse --short HEAD`) and the open issues kept.
 
 ## When something fails
 
