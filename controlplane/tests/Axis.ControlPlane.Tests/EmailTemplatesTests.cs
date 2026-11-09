@@ -45,6 +45,34 @@ public sealed class EmailTemplatesTests
         Assert.Contains("If you need help, contact Axis support.", body, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("tenantReady", "en", "Your Axis trial is ready")]
+    [InlineData("tenantReady", "vi", "Bản dùng thử Axis đã sẵn sàng")]
+    [InlineData("provisioningDelayed", "en", "Your Axis trial needs more time to set up")]
+    [InlineData("provisioningDelayed", "vi", "Bản dùng thử Axis cần thêm thời gian để chuẩn bị")]
+    public void The_provisioning_emails_name_the_trial_in_their_subject(string kind, string language, string subject)
+    {
+        var templates = EmailTemplates.LoadEmbedded();
+        var values = templates.Placeholders(kind).ToDictionary(name => name, name => $"<{name}>");
+
+        var (renderedSubject, _) = templates.Render(kind, language, values);
+
+        Assert.Equal(subject, renderedSubject);
+    }
+
+    [Theory]
+    [InlineData("en", "The trial is ready. Sign in at:")]
+    [InlineData("vi", "Bản dùng thử đã sẵn sàng. Đăng nhập tại:")]
+    public void The_tenant_ready_email_says_the_trial_is_ready_and_where_to_sign_in(string language, string sentence)
+    {
+        var templates = EmailTemplates.LoadEmbedded();
+        var values = templates.Placeholders("tenantReady").ToDictionary(name => name, name => $"<{name}>");
+
+        var (_, body) = templates.Render("tenantReady", language, values);
+
+        Assert.Contains(sentence, body, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_kind_without_a_vi_text_is_rejected_and_the_error_names_it()
     {

@@ -1,9 +1,9 @@
-Subject: Axis của bạn cần thêm thời gian để chuẩn bị
+Subject: Bản dùng thử Axis cần thêm thời gian để chuẩn bị
 
 Chào {{name}},
 
-Chúng tôi cần thêm thời gian để chuẩn bị Axis cho bạn. Đội ngũ của chúng tôi đang xử lý, bạn không cần làm gì thêm.
+Bản dùng thử cần thêm thời gian để chuẩn bị. Đội ngũ của chúng tôi đang xử lý, bạn không cần làm gì thêm.
 
-Chúng tôi sẽ gửi email ngay khi Axis sẵn sàng.
+Chúng tôi sẽ gửi email ngay khi bạn có thể đăng nhập.
 
 Đội ngũ Axis

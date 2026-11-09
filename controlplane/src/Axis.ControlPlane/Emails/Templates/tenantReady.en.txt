@@ -1,8 +1,8 @@
-Subject: Your Axis is ready
+Subject: Your Axis trial is ready
 
 Hello {{name}},
 
-Your Axis is ready. You can sign in at:
+The trial is ready. Sign in at:
 
 {{tenantAddress}}
 

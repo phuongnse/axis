@@ -320,7 +320,7 @@ The control plane provisions the tenant as one job, with the sign-up's id as the
    its `CNAME` record.
 4. Poll the cell job until it ends. A failed job is run again, up to 3 times. After that the operator
    is alerted, and the person gets an email that the team is on it.
-5. On success, email the person that their Axis is ready, with the tenant's address. The identity
+5. On success, email the person that the trial is ready, with the tenant's address. The identity
    provider sends its own invitation to set a password, as the `invite` step of the cell does.
 
 - **Progress.** After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
