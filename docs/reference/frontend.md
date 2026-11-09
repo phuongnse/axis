@@ -46,7 +46,8 @@ component holds a number of its own.
   text of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
-  modes. `onPrimary` reaches 4.5:1 on `primary` in both modes.
+  modes. `onPrimary` reaches 4.5:1 on `primary` in both modes. The [contrast spec](widget-previews.md#the-spec)
+  measures what each preview draws in both modes.
 - **Shadow.** The shadow group holds `overlay`, the only shadow. Dialogs, menus, pickers and popovers cast it, and
   widgets, cards, sections and buttons cast none.
 - **Type, spacing and radius.** Type has the body and code fonts and the font size, spacing runs from `spacing-xs` to

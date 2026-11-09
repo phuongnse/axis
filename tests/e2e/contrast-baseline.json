@@ -1,0 +1,338 @@
+[
+  {
+    "preview": "columns",
+    "state": "Typical",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "columns",
+    "state": "Typical",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "field-boolean",
+    "state": "Editable",
+    "mode": "dark",
+    "element": "border checkbox \"Urgent\""
+  },
+  {
+    "preview": "field-boolean",
+    "state": "Required, help text and error",
+    "mode": "dark",
+    "element": "border checkbox \"urgent\""
+  },
+  {
+    "preview": "field-enum",
+    "state": "Editable",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "field-enum",
+    "state": "Editable",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "field-enum",
+    "state": "Required, help text and error",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "field-enum",
+    "state": "Required, help text and error",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Fields in columns, with errors",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Fields in columns, with errors",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Read-only by a condition",
+    "mode": "dark",
+    "element": "border checkbox \"urgent\""
+  },
+  {
+    "preview": "form",
+    "state": "Read-only by a condition",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Read-only by a condition",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Validation errors",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Validation errors",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Wizard steps",
+    "mode": "dark",
+    "element": "border checkbox \"urgent\""
+  },
+  {
+    "preview": "form",
+    "state": "Wizard steps",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "form",
+    "state": "Wizard steps",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "identitySignIn",
+    "state": "Error",
+    "mode": "dark",
+    "element": "icon \"close-circle\""
+  },
+  {
+    "preview": "identitySignIn",
+    "state": "Update your profile",
+    "mode": "dark",
+    "element": "icon \"info-circle\""
+  },
+  {
+    "preview": "identitySignIn",
+    "state": "Wrong password",
+    "mode": "dark",
+    "element": "icon \"close-circle\""
+  },
+  {
+    "preview": "processInspector",
+    "state": "Typical",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "processInspector",
+    "state": "Typical",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "section",
+    "state": "Typical",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "section",
+    "state": "Typical",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "App switcher",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "App switcher",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Application site",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Application site",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Form page",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Form page",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Language and theme",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Language and theme",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Navigation collapsed",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "shell",
+    "state": "Navigation collapsed",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "signIn",
+    "state": "Session ended",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "signIn",
+    "state": "Session ended",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "signIn",
+    "state": "Sign-in refused",
+    "mode": "light",
+    "element": "icon \"exclamation-circle\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "dark",
+    "element": "text \"Amount\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "dark",
+    "element": "text \"Needed on\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "dark",
+    "element": "text \"Quantity\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "dark",
+    "element": "text \"Title\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "dark",
+    "element": "text \"Urgent\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "light",
+    "element": "text \"Amount\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "light",
+    "element": "text \"Needed on\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "light",
+    "element": "text \"Quantity\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "light",
+    "element": "text \"Title\""
+  },
+  {
+    "preview": "states",
+    "state": "Loading",
+    "mode": "light",
+    "element": "text \"Urgent\""
+  },
+  {
+    "preview": "table",
+    "state": "Many row actions",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "table",
+    "state": "Many row actions",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "table",
+    "state": "With data",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "table",
+    "state": "With data",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "tabs",
+    "state": "Typical",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "tabs",
+    "state": "Typical",
+    "mode": "light",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "taskInbox",
+    "state": "With data",
+    "mode": "dark",
+    "element": "icon \"down\""
+  },
+  {
+    "preview": "taskInbox",
+    "state": "With data",
+    "mode": "light",
+    "element": "icon \"down\""
+  }
+]

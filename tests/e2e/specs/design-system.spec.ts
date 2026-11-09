@@ -5,17 +5,17 @@ import path from "node:path";
 import { waitForDialog } from "../dialogs";
 import { cellValue, expectShown, fieldLabel, fieldValue } from "../fields";
 import { cardGroups, cardName } from "../../../web/src/designSystem/cardOrder";
+import {
+  bundleFile,
+  bundleUrl,
+  figure,
+  harnessUrl,
+  openHarness,
+  origin,
+  repositoryRoot,
+} from "../design-system";
+import { contrastRatio, parseColour } from "../contrast";
 
-// The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
-// web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
-// so the spec serves both from disk and needs no server.
-const origin = "http://design-system.test";
-const repositoryRoot = path.resolve(import.meta.dirname, "..", "..", "..");
-const harnessFile = path.join(repositoryRoot, "web", "design-system.html");
-const bundleFolder = path.join(repositoryRoot, "artifacts", "design-system");
-const bundleFile = path.join(bundleFolder, "axis-design-system.js");
-const harnessUrl = `${origin}/design-system.html`;
-const bundleUrl = `${origin}/artifacts/design-system/axis-design-system.js`;
 const productionBuild = path.join(
   repositoryRoot,
   "src",
@@ -26,10 +26,6 @@ const productionBuild = path.join(
 const fixtureMarker = "DesignSystemSample";
 
 const modes = ["light", "dark"] as const;
-
-/** The figure of one state of a preview, found by its caption. */
-const figure = (page: Page | FrameLocator, caption: string) =>
-  page.getByRole("figure", { name: caption, exact: true });
 
 // Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
 // the "With data" figure. A field preview's first state is its editable one.
@@ -199,56 +195,6 @@ function filesUnder(folder: string): string[] {
   } catch {
     return [];
   }
-}
-
-/** What a page records while it loads the harness: console errors, page errors and every request. */
-interface Recording {
-  errors: string[];
-  requests: string[];
-}
-
-/**
- * Opens the harness from disk with the bundle next to it, and records errors and requests. When `sandboxed`, it opens
- * a page that holds the harness in an iframe sandboxed as the Design System artifact's card frames are, without
- * `allow-forms`. The iframe is `frameWidth` pixels wide, or the width of the page when none is given.
- */
-async function openHarness(
-  page: Page,
-  query: string,
-  options: { sandboxed?: boolean; frameWidth?: number } = {},
-): Promise<Recording> {
-  const width =
-    options.frameWidth === undefined ? "100%" : `${options.frameWidth}px`;
-  const recording: Recording = { errors: [], requests: [] };
-  page.on("console", (message) => {
-    if (message.type() === "error") {
-      recording.errors.push(message.text());
-    }
-  });
-  page.on("pageerror", (error) => recording.errors.push(error.message));
-  page.on("request", (request) => recording.requests.push(request.url()));
-  await page.route(`${origin}/**`, async (route) => {
-    const { pathname } = new URL(route.request().url());
-    if (pathname === "/design-system.html") {
-      await route.fulfill({ path: harnessFile });
-    } else if (pathname === "/sandboxed.html") {
-      await route.fulfill({
-        contentType: "text/html",
-        body: `<iframe sandbox="allow-scripts allow-same-origin" src="/design-system.html${query}" style="width:${width};height:100vh;border:0"></iframe>`,
-      });
-    } else if (pathname.startsWith("/artifacts/design-system/")) {
-      const file = path.join(bundleFolder, path.basename(pathname));
-      await route
-        .fulfill({ path: file })
-        .catch(() => route.fulfill({ status: 404 }));
-    } else {
-      await route.fulfill({ status: 404 });
-    }
-  });
-  await page.goto(
-    options.sandboxed ? `${origin}/sandboxed.html` : `${harnessUrl}${query}`,
-  );
-  return recording;
 }
 
 for (const [name, widget] of Object.entries(previews)) {
@@ -968,25 +914,6 @@ for (const mode of modes) {
   });
 }
 
-// The WCAG contrast ratio of two colours written as rgb() or rgba().
-function contrast(foreground: string, background: string): number {
-  const luminance = (colour: string) => {
-    const [red, green, blue] = (colour.match(/[\d.]+/g) ?? [])
-      .slice(0, 3)
-      .map((channel) => {
-        const value = Number(channel) / 255;
-        return value <= 0.03928
-          ? value / 12.92
-          : ((value + 0.055) / 1.055) ** 2.4;
-      });
-    return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-  };
-  const [lighter, darker] = [luminance(foreground), luminance(background)].sort(
-    (a, b) => b - a,
-  );
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
 test("the dark table draws the Delete icon and the current page at 4.5:1 or more against their surface", async ({
   page,
 }) => {
@@ -1016,7 +943,9 @@ test("the dark table draws the Delete icon and the current page at 4.5:1 or more
 
   for (const text of [deleteIcon, currentPage]) {
     const { foreground, background } = await colours(text);
-    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    expect(
+      contrastRatio(parseColour(foreground), parseColour(background)),
+    ).toBeGreaterThanOrEqual(4.5);
   }
   expect(recording.errors).toEqual([]);
 });
