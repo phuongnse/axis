@@ -170,7 +170,11 @@ resolve ignoring letter case. Page titles and action labels join the `AXC0028` c
 - **Table.** A `table` widget names exactly one of `entity` and `dataSource`, otherwise it is
   `AXC0060` at `/widgets/{i}`. A table has no link to a form page: it opens and creates records
   through [`navigate` actions](#navigate-and-row-actions), and a `formPage` property is a schema
-  violation (`AXC0004`).
+  violation (`AXC0004`). Its `priorities` map a column name to `high` or `low`: any other value, or
+  `priorities` on another widget, is `AXC0004`. A key must name a column the table shows, ignoring
+  letter case, and name it once, otherwise it is `AXC0060` at `/widgets/{i}/priorities/{key}`. Child
+  collections, `references` fields and unknown names are not shown columns. For a grouped data
+  source the columns are its `groupBy` fields and its measures.
 - **Form.** A `form` widget names exactly one of `form` and `entity`, otherwise it is `AXC0060` at
   `/widgets/{i}`. A form widget that names a form is over the form's entity.
 - **Names.** A widget's `entity` must name a loaded entity (`AXC0021`). A `dataSource` must name a
@@ -232,7 +236,7 @@ is reported at the widget's own pointer, such as `/widgets/0/columns/1/widgets/0
 - **Shape.** The page schema requires `columns` on a `columns` widget, `tabs` on a `tabs` widget,
   and `title` with `widgets` on a `section` widget. It does not allow them on any other widget, and
   no container may name an `entity`, `dataSource`, `form`, `actions`, `rowActions`,
-  `toolbarActions` or `parameters` (`AXC0004`).
+  `toolbarActions`, `parameters` or `priorities` (`AXC0004`).
 
 ### Page parameters
 

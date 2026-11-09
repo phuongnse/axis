@@ -16,6 +16,7 @@ function leaf(type: WidgetMetadata['type'], process: string | null = null): Widg
     rowActions: [],
     toolbarActions: [],
     parameters: {},
+    priorities: {},
     access: null,
     detail: null,
     kpi: null,

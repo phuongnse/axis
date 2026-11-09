@@ -92,6 +92,11 @@ internal static class PageAccess
             Actions = ShapeActions(application, roles, entity, described.Actions, widget.Actions),
             RowActions = ShapeActions(application, roles, entity, described.RowActions, widget.RowActions),
             ToolbarActions = ShapeActions(application, roles, entity, described.ToolbarActions, widget.ToolbarActions),
+            // A priority would otherwise name a field the user may not read. A data source table keeps its priorities,
+            // as its column names are not entity field names.
+            Priorities = widget.DataSource is null && readable is not null
+                ? described.Priorities.Where(pair => readable.Contains(pair.Key)).ToDictionary()
+                : described.Priorities,
             Access = widget.Type is WidgetType.Kpi or WidgetType.Chart || entity is null ? null : Access(application, roles, widget, entity),
             Kpi = described.Kpi is { Navigate: { } navigate } kpi && !Allows(application, roles, null, navigate) ? kpi with { Navigate = null } : described.Kpi,
         };

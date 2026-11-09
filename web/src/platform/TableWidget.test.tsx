@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   DataSourceParameter,
   DeleteAction,
@@ -66,6 +66,7 @@ const noteWidget: EntityWidgetMetadata = {
   rowActions: [],
   toolbarActions: [],
   parameters: {},
+  priorities: {},
   access: everyAction,
   detail: null,
   kpi: null,
@@ -106,6 +107,7 @@ const noteListWidget: WidgetMetadata = {
   rowActions: [],
   toolbarActions: [],
   parameters: {},
+  priorities: {},
   access: everyAction,
   detail: null,
   kpi: null,
@@ -384,6 +386,7 @@ describe('TableWidget', () => {
       rowActions: [],
       toolbarActions: [],
       parameters: {},
+      priorities: {},
       access: everyAction,
       detail: null,
       kpi: null,
@@ -423,6 +426,51 @@ describe('TableWidget', () => {
     // Group rows have no id, so each needs a key of its own.
     expect(errors.mock.calls.flat().join(' ')).not.toMatch(/same key/)
     errors.mockRestore()
+  })
+
+  // jsdom has no layout, so the widths are faked: the free-text Title and Category columns need 208 px (160 px and
+  // their padding) each, and the Done and Due at columns are 100 px wide.
+  describe('column priority', () => {
+    const headerNames = () => screen.getAllByRole('columnheader').map((header) => header.textContent)
+
+    beforeEach(() => {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(530)
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.dataset.columnKey === 'done' || this.dataset.columnKey === 'dueAt' ? 100 : 0
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('moves the rightmost column first when no column has a priority', async () => {
+      stubRecords()
+
+      renderWidget()
+
+      await screen.findByText('Buy paper')
+      expect(headerNames()).toEqual(expect.arrayContaining(['Title', 'Done', 'Due at']))
+      expect(headerNames()).not.toContain('Category')
+    })
+
+    it('moves a column whose metadata priority is low before the rightmost column', async () => {
+      stubRecords()
+
+      renderWidget('', { ...noteWidget, priorities: { done: 'low' } })
+
+      await screen.findByText('Buy paper')
+      expect(headerNames()).toEqual(['Title', 'Due at', 'Category'])
+    })
+
+    it('moves a column whose metadata priority is high last', async () => {
+      stubRecords()
+
+      renderWidget('', { ...noteWidget, priorities: { category: 'high' } })
+
+      await screen.findByText('Buy paper')
+      expect(headerNames()).toEqual(['Title', 'Done', 'Category'])
+    })
   })
 
   describe('navigate actions', () => {
@@ -806,6 +854,7 @@ describe('TableWidget', () => {
       rowActions: [],
       toolbarActions: [],
       parameters: {},
+      priorities: {},
       access: everyAction,
       detail: null,
       kpi: null,

@@ -118,7 +118,8 @@ A page holds one or more widgets. A leaf widget's `type` is `table`, `form`, `ta
   `dataSource`, such as `{ "type": "table", "name": "requests", "dataSource": "PurchaseRequestList" }`,
   whose projected fields are then its columns, see [widget binding](data-sources.md#widget-binding).
   A table opens and creates records through `navigate` actions, and has no link to a form page of
-  its own.
+  its own. Its `priorities` give a column `high` or `low` by name, such as
+  `"priorities": { "amount": "low" }`, see [columns](frontend.md#columns).
 - **KPI.** A `kpi` names a `dataSource` with one total row, one of its `measure`s and a `label`, and
   may add a `comparison` with a second `measure` and a `label`, and a `navigate` action, see
   [detail, chart and KPI widgets](detail-chart-kpi-widgets.md).

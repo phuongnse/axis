@@ -122,6 +122,7 @@ public static class ApplicationSites
             [.. widget.RowActions.Select(action => Action(application, action, rowEntity))],
             [.. widget.ToolbarActions.Select(action => Action(application, action, null))],
             widget.Parameters,
+            widget.Priorities.ToDictionary(pair => pair.Key, pair => pair.Value == ColumnPriority.High ? "high" : "low"),
             FullAccess(application, widget),
             widget.Detail is { } detail ? new DetailMetadata(detail.Record) : null,
             widget.Kpi is { } kpi

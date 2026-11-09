@@ -22,6 +22,7 @@ function leaf(type: WidgetMetadata['type'], extra: Partial<WidgetMetadata> = {})
     rowActions: [],
     toolbarActions: [],
     parameters: {},
+    priorities: {},
     access: null,
     detail: null,
     kpi: null,

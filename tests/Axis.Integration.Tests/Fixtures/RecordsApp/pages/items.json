@@ -9,6 +9,7 @@
       "type": "table",
       "name": "table",
       "entity": "Item",
+      "priorities": { "name": "high", "quantity": "low" },
       "rowActions": [
         { "type": "navigate", "name": "navigate", "page": "ItemForm", "label": { "textKey": "items.open" }, "record": "id" },
         { "type": "delete", "name": "delete", "label": { "textKey": "items.delete" } }
