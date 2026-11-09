@@ -9,11 +9,11 @@ writes and diagnostics, and the publishing routes. The page and form metadata ro
 [draft page metadata](draft-page-metadata.md), and the routes that save a module resource are in
 [module resource saves](module-resource-saves.md).
 
-A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch
-no database, except the [release](#release-history) and [resource activity](studio-resource-form.md#resource-activity) routes,
-which read the releases. Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers
-and the expression completion, [text writes](#text-writes) the label texts, and the
-[expression check](#expression-check) the expression editor.
+A write takes a lock in the platform database, see [Versions](#versions). Reads and diagnostics touch no database,
+except the [release history](#release-history), [release](studio-workspace.md#release-route), [resource activity](studio-resource-form.md#resource-activity),
+[request status](#the-request) and [application settings](#application-settings) routes, which read the tenant database.
+Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers and the expression completion,
+[text writes](#text-writes) the label texts, and the [expression check](#expression-check) the expression editor.
 
 ## Settings
 
@@ -697,7 +697,7 @@ A request is shown as
 | `finishedAt`      | When it reached `succeeded` or `failed`, or null before                                                                                                                                                                    |
 | `releaseId`       | The release a `publish` activated or an `activate` named, or null. A `validate` and a `test` have none                                                                                                                     |
 | `diagnostics`     | The diagnostics, in the form of [Diagnostics](#diagnostics). Empty until the request ends. A `succeeded` request can hold warnings                                                                                         |
-| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for a `rollback`           |
+| `scenarios`       | The scenario outcomes, see below. For a `test`, empty until the request ends. For a `publish`, a `validate` or an `accept`, null until the request ends and when no scenario ran. Null for an `activate`          |
 
 `scenarios` has one item for each scenario that ran, in file order: for a `test`, the application's
 scenarios, and for a `publish`, a `validate` and an `accept`, the stored results of their
