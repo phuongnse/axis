@@ -1,7 +1,8 @@
-import { Alert, Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
+import { Button, Form, Input, Modal } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
+import { StartFromField } from '../platform/StartFromField'
 import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
@@ -156,32 +157,26 @@ export function StudioNewApplication({
               }}
             />
           </AxisField>
-          <AxisField
+          <StartFromField
             name="template"
-            label={t('shell.studio.newApplication.template')}
-            help={t('shell.studio.newApplication.template.help')}
-          >
-            <Radio.Group aria-label={t('shell.studio.newApplication.template')}>
-              <Flex vertical>
-                <Radio value="">{t('shell.studio.newApplication.blank')}</Radio>
-                {Array.isArray(templates) &&
-                  templates.map((item) => (
-                    <Radio key={item.id} value={item.id}>
-                      <span>{localized(item.title, locale)}</span>
-                      {item.builtIn && (
-                        <Tag style={{ marginInlineStart: 8 }}>{t('shell.studio.newApplication.builtIn')}</Tag>
-                      )}
-                      <Typography.Text type="secondary" style={{ display: 'block' }}>
-                        {localized(item.description, locale)}
-                      </Typography.Text>
-                    </Radio>
-                  ))}
-              </Flex>
-            </Radio.Group>
-          </AxisField>
-          {templates === 'failed' && (
-            <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
-          )}
+            texts={{
+              label: t('shell.studio.newApplication.template'),
+              help: t('shell.studio.newApplication.template.help'),
+              blank: t('shell.studio.newApplication.blank'),
+              builtIn: t('shell.studio.newApplication.builtIn'),
+              failed: t('shell.studio.newApplication.templatesFailed'),
+            }}
+            applications={
+              Array.isArray(templates)
+                ? templates.map((item) => ({
+                    id: item.id,
+                    title: localized(item.title, locale),
+                    description: localized(item.description, locale),
+                    builtIn: item.builtIn,
+                  }))
+                : templates
+            }
+          />
         </Form>
       </Modal>
     </>

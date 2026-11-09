@@ -10,7 +10,18 @@ const applicationsPath = '/api/sign-up/applications'
 const documentsPath = '/api/sign-up/documents'
 const subdomainPath = `/api/sign-up/subdomains/${suggestSubdomain(signUpBusinessName)}`
 
-const applications = () => ({ applications: [{ id: 'approvals', titles: { en: 'Approvals', vi: 'Phê duyệt' } }] })
+const applications = () => ({
+  applications: [
+    {
+      id: 'approvals',
+      titles: { en: 'Approvals', vi: 'Phê duyệt' },
+      descriptions: {
+        en: 'Requests that people send and approvers approve or reject.',
+        vi: 'Yêu cầu do nhân viên gửi và người duyệt phê duyệt hoặc từ chối.',
+      },
+    },
+  ],
+})
 const document = (kind: string, version: string) => ({
   version,
   urls: {

@@ -7,14 +7,17 @@ import { AxisField, type FieldCheck } from '../src/platform/AxisField'
 import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
 import { requiredMark } from '../src/platform/requiredMark'
+import { StartFromField } from '../src/platform/StartFromField'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
 
+/** Proposed: a built-in application the region offers to start from, with its title and description in each language. */
 interface SignUpApplication {
   id: string
   titles: Record<SignUpLocale, string>
+  descriptions: Record<SignUpLocale, string>
 }
 
 /** Proposed: a document the person accepts or is told of, at its current version, with its address in each language. */
@@ -64,7 +67,7 @@ export function SignUpPage({
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
-  const [applications, setApplications] = useState<SignUpApplication[]>([])
+  const [applications, setApplications] = useState<SignUpApplication[] | 'failed'>()
   const [documents, setDocuments] = useState<SignUpDocuments | null>(null)
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
@@ -72,12 +75,17 @@ export function SignUpPage({
     const controller = new AbortController()
     apiFetch('/api/sign-up/applications', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
       .then(async (response) => {
-        if (response.ok) {
-          setApplications(((await response.json()) as { applications: SignUpApplication[] }).applications)
+        if (!response.ok) {
+          setApplications('failed')
+          return
         }
+        setApplications(((await response.json()) as { applications: SignUpApplication[] }).applications)
       })
       .catch(() => {
-        // The list stays empty. The person can still fill in the rest of the form.
+        // Blank is still offered, and a warning says so.
+        if (!controller.signal.aborted) {
+          setApplications('failed')
+        }
       })
     return () => controller.abort()
   }, [])
@@ -178,13 +186,13 @@ export function SignUpPage({
           />
         }
       >
-        {/* Proposed: every field but the terms box is required, marked and helped, as every platform form's are. */}
+        {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
         <Form
           form={form}
           name="sign-up"
           layout="vertical"
           requiredMark={requiredMark}
-          initialValues={{ language: locale }}
+          initialValues={{ language: locale, application: '' }}
         >
           <AxisField
             name="fullName"
@@ -232,19 +240,25 @@ export function SignUpPage({
               }}
             />
           </AxisField>
-          <AxisField
+          {/* Proposed: a person starts from Blank or a built-in application, as Studio's New application offers. */}
+          <StartFromField
             name="application"
-            label={t('signUp.application')}
-            help={t('signUp.application.help')}
-            requiredMessage={t('signUp.application.required')}
-          >
-            <Select
-              options={applications.map((application) => ({
-                value: application.id,
-                label: application.titles[locale],
-              }))}
-            />
-          </AxisField>
+            texts={{
+              label: t('signUp.startFrom'),
+              help: t('signUp.startFrom.help'),
+              blank: t('signUp.startFrom.blank'),
+              failed: t('signUp.startFrom.failed'),
+            }}
+            applications={
+              Array.isArray(applications)
+                ? applications.map((application) => ({
+                    id: application.id,
+                    title: application.titles[locale],
+                    description: application.descriptions[locale],
+                  }))
+                : applications
+            }
+          />
           <AxisField
             name="language"
             label={t('signUp.language')}
