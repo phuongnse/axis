@@ -73,7 +73,7 @@ internal sealed class SignUpConfirmJobHandler(NpgsqlDataSource controlPlane, Con
             new Dictionary<string, string>
             {
                 ["name"] = fullName,
-                ["tenantAddress"] = $"https://{subdomain}.{options.TenantDomain!.ToLowerInvariant()}",
+                ["tenantAddress"] = SignUpAddress.Of(options, subdomain),
                 ["confirmLink"] = $"{options.PublicUrl}/sign-up/verify#{Base64Url.EncodeToString(token)}",
             },
             cancellationToken);

@@ -151,6 +151,10 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .IsUnique()
                         .HasFilter("state = 'pending'");
 
+                    b.HasIndex(new[] { "TokenHash" }, "ux_sign_ups_token_hash")
+                        .IsUnique()
+                        .HasFilter("token_hash IS NOT NULL");
+
                     b.ToTable("sign_ups", "control_plane", t =>
                         {
                             t.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");

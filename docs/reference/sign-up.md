@@ -223,7 +223,7 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   [the progress](#provisioning).
 - **Checking.** `POST /api/sign-up/verification` takes `{ token }` and answers
   `{ state: "pending", email, businessName, address }`, `{ state: "confirmed" }` or
-  `{ state: "expired" }`.
+  `{ state: "expired" }`. It changes nothing.
 - **Confirming.** `POST /api/sign-up/confirm` takes `{ token }` and answers `{ id, secret }` for the
   progress page. When the link was used or expired while the page was open, it answers `409` with
   `{ state }`.
