@@ -18,8 +18,10 @@ owner holds the copyright of all the code, so the licence can still be chosen fr
 - **A commercial licence is sold beside it,** with support, to a customer that cannot accept the
   AGPL, such as a large organization, a bank or a government that installs Axis itself.
 - **What others build on is under the MIT licence,** so that it binds nobody: `src/Axis.Extensions`,
-  which extension packages reference, the widget SDK `@axis/widgets-sdk`, and `samples/`, the sample
-  applications, packages, modules and templates. Each holds its own `LICENSE` file.
+  which extension packages reference, and `samples/`, the sample applications, packages, modules and
+  templates. Each holds its own `LICENSE` file.
+- **The widget SDK is under the MIT licence too** _(planned for M22)_. `@axis/widgets-sdk`, the npm
+  package a custom widget builds on, holds its own `LICENSE` file.
 - **An application belongs to its author.** An application's own resources, and a business's
   customization layer, are the business's, whatever the platform's licence.
 - **Contributors sign a contributor licence agreement** before their first contribution is merged,
