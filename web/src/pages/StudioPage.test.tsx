@@ -1819,7 +1819,7 @@ describe('StudioPage publishing', () => {
       stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=text')
 
-      await userEvent.click(await screen.findByRole('button', { name: 'New text resource…' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Add language…' }))
       expect(isRequiredLabel(screen.getByText('Locale'))).toBe(true)
       await userEvent.click(screen.getByRole('button', { name: 'Create' }))
 
@@ -1828,7 +1828,7 @@ describe('StudioPage publishing', () => {
 
       await userEvent.type(screen.getByRole('textbox', { name: 'Locale' }), 'de')
       await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
-      await userEvent.click(screen.getByRole('button', { name: 'New text resource…' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add language…' }))
 
       expect(screen.getByRole('textbox', { name: 'Locale' })).toHaveValue('')
       expect(screen.queryByText('Enter a locale.')).not.toBeInTheDocument()
@@ -1866,13 +1866,13 @@ describe('StudioPage publishing', () => {
       expect(fetchMock.mock.calls.filter(([, call]) => call?.method === 'POST')).toHaveLength(1)
     })
 
-    it("asks a kind's New text resource… for a locale alone", async () => {
+    it("asks a kind's Add language… for a locale alone", async () => {
       const fetchMock = stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=text')
 
-      await userEvent.click(await screen.findByRole('button', { name: 'New text resource…' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Add language…' }))
 
-      const dialog = await screen.findByRole('dialog', { name: 'New text resource' })
+      const dialog = await screen.findByRole('dialog', { name: 'Add language' })
       expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument()
       await userEvent.type(within(dialog).getByRole('textbox', { name: 'Locale' }), 'de')
@@ -1922,7 +1922,7 @@ describe('StudioPage publishing', () => {
       const fetchMock = stubCreate(201)
       renderPage()
 
-      await fillDialog('Text', 'de', 'Locale')
+      await fillDialog('Language', 'de', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
@@ -1969,7 +1969,7 @@ describe('StudioPage publishing', () => {
       )
       renderPage()
 
-      await fillDialog('Text', 'vi', 'Locale')
+      await fillDialog('Language', 'vi', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!

@@ -125,7 +125,7 @@ describe.each(['light', 'dark'])('StudioTestResults in %s mode', (mode) => {
     const { section } = renderResults(request({ status: 'failed', scenarios: [] }))
 
     expect(section).toHaveAttribute('data-status', 'failed')
-    expect(section).toHaveTextContent('No scenario ran. See the diagnostics.')
+    expect(section).toHaveTextContent('No scenario ran. See the problems.')
     expect(screen.queryAllByTestId('studio-test-result')).toHaveLength(0)
   })
 })
