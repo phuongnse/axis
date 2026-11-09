@@ -9,10 +9,11 @@ internal sealed record SubdomainAnswer(bool Free, string? Reason);
 
 /// <summary>
 /// Tells whether a subdomain is free for sign-up, see <c>docs/reference/sign-up.md#the-subdomain</c>. The checks run in a fixed
-/// order and the first that fails gives the reason: <c>invalid</c>, <c>reserved</c>, <c>taken</c>, then <c>held</c>. A malformed
+/// order and the first that fails gives the reason: <c>invalid</c>, <c>reserved</c>, <c>taken</c>, then <c>held</c>. A name is
+/// held by a deletion in the directory, or by a pending sign-up of the control plane that has not expired. A malformed
 /// name never reaches the database. The answer is advice: the tenant row's primary key still refuses a duplicate.
 /// </summary>
-internal sealed class SubdomainCheck(NpgsqlDataSource directory, ControlPlaneOptions options)
+internal sealed class SubdomainCheck(NpgsqlDataSource directory, NpgsqlDataSource controlPlane, ControlPlaneOptions options)
 {
     public const string Invalid = "invalid";
     public const string Reserved = "reserved";
@@ -57,7 +58,16 @@ internal sealed class SubdomainCheck(NpgsqlDataSource directory, ControlPlaneOpt
         command.Parameters.AddWithValue("name", name);
         command.Parameters.AddWithValue("host", $"{name}.{options.TenantDomain!.ToLowerInvariant()}");
         var reason = await command.ExecuteScalarAsync(cancellationToken) as string;
-        return reason is null ? new SubdomainAnswer(true, null) : Not(reason);
+        if (reason is not null)
+        {
+            return Not(reason);
+        }
+
+        // The pending sign-ups are in the control plane's database, which the directory's connection cannot read.
+        await using var pending = controlPlane.CreateCommand(
+            "SELECT EXISTS (SELECT 1 FROM control_plane.sign_ups WHERE subdomain = @name AND state = 'pending' AND expires_at > now())");
+        pending.Parameters.AddWithValue("name", name);
+        return (bool)(await pending.ExecuteScalarAsync(cancellationToken))! ? Not(Held) : new SubdomainAnswer(true, null);
     }
 
     private static SubdomainAnswer Not(string reason) => new(false, reason);

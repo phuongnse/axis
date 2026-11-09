@@ -8,7 +8,8 @@ namespace Axis.ControlPlane.Emails;
 /// <summary>
 /// Queues the <c>sendEmail</c> jobs, the only way code sends an email. The payload is <c>{ template, language, to, values }</c>
 /// and it is stored in the database, so it never holds a password, a token or a payment detail: an email that needs one needs
-/// its own design. A bad email fails when it is queued and not on the tenth retry.
+/// its own design, such as the confirm email of <see cref="SignUp.SignUpConfirmJobHandler"/>. A bad email fails when it is
+/// queued and not on the tenth retry.
 /// </summary>
 internal static class EmailJobs
 {
@@ -19,7 +20,7 @@ internal static class EmailJobs
     /// so both commit or neither does.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// The template is unknown, the language is not one of <see cref="EmailTemplates.Languages"/>, the address is not an email
+    /// The template is unknown or is <see cref="SignUp.SignUpConfirmJobHandler.Template"/>, the language is not one of <see cref="EmailTemplates.Languages"/>, the address is not an email
     /// address, or <paramref name="values"/> does not hold a value for each placeholder of the template.
     /// </exception>
     public static async Task<Guid> EnqueueAsync(
@@ -35,6 +36,12 @@ internal static class EmailJobs
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(templates);
         ArgumentNullException.ThrowIfNull(values);
+
+        // The confirm link holds a token, which a stored payload must never hold: that email has a job of its own.
+        if (string.Equals(template, SignUp.SignUpConfirmJobHandler.Template, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The sign-up confirm email holds a token and has its own job.", nameof(template));
+        }
 
         // Renders once to check the template, the language and the values. Nothing of the result is kept.
         _ = templates.Render(template, language, values);

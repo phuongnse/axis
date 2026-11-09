@@ -12,7 +12,9 @@ namespace Axis.ControlPlane;
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
-/// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions. The sign-up documents are optional as a group, and once one is set, all of them are required. A bad value stops the start. A message names the setting and never holds its value.
+/// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
+/// The sign-up documents are optional as a group, and once one is set, all of them are required.
+/// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
 {
@@ -56,6 +58,12 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>The mail relay that sends the emails of the control plane. Never a cell's mail settings.</summary>
     public ControlPlaneMailOptions Mail { get; set; } = new();
+
+    /// <summary>
+    /// The address that the links of the control plane's emails start with, such as <c>https://account.vn.example.com</c>. Optional:
+    /// <see cref="Load"/> fills in <c>https://account.&lt;TenantDomain&gt;</c>, so it is never empty on a loaded instance.
+    /// </summary>
+    public string? PublicUrl { get; set; }
 
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
@@ -149,6 +157,18 @@ public sealed partial class ControlPlaneOptions
             problems.Add($"The setting {mail}:{nameof(ControlPlaneMailOptions.Password)} is required when {mail}:{nameof(ControlPlaneMailOptions.UserName)} is set.");
         }
 
+        if (!string.IsNullOrWhiteSpace(options.PublicUrl))
+        {
+            if (!Uri.TryCreate(options.PublicUrl, UriKind.Absolute, out var publicUrl) || publicUrl.Scheme is not ("http" or "https"))
+            {
+                problems.Add($"The setting {SectionName}:{nameof(PublicUrl)} must be an absolute URL.");
+            }
+            else if (publicUrl.Scheme != Uri.UriSchemeHttps && RequiresVerifiedTls(environment))
+            {
+                problems.Add($"The setting {SectionName}:{nameof(PublicUrl)} must be an https URL outside Development.");
+            }
+        }
+
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
         problems.AddRange(SignUpProblems(options.SignUp));
 
@@ -157,6 +177,9 @@ public sealed partial class ControlPlaneOptions
             throw new InvalidOperationException($"The control plane configuration is invalid. {string.Join(" ", problems)}");
         }
 
+        options.PublicUrl = string.IsNullOrWhiteSpace(options.PublicUrl)
+            ? $"https://account.{options.TenantDomain}"
+            : options.PublicUrl.Trim().TrimEnd('/');
         return options;
     }
 

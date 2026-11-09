@@ -549,6 +549,55 @@ public sealed class ControlPlaneOptionsTests
         Assert.False(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.HasDocuments);
     }
 
+    [Fact]
+    public void The_public_URL_defaults_to_the_account_host_of_the_tenant_domain()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal("https://account.vn.example.com", factory.Services.GetRequiredService<ControlPlaneOptions>().PublicUrl);
+    }
+
+    [Fact]
+    public void A_public_URL_that_is_set_is_kept_without_its_trailing_slash()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PublicUrl"] = "http://localhost:5000/" });
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal("http://localhost:5000", factory.Services.GetRequiredService<ControlPlaneOptions>().PublicUrl);
+    }
+
+    [Fact]
+    public void A_public_URL_that_is_not_an_absolute_URL_stops_the_start_and_the_message_holds_no_value()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PublicUrl"] = "account.example" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PublicUrl", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("account.example", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Outside_Development_and_Testing_an_http_public_URL_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(
+            environment: "Production",
+            settings: new Dictionary<string, string?>
+            {
+                ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
+                ["ControlPlane:Mail:UseTls"] = "true",
+                ["ControlPlane:PublicUrl"] = "http://account.vn.example.com",
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PublicUrl", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
     private static Dictionary<string, string?> SignUpApplicationSettings(string id, string en, string vi) => new()
     {
         ["ControlPlane:SignUp:Applications:0:Id"] = id,
