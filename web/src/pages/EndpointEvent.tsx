@@ -1,6 +1,7 @@
 import { Input, Typography } from 'antd'
 import { useText } from '../platform/texts'
 import type { StudioNames } from '../platform/studio'
+import { useFieldTexts } from './fieldTexts'
 import { MappingRows } from './MappingRows'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
@@ -20,6 +21,7 @@ export function EndpointEvent({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { group } = useFieldTexts('endpoint')
   const eventLabel = t('shell.studio.process.event')
 
   if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) {
@@ -68,7 +70,7 @@ export function EndpointEvent({
       {entry !== undefined && (
         <MappingRows
           pointer="/event/fields"
-          title={t('shell.studio.process.eventFields')}
+          {...group('event.fields')}
           value={entry.fields}
           keyLabel={t('shell.studio.process.eventField')}
           keyOptions={payload}

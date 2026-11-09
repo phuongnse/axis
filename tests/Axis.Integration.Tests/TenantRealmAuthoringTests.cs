@@ -251,8 +251,14 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         var (realm, secret) = await NewRealmAsync();
         var tokens = (await SignInAsync(realm, secret)).Tokens;
         var first = tokens.GetProperty("refresh_token").GetString()!;
-        Assert.Equal(TenantRealm.AccessTokenLifespanSeconds, tokens.GetProperty("expires_in").GetInt32());
-        Assert.Contains(McpUrl, Audiences(tokens.GetProperty("access_token").GetString()!));
+        var access = tokens.GetProperty("access_token").GetString()!;
+        // Keycloak counts the time left when it builds the response, so a second may have passed since the token was issued.
+        Assert.InRange(tokens.GetProperty("expires_in").GetInt32(), TenantRealm.AccessTokenLifespanSeconds - 1, TenantRealm.AccessTokenLifespanSeconds);
+        using (var claims = Claims(access))
+        {
+            Assert.Equal(TenantRealm.AccessTokenLifespanSeconds, claims.RootElement.GetProperty("exp").GetInt64() - claims.RootElement.GetProperty("iat").GetInt64());
+        }
+        Assert.Contains(McpUrl, Audiences(access));
 
         var refreshed = await RefreshAsync(realm, first);
         Assert.Equal(HttpStatusCode.OK, refreshed.Status);
@@ -521,12 +527,17 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         return (response.StatusCode, await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken));
     }
 
-    // The audiences of an access token, read from its payload without checking the signature, which the MCP server checks.
-    private static List<string> Audiences(string accessToken)
+    // The claims of an access token, read from its payload without checking the signature, which the MCP server checks.
+    private static JsonDocument Claims(string accessToken)
     {
         var payload = accessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
         payload = payload.PadRight(payload.Length + ((4 - (payload.Length % 4)) % 4), '=');
-        using var claims = JsonDocument.Parse(Convert.FromBase64String(payload));
+        return JsonDocument.Parse(Convert.FromBase64String(payload));
+    }
+
+    private static List<string> Audiences(string accessToken)
+    {
+        using var claims = Claims(accessToken);
         var audience = claims.RootElement.GetProperty("aud");
         return audience.ValueKind == JsonValueKind.Array
             ? [.. audience.EnumerateArray().Select(item => item.GetString()!)]

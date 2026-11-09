@@ -1,7 +1,10 @@
 import { Button, Flex, Input, Radio, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { useFieldTexts } from './fieldTexts'
 import { Expression } from './ProcessFields'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
@@ -45,6 +48,7 @@ function kindOf(entry: unknown): Kind | undefined {
 export function ConnectorInputRows({
   pointer,
   title,
+  help,
   keyLabel,
   value,
   entity,
@@ -52,15 +56,17 @@ export function ConnectorInputRows({
 }: {
   pointer: string
   title: string
+  help: string
   keyLabel: string
   value: unknown
   entity: string
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { group } = useFieldTexts('process')
 
   if (value !== undefined && !isContent(value)) {
-    return <JsonOnly pointer={pointer} title={title} />
+    return <JsonOnly pointer={pointer} title={title} help={help} />
   }
 
   const entries = Object.entries(value ?? {})
@@ -90,72 +96,73 @@ export function ConnectorInputRows({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{title}</Typography.Text>
-        {entries.map(([key, entry], index) => {
-          const rowPointer = `${pointer}/${escapeSegment(key)}`
-          const kind = kindOf(entry)
-          return (
-            <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
-              <Flex gap="small" align="flex-start" wrap>
-                <Input aria-label={keyLabel} value={key} onChange={(event) => rename(key, event.target.value)} />
-                <Radio.Group
-                  name={`input-kind-${rowPointer}`}
-                  optionType="button"
-                  aria-label={t('shell.studio.process.inputKind')}
-                  value={kind}
-                  options={kinds.map((candidate) => ({ value: candidate, label: labels[candidate] }))}
-                  onChange={(event) => {
-                    if (event.target.value !== kind) {
-                      switchTo(rowPointer, entry, event.target.value as Kind)
-                    }
-                  }}
-                />
-                {kind === 'value' && (
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <Expression
-                      pointer={rowPointer}
-                      name={t('shell.studio.process.expression')}
-                      value={text(entry)}
+      <AxisFieldGroup title={title} help={help}>
+        <Flex vertical gap="small">
+          {entries.map(([key, entry], index) => {
+            const rowPointer = `${pointer}/${escapeSegment(key)}`
+            const kind = kindOf(entry)
+            return (
+              <Flex key={index} vertical gap="small" data-testid={`studio-field-${rowPointer}`}>
+                <Flex gap="small" align="flex-start" wrap>
+                  <Input aria-label={keyLabel} value={key} onChange={(event) => rename(key, event.target.value)} />
+                  <Radio.Group
+                    name={`input-kind-${rowPointer}`}
+                    optionType="button"
+                    aria-label={t('shell.studio.process.inputKind')}
+                    value={kind}
+                    options={kinds.map((candidate) => ({ value: candidate, label: labels[candidate] }))}
+                    onChange={(event) => {
+                      if (event.target.value !== kind) {
+                        switchTo(rowPointer, entry, event.target.value as Kind)
+                      }
+                    }}
+                  />
+                  {kind === 'value' && (
+                    <div style={{ flex: 1, minWidth: 240 }}>
+                      <Expression
+                        pointer={rowPointer}
+                        name={t('shell.studio.process.expression')}
+                        value={text(entry)}
+                        onChange={onChange}
+                      />
+                    </div>
+                  )}
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button onClick={() => onChange(rowPointer, undefined)}>
+                    {t('shell.studio.process.removeMapping')}
+                  </Button>
+                </Flex>
+                {kind === undefined && (
+                  <Typography.Text type="secondary" data-testid="studio-json-only">
+                    {t('shell.studio.editInJson')}
+                  </Typography.Text>
+                )}
+                {kind === 'object' && (
+                  <div style={{ marginInlineStart: 24 }}>
+                    <ConnectorInputRows
+                      pointer={`${rowPointer}/fields`}
+                      {...group('steps.input.fields')}
+                      keyLabel={t('shell.studio.process.nestedField')}
+                      value={(entry as Content).fields}
+                      entity={entity}
                       onChange={onChange}
                     />
                   </div>
                 )}
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(rowPointer, undefined)}>
-                  {t('shell.studio.process.removeMapping')}
-                </Button>
+                {kind === 'list' && (
+                  <ListRows pointer={rowPointer} value={entry as Content} entity={entity} onChange={onChange} />
+                )}
               </Flex>
-              {kind === undefined && (
-                <Typography.Text type="secondary" data-testid="studio-json-only">
-                  {t('shell.studio.editInJson')}
-                </Typography.Text>
-              )}
-              {kind === 'object' && (
-                <div style={{ marginInlineStart: 24 }}>
-                  <ConnectorInputRows
-                    pointer={`${rowPointer}/fields`}
-                    title={t('shell.studio.process.nestedFields')}
-                    keyLabel={t('shell.studio.process.nestedField')}
-                    value={(entry as Content).fields}
-                    entity={entity}
-                    onChange={onChange}
-                  />
-                </div>
-              )}
-              {kind === 'list' && (
-                <ListRows pointer={rowPointer} value={entry as Content} entity={entity} onChange={onChange} />
-              )}
-            </Flex>
-          )
-        })}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
-            {t('shell.studio.process.addMapping')}
-          </Button>
-        </div>
-      </Flex>
+            )
+          })}
+          <div>
+            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+            <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
+              {t('shell.studio.process.addMapping')}
+            </Button>
+          </div>
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 }
@@ -173,38 +180,36 @@ function ListRows({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('process')
   const names = useContext(ExpressionCheckContext)?.names ?? null
-  const label = t('shell.studio.process.inputFrom')
-  const from = text(value.from)
+  const from = field('steps.input.from')
+  const fromValue = text(value.from)
   const collections =
     names?.entities
       .find((item) => item.name.toLowerCase() === entity.toLowerCase())
-      ?.fields.filter((field) => field.type === 'child-collection') ?? []
-  const picked = collections.find((field) => field.name.toLowerCase() === from.toLowerCase())
+      ?.fields.filter((item) => item.type === 'child-collection') ?? []
+  const picked = collections.find((item) => item.name.toLowerCase() === fromValue.toLowerCase())
 
   return (
     <Flex vertical gap="small" style={{ marginInlineStart: 24 }}>
       <div data-testid={`studio-field-${pointer}/from`}>
-        <div>{label}</div>
-        {names === null ? (
-          <Input
-            aria-label={label}
-            value={from}
-            onChange={(event) => onChange(`${pointer}/from`, event.target.value)}
-          />
-        ) : (
-          <ReferencePicker
-            name={label}
-            value={from}
-            required
-            options={collections.map((field) => field.name)}
-            onChange={(next) => onChange(`${pointer}/from`, next ?? '')}
-          />
-        )}
+        <AxisField {...from}>
+          {names === null ? (
+            <Input value={fromValue} onChange={(event) => onChange(`${pointer}/from`, event.target.value)} />
+          ) : (
+            <ReferencePicker
+              name={from.label}
+              value={fromValue}
+              required
+              options={collections.map((item) => item.name)}
+              onChange={(next) => onChange(`${pointer}/from`, next ?? '')}
+            />
+          )}
+        </AxisField>
       </div>
       <ConnectorInputRows
         pointer={`${pointer}/fields`}
-        title={t('shell.studio.process.nestedFields')}
+        {...group('steps.input.fields')}
         keyLabel={t('shell.studio.process.nestedField')}
         value={value.fields}
         entity={picked?.target ?? ''}
@@ -214,14 +219,15 @@ function ListRows({
   )
 }
 
-function JsonOnly({ pointer, title }: { pointer: string; title: string }) {
+function JsonOnly({ pointer, title, help }: { pointer: string; title: string; help: string }) {
   const t = useText()
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <div>{title}</div>
-      <Typography.Text type="secondary" data-testid="studio-json-only">
-        {t('shell.studio.editInJson')}
-      </Typography.Text>
+      <AxisFieldGroup title={title} help={help}>
+        <Typography.Text type="secondary" data-testid="studio-json-only">
+          {t('shell.studio.editInJson')}
+        </Typography.Text>
+      </AxisFieldGroup>
     </div>
   )
 }

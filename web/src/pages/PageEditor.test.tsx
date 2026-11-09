@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { type ReactNode, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import type { StudioNames } from '../platform/studio'
@@ -518,6 +519,23 @@ describe('PageEditor navigate actions', () => {
 
     const action = ((saved().widgets as Record<string, unknown>[])[0].rowActions as Record<string, unknown>[])[0]
     expect(action.parameters).toEqual({ item: 'id' })
+  })
+
+  it('names the parameters of a row navigate to an unknown page as a group described by their help', () => {
+    renderEditor(page({ ...table, rowActions: [{ ...navigate, page: 'Unsaved' }] }))
+
+    expect(
+      within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('group', {
+        name: platformEnglish['shell.studio.field.page.widgets.rowActions.parameters'],
+      }),
+    ).toHaveAccessibleDescription(platformEnglish['shell.studio.field.page.widgets.rowActions.parameters.help'])
+  })
+
+  it('has a label and a help for the row-action parameters in English and Vietnamese', () => {
+    for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+      expect(catalogue['shell.studio.field.page.widgets.rowActions.parameters']).toBeTruthy()
+      expect(catalogue['shell.studio.field.page.widgets.rowActions.parameters.help']).toBeTruthy()
+    }
   })
 
   const toReviewList = { ...navigate, page: 'ReviewList' }

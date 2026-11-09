@@ -29,6 +29,7 @@ import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
+import { useFieldTexts } from './fieldTexts'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { uniqueStepName } from './processPalette'
@@ -617,6 +618,7 @@ function WidgetPanel({
           />
           <Actions
             pointer={`${base}/rowActions`}
+            path="widgets.rowActions"
             title={t('shell.studio.page.rowActions')}
             actions={widget.rowActions}
             startProcess={false}
@@ -629,6 +631,7 @@ function WidgetPanel({
           />
           <Actions
             pointer={`${base}/toolbarActions`}
+            path="widgets.toolbarActions"
             title={t('shell.studio.page.toolbarActions')}
             actions={widget.toolbarActions}
             startProcess={false}
@@ -670,6 +673,7 @@ function WidgetPanel({
           )}
           <Actions
             pointer={`${base}/actions`}
+            path="widgets.actions"
             title={t('shell.studio.page.actions')}
             actions={widget.actions}
             startProcess
@@ -942,7 +946,12 @@ function KpiPanel({
           ) : isContent(navigate) ? (
             <>
               <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
-              <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
+              <NavigateFields
+                pointer={`${base}/navigate`}
+                path="widgets.navigate"
+                action={navigate}
+                onChange={onChange}
+              />
               <div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
@@ -1324,8 +1333,19 @@ function ActionLabel({ pointer, value, onChange }: { pointer: string; value: unk
 }
 
 /** The fields of a `navigate` action: its page, label, optional `record` expression and parameter expressions. */
-function NavigateFields({ pointer, action, onChange }: { pointer: string; action: Content; onChange: ChangeHandler }) {
+function NavigateFields({
+  pointer,
+  path,
+  action,
+  onChange,
+}: {
+  pointer: string
+  path: string
+  action: Content
+  onChange: ChangeHandler
+}) {
   const t = useText()
+  const { group } = useFieldTexts('page')
   const names = useContext(StudioNamesContext)
   const page = pageNamed(names, action.page)
 
@@ -1363,7 +1383,7 @@ function NavigateFields({ pointer, action, onChange }: { pointer: string; action
       {page === undefined ? (
         <MappingRows
           pointer={`${pointer}/parameters`}
-          title={t('shell.studio.page.actionParameters')}
+          {...group(`${path}.parameters`)}
           value={action.parameters}
           keyLabel={t('shell.studio.page.parameterName')}
           target={{ kind: 'expression' }}
@@ -1499,6 +1519,7 @@ function ParameterExpressions({
  */
 function Actions({
   pointer,
+  path,
   title,
   actions,
   startProcess,
@@ -1510,6 +1531,8 @@ function Actions({
   onChange,
 }: {
   pointer: string
+  /** The path of the list in the page file, from the root, which names the texts of its navigate actions' parameters. */
+  path: string
   title: string
   actions: unknown
   startProcess: boolean
@@ -1557,7 +1580,7 @@ function Actions({
                       <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
                     )}
                     {action.type === 'navigate' ? (
-                      <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
+                      <NavigateFields pointer={actionPointer} path={path} action={action} onChange={onChange} />
                     ) : action.type === 'startProcess' ? (
                       <>
                         <NameField

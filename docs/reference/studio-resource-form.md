@@ -34,7 +34,9 @@ last section with no heading.
   [platform field help](frontend.md#platform-field-help). A property's raw name, such as `textKey`, never
   shows. The `<path>` is the property names from the root joined by dots, with list indices and map keys
   left out, so every item of a list shares one label. An input that sets no property of its own, such as
-  the step a section is on, takes a path that names it, beside the properties of its item.
+  the step a section is on, takes a path that names it, beside the properties of its item. A structure
+  that nests itself, such as a connector input's fields or a page's widgets, takes the path of its first
+  level at every depth.
 - **Drawn through the platform's field.** A field that holds one input is drawn through `AxisField`, and
   an object, a label, a list or a map through `AxisFieldGroup`, as
   [fields](actions-and-controls.md#fields) says. The label names the input and the help describes it.
