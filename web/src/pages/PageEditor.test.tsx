@@ -303,7 +303,79 @@ describe('PageEditor sections', () => {
     )
   })
 
-  it('puts Add parameter on the Parameters heading and says so when the page has no parameters', () => {
+  it('labels and helps the form, the process of an action and the target page of an action of a form', () => {
+    renderEditor(
+      page({
+        type: 'form',
+        entity: 'PurchaseRequest',
+        form: 'RequestForm',
+        actions: [
+          { type: 'startProcess', name: 'startProcess1', process: 'PurchaseRequestApproval', label: { textKey: '' } },
+          { type: 'navigate', name: 'navigate1', page: 'ReviewForm', label: { textKey: '' } },
+        ],
+      }),
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Form' })).toHaveAccessibleDescription(help('widgets.form'))
+    expect(screen.getByRole('combobox', { name: 'Action process' })).toHaveAccessibleDescription(
+      help('widgets.actions.process'),
+    )
+    expect(screen.getByRole('combobox', { name: 'Target page' })).toHaveAccessibleDescription(
+      help('widgets.actions.page'),
+    )
+  })
+
+  it('labels and helps the target page of a toolbar action', () => {
+    renderEditor(
+      page({
+        ...table,
+        toolbarActions: [{ type: 'navigate', name: 'navigate1', page: 'ReviewForm', label: { textKey: '' } }],
+      }),
+    )
+
+    expect(
+      within(screen.getByTestId('studio-field-/widgets/0/toolbarActions')).getByRole('combobox', {
+        name: 'Target page',
+      }),
+    ).toHaveAccessibleDescription(help('widgets.toolbarActions.page'))
+  })
+
+  it('labels and helps the process of a process inspector', () => {
+    renderEditor(page({ type: 'processInspector', process: 'PurchaseRequestApproval' }))
+
+    expect(screen.getByRole('combobox', { name: 'Process' })).toHaveAccessibleDescription(help('widgets.process'))
+  })
+
+  it('labels and helps the data source and the target page of a KPI with a navigate action', () => {
+    renderEditor(
+      page({
+        type: 'kpi',
+        dataSource: 'OpenTotals',
+        navigate: { type: 'navigate', page: 'ReviewForm', label: { textKey: '' } },
+      }),
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Data source' })).toHaveAccessibleDescription(
+      help('widgets.dataSource'),
+    )
+    expect(screen.getByRole('combobox', { name: 'Target page' })).toHaveAccessibleDescription(
+      help('widgets.navigate.page'),
+    )
+  })
+
+  it('puts Add parameter in the Parameters heading row, before the list of parameters', () => {
+    renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+    const parameters = screen.getByRole('region', { name: 'Parameters' })
+    const heading = within(parameters).getByRole('heading', { name: 'Parameters' })
+    const add = within(parameters).getByRole('button', { name: 'Add parameter' })
+    const list = screen.getByTestId('studio-field-/parameters')
+    expect(heading.parentElement?.parentElement).toContainElement(add)
+    expect(list).not.toContainElement(add)
+    expect(add.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+  })
+
+  it('says on a page with no parameters that it takes none', () => {
     renderEditor(page(table))
 
     const parameters = screen.getByRole('region', { name: 'Parameters' })
