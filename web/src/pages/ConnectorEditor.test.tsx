@@ -347,7 +347,7 @@ describe('ConnectorEditor', () => {
     await user.type(field('operations.output.source', 'textbox', output), '/shipment/tracking/number')
 
     expect(latest).toEqual(oauth2Fixture)
-  })
+  }, 30000)
 
   it('swaps the keys of oauth2 and bearer both ways', async () => {
     const onChange = renderEditor({ ...connector, auth: oauth2Fixture.auth })

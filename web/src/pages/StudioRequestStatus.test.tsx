@@ -73,7 +73,7 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
     const status = renderStatus(request({ status: 'failed', releaseId: 'r3' }), 3)
 
     expect(status).toHaveAttribute('data-status', 'failed')
-    expect(status).toHaveTextContent('Publish failed')
+    expect(status).toHaveTextContent('Publishing failed. See the problems.')
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
   })
 
@@ -104,7 +104,7 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
     const status = renderStatus(request({ kind: 'test', status: 'succeeded', scenarios: [] }))
 
     expect(status).toHaveAttribute('data-status', 'succeeded')
-    expect(status).toHaveTextContent('Tests passed')
+    expect(status).toHaveTextContent('Every test scenario passed.')
     expect(status).not.toHaveTextContent('Activated')
     expect(screen.queryByTestId('studio-release-number')).not.toBeInTheDocument()
   })

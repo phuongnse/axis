@@ -124,11 +124,18 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
   sao lưu trước khi khôi phục.". Axis speaking of itself says "chúng tôi", rarely. Never "người dùng" for the person
   reading, and never "quý khách", "mình" or a familiar tone.
+- **"Của bạn" only where the sentence needs it.** A text does not copy each English "your" as "của bạn". It keeps "của
+  bạn" where the sentence would be unclear or cold without it: "Đặt lại mật khẩu", "Nhập mật khẩu.", "Cập nhật hồ sơ",
+  but "Có người vừa yêu cầu đặt lại mật khẩu tài khoản {0} của bạn.". An email asks the reader to "Bấm nút bên dưới",
+  not "Chọn nút".
 - **The people who use an application are "người dùng", and are mostly left out.** Studio's help speaks of them often,
   as English says "people". Leave them out where the sentence needs no subject: "Thông báo hiện ở trường này khi điều
   kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
   Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
+- **A time names its event, then "lúc".** A column or label that holds the time of an event names the event and ends
+  with "lúc": "Tạo lúc", "Đăng nhập lúc", "Kích hoạt lúc", "Gửi lúc", "Yêu cầu lúc", "Lỗi lúc", "Phát hành lúc". Never
+  "Thời điểm …".
 - **"Tạo" for an application, "Thêm" for a resource.** A button that makes a new application says "Tạo": "Tạo ứng
   dụng…". A button that makes a new resource of an application says "Thêm", as the resource joins the application:
   "Thêm đối tượng…", "Thêm tài nguyên…". English keeps "New application…" and "New entity…".
