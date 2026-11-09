@@ -42,9 +42,7 @@ export interface StudioPublishingHandle {
  * state in words, see `StudioBand`: the problems of `diagnostics`, which `onToggleProblems` opens as the `problems`
  * panel beside the page, then the release state. The request status, test results and
  * preview links show at the top of the content, under the band, then `children`, which is called with the release history
- * when it is a function, then the release list. The release
- * list keeps its own title unless `releasesView`, where the page's heading names it, and is hidden on `releasePage`,
- * where a release's own page stands in the content. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
+ * when it is a function. The release list follows only on `releasesView`, under the page's heading. Validate sends a validate request. Preview shows only when `previewHost` is set, and sends a
  * preview request. When it succeeds, a link to each of the application's `sites` on the preview host shows, built
  * from the page's protocol and port. A preview never shows a release number, because its release belongs to the
  * preview tenant's history. Publish opens a dialog for an optional label and note, then
@@ -79,7 +77,6 @@ export function StudioPublishing({
   newResource,
   problems,
   releasesView,
-  releasePage,
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
@@ -98,7 +95,6 @@ export function StudioPublishing({
   newResource: ReactNode
   problems: ReactNode
   releasesView: boolean
-  releasePage: boolean
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
@@ -325,13 +321,12 @@ export function StudioPublishing({
             </Flex>
           )}
           {typeof children === 'function' ? children(history) : children}
-          {history && history !== 'failed' && !releasePage && (
+          {releasesView && history && history !== 'failed' && (
             <StudioReleasesList
               application={application}
               history={history}
               canActivate={canPublish}
               busy={busy}
-              titled={!releasesView}
               onActivate={(row: StudioReleaseListRow) => activateRelease(row.releaseId)}
             />
           )}

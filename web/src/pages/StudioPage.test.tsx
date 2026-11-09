@@ -385,6 +385,22 @@ describe('StudioPage', () => {
     expect(screen.getByTestId('studio-band')).not.toHaveTextContent(/off-standard/i)
   })
 
+  it.each([
+    ['the Releases page', '&view=releases', true],
+    ['the Overview', '', false],
+    ['a resource', `&resource=${entityId}`, false],
+  ])('shows the release table on %s only when it is the Releases page', async (_name, view, shown) => {
+    stubServer()
+    renderPage(`/studio?app=PurchaseRequests${view}`)
+
+    expect(await screen.findByText('Not published yet')).toBeInTheDocument()
+    if (shown) {
+      expect(screen.getByTestId('studio-releases')).toBeInTheDocument()
+    } else {
+      expect(screen.queryByTestId('studio-releases')).not.toBeInTheDocument()
+    }
+  })
+
   describe('names', () => {
     const textId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff'
     const named: StudioResourceItem[] = [
@@ -1365,6 +1381,22 @@ describe('StudioPage publishing', () => {
     }
   }
 
+  function row(id: string, number: number, activatedAt: string) {
+    return {
+      releaseId: id,
+      number,
+      contentHash: `hash-${number}`,
+      activatedAt,
+      actor: 'author',
+      actorName: null,
+      label: null,
+      note: null,
+      requestId: null,
+      offStandard: false,
+      relaxed: [],
+    }
+  }
+
   /** `stubServer` where `/api/me` answers `me`, and the request routes answer in turn with `statuses`. */
   function stubPublishing(me: () => Response, statuses: unknown[] = []) {
     const fetchMock = stubServer()
@@ -1409,19 +1441,6 @@ describe('StudioPage publishing', () => {
         return json(answers.length > 1 ? answers.shift() : answers[0])
       }
       if (input === `${folder}/releases`) {
-        const row = (id: string, number: number, activatedAt: string) => ({
-          releaseId: id,
-          number,
-          contentHash: `hash-${number}`,
-          activatedAt,
-          actor: 'author',
-          actorName: null,
-          label: null,
-          note: null,
-          requestId: null,
-          offStandard: false,
-          relaxed: [],
-        })
         return json({
           active: { releaseId, number: 3, contentHash: 'hash-3' },
           folderContentHash: 'hash-3',
@@ -1508,6 +1527,107 @@ describe('StudioPage publishing', () => {
     expect(within(panel).getByText('AXC0900')).toBeInTheDocument()
     expect(within(panel).queryByText('AXC0101')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Validate' })).toBeEnabled()
+  })
+
+  it('shows the new release in the table after a publish from the band on the Releases page', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const fetchMock = stubPublishing(publisher, [
+      request('running'),
+      request('succeeded', { releaseId, diagnostics: [published] }),
+    ])
+    const base = fetchMock.getMockImplementation()!
+    let sent = false
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/publish` && init?.method === 'POST') {
+        sent = true
+      }
+      if (input === `${folder}/releases` && !sent) {
+        return json({
+          active: { releaseId: 'older', number: 2, contentHash: 'hash-2' },
+          folderContentHash: 'hash-2',
+          changes: [],
+          items: [row('older', 2, '2026-05-01T10:00:00Z')],
+        })
+      }
+      return base(input, init)
+    })
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    expect(
+      await within(await screen.findByTestId('studio-releases')).findAllByTestId('studio-release-row'),
+    ).toHaveLength(1)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish…' }))
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Publish' }))
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId('studio-releases'))
+          .getAllByTestId('studio-release-row')
+          .map((item) => item.dataset.number),
+      ).toEqual(['3', '2']),
+    )
+  })
+
+  it('activates an older release from the table on the Releases page and marks it live', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const fetchMock = stubPublishing(publisher, [
+      request('running', { kind: 'activate', releaseId: 'older' }),
+      request('succeeded', { kind: 'activate', releaseId: 'older' }),
+    ])
+    const base = fetchMock.getMockImplementation()!
+    let activated = false
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+      if (input === `${folder}/releases/older/activate` && init?.method === 'POST') {
+        activated = true
+        return json(request('queued', { kind: 'activate', releaseId: 'older' }), 202)
+      }
+      if (input === `${folder}/releases/2`) {
+        return json({
+          number: 2,
+          previous: 3,
+          previousIsLive: true,
+          live: false,
+          changes: [],
+          partChanges: [],
+          modules: [],
+          packages: [],
+          blockers: [],
+        })
+      }
+      if (input === `${folder}/releases` && activated) {
+        return json({
+          active: { releaseId: 'older', number: 2, contentHash: 'hash-2' },
+          folderContentHash: 'hash-2',
+          changes: [],
+          items: [row(releaseId, 3, '2026-05-02T10:00:00Z'), row('older', 2, '2026-05-01T10:00:00Z')],
+        })
+      }
+      return base(input, init)
+    })
+    renderPage('/studio?app=PurchaseRequests&view=releases')
+    const olderRow = async () =>
+      (await within(await screen.findByTestId('studio-releases')).findAllByTestId('studio-release-row')).find(
+        (item) => item.dataset.number === '2',
+      )!
+    expect(await olderRow()).not.toHaveAttribute('data-active')
+
+    await userEvent.click(
+      await within(await screen.findByTestId('studio-releases')).findByRole('button', { name: 'Activate release 2' }),
+    )
+    await userEvent.click(await within(screen.getByRole('dialog')).findByRole('button', { name: 'Activate' }))
+
+    await vi.advanceTimersByTimeAsync(1000)
+    await vi.advanceTimersByTimeAsync(1000)
+    await waitFor(() => expect(screen.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded'))
+    await waitFor(async () => expect(await olderRow()).toHaveAttribute('data-active', 'true'))
+    expect(
+      fetchMock.mock.calls.some(
+        ([input, init]) => input === `${folder}/releases/older/activate` && init?.method === 'POST',
+      ),
+    ).toBe(true)
   })
 
   it('shows the quota title when a publish is refused past the storage quota', async () => {

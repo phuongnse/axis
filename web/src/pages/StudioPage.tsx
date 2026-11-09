@@ -171,8 +171,8 @@ type ManifestState = { application: string; resource: StudioResource | null }
  * A New application… item ends the application row's menu in the sidebar, and a button also sits on the list. Both show
  * only when `GET /api/me` answers `studioCreate: true`. A created application joins the menu and is picked at once.
  * Validate and Publish sit in the band, and Publish shows only when `GET /api/me` answers
- * `studioPublisher: true`. Under the content, the release list shows the application's releases, with an Activate… button
- * for a publisher. A save, a text write or a delete loads the release list again, because the folder may now differ from the
+ * `studioPublisher: true`. On the Releases view the release list shows the application's releases, with an Activate… button
+ * for a publisher. A save, a text write or a delete loads the release history again, because the folder may now differ from the
  * active release. The Problems panel shows the diagnostics of a request that ended. When the server does not
  * answer, a reconnect message shows at the top. Studio checks the server with a
  * back-off, then loads its data again, and an unsaved draft stays on screen. The names that the reference pickers
@@ -577,7 +577,6 @@ function StudioWorkspace() {
               )
             }
             releasesView={releasesView}
-            releasePage={releasePage}
             onDiagnostics={(diagnostics) =>
               setFolder((current) =>
                 current && current.application === application && 'resources' in current

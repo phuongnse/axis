@@ -793,6 +793,7 @@ for (const mode of modes) {
     const sidebar = state.getByRole("menu");
 
     await expect(heading("Purchase requests")).toBeVisible();
+    await expect(state.getByTestId("studio-releases")).toHaveCount(0);
     await sidebar
       .getByRole("menuitem", { name: "Settings", exact: true })
       .click();
@@ -805,6 +806,7 @@ for (const mode of modes) {
       .getByRole("menuitem", { name: "Releases", exact: true })
       .click();
     await expect(heading("Releases")).toBeVisible();
+    await expect(state.getByTestId("studio-releases")).toBeVisible();
     await sidebar
       .getByRole("menuitem", { name: "Overview", exact: true })
       .click();

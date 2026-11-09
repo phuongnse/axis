@@ -29,7 +29,7 @@ test.describe('the author builds an application from the built-in Approvals appl
 
   test('the author publishes OfficeApprovals, and release 1 is active', async ({ page }) => {
     await useJourneySession(page, 'author')
-    await page.goto(`${journeyURL}/studio?app=OfficeApprovals`)
+    await page.goto(`${journeyURL}/studio?app=OfficeApprovals&view=releases`)
 
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')

@@ -49,6 +49,10 @@ test.describe('the journey tenant publishes a Studio application', () => {
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(new RegExp(`app=${name}$`))
 
+    await page
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('link', { name: 'Releases', exact: true })
+      .click()
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {

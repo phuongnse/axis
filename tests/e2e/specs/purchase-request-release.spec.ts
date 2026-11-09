@@ -110,9 +110,17 @@ async function writeInStudio(page: Page, serverUrl: string, file: string, pointe
 /** Opens Studio for the purchase request sample and waits for Publish. A hang here leaves evidence. */
 async function openStudio(page: Page, serverUrl: string) {
   await guardStep(page, test.info(), 'Opening Studio', 60_000, async () => {
-    await page.goto(`${serverUrl}/studio?app=PurchaseRequests`)
+    await page.goto(`${serverUrl}/studio?app=PurchaseRequests&view=releases`)
     await expect(page.getByRole('button', { name: 'Publish…', exact: true })).toBeVisible()
   })
+}
+
+/** Opens the Releases page of the open application from the sidebar, where the release list is. */
+async function openReleases(page: Page) {
+  await page
+    .getByRole('navigation', { name: 'Menu', exact: true })
+    .getByRole('link', { name: 'Releases', exact: true })
+    .click()
 }
 
 /** Sets the en and vi texts of the key `key` through Studio's text route, as the signed-in author. */
@@ -264,6 +272,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await confirmDialog(page, 'Relax')
       await expect(page.getByTestId(`studio-contract-relaxed-${point}`)).toBeVisible()
 
+      await openReleases(page)
       await publishWithLabel(page, label)
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
         timeout: 60_000,
@@ -477,6 +486,7 @@ test.describe('the active release of the purchase request sample changes', () =>
           next: 'markApproved',
         })
 
+        await openReleases(page)
         await publishWithLabel(page, labelA)
         await expect(status).toHaveAttribute('data-status', 'succeeded', {
           timeout: 120_000,
@@ -691,7 +701,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const rows = page.getByTestId('studio-release-row')
     try {
       await useSession(page, 'author')
-      await page.goto(`${server.url}/studio?app=${name}`)
+      await page.goto(`${server.url}/studio?app=${name}&view=releases`)
       await publishWithLabel(page, 'Before the rename')
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
         timeout: 60_000,
@@ -794,7 +804,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByText(new RegExp(title))).toHaveCount(0)
 
       await useSession(page, 'author')
-      await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&view=releases`)
       await publishWithLabel(page, label)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
       const published = page.getByTestId('studio-release-row').filter({ hasText: label })
@@ -821,7 +831,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       }).toPass({ timeout: 30_000 })
 
       await useSession(page, 'author')
-      await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&view=releases`)
       await page
         .locator(`[data-testid="studio-release-row"][data-number="${before.number}"]`)
         .first()

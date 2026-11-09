@@ -1426,7 +1426,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   test('the author publishes ServiceDesk, and release 1 is active', async ({ page }) => {
     await useJourneySession(page, 'author')
-    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk&view=releases`)
 
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')
