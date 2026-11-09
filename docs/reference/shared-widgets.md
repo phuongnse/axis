@@ -41,6 +41,7 @@ Each common job has one shared widget or helper:
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
+| A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 
 ## What the build checks
 

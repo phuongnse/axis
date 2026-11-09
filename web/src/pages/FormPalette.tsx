@@ -1,12 +1,12 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Typography } from 'antd'
 import { useContext, type PointerEventHandler } from 'react'
+import { Announcement } from '../platform/Announcement'
 import { addSection, addStep, insertionPlace, paletteFields } from '../platform/formLayout'
 import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
-import { visuallyHidden } from '../platform/visuallyHidden'
 import { insertField } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
 import type { ChangeHandler } from './SchemaForm'
@@ -87,9 +87,7 @@ export function FormPalette({
             {t('shell.studio.design.addStep')}
           </Button>
         </Flex>
-        <div role="status" aria-live="polite" data-testid="studio-form-palette-announcement" style={visuallyHidden}>
-          {announcement}
-        </div>
+        <Announcement testId="studio-form-palette-announcement">{announcement}</Announcement>
       </Flex>
     </div>
   )

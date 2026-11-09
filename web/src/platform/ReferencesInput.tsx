@@ -1,11 +1,11 @@
 import { Flex } from 'antd'
 import { useRef, useState } from 'react'
+import { Announcement } from './Announcement'
 import { AxisButton } from './AxisButton'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { RecordItem } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
-import { visuallyHidden } from './visuallyHidden'
 
 interface ReferencesInputProps {
   /** The references field to choose records for. Its `target` is not `null`. */
@@ -88,14 +88,7 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
         {t('shell.form.add')}
       </AxisButton>
       <ReferenceLookup field={field} title={title} open={open} onPick={pick} onClose={() => setOpen(false)} />
-      <div
-        role="status"
-        aria-live="polite"
-        style={visuallyHidden}
-        data-testid={`references-${field.name}-announcement`}
-      >
-        {announcement}
-      </div>
+      <Announcement testId={`references-${field.name}-announcement`}>{announcement}</Announcement>
     </div>
   )
 }

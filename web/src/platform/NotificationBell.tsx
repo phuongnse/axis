@@ -2,6 +2,7 @@ import { BellOutlined } from '@ant-design/icons'
 import { Alert, Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
+import { Announcement } from './Announcement'
 import { formatValue } from './formatValue'
 import {
   fetchNotifications,
@@ -123,9 +124,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
           <BellOutlined aria-hidden />
         </Badge>
       </Button>
-      <span role="status" aria-live="polite" style={visuallyHidden}>
-        {named}
-      </span>
+      <Announcement>{named}</Announcement>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
         <Flex vertical gap={spacing.md}>
           {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
