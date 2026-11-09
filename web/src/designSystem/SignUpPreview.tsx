@@ -45,7 +45,7 @@ export function SignUpPreview({ businessName, send }: { businessName?: string; s
       return
     }
     if (send.email) {
-      typeInto(root, 'sign-up_fullName', 'Nguyễn Thị Lan')
+      typeInto(root, 'sign-up_fullName', 'Alex Morgan')
       typeInto(root, 'sign-up_email', send.email)
       root.querySelector<HTMLInputElement>('#sign-up_terms')?.click()
     }

@@ -4,7 +4,7 @@ import { suggestSubdomain } from '../../sign-up/suggestSubdomain'
 // and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
 
 /** The business name that the states with a subdomain type. */
-export const signUpBusinessName = 'An Phát Trading'
+export const signUpBusinessName = 'Contoso Trading'
 
 const sendPath = '/api/sign-up'
 const resendPath = '/api/sign-up/resend'

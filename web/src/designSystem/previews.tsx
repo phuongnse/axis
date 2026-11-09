@@ -316,11 +316,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Sent empty', fixtures: signUpFixtures.sentEmpty, draw: () => <SignUpPreview send={{}} /> },
     ...(
       [
-        ['Email refused', signUpFixtures.emailRefused, 'lan@mailinator.com'],
-        ['Terms changed', signUpFixtures.termsChanged, 'lan.nguyen@anphat.vn'],
-        ['Too many sign-ups', signUpFixtures.tooMany, 'lan.nguyen@anphat.vn'],
-        ['Send failed', signUpFixtures.sendFailed, 'lan.nguyen@anphat.vn'],
-        ['Check your inbox', signUpFixtures.inbox, 'lan.nguyen@anphat.vn'],
+        ['Email refused', signUpFixtures.emailRefused, 'alex@disposable.example'],
+        ['Terms changed', signUpFixtures.termsChanged, 'alex.morgan@contoso.example'],
+        ['Too many sign-ups', signUpFixtures.tooMany, 'alex.morgan@contoso.example'],
+        ['Send failed', signUpFixtures.sendFailed, 'alex.morgan@contoso.example'],
+        ['Check your inbox', signUpFixtures.inbox, 'alex.morgan@contoso.example'],
       ] as const
     ).map(([caption, fixtures, email]) => ({
       caption,
@@ -336,7 +336,10 @@ export const previews: Record<string, readonly PreviewState[]> = {
       caption,
       fixtures,
       draw: () => (
-        <SignUpPreview businessName={signUpBusinessName} send={{ email: 'lan.nguyen@anphat.vn', resend: true }} />
+        <SignUpPreview
+          businessName={signUpBusinessName}
+          send={{ email: 'alex.morgan@contoso.example', resend: true }}
+        />
       ),
     })),
   ].map((state) => ({ ...state, frameHeight: 850 })),
