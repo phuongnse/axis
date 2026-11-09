@@ -56,6 +56,8 @@ const drawnPaths = [
   'steps.escalations.reassign.user',
   'steps.escalations.reassign.role',
   'steps.escalations.notify',
+  'steps.escalations.notify.message.values',
+  'steps.escalations.notify.open.parameters',
   'steps.timer',
   'steps.wait',
   'steps.until',
@@ -70,6 +72,24 @@ const drawnPaths = [
   'steps.outcomes.name',
   'steps.outcomes.label',
   'steps.outcomes.next',
+  'steps.operation',
+  'steps.packageOperation',
+  'steps.connector',
+  'steps.connector.name',
+  'steps.connector.operation',
+  'steps.set',
+  'steps.fields',
+  'steps.entity',
+  'steps.input',
+  'steps.input.fields',
+  'steps.input.from',
+  'steps.output',
+  'steps.retry',
+  'steps.retry.attempts',
+  'steps.retry.backoff',
+  'steps.parameters',
+  'steps.message.values',
+  'steps.open.parameters',
 ]
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
@@ -718,6 +738,59 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     await chooseOption('OrderFulfilment', screen.getByTestId('studio-field-/steps/0/process'))
     expect(stepOf(latest, 0)).toEqual({ name: 'fulfil', type: 'subProcess', process: 'OrderFulfilment', next: 'done' })
+  })
+
+  it('describes the parameters of a sub-process whose child has no subject by their help', async () => {
+    renderEditor({
+      ...process,
+      steps: [
+        { name: 'fulfil', type: 'subProcess', process: '', next: 'done' },
+        { name: 'done', type: 'end' },
+      ],
+    })
+
+    await chooseOption('DailyReminder', screen.getByTestId('studio-field-/steps/0/process'))
+
+    const parameters = within(screen.getByTestId('studio-field-/steps/0/parameters'))
+    expect(parameters.getByRole('group', { name: label('steps.parameters') })).toHaveAccessibleDescription(
+      help('steps.parameters'),
+    )
+  })
+
+  it('describes the placeholder values and the page parameters of an escalation notify by their help', () => {
+    renderEditor({
+      ...complete,
+      steps: [
+        {
+          ...complete.steps[0],
+          escalations: [
+            {
+              name: 'late',
+              after: 'PT4H',
+              notify: {
+                to: [],
+                channels: [],
+                message: { subject: { textKey: '' }, body: { textKey: '' }, values: { n: 'number' } },
+                open: { page: 'P', parameters: {} },
+              },
+            },
+          ],
+        },
+        ...complete.steps.slice(1),
+      ],
+    })
+    const escalation = (path: string) => english[`shell.studio.field.process.steps.escalations.notify.${path}`]
+
+    expect(
+      within(screen.getByTestId('studio-field-/steps/0/escalations/0/notify/message/values')).getByRole('group', {
+        name: escalation('message.values'),
+      }),
+    ).toHaveAccessibleDescription(escalation('message.values.help'))
+    expect(
+      within(screen.getByTestId('studio-field-/steps/0/escalations/0/notify/open/parameters')).getByRole('group', {
+        name: escalation('open.parameters'),
+      }),
+    ).toHaveAccessibleDescription(escalation('open.parameters.help'))
   })
 
   it('changes only the process of a sub-process whose child is not in the names list', async () => {

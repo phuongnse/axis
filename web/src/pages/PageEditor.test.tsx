@@ -520,6 +520,16 @@ describe('PageEditor navigate actions', () => {
     expect(action.parameters).toEqual({ item: 'id' })
   })
 
+  it('names the parameters of a row navigate to an unknown page as a group described by their help', () => {
+    renderEditor(page({ ...table, rowActions: [{ ...navigate, page: 'Unsaved' }] }))
+
+    expect(
+      within(screen.getByTestId(`${rows}/0/parameters`)).getByRole('group', {
+        name: platformEnglish['shell.studio.field.page.widgets.rowActions.parameters'],
+      }),
+    ).toHaveAccessibleDescription(platformEnglish['shell.studio.field.page.widgets.rowActions.parameters.help'])
+  })
+
   const toReviewList = { ...navigate, page: 'ReviewList' }
 
   function firstAction(saved: () => Record<string, unknown>) {

@@ -1,5 +1,6 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext } from 'react'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { expressionScope } from './expressionScope'
@@ -23,6 +24,7 @@ export type MappingTarget = { kind: 'expression' } | { kind: 'field'; label: str
 export function MappingRows({
   pointer,
   title,
+  help,
   value,
   keyLabel,
   keyOptions,
@@ -31,6 +33,7 @@ export function MappingRows({
 }: {
   pointer: string
   title: string
+  help: string
   value: unknown
   keyLabel: string
   keyOptions?: string[]
@@ -43,10 +46,11 @@ export function MappingRows({
   if (value !== undefined && (typeof value !== 'object' || value === null || Array.isArray(value))) {
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <div>{title}</div>
-        <Typography.Text type="secondary" data-testid="studio-json-only">
-          {t('shell.studio.editInJson')}
-        </Typography.Text>
+        <AxisFieldGroup title={title} help={help}>
+          <Typography.Text type="secondary" data-testid="studio-json-only">
+            {t('shell.studio.editInJson')}
+          </Typography.Text>
+        </AxisFieldGroup>
       </div>
     )
   }
@@ -66,95 +70,98 @@ export function MappingRows({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{title}</Typography.Text>
-        {entries.map(([key, entry], index) => {
-          const rowPointer = `${pointer}/${escapeSegment(key)}`
-          const text = typeof entry === 'string' ? entry : ''
-          return (
-            <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
-              <div>
-                {keyOptions === undefined ? (
-                  <Input aria-label={keyLabel} value={key} onChange={(event) => rename(key, event.target.value)} />
-                ) : (
-                  <ReferencePicker
-                    name={keyLabel}
-                    value={key}
-                    required
-                    options={keyOptions}
-                    onChange={(next) => rename(key, next ?? '')}
-                  />
-                )}
-              </div>
-              {typeof entry === 'object' && entry !== null ? (
-                <Typography.Text type="secondary" data-testid="studio-json-only" style={{ flex: 1, minWidth: 240 }}>
-                  {t('shell.studio.editInJson')}
-                </Typography.Text>
-              ) : (
-                <div style={{ flex: 1, minWidth: 240 }}>
-                  {target.kind === 'field' ? (
-                    target.options === undefined ? (
-                      <Input
-                        aria-label={target.label}
-                        value={text}
-                        onChange={(event) => onChange(rowPointer, event.target.value)}
-                      />
-                    ) : (
-                      <ReferencePicker
-                        name={target.label}
-                        value={text}
-                        required
-                        options={target.options}
-                        onChange={(next) => onChange(rowPointer, next ?? '')}
-                      />
-                    )
-                  ) : check ? (
-                    <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly aria-busy="true" />}>
-                      <LazyExpressionEditor
-                        application={check.application}
-                        resourceId={check.resourceId}
-                        path={rowPointer}
-                        name={expressionName}
-                        value={text}
-                        required
-                        options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
-                        onChange={onChange}
-                      />
-                    </Suspense>
+      <AxisFieldGroup title={title} help={help}>
+        <Flex vertical gap="small">
+          {entries.map(([key, entry], index) => {
+            const rowPointer = `${pointer}/${escapeSegment(key)}`
+            const text = typeof entry === 'string' ? entry : ''
+            return (
+              <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
+                <div>
+                  {keyOptions === undefined ? (
+                    <Input aria-label={keyLabel} value={key} onChange={(event) => rename(key, event.target.value)} />
                   ) : (
-                    <Input
-                      aria-label={expressionName}
-                      value={text}
-                      onChange={(event) => onChange(rowPointer, event.target.value)}
+                    <ReferencePicker
+                      name={keyLabel}
+                      value={key}
+                      required
+                      options={keyOptions}
+                      onChange={(next) => rename(key, next ?? '')}
                     />
                   )}
                 </div>
-              )}
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
-            </Flex>
-          )
-        })}
-        <div>
-          {keyOptions === undefined ? (
-            // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-            <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
-              {t('shell.studio.process.addMapping')}
-            </Button>
-          ) : (
-            <Select
-              aria-label={`${t('shell.studio.process.addMapping')} ${title}`}
-              placeholder={t('shell.studio.process.addMapping')}
-              style={{ minWidth: 240 }}
-              showSearch
-              virtual={false}
-              value={null}
-              options={unmapped.map((option) => ({ value: option, label: option }))}
-              onChange={(next: string) => onChange(`${pointer}/${escapeSegment(next)}`, '')}
-            />
-          )}
-        </div>
-      </Flex>
+                {typeof entry === 'object' && entry !== null ? (
+                  <Typography.Text type="secondary" data-testid="studio-json-only" style={{ flex: 1, minWidth: 240 }}>
+                    {t('shell.studio.editInJson')}
+                  </Typography.Text>
+                ) : (
+                  <div style={{ flex: 1, minWidth: 240 }}>
+                    {target.kind === 'field' ? (
+                      target.options === undefined ? (
+                        <Input
+                          aria-label={target.label}
+                          value={text}
+                          onChange={(event) => onChange(rowPointer, event.target.value)}
+                        />
+                      ) : (
+                        <ReferencePicker
+                          name={target.label}
+                          value={text}
+                          required
+                          options={target.options}
+                          onChange={(next) => onChange(rowPointer, next ?? '')}
+                        />
+                      )
+                    ) : check ? (
+                      <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly aria-busy="true" />}>
+                        <LazyExpressionEditor
+                          application={check.application}
+                          resourceId={check.resourceId}
+                          path={rowPointer}
+                          name={expressionName}
+                          value={text}
+                          required
+                          options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
+                          onChange={onChange}
+                        />
+                      </Suspense>
+                    ) : (
+                      <Input
+                        aria-label={expressionName}
+                        value={text}
+                        onChange={(event) => onChange(rowPointer, event.target.value)}
+                      />
+                    )}
+                  </div>
+                )}
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                <Button onClick={() => onChange(rowPointer, undefined)}>
+                  {t('shell.studio.process.removeMapping')}
+                </Button>
+              </Flex>
+            )
+          })}
+          <div>
+            {keyOptions === undefined ? (
+              // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+              <Button disabled={entries.some(([key]) => key === '')} onClick={() => onChange(`${pointer}/`, '')}>
+                {t('shell.studio.process.addMapping')}
+              </Button>
+            ) : (
+              <Select
+                aria-label={`${t('shell.studio.process.addMapping')} ${title}`}
+                placeholder={t('shell.studio.process.addMapping')}
+                style={{ minWidth: 240 }}
+                showSearch
+                virtual={false}
+                value={null}
+                options={unmapped.map((option) => ({ value: option, label: option }))}
+                onChange={(next: string) => onChange(`${pointer}/${escapeSegment(next)}`, '')}
+              />
+            )}
+          </div>
+        </Flex>
+      </AxisFieldGroup>
     </div>
   )
 }

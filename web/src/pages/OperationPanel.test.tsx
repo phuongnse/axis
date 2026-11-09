@@ -928,6 +928,70 @@ describe('A package operation step', () => {
   })
 })
 
+describe('The operation panel field texts', () => {
+  const texts = platformEnglish as Record<string, string>
+  const label = (path: string) => texts[`shell.studio.field.process.${path}`]
+  const help = (path: string) => texts[`shell.studio.field.process.${path}.help`]
+  const renderStep = (value: Record<string, unknown>) =>
+    renderEditor(false, {
+      ...process,
+      steps: [
+        { name: 'act', type: 'operation', ...value, next: 'done' },
+        { name: 'done', type: 'end' },
+      ],
+    })
+  const connector = { name: 'Bill', operation: 'charge' }
+
+  it.each([
+    ['steps.operation', 'combobox', { operation: 'updateRecord' }],
+    ['steps.packageOperation', 'textbox', { operation: 'billing/charge' }],
+    ['steps.entity', 'textbox', { operation: 'createRecord', entity: 'Order' }],
+    ['steps.event', 'textbox', { operation: 'raiseEvent', event: 'Paid' }],
+    ['steps.connector.name', 'textbox', { operation: 'callConnector', connector }],
+    ['steps.connector.operation', 'textbox', { operation: 'callConnector', connector }],
+    [
+      'steps.input.from',
+      'textbox',
+      { operation: 'callConnector', connector, input: { lines: { from: 'lines', fields: {} } } },
+    ],
+    ['steps.retry.attempts', 'spinbutton', { operation: 'callConnector', connector, retry: { attempts: 3 } }],
+    ['steps.retry.backoff', 'textbox', { operation: 'callConnector', connector, retry: { backoff: 'PT5S' } }],
+  ])('describes the %s field by its help', (path, role, value) => {
+    renderStep(value)
+
+    expect(screen.getByRole(role, { name: label(path) })).toHaveAccessibleDescription(help(path))
+  })
+
+  it.each([
+    ['steps.set', { operation: 'updateRecord', set: {} }],
+    ['steps.fields', { operation: 'raiseEvent', event: 'Paid', fields: {} }],
+    ['steps.input', { operation: 'callConnector', connector, input: {} }],
+    ['steps.output', { operation: 'callConnector', connector, output: {} }],
+    ['steps.retry', { operation: 'callConnector', connector, retry: { attempts: 3 } }],
+    ['steps.connector', { operation: 'callConnector', connector: 'Bill' }],
+    ['steps.message.values', { operation: 'notify', message: { values: {} } }],
+    ['steps.open.parameters', { operation: 'notify', open: { page: 'P', parameters: {} } }],
+  ])('titles the %s group and describes it by its help', (path, value) => {
+    renderStep(value)
+
+    expect(screen.getAllByRole('group', { name: label(path) })[0]).toHaveAccessibleDescription(help(path))
+  })
+
+  it('describes the nested fields of an object input and of a list input', () => {
+    renderStep({
+      operation: 'callConnector',
+      connector,
+      input: { address: { fields: { city: 'c' } }, lines: { from: 'lines', fields: { sku: 'sku' } } },
+    })
+
+    const groups = screen.getAllByRole('group', { name: label('steps.input.fields') })
+    expect(groups).toHaveLength(2)
+    for (const group of groups) {
+      expect(group).toHaveAccessibleDescription(help('steps.input.fields'))
+    }
+  })
+})
+
 describe('withOperation', () => {
   const full = {
     name: 's',

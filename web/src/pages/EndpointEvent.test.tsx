@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
@@ -137,6 +138,21 @@ describe('EndpointEvent', () => {
 
     expect(onChange).toHaveBeenLastCalledWith('/event/fields', { note: 'a', reference: 'r' })
     expect(Object.keys(onChange.mock.calls[0][1] as object)).toEqual(['note', 'reference'])
+  })
+
+  it('names the event fields as a group described by their help', () => {
+    renderEvent({ name: 'PaymentReceived', fields: { amount: 'a' } })
+
+    expect(screen.getByRole('group', { name: 'Event fields' })).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.field.endpoint.event.fields.help'],
+    )
+  })
+
+  it('has a label and a help for the event fields in English and Vietnamese', () => {
+    for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+      expect(catalogue['shell.studio.field.endpoint.event.fields']).toBeTruthy()
+      expect(catalogue['shell.studio.field.endpoint.event.fields.help']).toBeTruthy()
+    }
   })
 
   it('removes a row by its payload field', async () => {

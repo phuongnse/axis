@@ -2,6 +2,7 @@ import { Button, Checkbox, Flex, Radio, Typography } from 'antd'
 import { useContext } from 'react'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { MappingRows } from './MappingRows'
 import { Expression, NamePicker } from './ProcessFields'
@@ -38,15 +39,18 @@ function JsonOnly({ pointer, title }: { pointer: string; title: string }) {
 /**
  * The editor of a notification: its recipients, channels, subject and body, placeholder values and an optional page
  * to open. `pointer` is the object that holds the `to`, `channels`, `message` and `open` keys, and the editor never
- * shows the `next` of a step that holds them, so a task's escalation can use it too. Each value is edited through its
- * own pointer, and an empty list stays in the draft for the compiler to report.
+ * shows the `next` of a step that holds them, so a task's escalation can use it too. `path` is that object's path in the
+ * process, from the root, which names the texts of its groups, see docs/reference/studio-resource-form.md#fields. Each
+ * value is edited through its own pointer, and an empty list stays in the draft for the compiler to report.
  */
 export function NotifyFields({
   pointer,
+  path,
   value,
   onChange,
 }: {
   pointer: string
+  path: string
   value: Content
   onChange: ChangeHandler
 }) {
@@ -54,8 +58,8 @@ export function NotifyFields({
     <>
       <Recipients pointer={`${pointer}/to`} value={value.to} onChange={onChange} />
       <Channels pointer={`${pointer}/channels`} value={value.channels} onChange={onChange} />
-      <Message pointer={`${pointer}/message`} value={value.message} onChange={onChange} />
-      <OpenPage pointer={`${pointer}/open`} value={value.open} onChange={onChange} />
+      <Message pointer={`${pointer}/message`} path={path} value={value.message} onChange={onChange} />
+      <OpenPage pointer={`${pointer}/open`} path={path} value={value.open} onChange={onChange} />
     </>
   )
 }
@@ -158,8 +162,19 @@ function Channels({ pointer, value, onChange }: { pointer: string; value: unknow
 }
 
 /** The subject and body, which are text references, and the placeholder values that fill the `{name}` in them. */
-function Message({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
+function Message({
+  pointer,
+  path,
+  value,
+  onChange,
+}: {
+  pointer: string
+  path: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
   const t = useText()
+  const { group } = useFieldTexts('process')
   if (value !== undefined && !isContent(value)) {
     return <JsonOnly pointer={pointer} title={t('shell.studio.process.notifySubject')} />
   }
@@ -183,7 +198,7 @@ function Message({ pointer, value, onChange }: { pointer: string; value: unknown
         </div>
         <MappingRows
           pointer={`${pointer}/values`}
-          title={t('shell.studio.process.placeholderValues')}
+          {...group(`${path}.message.values`)}
           value={message.values}
           keyLabel={t('shell.studio.process.placeholder')}
           target={{ kind: 'expression' }}
@@ -195,8 +210,19 @@ function Message({ pointer, value, onChange }: { pointer: string; value: unknown
 }
 
 /** The optional page to open: a checkbox, then the page and its parameters, which are keyed by the page's own. */
-function OpenPage({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
+function OpenPage({
+  pointer,
+  path,
+  value,
+  onChange,
+}: {
+  pointer: string
+  path: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
   const t = useText()
+  const { group } = useFieldTexts('process')
   const names = useContext(StudioNamesContext)
   if (value !== undefined && !isContent(value)) {
     return <JsonOnly pointer={pointer} title={t('shell.studio.process.openPage')} />
@@ -228,7 +254,7 @@ function OpenPage({ pointer, value, onChange }: { pointer: string; value: unknow
             />
             <MappingRows
               pointer={`${pointer}/parameters`}
-              title={t('shell.studio.process.pageParameters')}
+              {...group(`${path}.open.parameters`)}
               value={open.parameters}
               keyLabel={t('shell.studio.page.parameterName')}
               keyOptions={picked?.parameters.map((parameter) => parameter.name)}
