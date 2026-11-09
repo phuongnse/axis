@@ -1,3 +1,6 @@
+using System.Buffers;
+using System.Buffers.Text;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.ControlPlane.Emails;
@@ -13,6 +16,7 @@ internal static class SignUpEndpoints
 {
     private const int MaxTextLength = 200;
     private const int MaxEmailLength = 254;
+    private const int TokenBytes = 32;
 
     public static void MapSignUpEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -31,6 +35,14 @@ internal static class SignUpEndpoints
         // See docs/reference/sign-up.md#sending-the-form. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
         // and queues the confirm email in the same transaction. The answer has no body yet. Without the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
+
+        // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
+        // expired token answers expired, so a caller learns nothing about the sign-ups it does not hold.
+        endpoints.MapPost("/api/sign-up/verification", VerifyAsync);
+
+        // See docs/reference/sign-up.md#the-verify-page. One conditional update marks a pending, unexpired sign-up verified, so a link
+        // works once and two parallel confirms cannot both succeed. A used or expired link answers 409 with its state.
+        endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
 
         // The region's built-in applications from the settings, each with its id, its title and its description in both languages.
         endpoints.MapGet("/api/sign-up/applications", (ControlPlaneOptions options) => Results.Ok(new
@@ -83,24 +95,10 @@ internal static class SignUpEndpoints
             return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
-        if (!JsonRequest.IsJson(request))
-        {
-            return JsonRequest.UnsupportedMediaType();
-        }
-
-        JsonObject? body;
-        try
-        {
-            body = await JsonNode.ParseAsync(request.Body, cancellationToken: cancellationToken) as JsonObject;
-        }
-        catch (Exception exception) when (exception is JsonException or ArgumentException)
-        {
-            body = null;
-        }
-
+        var (body, refused) = await ReadBodyAsync(request, cancellationToken);
         if (body is null)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The request body must be a JSON object.");
+            return refused!;
         }
 
         // Every field is checked in one pass, so the person sees all that is wrong at once.
@@ -195,6 +193,107 @@ internal static class SignUpEndpoints
         }
 
         return Results.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    private static async Task<IResult> VerifyAsync(HttpRequest request, ControlPlaneOptions options, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)
+    {
+        var (body, refused) = await ReadBodyAsync(request, cancellationToken);
+        if (body is null)
+        {
+            return refused!;
+        }
+
+        var found = await FindAsync(controlPlane, TokenHash(body), cancellationToken);
+        return found.State switch
+        {
+            "pending" => Results.Ok(new { state = "pending", email = found.Email, businessName = found.BusinessName, address = SignUpAddress.Of(options, found.Subdomain) }),
+            _ => Results.Ok(new { state = found.State }),
+        };
+    }
+
+    private static async Task<IResult> ConfirmAsync(HttpRequest request, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)
+    {
+        var (body, refused) = await ReadBodyAsync(request, cancellationToken);
+        if (body is null)
+        {
+            return refused!;
+        }
+
+        var hash = TokenHash(body);
+        if (hash is not null)
+        {
+            await using var confirm = controlPlane.CreateCommand(
+                "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id");
+            confirm.Parameters.AddWithValue("hash", hash);
+            if (await confirm.ExecuteScalarAsync(cancellationToken) is Guid id)
+            {
+                return Results.Ok(new { id });
+            }
+        }
+
+        // The update found nothing to confirm: the link was used, ran out or was never issued. A pending answer means the link ran out in between.
+        var found = await FindAsync(controlPlane, hash, cancellationToken);
+        return Results.Json(new { state = found.State is "confirmed" ? "confirmed" : "expired" }, statusCode: StatusCodes.Status409Conflict);
+    }
+
+    // The state of a link: pending within its 24 hours, confirmed or expired. No row, or a link that ran out before the expiry job marked it, is expired.
+    private static async Task<(string State, string Email, string BusinessName, string Subdomain)> FindAsync(NpgsqlDataSource controlPlane, byte[]? hash, CancellationToken cancellationToken)
+    {
+        if (hash is not null)
+        {
+            await using var read = controlPlane.CreateCommand(
+                "SELECT state, expires_at > now(), email, business_name, subdomain FROM control_plane.sign_ups WHERE token_hash = @hash");
+            read.Parameters.AddWithValue("hash", hash);
+            await using var reader = await read.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                var state = reader.GetString(0) switch
+                {
+                    "verified" => "confirmed",
+                    "pending" when reader.GetBoolean(1) => "pending",
+                    _ => "expired",
+                };
+                return (state, reader.GetString(2), reader.GetString(3), reader.GetString(4));
+            }
+        }
+
+        return ("expired", "", "", "");
+    }
+
+    // The SHA-256 of the token of a body, or null when the token is missing, not a string or not 32 bytes of base64url.
+    private static byte[]? TokenHash(JsonObject body)
+    {
+        if (body["token"] is not JsonValue value || !value.TryGetValue<string>(out var token))
+        {
+            return null;
+        }
+
+        var bytes = new byte[TokenBytes];
+        var status = Base64Url.DecodeFromChars(token, bytes, out _, out var written);
+        return status == OperationStatus.Done && written == TokenBytes ? SHA256.HashData(bytes) : null;
+    }
+
+    // The body as a JSON object, or the answer that refuses it: 415 for a body that is not JSON and 400 for one that is not an object.
+    private static async Task<(JsonObject? Body, IResult? Refused)> ReadBodyAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        if (!JsonRequest.IsJson(request))
+        {
+            return (null, JsonRequest.UnsupportedMediaType());
+        }
+
+        JsonObject? body;
+        try
+        {
+            body = await JsonNode.ParseAsync(request.Body, cancellationToken: cancellationToken) as JsonObject;
+        }
+        catch (Exception exception) when (exception is JsonException or ArgumentException)
+        {
+            body = null;
+        }
+
+        return body is null
+            ? (null, Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The request body must be a JSON object."))
+            : (body, null);
     }
 
     // The text of a field that is a string and not blank, or null.

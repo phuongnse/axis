@@ -212,6 +212,115 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         await AssertNothingStoredAsync();
     }
 
+    [Fact]
+    public async Task Verification_of_the_emailed_link_answers_pending_with_the_sign_up_and_changes_nothing()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, subdomain, token) = await SignUpAsync(client);
+        var before = await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE email = '{address}'");
+
+        var response = await client.PostAsJsonAsync("/api/sign-up/verification", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var answer = await response.Content.ReadFromJsonAsync<JsonElement>(cancellation);
+        Assert.Equal("pending", answer.GetProperty("state").GetString());
+        Assert.Equal(address, answer.GetProperty("email").GetString());
+        Assert.Equal("Contoso Trading", answer.GetProperty("businessName").GetString());
+        Assert.Equal($"https://{subdomain}.vn.example.com", answer.GetProperty("address").GetString());
+        Assert.Equal(before, await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE email = '{address}'"));
+    }
+
+    [Fact]
+    public async Task The_first_confirm_verifies_the_sign_up_and_a_second_answers_409_confirmed()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, _, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+
+        var first = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(id, (await first.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("id").GetGuid());
+        Assert.Equal("verified", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE id = '{id}'"));
+        var second = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal("confirmed", (await second.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("state").GetString());
+        var verification = await client.PostAsJsonAsync("/api/sign-up/verification", new { token }, cancellation);
+        Assert.Equal("confirmed", (await verification.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task Two_parallel_confirms_verify_the_sign_up_once()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (_, _, token) = await SignUpAsync(client);
+
+        var responses = await Task.WhenAll(
+            client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation),
+            client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation));
+
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.OK);
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task An_expired_token_and_a_token_never_issued_are_refused_as_expired_by_both_routes_and_no_row_changes()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, _, token) = await SignUpAsync(client);
+        await ControlPlaneDatabase.ExecuteAsync(
+            _controlPlane,
+            $"UPDATE control_plane.sign_ups SET expires_at = now() - interval '1 minute' WHERE email = '{address}'",
+            cancellation);
+        var before = await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE email = '{address}'");
+
+        // A pending sign-up past its 24 hours is expired before the expiry job marks it. A wrong token, a malformed one and a missing one are unknown.
+        object[] bodies =
+        [
+            new { token },
+            new { token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)) },
+            new { token = "not-a-token" },
+            new { token = 5 },
+            new { },
+        ];
+        foreach (var body in bodies)
+        {
+            var verification = await client.PostAsJsonAsync("/api/sign-up/verification", body, cancellation);
+            Assert.Equal(HttpStatusCode.OK, verification.StatusCode);
+            Assert.Equal("expired", (await verification.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("state").GetString());
+            var confirm = await client.PostAsJsonAsync("/api/sign-up/confirm", body, cancellation);
+            Assert.Equal(HttpStatusCode.Conflict, confirm.StatusCode);
+            Assert.Equal("expired", (await confirm.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("state").GetString());
+        }
+
+        Assert.Equal(before, await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE email = '{address}'"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_ups WHERE state = 'verified'"));
+    }
+
+    [Fact]
+    public async Task The_verification_and_confirm_routes_refuse_a_body_that_is_not_a_JSON_object()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+
+        foreach (var route in new[] { "/api/sign-up/verification", "/api/sign-up/confirm" })
+        {
+            var notAnObject = await client.PostAsync(route, new StringContent("[1]", System.Text.Encoding.UTF8, "application/json"), cancellation);
+            Assert.Equal(HttpStatusCode.BadRequest, notAnObject.StatusCode);
+            var plainText = await client.PostAsync(route, new StringContent("{}", System.Text.Encoding.UTF8, "text/plain"), cancellation);
+            Assert.Equal(HttpStatusCode.UnsupportedMediaType, plainText.StatusCode);
+        }
+    }
+
     private string ControlPlaneConnectionString => $"{_container.GetConnectionString()};Timeout=5;Command Timeout=5";
 
     private string DirectoryConnectionString =>
@@ -254,6 +363,17 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         ["language"] = language,
         ["application"] = application,
     };
+
+    // Signs up, waits for the confirm email and returns the address, the subdomain and the token of its link.
+    private async Task<(string Address, string Subdomain, string Token)> SignUpAsync(HttpClient client)
+    {
+        var address = NewAddress();
+        var subdomain = NewSubdomain();
+        var response = await client.PostAsJsonAsync("/api/sign-up", Form(address, subdomain), TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var message = await WaitForMessageAsync(address);
+        return (address, subdomain, TokenPattern().Match(message.Text).Groups[1].Value);
+    }
 
     private static async Task<JsonElement> CheckAsync(HttpClient client, string subdomain)
     {
