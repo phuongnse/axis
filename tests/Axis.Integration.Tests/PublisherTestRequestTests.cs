@@ -28,7 +28,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     private static readonly string[] _moduleScenarios =
     [
         .. ScenarioNames("department-budgets", "1.2.0", ModulePrefix),
-        .. ScenarioNames("organization", "1.0.0", OrganizationPrefix),
+        .. ScenarioNames("organization", "1.0.1", OrganizationPrefix),
     ];
 
     // A sample has several scenarios, and each one creates, migrates and drops a database.

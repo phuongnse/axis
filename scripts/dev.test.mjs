@@ -286,7 +286,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
 
     // The built-in module organization and the sample module department-budgets are installed where Modules:Path points, and the server loads them.
     assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/department-budgets/1.2.0/module.json')))
-    assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/organization/1.0.0/module.json')))
+    assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/organization/1.0.1/module.json')))
     assert.ok(!fs.existsSync(path.join(copy, 'artifacts/modules', 'departments')))
     assert.doesNotMatch(run.stdout, /The module version is not loaded/)
 

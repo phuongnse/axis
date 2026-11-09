@@ -260,7 +260,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         using var modules = new TempModules();
         CopyFolder(System.IO.Path.Combine(AppContext.BaseDirectory, "BuiltInModules"), modules.Path);
         // The branch after the submit never takes the way to the steps, so the process goes straight to markApproved.
-        var processFile = System.IO.Path.Combine(modules.Path, "approvals", "1.0.0", "processes", "request-approval.json");
+        var processFile = System.IO.Path.Combine(modules.Path, "approvals", "1.0.1", "processes", "request-approval.json");
         var process = JsonNode.Parse(await File.ReadAllTextAsync(processFile, CancellationToken))!;
         Assert.Equal("nextStep", process["steps"]![1]!["name"]!.GetValue<string>());
         process["steps"]![1]!["branches"]![0]!["when"] = "step < 0";

@@ -29,7 +29,7 @@ The module's manifest is `module.json` at the root of its folder:
 {
   "kind": "module",
   "id": "organization",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "label": "Organization",
   "roles": [
     { "name": "admin", "label": { "textKey": "organization.roles.admin" } },
@@ -40,7 +40,7 @@ The module's manifest is `module.json` at the root of its folder:
 
 `organization` is a [built-in module](built-in-modules.md), and `department-budgets` is the
 [sample module](#the-department-budgets-sample). `scripts/build.sh`, `scripts/dev.sh` and the E2E run
-install them under `artifacts/modules/organization/1.0.0/` and `artifacts/modules/department-budgets/1.2.0/`,
+install them under `artifacts/modules/organization/1.0.1/` and `artifacts/modules/department-budgets/1.2.0/`,
 the Compose images hold them in `/modules`, and the server and the worker read them through
 `Modules:Path`.
 
