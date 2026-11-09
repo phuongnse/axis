@@ -1,19 +1,19 @@
 import { ConfigProvider, Form, Input, InputNumber, Select, Upload } from 'antd'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AxisField } from './AxisField'
+import { AxisField, type AxisFieldStatus } from './AxisField'
 import { requiredMark } from './requiredMark'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
-import { chooseOption, formItem, hasFieldError, isRequiredLabel } from '../test/antd'
+import { chooseOption, formItem, hasFieldError, hasFieldWarning, isRequiredLabel } from '../test/antd'
 
 const texts = {}
 const catalogs = [{ texts, fallbackTexts: texts }]
 
-function renderForm(field: React.ReactNode) {
-  return render(
+function formTree(field: React.ReactNode) {
+  return (
     <ThemeModeProvider initialMode="light">
       <ConfigProvider theme={{ token: { motion: false } }}>
         <TextProvider catalogs={catalogs} development={false}>
@@ -23,8 +23,12 @@ function renderForm(field: React.ReactNode) {
           </Form>
         </TextProvider>
       </ConfigProvider>
-    </ThemeModeProvider>,
+    </ThemeModeProvider>
   )
+}
+
+function renderForm(field: React.ReactNode) {
+  return render(formTree(field))
 }
 
 describe('AxisField', () => {
@@ -184,69 +188,6 @@ describe('AxisField', () => {
     await waitFor(() => expect(screen.queryByText('Choose a state.')).not.toBeInTheDocument())
   })
 
-  it('shows a refused status as its error in place of the required message', async () => {
-    renderForm(
-      <AxisField
-        label="Subdomain"
-        help="It starts the address."
-        name="subdomain"
-        requiredMessage="Enter a subdomain."
-        status={{ state: 'refused', message: 'This subdomain is taken.' }}
-      >
-        <Input />
-      </AxisField>,
-    )
-    const input = screen.getByRole('textbox', { name: 'Subdomain' })
-
-    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
-
-    expect(await screen.findByText('This subdomain is taken.')).toBeInTheDocument()
-    expect(screen.queryByText('Enter a subdomain.')).not.toBeInTheDocument()
-    expect(hasFieldError(input)).toBe(true)
-  })
-
-  it('shows a failed status as a warning that is not an error', () => {
-    renderForm(
-      <AxisField
-        label="Subdomain"
-        help="It starts the address."
-        name="subdomain"
-        status={{ state: 'failed', message: 'The subdomain could not be checked.' }}
-      >
-        <Input />
-      </AxisField>,
-    )
-
-    expect(screen.getByText('The subdomain could not be checked.')).toBeInTheDocument()
-    expect(hasFieldError(screen.getByRole('textbox', { name: 'Subdomain' }))).toBe(false)
-  })
-
-  it('puts a passed status in a status region and leaves the field without an error', () => {
-    renderForm(
-      <AxisField
-        label="Subdomain"
-        help="It starts the address."
-        name="subdomain"
-        status={{ state: 'passed', message: 'This subdomain is free.' }}
-      >
-        <Input />
-      </AxisField>,
-    )
-
-    expect(screen.getByRole('status')).toHaveTextContent('This subdomain is free.')
-    expect(hasFieldError(screen.getByRole('textbox', { name: 'Subdomain' }))).toBe(false)
-  })
-
-  it('marks the field busy while a status is running', () => {
-    renderForm(
-      <AxisField label="Subdomain" help="It starts the address." name="subdomain" status={{ state: 'running' }}>
-        <Input />
-      </AxisField>,
-    )
-
-    expect(formItem(screen.getByRole('textbox', { name: 'Subdomain' }))).toHaveClass('ant-form-item-is-validating')
-  })
-
   it('requires a name for a requiredMessage', () => {
     expect(
       // @ts-expect-error A `requiredMessage` belongs to a field with a `name`, which is in an Ant Design form.
@@ -261,6 +202,69 @@ describe('AxisField', () => {
       // @ts-expect-error `help` is required on a platform field, see docs/reference/frontend.md#platform-field-help.
       <AxisField label="Name" name="name">
         <Input />
+      </AxisField>,
+    ).toBeDefined()
+  })
+})
+
+describe('AxisField status', () => {
+  const nameField = (status?: AxisFieldStatus) => (
+    <AxisField label="Name" help="Letters and digits." name="name" requiredMessage="Enter a name." status={status}>
+      <Input />
+    </AxisField>
+  )
+
+  it('shows a running status as a busy input in a validating form item', () => {
+    renderForm(nameField({ state: 'running' }))
+
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(input).toHaveAttribute('aria-busy', 'true')
+    expect(formItem(input)).toHaveClass('ant-form-item-is-validating')
+  })
+
+  it('announces a passed status and shows its text nowhere else, with no error on the field', () => {
+    renderForm(nameField({ state: 'passed', message: 'Name is free.' }))
+
+    expect(within(screen.getByRole('status')).getByText('Name is free.')).toBeInTheDocument()
+    expect(screen.getAllByText('Name is free.')).toHaveLength(1)
+    expect(hasFieldError(screen.getByRole('textbox', { name: 'Name' }))).toBe(false)
+  })
+
+  it('shows a refused status as the error of the field', () => {
+    renderForm(nameField({ state: 'refused', message: 'That name is taken.' }))
+
+    expect(screen.getByText('That name is taken.')).toBeInTheDocument()
+    expect(hasFieldError(screen.getByRole('textbox', { name: 'Name' }))).toBe(true)
+  })
+
+  it('shows a failed status as the warning of the field', () => {
+    renderForm(nameField({ state: 'failed', message: 'Names could not be checked.' }))
+
+    expect(screen.getByText('Names could not be checked.')).toBeInTheDocument()
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(hasFieldWarning(input)).toBe(true)
+    expect(hasFieldError(input)).toBe(false)
+  })
+
+  it('replaces a rule error with a refused status, and brings the rule error back when the status goes', async () => {
+    const { rerender } = renderForm(nameField())
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
+
+    rerender(formTree(nameField({ state: 'refused', message: 'That name is taken.' })))
+    expect(screen.getByText('That name is taken.')).toBeInTheDocument()
+    expect(screen.queryByText('Enter a name.')).not.toBeInTheDocument()
+
+    rerender(formTree(nameField()))
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
+  })
+
+  it('takes no status outside a form', () => {
+    expect(
+      // @ts-expect-error A field outside a form takes no `status`: its form item does not draw one.
+      <AxisField label="Name" help="Letters and digits." status={{ state: 'running' }}>
+        <Input value="" onChange={() => {}} />
       </AxisField>,
     ).toBeDefined()
   })

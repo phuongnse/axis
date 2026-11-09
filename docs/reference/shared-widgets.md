@@ -35,7 +35,7 @@ Each common job has one shared widget or helper:
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
-| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_, and a `status` for what the screen found about a field _(planned for M33)_ |
+| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_, and a `status` for what the screen found about a field |
 | A row of actions                               | `AxisActionRow`                                                                                        |
 | A text in the author's language                | `textIn`, else `en` _(planned for M31)_                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |

@@ -136,7 +136,7 @@ These rules hold for every field on a form.
   hidden from screen readers. An editable input of a required field carries `aria-required`, and a
   read-only value does not. Required means the form state answer's `required`, or else the field's
   `required`.
-- **Warning** _(planned for M33)_. A field's warning message and its border take `warningText`, as an
+- **Warning.** A field's warning message and its border take `warningText`, as an
   error's take `dangerText`, see [fields](actions-and-controls.md#fields).
 - **Help text.** A field whose entity field has [`help`](resource-files.md#resource-file-shape) shows
   it between the label and the input, in small text in `textMuted`, `spacing-xs` above the input, and

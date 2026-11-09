@@ -5,7 +5,7 @@ import { useDesignTokens } from './themeMode'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
 
-/** What the screen found about a field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
+/** What the screen found about the field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
 export type AxisFieldStatus = { state: 'running' } | { state: 'passed' | 'refused' | 'failed'; message: string }
 
 type FormFieldProps = {
@@ -79,6 +79,7 @@ export function AxisField(props: AxisFieldProps) {
   return isFormField(props) ? <FormField {...props} /> : <OwnField {...props} />
 }
 
+/** The form item's state for a status. A passed status gives none, so the field keeps its own rule errors. */
 function statusItemProps(status: AxisFieldStatus | undefined): Pick<FormItemProps, 'validateStatus' | 'help'> {
   if (status === undefined || status.state === 'passed') {
     return {}
@@ -144,7 +145,7 @@ function FormField({
       }
     >
       {/* Ant Design gives the one child of a named item its value, its change handler and its accessibility props. */}
-      <HelpedInput help={help} input={children} onChange={children.props.onChange} />
+      <HelpedInput help={help} input={children} onChange={children.props.onChange} status={status} />
     </Form.Item>
   )
 }
@@ -152,6 +153,7 @@ function FormField({
 type HelpedInputProps = {
   help: string
   input: FieldInput
+  status?: AxisFieldStatus
   id?: string
   'aria-describedby'?: string
   onChange?: (...args: never[]) => void
@@ -159,7 +161,7 @@ type HelpedInputProps = {
 
 /** The help and the input under the label. The help joins the input's description, after the error Ant Design adds. */
 const HelpedInput = forwardRef(function HelpedInput(
-  { help, input, 'aria-describedby': described, ...control }: HelpedInputProps,
+  { help, input, status, 'aria-describedby': described, ...control }: HelpedInputProps,
   ref: Ref<unknown>,
 ) {
   const { spacing, colour } = useDesignTokens()
@@ -188,6 +190,7 @@ const HelpedInput = forwardRef(function HelpedInput(
         ...control,
         ref,
         'aria-describedby': describedBy,
+        'aria-busy': status?.state === 'running' ? true : undefined,
       } as object)}
     </>
   )
