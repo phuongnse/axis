@@ -74,6 +74,7 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
             <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
           </Form.Item>
         </Form>
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
       </Flex>
     </Modal>

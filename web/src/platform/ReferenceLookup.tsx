@@ -130,6 +130,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
       }}
       failure={
         failed ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="reference-lookup-error" type="error" title={t('shell.table.loadFailed')} />
         ) : undefined
       }

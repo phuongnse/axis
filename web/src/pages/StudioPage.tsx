@@ -220,6 +220,7 @@ export function StudioPage() {
 
   return (
     <StudioConnectionContext.Provider value={connection}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {reconnecting && <Alert data-testid="studio-reconnecting" type="info" title={t('shell.studio.reconnecting')} />}
       <StudioWorkspace />
     </StudioConnectionContext.Provider>
@@ -501,6 +502,7 @@ function StudioWorkspace() {
     )
   }
   if (apps === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
   }
   if (application === null) {
@@ -512,6 +514,7 @@ function StudioWorkspace() {
           actions={canCreate && <StudioNewApplication primary onCreated={onApplicationCreated} />}
         />
         {apps.length === 0 ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="studio-no-applications" type="info" title={t('shell.studio.noApplications')} />
         ) : (
           <StudioApplicationTiles apps={apps} />
@@ -522,6 +525,7 @@ function StudioWorkspace() {
   if (apps.length === 0) {
     return (
       <Flex vertical gap="middle">
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         <Alert data-testid="studio-no-applications" type="info" title={t('shell.studio.noApplications')} />
         {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
       </Flex>
@@ -793,6 +797,7 @@ function StudioWorkspace() {
           </StudioPublishing>
         )}
         {loaded && 'failed' in loaded && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
         )}
       </Flex>

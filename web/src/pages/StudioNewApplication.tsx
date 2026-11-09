@@ -180,6 +180,7 @@ export function StudioNewApplication({
             </Radio.Group>
           </AxisField>
           {templates === 'failed' && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
           )}
         </Form>

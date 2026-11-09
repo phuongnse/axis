@@ -146,6 +146,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <div data-testid="detail" aria-busy="true" />
   }
   if (load === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="detail-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
   if (load === 'missing' || record === null) {
@@ -229,7 +230,9 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
 
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {started && <Alert data-testid="detail-started" type="success" title={t('shell.form.processStarted')} />}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {errors.length > 0 && <Alert data-testid="detail-error" type="error" title={errors.join(' ')} />}
       {sections.map((section, index) => (
         <Fragment key={index}>

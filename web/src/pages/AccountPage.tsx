@@ -89,6 +89,7 @@ export function AccountPage() {
       breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.sessions.title') }]}
     >
       {authenticatorsFailed && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="authenticators-error" type="error" title={t('shell.account.authenticators.loadFailed')} />
       )}
       {authenticators?.account && (
@@ -146,11 +147,14 @@ export function AccountPage() {
           </Flex>
         </>
       )}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {loadFailed && <Alert data-testid="sessions-error" type="error" title={t('shell.account.sessions.loadFailed')} />}
       {endFailed && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="sessions-end-error" type="error" title={t('shell.account.sessions.endFailed')} />
       )}
       {sessions && !sessions.endAllowed && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert
           data-testid="sessions-reauthenticate"
           type="info"

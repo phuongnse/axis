@@ -390,6 +390,7 @@ function Fields({
             onChange={onChange}
           />
           {warnings?.get(index) && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert
               type="warning"
               data-testid={`studio-migration-warning-/fields/${index}`}

@@ -171,6 +171,7 @@ export function CellTenantsPage() {
 
   return (
     <PageLayout title={t('shell.cell.tenants.title')}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {failed && <Alert data-testid="cell-tenants-error" type="error" title={t('shell.cell.tenants.loadFailed')} />}
       {visible && (
         <AxisTable<CellTenant>

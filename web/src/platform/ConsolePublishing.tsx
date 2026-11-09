@@ -191,6 +191,7 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           }}
         />
         {load.failed && !loading ? (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="console-publishing-error" type="error" title={t('shell.console.publishing.loadFailed')} />
         ) : (
           <>
