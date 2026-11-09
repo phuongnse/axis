@@ -566,12 +566,14 @@ describe('StudioEditor for a connector', () => {
     const { fetchMock, url } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
-    const urlBinding = await screen.findByRole('textbox', { name: 'URL binding' }, slow)
+    const baseUrl = platformEnglish['shell.studio.field.connector.baseUrl']
+    const token = platformEnglish['shell.studio.field.connector.auth.token']
+    const urlBinding = await screen.findByRole('textbox', { name: baseUrl }, slow)
     expect(urlBinding).toHaveValue('PurchasingSystemUrl')
-    expect(screen.getByRole('textbox', { name: 'Secret binding' })).toHaveValue('PurchasingSystemToken')
+    expect(screen.getByRole('textbox', { name: token })).toHaveValue('PurchasingSystemToken')
 
     await userEvent.type(urlBinding, '2')
-    await userEvent.type(screen.getByRole('textbox', { name: 'Secret binding' }), '2')
+    await userEvent.type(screen.getByRole('textbox', { name: token }), '2')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
@@ -2185,7 +2187,10 @@ describe('StudioEditor for an entity', () => {
     await chooseOption('integer', await screen.findByTestId('studio-field-/fields/2/type', {}, slow))
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
     expect(screen.getByTestId('studio-migration-field')).toHaveTextContent('note')
-    expect(screen.getByRole('button', { name: 'Add convert' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Add convert' })).toBeEnabled()
+    await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
+    expect(await screen.findByText('Enter a value.')).toBeInTheDocument()
+    expect(requests(fetchMock, 'PATCH') + requests(fetchMock, 'POST')).toBe(0)
     await userEvent.type(screen.getByRole('textbox', { name: 'Convert expression' }), 'length(note)')
     await userEvent.click(screen.getByRole('button', { name: 'Add convert' }))
 

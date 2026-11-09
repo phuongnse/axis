@@ -6,6 +6,9 @@ using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Tests;
 using Axis.Expressions.Diagnostics;
+using Axis.Expressions.Functions;
+using Axis.Presentation.Texts;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
 using Json.Pointer;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -14,7 +17,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The expression check route puts an expression into a copy of the saved resource and compiles the folder in memory. It
-/// answers the type or the first problem with its range, and it writes nothing.
+/// answers the type or the first problem with its range, and it writes nothing. The scope route answers what a place offers:
+/// the type it needs, the fields in scope and the functions it allows, from the same compile.
 /// </summary>
 public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionCheckTests.StudioFixture>
 {
@@ -22,7 +26,12 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
 
     private const string CheckUrl = "/api/studio/apps/PurchaseRequests/expressions/check";
 
+    private const string ScopeUrl = "/api/studio/apps/PurchaseRequests/expressions/scope";
+
     private const string MigrationFile = "migrations/0001-fill-title.json";
+
+    // Its entity is dropped and not in the release, so the field types are unknown and the compile type checks no value.
+    private const string UntypedMigrationFile = "migrations/0002-retired-thing.json";
 
     private readonly StudioFixture _studio;
 
@@ -239,6 +248,190 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
     }
 
+    [Fact]
+    public async Task A_field_defaults_scope_has_no_fields_and_no_aggregate_functions()
+    {
+        const string File = "entities/purchase-request.json";
+        var before = Hash(File);
+
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync(File), "/fields/1/default");
+
+        Assert.Equal("text", answer.RootElement.GetProperty("type").GetString());
+        Assert.Equal(0, answer.RootElement.GetProperty("fields").GetArrayLength());
+        var functions = FunctionNames(answer);
+        Assert.Contains("now", functions);
+        Assert.Empty(functions.Intersect(ExpressionFunctions.AggregateNames));
+        Assert.Equal(before, Hash(File));
+    }
+
+    [Fact]
+    public async Task A_computed_fields_scope_lists_no_current_time_function_but_lists_the_aggregates()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("entities/purchase-request.json"), "/fields/7/expression");
+
+        Assert.Equal("decimal", answer.RootElement.GetProperty("type").GetString());
+        var functions = FunctionNames(answer);
+        Assert.DoesNotContain("now", functions);
+        Assert.DoesNotContain("today", functions);
+        Assert.DoesNotContain("toDate", functions);
+        Assert.Contains("sum", functions);
+        Assert.Contains("lower", functions);
+    }
+
+    [Fact]
+    public async Task A_validations_scope_needs_boolean_and_lists_the_entitys_fields_with_their_label_keys_and_types()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("entities/line-item.json"), "/validations/0/expression");
+
+        Assert.Equal("boolean", answer.RootElement.GetProperty("type").GetString());
+        Assert.Equal(
+            [
+                ("description", "lineItem.description", "text"),
+                ("quantity", "lineItem.quantity", "integer"),
+                ("unitPrice", "lineItem.unitPrice", "decimal"),
+                ("amount", "lineItem.amount", "decimal"),
+            ],
+            answer.RootElement.GetProperty("fields").EnumerateArray().Select(field => (
+                field.GetProperty("name").GetString()!,
+                field.GetProperty("labelKey").GetString()!,
+                field.GetProperty("type").GetString()!)));
+    }
+
+    [Fact]
+    public async Task Each_function_is_described_in_the_language_of_the_request_and_in_english_without_one()
+    {
+        var id = await _studio.IdOfAsync("entities/purchase-request.json");
+        using var inVietnamese = await _studio.ScopeAsync(id, "/fields/7/expression", "vi");
+        using var inEnglish = await _studio.ScopeAsync(id, "/fields/7/expression");
+        var texts = new EmbeddedTextResourceProvider();
+        var vietnamese = texts.GetTexts("vi")!.Texts;
+        var english = texts.GetTexts("en")!.Texts;
+
+        Assert.Equal(
+            FunctionNames(inVietnamese).ToDictionary(name => name, name => vietnamese[StudioExpressionEndpoints.FunctionDescriptionKey(name)]),
+            Descriptions(inVietnamese));
+        Assert.Equal(
+            FunctionNames(inEnglish).ToDictionary(name => name, name => english[StudioExpressionEndpoints.FunctionDescriptionKey(name)]),
+            Descriptions(inEnglish));
+    }
+
+    [Fact]
+    public async Task Each_function_carries_its_parameters_result_group_and_example()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("entities/purchase-request.json"), "/fields/7/expression");
+
+        var functions = answer.RootElement.GetProperty("functions").EnumerateArray().ToList();
+        Assert.NotEmpty(functions);
+        foreach (var function in functions)
+        {
+            Assert.Equal(JsonValueKind.Array, function.GetProperty("parameters").ValueKind);
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("result").GetString()));
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("group").GetString()));
+            Assert.False(string.IsNullOrEmpty(function.GetProperty("example").GetString()));
+        }
+    }
+
+    [Fact]
+    public async Task A_data_sources_scope_lists_the_entitys_fields_with_label_keys_then_the_parameters_with_none()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("data-sources/purchase-request-list.json"), "/filter");
+
+        Assert.Equal("boolean", answer.RootElement.GetProperty("type").GetString());
+        var fields = answer.RootElement.GetProperty("fields").EnumerateArray().ToList();
+        var status = fields.Single(field => field.GetProperty("name").GetString() == "status");
+        Assert.Equal("purchaseRequest.status", status.GetProperty("labelKey").GetString());
+        Assert.Equal("enum", status.GetProperty("type").GetString());
+        var parameter = fields[^1];
+        Assert.Equal("statusFilter", parameter.GetProperty("name").GetString());
+        Assert.Equal(JsonValueKind.Null, parameter.GetProperty("labelKey").ValueKind);
+        Assert.Equal("enum", parameter.GetProperty("type").GetString());
+    }
+
+    [Fact]
+    public async Task A_data_sources_scope_lists_only_the_functions_of_the_SQL_subset()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync("data-sources/purchase-request-list.json"), "/filter");
+
+        var functions = FunctionNames(answer);
+        Assert.DoesNotContain("lower", functions);
+        Assert.DoesNotContain("upper", functions);
+        Assert.DoesNotContain("trim", functions);
+        Assert.DoesNotContain("sum", functions);
+        Assert.Contains("any", functions);
+        Assert.Contains("count", functions);
+        Assert.Contains("currentUser", functions);
+    }
+
+    [Theory]
+    [InlineData("policies/department-manager-access.json", "/grants/0/filter")]
+    [InlineData(MigrationFile, "/changes/0/value")]
+    public async Task A_policy_filters_and_a_migration_values_scope_lists_no_function_outside_the_SQL_subset(string file, string path)
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync(file), path);
+
+        var functions = FunctionNames(answer);
+        Assert.DoesNotContain("lower", functions);
+        Assert.DoesNotContain("upper", functions);
+        Assert.DoesNotContain("trim", functions);
+        Assert.Contains("length", functions);
+    }
+
+    [Fact]
+    public async Task A_place_without_a_type_check_answers_no_type_no_fields_and_no_functions()
+    {
+        using var answer = await _studio.ScopeAsync(await _studio.IdOfAsync(UntypedMigrationFile), "/changes/1/value");
+
+        Assert.Equal(JsonValueKind.Null, answer.RootElement.GetProperty("type").ValueKind);
+        Assert.Equal(0, answer.RootElement.GetProperty("fields").GetArrayLength());
+        Assert.Equal(0, answer.RootElement.GetProperty("functions").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task The_scope_route_refuses_as_the_check_does_and_writes_nothing()
+    {
+        const string File = "entities/line-item.json";
+        var id = await _studio.IdOfAsync(File);
+        var before = Hash(File);
+        var versionBefore = await _studio.VersionOfAsync(File);
+        var body = ScopeBody(id, "/validations/0/expression");
+
+        using var signedOut = await StudioFixture.SendAsync(_studio.Anonymous, body, url: ScopeUrl);
+        Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);
+
+        using var employee = await StudioFixture.SendAsync(_studio.Employee, body, url: ScopeUrl);
+        Assert.Equal(HttpStatusCode.Forbidden, employee.StatusCode);
+
+        using var unknownApplication = await StudioFixture.SendAsync(
+            _studio.Author, body, url: "/api/studio/apps/NoSuchApplication/expressions/scope");
+        Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
+
+        using var wrongType = await StudioFixture.SendAsync(_studio.Author, body, "text/plain", ScopeUrl);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, wrongType.StatusCode);
+
+        using var notAnId = await StudioFixture.SendAsync(_studio.Author, ScopeBody("nope", "/validations/0/expression"), url: ScopeUrl);
+        Assert.Equal(HttpStatusCode.BadRequest, notAnId.StatusCode);
+
+        using var unknown = await StudioFixture.SendAsync(
+            _studio.Author, ScopeBody(Guid.NewGuid().ToString("D"), "/validations/0/expression"), url: ScopeUrl);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+
+        using var noExpression = await StudioFixture.SendAsync(_studio.Author, ScopeBody(id, "/name"), url: ScopeUrl);
+        Assert.Equal(HttpStatusCode.BadRequest, noExpression.StatusCode);
+
+        Assert.Equal(before, Hash(File));
+        Assert.Equal(versionBefore, await _studio.VersionOfAsync(File));
+    }
+
+    private static List<string> FunctionNames(JsonDocument answer) =>
+        [.. answer.RootElement.GetProperty("functions").EnumerateArray().Select(function => function.GetProperty("name").GetString()!)];
+
+    private static Dictionary<string, string> Descriptions(JsonDocument answer) =>
+        answer.RootElement.GetProperty("functions").EnumerateArray()
+            .ToDictionary(function => function.GetProperty("name").GetString()!, function => function.GetProperty("description").GetString()!);
+
+    private static string ScopeBody(string id, string path) =>
+        new JsonObject { ["resourceId"] = id, ["path"] = path }.ToJsonString();
+
     private static string CheckBody(string id, string path, string expression, JsonNode? draft = null)
     {
         var body = new JsonObject { ["resourceId"] = id, ["path"] = path, ["expression"] = expression };
@@ -261,6 +454,8 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
     public sealed class StudioFixture : IAsyncLifetime
     {
         private const string MigrationId = "7b3096e8-c14a-48f2-9a56-30bbd774e102";
+
+        private const string UntypedMigrationId = "1d0f6f0e-6a7e-4a43-9d5e-5e0a3f1b7c21";
 
         private readonly PostgreSqlFixture _database = new();
         private TemporaryFolder? _folder;
@@ -299,6 +494,19 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
                 }
                 """,
                 CancellationToken);
+            await File.WriteAllTextAsync(
+                Path.Combine(_folder.Path, UntypedMigrationFile),
+                $$"""
+                {
+                  "id": "{{UntypedMigrationId}}",
+                  "kind": "migration",
+                  "name": "RetiredThing",
+                  "formatVersion": 1,
+                  "entity": "RetiredThing",
+                  "changes": [ { "type": "dropEntity" }, { "type": "fill", "field": "title", "value": "'untitled'" } ]
+                }
+                """,
+                CancellationToken);
         }
 
         public async ValueTask DisposeAsync()
@@ -332,6 +540,19 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
         public async Task<JsonDocument> CheckAsync(string id, string path, string expression, JsonNode? draft = null)
         {
             using var response = await SendAsync(Author, CheckBody(id, path, expression, draft));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        }
+
+        public async Task<JsonDocument> ScopeAsync(string id, string path, string? language = null)
+        {
+            using var request = RecordApiFixture.Request(HttpMethod.Post, ScopeUrl, Host, ScopeBody(id, path));
+            if (language is not null)
+            {
+                request.Headers.AcceptLanguage.ParseAdd(language);
+            }
+
+            using var response = await Author.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         }

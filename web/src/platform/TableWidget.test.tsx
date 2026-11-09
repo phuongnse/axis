@@ -13,8 +13,9 @@ import type {
   WidgetAccess,
   WidgetMetadata,
 } from './site'
-import { isSortableHeader, tabTo } from '../test/antd'
+import { chooseOption, isSortableHeader, optionTexts, shownDropdown, tabTo } from '../test/antd'
 import { hostileMarkup } from '../test/hostile'
+import { clickInDialog, dialog, filterTexts, pick } from '../test/tableFilter'
 import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
@@ -162,6 +163,7 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.table.search': 'Search',
+  'shell.table.range': '{from}–{to} of {total}',
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
   'shell.table.delete': 'Delete',
@@ -174,14 +176,17 @@ const texts = {
   'shell.table.import': 'Import…',
   'shell.table.importTitle': 'Import records',
   'shell.table.importChoose': 'Choose a CSV or Excel file',
+  'shell.table.importFileField': 'File',
+  'shell.table.importFileField.help': 'A CSV or Excel file.',
+  'shell.table.importFileRequired': 'Choose a file.',
   'shell.table.importCheck': 'Check',
   'shell.table.importChecking': 'Checking the file…',
-  'shell.table.importChecked': 'The file is clean.',
-  'shell.table.importFailed': 'The import failed.',
+  'shell.table.importChecked': 'The file has no errors.',
+  'shell.table.importFailed': 'The file has errors. Fix them and check the file again.',
   'shell.table.importRow': 'Row',
   'shell.table.importColumn': 'Column',
   'shell.table.importFile': 'File',
-  'shell.table.importCommit': 'Commit',
+  'shell.table.importCommit': 'Create records',
   'shell.table.importCommitting': 'Creating the records…',
   'shell.table.imported': 'The records were imported.',
   'shell.table.importDenied': 'You may not import records here.',
@@ -192,10 +197,11 @@ const texts = {
   'shell.table.export': 'Export',
   'shell.table.exportCsv': 'CSV',
   'shell.table.exportXlsx': 'Excel',
-  'shell.table.exportTruncated': 'The file stops at the row limit.',
+  'shell.table.exportTruncated':
+    'The file holds rows up to the limit only. Narrow the search or filters to export the rest.',
   'shell.table.exportDenied': 'You may not export these records.',
-  'shell.table.exportPending': 'A field is being recomputed.',
-  'shell.table.exportTimeout': 'The export took too long.',
+  'shell.table.exportPending': 'A field is still being recomputed. Export again in a few minutes.',
+  'shell.table.exportTimeout': 'The export took too long and stopped. Narrow the search or filters and try again.',
   'shell.table.exportFailed': 'The records could not be exported.',
   'shell.navigate.failed': 'The page could not be opened.',
   'shell.form.cancel': 'Cancel',
@@ -222,6 +228,10 @@ const texts = {
   'filter.dueFrom': 'Due from',
   'filter.status': 'State',
   'filter.category': 'In category',
+  'note.status': 'Status',
+  'note.statusOpen': 'Open',
+  'note.statusDone': 'Done',
+  ...filterTexts,
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -1249,7 +1259,7 @@ describe('TableWidget', () => {
       const refresh = await screen.findByRole('button', { name: 'Refresh' })
       await tabTo(refresh)
 
-      expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')
+      await waitFor(() => expect(screen.getAllByRole('tooltip').map((tip) => tip.textContent)).toContain('Refresh'))
     })
 
     it('draws Refresh as a borderless icon button', async () => {
@@ -1528,6 +1538,74 @@ describe('TableWidget', () => {
   })
 })
 
+describe('TableWidget filter', () => {
+  const statusField: FieldMetadata = {
+    ...field('status', 'enum', 'note.status'),
+    values: ['open', 'done'],
+    valueLabelKeys: { open: 'note.statusOpen', done: 'note.statusDone' },
+  }
+  const filterWidget: WidgetMetadata = {
+    ...noteWidget,
+    entity: {
+      ...noteWidget.entity!,
+      displayField: 'title',
+      fields: [
+        field('title', 'text', 'note.title'),
+        statusField,
+        field('done', 'boolean', 'note.done'),
+        field('dueAt', 'date-time', 'note.dueAt'),
+        noteWidget.entity!.fields.find((candidate) => candidate.name === 'category')!,
+        receipt,
+      ],
+    },
+  }
+
+  /** The filter the last record request carried, or null when it carried none. */
+  const filterOfLastRequest = (urls: () => string[]) => new URLSearchParams(urls().at(-1)!.split('?')[1]).get('filter')
+
+  it('sends the filter the builder applies to the record API, keeps it in the address and starts at page 1', async () => {
+    const urls = stubRecords()
+    renderWidget('?page=3', filterWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await pick('Operator', 0, 'contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'paper')
+    await clickInDialog('Apply')
+
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    await waitFor(() => expect(filterOfLastRequest(urls)).toBe(filter))
+    expect(new URLSearchParams(search()!).get('filter')).toBe(filter)
+    expect(new URLSearchParams(search()!).has('page')).toBe(false)
+  })
+
+  it('offers only the text, enum, number and date columns, and an enum column by its labels', async () => {
+    stubRecords()
+    renderWidget('', filterWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Title', 'Status'])
+
+    await chooseOption('Status')
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Value' }))
+    expect(optionTexts(shownDropdown()!)).toEqual(['Open', 'Done'])
+  })
+
+  it('has no Filter button on a data source table, with or without parameters', async () => {
+    stubRecords()
+    const { unmount } = renderWidget('', noteListWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+    unmount()
+
+    renderWidget('', filteredWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Filter' })).not.toBeInTheDocument()
+  })
+})
+
 describe('TableWidget search', () => {
   const searchableWidget: WidgetMetadata = {
     ...noteWidget,
@@ -1700,7 +1778,7 @@ describe('TableWidget import', () => {
     expect(screen.queryByRole('button', { name: 'Import…' })).not.toBeInTheDocument()
   })
 
-  it('lists the dry run errors by row and field label and offers no Commit', async () => {
+  it('lists the dry run errors by row and field label and offers no Create records', async () => {
     const { uploads, commits } = stubImport([
       answer('failed', {
         '/rows/2/values/title': ['Required.'],
@@ -1719,7 +1797,7 @@ describe('TableWidget import', () => {
     expect(status).toHaveTextContent('Column 3: Unknown field.')
     expect(status).toHaveTextContent('File: No header.')
     expect(status).toHaveAttribute('aria-live', 'polite')
-    expect(screen.queryByRole('button', { name: 'Commit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create records' })).not.toBeInTheDocument()
     const [url, init] = uploads()[0]
     expect(url).toBe(importsPath)
     expect(new Headers(init?.headers).get('Content-Type')).toBe('text/csv')
@@ -1732,7 +1810,7 @@ describe('TableWidget import', () => {
     renderWidget('', importWidget)
 
     const dialog = await chooseAndCheck()
-    await userEvent.click(await within(dialog).findByRole('button', { name: 'Commit' }))
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Create records' }))
 
     expect(await screen.findByTestId('table-action-done')).toHaveTextContent('The records were imported.')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -1751,7 +1829,24 @@ describe('TableWidget import', () => {
     await userEvent.upload(input, new File(['x'], 'notes.txt', { type: 'text/plain' }), { applyAccept: false })
 
     expect(await screen.findByTestId('import-problem')).toHaveTextContent('Only a CSV or Excel file can be imported.')
-    expect(within(dialog).getByRole('button', { name: 'Check' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Check' })).toBeEnabled()
+    expect(uploads()).toHaveLength(0)
+  })
+
+  it('checks for a file on click and sends nothing', async () => {
+    const { uploads } = stubImport([])
+    renderWidget('', importWidget)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Import…' }))
+    const dialog = await screen.findByRole('dialog')
+    const check = within(dialog).getByRole('button', { name: 'Check' })
+    expect(check).toBeEnabled()
+    await userEvent.click(check)
+
+    expect(await within(dialog).findByText('Choose a file.')).toBeInTheDocument()
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Choose a CSV or Excel file' })).toHaveFocus(),
+    )
     expect(uploads()).toHaveLength(0)
   })
 
@@ -1875,6 +1970,25 @@ describe('TableWidget export', () => {
     click.mockRestore()
   })
 
+  it('exports the rows with the filter they are sent with, beside the search, sort and format', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const filter = JSON.stringify({ all: [{ field: 'title', op: 'contains', value: 'paper' }] })
+    renderWidget(`?${new URLSearchParams({ search: 'pap', filter, sort: '-title' })}`, exportWidget)
+
+    await chooseExport('CSV')
+
+    await waitFor(() => expect(exported()).toHaveLength(1))
+    expect([...new URLSearchParams(exported()[0].split('?')[1])]).toEqual([
+      ['search', 'pap'],
+      ['filter', filter],
+      ['sort', '-title'],
+      ['format', 'csv'],
+    ])
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    click.mockRestore()
+  })
+
   it('asks for xlsx from the Excel item', async () => {
     const exported = stubExport(() => file())
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -1893,15 +2007,17 @@ describe('TableWidget export', () => {
 
     await chooseExport('CSV')
 
-    expect(await screen.findByTestId('table-export-truncated')).toHaveTextContent('The file stops at the row limit.')
+    expect(await screen.findByTestId('table-export-truncated')).toHaveTextContent(
+      'The file holds rows up to the limit only.',
+    )
     expect(click).toHaveBeenCalledTimes(1)
     click.mockRestore()
   })
 
   it.each([
     [403, 'You may not export these records.'],
-    [409, 'A field is being recomputed.'],
-    [503, 'The export took too long.'],
+    [409, 'A field is still being recomputed.'],
+    [503, 'The export took too long and stopped.'],
     [500, 'The records could not be exported.'],
   ])('shows its own message for an export answered with %i and saves nothing', async (status, message) => {
     stubExport(() => new Response(null, { status }))

@@ -2,87 +2,69 @@
   "$comment": "The terms that wait for the owner's approval, by locale. The owner approves a term by moving it to ui-glossary.json. See docs/reference/ui-writing.md#the-glossary. status: proposed or decide.",
   "terms": [
     {
-      "concept": "Revision",
-      "en": "revision",
-      "vi": "bản sửa đổi",
+      "concept": "Deadline",
+      "en": "deadline",
+      "vi": "thời hạn chót",
       "status": "proposed"
     },
     {
-      "concept": "Tenant subdomain",
-      "en": "subdomain",
-      "vi": "tên miền phụ",
+      "concept": "Escalation",
+      "en": "escalation",
+      "vi": "leo thang",
       "status": "proposed"
     },
     {
-      "concept": "Cell",
-      "en": "cell",
-      "vi": "cụm",
+      "concept": "Outcome (of a task)",
+      "en": "outcome",
+      "vi": "kết quả",
       "status": "proposed"
     },
     {
-      "concept": "Job",
-      "en": "job",
-      "vi": "tác vụ",
+      "concept": "Timer (step)",
+      "en": "timer",
+      "vi": "hẹn giờ",
       "status": "proposed"
     },
     {
-      "concept": "Platform operator",
-      "en": "platform operator",
-      "vi": "người vận hành nền tảng",
+      "concept": "Application template",
+      "en": "template",
+      "vi": "mẫu",
       "status": "proposed"
     },
     {
-      "concept": "Cell console",
-      "en": "cell console",
-      "vi": "bảng điều khiển cụm",
+      "concept": "Action: Apply",
+      "en": "Apply",
+      "vi": "Áp dụng",
       "status": "proposed"
     },
     {
-      "concept": "Quota",
-      "en": "quota",
-      "vi": "hạn mức",
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
       "status": "proposed"
     },
     {
-      "concept": "Usage",
-      "en": "usage",
-      "vi": "mức sử dụng",
+      "concept": "Action: Reset",
+      "en": "Reset",
+      "vi": "Đặt lại",
       "status": "proposed"
     },
     {
-      "concept": "Package",
-      "en": "package",
-      "vi": "gói",
+      "concept": "Action: Move up",
+      "en": "Move up",
+      "vi": "Chuyển lên",
       "status": "proposed"
     },
     {
-      "concept": "Binding",
-      "en": "binding",
-      "vi": "liên kết",
+      "concept": "Action: Move down",
+      "en": "Move down",
+      "vi": "Chuyển xuống",
       "status": "proposed"
     },
     {
-      "concept": "Grant",
-      "en": "grant",
-      "vi": "quyền",
-      "status": "proposed"
-    },
-    {
-      "concept": "Parameter",
-      "en": "parameter",
-      "vi": "tham số",
-      "status": "proposed"
-    },
-    {
-      "concept": "Result type",
-      "en": "result type",
-      "vi": "kiểu kết quả",
-      "status": "proposed"
-    },
-    {
-      "concept": "Draft",
-      "en": "draft",
-      "vi": "bản nháp",
+      "concept": "Column",
+      "en": "column",
+      "vi": "cột",
       "status": "proposed"
     }
   ]

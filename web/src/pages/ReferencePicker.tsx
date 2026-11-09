@@ -7,12 +7,17 @@ import { useText } from '../platform/texts'
  */
 export function ReferencePicker({
   name,
+  id,
+  'aria-describedby': describedBy,
   value,
   required,
   options,
   onChange,
 }: {
   name: string
+  /** The id and description that `AxisField` gives its input. */
+  id?: string
+  'aria-describedby'?: string
   value: string | undefined
   required: boolean
   options: string[]
@@ -42,6 +47,8 @@ export function ReferencePicker({
   return (
     <Select
       aria-label={name}
+      id={id}
+      aria-describedby={describedBy}
       showSearch
       virtual={false}
       allowClear={!required}

@@ -2,12 +2,14 @@ import { DeleteOutlined } from '@ant-design/icons'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
-import type { HTMLAttributes } from 'react'
+import { useState, type HTMLAttributes } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { tabTo } from '../test/antd'
+import { chooseOption, tabTo } from '../test/antd'
+import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
 import { designTokensFor } from './designTokens'
 import { TextProvider } from './TextProvider'
+import type { TableQuery } from './tableQuery'
 import { narrowWidthQuery } from './useNarrowWidth'
 
 interface Row {
@@ -15,18 +17,28 @@ interface Row {
   name: string | null
   amount: number | null
   group?: boolean
+  note?: string
 }
 
 const texts = {
   'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
   'shell.table.selected': '{count} selected',
+  'shell.table.range': '{from}–{to} of {total}',
+  'shell.table.search': 'Search',
+  'shell.table.columns': 'Columns',
+  'shell.table.columnsApply': 'Apply',
+  'shell.table.columnsReset': 'Reset',
+  'shell.table.columnsMoveUp': 'Move up',
+  'shell.table.columnsMoveDown': 'Move down',
+  'shell.form.cancel': 'Cancel',
   'shell.table.selectRow': 'Select row',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
   'row.open': 'Open',
   'row.close': 'Close',
   'shell.empty.noData': 'No data yet.',
+  ...filterTexts,
 }
 const catalogs = [{ texts, fallbackTexts: texts }]
 
@@ -156,10 +168,29 @@ describe('AxisTable', () => {
     expect(screen.getAllByRole('columnheader')[0].closest('tr')).toHaveStyle({ height: `${tableRow}px` })
   })
 
+  it('makes the sideways-scrolling region of the table reachable by keyboard', () => {
+    const { container } = renderTable()
+
+    expect(container.querySelector('.ant-table-content')).toHaveAttribute('tabindex', '0')
+  })
+
   it('shows the empty text when there are no rows', () => {
     renderTable({ dataSource: [] })
 
     expect(screen.getByText('Nothing here')).toBeInTheDocument()
+  })
+
+  it("shows what a paged table shows of how many, with the number in the locale's format", () => {
+    const many = Array.from({ length: 20 }, (_, index) => ({ id: String(index), name: `Row ${index}`, amount: index }))
+    renderTable({ dataSource: many, pagination: { current: 1, pageSize: 20, total: 143, pageSizeOptions: [10, 20] } })
+
+    expect(screen.getByText('1–20 of 143')).toBeInTheDocument()
+  })
+
+  it('draws no search box for a table that holds its rows when no column gives searchText', () => {
+    renderTable({ view: { query: { page: 1, pageSize: 20, sort: null }, onChange: vi.fn() }, pagination: undefined })
+
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
   })
 
   it('lists every row on one page without paging when pagination is false', () => {
@@ -442,5 +473,195 @@ describe('AxisTable', () => {
     const { container } = renderTable({ loading: true })
 
     expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('shows the Filter button on a table paged on the server and applies the filter from page 1 without changing the rows', async () => {
+    const onChange = vi.fn()
+    const filterable: AxisColumn<Row> = {
+      key: 'name',
+      title: 'Name',
+      dataIndex: 'name',
+      kind: 'freeText',
+      filter: { kind: 'text' },
+    }
+    renderTable({
+      columns: [filterable, amountColumn],
+      view: { query: { page: 3, pageSize: 20, sort: null }, onChange, total: 60 },
+      pagination: undefined,
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+    await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Operator' }))
+    await chooseOption('contains')
+    await userEvent.type(within(dialog()).getByRole('textbox', { name: 'Value' }), 'pa')
+    await userEvent.click(within(dialog()).getByRole('button', { name: 'Apply' }))
+
+    expect(onChange).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      sort: null,
+      filter: { all: [{ field: 'name', op: 'contains', value: 'pa' }] },
+    })
+    expect(screen.getByRole('row', { name: /Buy paper/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('row').filter((row) => within(row).queryAllByRole('cell').length > 0)).toHaveLength(2)
+  })
+
+  describe('columns control', () => {
+    const idColumn: AxisColumn<Row> = {
+      key: 'name',
+      title: 'Name',
+      dataIndex: 'name',
+      kind: 'freeText',
+      searchText: (row) => row.name ?? '',
+    }
+    const hiddenNote: AxisColumn<Row> = {
+      key: 'note',
+      title: 'Note',
+      dataIndex: 'note',
+      kind: 'freeText',
+      searchText: (row) => row.note ?? '',
+      filter: { kind: 'text', value: (row) => row.note ?? null },
+    }
+    const arranged = [idColumn, amountColumn, hiddenNote]
+    const noted: Row[] = [
+      { id: '1', name: 'Buy paper', amount: 12, note: 'urgent' },
+      { id: '2', name: 'Fix door', amount: 5, note: 'later' },
+    ]
+    const first: TableQuery = { page: 1, pageSize: 20, sort: null }
+
+    /** Holds the view as the address would, with the Columns button on. */
+    function Harness({ initial = first, onQuery }: { initial?: TableQuery; onQuery?: (query: TableQuery) => void }) {
+      const [query, setQuery] = useState(initial)
+      return (
+        <TextProvider catalogs={catalogs} development={false}>
+          <AxisTable<Row>
+            columns={arranged}
+            rowKey={(row) => row.id}
+            dataSource={noted}
+            view={{
+              query,
+              onChange: (next) => {
+                setQuery(next)
+                onQuery?.(next)
+              },
+              columns: true,
+            }}
+          />
+        </TextProvider>
+      )
+    }
+
+    const headers = () => screen.getAllByRole('columnheader').map((header) => header.textContent)
+    const columnsDialog = () => screen.getByRole('dialog', { name: 'Columns' })
+
+    it('hides a column and reorders the rest, keeping the identifying column first and always shown', async () => {
+      render(<Harness />)
+      expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      const lines = within(columnsDialog())
+      expect(lines.getByRole('checkbox', { name: 'Name' })).toBeChecked()
+      expect(lines.getByRole('checkbox', { name: 'Name' })).toBeDisabled()
+      expect(lines.queryByRole('button', { name: /Move (up|down) Name/ })).not.toBeInTheDocument()
+      await userEvent.click(lines.getByRole('button', { name: 'Move up Note' }))
+      await userEvent.click(lines.getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note', 'Amount'])
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note'])
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      expect(within(columnsDialog()).getByRole('checkbox', { name: 'Name' })).toBeDisabled()
+      expect(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' })).not.toBeChecked()
+    })
+
+    it('moves a column down', async () => {
+      render(<Harness />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Move down Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note', 'Amount'])
+    })
+
+    it('puts a column that is shown again last', async () => {
+      render(<Harness initial={{ ...first, columns: ['name', 'note'] }} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Note', 'Amount'])
+    })
+
+    it('throws the changes away on Cancel', async () => {
+      const onQuery = vi.fn()
+      render(<Harness onQuery={onQuery} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Cancel' }))
+
+      expect(onQuery).not.toHaveBeenCalled()
+      expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+    })
+
+    it('still finds a row by the text of a hidden column', async () => {
+      render(<Harness initial={{ ...first, columns: ['name', 'amount'] }} />)
+      expect(headers()).toEqual(['Name', 'Amount'])
+
+      await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'later{Enter}')
+
+      expect(screen.getByRole('row', { name: /Fix door/ })).toBeInTheDocument()
+      expect(screen.queryByRole('row', { name: /Buy paper/ })).not.toBeInTheDocument()
+    })
+
+    it('still offers a hidden column in the Filter dialog', async () => {
+      render(<Harness initial={{ ...first, columns: ['name', 'amount'] }} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Filter' }))
+      await userEvent.click(within(dialog()).getByRole('combobox', { name: 'Column' }))
+
+      expect(screen.getByRole('option', { name: 'Note' })).toBeInTheDocument()
+    })
+
+    it('brings every column back in its first order on Reset and Apply, and clears the columns of the view', async () => {
+      const onQuery = vi.fn()
+      render(<Harness initial={{ ...first, columns: ['name', 'note'] }} onQuery={onQuery} />)
+      expect(headers()).toEqual(['Name', 'Note'])
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Reset' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(headers()).toEqual(['Name', 'Amount', 'Note'])
+      expect(onQuery.mock.lastCall![0].columns).toBeUndefined()
+    })
+
+    it('keeps the page when the columns change', async () => {
+      const onQuery = vi.fn()
+      render(<Harness initial={{ ...first, page: 1, pageSize: 10 }} onQuery={onQuery} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Columns' }))
+      await userEvent.click(within(columnsDialog()).getByRole('checkbox', { name: 'Amount' }))
+      await userEvent.click(within(columnsDialog()).getByRole('button', { name: 'Apply' }))
+
+      expect(onQuery).toHaveBeenCalledWith({ page: 1, pageSize: 10, sort: null, columns: ['name', 'note'] })
+    })
+
+    it('draws the identifying column first even when the view lists it later', () => {
+      render(<Harness initial={{ ...first, columns: ['amount', 'name'] }} />)
+
+      expect(headers()).toEqual(['Name', 'Amount'])
+    })
+
+    it('has no Columns button unless the view turns it on', () => {
+      renderTable({ view: { query: first, onChange: () => {} } })
+
+      expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument()
+    })
   })
 })

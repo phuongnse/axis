@@ -41,10 +41,11 @@ New application… creates an application folder, blank or from a template, as
 [creating an application](authoring-applications.md#creating-an-application) describes. Where its button shows is
 in [applications](studio-workspace.md#applications) and [workspace](studio-workspace.md#workspace).
 
-The dialog asks for a name and checks it with the API's rule before it sends anything. It offers Blank
-or a template from `GET /api/studio/templates`, with the title and description in the UI locale and
-`en` as the fallback, and a built-in template first, with a "Built in" mark. A `409` or a `400` shows
-next to the name. A success adds the application to the list and to the application row's menu, opens
+The dialog asks for a name. It offers Blank or a template from `GET /api/studio/templates`, with the
+title and description in the UI locale and `en` as the fallback, and a built-in template first, with a
+"Built in" mark. Name is marked required and both fields have help. Create stays on, and a click
+[checks the fields](actions-and-controls.md#fields), including the name against the API's rule, and
+sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
 ## New resource
@@ -57,7 +58,7 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
   author can type to narrow it. The dialog then asks for a name, or for a locale when the kind is
   `text`. A `409`, when the id or the file exists, or a `400`, when the name or the locale is refused,
   shows under the field and keeps the dialog open.
-- **Its fields** _(planned for M31)_. Kind and Name, or Locale, are marked required and have help. Create
+- **Its fields.** Kind and Name, or Locale, are marked required and have help. Create
   stays on, and a click [checks the fields](actions-and-controls.md#fields).
 - **The starter.** Studio sends the kind's starter, the smallest content that passes the kind's
   schema except at the references the author must still choose, with an id from
@@ -145,13 +146,15 @@ what changed.
   the editor carries on from the new version.
 - **A stale version** is a `409`. The editor keeps the author's draft on screen and offers Reload,
   which reads the resource again and drops the draft.
-- **Leave without saving** _(planned for M31)_. One guard around the shell asks "Leave without saving?", with
+- **Leave without saving.** One guard around the shell asks "Leave without saving?", with
   Stay and Leave, before a link in the shell is followed and before a move that the workspace starts by
   itself, such as opening a reference or a problem. It guards Back and Forward too, through the
   [data router](frontend.md#routing). An editor counts itself in through `useUnsavedChanges`, which
   `SaveBar` calls, so every editor with a save bar is guarded, and the module editors and contract pages
   join it. A reload or closing the tab asks the browser's own question. A link opened in a new tab is not
-  asked about.
+  asked about, and neither is the move that Studio makes after a delete, because the draft went with the resource.
+  A move that only changes the `search`, `sort`, `page` or `pageSize` of a [table](actions-and-controls.md#tables)
+  is not asked about either, because the editor stays on screen.
 
 ## References
 
@@ -709,8 +712,8 @@ second view of the same draft. The [process designer](process-designer.md) edits
 graph, with the card of the selected step beside it, and describes the panels of the timer,
 sub-process and wait for event steps and of a task's deadline and escalations.
 
-- **The process.** The Form tab shows the process's name, its [description](#editor), its subject, its
-  optional start condition and its start step.
+- **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
+  and each field has a [field text](studio-resource-form.md#fields).
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
   and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
@@ -756,19 +759,19 @@ sub-process and wait for event steps and of a task's deadline and escalations.
 
 ## Connector editor
 
-The connector editor's Form tab shows the base URL binding, the auth type with its bindings,
-`timeout`, `idempotency` and the operations as a list, and the JSON view stays as the second view of
-the same draft.
+The connector editor's Form tab shows the connector's fields in the four
+[shared sections](studio-resource-form.md#sections) General, Service, Authentication and Operations,
+each field with its label and [help](frontend.md#platform-field-help). Add operation sits on the
+Operations heading, and the JSON view stays as the second view of the same draft.
 
-- **No values.** A binding is a name, labelled as a URL or a secret binding, and no value of a binding
-  is shown or stored: the editor reads the resource and schema routes and the binding names, and
-  writes only the resource, and the values stay in tenant settings.
-- **Bindings from the tenant.** A binding is chosen from the tenant's names of the
-  kind it needs, see
+- **No values.** A binding is a name, named by what it holds, and its help says which kind it is. No
+  value of a binding is shown or stored: the editor reads the resource and schema routes and the
+  binding names, and writes only the resource, and the values stay in tenant settings.
+- **Bindings from the tenant.** A binding is chosen from the tenant's names of the kind it needs, see
   [controls that know what they hold](studio-resource-form.md#controls-that-know-what-they-hold).
 - **Auth.** Choosing a type removes the keys the new type forbids, such as `token` for `header`, and
   adds the keys it requires, with an empty name, and clearing the type removes `auth`. `oauth2` shows a
-  token URL, a URL binding, a client id and a client secret, both secret bindings, and Scope and
+  Token URL, a URL binding, a Client ID and a Client secret, both secret bindings, and Scope and
   Audience boxes that remove their key when empty, see [OAuth2 auth](integration-resources.md#oauth2-auth).
 - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from
   the connector's other operations. Its input and output fields are rows of name, type and required.

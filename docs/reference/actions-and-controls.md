@@ -20,7 +20,7 @@ widget names a role, never an Ant Design button type.
 | Icon        | A text button with only an icon             | Small actions such as Refresh. Choose and Clear of a `reference` field are bordered and joined                                                                                   |
 | Plain       | A borderless text button in the text colour | Header controls, such as the account button                                                                                                                                      |
 | Link | Text in `primaryText` with no border | An action that reads as a link but goes to no address, such as the first cell of a [list of objects](studio-resource-form.md#lists-of-objects) |
-| Destructive | `dangerText` at any level                   | Actions that remove, such as Remove row and Delete                                                                                                                               |
+| Destructive | `dangerText` at any level                   | Actions that remove, such as Delete row and Delete                                                                                                                               |
 
 - **Text colours, not fill colours.** Ant Design writes the text of text, outlined and danger buttons
   in the fill colours `primary` and `danger`, which fail contrast on a dark surface, so Axis writes
@@ -82,10 +82,16 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   such as a danger button, whose white text needs it.
 - **A label is above its input, everywhere**, as the form widget has it, never beside it. Each form
   names Ant Design's vertical layout, and a Vitest check refuses a form that does not.
-- **One field for the platform's screens** _(planned for M31)_. `AxisField` draws every field of Studio
-  and the console: its label, its help and its input, as a group that its help describes.
-  `AxisCheckboxField` is a yes-or-no field with its help under its label, `AxisChoiceField` a choice among
-  a few ways, each with its help, and `AxisFieldGroup` a titled group of fields.
+- **One field for the platform's screens.** `AxisField` draws a field: its label, its help and its input, as a
+  group that its help describes. Inside a vertical form it takes the form's value and checks. Outside an
+  Ant Design form, where a screen keeps its draft itself, the caller gives the input its value and change
+  handler, and `AxisField` still ties the label to the input and makes the help its description.
+  `AxisFieldGroup` draws a titled group of fields with its help, such as an object's fields or a table, as a
+  group that its title names and its help describes. A field that holds one input uses `AxisField`, and a
+  field that holds several inputs, or rows, uses `AxisFieldGroup`, because a label names only one input.
+- **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
+  a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
+  with its help.
 - **Every field has help** _(planned for M31)_, as [platform field help](frontend.md#platform-field-help) says.
 - **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
   its own.
@@ -99,7 +105,9 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
   focuses the first. A message goes once the field is put right. A button is disabled only while its
-  action runs. This holds for every form and dialog, as it does for the form widget's Save.
+  action runs. This holds for every form and dialog, as it does for the form widget's Save. A confirmation
+  that asks the user to type a name before a destructive action keeps its button off until the name
+  matches, as [the cell console's Delete](cell-console.md#actions) does.
 
 ## Tab bars
 
@@ -139,19 +147,31 @@ be kept right.
   actions its author configures.
 - **Every control in one table** _(planned for M31)_. `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address.
-- **Sort** _(planned for M31)_. A column sorts from its header when its values have an order a person uses:
-  names, people, statuses, dates and numbers. Long text, files, lists and actions do not. A header only
-  sorts, as there is one place to filter.
-- **Search** _(planned for M31)_. A column is searchable when it says so, through `searchText`, as a field
-  marked `searchable` is in the record API, and search looks in all of them. The box says Search.
-- **Filter** _(planned for M31)_. Filter is an icon button that carries the count of conditions in force, and
-  opens a builder of conditions in groups of All or Any, with no limit on depth. Every column can be
-  filtered on, and conditions follow the kind of value, text, enum, number or date, each with empty and
-  not empty. Apply puts it in force, and a condition with no value is left out. A chip stands for each
-  condition and group, with Clear all.
-- **Columns control** _(planned for M31)_. Columns is an icon button that opens a dialog that shows, hides and
-  orders the columns, with Reset. The identifying column stays first and always shows. A hidden column is
-  still searched and filtered on. The platform keeps each person's choice.
+- **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
+  statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
+  one place to filter. A table that holds all its rows sorts them by the value its column gives through
+  `sortValue`, and a table paged on the server sends the sort to the server. A new sort starts at page 1.
+- **Search.** A column is searchable when it says so, through `searchText`, as a field marked `searchable` is
+  in the record API, and search looks in all of them. `AxisTable` draws the box, which says Search, and a
+  table that holds all its rows searches them by itself, while a table paged on the server sends the text to
+  the server. The text applies on Enter, on the search button and when the box is cleared, never on each
+  key, and a new search starts at page 1. Search, sort, page and page size live in the address.
+- **Filter.** Filter is an icon button that carries the count of conditions in force, and
+  opens a builder of conditions in groups of All or Any, with no limit on depth. A column can be filtered
+  on when it gives its kind of value through `filter`, and conditions follow that kind, text, enum, number
+  or date, each with empty and not empty. Apply puts it in force, and a condition with no value is left
+  out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
+  them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
+  filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
+- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, a data source
+  table's included.
+- **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
+  opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
+  back to every column in its first order, and nothing takes effect until Apply. The identifying column, the
+  first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
+  the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
+  its first order. A change of columns keeps the page.
+- **Each person's columns** _(planned for M31)_. The platform keeps each person's choice of columns.
 - **Saved views** _(planned for M31)_. A person saves a table's search, filter and sort as a view.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free
@@ -169,7 +189,8 @@ be kept right.
 - **An empty table keeps its header**, with the
   [empty state](#showing-what-is-empty) in its body.
 - **Paging.** A long table pages.
-- **How many** _(planned for M31)_. A paged table says what it shows of how many, as "1–20 of 143".
+- **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
+  language's format.
 - **Too little room** _(planned for M31)_. A table measures its own width, as it changes. Its text columns
   narrow to 160 px first. Then columns move under their row one at a time, from the right or by a column's
   `priority`, `low` first and `high` last, as "Title: value" on the row's own surface, with no line between

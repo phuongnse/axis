@@ -6,6 +6,8 @@ import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioReference, StudioReferenceNode, StudioResourceItem } from '../platform/studio'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
+import { useUnsavedChanges } from '../platform/unsavedChanges'
+import { renderGuarded } from '../test/leaveGuard'
 import { StudioUsedBy } from './StudioUsedBy'
 
 const application = 'PurchaseRequests'
@@ -151,12 +153,38 @@ describe('StudioUsedBy', () => {
     expect(links[1]).toHaveAttribute('href', expect.stringContaining('%2Ffields%2F3%2Ftarget'))
   })
 
-  it('narrows the rows by search and by kind', async () => {
+  it('sorts the rows by the Name header, and by the Kind header in the order of the sidebar', async () => {
+    stubReferences()
+    renderTab()
+
+    const table = await screen.findByTestId('studio-used-by')
+    const labels = () =>
+      within(table)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
+    expect(labels()).toEqual([
+      'PurchaseRequestForm',
+      'Purchase request totals by department',
+      'Purchase request',
+      'Department',
+    ])
+
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Kind' }))
+    expect(labels()[0]).toBe('Department')
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Kind' }))
+    expect(labels()[0]).toBe('PurchaseRequestForm')
+  })
+
+  it('narrows the rows by search, which applies on Enter, and by kind', async () => {
     stubReferences()
     renderTab()
 
     const table = await screen.findByTestId('studio-used-by')
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'totals')
+    expect(within(table).getAllByRole('link')).toHaveLength(4)
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
     expect(
       within(table)
         .getAllByRole('link')
@@ -164,6 +192,7 @@ describe('StudioUsedBy', () => {
     ).toEqual(['Purchase request totals by department'])
 
     await userEvent.clear(screen.getByRole('searchbox', { name: 'Search' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
     await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
     await userEvent.click(await screen.findByRole('option', { name: 'Form' }))
     expect(
@@ -171,6 +200,32 @@ describe('StudioUsedBy', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['PurchaseRequestForm'])
+  })
+
+  it('sorts and searches without asking to leave, though a draft is unsaved', async () => {
+    stubReferences()
+    function UnsavedDraft() {
+      useUnsavedChanges(true)
+      return null
+    }
+    const router = renderGuarded(
+      <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+        <UnsavedDraft />
+        <StudioUsedBy application={application} resourceId={targetId} resources={resources} />
+      </TextProvider>,
+    )
+
+    const table = await screen.findByTestId('studio-used-by')
+    await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'totals{Enter}')
+
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+    expect(router.state.location.search).toBe('?search=totals&sort=label')
+    expect(
+      within(table)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Purchase request totals by department'])
   })
 
   it('says that nothing uses the resource when no resource uses it', async () => {

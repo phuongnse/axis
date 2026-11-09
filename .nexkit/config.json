@@ -288,7 +288,7 @@
     "enabled": true,
     "scope": null,
     "answer": "recommended",
-    "max_parallel": 3,
+    "max_parallel": 1,
     "watch_workflows": [],
     "trusted_workflows": [
       "docs-audit.yml"

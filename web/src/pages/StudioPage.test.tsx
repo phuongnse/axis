@@ -1,8 +1,8 @@
 import { EditorView } from '@codemirror/view'
 import { ConfigProvider } from 'antd'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { createMemoryRouter, Link, MemoryRouter, RouterProvider, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
@@ -11,10 +11,12 @@ import { assignLocation } from '../platform/navigation'
 import { ShellSidebarContext } from '../platform/shellSidebarContext'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
+import { LeaveWithoutSaving, UnsavedChangesGuard } from '../platform/UnsavedChangesGuard'
 import type { StudioApplication, StudioDiagnostic, StudioReference, StudioResourceItem } from '../platform/studio'
 import { PlatformContext, type Platform } from './context'
 import { StudioPage } from './StudioPage'
 import { editJson, jsonText } from '../test/jsonView'
+import { isRequiredLabel } from '../test/antd'
 
 vi.mock('../platform/navigation', () => ({ assignLocation: vi.fn() }))
 
@@ -286,6 +288,42 @@ function renderPage(entry = '/studio?app=PurchaseRequests', locale?: string) {
     ),
   )
   return claim
+}
+
+/**
+ * Renders the page under the guard of docs/reference/studio.md#editor, in a data router that holds `entries` with the
+ * last one open. A link to `/` stands for a link in the shell. Returns the router.
+ */
+function renderGuardedPage(entries: string[]) {
+  sidebar = document.createElement('div')
+  sidebar.dataset.testid = 'sidebar'
+  document.body.append(sidebar)
+  const router = createMemoryRouter(
+    [
+      {
+        path: '*',
+        element: (
+          <ConfigProvider theme={{ token: { motion: false } }}>
+            <ThemeModeProvider>
+              <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+                <ShellSidebarContext.Provider value={{ target: sidebar, collapsed: false, claim: () => () => {} }}>
+                  <UnsavedChangesGuard>
+                    <StudioPage />
+                    <Location />
+                    <Link to="/">Home</Link>
+                    <LeaveWithoutSaving />
+                  </UnsavedChangesGuard>
+                </ShellSidebarContext.Provider>
+              </TextProvider>
+            </ThemeModeProvider>
+          </ConfigProvider>
+        ),
+      },
+    ],
+    { initialEntries: entries, initialIndex: entries.length - 1 },
+  )
+  render(<RouterProvider router={router} />)
+  return router
 }
 
 /** Opens the Problems panel from the band's problems button and returns it. */
@@ -1206,6 +1244,99 @@ describe('StudioPage', () => {
   })
 })
 
+describe('StudioPage leaving unsaved changes', () => {
+  const overview = '/studio?app=PurchaseRequests'
+  const entityAddress = `${overview}&resource=${entityId}`
+
+  async function editMaxLength() {
+    const maxLength = within(await screen.findByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton')
+    await userEvent.clear(maxLength)
+    await userEvent.type(maxLength, '250')
+    return maxLength
+  }
+
+  async function stay() {
+    expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Stay' }))
+    await waitFor(() => expect(screen.getByText('Leave without saving?')).not.toBeVisible())
+  }
+
+  it('asks before a shell link, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    const maxLength = await editMaxLength()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+    expect(screen.getByTestId('studio-save-bar')).toHaveTextContent('Unsaved changes')
+  })
+
+  it('moves on when the author picks Leave', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await editMaxLength()
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Leave' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+  })
+
+  it('asks before opening a problem, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    const maxLength = await editMaxLength()
+
+    await openProblems()
+    await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+  })
+
+  it('asks before Back, and Stay keeps the address and the draft', async () => {
+    stubServer()
+    const router = renderGuardedPage([overview, entityAddress])
+    const maxLength = await editMaxLength()
+
+    act(() => {
+      void router.navigate(-1)
+    })
+    await stay()
+
+    expect(router.state.location.pathname + router.state.location.search).toBe(entityAddress)
+    expect(maxLength).toHaveValue('250')
+  })
+
+  it('does not ask before a link while nothing is unsaved', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await screen.findByTestId('studio-field-/fields/1/maxLength')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Home' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+  })
+
+  it('opens the Overview after a delete without asking, though the draft is unsaved', async () => {
+    stubServer()
+    const router = renderGuardedPage([entityAddress])
+    await editMaxLength()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'More actions' }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Delete…' }))
+    await userEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(overview))
+    expect(screen.queryByText('Leave without saving?')).not.toBeInTheDocument()
+  })
+})
+
 describe('StudioPage publishing', () => {
   const requestId = '7a8b9c0d-1e2f-4a3b-9c4d-5e6f70819203'
   const siteId = '3c4d5e6f-7081-4920-a3b4-c5d6e7f80910'
@@ -1651,6 +1782,58 @@ describe('StudioPage publishing', () => {
       expect(screen.getByRole('textbox', { name: 'Name' })).toBeInTheDocument()
     })
 
+    it('keeps Create on, marks Kind and Name required and checks them on a click', async () => {
+      const fetchMock = stubCreate(201)
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New resource…' }))
+
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
+      expect(isRequiredLabel(screen.getByText('Kind'))).toBe(true)
+      expect(isRequiredLabel(screen.getByText('Name'))).toBe(true)
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(
+        expect.stringContaining('Letters and digits'),
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Choose a kind.')).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveFocus()
+      expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(false)
+
+      await userEvent.click(screen.getByRole('combobox', { name: 'Kind' }))
+      await userEvent.click(await screen.findByTitle('Entity'))
+      await waitFor(() => expect(screen.queryByText('Choose a kind.')).not.toBeInTheDocument())
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus()
+      expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(false)
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'CostCentre')
+
+      await waitFor(() => expect(screen.queryByText('Enter a name.')).not.toBeInTheDocument())
+    })
+
+    it('checks the locale of a kind that is text, and starts empty on each opening', async () => {
+      stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=text')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Add language…' }))
+      expect(isRequiredLabel(screen.getByText('Locale'))).toBe(true)
+      await userEvent.click(screen.getByRole('button', { name: 'Create' }))
+
+      expect(await screen.findByText('Enter a locale.')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Locale' })).toHaveFocus()
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Locale' }), 'de')
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+      await userEvent.click(screen.getByRole('button', { name: 'Add language…' }))
+
+      expect(screen.getByRole('textbox', { name: 'Locale' })).toHaveValue('')
+      expect(screen.queryByText('Enter a locale.')).not.toBeInTheDocument()
+    })
+
     it("asks a kind's New entity… for the name alone", async () => {
       const fetchMock = stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=entity')
@@ -1660,7 +1843,7 @@ describe('StudioPage publishing', () => {
       const dialog = await screen.findByRole('dialog', { name: 'New entity' })
       expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
       const create = within(dialog).getByRole('button', { name: 'Create' })
-      expect(create).toBeDisabled()
+      expect(create).toBeEnabled()
       await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre')
       expect(create).toBeEnabled()
       await userEvent.click(create)
@@ -1670,13 +1853,26 @@ describe('StudioPage publishing', () => {
       expect(JSON.parse(init!.body as string)).toMatchObject({ kind: 'entity', name: 'CostCentre' })
     })
 
-    it("asks a kind's New text resource… for a locale alone", async () => {
+    it("creates once when Enter is pressed in a kind's New entity…", async () => {
+      const fetchMock = stubCreate(201)
+      renderPage('/studio?app=PurchaseRequests&kind=entity')
+
+      await userEvent.click(await screen.findByRole('button', { name: 'New entity…' }))
+
+      const dialog = await screen.findByRole('dialog', { name: 'New entity' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'CostCentre{Enter}')
+
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('resource='))
+      expect(fetchMock.mock.calls.filter(([, call]) => call?.method === 'POST')).toHaveLength(1)
+    })
+
+    it("asks a kind's Add language… for a locale alone", async () => {
       const fetchMock = stubCreate(201)
       renderPage('/studio?app=PurchaseRequests&kind=text')
 
-      await userEvent.click(await screen.findByRole('button', { name: 'New text resource…' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Add language…' }))
 
-      const dialog = await screen.findByRole('dialog', { name: 'New text resource' })
+      const dialog = await screen.findByRole('dialog', { name: 'Add language' })
       expect(within(dialog).queryByRole('combobox', { name: 'Kind' })).not.toBeInTheDocument()
       expect(within(dialog).queryByRole('textbox', { name: 'Name' })).not.toBeInTheDocument()
       await userEvent.type(within(dialog).getByRole('textbox', { name: 'Locale' }), 'de')
@@ -1717,17 +1913,16 @@ describe('StudioPage publishing', () => {
 
       expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['Process'])
       await userEvent.click(screen.getByRole('option', { name: 'Process' }))
-      const create = screen.getByRole('button', { name: 'Create' })
-      expect(create).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
       await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Approval')
-      expect(create).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled()
     })
 
     it('creates a text resource that copies the texts of the default locale of the first site', async () => {
       const fetchMock = stubCreate(201)
       renderPage()
 
-      await fillDialog('Text', 'de', 'Locale')
+      await fillDialog('Language', 'de', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
@@ -1774,7 +1969,7 @@ describe('StudioPage publishing', () => {
       )
       renderPage()
 
-      await fillDialog('Text', 'vi', 'Locale')
+      await fillDialog('Language', 'vi', 'Locale')
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`resource=${newId}`))
       const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!

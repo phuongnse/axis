@@ -1,4 +1,6 @@
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Data.Audit;
 using Axis.Server.Studio;
 using Axis.Studio;
@@ -7,7 +9,7 @@ using Json.Pointer;
 namespace Axis.Server.Mcp;
 
 /// <summary>
-/// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c> and <c>delete_resource</c>, and
+/// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c>, <c>delete_resource</c> and <c>write_layer</c>, and
 /// <c>check_expression</c>, which writes nothing, see <c>docs/reference/mcp-server.md#tools</c>. They change only the draft of the
 /// calling person through <see cref="StudioDrafts"/> and answer what the authoring API's matching route answers, or an error text
 /// that is a problem title of the authoring API or a fixed one, never text from the request or a path. A draft that is not the
@@ -159,6 +161,71 @@ internal static class McpWriteTools
         }
 
         return (new StudioDeleteResponse(diagnostics), null);
+    }
+
+    /// <summary>
+    /// Writes the edited module resource <paramref name="contentJson"/> as the draft's layer that holds only the difference from the
+    /// module version the draft's manifest pins, through the checks of the save route, <see cref="StudioEndpoints.LayerChanges"/>.
+    /// An edit with no difference removes the draft's layer and answers no file and no version.
+    /// </summary>
+    public static async Task<(object? Output, string? Error)> WriteLayerAsync(
+        McpToolContext context, string application, string draft, string module, string id, string contentJson, CancellationToken ct)
+    {
+        var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
+        if (folder is null)
+        {
+            return (null, McpReadTools.Title(refusal));
+        }
+
+        var (files, error) = await McpReadTools.DraftFilesAsync(context, folder, draft, ct);
+        if (files is null)
+        {
+            return (null, error);
+        }
+
+        var (found, notFound) = StudioEndpoints.FindModuleFile(
+            ApplicationCompiler.CompileFiles(McpReadTools.Contents(files), context.Packages.Versions, context.Modules.Modules),
+            context.Modules,
+            module,
+            id);
+        if (found is null)
+        {
+            return (null, McpReadTools.Title(notFound));
+        }
+
+        using var edited = JsonDocument.Parse(contentJson);
+        var (changes, layerRefusal) = StudioEndpoints.LayerChanges(found, module, edited.RootElement);
+        if (layerRefusal is not null)
+        {
+            return (null, layerRefusal);
+        }
+
+        var (drafts, draftsError) = McpReadTools.Drafts(context, folder);
+        if (drafts is null)
+        {
+            return (null, draftsError);
+        }
+
+        var outcome = await drafts.WriteLayerAsync(draft, module, found.Name!, changes, ct);
+        switch (outcome.Refusal)
+        {
+            case StudioWriteRefusal.Unavailable:
+                return (null, StudioEndpoints.WriteLockUnavailable);
+            case StudioWriteRefusal.Exists:
+                return (null, "A resource with this id or file already exists.");
+            case not null:
+                return (null, StudioRevisionEndpoints.NoDraft);
+        }
+
+        await AuditAsync(context, folder, "write_layer", draft, found.Id);
+
+        var (diagnostics, diagnosticsError) = await DiagnosticsAsync(context, folder, draft, ct);
+        if (diagnostics is null)
+        {
+            return (null, diagnosticsError);
+        }
+
+        return (new StudioModuleSaveResponse(outcome.Value!.File, outcome.Value.Version, diagnostics), null);
     }
 
     /// <summary>

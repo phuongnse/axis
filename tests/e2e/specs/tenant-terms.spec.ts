@@ -53,7 +53,7 @@ test('a first sign-in on a tenant with terms asks for them, asks again for an un
 
     await page.getByRole('button', { name: 'Decline and sign out', exact: true }).click()
     await page.waitForURL(`https://${host}/?signIn=declined`)
-    await expect(page.getByRole('alert').filter({ hasText: 'Signing in needs the terms accepted.' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'You need to accept the terms to sign in.' })).toBeVisible()
     await expect(page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   } finally {
     await browser.close()

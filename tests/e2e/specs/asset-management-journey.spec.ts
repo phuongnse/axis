@@ -16,7 +16,6 @@ import {
   createResource,
   deleteResource,
   doneListItem,
-  hasKind,
   jsonViewText,
   openFormTab,
   openKind,
@@ -254,26 +253,19 @@ test.describe('the author builds the asset management application with Studio on
       .click()
   }
 
-  // The migration kind has no sidebar entry without a migration. Deleting the last migration removes the entry,
-  // so the list is reopened only while one is left.
+  // Studio writes a save's migration before it answers, so the built folder says how many there are. The sidebar
+  // is not read for that count, because a list that has not drawn yet would look empty.
   async function deleteMigrations(page: Page) {
-    // The sidebar loads the new migration after the save, so the entry is given a moment to appear.
-    await expect.poll(() => hasKind(page, 'migration'), { timeout: 5_000 }).toBe(true).catch(() => undefined)
-    if (!(await hasKind(page, 'migration'))) {
-      return
-    }
-    const migrations = page.getByTestId('studio-group-migration')
-    await openKind(page, 'migration')
-    while ((await migrations.getByRole('button').count()) > 0) {
-      const before = await migrations.getByRole('button').count()
-      await migrations.getByRole('button').first().click()
+    const written = async () => (await readdir(path.join(built, 'migrations')).catch(() => [])).length
+    const migrations = page.getByTestId('studio-group-migration').getByRole('button')
+    for (let left = await written(); left > 0; left--) {
+      await openKind(page, 'migration')
+      await expect(migrations).toHaveCount(left)
+      await migrations.first().click()
       await expectForm(page)
       await deleteResource(page)
-      if (before > 1) {
-        await openKind(page, 'migration')
-      }
-      await expect(migrations.getByRole('button')).toHaveCount(before - 1)
     }
+    await expect.poll(written).toBe(0)
   }
 
   async function buildDataSource(page: Page, name: string, file: string) {
@@ -908,7 +900,7 @@ test.describe('the author builds the asset management application with Studio on
     expect(
       (await readdir(built, { recursive: true })).filter((file) => sixParts(file) && !file.startsWith('texts/')).sort(),
     ).toEqual(files)
-    await expect(page.getByTestId('studio-group-migration').getByRole('button')).toHaveCount(0)
+    expect(await readdir(path.join(built, 'migrations')).catch(() => [])).toEqual([])
     compareApplicationFolders(assetManagement, built, { files, ignorePageElementNames: true, generatedNames: true })
 
     const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
@@ -1322,7 +1314,7 @@ test.describe('the author builds the asset management application with Studio on
       .locator('input[type=file]')
       .setInputFiles(path.join(import.meta.dirname, '..', 'fixtures', 'asset-management-import.csv'))
     await dialog.getByRole('button', { name: 'Check', exact: true }).click()
-    const commit = dialog.getByRole('button', { name: 'Commit', exact: true })
+    const commit = dialog.getByRole('button', { name: 'Create records', exact: true })
     await expect(commit).toBeVisible()
     await expect(dialog.getByTestId('import-status')).not.toContainText('Row')
     await commit.click()

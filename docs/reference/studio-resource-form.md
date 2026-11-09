@@ -21,8 +21,9 @@ last section with no heading.
 - **One list in a section.** A section that holds one list puts the list's Add… on the right of its
   heading, and the table has no toolbar row.
 - **One rhythm.** The sections are `spacing-md` apart.
-- **Shared parts.** _(planned for M31)_ Every Studio form is built from these sections, with its fields as
-  [fields](actions-and-controls.md#fields) says.
+- **One shared part.** The section is one shared part that the generic form draws and the typed editors can
+  draw too.
+- **Every Studio form is built from it.** _(planned for M31)_ A typed editor draws its sections through it.
 
 ## Fields
 
@@ -33,6 +34,9 @@ last section with no heading.
   [platform field help](frontend.md#platform-field-help). A property's raw name, such as `textKey`, never
   shows. The `<path>` is the property names from the root joined by dots, with list indices and map keys
   left out, so every item of a list shares one label.
+- **Drawn through the platform's field.** A field that holds one input is drawn through `AxisField`, and
+  an object, a label, a list or a map through `AxisFieldGroup`, as
+  [fields](actions-and-controls.md#fields) says. The label names the input and the help describes it.
 - **The file's identity is hidden.** `id`, `kind` and `formatVersion` are not shown, while `name` is.
   A module's `name` stays read-only, as [customization layers](customization-layers.md#in-studio) says.
 - **A group's fields sit in.** They sit in from the group's label, behind a rule in `borderSubtle`, so they
@@ -75,7 +79,9 @@ values keeps its rows of inputs.
   and creates none, or "Edit module". The item's name comes from the text `shell.studio.item.<kind>.<path>`,
   which every list of objects in a kind with field texts has. A list without one reads "item", as in
   Add item…. The dialog's fields are the item's fields at their real pointers. Done writes the copy to the
-  list as one step to undo, and waits for the item's required fields. Cancel leaves the list as it was, so
+  list as one step to undo. Done stays on, and a click on it with a required field empty shows what to fill in under
+  each such field and focuses the first, as [fields](actions-and-controls.md#fields) says, and the dialog stays open.
+  Cancel leaves the list as it was, so
   Add… adds no row until Done. Inside the dialog a nested list is rows of inputs with Add row, because a
   dialog never opens another.
 - **Labels in the dialog.** The texts typed in a label's boxes in the dialog are held with the copy. Done
@@ -101,7 +107,7 @@ A field whose values Axis knows is chosen, never typed, so an author cannot name
 | A module's slots  | The module's role and connector maps are one field for each slot of the chosen module: the slot's label above a select of the application's roles or connectors.                                                                                                                                                                                                                                                 |
 | Version range     | Two selects, because a range has three forms. Version lists the installed versions, newest first, as "1.2.0 (newest)". Updates reads "Compatible updates (1.x)" for `^`, the default, "Fixes only (1.2.x)" for `~` and "This version only" for an exact version.                                                                                                                                                 |
 | Time zone         | A searchable select of the time zones the server knows, from the catalog, so every choice passes `AXC0277`. Each reads as "(UTC+07:00) Asia/Ho Chi Minh", by offset then id. Cleared, the application's dates are UTC. A schedule trigger's time zone is the same control.                                                                                                                                       |
-| Binding           | Chosen from the names of the kind the place needs, from [`GET /api/studio/bindings`](#studio-api): the application's file storage, a webhook's URL and secret, and a connector's base URL, token URL and secrets. File storage also offers "The tenant's database, with no binding", which clears the whole entry. A binding name the tenant lacks stays shown, with a line that says activation will refuse it. |
+| Binding           | Chosen from the names of the kind the place needs, from [`GET /api/studio/bindings`](#studio-api): the application's file storage, a webhook's URL and secret, and a connector's base URL, token URL and secrets. File storage also offers "The database, with no binding", which clears the whole entry. A binding name the tenant lacks stays shown, with a line that says activation will refuse it. |
 
 The file keeps a version range as written, and a table shows it in words, as "1.2.0 and later 1.x" or
 "1.2.0 only". A version that is no longer installed stays shown, with a line in `warningText` that says
@@ -129,8 +135,9 @@ The tab is the [standard table](actions-and-controls.md#tables), flat, with sear
 2. Kind, as wide as its content.
 3. How it is used, in words, such as "A field refers to it", with one text for each relation of the compiler.
 
-No file, path or relation code shows. It sorts by kind in
-the sidebar's order, then by name. The same resource used the same way shows once. With none, the table
+No file, path or relation code shows. Name and Kind sort from their headers, Kind in the sidebar's order, and
+search looks in the name. Until a person sorts, the rows are by kind in the sidebar's order, then by name. The
+same resource used the same way shows once. With none, the table
 says so.
 
 ## Save bar
@@ -197,17 +204,24 @@ release routes are in [release page](studio-workspace.md#release-page).
 
 ### Resource activity
 
-_(planned for M31)_
-
 `GET .../resource-activity` answers `{ items }`, one for each resource of the folder and of the modules the
-application uses. It is a route of its own, so the resource list stays free of the database. Studio's
-[kind lists](studio.md#kind-lists-and-module-resources) read it.
+application uses, each `{ id, module, status, titles, descriptions, modifiedBy, modifiedAt }`. It is a route of
+its own, so the resource list stays free of the database. Studio's [kind lists](studio.md#kind-lists-and-module-resources)
+read it. Like every Studio route it answers `401` without a session and `403` without the author role.
 
-- **`status`** is `new`, `changed` or `published`, against the live release. A file the release does not
-  hold is new, and with no live release every file is. A file it holds that no longer loads is changed. A
-  module's resource changes with a new module version or a layer.
+- **`status`** is `new`, `changed` or `published`, against the live release, comparing each file as canonical
+  JSON. A file the release does not hold is new, and with no live release every file is. A file it holds that
+  no longer loads is changed, and is listed with the id the release gives it. A scenario has no status,
+  because a release never stores scenarios, so it is null. A module's resource is changed when its file in the
+  module version the application pins differs from the release's copy, or when the application's layer for it
+  differs from the release's layer. A new module version that leaves a file the same changes nothing.
+- **`module`** is the module's id for a module's resource, else null.
 - **`titles` and `descriptions`** go with a module's resource: its label and description by locale, from
-  the module's own texts.
-- **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a resource and when, with the version
-  the write left, and a module's layer write counts too. The route answers them only while the file still
-  has that version, so a file changed in git shows the dash rather than the wrong person.
+  the module's own texts. A resource of the folder has them null, because the resource list gives them.
+- **`modifiedBy` and `modifiedAt`.** Studio's writes record who wrote a file and when, with the version
+  the write left, and a module's layer write counts too. The create, patch, `changes`, text write and module
+  resource save and reset routes record, and undo, accepting an authoring request and creating an
+  application do not. The route answers them only while the file still has that version, so a file changed in
+  git or by hand shows the dash rather than the wrong person. A module resource's writer is whoever last
+  wrote its layer. `modifiedBy` is the user's current profile name, else the name stored with the write.
+  A record that fails is logged and never fails the write.

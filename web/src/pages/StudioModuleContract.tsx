@@ -1,10 +1,12 @@
-import { Alert, Button, Checkbox, Flex, Input, Modal, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Checkbox, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
 import { AxisTable } from '../platform/AxisTable'
 import { diffPatch, getAt, setAt } from '../platform/jsonPatch'
 import { layerMarks, markOf } from '../platform/layerMarks'
 import { QuotaRefusedError } from '../platform/quota'
+import { requiredMark } from '../platform/requiredMark'
 import {
   fetchStudioModuleResource,
   patchStudioResource,
@@ -19,6 +21,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useUnsavedChanges } from '../platform/unsavedChanges'
 import { type ContractView, contractView } from './contractView'
 import {
   moduleIndex,
@@ -68,7 +71,7 @@ function Point({ value }: { value: string }) {
   const { lost } = useStudioConnection()
   const relax = useContext(RelaxContextValue)
   const [open, setOpen] = useState(false)
-  const [reason, setReason] = useState('')
+  const [form] = Form.useForm<{ reason: string }>()
   const [busy, setBusy] = useState(false)
   const [conflict, setConflict] = useState(false)
   const code = <Typography.Text code>{value}</Typography.Text>
@@ -104,7 +107,7 @@ function Point({ value }: { value: string }) {
     }
   }
 
-  function save() {
+  function save({ reason }: { reason: string }) {
     if (relax === undefined || !relaxReasonValid(reason)) {
       return
     }
@@ -134,7 +137,6 @@ function Point({ value }: { value: string }) {
           data-testid={`studio-contract-relax-${value}`}
           disabled={busy}
           onClick={() => {
-            setReason('')
             setConflict(false)
             setOpen(true)
           }}
@@ -166,21 +168,35 @@ function Point({ value }: { value: string }) {
         title={t('shell.studio.contract.relaxTitle')}
         okText={t('shell.studio.contract.relax')}
         cancelText={t('shell.studio.cancel')}
-        okButtonProps={{ disabled: !relaxReasonValid(reason) }}
         confirmLoading={busy}
-        onOk={save}
+        onOk={() => form.submit()}
         onCancel={() => setOpen(false)}
+        // Each opening starts with an empty reason.
+        afterClose={() => form.resetFields()}
       >
         <Flex vertical gap={4}>
           <Typography.Text code>{value}</Typography.Text>
-          <Input.TextArea
-            aria-label={t('shell.studio.contract.relaxReason')}
-            placeholder={t('shell.studio.contract.relaxReason')}
-            maxLength={relaxReasonMaxLength}
-            showCount
-            value={reason}
-            onChange={(event) => setReason(event.target.value)}
-          />
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={requiredMark}
+            initialValues={{ reason: '' }}
+            scrollToFirstError={{ focus: true }}
+            onFinish={save}
+          >
+            <AxisField
+              name="reason"
+              label={t('shell.studio.contract.relaxReason')}
+              help={t('shell.studio.contract.relaxReason.help')}
+              requiredMessage={t('shell.studio.contract.relaxReasonRequired')}
+            >
+              <Input.TextArea
+                aria-label={t('shell.studio.contract.relaxReason')}
+                maxLength={relaxReasonMaxLength}
+                showCount
+              />
+            </AxisField>
+          </Form>
         </Flex>
       </Modal>
     </Flex>
@@ -230,13 +246,25 @@ function ContractTable<T extends object>({
   )
 }
 
-/** True when `name` is not empty and no name in `names` equals it, ignoring letter case. */
-function nameFree(name: string, names: string[]) {
-  const trimmed = name.trim()
-  return trimmed !== '' && !names.some((other) => other.toLowerCase() === trimmed.toLowerCase())
+/** True when a name in `names` equals `name`, ignoring letter case and the spaces around it. */
+function nameTaken(name: string, names: string[]) {
+  const trimmed = name.trim().toLowerCase()
+  return names.some((other) => other.toLowerCase() === trimmed)
 }
 
-/** The dialog that adds a state: its name, and whether it is initial and deletable. */
+/** The rule that rejects a name that `names` already holds, with the message `taken`. An empty name is the required rule's. */
+function freeNameRule(names: string[], taken: string) {
+  return {
+    validator: (_: unknown, value: string) =>
+      nameTaken(value, names) ? Promise.reject(new Error(taken)) : Promise.resolve(),
+  }
+}
+
+/**
+ * The dialog that adds a state: its name, and whether it is initial and deletable. Add is on until a state is added. A
+ * click with the name empty or taken shows what is wrong under it and focuses it, see
+ * [Added states](docs/reference/module-contracts.md#in-studio).
+ */
 function AddStateDialog({
   open,
   names,
@@ -250,18 +278,18 @@ function AddStateDialog({
 }) {
   const t = useText()
   const { size } = useDesignTokens()
-  const [name, setName] = useState('')
+  const [form] = Form.useForm<{ name: string }>()
   const [initial, setInitial] = useState(false)
   const [deletable, setDeletable] = useState(false)
 
   function close() {
-    setName('')
+    form.resetFields()
     setInitial(false)
     setDeletable(false)
     onClose()
   }
 
-  function add() {
+  function add({ name }: { name: string }) {
     onAdd({
       name: name.trim(),
       ...(initial ? { initial: true } : {}),
@@ -277,31 +305,47 @@ function AddStateDialog({
       title={t('shell.studio.contract.addState')}
       okText={t('shell.studio.addItem')}
       cancelText={t('shell.studio.cancel')}
-      okButtonProps={{ disabled: !nameFree(name, names) }}
-      onOk={add}
+      onOk={() => form.submit()}
       onCancel={close}
     >
-      <Flex vertical gap="small">
-        <Input
-          aria-label={t('shell.studio.contract.name')}
-          placeholder={t('shell.studio.contract.name')}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Checkbox checked={initial} onChange={(event) => setInitial(event.target.checked)}>
-          {t('shell.studio.contract.initial')}
-        </Checkbox>
-        <Checkbox checked={deletable} onChange={(event) => setDeletable(event.target.checked)}>
-          {t('shell.studio.contract.deletable')}
-        </Checkbox>
-      </Flex>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={requiredMark}
+        initialValues={{ name: '' }}
+        scrollToFirstError={{ focus: true }}
+        onFinish={add}
+      >
+        <AxisField
+          name="name"
+          label={t('shell.studio.contract.name')}
+          help={t('shell.studio.contract.stateName.help')}
+          requiredMessage={t('shell.studio.contract.nameRequired')}
+          rules={[freeNameRule(names, t('shell.studio.contract.stateNameTaken'))]}
+        >
+          <Input aria-label={t('shell.studio.contract.name')} />
+        </AxisField>
+        <Flex vertical gap="small">
+          <Checkbox checked={initial} onChange={(event) => setInitial(event.target.checked)}>
+            {t('shell.studio.contract.initial')}
+          </Checkbox>
+          <Checkbox checked={deletable} onChange={(event) => setDeletable(event.target.checked)}>
+            {t('shell.studio.contract.deletable')}
+          </Checkbox>
+        </Flex>
+      </Form>
     </Modal>
   )
 }
 
+type TransitionValues = { name: string; from: string[]; to?: string; guard: string }
+
 /**
  * The dialog that adds a transition: its name, the states it leaves, the state it enters and an optional guard. Every
- * state of the lifecycle can be picked, a protected one included, since the server reports a transition into it.
+ * state of the lifecycle can be picked, a protected one included, since the server reports a transition into it. Add is
+ * on until a transition is added. A click with the name empty or taken, no From state, or no To state or one that is
+ * among the From states shows what is wrong under the first such field and focuses it. A change of From clears the
+ * message under To, since the check of To depends on From.
  */
 function AddTransitionDialog({
   open,
@@ -318,21 +362,15 @@ function AddTransitionDialog({
 }) {
   const t = useText()
   const { size } = useDesignTokens()
-  const [name, setName] = useState('')
-  const [from, setFrom] = useState<string[]>([])
-  const [to, setTo] = useState<string>()
-  const [guard, setGuard] = useState('')
+  const [form] = Form.useForm<TransitionValues>()
   const options = states.map((state) => ({ value: state, label: state }))
 
   function close() {
-    setName('')
-    setFrom([])
-    setTo(undefined)
-    setGuard('')
+    form.resetFields()
     onClose()
   }
 
-  function add() {
+  function add({ name, from, to, guard }: TransitionValues) {
     if (to === undefined) {
       return
     }
@@ -347,41 +385,55 @@ function AddTransitionDialog({
       title={t('shell.studio.contract.addTransition')}
       okText={t('shell.studio.addItem')}
       cancelText={t('shell.studio.cancel')}
-      okButtonProps={{ disabled: !nameFree(name, names) || from.length === 0 || to === undefined || from.includes(to) }}
-      onOk={add}
+      onOk={() => form.submit()}
       onCancel={close}
     >
-      <Flex vertical gap="small">
-        <Input
-          aria-label={t('shell.studio.contract.name')}
-          placeholder={t('shell.studio.contract.name')}
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <Select
-          virtual={false}
-          mode="multiple"
-          aria-label={t('shell.studio.contract.from')}
-          placeholder={t('shell.studio.contract.from')}
-          options={options}
-          value={from}
-          onChange={setFrom}
-        />
-        <Select
-          virtual={false}
-          aria-label={t('shell.studio.contract.to')}
-          placeholder={t('shell.studio.contract.to')}
-          options={options}
-          value={to}
-          onChange={setTo}
-        />
-        <Input
-          aria-label={t('shell.studio.contract.guard')}
-          placeholder={t('shell.studio.contract.guard')}
-          value={guard}
-          onChange={(event) => setGuard(event.target.value)}
-        />
-      </Flex>
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={requiredMark}
+        initialValues={{ name: '', from: [], to: undefined, guard: '' }}
+        scrollToFirstError={{ focus: true }}
+        onValuesChange={(changed) => 'from' in changed && form.setFields([{ name: 'to', errors: [] }])}
+        onFinish={add}
+      >
+        <AxisField
+          name="name"
+          label={t('shell.studio.contract.name')}
+          help={t('shell.studio.contract.transitionName.help')}
+          requiredMessage={t('shell.studio.contract.nameRequired')}
+          rules={[freeNameRule(names, t('shell.studio.contract.transitionNameTaken'))]}
+        >
+          <Input aria-label={t('shell.studio.contract.name')} />
+        </AxisField>
+        <AxisField
+          name="from"
+          label={t('shell.studio.contract.from')}
+          help={t('shell.studio.contract.from.help')}
+          requiredMessage={t('shell.studio.contract.fromRequired')}
+        >
+          <Select virtual={false} mode="multiple" aria-label={t('shell.studio.contract.from')} options={options} />
+        </AxisField>
+        <AxisField
+          name="to"
+          label={t('shell.studio.contract.to')}
+          help={t('shell.studio.contract.to.help')}
+          requiredMessage={t('shell.studio.contract.toRequired')}
+          rules={[
+            ({ getFieldValue }) => ({
+              validator: (_, value: string | undefined) =>
+                value !== undefined && (getFieldValue('from') as string[]).includes(value)
+                  ? Promise.reject(new Error(t('shell.studio.contract.toInFrom')))
+                  : Promise.resolve(),
+            }),
+          ]}
+        >
+          <Select virtual={false} aria-label={t('shell.studio.contract.to')} options={options} />
+        </AxisField>
+        <AxisField name="guard" label={t('shell.studio.contract.guard')} help={t('shell.studio.contract.guard.help')}>
+          <Input aria-label={t('shell.studio.contract.guard')} />
+        </AxisField>
+      </Form>
     </Modal>
   )
 }
@@ -492,6 +544,9 @@ export function StudioModuleContract({
     return () => controller.abort()
   }, [application, module, id, generation, lost])
 
+  const patch = useMemo(() => (loaded ? diffPatch(loaded.content, draft) : []), [loaded, draft])
+  useUnsavedChanges(patch.length > 0)
+
   if (loadFailed) {
     return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
   }
@@ -499,7 +554,6 @@ export function StudioModuleContract({
     return null
   }
 
-  const patch = diffPatch(loaded.content, draft)
   const hasLifecycle = typeof draft.lifecycle === 'object' && draft.lifecycle !== null
   const elements = layerMarks(loaded.content, loaded.marks, loaded.removed, lifecycleLists)
 

@@ -40,7 +40,9 @@ These principles hold in every language.
     release, are always written in the locale's language, by the glossary. The only exceptions are a closed list of
     integration and operations terms that the people who read them use in that form, such as webhook, endpoint, tenant
     and token. They show only on integration and operator screens, so an author's or a user's screen reads wholly in
-    one language.
+    one language. An author's or a user's screen names no integration or operations concept, such as a tenant or the
+    worker: it says what the person sees, "its database", not "the tenant's database", and "in the background", not
+    "through the worker".
 
   A word joins the closed list only by a change of the glossary. One sentence never names a concept twice, once in each
   language.
@@ -122,11 +124,21 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   bản ghi.". A question or advice addressed to the person says "bạn": "Bạn có muốn xóa vai trò này không?", "Bạn nên
   sao lưu trước khi khôi phục.". Axis speaking of itself says "chúng tôi", rarely. Never "người dùng" for the person
   reading, and never "quý khách", "mình" or a familiar tone.
+- **"Của bạn" only where the sentence needs it.** A text does not copy each English "your" as "của bạn". It keeps "của
+  bạn" where the sentence would be unclear or cold without it: "Đặt lại mật khẩu", "Nhập mật khẩu.", "Cập nhật hồ sơ",
+  but "Có người vừa yêu cầu đặt lại mật khẩu tài khoản {0} của bạn.". An email asks the reader to "Bấm nút bên dưới",
+  not "Chọn nút".
 - **The people who use an application are "người dùng", and are mostly left out.** Studio's help speaks of them often,
   as English says "people". Leave them out where the sentence needs no subject: "Thông báo hiện ở trường này khi điều
   kiện không thỏa.", "Tên hiện trong menu và biểu mẫu.". Where it needs one, "người dùng": "Người dùng chọn một người.".
   Never "mọi người" for them, which reads as a crowd.
 - **Verb first for actions.** "Thêm trường", "Thêm vai trò…", not "Trường mới", "Vai trò mới…".
+- **A time names its event, then "lúc".** A column or label that holds the time of an event names the event and ends
+  with "lúc": "Tạo lúc", "Đăng nhập lúc", "Kích hoạt lúc", "Gửi lúc", "Yêu cầu lúc", "Lỗi lúc", "Phát hành lúc". Never
+  "Thời điểm …".
+- **"Tạo" for an application, "Thêm" for a resource.** A button that makes a new application says "Tạo": "Tạo ứng
+  dụng…". A button that makes a new resource of an application says "Thêm", as the resource joins the application:
+  "Thêm đối tượng…", "Thêm tài nguyên…". English keeps "New application…" and "New entity…".
 - **"Hãy" and "Vui lòng" only where they belong.** A validation message, a button or a tooltip takes the bare verb:
   "Nhập tên.", "Chọn loại.". A sentence of guidance may start with "Hãy": "Hãy đăng nhập lại để đổi vai trò.". "Vui lòng"
   is for a real request where English says "please", and is rare.
@@ -153,8 +165,12 @@ The voice is the meaning rewritten as a Vietnamese writer would say it, in short
   - No "việc", "thực hiện việc", "tiến hành" or "thao tác" wrapped around a verb: "Xóa", not "Thực hiện việc xóa".
   - No literal noun piles from English: "Độ rộng (trên 12 cột)", not "Độ rộng theo phần mười hai của hàng". A compound
     reads in Vietnamese order: "Tài khoản Internet", not "Internet tài khoản".
+  - A help text says what an empty field does in a sentence of its own that starts "Để trống thì …": "Múi giờ ứng dụng
+    dùng cho ngày giờ. Để trống thì dùng UTC.", not "…, hoặc UTC khi không đặt".
 - **A short label that reads two ways on its own is rewritten.** "Nhãn trường" can read as a school's label; "Tên
   hiển thị" cannot.
+- **An optional field says "không bắt buộc".** A label that marks a field as optional ends with "(không bắt buộc)",
+  never "(tùy chọn)", which reads as a choice: "Ghi chú (không bắt buộc)" for "Note (optional)".
 - **Capital on the first word only**, on buttons and titles too: "Chọn tất cả", not "Chọn Tất Cả". A proper name keeps its
   capitals: "Việt Nam".
 - **One spelling and spacing.** The modern placement of tone marks: "xóa", "hủy", "hòa". No space before `. , : ; ? ! )`

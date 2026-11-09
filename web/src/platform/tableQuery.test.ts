@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { FieldMetadata } from './site'
-import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
+import type { FilterGroup } from './tableFilter'
+import {
+  columnsChoice,
+  parseTableQuery,
+  recordQuery,
+  shownColumns,
+  tablePageSizes,
+  writeTableQuery,
+} from './tableQuery'
 
 const fields = [
   { name: 'title', type: 'text' },
@@ -148,5 +156,99 @@ describe('search', () => {
 
   it('is sent in the request', () => {
     expect(recordQuery({ page: 1, pageSize: 20, sort: null, search: 'a&b' })).toBe('search=a%26b')
+  })
+})
+
+describe('filter', () => {
+  const filterFields = [
+    { name: 'title', type: 'text' },
+    { name: 'total', type: 'integer' },
+  ] as FieldMetadata[]
+  const parse = (filter: string) =>
+    parseTableQuery(new URLSearchParams({ filter }), filterFields, 20, [], false, true).filter
+
+  it('drops a filter that is not valid and writes a valid one after search and before page', () => {
+    for (const filter of [
+      'not json',
+      '{"all":[{"field":"nope","op":"eq","value":"x"}]}',
+      '{"all":[{"field":"title","op":"empty","value":"x"}]}',
+      '{"all":[{"field":"title","op":"like","value":"x"}]}',
+      '{"all":[{"field":"title","op":"eq","value":null}]}',
+      '{"all":[],"any":[]}',
+      '{"field":"title","op":"eq","value":"x"}',
+    ]) {
+      expect(parse(filter)).toBeUndefined()
+    }
+    expect(
+      parseTableQuery(new URLSearchParams('filter={"all":[{"field":"title","op":"eq","value":"x"}]}'), filterFields),
+    ).not.toHaveProperty('filter')
+
+    const filter: FilterGroup = {
+      any: [{ field: 'title', op: 'contains', value: 'a b' }, { all: [{ field: 'total', op: 'empty' }] }],
+    }
+    expect(parse(JSON.stringify(filter))).toEqual(filter)
+
+    const query = { page: 2, pageSize: 20, sort: null, search: 'x', filter }
+    const written = writeTableQuery(new URLSearchParams('filter=old&other=1'), query).toString()
+    expect(written).toBe(`other=1&search=x&${new URLSearchParams({ filter: JSON.stringify(filter) })}&page=2`)
+    expect(writeTableQuery(new URLSearchParams('filter=old'), { page: 1, pageSize: 20, sort: null }).toString()).toBe(
+      '',
+    )
+  })
+})
+
+describe('columns', () => {
+  const columnFields = [
+    { name: 'title', type: 'text' },
+    { name: 'total', type: 'integer' },
+    { name: 'note', type: 'text' },
+  ] as FieldMetadata[]
+  const keys = ['title', 'total', 'note']
+  const parse = (columns: string, control = true) =>
+    parseTableQuery(new URLSearchParams({ columns }), columnFields, 20, [], false, false, control).columns
+
+  it('shows the first key first, then the known keys of the choice once each', () => {
+    expect(shownColumns(keys, ['note', 'title', 'nope', 'note'])).toEqual(['title', 'note'])
+    expect(shownColumns(keys, ['note', 'total'])).toEqual(['title', 'note', 'total'])
+    expect(shownColumns(keys, ['title'])).toEqual(['title'])
+  })
+
+  it('shows every key when there is no choice or none of it is known', () => {
+    expect(shownColumns(keys)).toEqual(keys)
+    expect(shownColumns(keys, [])).toEqual(keys)
+    expect(shownColumns(keys, ['nope'])).toEqual(keys)
+  })
+
+  it('keeps no choice when every key shows in its first order', () => {
+    expect(columnsChoice(keys, keys)).toBeUndefined()
+    expect(columnsChoice(keys, ['title', 'note', 'total'])).toEqual(['title', 'note', 'total'])
+    expect(columnsChoice(keys, ['title', 'total'])).toEqual(['title', 'total'])
+  })
+
+  it('is read with the first column first and unknown or repeated keys dropped, only when the table has the control', () => {
+    expect(parse('note,title,nope,note')).toEqual(['title', 'note'])
+    expect(parse('note,total')).toEqual(['title', 'note', 'total'])
+    expect(parse('total,note')).toBeUndefined()
+    expect(parse('title,total,note')).toBeUndefined()
+    expect(parse('nope')).toBeUndefined()
+    expect(parse('note,title', false)).toBeUndefined()
+    expect(
+      parseTableQuery(new URLSearchParams('columns=note'), columnFields, 20, [], false, false, false),
+    ).not.toHaveProperty('columns')
+  })
+
+  it('is written after sort, replaces the old value and goes when it is undefined', () => {
+    const query = { page: 2, pageSize: 50, sort: { field: 'title', descending: true }, columns: ['title', 'note'] }
+
+    expect(writeTableQuery(new URLSearchParams('x=1&columns=old'), query).toString()).toBe(
+      'x=1&page=2&pageSize=50&sort=-title&columns=title%2Cnote',
+    )
+    expect(writeTableQuery(new URLSearchParams('columns=old'), { page: 1, pageSize: 20, sort: null }).toString()).toBe(
+      '',
+    )
+  })
+
+  it('is never sent in the request', () => {
+    expect(recordQuery({ page: 1, pageSize: 20, sort: null, columns: ['title', 'note'] })).toBe('')
   })
 })

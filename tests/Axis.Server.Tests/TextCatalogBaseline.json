@@ -2,17 +2,13 @@
   "placeholders": { "vi": [] },
   "untranslated": {
     "vi": [
-      "shell.console.schedules.trigger",
       "shell.locale.en",
       "shell.locale.vi",
-      "shell.studio.connector.clientId",
-      "shell.studio.connector.clientSecret",
       "shell.studio.identityProvider.clientId",
       "shell.studio.identityProvider.clientKey",
       "shell.studio.identityProvider.clientSecret",
       "shell.studio.identityProvider.issuer",
       "shell.studio.identityProvider.metadata",
-      "shell.studio.nav.group.logic",
       "shell.studio.process.channelEmail",
       "shell.studio.process.recipientEmail",
       "shell.studio.scenario.connector",

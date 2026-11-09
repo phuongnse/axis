@@ -30,11 +30,6 @@ function kindEntry(page: Page, kind: string) {
   return page.getByRole('navigation', { name: 'Menu', exact: true }).locator(`a[href$="&kind=${kind}"]`)
 }
 
-/** Whether the sidebar has an entry for a kind, which it shows only while the application holds a resource of that kind. */
-export async function hasKind(page: Page, kind: string) {
-  return (await kindEntry(page, kind).count()) > 0
-}
-
 /** Opens a kind's list from its entry in the sidebar, and waits until the address shows the kind. */
 export async function openKind(page: Page, kind: string) {
   await kindEntry(page, kind).click()
@@ -61,8 +56,8 @@ const kindNames: Record<string, string> = {
   connector: 'Connector',
   endpoint: 'Endpoint',
   webhook: 'Webhook',
-  text: 'Text',
-  scenario: 'Scenario',
+  text: 'Language',
+  scenario: 'Test scenario',
 }
 
 /**

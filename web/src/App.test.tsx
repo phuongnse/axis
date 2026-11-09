@@ -1,10 +1,10 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router'
+import { createMemoryRouter, Outlet, RouterProvider, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
-import { App } from './App'
+import { appRoutes } from './appRoutes'
 import { homeGridColumns } from './pages/homeGrid'
 import { apiFetch, signInUrl } from './platform/api'
 import { narrowWidthQuery } from './platform/useNarrowWidth'
@@ -55,14 +55,14 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.users.description': 'Invite people and give them roles.',
     'shell.home.applications.title': 'Applications',
     'shell.home.tools.title': 'Tools',
-    'shell.home.applications.empty': 'No application is active.',
+    'shell.home.applications.empty': 'No application is active yet.',
     'shell.home.applications.loadFailed': 'The sites could not be loaded.',
     'shell.home.signIn.title': 'Sign in',
     'shell.home.signedOut.title': 'You have signed out',
     'shell.home.signedOut.message': 'You can close this page, or sign in again.',
     'shell.home.signedOut.signIn': 'Sign in again',
-    'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
-    'shell.home.signInDeclined': 'Signing in needs the terms accepted. Sign in again to accept them.',
+    'shell.home.signInFailed': 'Sign-in did not finish. Try again.',
+    'shell.home.signInDeclined': 'You need to accept the terms to sign in. Sign in again to accept them.',
     'shell.account.signIn': 'Sign in',
     'shell.signInPrompt.title': 'Your session has ended',
     'shell.signInPrompt.message': 'Sign in again to continue.',
@@ -451,14 +451,23 @@ function CurrentPath() {
   return <output data-testid="location">{useLocation().pathname}</output>
 }
 
-function renderApp(path = '/') {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <ThemeModeProvider>
-        <App development={false} />
-      </ThemeModeProvider>
+function CurrentPathLayout() {
+  return (
+    <>
+      <Outlet />
       <CurrentPath />
-    </MemoryRouter>,
+    </>
+  )
+}
+
+function renderApp(path = '/') {
+  const router = createMemoryRouter([{ element: <CurrentPathLayout />, children: appRoutes(false) }], {
+    initialEntries: [path],
+  })
+  return render(
+    <ThemeModeProvider>
+      <RouterProvider router={router} />
+    </ThemeModeProvider>,
   )
 }
 
@@ -837,7 +846,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await screen.findByText('No application is active.')).toBeInTheDocument()
+    expect(await screen.findByText('No application is active yet.')).toBeInTheDocument()
   })
 
   it('lists only the sites that /api/sites returns for the provider of the session, and no tool tiles', async () => {
@@ -902,7 +911,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     const alert = screen.getByTestId('sign-in-failed')
-    expect(alert).toHaveTextContent('Sign-in did not complete. Try again.')
+    expect(alert).toHaveTextContent('Sign-in did not finish. Try again.')
     expect(alert).toHaveAttribute('role', 'alert')
     const button = screen.getByRole('button', { name: 'Sign in' })
     expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
@@ -925,7 +934,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
     const alert = screen.getByTestId('sign-in-declined')
-    expect(alert).toHaveTextContent('Signing in needs the terms accepted. Sign in again to accept them.')
+    expect(alert).toHaveTextContent('You need to accept the terms to sign in. Sign in again to accept them.')
     expect(alert).toHaveAttribute('role', 'alert')
     expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
     const button = screen.getByRole('button', { name: 'Sign in' })

@@ -1,10 +1,12 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
 import { StudioConnectionContext } from '../platform/studioConnection'
 import { ThemeModeProvider } from '../platform/theme'
+import { chooseOption, formItem } from '../test/antd'
+import { followLink, renderGuarded } from '../test/leaveGuard'
 import type { StudioDiagnostic, StudioResource } from '../platform/studio'
 import { StudioModuleContract } from './StudioModuleContract'
 
@@ -155,7 +157,7 @@ describe('StudioModuleContract', () => {
       removed: [],
     }
 
-    function renderLayered(diagnostics: StudioDiagnostic[] = []) {
+    function renderLayered(diagnostics: StudioDiagnostic[] = [], mount?: typeof renderGuarded) {
       const fetchMock = vi.fn(async (_input: string, init?: RequestInit) =>
         init?.method === 'PUT'
           ? new Response(JSON.stringify({ file: null, version: null, diagnostics: [] }))
@@ -163,7 +165,7 @@ describe('StudioModuleContract', () => {
       )
       vi.stubGlobal('fetch', fetchMock)
       const onWritten = vi.fn()
-      render(
+      const ui = (
         <ThemeModeProvider>
           <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
             <StudioModuleContract
@@ -174,10 +176,11 @@ describe('StudioModuleContract', () => {
               onWritten={onWritten}
             />
           </TextProvider>
-        </ThemeModeProvider>,
+        </ThemeModeProvider>
       )
+      const router = mount ? mount(ui) : render(ui) && undefined
       const puts = () => fetchMock.mock.calls.filter(([, init]) => init?.method === 'PUT')
-      return { puts, onWritten }
+      return { puts, onWritten, router }
     }
 
     it('marks an added state and transition Added with Remove, and the module rows have no Remove', async () => {
@@ -218,17 +221,86 @@ describe('StudioModuleContract', () => {
 
       await userEvent.click(await screen.findByTestId('studio-contract-add-state'))
       const stateDialog = await screen.findByRole('dialog')
-      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
-      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'ONHOLD')
-      expect(within(stateDialog).getByRole('button', { name: 'Add' })).toBeDisabled()
-      await userEvent.clear(within(stateDialog).getByRole('textbox', { name: 'Name' }))
-      await userEvent.type(within(stateDialog).getByRole('textbox', { name: 'Name' }), 'review')
+      const add = within(stateDialog).getByRole('button', { name: 'Add' })
+      const name = within(stateDialog).getByRole('textbox', { name: 'Name' })
+      expect(add).toBeEnabled()
+      await userEvent.click(add)
+      expect(await within(stateDialog).findByText('Enter a name.')).toBeInTheDocument()
+      expect(name).toHaveFocus()
+      expect(screen.queryByRole('note', { name: 'Added ' })).toBeNull()
+      await userEvent.type(name, 'ONHOLD')
+      await userEvent.click(add)
+      expect(await within(stateDialog).findByText('A state with this name already exists.')).toBeInTheDocument()
+      expect(add).toBeEnabled()
+      await userEvent.clear(name)
+      await userEvent.type(name, 'review')
       await userEvent.click(within(stateDialog).getByRole('checkbox', { name: 'Deletable' }))
-      await userEvent.click(within(stateDialog).getByRole('button', { name: 'Add' }))
+      await userEvent.click(add)
 
       expect(await screen.findByRole('note', { name: 'Added review' })).toBeInTheDocument()
       expect(screen.getByTestId('studio-save')).toBeEnabled()
       expect(screen.getByTestId('studio-contract-state-review')).toHaveTextContent('Deletable')
+    })
+
+    it('keeps Add transition on, and a click with nothing chosen shows what is missing and adds no row', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      const add = within(dialog).getByRole('button', { name: 'Add' })
+      expect(add).toBeEnabled()
+      await userEvent.click(add)
+
+      expect(await within(dialog).findByText('Enter a name.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose at least one state.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose a state.')).toBeInTheDocument()
+      expect(within(dialog).getByRole('textbox', { name: 'Name' })).toHaveFocus()
+      expect(screen.getByTestId('studio-save')).toBeDisabled()
+    })
+
+    it('rejects a taken transition name and a To state among the From states, then adds the transition', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      const add = within(dialog).getByRole('button', { name: 'Add' })
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'HOLD')
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'From' })))
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'To' })))
+      await userEvent.click(add)
+
+      expect(await within(dialog).findByText('A transition with this name already exists.')).toBeInTheDocument()
+      expect(within(dialog).getByText('Choose a state that the transition does not leave.')).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeDisabled()
+    })
+
+    it('adds a transition once its fields are right', async () => {
+      renderLayered()
+
+      await userEvent.click(await screen.findByTestId('studio-contract-add-transition'))
+      const dialog = await screen.findByRole('dialog')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'park')
+      await chooseOption('open', formItem(within(dialog).getByRole('combobox', { name: 'From' })))
+      await chooseOption('onHold', formItem(within(dialog).getByRole('combobox', { name: 'To' })))
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Add' }))
+
+      expect(await screen.findByRole('note', { name: 'Added park' })).toBeInTheDocument()
+      expect(screen.getByTestId('studio-save')).toBeEnabled()
+    })
+
+    it('asks before a link leaves an edited contract, and not before one leaves an untouched contract', async () => {
+      const router = renderLayered([], renderGuarded).router!
+      await screen.findByRole('note', { name: 'Added onHold' })
+
+      await followLink()
+      expect(router.state.location.pathname).toBe('/elsewhere')
+      await act(() => router.navigate('/studio'))
+
+      await userEvent.click(screen.getByRole('button', { name: 'Remove onHold' }))
+      await followLink()
+
+      expect(await screen.findByText('Leave without saving?')).toBeInTheDocument()
+      expect(router.state.location.pathname).toBe('/studio')
     })
 
     it('shows the diagnostics that name the contract layer and no other', async () => {
@@ -308,16 +380,19 @@ describe('StudioModuleContract', () => {
       return within(screen.getByRole('dialog')).getByRole('button', { name: 'Relax' })
     }
 
-    it('sends no write for a blank or whitespace-only reason', async () => {
+    it('keeps Relax on, and a click with a blank or whitespace-only reason asks for a reason and sends no write', async () => {
       const { patches } = renderRelax(manifestWith([{ id: 'checklists', version: '^1.0.0' }]))
       const reason = await openRelax()
 
-      expect(okButton()).toBeDisabled()
+      expect(okButton()).toBeEnabled()
       await userEvent.click(okButton())
+      expect(await screen.findByText('Enter a reason.')).toBeInTheDocument()
+      expect(reason).toHaveFocus()
       await userEvent.type(reason, '   ')
-      expect(okButton()).toBeDisabled()
       await userEvent.click(okButton())
 
+      expect(okButton()).toBeEnabled()
+      expect(screen.getByText('Enter a reason.')).toBeInTheDocument()
       expect(patches()).toHaveLength(0)
     })
 

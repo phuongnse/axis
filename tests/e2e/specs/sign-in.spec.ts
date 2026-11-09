@@ -89,7 +89,7 @@ test('a sign-in that the identity provider refuses lands on the home page with a
   await page.goto(`/api/auth/callback?error=temporarily_unavailable&state=${encodeURIComponent(state!)}`)
 
   await expect(page).toHaveURL(`${baseURL}/?signIn=failed`)
-  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not finish.' })).toBeVisible()
   await expect(signIn).toBeVisible()
   // The card never starts sign-in on its own.
   await expect(page).toHaveURL(`${baseURL}/?signIn=failed`)
@@ -99,5 +99,5 @@ test('a sign-in that the identity provider refuses lands on the home page with a
 
   await expect(page).toHaveURL(`${baseURL}/`)
   await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
-  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toHaveCount(0)
+  await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not finish.' })).toHaveCount(0)
 })

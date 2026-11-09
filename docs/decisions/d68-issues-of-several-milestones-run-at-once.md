@@ -27,7 +27,7 @@ so ordering by milestone adds a wait that the marks do not need.
   [roadmap](../roadmap.md#milestones) lets them change order.
 
 How many issues run at once is
-[D113](d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)'s choice.
+[D143](d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md)'s choice.
 
 ## Consequences
 

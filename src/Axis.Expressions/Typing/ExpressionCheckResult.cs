@@ -11,6 +11,9 @@ public sealed record ExpressionCheckResult(ExpressionType? Type, ExpressionDiagn
     [MemberNotNullWhen(false, nameof(Diagnostic))]
     public bool Succeeded => Diagnostic is null;
 
+    /// <summary>What the check was given at the place, or null for a result built by <see cref="Merge"/>.</summary>
+    public ExpressionPlace? Place { get; internal init; }
+
     /// <summary>
     /// The <c>coalesce</c>, <c>if</c>, <c>sum</c>, <c>min</c> and <c>max</c> calls checked as
     /// decimal, compared by reference. The interpreter returns an integer one of them gives as a

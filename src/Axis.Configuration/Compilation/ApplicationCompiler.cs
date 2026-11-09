@@ -1470,7 +1470,7 @@ public static partial class ApplicationCompiler
                     0);
             }
 
-            references.RecordExpression(entity, $"/fields/{index}/expression", check?.Type, problem);
+            references.RecordExpression(entity, $"/fields/{index}/expression", check?.Type, problem, check?.Place);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, $"/fields/{index}/expression");
@@ -1528,6 +1528,7 @@ public static partial class ApplicationCompiler
             var parsed = ExpressionParser.Parse(validation.Expression);
             ExpressionDiagnostic? problem = parsed.Succeeded ? null : parsed.Diagnostic;
             ExpressionType? type = null;
+            ExpressionPlace? place = null;
             if (parsed.Succeeded)
             {
                 var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
@@ -1539,9 +1540,10 @@ public static partial class ApplicationCompiler
 
                 problem = check.Diagnostic;
                 type = check.Type;
+                place = check.Place;
             }
 
-            references.RecordExpression(entity, $"{path}/expression", type, problem);
+            references.RecordExpression(entity, $"{path}/expression", type, problem, place);
 
             if (problem is not null)
             {
@@ -1926,6 +1928,7 @@ public static partial class ApplicationCompiler
         var parsed = ExpressionParser.Parse(defaultExpression);
         ExpressionDiagnostic? expressionProblem = parsed.Succeeded ? null : parsed.Diagnostic;
         ExpressionType? checkedType = null;
+        ExpressionPlace? checkedPlace = null;
         if (parsed.Succeeded)
         {
             var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!);
@@ -1937,9 +1940,10 @@ public static partial class ApplicationCompiler
 
             expressionProblem = check.Diagnostic;
             checkedType = check.Type;
+            checkedPlace = check.Place;
         }
 
-        references.RecordExpression(entity, $"{path}/default", checkedType, expressionProblem);
+        references.RecordExpression(entity, $"{path}/default", checkedType, expressionProblem, checkedPlace);
 
         if (expressionProblem is not null)
         {
@@ -2770,7 +2774,7 @@ public static partial class ApplicationCompiler
                         references.AddRuleCalls(dataSource, path, check);
                     }
 
-                    references.RecordExpression(dataSource, path, check?.Type, problem);
+                    references.RecordExpression(dataSource, path, check?.Type, problem, check?.Place);
                     if (problem is not null)
                     {
                         Report(problem.Code, problem.Message, path);
@@ -2948,7 +2952,7 @@ public static partial class ApplicationCompiler
             return parsed.Diagnostic;
         }
 
-        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, currentUser: currentUser);
+        var typeCheck = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean, currentUser: currentUser, sql: true);
         if (!typeCheck.Succeeded)
         {
             return typeCheck.Diagnostic;

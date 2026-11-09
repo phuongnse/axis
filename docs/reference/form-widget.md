@@ -211,7 +211,7 @@ A child collection field shows its rows as a table under the field's label.
   italic "—". A read-only file cell shows its download link, or a dash when it has no file.
 - **Table.** The table is the shared table, see [tables](actions-and-controls.md#tables). A reference
   cell's input keeps at least 240px and the other inputs at least 160px.
-- **Rows.** Remove row is the row's icon action: a trash icon button in `dangerText`, with its name as
+- **Rows.** Delete row is the row's icon action: a trash icon button in `dangerText`, with its name as
   a tooltip on hover and on keyboard focus. Below 992px it folds into the row's "…" menu. Add row is the table
   toolbar's main action, above the table on the right, outlined at the main level of
   [buttons](actions-and-controls.md#buttons). It appends a row with every child field `null`, and
@@ -320,9 +320,9 @@ A new record has no history panel.
 - **Summary lines**. In the summary the field labels are joined by commas, and the
   task outcome and the step each take a line of their own, never joined by a separator, see
   [text](actions-and-controls.md#text).
-- **Open instance.** An entry whose `inspectPath` is not `null` links to the instance page of the first
+- **Open process.** An entry whose `inspectPath` is not `null` links to the instance page of the first
   page of the site whose widget is a `processInspector` that names the entry's process. The link reads
-  "Open instance", and the process and the instance id are the segments of `inspectPath`. The panel
+  "Open process", and the process and the instance id are the segments of `inspectPath`. The panel
   looks at the pages of the site's navigation in order, and loads their page metadata only when an
   entry has an `inspectPath`. The entry shows no link when no such page is in the navigation.
 - **Paging.** The panel shows 20 entries per page, with a paging control when there are more. The page

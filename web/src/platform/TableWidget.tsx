@@ -1,7 +1,7 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Alert, Dropdown, Input, Modal, type TableProps } from 'antd'
+import { Alert, Dropdown, Modal } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { AxisButton } from './AxisButton'
 import { AxisTable, type AxisColumn, type AxisRowAction } from './AxisTable'
 import { useCanvasActions } from './canvasActions'
@@ -9,7 +9,7 @@ import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
-import { formatValue, isNumeric } from './formatValue'
+import { enumLabel, formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -32,17 +32,10 @@ import type {
   StartProcessAction,
   WidgetMetadata,
 } from './site'
-import {
-  parseTableQuery,
-  recordPageSize,
-  recordQuery,
-  tablePageSizes,
-  writeTableQuery,
-  type TableQuery,
-  type TableSort,
-} from './tableQuery'
+import { recordPageSize, recordQuery, tablePageSizes } from './tableQuery'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+import { useTableView } from './useTableView'
 import { isVisible } from './visibleWhen'
 import { setOwn } from './ownProperty'
 
@@ -68,10 +61,6 @@ interface LoadState {
 
 /** A table row: a record, a data source row, or a group of a grouped data source, which has no id. */
 type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
-
-function sameSort(a: TableSort | null, b: TableSort | null): boolean {
-  return a?.field === b?.field && a?.descending === b?.descending
-}
 
 /** What a table reads, from its entity or its data source. */
 interface TableSource {
@@ -151,18 +140,18 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * cell. Text, reference and file columns are free text: they share the width left in equal parts and wrap at 320 px.
  * Every other column, an enum too, fits its content.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
- * and the back button keep them. A data source table also has a filter bar, whose values live in the
+ * and the back button keep them. An entity table has a Filter button, and its filter lives in the URL as
+ * `filter` and goes to the rows and export routes as it is. A data source table has no Filter button, but a
+ * filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
  * no filter input: the table sends the page parameter's value under the data source parameter's name,
  * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
- * box, whose text lives in the URL as `search`. It applies on Enter, on the search button and when
- * cleared, and a new search starts at page 1 and adds a history entry. The text is sent as typed.
+ * box, which AxisTable draws and whose text lives in the URL as `search`. The text is sent as typed.
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
   const { size } = useDesignTokens()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
   const canvas = useCanvasActions()
   // The form returns to this address, with its paging and sorting, after save or cancel.
@@ -184,17 +173,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
-  const query = useMemo(
-    () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames, searchable),
-    [searchParams, fields, defaultPageSize, parameterNames, searchable],
-  )
-  // The text in the search box. A search from the URL, such as after the back button, replaces it.
-  const [draft, setDraft] = useState(query.search ?? '')
-  const [shownSearch, setShownSearch] = useState(query.search)
-  if (shownSearch !== query.search) {
-    setShownSearch(query.search)
-    setDraft(query.search ?? '')
-  }
+  // The record API filters an entity's records. A data source's rows route takes no `filter`.
+  const filterable = widget.entity !== null
+  const { view: query, setView } = useTableView(fields, defaultPageSize, parameterNames, searchable, filterable)
   // The bound values and the filter values, in declaration order.
   const parameterValues = useMemo(() => {
     const values: Record<string, string> = {}
@@ -234,14 +215,6 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const parameterErrors = loading ? undefined : state.parameterErrors
   const totalCount = loading ? undefined : state.page?.totalCount
 
-  // An invalid, empty, repeated or out-of-order parameter, or a search the table cannot make, is rewritten without a history entry.
-  useEffect(() => {
-    const canonical = writeTableQuery(searchParams, query, defaultPageSize, parameterNames)
-    if (canonical.toString() !== searchParams.toString()) {
-      setSearchParams(canonical, { replace: true })
-    }
-  }, [searchParams, query, defaultPageSize, parameterNames, setSearchParams])
-
   // A page past the end becomes the last page once the total is known, so the URL and the
   // pagination agree.
   useEffect(() => {
@@ -250,11 +223,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     }
     const lastPage = Math.max(1, Math.ceil(totalCount / query.pageSize))
     if (query.page > lastPage) {
-      setSearchParams(writeTableQuery(searchParams, { ...query, page: lastPage }, defaultPageSize, parameterNames), {
-        replace: true,
-      })
+      setView({ ...query, page: lastPage }, { replace: true })
     }
-  }, [totalCount, searchParams, query, defaultPageSize, parameterNames, setSearchParams])
+  }, [totalCount, query, setView])
 
   // Data source rows have the shape of records without a version, which the table never reads. A
   // rejected parameter value shows under its filter input, with no rows, rather than as a failure.
@@ -359,7 +330,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     }
   }, [confirming, deleting, t])
 
-  // Fetches the file with the table's parameters, search and sort, and saves it. A 403, 409 and 503 each have their own message.
+  // Fetches the file with the table's parameters, filter, search and sort, and saves it. A 403, 409 and 503 each have their own message.
   const runExport = useCallback(
     async (format: ExportFormat) => {
       if (exporting) {
@@ -424,8 +395,29 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   )
 
   const columns = useMemo<AxisColumn<TableRow>[]>(() => {
-    const sortOrder = (field: string) =>
-      query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
+    // The types the record API filters, see docs/reference/record-api.md#paging-and-sorting.
+    const filterOf = (field: FieldMetadata | DataSourceColumn): AxisColumn<TableRow>['filter'] => {
+      if (!filterable) {
+        return undefined
+      }
+      switch (field.type) {
+        case 'text':
+          return { kind: 'text' }
+        case 'enum':
+          return {
+            kind: 'enum',
+            options: (field.values ?? []).map((value) => ({ value, label: enumLabel(field, value, t) })),
+          }
+        case 'integer':
+        case 'decimal':
+        case 'money':
+          return { kind: 'number' }
+        case 'date':
+          return { kind: 'date' }
+        default:
+          return undefined
+      }
+    }
     // The link of the identifying cell. A cell with no id, or with no address the SPA can build, is plain text.
     const openLink = (shown: ReactNode, text: string, record: TableRow): ReactNode => {
       const action = rowActions[openIndex]
@@ -480,8 +472,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       kind: freeTextTypes.includes(field.type) ? 'freeText' : 'fixed',
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
-      sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
       align: isNumeric(field.type) ? 'right' : undefined,
+      filter: filterOf(field),
       // Digits of equal width line up in a column.
       onCell: () => (isNumeric(field.type) ? { style: { fontVariantNumeric: 'tabular-nums' } } : {}),
       render: (value: unknown, record: TableRow) => {
@@ -496,7 +488,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         return column === 0 ? openLink(text, text, record) : text
       },
     }))
-  }, [fields, locale, query.sort, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
+  }, [fields, filterable, locale, rowActions, openIndex, runNavigate, sitePath, from, t, canvas])
 
   // The row's actions other than the one its identifying cell opens. A start action runs for the row, a delete asks
   // first, a navigate action opens its page or is dropped when its path is unknown, and an action whose visibleWhen
@@ -534,22 +526,6 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     })
   }
 
-  // A new sort or page size starts again at page 1. Paging and sorting add history entries.
-  const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
-    const single = Array.isArray(sorter) ? sorter[0] : sorter
-    const sort = single?.order ? { field: String(single.columnKey), descending: single.order === 'descend' } : null
-    const pageSize = pagination.pageSize ?? query.pageSize
-    const reset = !sameSort(sort, query.sort) || pageSize !== query.pageSize
-    const next: TableQuery = {
-      page: reset ? 1 : (pagination.current ?? 1),
-      pageSize,
-      sort,
-      parameters: query.parameters,
-      search: query.search,
-    }
-    setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames))
-  }
-
   // A new filter value starts again at page 1 and adds a history entry. The values keep the
   // declaration order, so the URL order is stable.
   const onFilter = (changed: string, value: string | null) => {
@@ -560,19 +536,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         setOwn(next, parameter, current[parameter])
       }
     }
-    setSearchParams(
-      writeTableQuery(searchParams, { ...query, page: 1, parameters: next }, defaultPageSize, parameterNames),
-    )
-  }
-
-  // A new search starts again at page 1 and adds a history entry. An empty text means no search.
-  const onSearch = (value: string) => {
-    if (value === (query.search ?? '')) {
-      return
-    }
-    setSearchParams(
-      writeTableQuery(searchParams, { ...query, page: 1, search: value || undefined }, defaultPageSize, parameterNames),
-    )
+    setView({ ...query, page: 1, parameters: next })
   }
 
   // A toolbar has no row, so only the literals of its expressions resolve. An action to a form page
@@ -612,28 +576,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       dataSource={parameterErrors ? [] : state.page?.items}
       loading={loading}
       emptyText={t('shell.table.empty')}
-      pagination={{
-        current: query.page,
-        pageSize: query.pageSize,
+      view={{
+        query,
+        onChange: setView,
+        pageSizes: sizes,
         total: parameterErrors ? 0 : (state.page?.totalCount ?? 0),
-        pageSizeOptions: sizes,
+        search: searchable,
       }}
-      onChange={onChange}
       rowActions={{ configured: otherIndexes.length, actions: actionsOf }}
       blankRow={(row) => row.id === null}
       toolbar={{
-        view: searchable ? (
-          <Input.Search
-            allowClear
-            maxLength={200}
-            style={{ maxWidth: 320 }}
-            aria-label={t('shell.table.search')}
-            placeholder={t('shell.table.search')}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onSearch={onSearch}
-          />
-        ) : undefined,
         onRefresh: () => {
           if (!canvas.active) {
             // The same URL is requested again, so the table shows busy meanwhile.

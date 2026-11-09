@@ -162,7 +162,7 @@ test('the platform operator adds a host to a tenant and sees the records to add'
   await page.getByTestId('cell-tenant-add-host').click()
   const dialog = await waitForDialog(page)
   await expect(dialog).toContainText(tenant)
-  await dialog.getByLabel('Host', { exact: true }).fill(host)
+  await dialog.getByRole('textbox', { name: 'Host', exact: true }).fill(host)
   await dialog.getByRole('button', { name: 'Add', exact: true }).click()
 
   // The TXT token is random, so the test reads the record names and the CNAME target.

@@ -4,7 +4,6 @@ import path from 'node:path'
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { startServer } from '../activate'
-import { waitForDialog } from '../dialogs'
 import { pickOption, pickOptions } from '../select'
 import { e2eApp, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
@@ -395,20 +394,23 @@ test.describe('Studio creates a resource from a starter', () => {
     expect(savedWithoutId).toEqual(expected)
   })
 
-  test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
+  test('a click on the disabled Save button fails within the action timeout and names the button', async ({ page }) => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
-    await page.getByRole('button', { name: 'New resource…', exact: true }).click()
-    const dialog = await waitForDialog(page, 'New resource')
-    const create = dialog.getByRole('button', { name: 'Create', exact: true })
+    await openKind(page, 'entity')
+    await page.getByTestId('studio-group-entity').getByRole('button', { name: 'Supplier', exact: true }).click()
+    // A change shows the save bar, and Undo brings back the saved state, so Save stays on the bar and is off.
+    await page.getByTestId('studio-field-/name').getByRole('textbox').fill('SupplierChanged')
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    const save = page.getByRole('button', { name: 'Save', exact: true })
+    await expect(save).toBeDisabled()
 
     const started = Date.now()
-    const error = await create.click().catch((caught: Error) => caught)
+    const error = await save.click().catch((caught: Error) => caught)
 
     expect(error).toBeInstanceOf(Error)
     expect((error as Error).message).toContain('Timeout 15000ms')
-    expect((error as Error).message).toContain('Create')
+    expect((error as Error).message).toContain('Save')
     expect(Date.now() - started).toBeLessThan(20_000)
-    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
   })
 })
