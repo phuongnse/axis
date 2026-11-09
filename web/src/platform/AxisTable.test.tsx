@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Button } from 'antd'
 import { useState, type HTMLAttributes } from 'react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { chooseOption, tabTo } from '../test/antd'
 import { dialog, filterTexts } from '../test/tableFilter'
 import { AxisTable, type AxisColumn, type AxisRowAction, type AxisTableProps } from './AxisTable'
@@ -662,6 +662,82 @@ describe('AxisTable', () => {
       renderTable({ view: { query: first, onChange: () => {} } })
 
       expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument()
+    })
+  })
+
+  // jsdom has no layout, so the widths are faked: the fixed Amount column is 100 px wide, and a free-text column needs
+  // 208 px (160 px and its padding).
+  describe('too little room', () => {
+    const lowAmount: AxisColumn<Row> = { ...amountColumn, priority: 'low' }
+    const columns = [nameColumn, lowAmount, noteColumn]
+
+    function fakeWidth(width: number) {
+      vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width)
+      vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(function (this: HTMLElement) {
+        return this.dataset.columnKey === 'amount' ? 100 : 0
+      })
+    }
+    const headerNames = () => screen.getAllByRole('columnheader').map((header) => header.textContent)
+    const movedLines = (container: HTMLElement) => [...container.querySelectorAll('[data-moved-cells]')]
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    it('moves a column under its row as "Title: value" and leaves out a moved cell with no value', () => {
+      fakeWidth(450)
+      const { container } = renderTable({ columns })
+
+      expect(headerNames()).toEqual(['Name', 'Note'])
+      const moved = movedLines(container)
+      expect(moved.map((lines) => lines.textContent)).toEqual(['Amount: 12'])
+      // The lines sit in the row they belong to.
+      expect(moved[0].closest('tr')).toHaveTextContent('Buy paper')
+    })
+
+    it('keeps the identifying column in the header however narrow the table is', () => {
+      fakeWidth(100)
+      const { container } = renderTable({ columns })
+
+      expect(headerNames()).toEqual(['Name'])
+      expect(movedLines(container).map((row) => row.textContent)).toEqual(['Amount: 12Note: Buy paper'])
+    })
+
+    it('leaves the cells that stay room under their content for the moved lines', () => {
+      fakeWidth(450)
+      const { container } = renderTable({ columns })
+
+      const row = container.querySelector('[data-moved-cells]')!.closest('tr')!
+      const [name, note] = row.querySelectorAll('td')
+      expect(note.style.paddingBottom).toContain('var(--axis-moved-height')
+      // The identifying cell holds the lines itself and needs no room.
+      expect(name.style.paddingBottom).toBe('')
+      expect(row.style.getPropertyValue('--axis-moved-height')).toBe('0px')
+    })
+
+    it.each([
+      ['has room', 1000],
+      ['moves columns', 450],
+    ])('keeps the row actions on the first line of the row when the table %s', (_case, width) => {
+      fakeWidth(width)
+      const { container } = renderTable({
+        columns,
+        rowActions: { configured: 1, actions: () => [deleteAction] },
+      })
+
+      const cell = container.querySelector('tbody tr:not([aria-hidden]) td:last-child') as HTMLElement
+      expect(within(cell).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+      expect(cell.style.verticalAlign).toBe('top')
+      expect(cell.style.whiteSpace).toBe('nowrap')
+      expect(cell.style.paddingBottom).toContain('var(--axis-moved-height')
+    })
+
+    it('shows every column and no moved lines when the columns fit', () => {
+      fakeWidth(1000)
+      const { container } = renderTable({ columns })
+
+      expect(headerNames()).toEqual(['Name', 'Amount', 'Note'])
+      expect(movedLines(container)).toEqual([])
     })
   })
 })
