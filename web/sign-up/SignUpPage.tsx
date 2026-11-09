@@ -1,8 +1,9 @@
-import { ConfigProvider, Form, Input, Select, Typography } from 'antd'
+import { Alert, ConfigProvider, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
+import { AxisButton } from '../src/platform/AxisButton'
 import { AxisField, type FieldStatus } from '../src/platform/AxisField'
 import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
@@ -32,6 +33,24 @@ interface SignUpDocuments {
   dpa: SignUpDocument
   privacy: SignUpDocument
   licencesUrl: string
+}
+
+/** The fields of the form, as `POST /api/sign-up` takes them with the versions of the documents shown. */
+interface SignUpValues {
+  fullName: string
+  email: string
+  businessName: string
+  subdomain: string
+  language: SignUpLocale
+  application: string
+  terms: boolean
+}
+
+/** Proposed: the problem of a refused sign-up: text keys by the JSON Pointer of the field they are about. */
+interface SignUpProblem {
+  errors?: Record<string, string[]>
+  /** On a `429`: whether the client address or the email's domain reached its limit. */
+  limit?: 'address' | 'domain'
 }
 
 type SubdomainStatus =
@@ -70,6 +89,10 @@ export function SignUpPage({
   const [applications, setApplications] = useState<SignUpApplication[] | 'failed'>()
   const [tenantDomain, setTenantDomain] = useState<string>()
   const [documents, setDocuments] = useState<SignUpDocuments | null>(null)
+  // Counts the loads of the documents, so a sign-up refused for a changed version loads them again.
+  const [documentsLoad, setDocumentsLoad] = useState(0)
+  const [sending, setSending] = useState(false)
+  const [formError, setFormError] = useState<string>()
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
   useEffect(() => {
@@ -103,7 +126,7 @@ export function SignUpPage({
         // Without the addresses the box names the documents as plain text, and sending is refused.
       })
     return () => controller.abort()
-  }, [])
+  }, [documentsLoad])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -178,6 +201,79 @@ export function SignUpPage({
     unavailable: { state: 'failed' as const, message: t('signUp.subdomain.unavailable') },
   }[status.state]
 
+  // Proposed: Sign up checks every field on click and sends nothing while one is wrong. A refusal shows under the field
+  // its JSON Pointer names, and any other one above the form, as the form widget does.
+  const send = async (values: SignUpValues) => {
+    if (status.state === 'refused' || status.state === 'checking') {
+      form.scrollToField('subdomain', { focus: true })
+      return
+    }
+    setFormError(undefined)
+    setSending(true)
+    try {
+      const response = await apiFetch(
+        '/api/sign-up',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: values.fullName,
+            email: values.email,
+            businessName: values.businessName,
+            subdomain: values.subdomain,
+            language: values.language,
+            application: values.application,
+            termsVersion: documents?.terms.version,
+            dpaVersion: documents?.dpa.version,
+            privacyVersion: documents?.privacy.version,
+          }),
+        },
+        { promptSignInOnUnauthorized: false },
+      )
+      if (response.ok) {
+        return
+      }
+      const problem = ((await response.json().catch(() => ({}))) ?? {}) as SignUpProblem
+      if (response.status === 429) {
+        const minutes = Math.max(1, Math.ceil(Number(response.headers.get('Retry-After') ?? '60') / 60))
+        setFormError(
+          problem.limit === 'domain'
+            ? t('signUp.tooMany.domain')
+            : t('signUp.tooMany.address').replace('{minutes}', String(minutes)),
+        )
+        return
+      }
+      const onForm: string[] = []
+      const onFields: { name: string; errors: string[] }[] = []
+      for (const [pointer, messages] of Object.entries(problem.errors ?? {})) {
+        const name = pointer.replace(/^\//, '')
+        const texts = messages.map((message) => t(message))
+        if (name === 'termsVersion' || name === 'dpaVersion' || name === 'privacyVersion') {
+          // A document changed while the person filled in the form: they read it again and accept it again.
+          setDocumentsLoad((load) => load + 1)
+          form.setFieldValue('terms', false)
+          onFields.push({ name: 'terms', errors: texts })
+        } else if (['fullName', 'email', 'businessName', 'subdomain', 'language', 'application'].includes(name)) {
+          onFields.push({ name, errors: texts })
+        } else {
+          onForm.push(...texts)
+        }
+      }
+      if (onFields.length === 0 && onForm.length === 0) {
+        onForm.push(t('signUp.sendFailed'))
+      }
+      form.setFields(onFields)
+      setFormError(onForm.length === 0 ? undefined : onForm.join(' '))
+      if (onFields.length > 0) {
+        form.scrollToField(onFields[0].name, { focus: true })
+      }
+    } catch {
+      setFormError(t('signUp.sendFailed'))
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
       <CardPage
@@ -201,6 +297,7 @@ export function SignUpPage({
           />
         }
       >
+        {formError !== undefined && <Alert type="error" title={formError} />}
         {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
         <Form
           form={form}
@@ -208,6 +305,8 @@ export function SignUpPage({
           layout="vertical"
           requiredMark={requiredMark}
           initialValues={{ language: locale, application: '' }}
+          scrollToFirstError={{ focus: true }}
+          onFinish={send}
         >
           <AxisField
             name="fullName"
@@ -222,6 +321,7 @@ export function SignUpPage({
             label={t('signUp.email')}
             help={t('signUp.email.help')}
             requiredMessage={t('signUp.email.required')}
+            rules={[{ type: 'email', message: t('signUp.email.invalid') }]}
           >
             <Input type="email" autoComplete="email" />
           </AxisField>
@@ -311,6 +411,9 @@ export function SignUpPage({
               }}
             />
           </Typography.Paragraph>
+          <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: 24 }}>
+            {t('signUp.send')}
+          </AxisButton>
         </Form>
       </CardPage>
     </ConfigProvider>

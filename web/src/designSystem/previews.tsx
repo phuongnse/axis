@@ -313,6 +313,19 @@ export const previews: Record<string, readonly PreviewState[]> = {
       draw: () => <SignUpPreview businessName={signUpBusinessName} />,
     },
     { caption: 'Applications failed', fixtures: signUpFixtures.applicationsFailed, draw: () => <SignUpPreview /> },
+    { caption: 'Sent empty', fixtures: signUpFixtures.sentEmpty, draw: () => <SignUpPreview send={{}} /> },
+    ...(
+      [
+        ['Email refused', signUpFixtures.emailRefused, 'lan@mailinator.com'],
+        ['Terms changed', signUpFixtures.termsChanged, 'lan.nguyen@anphat.vn'],
+        ['Too many sign-ups', signUpFixtures.tooMany, 'lan.nguyen@anphat.vn'],
+        ['Send failed', signUpFixtures.sendFailed, 'lan.nguyen@anphat.vn'],
+      ] as const
+    ).map(([caption, fixtures, email]) => ({
+      caption,
+      fixtures,
+      draw: () => <SignUpPreview businessName={signUpBusinessName} send={{ email }} />,
+    })),
   ].map((state) => ({ ...state, frameHeight: 850 })),
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },

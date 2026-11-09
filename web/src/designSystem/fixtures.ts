@@ -1181,7 +1181,7 @@ export const siteTexts: Record<string, string> = {
 export const fixtureScopes = [
   `${apiPath}/`,
   '/api/studio/',
-  '/api/sign-up/',
+  '/api/sign-up',
   '/api/sites',
   '/api/me',
   '/api/about',

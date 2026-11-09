@@ -63,6 +63,7 @@ function Figure({ state }: { state: PreviewState }) {
 /**
  * The states of a preview that answers the same paths in each of them, one at a time under a Fixtures control. The
  * `state` query of the page, a state's caption in kebab case, picks the first one shown, else the first state does.
+ * The control's captions wrap onto more lines when they do not fit, so the card never scrolls sideways at 992 px.
  */
 function Chooser({ states }: { states: readonly PreviewState[] }) {
   const { colour, spacing } = useDesignTokens()
@@ -74,9 +75,12 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
   })
   return (
     <>
+      <style>{'.axis-fixtures .ant-segmented-group { flex-wrap: wrap; }'}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
         <span style={{ color: colour.textMuted }}>Fixtures</span>
         <Segmented
+          className="axis-fixtures"
+          style={{ minWidth: 0, maxWidth: '100%' }}
           aria-label="Fixtures"
           options={states.map(({ caption }) => caption)}
           value={state.caption}
