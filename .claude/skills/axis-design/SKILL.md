@@ -40,30 +40,34 @@ section more space".
 ## A design review
 
 Use this when the owner reviews the design in words, one change after
-another. The rules are under "Several changes are a design review" and the
-bullets after it in Design changes.
+another. The rules are under "Several changes are a design review" in Design changes.
 
 ### Start
 
 1. Take the review's design issue, or agree a short topic with the owner, such
    as `field-look`, and open a design issue with the `on-hold` label for it. Its
-   body says the review ends in a docs change that NexKit writes from the rule
-   comments, and that a comment naming the one it replaces supersedes it. If an
-   earlier review's issues have not built what it touches, say so and stop.
+   body states the review's scope and the build notes, and says the review ends
+   in a docs change that NexKit writes from the rule comments. Set the body with
+   `gh issue edit <n> --body-file <file>`. If an earlier review's issues have not
+   built what it touches, say so and stop.
 2. Create the prototype branch from `main`, named as
    [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
    `git switch -c design/<yyyy-mm-dd>-<topic> main`, then
    `git push -u origin design/<yyyy-mm-dd>-<topic>`. Work only on that branch.
    It gets no pull request, no CI and no `/nexkit review`, as Design changes
    says.
-3. Link the branch on the design issue, and keep its state there: what is
-   done, what waits for the owner and what comes next.
+3. Post one state comment with `gh issue comment <n> --body-file <file>`. It
+   names the branch, what is done, what waits for the owner and what comes next.
+   Its id is the `#issuecomment-<id>` at the end of the URL. Edit it from then
+   on: `gh api --method PATCH repos/{owner}/{repo}/issues/comments/<id> -F
+   body=@<file>`.
 
 ### Each change
 
 Take one change at a time, and do not start the next until the owner has seen
-this one. What the build must do that the docs do not say is a comment on the
-design issue. What you find outside the review's topic becomes an issue.
+this one. What the build must do that the docs do not say goes in the design
+issue's body, with `gh issue edit`. What you find outside the review's topic
+becomes an issue.
 
 1. Restate the change in Axis terms: the tokens, the widgets and the previews
    it touches. Then search for what already does the job and say which one the
@@ -81,10 +85,11 @@ design issue. What you find outside the review's topic becomes an issue.
 5. Check every changed card as [checking-a-card.md](checking-a-card.md) says.
 6. Commit the change with a message that says what it shows. Push the branch.
 7. Tell the owner what changed and which preview to open, and ask for a
-   verdict. Keep, change or drop the change as they say. Comment each rule they
-   agree on the design issue, as [Design changes](../../../docs/delivery.md#design-changes)
-   says, with `gh issue comment <n> --body-file <file>`. Then bring the design
-   issue's state up to date.
+   verdict. Keep, change or drop the change as they say. Write the rules agreed
+   in this step as one comment, as [Design changes](../../../docs/delivery.md#design-changes)
+   says. Post it with `gh issue comment <n> --body-file <file>`, or if the screen
+   already has a rule comment, edit that one with the PATCH command in Start
+   step 3. Then edit the state comment in place.
 
 When `main` has changed code the prototype touches, follow
 [merging-main.md](merging-main.md) before the next change.

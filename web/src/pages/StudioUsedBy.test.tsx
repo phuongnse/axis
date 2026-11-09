@@ -106,6 +106,13 @@ function renderTab() {
   )
 }
 
+// The table renders before its rows load, so a test waits for a row before it reads the rows.
+async function loadedTable() {
+  const table = await screen.findByTestId('studio-used-by')
+  await within(table).findAllByRole('link')
+  return table
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
@@ -116,7 +123,7 @@ describe('StudioUsedBy', () => {
     stubReferences()
     renderTab()
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     const link = within(table).getByRole('link', { name: 'Purchase request' })
     expect(link).toHaveAttribute(
       'href',
@@ -129,7 +136,7 @@ describe('StudioUsedBy', () => {
     stubReferences()
     renderTab()
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     const row = within(table).getByRole('link', { name: 'Purchase request' }).closest('tr')!
     expect(within(row).getByText('Entity')).toBeInTheDocument()
     expect(within(row).getByText('A field refers to it')).toBeInTheDocument()
@@ -142,7 +149,7 @@ describe('StudioUsedBy', () => {
     stubReferences()
     renderTab()
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     const links = within(table).getAllByRole('link')
     expect(links.map((link) => link.textContent)).toEqual([
       'Department',
@@ -157,7 +164,7 @@ describe('StudioUsedBy', () => {
     stubReferences()
     renderTab()
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     const labels = () =>
       within(table)
         .getAllByRole('link')
@@ -181,7 +188,7 @@ describe('StudioUsedBy', () => {
     stubReferences()
     renderTab()
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'totals')
     expect(within(table).getAllByRole('link')).toHaveLength(4)
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), '{Enter}')
@@ -215,7 +222,7 @@ describe('StudioUsedBy', () => {
       </TextProvider>,
     )
 
-    const table = await screen.findByTestId('studio-used-by')
+    const table = await loadedTable()
     await userEvent.click(within(table).getByRole('columnheader', { name: 'Name' }))
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search' }), 'totals{Enter}')
 

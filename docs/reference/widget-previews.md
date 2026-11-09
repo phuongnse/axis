@@ -89,7 +89,8 @@ states. It checks text at 4.5:1, or 3:1 when the text is large: 24 px, or 18.66 
 nearest opaque layer behind the text, with any translucent layer above it blended in. It checks the border of each
 input, select, checkbox and radio, and each icon, at 3:1. It skips disabled controls, `aria-hidden` elements, and text
 or icons that draw nothing: fully transparent colours and visually hidden text. The arithmetic is in
-`tests/e2e/contrast.ts`, with its own unit test.
+`web/src/test/contrast.ts`, the helper the Vitest colour tests use too. Its unit test is
+`tests/e2e/contrast.test.ts`.
 
 `tests/e2e/contrast-baseline.json` lists the known misses, by preview, state, mode and element. The list only goes
 down. A new miss fails the test. A listed miss that no longer misses also fails the test, until its entry is removed.

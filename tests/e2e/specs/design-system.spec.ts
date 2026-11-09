@@ -14,7 +14,7 @@ import {
   origin,
   repositoryRoot,
 } from "../design-system";
-import { contrastRatio, parseColour } from "../contrast";
+import { contrast } from "../../../web/src/test/contrast";
 
 const productionBuild = path.join(
   repositoryRoot,
@@ -943,9 +943,7 @@ test("the dark table draws the Delete icon and the current page at 4.5:1 or more
 
   for (const text of [deleteIcon, currentPage]) {
     const { foreground, background } = await colours(text);
-    expect(
-      contrastRatio(parseColour(foreground), parseColour(background)),
-    ).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
   }
   expect(recording.errors).toEqual([]);
 });

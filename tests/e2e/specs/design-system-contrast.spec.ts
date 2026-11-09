@@ -6,11 +6,10 @@ import { cardGroups } from "../../../web/src/designSystem/cardOrder";
 import { openHarness } from "../design-system";
 import {
   backgroundOf,
-  contrastRatio,
+  contrast,
   isLargeText,
-  parseColour,
   requiredRatio,
-} from "../contrast";
+} from "../../../web/src/test/contrast";
 
 // One sample is a piece of a preview that draws: a text colour, a control's border or an icon's colour, with the
 // layers behind it, nearest first, up to the first opaque one. The browser collects samples, see collectSamples.
@@ -254,7 +253,7 @@ function findingsOf(
   const findings = new Map<string, Finding>();
   for (const sample of samples) {
     const background = backgroundOf(sample.layers);
-    const ratio = contrastRatio(parseColour(sample.foreground), background);
+    const ratio = contrast(sample.foreground, background);
     const required = requiredRatio(
       sample.kind,
       isLargeText(sample.fontSize, sample.fontWeight),
@@ -270,7 +269,7 @@ function findingsOf(
       ratio,
       required,
       foreground: sample.foreground,
-      background: `rgb(${[background.red, background.green, background.blue].map(Math.round).join(", ")})`,
+      background,
     };
     findings.set(keyOf(finding), finding);
   }
