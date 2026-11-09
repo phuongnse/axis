@@ -1044,9 +1044,9 @@ describe('the Design tab of a page', () => {
       ],
     } as unknown as StudioNames
 
-    async function openDesign(widgets: Record<string, unknown>[]) {
+    async function openDesign(widgets: Record<string, unknown>[], provided: StudioNames = bound) {
       const stubbed = stub(content(widgets))
-      renderEditor(bound)
+      renderEditor(provided)
       await openTab('Form')
       await screen.findByTestId('studio-page-editor', {}, slow)
       await openTab('Design')
@@ -1082,6 +1082,26 @@ describe('the Design tab of a page', () => {
       }
       expect(data.getByText('Entities')).toBeInTheDocument()
       expect(data.getByText('Data sources')).toBeInTheDocument()
+    })
+
+    it('titles the two lists as groups, described by their help, inside the Data group', async () => {
+      const { design } = await openDesign([{ type: 'kpi' }])
+
+      const group = within(within(design).getByRole('group', { name: 'Data' }))
+      expect(group.getByRole('group', { name: 'Entities' })).toHaveAccessibleDescription(
+        platformEnglish['shell.studio.data.entities.help'],
+      )
+      expect(group.getByRole('group', { name: 'Data sources' })).toHaveAccessibleDescription(
+        platformEnglish['shell.studio.data.dataSources.help'],
+      )
+    })
+
+    it('says in one line when a list has no names, and lists no button for it', async () => {
+      const { data } = await openDesign([{ type: 'kpi' }], names)
+
+      expect(data.getByText(platformEnglish['shell.studio.data.noEntities'])).toBeInTheDocument()
+      expect(data.getByText(platformEnglish['shell.studio.data.noDataSources'])).toBeInTheDocument()
+      expect(data.queryAllByTestId(/^studio-data-(entity|dataSource)-/)).toHaveLength(0)
     })
 
     it('opens the choice on a drop, and inserts the bound chart after the widget, selected', async () => {
