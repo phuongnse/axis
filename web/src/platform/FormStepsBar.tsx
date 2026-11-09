@@ -13,7 +13,8 @@ const circleSize = 24
  * shows a check mark in place of its number. From seven steps, only the current title shows, and the other steps show
  * their number, or a check mark when finished, with the title on hover, on focus and to assistive technology. The
  * current step is marked with `aria-current`, and the bar wraps when it does not fit. Proposed: `vertical` puts one step
- * on each line, joined by a vertical line, for a narrow card such as a sign-up page.
+ * on each line, joined by a vertical line, for a narrow card such as a sign-up page. The bar keeps no space around
+ * it: the screen that places it does.
  */
 export function FormStepsBar({
   titles,
@@ -40,7 +41,6 @@ export function FormStepsBar({
         listStyle: 'none',
         margin: 0,
         padding: 0,
-        marginBottom: spacing.lg,
       }}
     >
       {titles.map((title, index) => {

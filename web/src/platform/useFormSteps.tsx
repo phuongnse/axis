@@ -3,6 +3,7 @@ import { FormCanvasContext } from './formCanvas'
 import { FormStepsBar } from './FormStepsBar'
 import type { FormMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import type { Section, useRecordForm } from './useRecordForm'
 
 const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
@@ -23,6 +24,7 @@ export function useFormSteps(
   recordForm: ReturnType<typeof useRecordForm>,
 ) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const canvas = useContext(FormCanvasContext)
   const steps = form?.steps ?? []
   const active = steps.length > 0
@@ -88,8 +90,11 @@ export function useFormSteps(
     }
   }
 
+  // The wizard keeps a large space between its steps bar and the step's fields.
   const progress: ReactNode = active && (
-    <FormStepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
+    <div style={{ marginBottom: spacing.lg }}>
+      <FormStepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
+    </div>
   )
 
   const fields: ReactNode = active ? (
