@@ -267,10 +267,11 @@ The fields that may not be sorted, grouped or filtered:
   `/aggregate/groupBy/{i}`).
 - `sort`, a `groupBy` entry and a measure's `field` cannot name a projected field whose path ends at
   a `sensitive` field, and neither can a `filter` or a measure's `filter` read one (`AXC0308`, at
-  `/sort`, `/aggregate/groupBy/{i}`, `/aggregate/measures/{i}/field`, `/filter` or
-  `/aggregate/measures/{i}/filter`). A `filter` or a measure's `filter` may test an exact lookup
-  field of the root entity with `==` or `!=` against a literal or a parameter, which Axis matches by
-  the stored hashes, see [exact lookup](data-encryption.md#exact-lookup).
+  `/sort`, `/aggregate/groupBy/{i}`, or `/aggregate/groupBy/{i}/field` for the object form,
+  `/aggregate/measures/{i}/field`, `/filter` or `/aggregate/measures/{i}/filter`). A `filter` or a
+  measure's `filter` may test an exact lookup field of the root entity with `==` or `!=` against a
+  literal or a parameter, which Axis matches by the stored hashes, see
+  [exact lookup](data-encryption.md#exact-lookup).
 
 ## Endpoint
 
@@ -447,9 +448,9 @@ Every error is problem details (`application/problem+json`), with a fixed title 
 text from the request.
 
 A request is checked in this order, and the first failure is the response: the session, then the
-path, then the grants with the readable fields, then a root read filter that reads a pending field,
-then the query, then the pending fields of the `sort`, `filter`, `aggregate` and `search`, then the
-database.
+path, then the grants with the readable fields, then, in a cell, a free lease of the tenant's
+`concurrentQueries` quota, then a root read filter that reads a pending field, then the query, then
+the pending fields of the `sort`, `filter`, `aggregate` and `search`, then the database.
 
 - **`401`.** A request without a session, or with a session from another tenant. A request with a
   bearer token that fails the checks of [service accounts](security.md#service-accounts) is a `401`
