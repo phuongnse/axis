@@ -1,4 +1,4 @@
-import { Alert, ConfigProvider, Form, Input, Select, Typography } from 'antd'
+import { Alert, ConfigProvider, Flex, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
@@ -81,7 +81,7 @@ export function SignUpPage({
   onLocaleChange: (locale: SignUpLocale) => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
@@ -202,7 +202,7 @@ export function SignUpPage({
   }[status.state]
 
   // Proposed: Sign up checks every field on click and sends nothing while one is wrong. A refusal shows under the field
-  // its JSON Pointer names, and any other one above the form, as the form widget does.
+  // its JSON Pointer names, which it scrolls to, and any other one right above Sign up.
   const send = async (values: SignUpValues) => {
     if (status.state === 'refused' || status.state === 'checking') {
       form.scrollToField('subdomain', { focus: true })
@@ -297,7 +297,6 @@ export function SignUpPage({
           />
         }
       >
-        {formError !== undefined && <Alert type="error" title={formError} />}
         {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
         <Form
           form={form}
@@ -411,9 +410,13 @@ export function SignUpPage({
               }}
             />
           </Typography.Paragraph>
-          <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: 24 }}>
-            {t('signUp.send')}
-          </AxisButton>
+          {/* Proposed: a refusal that names no field shows right above Sign up, where the person pressed it. */}
+          <Flex vertical gap={spacing.md} style={{ marginTop: spacing.lg }}>
+            {formError !== undefined && <Alert type="error" title={formError} />}
+            <AxisButton role="finish" htmlType="submit" block loading={sending}>
+              {t('signUp.send')}
+            </AxisButton>
+          </Flex>
         </Form>
       </CardPage>
     </ConfigProvider>
