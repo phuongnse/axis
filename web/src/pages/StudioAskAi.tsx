@@ -1,9 +1,9 @@
-import { Checkbox, Flex, Form, Input, Typography } from 'antd'
+import { Flex, Form, Input, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
-import { AxisField } from '../platform/AxisField'
+import { AxisCheckboxField, AxisField } from '../platform/AxisField'
 import { EmptyState } from '../platform/EmptyState'
 import { QuotaRefusedError } from '../platform/quota'
 import { requiredMark } from '../platform/requiredMark'
@@ -39,16 +39,14 @@ export function authoringRequestAddress(application: string, id: string): string
  * Proposed: the request panel of the open application, in the shared `StudioSidePanel`. On top an author writes a
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept,
  * and the requests left this month when the tenant has a quota. Under it the application's requests, newest first:
- * each one's text is a link to the request's page, with its state in words and who sent it when. A request that waits
- * for its author says so first. The panel goes with the page and never holds a request, see
- * docs/reference/actions-and-controls.md#opening-things. At its foot, the MCP server's address when the tenant lets
- * outside clients connect.
+ * each one's text is a link to the request's page, and under it one sentence of its state and who sent it when. The
+ * request whose page is open is on the selected tint. The panel goes with the page and never holds a request, see
+ * docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioAskAi({
   application,
   userId,
   openRequest,
-  mcpServer,
   onClose,
 }: {
   application: string
@@ -56,7 +54,6 @@ export function StudioAskAi({
   userId: string | null
   /** The id of the request whose page is open, which the list marks. */
   openRequest: string | null
-  mcpServer: string | null
   onClose: () => void
 }) {
   const t = useText()
@@ -128,14 +125,11 @@ export function StudioAskAi({
           />
         </AxisField>
         {allowsAutoAccept && (
-          <AxisField
+          <AxisCheckboxField
             name="autoAccept"
-            valuePropName="checked"
             label={t('shell.studio.ai.autoAccept')}
             help={t('shell.studio.ai.autoAccept.help')}
-          >
-            <Checkbox aria-label={t('shell.studio.ai.autoAccept')} />
-          </AxisField>
+          />
         )}
         {sendError !== null && <AxisAlert kind="error" message={sendError} style={{ marginBottom: spacing.sm }} />}
         <AxisActionRow align="center">
@@ -153,15 +147,21 @@ export function StudioAskAi({
           )}
         </AxisActionRow>
       </Form>
-      <Typography.Title level={5} style={{ margin: `${spacing.sm}px 0 0` }}>
+      <Typography.Text strong style={{ marginTop: spacing.xs }}>
         {t('shell.studio.ai.requests')}
-      </Typography.Title>
+      </Typography.Text>
       {list === 'failed' ? (
         <AxisAlert kind="warning" message={t('shell.studio.ai.listFailed')} />
       ) : list === undefined ? null : list.items.length === 0 ? (
         <EmptyState text={t('shell.studio.ai.noRequests')} />
       ) : (
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid="studio-ai-requests">
+        <Flex
+          component="ul"
+          vertical
+          gap={4}
+          style={{ listStyle: 'none', margin: 0, padding: 0 }}
+          data-testid="studio-ai-requests"
+        >
           {list.items.map((request) => (
             <RequestRow
               key={request.id}
@@ -171,26 +171,13 @@ export function StudioAskAi({
               open={request.id === openRequest}
             />
           ))}
-        </ul>
-      )}
-      {mcpServer !== null && (
-        <Flex
-          vertical
-          gap={4}
-          style={{ marginTop: spacing.sm, paddingTop: spacing.sm, borderTop: `1px solid ${colour.borderSubtle}` }}
-        >
-          <Typography.Text strong>{t('shell.studio.ai.mcp')}</Typography.Text>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.ai.mcp.help')}</Typography.Text>
-          <Typography.Text copyable={{ text: mcpServer }} code>
-            {mcpServer}
-          </Typography.Text>
         </Flex>
       )}
     </StudioSidePanel>
   )
 }
 
-/** One request of the list: its text as a link to its page, its state in words, and who sent it when. */
+/** One request of the list: its text as a link to its page, then one sentence of its state and who sent it when. */
 function RequestRow({
   application,
   request,
@@ -206,9 +193,9 @@ function RequestRow({
   const { colour, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale
-  const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(request.sentAt),
-  )
+  const sentAt = new Date(request.sentAt)
+  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(sentAt)
+  const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(sentAt)
   const waiting = waitingForAuthor.includes(request.state)
   const stateColour =
     request.state === 'failed'
@@ -218,38 +205,30 @@ function RequestRow({
         : colour.text
   const stateKey =
     waiting && !mine ? `shell.studio.ai.state.${request.state}.other` : `shell.studio.ai.state.${request.state}`
+  const sent = t(mine ? 'shell.studio.ai.sentByYou' : 'shell.studio.ai.sentBy')
+    .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
+    .replace('{date}', date)
+    .replace('{time}', time)
 
   return (
     <li
       aria-current={open ? 'page' : undefined}
       style={{
-        padding: `${spacing.xs}px ${spacing.sm}px`,
+        padding: `${spacing.xs / 2}px ${spacing.sm}px`,
         marginInline: -spacing.sm,
         background: open ? selectedItemTint(mode) : undefined,
-        borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex vertical gap={2}>
-        <Link
-          to={authoringRequestAddress(application, request.id)}
-          style={{
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {request.text}
-        </Link>
-        <Typography.Text strong={waiting && mine} style={{ color: stateColour }}>
-          {t(stateKey)}
-        </Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>
-          {t(mine ? 'shell.studio.ai.sentByYou' : 'shell.studio.ai.sentBy')
-            .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
-            .replace('{time}', time)}
-        </Typography.Text>
-      </Flex>
+      <Link
+        to={authoringRequestAddress(application, request.id)}
+        style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+      >
+        {request.text}
+      </Link>
+      <Typography.Text style={{ color: colour.textMuted }}>
+        <span style={{ color: stateColour, fontWeight: waiting && mine ? 600 : undefined }}>{t(stateKey)}</span>
+        {sent}
+      </Typography.Text>
     </li>
   )
 }

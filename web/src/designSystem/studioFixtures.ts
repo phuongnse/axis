@@ -333,17 +333,11 @@ const aiRequests: StudioAuthoringRequest[] = [
   authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
 ]
 
-const mcpServer = 'https://acme.axis.example/mcp'
-
-/** The routes of the open application with Ask AI on, its requests, whether it allows auto-accept, and the MCP address. */
-function askAiRoutes(
-  list: StudioAuthoringRequestList,
-  autoAccept: boolean,
-  mcp: string | null,
-): Record<string, () => unknown> {
+/** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
+function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, () => unknown> {
   return {
     ...workspaceRoutes(typicalFolder),
-    '/api/me': () => ({ ...currentUser, studioPublisher: true, studioAi: true, studioMcpServer: mcp }),
+    '/api/me': () => ({ ...currentUser, studioPublisher: true, studioAi: true }),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
     [`${folderPath}/authoring-requests`]: () => list,
   }
@@ -358,7 +352,7 @@ export const studioFixtures = {
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
-  askAi: askAiRoutes({ items: aiRequests, left: 12 }, true, mcpServer),
-  askAiFirst: askAiRoutes({ items: [], left: null }, false, null),
-  askAiNoneLeft: askAiRoutes({ items: aiRequests.slice(0, 3), left: 0 }, false, mcpServer),
+  askAi: askAiRoutes({ items: aiRequests, left: 12 }, true),
+  askAiFirst: askAiRoutes({ items: [], left: null }, false),
+  askAiNoneLeft: askAiRoutes({ items: aiRequests.slice(0, 3), left: 0 }, false),
 } satisfies Record<string, Record<string, () => unknown>>

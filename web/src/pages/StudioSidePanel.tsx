@@ -4,11 +4,8 @@ import type { ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { useDesignTokens } from '../platform/themeMode'
 
-/** The width of a side panel in px. */
-const panelWidth = 320
-
 /**
- * Proposed: one side panel frame for Studio, which the Problems panel and the request panel share. A column beside
+ * Proposed: one side panel frame for Studio, `sidePanel` wide, which the Problems panel and the request panel share. A column beside
  * the page, under the header and the band, that is not modal, so the page stays usable while it is open. It has a
  * title and a close button, and its content scrolls inside it. Studio shows one side panel at a time: opening one
  * closes the other. See docs/reference/actions-and-controls.md#opening-things.
@@ -44,7 +41,7 @@ export function StudioSidePanel({
         top,
         alignSelf: 'flex-start',
         flex: 'none',
-        width: panelWidth,
+        width: size.sidePanel,
         maxHeight: `calc(100vh - ${top + spacing.md}px)`,
         overflowY: 'auto',
         padding: spacing.sm,

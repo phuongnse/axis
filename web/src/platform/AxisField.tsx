@@ -1,4 +1,4 @@
-import { Form, type FormItemProps } from 'antd'
+import { Checkbox, Form, type CheckboxProps, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
 import { useDesignTokens } from './themeMode'
 
@@ -165,3 +165,53 @@ const HelpedInput = forwardRef(function HelpedInput(
     </>
   )
 })
+
+/**
+ * Proposed: a yes-or-no field of a platform form, as docs/reference/actions-and-controls.md#fields plans
+ * `AxisCheckboxField`: the box with its label beside it, on the label's first line, and the help under the label,
+ * lined up with the label's text. The help describes the box. The form holds the value as `checked`.
+ */
+export function AxisCheckboxField({ name, label, help }: { name: FormItemProps['name']; label: string; help: string }) {
+  const { colour, spacing } = useDesignTokens()
+  const helpId = `${useId()}-help`
+  return (
+    <Form.Item name={name} valuePropName="checked">
+      <CheckboxWithHelp label={label} help={help} helpId={helpId} colour={colour.textMuted} gap={spacing.xs} />
+    </Form.Item>
+  )
+}
+
+/** The box, its label and its help. Ant Design's form gives it `checked` and `onChange`. */
+function CheckboxWithHelp({
+  label,
+  help,
+  helpId,
+  colour,
+  gap,
+  ...control
+}: {
+  label: string
+  help: string
+  helpId: string
+  colour: string
+  gap: number
+  checked?: boolean
+  onChange?: CheckboxProps['onChange']
+}) {
+  return (
+    <div>
+      <Checkbox {...control} aria-describedby={help === '' ? undefined : helpId} style={{ alignItems: 'flex-start' }}>
+        <span style={{ fontWeight: 500 }}>{label}</span>
+      </Checkbox>
+      {help !== '' && (
+        // The box is 16 px wide with 8 px after it, so the help starts under the label's text.
+        <div
+          id={helpId}
+          style={{ fontSize: 12, lineHeight: '20px', color: colour, paddingInlineStart: 24, marginTop: gap / 4 }}
+        >
+          {help}
+        </div>
+      )}
+    </div>
+  )
+}

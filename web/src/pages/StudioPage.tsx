@@ -261,7 +261,6 @@ function StudioWorkspace() {
   // Proposed: one side panel at a time, the Problems panel or the request panel.
   const [sidePanel, setSidePanel] = useState<'problems' | 'askAi' | null>(null)
   const [askAi, setAskAi] = useState(false)
-  const [mcpServer, setMcpServer] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [requestBusy, setRequestBusy] = useState(false)
 
@@ -274,7 +273,6 @@ function StudioWorkspace() {
         setCanTest(user?.studioTest === true)
         setPreviewHost(user?.studioPreviewHost ?? null)
         setAskAi(user?.studioAi === true)
-        setMcpServer(user?.studioMcpServer ?? null)
         setUserId(user?.id ?? null)
       },
       () => {
@@ -590,7 +588,6 @@ function StudioWorkspace() {
                   application={application!}
                   userId={userId}
                   openRequest={requestsView ? params.get('request') : null}
-                  mcpServer={mcpServer}
                   onClose={() => setSidePanel(null)}
                 />
               ) : (

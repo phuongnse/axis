@@ -17,8 +17,6 @@ export interface CurrentUser {
   studioTest: boolean
   /** Proposed: whether the user may ask AI for a change in Studio: `studio` is true and the server's `Ai:DefaultBinding` is set. */
   studioAi?: boolean
-  /** Proposed: the address of the tenant's MCP server, when `studio` is true and the tenant lets outside clients connect, else `null`. */
-  studioMcpServer?: string | null
   /** Whether the user may use the operator console: the user holds the role that the server's `Console:OperatorRole` names. */
   console: boolean
   /** Whether the user may administer users: the user holds the role that the server's `Users:AdministratorRole` names, and the tenant is not a preview tenant. */

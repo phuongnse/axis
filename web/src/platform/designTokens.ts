@@ -58,8 +58,15 @@ export const radiusTokens = { base: 6 }
 /**
  * Fixed sizes in px: the shell header (`bar`), a small control and the line a table row holds, and a table row. A
  * dialog's width (`dialog`) is one of three, picked by what the dialog holds: a confirmation, a short form or a list.
+ * Proposed: every side panel, such as Studio's Problems panel and request panel, is `sidePanel` wide.
  */
-export const sizeTokens = { bar: 48, smallControl: 24, tableRow: 40, dialog: { small: 400, medium: 560, large: 880 } }
+export const sizeTokens = {
+  bar: 48,
+  smallControl: 24,
+  tableRow: 40,
+  sidePanel: 400,
+  dialog: { small: 400, medium: 560, large: 880 },
+}
 
 /**
  * The one layout breakpoint, see docs/reference/frontend.md#narrow-width. Below it is narrow width. A page cannot change
