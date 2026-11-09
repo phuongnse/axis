@@ -3,7 +3,7 @@
 | Symptom                                           | What to do                                                                                   |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | The artifact link does not open                   | Ask the owner. The artifact is private to them.                                              |
-| `scripts/design-system.sh` fails                  | It needs the Playwright browser from `scripts/setup.sh`. Run that, then try again.           |
+| `scripts/design-system.sh` fails                  | It runs the Vite build, the header step, then the bundle check. Read which step failed. If the build lacks packages, run `scripts/setup.sh`. If the check fails, fix the rule it prints. |
 | A change note names a closed issue never merged   | Ask the owner whether to drop the change or to open a new issue. Do not drop it by yourself. |
 | An issue named in a note cannot be found          | Ask the owner. Keep the change until they answer.                                            |
 | Save or Next does nothing in the artifact         | The frame is sandboxed without `allow-forms`. Check the bundle still fires the submit event. |
