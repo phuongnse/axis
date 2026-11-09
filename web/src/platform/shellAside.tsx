@@ -1,14 +1,6 @@
-import { createContext, useContext, useLayoutEffect, type ReactNode } from 'react'
+import { useContext, useLayoutEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-
-export interface ShellAsideState {
-  /** The element in the shell's right column that holds the side panel, or `null` while no page claims it. */
-  target: HTMLElement | null
-  /** Registers a claim on the right column. The returned function releases it. */
-  claim: () => () => void
-}
-
-export const ShellAsideContext = createContext<ShellAsideState>({ target: null, claim: () => () => {} })
+import { ShellAsideContext } from './shellAsideContext'
 
 /**
  * Proposed: draws a side panel into the shell's right column, which runs from under the header to the bottom of the

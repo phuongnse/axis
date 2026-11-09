@@ -31,7 +31,7 @@ const maxText = 4000
 const waitingForAuthor: StudioAuthoringRequestState[] = ['awaitingApproval', 'ready']
 
 /** The address of one request's page. */
-export function authoringRequestAddress(application: string, id: string): string {
+function authoringRequestAddress(application: string, id: string): string {
   return `/studio?${new URLSearchParams({ app: application, view: 'requests', request: id })}`
 }
 
