@@ -658,16 +658,16 @@ panel, its undo and its drag and drop.
   [widget tree](resource-files.md#resource-file-shape), is off, cannot be dragged, and shows its
   reason: a second table, a second form, task inbox or process inspector, or a container past 4
   levels. A drop that a limit forbids inserts nothing, and the live region gives the same reason.
-- **Data panel.** Between the palette and the widget tree, the side pane lists every entity and every
-  data source, module ones too. A drop lands where a palette drop lands, and opens a dialog with one
-  button for each widget that can show the name: a table, a form or a detail for an entity, and a
-  table, a chart with one group field or a KPI with a total row for a data source. A widget that a page
-  limit forbids is off with the palette's reason. Enter, Space or a click on a name opens the same
-  dialog, and the widget goes after the selected widget. A detail takes as its record the first
-  required `reference` parameter that targets the entity, or none, because the designer adds no page
-  parameter. A chart takes the group field as its category, the `bar` kind and the first numeric
-  measure, and a KPI the first measure. A measure has no label, so a chart and a KPI start with empty
-  text keys and draw as placeholders until the author writes them.
+- **Data panel.** Between the palette and the widget tree, the side pane lists every entity and every data
+  source, module ones too. Each list has a title and a help line, and a list with no names says so in one
+  line. A drop lands where a palette drop lands, and opens a dialog with one button for each widget that
+  can show the name: a table, a form or a detail for an entity, and a table, a chart with one group field
+  or a KPI with a total row for a data source. A widget that a page limit forbids is off with the palette's
+  reason. Enter, Space or a click on a name opens the same dialog, and the widget goes after the selected
+  widget. A detail takes as its record the first required `reference` parameter that targets the entity, or
+  none, because the designer adds no page parameter. A chart takes the group field as its category, the
+  `bar` kind and the first numeric measure, and a KPI the first measure. A measure has no label, so a chart
+  and a KPI start with empty text keys and draw as placeholders until the author writes them.
 - **Moves.** The author can drag any widget of the canvas, and the innermost widget under the pointer
   drags, so a press on a KPI in a column moves the KPI. It drops on the same targets as a palette type.
   Alt+ArrowDown and Alt+ArrowUp move the selected widget to the next or previous allowed place,

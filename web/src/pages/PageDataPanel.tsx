@@ -1,6 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
 import { Button, Flex, Modal, Typography } from 'antd'
 import { useContext } from 'react'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { EmptyState } from '../platform/EmptyState'
 import { bindingTypes, paletteLimit, type DataBinding } from '../platform/pageWidgets'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
@@ -8,10 +10,10 @@ import { useDesignTokens } from '../platform/themeMode'
 import { paletteReasons } from './pagePaletteSupport'
 
 /**
- * The data panel of the Design tab: the application's entities and data sources, in two lists, each name a button. A
- * pointer drag from a name to the canvas is handled by the page designer around it. A click, Enter or Space calls
- * `onPick`, which is the keyboard way to bind. It shows nothing until Studio's names load. Module entities and data
- * sources are listed too, as the reference pickers list them.
+ * The data panel of the Design tab: the application's entities and data sources, in two titled lists, each name a
+ * button. A list with no names says so in one line. A pointer drag from a name to the canvas is handled by the page
+ * designer around it. A click, Enter or Space calls `onPick`, which is the keyboard way to bind. It shows nothing until
+ * Studio's names load. Module entities and data sources are listed too, as the reference pickers list them.
  */
 export function PageDataPanel({ onPick }: { onPick: (binding: DataBinding) => void }) {
   const t = useText()
@@ -23,9 +25,18 @@ export function PageDataPanel({ onPick }: { onPick: (binding: DataBinding) => vo
     <div data-testid="studio-data-panel" role="group" aria-label={t('shell.studio.data')}>
       <Flex vertical gap="small">
         <Typography.Text strong>{t('shell.studio.data')}</Typography.Text>
-        <DataList heading={t('shell.studio.data.entities')} kind="entity" items={names.entities} onPick={onPick} />
         <DataList
-          heading={t('shell.studio.data.dataSources')}
+          title={t('shell.studio.data.entities')}
+          help={t('shell.studio.data.entities.help')}
+          empty={t('shell.studio.data.noEntities')}
+          kind="entity"
+          items={names.entities}
+          onPick={onPick}
+        />
+        <DataList
+          title={t('shell.studio.data.dataSources')}
+          help={t('shell.studio.data.dataSources.help')}
+          empty={t('shell.studio.data.noDataSources')}
           kind="dataSource"
           items={names.dataSources}
           onPick={onPick}
@@ -36,25 +47,32 @@ export function PageDataPanel({ onPick }: { onPick: (binding: DataBinding) => vo
 }
 
 function DataList({
-  heading,
+  title,
+  help,
+  empty,
   kind,
   items,
   onPick,
 }: {
-  heading: string
+  title: string
+  help: string
+  empty: string
   kind: DataBinding['kind']
   items: { id: string; name: string }[]
   onPick: (binding: DataBinding) => void
 }) {
   return (
-    <Flex vertical gap={4}>
-      <Typography.Text type="secondary">{heading}</Typography.Text>
-      <Flex gap="small" wrap>
-        {items.map((item) => (
-          <DataName key={item.id} binding={{ kind, name: item.name }} onPick={onPick} />
-        ))}
-      </Flex>
-    </Flex>
+    <AxisFieldGroup title={title} help={help}>
+      {items.length === 0 ? (
+        <EmptyState text={empty} />
+      ) : (
+        <Flex gap="small" wrap>
+          {items.map((item) => (
+            <DataName key={item.id} binding={{ kind, name: item.name }} onPick={onPick} />
+          ))}
+        </Flex>
+      )}
+    </AxisFieldGroup>
   )
 }
 
