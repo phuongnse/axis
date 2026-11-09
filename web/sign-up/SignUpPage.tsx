@@ -68,6 +68,7 @@ export function SignUpPage({
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
   const [applications, setApplications] = useState<SignUpApplication[] | 'failed'>()
+  const [tenantDomain, setTenantDomain] = useState<string>()
   const [documents, setDocuments] = useState<SignUpDocuments | null>(null)
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
@@ -100,6 +101,20 @@ export function SignUpPage({
       })
       .catch(() => {
         // Without the addresses the box names the documents as plain text, and sending is refused.
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch('/api/sign-up/region', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
+      .then(async (response) => {
+        if (response.ok) {
+          setTenantDomain(((await response.json()) as { tenantDomain: string }).tenantDomain)
+        }
+      })
+      .catch(() => {
+        // Without the domain the input shows the subdomain alone, and its help still says it starts the address.
       })
     return () => controller.abort()
   }, [])
@@ -232,9 +247,15 @@ export function SignUpPage({
             requiredMessage={t('signUp.subdomain.required')}
             check={subdomainCheck}
           >
+            {/* Proposed: the region's tenant domain ends the input, so the person reads their whole address. */}
             <Input
               autoComplete="off"
               spellCheck={false}
+              suffix={
+                tenantDomain === undefined ? undefined : (
+                  <span style={{ color: colour.textMuted }}>.{tenantDomain}</span>
+                )
+              }
               onChange={() => {
                 subdomainEdited.current = true
               }}

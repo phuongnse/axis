@@ -8,6 +8,7 @@ export const signUpBusinessName = 'An Phát Trading'
 
 const applicationsPath = '/api/sign-up/applications'
 const documentsPath = '/api/sign-up/documents'
+const regionPath = '/api/sign-up/region'
 const subdomainPath = `/api/sign-up/subdomains/${suggestSubdomain(signUpBusinessName)}`
 
 const applications = () => ({
@@ -35,17 +36,17 @@ const documents = () => ({
   privacy: document('privacy', '2026-10-15'),
   licencesUrl: 'https://axis.example/licences',
 })
+const region = () => ({ tenantDomain: 'vn.example.com' })
 const free = () => ({ free: true, reason: null })
 const unavailable = () => new Response(null, { status: 503 })
 
+/** What every state answers the same: the region, its documents and its applications. */
+const page = { [regionPath]: region, [documentsPath]: documents, [applicationsPath]: applications }
+
 export const signUpFixtures = {
-  empty: { [documentsPath]: documents, [applicationsPath]: applications, [subdomainPath]: free },
-  free: { [documentsPath]: documents, [applicationsPath]: applications, [subdomainPath]: free },
-  taken: {
-    [documentsPath]: documents,
-    [applicationsPath]: applications,
-    [subdomainPath]: () => ({ free: false, reason: 'taken' }),
-  },
-  checkFailed: { [documentsPath]: documents, [applicationsPath]: applications, [subdomainPath]: unavailable },
-  applicationsFailed: { [documentsPath]: documents, [applicationsPath]: unavailable, [subdomainPath]: free },
+  empty: { ...page, [subdomainPath]: free },
+  free: { ...page, [subdomainPath]: free },
+  taken: { ...page, [subdomainPath]: () => ({ free: false, reason: 'taken' }) },
+  checkFailed: { ...page, [subdomainPath]: unavailable },
+  applicationsFailed: { ...page, [applicationsPath]: unavailable, [subdomainPath]: free },
 } satisfies Record<string, Record<string, () => unknown>>
