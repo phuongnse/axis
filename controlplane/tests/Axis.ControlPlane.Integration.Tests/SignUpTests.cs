@@ -236,6 +236,8 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Id", "approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:en", "Approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:vi", "Phê duyệt");
+            builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:en", "Approve requests");
+            builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:vi", "Duyệt yêu cầu");
         });
     }
 
