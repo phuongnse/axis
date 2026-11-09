@@ -17,6 +17,9 @@ one.
   that the widget or its data is incomplete. Fix it there, so every caller gets it.
 - If a second mechanism already exists, merge the two in the same change.
 - A new shared widget or helper gets its row in [which widget](#which-widget) in the same change.
+- **A shared widget keeps no space around itself** _(planned for M33)_. It draws no margin outside
+  itself, and the screen that places it gives the space, so the widget sits in a card's gap as in a
+  form's layout.
 
 ## Which widget
 
@@ -32,7 +35,7 @@ Each common job has one shared widget or helper:
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
-| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_ |
+| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_, and a `status` for what the screen found about a field _(planned for M33)_ |
 | A row of actions                               | `AxisActionRow`                                                                                        |
 | A text in the author's language                | `textIn`, else `en` _(planned for M31)_                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |
@@ -42,6 +45,11 @@ Each common job has one shared widget or helper:
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
+| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line _(planned for M33)_ |
+| A required box that accepts terms, each document a link | `AcceptTermsField` _(planned for M33)_ |
+| A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language _(planned for M33)_ |
+| The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line _(planned for M33)_ |
+| The application a new tenant or a new application starts from | `StartFromField`, with Blank first _(planned for M33)_ |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 | Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
 

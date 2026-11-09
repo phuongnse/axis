@@ -711,6 +711,8 @@ because the provisioning API answers `404` there. The job has five steps, and ea
    invite records name `tenant create` as their actor.
 5. `resume`: sets the tenant `active`. A tenant that is already `active` is ok.
 
+- **No application** _(planned for M33)_. Without an `application`, the `application` step creates a blank one.
+
 A step that throws ends the claim, and the next claim runs the job again from the first step that has
 not succeeded. A job gets three claims, and running a failed job again is described with the
 [provisioning API](tenant-lifecycle.md#provisioning-api).

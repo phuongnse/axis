@@ -125,6 +125,9 @@ read never returns.
   [application template](modules-and-templates.md#application-templates), such as the built-in
   `approvals`. An id that is not an installed template answers `400`. The job keeps the id, and its
   `application` step takes the newest version.
+- **Without an `application`** _(planned for M33)_. The request may leave `application` out. The
+  `application` step then creates a blank application named by the tenant id, as Studio's Blank does,
+  and `activate` activates its first release.
 - **`administrator`** is the email of the person invited as the tenant's first administrator. A value
   that is not an email answers `400`.
 - **`quotas`** is optional and has the shape of the `set` object of
