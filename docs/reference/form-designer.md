@@ -84,7 +84,7 @@ and the moved element keeps all its keys and stays selected.
 - **Sections.** A section row moves the same way, by a pointer drag from its title line or by the
   keyboard. It takes the place of the section row it is dropped on, and a drop on another step's heading
   in the outline, or on a step in the step switch, appends it to that step. On a form with steps, the
-  section's property panel also has a Move to step picker, which appends the section to the chosen step.
+  section's property panel also has a Step picker, which appends the section to the chosen step.
   The live region names the section, its step and its position.
 - **Targets.** While a section moves, field rows are not targets, and while a field moves, step headings
   and the switch's entries are not. While a section moves, the switch's entries show an outline under
@@ -125,7 +125,7 @@ The selection is kept across the Design, Form and JSON tabs while the resource s
 | Element | The panel shows                                                                                                                                                                                                 |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Field   | `readOnly`, its three conditions in the expression editor, its `width` and a Remove field button. The width is a whole number from 1 to 12, and the canvas draws the fields in their [columns](form-widget.md). |
-| Section | Its name, title and `visibleWhen`, a Remove section button and, on a form with steps, the Move to step picker                                                                                                   |
+| Section | Its name, title and `visibleWhen`, a Remove section button and, on a form with steps, the Step picker                                                                                                           |
 | Step    | Its title and a Remove step button                                                                                                                                                                              |
 
 - **Conditions offer the form's fields.** The expression editor of a condition offers only the fields

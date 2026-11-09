@@ -1,5 +1,7 @@
 import { Button, Card, Flex, Select, Typography } from 'antd'
 import { useState } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { unusedStepName } from '../platform/formLayout'
 import { useText } from '../platform/texts'
 import { LabelTexts } from './LabelTexts'
@@ -9,6 +11,17 @@ type Content = Record<string, unknown>
 
 function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** The label and the help of a form's input, from `shell.studio.field.form.<path>`, see docs/reference/frontend.md#platform-field-help. */
+function fieldTexts(t: (key: string) => string, path: string) {
+  return { label: t(`shell.studio.field.form.${path}`), help: t(`shell.studio.field.form.${path}.help`) }
+}
+
+/** The title and the help of a form's group of inputs, which has no one input to label. */
+function groupTexts(t: (key: string) => string, path: string) {
+  const { label, help } = fieldTexts(t, path)
+  return { title: label, help }
 }
 
 /** The names of the sections that have one, in the order of the form. */
@@ -82,24 +95,25 @@ export function FormSteps({
             <Card key={`${generation}-${index}`} size="small" data-testid={`studio-field-${pointer}`}>
               <Flex vertical gap="small">
                 <div data-testid={`studio-field-${pointer}/title`}>
-                  <div>{t('shell.studio.formSteps.step')}</div>
-                  <LabelTexts
-                    pointer={`${pointer}/title`}
-                    value={isContent(step) ? step.title : undefined}
-                    onChange={onChange}
-                  />
+                  <AxisFieldGroup {...groupTexts(t, 'steps.title')}>
+                    <LabelTexts
+                      pointer={`${pointer}/title`}
+                      value={isContent(step) ? step.title : undefined}
+                      onChange={onChange}
+                    />
+                  </AxisFieldGroup>
                 </div>
                 <div data-testid={`studio-field-${pointer}/sections`}>
-                  <div>{t('shell.studio.formSteps.sections')}</div>
-                  <Select
-                    mode="multiple"
-                    virtual={false}
-                    aria-label={t('shell.studio.formSteps.sections')}
-                    style={{ minWidth: 240 }}
-                    value={chosen}
-                    options={options}
-                    onChange={(next: string[]) => onChange(`${pointer}/sections`, next)}
-                  />
+                  <AxisField {...fieldTexts(t, 'steps.sections')}>
+                    <Select
+                      mode="multiple"
+                      virtual={false}
+                      style={{ minWidth: 240 }}
+                      value={chosen}
+                      options={options}
+                      onChange={(next: string[]) => onChange(`${pointer}/sections`, next)}
+                    />
+                  </AxisField>
                 </div>
                 <Flex gap="small">
                   {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}

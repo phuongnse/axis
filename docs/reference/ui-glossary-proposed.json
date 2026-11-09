@@ -66,6 +66,30 @@
       "en": "column",
       "vi": "cột",
       "status": "proposed"
+    },
+    {
+      "concept": "Section",
+      "en": "section",
+      "vi": "phần",
+      "status": "proposed"
+    },
+    {
+      "concept": "Index",
+      "en": "index",
+      "vi": "chỉ mục",
+      "status": "proposed"
+    },
+    {
+      "concept": "Currency",
+      "en": "currency",
+      "vi": "tiền tệ",
+      "status": "proposed"
+    },
+    {
+      "concept": "Width",
+      "en": "width",
+      "vi": "độ rộng",
+      "status": "proposed"
     }
   ]
 }

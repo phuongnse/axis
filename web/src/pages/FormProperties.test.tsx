@@ -3,12 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { setAt } from '../platform/jsonPatch'
 import { TextProvider } from '../platform/TextProvider'
 import { ThemeModeProvider } from '../platform/theme'
 import { FormProperties } from './FormProperties'
 
 type Content = Record<string, unknown>
+
+const english: Record<string, string> = platformEnglish
 
 /** Keeps the draft in state, like the editor does, and exposes it as JSON. */
 function Harness({ initial, selected }: { initial: Content; selected: string }) {
@@ -54,11 +57,13 @@ const stepped = {
 }
 
 describe('FormProperties section', () => {
-  it('moves the section to the step that the Move to step picker chooses', async () => {
+  it('moves the section to the step that the Step picker chooses', async () => {
     renderHarness(stepped, '/sections/0')
 
     expect(within(screen.getByTestId('studio-design-move-to-step')).getByTitle('steps.one')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('combobox', { name: 'Move to step' }))
+    const step = screen.getByRole('combobox', { name: 'Step' })
+    expect(step).toHaveAccessibleDescription(english['shell.studio.field.form.sections.step.help'])
+    await userEvent.click(step)
     await userEvent.click(await screen.findByText('steps.two', { selector: '.ant-select-item-option-content' }))
 
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
@@ -69,7 +74,7 @@ describe('FormProperties section', () => {
     expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a, steps.two, position 1')
   })
 
-  it('has no Move to step picker on a form without steps', () => {
+  it('has no Step picker on a form without steps', () => {
     renderHarness({ sections: [{ name: 'a', fields: [] }] }, '/sections/0')
 
     expect(screen.getByTestId('studio-design-section')).toBeInTheDocument()
@@ -187,7 +192,8 @@ describe('FormProperties field', () => {
 
   it('writes the width of the field under width and removes it when the box is cleared', async () => {
     renderHarness({ sections: [{ name: 's', fields: [{ field: 'x' }] }] }, '/sections/0/fields/0')
-    const width = screen.getByRole('spinbutton', { name: 'Width in twelfths of the row' })
+    const width = screen.getByRole('spinbutton', { name: 'Width' })
+    expect(width).toHaveAccessibleDescription(english['shell.studio.field.form.sections.fields.width.help'])
 
     await userEvent.type(width, '8')
     expect(JSON.parse(screen.getByTestId('draft').textContent ?? '').sections[0].fields[0]).toEqual({
@@ -207,5 +213,26 @@ describe('FormProperties field', () => {
     const draft = JSON.parse(screen.getByTestId('draft').textContent ?? '')
     expect(draft.sections[0].fields).toEqual([])
     expect(screen.getByTestId('announcement')).toHaveTextContent('/sections/0/fields/0')
+  })
+})
+
+describe('the texts of the form designer', () => {
+  it.each([
+    'sections.step',
+    'sections.name',
+    'sections.title',
+    'sections.visibleWhen',
+    'sections.fields.readOnly',
+    'sections.fields.readOnlyWhen',
+    'sections.fields.requiredWhen',
+    'sections.fields.visibleWhen',
+    'sections.fields.width',
+    'steps.title',
+    'steps.sections',
+  ])('has a label and a help for %s in English and Vietnamese', (path) => {
+    for (const catalogue of [platformEnglish, platformVietnamese] as Record<string, string>[]) {
+      expect(catalogue[`shell.studio.field.form.${path}`]).toBeTruthy()
+      expect(catalogue[`shell.studio.field.form.${path}.help`]).toBeTruthy()
+    }
   })
 })

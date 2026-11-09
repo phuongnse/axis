@@ -1,16 +1,15 @@
 import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext, useState } from 'react'
+import { useState } from 'react'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { renameSection } from '../platform/formLayout'
 import { getAt } from '../platform/jsonPatch'
 import type { FieldMetadata } from '../platform/site'
 import { useText } from '../platform/texts'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
 import { LabelTexts } from './LabelTexts'
 import { moveSectionTo, removeField, removeSectionAt, removeStepAt } from './formPaletteSupport'
+import { Expression } from './ProcessFields'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -24,12 +23,22 @@ function isContent(value: unknown): value is Content {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** The label and the help of a form's input, from `shell.studio.field.form.<path>`, see docs/reference/frontend.md#platform-field-help. */
+function fieldTexts(t: (key: string) => string, path: string) {
+  return { label: t(`shell.studio.field.form.${path}`), help: t(`shell.studio.field.form.${path}.help`) }
+}
+
+/** The title and the help of a form's group of inputs, which has no one input to label. */
+function groupTexts(t: (key: string) => string, path: string) {
+  const { label, help } = fieldTexts(t, path)
+  return { title: label, help }
+}
+
 /**
  * The properties of the element that is selected on the form canvas, found by its JSON Pointer in the draft. A field
  * has `readOnly`, its three conditions and a Remove field button, a section its name, title, `visibleWhen`, a Remove
- * section button and, on a form with steps, a Move to step picker, and a step its title and a Remove step button. A
- * field the entity marks required has no
- * `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
+ * section button and, on a form with steps, a Step picker, and a step its title and a Remove step button. A field the
+ * entity marks required has no `visibleWhen` (AXC0226). A computed, sequence or creator field is always read-only. A selection that finds no object
  * in the draft shows a hint, so no edit goes to a stale pointer.
  */
 export function FormProperties({
@@ -129,24 +138,21 @@ function FieldProperties({
     <Flex vertical gap="small" data-testid="studio-design-field">
       <Typography.Text strong>{name}</Typography.Text>
       <div>
-        <Checkbox
-          aria-label={t('shell.studio.design.readOnly')}
-          checked={locked || field.readOnly === true}
-          disabled={locked}
-          onChange={(event) => onChange(`${pointer}/readOnly`, event.target.checked)}
-        >
-          {t('shell.studio.design.readOnly')}
-        </Checkbox>
+        <AxisField {...fieldTexts(t, 'sections.fields.readOnly')}>
+          <Checkbox
+            checked={locked || field.readOnly === true}
+            disabled={locked}
+            onChange={(event) => onChange(`${pointer}/readOnly`, event.target.checked)}
+          />
+        </AxisField>
         {locked && (
           <div>
             <Typography.Text type="secondary">{t('shell.studio.design.readOnlyLocked')}</Typography.Text>
           </div>
         )}
       </div>
-      <Flex vertical gap={4}>
-        <Typography.Text>{t('shell.studio.design.fieldWidth')}</Typography.Text>
+      <AxisField {...fieldTexts(t, 'sections.fields.width')}>
         <InputNumber
-          aria-label={t('shell.studio.design.fieldWidth')}
           min={1}
           max={12}
           precision={0}
@@ -155,14 +161,14 @@ function FieldProperties({
           value={typeof field.width === 'number' ? field.width : null}
           onChange={(next) => onChange(`${pointer}/width`, typeof next === 'number' ? next : undefined)}
         />
-      </Flex>
+      </AxisField>
       {conditions.map((condition) => (
         <ConditionBox
           key={condition}
-          draft={draft}
           pointer={pointer}
           element={field}
           condition={condition}
+          textPath="sections.fields"
           onChange={onChange}
         />
       ))}
@@ -223,12 +229,10 @@ function SectionProperties({
         section={section}
         onChange={onChange}
       />
-      <TitleEditor pointer={pointer} element={section} onChange={onChange} />
+      <TitleEditor pointer={pointer} element={section} textPath="sections" onChange={onChange} />
       {steps.length > 0 && name !== '' && (
-        <div>
-          <div>{t('shell.studio.design.moveToStep')}</div>
+        <AxisField {...fieldTexts(t, 'sections.step')}>
           <Select
-            aria-label={t('shell.studio.design.moveToStep')}
             data-testid="studio-design-move-to-step"
             style={{ width: '100%' }}
             value={current >= 0 ? current : undefined}
@@ -248,9 +252,15 @@ function SectionProperties({
               )
             }
           />
-        </div>
+        </AxisField>
       )}
-      <ConditionBox draft={draft} pointer={pointer} element={section} condition="visibleWhen" onChange={onChange} />
+      <ConditionBox
+        pointer={pointer}
+        element={section}
+        condition="visibleWhen"
+        textPath="sections"
+        onChange={onChange}
+      />
       {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         danger
@@ -301,16 +311,16 @@ function SectionNameBox({
   }
   return (
     <div>
-      <div>{t('shell.studio.design.name')}</div>
-      <Input
-        aria-label={t('shell.studio.design.name')}
-        data-testid="studio-design-section-name"
-        status={refused === null ? undefined : 'error'}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onPressEnter={commit}
-        onBlur={commit}
-      />
+      <AxisField {...fieldTexts(t, 'sections.name')}>
+        <Input
+          data-testid="studio-design-section-name"
+          status={refused === null ? undefined : 'error'}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onPressEnter={commit}
+          onBlur={commit}
+        />
+      </AxisField>
       {refused !== null && (
         <Typography.Text type="danger">
           {t(refused === 'taken' ? 'shell.studio.design.nameTaken' : 'shell.studio.design.nameEmpty')}
@@ -338,7 +348,7 @@ function StepProperties({
   const t = useText()
   return (
     <Flex vertical gap="small" data-testid="studio-design-step">
-      <TitleEditor pointer={pointer} element={step} onChange={onChange} />
+      <TitleEditor pointer={pointer} element={step} textPath="steps" onChange={onChange} />
       {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
       <Button
         danger
@@ -351,55 +361,58 @@ function StepProperties({
   )
 }
 
-/** The title of a section or a step. The label editor keeps its key in state, so the pointer is its key. */
-function TitleEditor({ pointer, element, onChange }: { pointer: string; element: Content; onChange: ChangeHandler }) {
+/**
+ * The title of a section or a step, under `shell.studio.field.form.<textPath>.title`. The label editor keeps its key in
+ * state, so the pointer is its key.
+ */
+function TitleEditor({
+  pointer,
+  element,
+  textPath,
+  onChange,
+}: {
+  pointer: string
+  element: Content
+  textPath: string
+  onChange: ChangeHandler
+}) {
   const t = useText()
   const title = `${pointer}/title`
   return (
     <div data-testid={`studio-field-${title}`}>
-      <div>{t('shell.studio.design.title')}</div>
-      <LabelTexts key={title} pointer={title} value={element.title} onChange={onChange} />
+      <AxisFieldGroup {...groupTexts(t, `${textPath}.title`)}>
+        <LabelTexts key={title} pointer={title} value={element.title} onChange={onChange} />
+      </AxisFieldGroup>
     </div>
   )
 }
 
-/** An expression box for a condition of a field or a section. It offers only the fields the form lists. */
+/**
+ * An expression box for a condition of a field or a section, under `shell.studio.field.form.<textPath>.<condition>`.
+ * It offers only the fields the form lists. The key resets the box when the element changes.
+ */
 function ConditionBox({
-  draft,
   pointer,
   element,
   condition,
+  textPath,
   onChange,
 }: {
-  draft: Content
   pointer: string
   element: Content
   condition: Condition
+  textPath: string
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const check = useContext(ExpressionCheckContext)
   const path = `${pointer}/${condition}`
-  const name = t(`shell.studio.design.${condition}`)
+  const texts = fieldTexts(t, `${textPath}.${condition}`)
   const value = typeof element[condition] === 'string' ? element[condition] : ''
   return (
-    <div data-testid={`studio-field-${path}`}>
-      <div>{name}</div>
-      {check && (
-        <Suspense fallback={<Input aria-label={name} value={value} readOnly aria-busy="true" />}>
-          <LazyExpressionEditor
-            key={path}
-            application={check.application}
-            resourceId={check.resourceId}
-            path={path}
-            name={name}
-            value={value}
-            required={false}
-            options={expressionScope('form', draft, path, check.names)}
-            onChange={onChange}
-          />
-        </Suspense>
-      )}
+    <div key={path} data-testid={`studio-field-${path}`}>
+      <AxisField {...texts}>
+        <Expression pointer={path} name={texts.label} value={value} required={false} onChange={onChange} />
+      </AxisField>
     </div>
   )
 }

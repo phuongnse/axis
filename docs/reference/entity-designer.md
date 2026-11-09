@@ -12,8 +12,9 @@ The Form tab is sections, as [the resource form](studio-resource-form.md#section
 Fields, Validations and Indexes. Sections suit an entity because its parts are small, and tabs are for
 parts that are large and apart. The details are inputs on the page, with no step to edit them.
 
-General holds the name, the label, the description and the display field, each an
-[`AxisField`](actions-and-controls.md#fields) with its help. The display field is a
+General holds the name, the label, the description and the display field, each with its help. The name
+and the display field are an [`AxisField`](actions-and-controls.md#fields), and the label and the
+description are an `AxisFieldGroup` of [label texts](studio.md#label-texts). The display field is a
 [picker](studio.md#reference-pickers) of the draft's fields. The section does not show `id`, `kind` or
 `formatVersion`.
 
@@ -56,8 +57,8 @@ A field's settings open in a drawer of the `medium` width with the table still i
 Salesforce's Object Manager, Dataverse and Strapi have it. The drawer has an address, `&field=<name>`,
 so Back reopens it and a link can open a field. A migration warning is at the top of the drawer.
 
-The settings are in groups, each setting an [`AxisField`](actions-and-controls.md#fields) with its help.
-A setting that the field's type does not take does not show, as the
+The settings are in groups, each setting an [`AxisField`](actions-and-controls.md#fields) with its help,
+and the value labels an `AxisFieldGroup` with a label for each value. A setting that the field's type does not take does not show, as the
 [field types](resource-files.md#entity-field-types-and-constraints) say, and a group with none is left
 out. What has an effect comes before what it affects: the type decides which settings there are, and
 where the value comes from decides whether Required applies.

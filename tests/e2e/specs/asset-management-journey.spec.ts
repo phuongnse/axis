@@ -685,7 +685,7 @@ test.describe('the author builds the asset management application with Studio on
         )
         // The new field is the selected one, and the property panel sets its width on the row.
         if (field.width !== undefined) {
-          await panel.getByRole('spinbutton', { name: 'Width in twelfths of the row', exact: true }).fill(String(field.width))
+          await panel.getByRole('spinbutton', { name: 'Width', exact: true }).fill(String(field.width))
         }
       }
     }
