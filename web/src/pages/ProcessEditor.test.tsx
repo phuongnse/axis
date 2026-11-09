@@ -58,6 +58,15 @@ const drawnPaths = [
   'steps.escalations.notify',
   'steps.escalations.notify.message.values',
   'steps.escalations.notify.open.parameters',
+  'steps.escalations.notify.to',
+  'steps.escalations.notify.to.user',
+  'steps.escalations.notify.to.role',
+  'steps.escalations.notify.to.email',
+  'steps.escalations.notify.channels',
+  'steps.escalations.notify.message.subject',
+  'steps.escalations.notify.message.body',
+  'steps.escalations.notify.open',
+  'steps.escalations.notify.open.page',
   'steps.timer',
   'steps.wait',
   'steps.until',
@@ -90,6 +99,15 @@ const drawnPaths = [
   'steps.parameters',
   'steps.message.values',
   'steps.open.parameters',
+  'steps.to',
+  'steps.to.user',
+  'steps.to.role',
+  'steps.to.email',
+  'steps.channels',
+  'steps.message.subject',
+  'steps.message.body',
+  'steps.open',
+  'steps.open.page',
 ]
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
@@ -365,6 +383,21 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(screen.queryByTestId('studio-field-/steps/1/assignee/role')).toBeNull()
     await userEvent.type(within(screen.getByTestId('studio-field-/steps/1/assignee/user')).getByRole('textbox'), 'a')
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'a' })
+  })
+
+  it('describes the assignee role picker by its label and help', () => {
+    renderEditor({
+      ...process,
+      steps: process.steps.map((step, index) =>
+        index === 1 ? { ...step, assignee: { role: 'finance-reviewer' } } : step,
+      ),
+    })
+
+    expect(
+      within(screen.getByTestId('studio-field-/steps/1/assignee/role')).getByRole('combobox', {
+        name: label('steps.assignee.role'),
+      }),
+    ).toHaveAccessibleDescription(help('steps.assignee.role'))
   })
 
   it('adds an escalation with a notify and writes to, channels and message without next', async () => {
@@ -757,40 +790,58 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     )
   })
 
-  it('describes the placeholder values and the page parameters of an escalation notify by their help', () => {
-    renderEditor({
-      ...complete,
-      steps: [
-        {
-          ...complete.steps[0],
-          escalations: [
-            {
-              name: 'late',
-              after: 'PT4H',
-              notify: {
-                to: [],
-                channels: [],
-                message: { subject: { textKey: '' }, body: { textKey: '' }, values: { n: 'number' } },
-                open: { page: 'P', parameters: {} },
-              },
-            },
-          ],
-        },
-        ...complete.steps.slice(1),
-      ],
-    })
+  describe('an escalation notify', () => {
     const escalation = (path: string) => english[`shell.studio.field.process.steps.escalations.notify.${path}`]
+    const at = (pointer: string) => within(screen.getByTestId(`studio-field-/steps/0/escalations/0/notify/${pointer}`))
 
-    expect(
-      within(screen.getByTestId('studio-field-/steps/0/escalations/0/notify/message/values')).getByRole('group', {
-        name: escalation('message.values'),
-      }),
-    ).toHaveAccessibleDescription(escalation('message.values.help'))
-    expect(
-      within(screen.getByTestId('studio-field-/steps/0/escalations/0/notify/open/parameters')).getByRole('group', {
-        name: escalation('open.parameters'),
-      }),
-    ).toHaveAccessibleDescription(escalation('open.parameters.help'))
+    beforeEach(() => {
+      renderEditor({
+        ...complete,
+        steps: [
+          {
+            ...complete.steps[0],
+            escalations: [
+              {
+                name: 'late',
+                after: 'PT4H',
+                notify: {
+                  to: [{ user: 'u' }, { role: 'r' }, { email: 'e' }],
+                  channels: ['inApp', 'email'],
+                  message: { subject: { textKey: 's' }, body: { textKey: 'b' }, values: { n: 'number' } },
+                  open: { page: 'P', parameters: {} },
+                },
+              },
+            ],
+          },
+          ...complete.steps.slice(1),
+        ],
+      })
+    })
+
+    it.each([
+      ['to/0/user', 'textbox', 'to.user'],
+      ['to/1/role', 'combobox', 'to.role'],
+      ['to/2/email', 'textbox', 'to.email'],
+      ['open', 'checkbox', 'open'],
+      ['open/page', 'combobox', 'open.page'],
+    ])('describes its %s field by its label and help', (pointer, role, path) => {
+      expect(at(pointer).getByRole(role, { name: escalation(path) })).toHaveAccessibleDescription(
+        escalation(`${path}.help`),
+      )
+    })
+
+    it.each([
+      ['to', 'to'],
+      ['channels', 'channels'],
+      ['message/subject', 'message.subject'],
+      ['message/body', 'message.body'],
+      ['message/values', 'message.values'],
+      ['open/parameters', 'open.parameters'],
+    ])('describes its %s group by its title and help', (pointer, path) => {
+      expect(at(pointer).getByRole('group', { name: escalation(path) })).toHaveAccessibleDescription(
+        escalation(`${path}.help`),
+      )
+    })
   })
 
   it('changes only the process of a sub-process whose child is not in the names list', async () => {

@@ -467,6 +467,40 @@ describe('A notify step', () => {
     }
   })
 
+  describe('its fields and groups', () => {
+    const text = (path: string) =>
+      (platformEnglish as Record<string, string>)[`shell.studio.field.process.steps.${path}`]
+
+    beforeEach(() => {
+      render({ ...notify, to: [{ user: 'u' }, { role: 'r' }, { email: 'e' }] })
+    })
+
+    it.each([
+      ['to/0/user', 'textbox', 'to.user'],
+      ['to/1/role', 'textbox', 'to.role'],
+      ['to/2/email', 'textbox', 'to.email'],
+      ['open', 'checkbox', 'open'],
+      ['open/page', 'textbox', 'open.page'],
+    ])('describes its %s field by its label and help', (pointer, role, path) => {
+      expect(field(`/steps/0/${pointer}`).getByRole(role, { name: text(path) })).toHaveAccessibleDescription(
+        text(`${path}.help`),
+      )
+    })
+
+    it.each([
+      ['to', 'to'],
+      ['channels', 'channels'],
+      ['message/subject', 'message.subject'],
+      ['message/body', 'message.body'],
+      ['message/values', 'message.values'],
+      ['open/parameters', 'open.parameters'],
+    ])('describes its %s group by its title and help', (pointer, path) => {
+      expect(field(`/steps/0/${pointer}`).getByRole('group', { name: text(path) })).toHaveAccessibleDescription(
+        text(`${path}.help`),
+      )
+    })
+  })
+
   it('removes the notify keys and keeps next when the operation is changed to updateRecord', async () => {
     const onChange = render()
 
