@@ -39,8 +39,9 @@ module or template.
 ## The organization module
 
 `organization` holds the departments and the employees of the business, which other modules route
-work by. It keeps no personal data beyond what that needs. It holds the entities, data
-sources, rule, contracts, role slots, policies, contract scenarios, pages, form and texts below.
+work by. It keeps the contact and routing data an office needs and no further personal data. It
+holds the entities, data sources, rule, contracts, role slots, policies, contract scenarios, pages,
+form and texts below.
 
 - **`Department`:** `code`, unique, in capital letters, `name`, `parent`, a reference to another
   department, `head`, a reference to an employee, and `active`.
