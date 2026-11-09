@@ -353,7 +353,6 @@ export const previews: Record<string, readonly PreviewState[]> = {
   ].map((state) => ({ ...state, frameHeight: 600 })),
   signUpProgress: (
     [
-      ['Checking', progressFixtures.checking],
       ['Confirmed', progressFixtures.verified],
       ['Setting up', progressFixtures.creating],
       ['Needs more time', progressFixtures.delayed],

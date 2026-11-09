@@ -104,9 +104,7 @@ export function ProgressPage({
         />
         {step === 'delayed' && <Alert type="info" showIcon title={t('progress.delayed')} />}
         <Typography.Paragraph role="status" style={{ margin: 0 }}>
-          {progress === undefined ? (
-            t('progress.checking')
-          ) : step === 'ready' ? (
+          {step === 'ready' ? (
             <FilledText
               text={t('progress.ready.message')}
               parts={{
@@ -118,7 +116,8 @@ export function ProgressPage({
               }}
             />
           ) : (
-            <FilledText text={t('progress.settingUp')} parts={{ address: <strong>{address}</strong> }} />
+            // Proposed: the page opens right after Confirm, so it says the trial is being set up before the first answer.
+            t('progress.settingUp')
           )}
         </Typography.Paragraph>
       </Flex>

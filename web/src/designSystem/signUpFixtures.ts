@@ -111,7 +111,6 @@ const progressPath = '/api/sign-up/p-3d9a'
 const at = (step: string) => () => ({ step, address: `${suggestSubdomain(signUpBusinessName)}.vn.example.com` })
 
 export const progressFixtures = {
-  checking: { ...verifyPage, [progressPath]: () => new Promise<never>(() => {}) },
   verified: { ...verifyPage, [progressPath]: at('verified') },
   creating: { ...verifyPage, [progressPath]: at('creating') },
   delayed: { ...verifyPage, [progressPath]: at('delayed') },
