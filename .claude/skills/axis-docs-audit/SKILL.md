@@ -1,6 +1,6 @@
 ---
 name: axis-docs-audit
-description: How the docs audit reads Axis's docs, skills and AGENTS.md against the code. The docs-audit.yml workflow follows it every few merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for the hourly driver, which uses axis-nexkit-routine, and not for agents inside the NexKit pipeline.
+description: How the docs audit reads Axis's docs, skills and AGENTS.md against the code. The docs-audit.yml workflow follows it every few merges, and the owner's local session follows it when the owner asks for an audit of named pages. Not for agents inside the NexKit pipeline.
 ---
 
 # Axis's docs audit
