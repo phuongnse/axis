@@ -196,14 +196,5 @@ export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginB
  * side keeps columns apart. `AxisTable` applies it through a nested ConfigProvider.
  */
 export function tableTheme(tokens: DesignTokens): ThemeConfig {
-  return {
-    components: {
-      Table: {
-        cellPaddingBlock: tokens.spacing.xs,
-        cellPaddingInline: tokens.spacing.lg,
-        // The cells that moved under a row sit on the row's own surface.
-        rowExpandedBg: tokens.colour.surface,
-      },
-    },
-  }
+  return { components: { Table: { cellPaddingBlock: tokens.spacing.xs, cellPaddingInline: tokens.spacing.lg } } }
 }

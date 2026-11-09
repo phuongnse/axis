@@ -30,10 +30,7 @@ test('a purchase request is created and reopened at phone width, without the pag
   const cell = (label: string) => page.getByLabel(fieldLabel(label))
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
-  // The table is wider than the window, so it scrolls inside its widget and not the page.
-  const table = page.getByRole('table').first()
-  await expect(table).toBeVisible()
-  expect((await table.boundingBox())!.width).toBeGreaterThan(phoneWidth)
+  await expect(page.getByRole('table').first()).toBeVisible()
   await noSideways(page)
 
   // The shell's navigation sits behind a Menu button that the keyboard opens and closes.
@@ -64,6 +61,9 @@ test('a purchase request is created and reopened at phone width, without the pag
   // The title is the link that opens the row. This table has no other row actions, so there is no Actions menu.
   await expect(page).toHaveURL(/\/purchasing\/purchaserequests\?pageSize=100&sort=-title$/)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
+  // The columns that do not fit the phone's width moved under their row, which the page still holds without scrolling.
+  await expect(row.locator('[data-moved-cells]')).toBeVisible()
+  await noSideways(page)
   await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expectShown(fieldValue(page, 'totalAmount'), '20.00')

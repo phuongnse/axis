@@ -232,7 +232,11 @@ export function AxisTable<T extends object>({
   const narrow = useNarrowWidth()
   // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
   const naturalWidths = useRef(new Map<string, number>())
-  const [room, setRoom] = useState<{ moved: string[]; scrolls: boolean }>({ moved: [], scrolls: false })
+  const [room, setRoom] = useState<{ moved: string[]; scrolls: boolean; lineWidth: number }>({
+    moved: [],
+    scrolls: false,
+    lineWidth: 0,
+  })
   const measureRef = useRef<() => void>(() => {})
   // The first column identifies the row. A table with the Columns button shows the columns of the choice in the view.
   const arrangeable = view?.columns === true && query !== undefined
@@ -275,9 +279,13 @@ export function AxisTable<T extends object>({
         }
         return { key: column.key, width: widths.get(column.key) ?? 0, priority: column.priority }
       })
-      const next = makeRoom(available, others, sizes)
+      const { moved, scrolls } = makeRoom(available, others, sizes)
+      // The moved lines of a row are as wide as the row's content, which starts after the checkbox and its padding.
+      const selection = root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0
+      const next = { moved, scrolls, lineWidth: Math.max(0, available - selection - 2 * tokens.spacing.lg) }
       setRoom((current) =>
         current.scrolls === next.scrolls &&
+        current.lineWidth === next.lineWidth &&
         current.moved.length === next.moved.length &&
         current.moved.every((key, index) => key === next.moved[index])
           ? current
@@ -346,19 +354,7 @@ export function AxisTable<T extends object>({
     }
   }
 
-  // Only a row with a moved value has an expanded row, see docs/reference/actions-and-controls.md#tables.
-  const expandedKeys = new Set<Key>()
-  if (movedColumns.length > 0) {
-    ;(pageRows ?? []).forEach((item, index) => {
-      if (!blankRow?.(item) && movedLines(item, index).length > 0) {
-        expandedKeys.add(rowKey(item))
-      }
-    })
-  }
-  // A row whose moved cells show draws no line below itself, as they sit under it on the same surface.
-  const hasMoved = (row: T) => expandedKeys.has(rowKey(row))
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
-  const open: CSSProperties = { borderBottom: 'none' }
   const antColumns: TableColumnType<T>[] = shown
     .filter((column) => !room.moved.includes(column.key))
     .map(
@@ -396,26 +392,39 @@ export function AxisTable<T extends object>({
           },
           onCell: (row, index) => {
             const own = onCell?.(row, index)
-            return { ...own, style: { ...sizing, ...(hasMoved(row) ? open : {}), ...own?.style } }
+            return { ...own, style: { ...sizing, ...own?.style } }
           },
           render: (_value: unknown, row: T, index: number) => {
             const content = contentOf(original, row, index)
-            if (content === null) {
-              return blankRow?.(row) ? null : <EmptyDash />
+            // The moved cells sit in the cell of the identifying column, so they stay in the row they belong to.
+            const lines = position === 0 && !blankRow?.(row) ? movedLines(row, index) : []
+            const own =
+              content === null ? (
+                blankRow?.(row) ? null : (
+                  <EmptyDash />
+                )
+              ) : freeText ? (
+                <div
+                  style={{
+                    minWidth: freeTextMinWidth,
+                    maxWidth: freeTextMaxWidth,
+                    whiteSpace: 'normal',
+                    overflowWrap: 'anywhere',
+                  }}
+                >
+                  {content}
+                </div>
+              ) : (
+                content
+              )
+            if (lines.length === 0) {
+              return own
             }
-            return freeText ? (
-              <div
-                style={{
-                  minWidth: freeTextMinWidth,
-                  maxWidth: freeTextMaxWidth,
-                  whiteSpace: 'normal',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {content}
-              </div>
-            ) : (
-              content
+            return (
+              <>
+                {own}
+                <MovedCells lines={lines} width={room.lineWidth} />
+              </>
             )
           },
         }
@@ -428,7 +437,6 @@ export function AxisTable<T extends object>({
       // A header without text fails the accessibility check, so the column is named for screen readers only.
       title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
       onHeaderCell: () => ({ ...cell, 'data-column-key': actionsKey }),
-      onCell: (row) => ({ style: { ...cell.style, ...(hasMoved(row) ? open : {}) } }),
       render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
     })
   }
@@ -563,7 +571,6 @@ export function AxisTable<T extends object>({
                       onChange: (keys) => setSelectedKeys(keys),
                       getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
                       fixed: room.scrolls,
-                      onCell: (row) => (hasMoved(row) ? { style: open } : {}),
                     }
                   : undefined
               }
@@ -572,15 +579,6 @@ export function AxisTable<T extends object>({
               scroll={{ x: true }}
               // Ant Design otherwise switches to a fixed layout once a column is fixed.
               tableLayout="auto"
-              expandable={
-                movedColumns.length > 0
-                  ? {
-                      showExpandColumn: false,
-                      expandedRowKeys: [...expandedKeys],
-                      expandedRowRender: (item, index) => <MovedCells lines={movedLines(item, index)} line={line} />,
-                    }
-                  : undefined
-              }
               dataSource={pageRows as T[] | undefined}
               loading={loading}
               locale={{ emptyText: <EmptyState text={emptyText} /> }}
@@ -669,22 +667,28 @@ function titleText<T>(column: AxisColumn<T>): ReactNode {
   return typeof column.title === 'function' ? column.key : column.title
 }
 
-/** The cells of a row that moved under it, one "Title: value" line each, see docs/reference/actions-and-controls.md#tables. */
+/**
+ * The cells of a row that moved under it, one "Title: value" line each, see docs/reference/actions-and-controls.md#tables.
+ * They sit in the row's first cell, so the row holds its own values. The zero-width box keeps the lines from widening
+ * that column, and the lines are as wide as the row.
+ */
 function MovedCells({
   lines,
-  line,
+  width,
 }: {
   lines: { key: string; title: ReactNode; content: ReactNode }[]
-  line: CSSProperties
+  width: number
 }) {
   return (
-    <Flex vertical style={line}>
-      {lines.map((moved) => (
-        <div key={moved.key}>
-          <span>{moved.title}</span>: {moved.content}
-        </div>
-      ))}
-    </Flex>
+    <div style={{ width: 0 }}>
+      <Flex vertical data-moved-cells style={{ position: 'relative', width: width || undefined, whiteSpace: 'normal' }}>
+        {lines.map((moved) => (
+          <div key={moved.key}>
+            <span>{moved.title}</span>: {moved.content}
+          </div>
+        ))}
+      </Flex>
+    </div>
   )
 }
 

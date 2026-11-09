@@ -301,12 +301,11 @@ describe('theme values', () => {
 })
 
 describe('the table theme', () => {
-  it('pads a cell by spacing-xs above and below and spacing-lg on each side, and draws moved cells on the surface', () => {
-    const { spacing, colour } = designTokensFor('light')
+  it('pads a cell by spacing-xs above and below and spacing-lg on each side', () => {
+    const { spacing } = designTokensFor('light')
     expect(tableTheme(designTokensFor('light')).components?.Table).toEqual({
       cellPaddingBlock: spacing.xs,
       cellPaddingInline: spacing.lg,
-      rowExpandedBg: colour.surface,
     })
   })
 })

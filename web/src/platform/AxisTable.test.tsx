@@ -678,7 +678,7 @@ describe('AxisTable', () => {
       })
     }
     const headerNames = () => screen.getAllByRole('columnheader').map((header) => header.textContent)
-    const expandedRows = (container: HTMLElement) => [...container.querySelectorAll('.ant-table-expanded-row')]
+    const movedLines = (container: HTMLElement) => [...container.querySelectorAll('[data-moved-cells]')]
 
     afterEach(() => {
       vi.restoreAllMocks()
@@ -689,8 +689,10 @@ describe('AxisTable', () => {
       const { container } = renderTable({ columns })
 
       expect(headerNames()).toEqual(['Name', 'Note'])
-      const moved = expandedRows(container)
-      expect(moved.map((row) => row.textContent)).toEqual(['Amount: 12'])
+      const moved = movedLines(container)
+      expect(moved.map((lines) => lines.textContent)).toEqual(['Amount: 12'])
+      // The lines sit in the row they belong to.
+      expect(moved[0].closest('tr')).toHaveTextContent('Buy paper')
     })
 
     it('keeps the identifying column in the header however narrow the table is', () => {
@@ -698,7 +700,7 @@ describe('AxisTable', () => {
       const { container } = renderTable({ columns })
 
       expect(headerNames()).toEqual(['Name'])
-      expect(expandedRows(container).map((row) => row.textContent)).toEqual(['Amount: 12Note: Buy paper'])
+      expect(movedLines(container).map((row) => row.textContent)).toEqual(['Amount: 12Note: Buy paper'])
     })
 
     it('shows every column and no moved lines when the columns fit', () => {
@@ -706,7 +708,7 @@ describe('AxisTable', () => {
       const { container } = renderTable({ columns })
 
       expect(headerNames()).toEqual(['Name', 'Amount', 'Note'])
-      expect(expandedRows(container)).toEqual([])
+      expect(movedLines(container)).toEqual([])
     })
   })
 })
