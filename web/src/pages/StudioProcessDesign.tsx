@@ -1,11 +1,11 @@
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { Button, Flex, Menu, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Announcement } from '../platform/Announcement'
 import { markOf } from '../platform/layerMarks'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
-import { visuallyHidden } from '../platform/visuallyHidden'
 import { innermostCollision, silent } from './designDrag'
 import { type DesignerLayer, RemovedRows } from './LayerMarkViews'
 import { choiceLabel, type ConnectChoice, connectChoices, connectEdit } from './processConnect'
@@ -332,9 +332,7 @@ export default function StudioProcessDesign({
             </Flex>
           </aside>
         </Flex>
-        <div role="status" aria-live="polite" data-testid="studio-process-announcement" style={visuallyHidden}>
-          {announcement}
-        </div>
+        <Announcement testId="studio-process-announcement">{announcement}</Announcement>
       </div>
       <DragOverlay dropAnimation={null}>
         {dragging === undefined ? null : (
