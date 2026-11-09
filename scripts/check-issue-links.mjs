@@ -8,8 +8,9 @@ import { slugify } from './check-links.mjs'
 // at main that is missing, or to a heading of a Markdown file that has no such anchor, so that a
 // renamed heading or a deleted decision does not leave an issue pointing nowhere. An issue that an
 // open issue blocks is left out, because the awaited work may add the section it links. It reads the
-// working tree as main. GH names the command, so the tests can replace it. The hourly driver runs it
-// and points each link at its new home, see .claude/skills/axis-nexkit-routine/SKILL.md.
+// working tree as main. GH names the command, so the tests can replace it. The local agent session runs it
+// when the owner asks what waits for them, and points each link at its new home after the owner agrees,
+// see .claude/skills/axis-nexkit/what-waits-for-the-owner.md.
 
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const linkPattern = /github\.com\/phuongnse\/axis\/blob\/main\/([^\s)#"'>]+)(?:#([^\s)"'>]+))?/g
