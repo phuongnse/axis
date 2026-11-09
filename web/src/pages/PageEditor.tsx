@@ -1,5 +1,9 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
+import { EmptyState } from '../platform/EmptyState'
 import { getAt } from '../platform/jsonPatch'
 import {
   actionKeyOf,
@@ -15,6 +19,7 @@ import {
   newColumn,
   newTab,
   newWidget,
+  pageFieldPath,
   typeChanges,
   widgetLists,
   widgetPointerOf,
@@ -34,6 +39,7 @@ import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
@@ -62,8 +68,9 @@ function JsonOnly() {
 }
 
 /**
- * The editor of a page. It shows the page's name and title, its parameters, its widgets as a tree, and a panel for
- * the selected widget. Each parameter has a name, a type, a Required switch and Remove. A `reference` parameter also
+ * The editor of a page. Its General section shows the page's name, title and description, its Parameters section lists the
+ * parameters, and its Widgets section shows the widgets as a tree, and a panel for the selected widget. Each parameter
+ * has a name, a type, a Required switch and Remove. A `reference` parameter also
  * has a target entity and an `enum` parameter has its values, and a type change removes the one the new type does not
  * take. The tree nests the widgets inside `columns`, `tabs` and `section`. Every list has an Add widget picker,
  * and every widget has Move up, Move down, Remove and a Move to picker that lists the other widget lists. A new
@@ -104,29 +111,47 @@ export function PageEditor({
   onSelect?: (pointer: string) => void
 }) {
   const t = useText()
+  const { field, group } = useFieldTexts('page')
   const [picked, setPicked] = useState('/widgets/0')
+  const heading = (name: string) => ({
+    title: t(`shell.studio.section.page.${name}`),
+    line: t(`shell.studio.section.page.${name}.line`),
+  })
 
   return (
-    <Flex vertical gap="small" data-testid="studio-page-editor">
-      <div data-testid="studio-field-/name">
-        <div>{t('shell.studio.page.name')}</div>
-        <Input
-          aria-label={t('shell.studio.page.name')}
-          value={text(value.name)}
-          onChange={(event) => onChange('/name', event.target.value)}
-        />
-      </div>
-      <div data-testid="studio-field-/title">
-        <div>{t('shell.studio.page.title')}</div>
-        <LabelTexts pointer="/title" value={value.title} onChange={onChange} />
-      </div>
-      <div data-testid="studio-field-/description">
-        <div>{t('shell.studio.page.description')}</div>
-        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
-      </div>
-      <PageParameters value={value.parameters} onChange={onChange} />
-      <PageWidgets value={value} selected={selected ?? picked} onSelect={onSelect ?? setPicked} onChange={onChange} />
-    </Flex>
+    <div data-testid="studio-page-editor">
+      <ResourceFormSections>
+        <ResourceFormSection testName="general" heading={heading('general')}>
+          <Flex vertical gap="small">
+            <div data-testid="studio-field-/name">
+              <AxisField {...field('name')}>
+                <Input value={text(value.name)} onChange={(event) => onChange('/name', event.target.value)} />
+              </AxisField>
+            </div>
+            <div data-testid="studio-field-/title">
+              <AxisFieldGroup {...group('title')}>
+                <LabelTexts pointer="/title" value={value.title} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+            <div data-testid="studio-field-/description">
+              <AxisFieldGroup {...group('description')}>
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+          </Flex>
+        </ResourceFormSection>
+        <PageParameters value={value.parameters} onChange={onChange} />
+        <ResourceFormSection testName="widgets" heading={heading('widgets')}>
+          <PageWidgets
+            named
+            value={value}
+            selected={selected ?? picked}
+            onSelect={onSelect ?? setPicked}
+            onChange={onChange}
+          />
+        </ResourceFormSection>
+      </ResourceFormSections>
+    </div>
   )
 }
 
@@ -134,6 +159,9 @@ export function PageEditor({
  * The widgets of a page as a tree, and the panel of the selected widget below it. The selection is a pointer that the
  * caller keeps, so that other views of the page can share it. A pointer that names nothing selects the first widget.
  * A pointer to an action of a widget selects the widget, and its panel marks the action.
+ *
+ * With `named`, the caller titles the widgets, as the editor's section does, so the tree draws no group of its own. Without
+ * it, the tree is a titled group with its help, as the designer's side pane shows it.
  *
  * With `layer`, the tree shows a module page with the application's customization layer applied. A widget the layer
  * added or changed is marked Added or Changed on its row, and so are the actions, row actions and toolbar actions on
@@ -146,14 +174,16 @@ export function PageWidgets({
   onSelect,
   onChange,
   layer,
+  named = false,
 }: {
   value: Content
   selected: string
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
   layer?: DesignerLayer
+  named?: boolean
 }) {
-  const t = useText()
+  const { group } = useFieldTexts('page')
   const widgets = Array.isArray(value.widgets) ? value.widgets : undefined
   const widgetPointer = widgetPointerOf(pointer)
   const selected = getAt(value, widgetPointer) === undefined ? '/widgets/0' : widgetPointer
@@ -161,31 +191,40 @@ export function PageWidgets({
     selected === widgetPointer && actionKeyOf(pointer) !== undefined && getAt(value, pointer) !== undefined
       ? pointer
       : undefined
+  const body =
+    widgets === undefined ? (
+      <JsonOnly />
+    ) : (
+      <>
+        <WidgetList pointer="/widgets" widgets={widgets} tree={{ widgets, selected, onSelect, onChange, layer }} />
+        {widgets.length > 0 && (
+          <WidgetPanel
+            key={selected}
+            base={selected}
+            widget={getAt(value, selected)}
+            parameters={value.parameters}
+            selectedAction={selectedAction}
+            layer={layer}
+            onSelect={onSelect}
+            onChange={onChange}
+          />
+        )}
+      </>
+    )
 
   return (
     <div data-testid="studio-field-/widgets">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.page.widgets')}</Typography.Text>
-        {widgets === undefined ? (
-          <JsonOnly />
-        ) : (
-          <>
-            <WidgetList pointer="/widgets" widgets={widgets} tree={{ widgets, selected, onSelect, onChange, layer }} />
-            {widgets.length > 0 && (
-              <WidgetPanel
-                key={selected}
-                base={selected}
-                widget={getAt(value, selected)}
-                parameters={value.parameters}
-                selectedAction={selectedAction}
-                layer={layer}
-                onSelect={onSelect}
-                onChange={onChange}
-              />
-            )}
-          </>
-        )}
-      </Flex>
+      {named ? (
+        <Flex vertical gap="small">
+          {body}
+        </Flex>
+      ) : (
+        <AxisFieldGroup {...group('widgets')}>
+          <Flex vertical gap="small">
+            {body}
+          </Flex>
+        </AxisFieldGroup>
+      )}
     </div>
   )
 }
@@ -194,15 +233,29 @@ export function PageWidgets({
 function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeHandler }) {
   const t = useText()
   const list = Array.isArray(value) ? value : []
+  const editable = value === undefined || Array.isArray(value)
 
   return (
-    <div data-testid="studio-field-/parameters">
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.page.parameters')}</Typography.Text>
-        {value !== undefined && !Array.isArray(value) ? (
+    <ResourceFormSection
+      testName="parameters"
+      heading={{
+        title: t('shell.studio.section.page.parameters'),
+        line: t('shell.studio.section.page.parameters.line'),
+      }}
+      action={
+        editable ? (
+          <AxisButton role="secondary" onClick={() => onChange('/parameters', [...list, { name: '', type: 'text' }])}>
+            {t('shell.studio.page.addParameter')}
+          </AxisButton>
+        ) : undefined
+      }
+    >
+      <div data-testid="studio-field-/parameters">
+        {!editable ? (
           <JsonOnly />
         ) : (
-          <>
+          <Flex vertical gap="small">
+            {list.length === 0 && <EmptyState text={t('shell.studio.page.noParameters')} />}
             {list.map((parameter, index) => {
               const base = `/parameters/${index}`
               if (!isContent(parameter)) {
@@ -218,21 +271,16 @@ function PageParameters({ value, onChange }: { value: unknown; onChange: ChangeH
                 </Card>
               )
             })}
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange('/parameters', [...list, { name: '', type: 'text' }])}>
-                {t('shell.studio.page.addParameter')}
-              </Button>
-            </div>
-          </>
+          </Flex>
         )}
-      </Flex>
-    </div>
+      </div>
+    </ResourceFormSection>
   )
 }
 
 function PageParameter({ base, parameter, onChange }: { base: string; parameter: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const { field } = useFieldTexts('page')
   const type = typeof parameter.type === 'string' ? parameter.type : undefined
   const values = Array.isArray(parameter.values) ? parameter.values.filter((item) => typeof item === 'string') : []
 
@@ -240,45 +288,41 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
     <Flex vertical gap="small">
       <Flex gap="small" align="flex-start" wrap>
         <div data-testid={`studio-field-${base}/name`}>
-          <Input
-            aria-label={t('shell.studio.page.parameterNameLabel')}
-            value={text(parameter.name)}
-            onChange={(event) => onChange(`${base}/name`, event.target.value)}
-          />
+          <AxisField {...field('parameters.name')}>
+            <Input value={text(parameter.name)} onChange={(event) => onChange(`${base}/name`, event.target.value)} />
+          </AxisField>
         </div>
         <div data-testid={`studio-field-${base}/type`}>
-          <Select
-            aria-label={t('shell.studio.page.parameterType')}
-            virtual={false}
-            style={{ minWidth: 160 }}
-            value={type}
-            options={parameterTypes.map((option) => ({ value: option, label: option }))}
-            onChange={(next: string) => {
-              onChange(`${base}/type`, next)
-              if (next !== 'reference' && parameter.target !== undefined) {
-                onChange(`${base}/target`, undefined)
-              }
-              if (next !== 'enum' && parameter.values !== undefined) {
-                onChange(`${base}/values`, undefined)
-              }
-            }}
-          />
+          <AxisField {...field('parameters.type')}>
+            <Select
+              virtual={false}
+              style={{ minWidth: 160 }}
+              value={type}
+              options={parameterTypes.map((option) => ({ value: option, label: option }))}
+              onChange={(next: string) => {
+                onChange(`${base}/type`, next)
+                if (next !== 'reference' && parameter.target !== undefined) {
+                  onChange(`${base}/target`, undefined)
+                }
+                if (next !== 'enum' && parameter.values !== undefined) {
+                  onChange(`${base}/values`, undefined)
+                }
+              }}
+            />
+          </AxisField>
         </div>
         <div data-testid={`studio-field-${base}/required`}>
-          <Flex gap="small" align="center">
+          <AxisField {...field('parameters.required')}>
             <Switch
-              aria-label={t('shell.studio.page.parameterRequired')}
               checked={parameter.required === true}
               onChange={(checked) => onChange(`${base}/required`, checked ? true : undefined)}
             />
-            <span>{t('shell.studio.page.parameterRequired')}</span>
-          </Flex>
+          </AxisField>
         </div>
       </Flex>
       {type === 'reference' && (
         <NameField
           pointer={`${base}/target`}
-          label={t('shell.studio.page.parameterTarget')}
           kind="entity"
           current={parameter.target}
           required={false}
@@ -287,15 +331,15 @@ function PageParameter({ base, parameter, onChange }: { base: string; parameter:
       )}
       {type === 'enum' && (
         <div data-testid={`studio-field-${base}/values`}>
-          <div>{t('shell.studio.page.parameterValues')}</div>
-          <Select
-            mode="tags"
-            aria-label={t('shell.studio.page.parameterValues')}
-            style={{ minWidth: 240 }}
-            open={false}
-            value={values}
-            onChange={(next: string[]) => onChange(`${base}/values`, next.length === 0 ? undefined : next)}
-          />
+          <AxisField {...field('parameters.values')}>
+            <Select
+              mode="tags"
+              style={{ minWidth: 240 }}
+              open={false}
+              value={values}
+              onChange={(next: string[]) => onChange(`${base}/values`, next.length === 0 ? undefined : next)}
+            />
+          </AxisField>
         </div>
       )}
       <div>
@@ -477,9 +521,9 @@ function partCount(widget: Content): number {
 }
 
 /** The picker of a name, or a plain box while the application's names have not loaded. */
+/** A name picker of a page property, labelled and helped by the property's path, see {@link pageFieldPath}. */
 function NameField({
   pointer,
-  label,
   kind,
   current,
   required,
@@ -488,7 +532,6 @@ function NameField({
   onPick,
 }: {
   pointer: string
-  label: string
   kind: string
   current: unknown
   required: boolean
@@ -498,6 +541,8 @@ function NameField({
   choices?: string[]
   onPick: (next: string | undefined) => void
 }) {
+  const { field } = useFieldTexts('page')
+  const { label, help } = field(pageFieldPath(pointer))
   const names = useContext(StudioNamesContext)
   const value = typeof current === 'string' ? current : undefined
   const options =
@@ -509,16 +554,16 @@ function NameField({
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <div>{label}</div>
-      {names === undefined ? (
-        <Input
-          aria-label={label}
-          value={text(value)}
-          onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
-        />
-      ) : (
-        <ReferencePicker name={label} value={value} required={required} options={options} onChange={onPick} />
-      )}
+      <AxisField label={label} help={help}>
+        {names === undefined ? (
+          <Input
+            value={text(value)}
+            onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
+          />
+        ) : (
+          <ReferencePicker name={label} value={value} required={required} options={options} onChange={onPick} />
+        )}
+      </AxisField>
     </div>
   )
 }
@@ -602,7 +647,6 @@ function WidgetPanel({
         <>
           <NameField
             pointer={`${base}/entity`}
-            label={t('shell.studio.page.entity')}
             kind="entity"
             current={widget.entity}
             required={false}
@@ -610,7 +654,6 @@ function WidgetPanel({
           />
           <NameField
             pointer={`${base}/dataSource`}
-            label={t('shell.studio.page.dataSource')}
             kind="dataSource"
             current={widget.dataSource}
             required={false}
@@ -648,7 +691,6 @@ function WidgetPanel({
         <>
           <NameField
             pointer={`${base}/entity`}
-            label={t('shell.studio.page.entity')}
             kind="entity"
             current={widget.entity}
             required={false}
@@ -656,7 +698,6 @@ function WidgetPanel({
           />
           <NameField
             pointer={`${base}/form`}
-            label={t('shell.studio.page.form')}
             kind="form"
             current={widget.form}
             required={false}
@@ -689,7 +730,6 @@ function WidgetPanel({
       {type === 'processInspector' && (
         <NameField
           pointer={`${base}/process`}
-          label={t('shell.studio.page.process')}
           kind="process"
           current={widget.process}
           required
@@ -860,7 +900,6 @@ function KpiPanel({
     <>
       <NameField
         pointer={`${base}/dataSource`}
-        label={t('shell.studio.page.dataSource')}
         kind="dataSource"
         choices={dataSourcesGroupedBy(names, 0)}
         current={widget.dataSource}
@@ -1006,7 +1045,6 @@ function ChartPanel({
     <>
       <NameField
         pointer={`${base}/dataSource`}
-        label={t('shell.studio.page.dataSource')}
         kind="dataSource"
         choices={dataSourcesGroupedBy(names, 1)}
         current={widget.dataSource}
@@ -1361,14 +1399,7 @@ function NavigateFields({
 
   return (
     <>
-      <NameField
-        pointer={`${pointer}/page`}
-        label={t('shell.studio.page.actionPage')}
-        kind="page"
-        current={action.page}
-        required
-        onPick={pick}
-      />
+      <NameField pointer={`${pointer}/page`} kind="page" current={action.page} required onPick={pick} />
       <ActionLabel pointer={`${pointer}/label`} value={action.label} onChange={onChange} />
       <div data-testid={`studio-field-${pointer}/record`}>
         <div>{t('shell.studio.page.actionRecord')}</div>
@@ -1585,7 +1616,6 @@ function Actions({
                       <>
                         <NameField
                           pointer={`${actionPointer}/process`}
-                          label={t('shell.studio.page.actionProcess')}
                           kind="process"
                           current={action.process}
                           required

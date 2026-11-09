@@ -44,6 +44,24 @@ export function actionKeyOf(pointer: string): string | undefined {
   return end === null ? undefined : end[0].slice(1)
 }
 
+const listIndex = /^\d+$/
+
+/** The text path under `shell.studio.field.page.` for a pointer, from its last widget on, without list indices. */
+export function pageFieldPath(pointer: string): string {
+  const segments = pointer.split('/').slice(1)
+  let start = 0
+  for (let index = segments.length - 2; index >= 0; index--) {
+    if (segments[index] === 'widgets' && listIndex.test(segments[index + 1])) {
+      start = index
+      break
+    }
+  }
+  return segments
+    .slice(start)
+    .filter((segment) => !listIndex.test(segment))
+    .join('.')
+}
+
 /** The properties of a widget that name what it shows, in the order the summary prefers them. */
 const summaryKeys = ['entity', 'dataSource', 'form', 'process']
 

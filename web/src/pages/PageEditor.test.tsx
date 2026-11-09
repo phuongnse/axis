@@ -237,6 +237,105 @@ describe('PageEditor page', () => {
   })
 })
 
+describe('PageEditor sections', () => {
+  const english: Record<string, string> = platformEnglish
+  const help = (path: string) => english[`shell.studio.field.page.${path}.help`]
+
+  it('draws General, Parameters and Widgets in that order, each with its heading and line', () => {
+    renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+    const general = screen.getByRole('region', { name: 'General' })
+    const parameters = screen.getByRole('region', { name: 'Parameters' })
+    const widgets = screen.getByRole('region', { name: 'Widgets' })
+    expect(general).toHaveTextContent(english['shell.studio.section.page.general.line'])
+    expect(parameters).toHaveTextContent(english['shell.studio.section.page.parameters.line'])
+    expect(widgets).toHaveTextContent(english['shell.studio.section.page.widgets.line'])
+    expect(general.compareDocumentPosition(parameters) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(parameters.compareDocumentPosition(widgets) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+  })
+
+  it('labels and helps the name, the title and the description of the page', () => {
+    renderEditor(page(table, { description: { textKey: 'pages.review.description' } }))
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(help('name'))
+    expect(screen.getByRole('group', { name: 'Title' })).toHaveAccessibleDescription(help('title'))
+    expect(screen.getByRole('group', { name: 'Description' })).toHaveAccessibleDescription(help('description'))
+  })
+
+  it('labels and helps each field of a parameter', () => {
+    renderEditor(
+      page(table, { parameters: [{ name: 'request', type: 'reference', target: 'Supplier', required: true }] }),
+    )
+
+    const item = screen.getByTestId('studio-field-/parameters/0')
+    expect(within(item).getByRole('textbox', { name: 'Parameter name' })).toHaveAccessibleDescription(
+      help('parameters.name'),
+    )
+    expect(within(item).getByRole('combobox', { name: 'Type' })).toHaveAccessibleDescription(help('parameters.type'))
+    expect(within(item).getByRole('switch', { name: 'Required' })).toHaveAccessibleDescription(
+      help('parameters.required'),
+    )
+    expect(within(item).getByRole('combobox', { name: 'Target entity' })).toHaveAccessibleDescription(
+      help('parameters.target'),
+    )
+  })
+
+  it('labels and helps the values of an enum parameter', () => {
+    renderEditor(page(table, { parameters: [{ name: 'state', type: 'enum', values: ['open'] }] }))
+
+    expect(screen.getByRole('combobox', { name: 'Values' })).toHaveAccessibleDescription(help('parameters.values'))
+  })
+
+  it('labels and helps the name pickers of a widget from their paths', () => {
+    renderEditor(
+      page({
+        ...table,
+        rowActions: [{ type: 'navigate', name: 'open', page: 'ReviewForm', label: { textKey: '' }, record: 'id' }],
+      }),
+    )
+
+    expect(screen.getByRole('combobox', { name: 'Entity' })).toHaveAccessibleDescription(help('widgets.entity'))
+    expect(screen.getByRole('combobox', { name: 'Data source' })).toHaveAccessibleDescription(
+      help('widgets.dataSource'),
+    )
+    expect(screen.getByRole('combobox', { name: 'Target page' })).toHaveAccessibleDescription(
+      help('widgets.rowActions.page'),
+    )
+  })
+
+  it('puts Add parameter on the Parameters heading and says so when the page has no parameters', () => {
+    renderEditor(page(table))
+
+    const parameters = screen.getByRole('region', { name: 'Parameters' })
+    expect(within(parameters).getByRole('button', { name: 'Add parameter' })).toBeInTheDocument()
+    expect(within(parameters).getByText(english['shell.studio.page.noParameters'])).toBeVisible()
+  })
+
+  it('shows no empty line once the page declares a parameter', () => {
+    renderEditor(page(table, { parameters: [{ name: 'request', type: 'text' }] }))
+
+    expect(screen.queryByText(english['shell.studio.page.noParameters'])).not.toBeInTheDocument()
+  })
+
+  it('offers no Add parameter and no empty line when the parameters are not a list', () => {
+    const onChange = renderEditor(page(table, { parameters: 'broken' }))
+
+    const parameters = screen.getByRole('region', { name: 'Parameters' })
+    expect(within(parameters).queryByRole('button', { name: 'Add parameter' })).not.toBeInTheDocument()
+    expect(within(parameters).queryByText(english['shell.studio.page.noParameters'])).not.toBeInTheDocument()
+    expect(within(parameters).getByTestId('studio-json-only')).toBeVisible()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('leaves the widget tree untitled in its section, since the section names it', () => {
+    renderEditor(page(table))
+
+    expect(
+      within(screen.getByRole('region', { name: 'Widgets' })).queryByRole('group', { name: 'Widgets' }),
+    ).not.toBeInTheDocument()
+  })
+})
+
 describe('PageEditor table panel', () => {
   it('shows the entity and the data source', () => {
     renderEditor(page({ ...table, entity: undefined }))

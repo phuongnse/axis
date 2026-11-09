@@ -19,6 +19,7 @@ import {
   newTab,
   newWidget,
   paletteLimit,
+  pageFieldPath,
   targetPlace,
   typeChanges,
   widgetKeys,
@@ -29,6 +30,16 @@ import {
   widgetTypes,
 } from './pageWidgets'
 import type { StudioNames } from './studio'
+
+describe('pageFieldPath', () => {
+  it('names a page property by its path, without list indices', () => {
+    expect(pageFieldPath('/name')).toBe('name')
+    expect(pageFieldPath('/parameters/2/target')).toBe('parameters.target')
+    expect(pageFieldPath('/widgets/0/columns/1/widgets/2/rowActions/0/page')).toBe('widgets.rowActions.page')
+    expect(pageFieldPath('/widgets/0/columns/1/width')).toBe('widgets.columns.width')
+    expect(pageFieldPath('/widgets/1/measures/0/label')).toBe('widgets.measures.label')
+  })
+})
 
 describe('widgetSummary', () => {
   it('names the type and the first name the widget binds', () => {
