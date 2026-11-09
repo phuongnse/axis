@@ -16,8 +16,8 @@ import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
-import { SignUpPreview, VerifyPreview } from './SignUpPreview'
-import { signUpFixtures, signUpBusinessName, verifyFixtures } from './signUpFixtures'
+import { ProgressPreview, SignUpPreview, VerifyPreview } from './SignUpPreview'
+import { progressFixtures, signUpFixtures, signUpBusinessName, verifyFixtures } from './signUpFixtures'
 import { studioFixtures } from './studioFixtures'
 import {
   application,
@@ -351,6 +351,16 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Already confirmed', fixtures: verifyFixtures.confirmed, draw: () => <VerifyPreview /> },
     { caption: 'Expired', fixtures: verifyFixtures.expired, draw: () => <VerifyPreview /> },
   ].map((state) => ({ ...state, frameHeight: 600 })),
+  signUpProgress: (
+    [
+      ['Checking', progressFixtures.checking],
+      ['Confirmed', progressFixtures.verified],
+      ['Setting up', progressFixtures.creating],
+      ['Needs more time', progressFixtures.delayed],
+      ['Ready', progressFixtures.ready],
+      ['Link not usable', progressFixtures.unknown],
+    ] as const
+  ).map(([caption, fixtures]) => ({ caption, fixtures, draw: () => <ProgressPreview />, frameHeight: 600 })),
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },

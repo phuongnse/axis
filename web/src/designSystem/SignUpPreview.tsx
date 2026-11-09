@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TextContext } from '../platform/texts'
+import { ProgressPage } from '../../sign-up/ProgressPage'
 import { SignUpPage } from '../../sign-up/SignUpPage'
 import { VerifyPage } from '../../sign-up/VerifyPage'
 import { signUpTexts, type SignUpLocale } from '../../sign-up/texts'
@@ -97,5 +98,19 @@ export function VerifyPreview({ confirm }: { confirm?: boolean }) {
         <VerifyPage token="t-5b2f" locale={locale} onLocaleChange={setLocale} onConfirmed={() => {}} />
       </TextContext.Provider>
     </div>
+  )
+}
+
+/** The progress page with the sign-up texts, on a sample id and secret. */
+export function ProgressPreview() {
+  const [locale, setLocale] = useState<SignUpLocale>('en')
+  const text = useCallback(
+    (key: string) => signUpTexts[locale][key as keyof (typeof signUpTexts)[SignUpLocale]] ?? key,
+    [locale],
+  )
+  return (
+    <TextContext.Provider value={text}>
+      <ProgressPage id="p-3d9a" secret="s-81c4" locale={locale} onLocaleChange={setLocale} />
+    </TextContext.Provider>
   )
 }

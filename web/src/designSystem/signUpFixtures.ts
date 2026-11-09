@@ -106,3 +106,15 @@ export const verifyFixtures = {
   confirmed: { ...verifyPage, [verificationPath]: () => ({ state: 'confirmed' }) },
   expired: { ...verifyPage, [verificationPath]: () => ({ state: 'expired' }) },
 } satisfies Record<string, Record<string, () => unknown>>
+
+const progressPath = '/api/sign-up/p-3d9a'
+const at = (step: string) => () => ({ step, address: `${suggestSubdomain(signUpBusinessName)}.vn.example.com` })
+
+export const progressFixtures = {
+  checking: { ...verifyPage, [progressPath]: () => new Promise<never>(() => {}) },
+  verified: { ...verifyPage, [progressPath]: at('verified') },
+  creating: { ...verifyPage, [progressPath]: at('creating') },
+  delayed: { ...verifyPage, [progressPath]: at('delayed') },
+  ready: { ...verifyPage, [progressPath]: at('ready') },
+  unknown: { ...verifyPage, [progressPath]: () => new Response(null, { status: 404 }) },
+} satisfies Record<string, Record<string, () => unknown>>

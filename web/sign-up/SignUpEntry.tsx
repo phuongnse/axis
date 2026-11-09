@@ -1,6 +1,7 @@
 import { StrictMode, useCallback, useEffect, useState } from 'react'
 import { TextContext } from '../src/platform/texts'
 import { ThemeModeProvider } from '../src/platform/theme'
+import { ProgressPage } from './ProgressPage'
 import { SignUpPage } from './SignUpPage'
 import { VerifyPage } from './VerifyPage'
 import { signUpTexts, type SignUpLocale } from './texts'
@@ -11,7 +12,8 @@ function browserLocale(): SignUpLocale {
 
 /**
  * The sign-up pages with the SPA's theme provider and their own two-language texts. It starts in `vi` for a Vietnamese
- * browser. Proposed: `/sign-up/verify#<token>` draws the verify page, and any other path the sign-up page.
+ * browser. Proposed: `/sign-up/verify#<token>` draws the verify page, `/sign-up/progress#<id>.<secret>` the progress
+ * page, and any other path the sign-up page.
  */
 export function SignUpEntry() {
   const [locale, setLocale] = useState<SignUpLocale>(browserLocale)
@@ -26,7 +28,14 @@ export function SignUpEntry() {
     <StrictMode>
       <ThemeModeProvider>
         <TextContext.Provider value={text}>
-          {window.location.pathname.endsWith('/sign-up/verify') ? (
+          {window.location.pathname.endsWith('/sign-up/progress') ? (
+            <ProgressPage
+              id={window.location.hash.slice(1).split('.')[0] ?? ''}
+              secret={window.location.hash.slice(1).split('.')[1] ?? ''}
+              locale={locale}
+              onLocaleChange={setLocale}
+            />
+          ) : window.location.pathname.endsWith('/sign-up/verify') ? (
             <VerifyPage
               token={window.location.hash.slice(1)}
               locale={locale}
