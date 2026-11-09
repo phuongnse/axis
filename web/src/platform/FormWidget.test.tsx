@@ -758,6 +758,28 @@ describe('FormWidget', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
   })
 
+  it('scrolls an error above the form into view and focuses it', async () => {
+    stubFetch({
+      status: 400,
+      body: '{"title":"Invalid","status":400,"errors":{"":["Must be a JSON object."]}}',
+    })
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      renderForm()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      const error = await screen.findByTestId('form-error')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([error])
+      expect(error).toHaveFocus()
+      expect(within(error).getByRole('alert')).toHaveTextContent('Must be a JSON object.')
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
   it('shows a validation text key as its text and a fixed message as is', async () => {
     stubFetch({
       status: 400,
