@@ -145,10 +145,10 @@ const noPresetTagColour = {
   },
 }
 
-const noAntdButton = {
+const noAntdComponent = (component, message) => ({
   meta: {
     type: 'problem',
-    messages: { button: 'Use AxisButton with a role, not the Button of antd.' },
+    messages: { component: message },
     schema: [],
   },
   create(context) {
@@ -159,7 +159,7 @@ const noAntdButton = {
         for (const specifier of node.specifiers) {
           if (
             specifier.type === 'ImportSpecifier' &&
-            (specifier.imported.name ?? specifier.imported.value) === 'Button'
+            (specifier.imported.name ?? specifier.imported.value) === component
           ) {
             names.add(specifier.local.name)
           }
@@ -167,11 +167,14 @@ const noAntdButton = {
       },
       JSXOpeningElement(node) {
         if (node.name?.type === 'JSXIdentifier' && names.has(node.name.name))
-          context.report({ node, messageId: 'button' })
+          context.report({ node, messageId: 'component' })
       },
     }
   },
-}
+})
+
+const noAntdButton = noAntdComponent('Button', 'Use AxisButton with a role, not the Button of antd.')
+const noAntdAlert = noAntdComponent('Alert', 'Use AxisAlert with a kind, not the Alert of antd.')
 
 const locatorMethods = new Set(['getByRole', 'getByLabel', 'getByText', 'getByTitle'])
 const wrappers = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
@@ -292,6 +295,7 @@ export default {
     'no-prototype-write': noPrototypeWrite,
     'no-preset-tag-colour': noPresetTagColour,
     'no-antd-button': noAntdButton,
+    'no-antd-alert': noAntdAlert,
     'exact-locators': exactLocators,
   },
 }

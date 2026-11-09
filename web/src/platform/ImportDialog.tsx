@@ -280,6 +280,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               ))}
             </ul>
           )}
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {problem !== null && <Alert data-testid="import-problem" type="error" title={problem} />}
         </div>
       </Flex>

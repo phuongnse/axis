@@ -94,6 +94,7 @@ export function ConsolePage() {
           <Result status="403" title={t('shell.console.forbidden')} />
         </div>
       )}
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {loadFailed && <Alert data-testid="console-error" type="error" title={t('shell.console.loadFailed')} />}
       {tenant && !forbidden && (
         <Card data-testid="console-tenant" title={t('shell.console.tenant.title')}>
@@ -160,6 +161,7 @@ export function ConsolePage() {
               }}
             />
             {failedWorkFailed && (
+              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
               <Alert
                 data-testid="console-failed-work-error"
                 type="error"

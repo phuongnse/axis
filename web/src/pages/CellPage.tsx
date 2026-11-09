@@ -37,6 +37,7 @@ export function CellPage() {
 
   return (
     <PageLayout title={t('shell.cell.overview.title')}>
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {failed && <Alert data-testid="cell-error" type="error" title={t('shell.cell.loadFailed')} />}
       {cell && (
         <Card data-testid="cell-overview">

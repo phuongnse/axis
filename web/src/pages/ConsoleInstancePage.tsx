@@ -57,9 +57,11 @@ export function ConsoleInstancePage() {
         </div>
       )}
       {instance === null && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="console-instance-not-found" type="warning" title={t('shell.console.instance.notFound')} />
       )}
       {instance === 'failed' && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="console-instance-error" type="error" title={t('shell.console.instance.loadFailed')} />
       )}
       {typeof instance === 'object' && instance !== null && (

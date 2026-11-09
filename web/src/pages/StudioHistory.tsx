@@ -153,11 +153,13 @@ export function StudioHistory({
         toolbar={{}}
         failure={
           revisions === 'failed' ? (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert data-testid="studio-history-error" type="error" title={t('shell.studio.history.loadFailed')} />
           ) : undefined
         }
         below={
           outcome === null ? undefined : outcome.kind === 'blocked' ? (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert
               data-testid="studio-history-blocked"
               type="warning"
@@ -175,6 +177,7 @@ export function StudioHistory({
               }
             />
           ) : (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert data-testid="studio-history-failed" type="error" title={outcome.message} />
           )
         }

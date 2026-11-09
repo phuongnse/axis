@@ -154,6 +154,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   }
 
   if (failed || releaseTexts.failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="tasks-error" type="error" title={t('shell.tasks.loadFailed')} />
   }
   return (

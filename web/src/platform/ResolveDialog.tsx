@@ -151,6 +151,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
             </fieldset>
           )}
         </Form>
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
       </Flex>
     </Modal>

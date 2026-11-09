@@ -41,9 +41,10 @@ component holds a number of its own.
 - **Colours.** The colours are `primary`, `success`, `warning`, `danger`, `info`, `primaryText`, `successText`,
   `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `text`, `textMuted`, `border`, `borderSubtle`,
   `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. The first five are seeds, which colour
-  fills, icons and tints. The `*Text` tokens colour text in that state colour: state text, links, the selected tab, the
-  active navigation entry, form validation messages, the current page of a pagination, destructive menu entries and the
-  text of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
+  fills, icons and tints, except a message's icon. The `*Text` tokens colour text and a message's icon in that state
+  colour: state text, links, the selected tab, the active navigation entry, form validation messages, the current page
+  of a pagination, destructive menu entries and the text of outlined and danger buttons, see
+  [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
   keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
   modes. `onPrimary` reaches 4.5:1 on `primary` in both modes.

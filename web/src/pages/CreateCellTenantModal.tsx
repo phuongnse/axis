@@ -110,6 +110,7 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
         <CellJobTable jobs={[job]} locale={locale} />
       ) : (
         <Flex vertical gap="middle">
+          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
           {error && <Alert data-testid="cell-create-error" type="error" title={error} />}
           <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={false}>
             <Form.Item

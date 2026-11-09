@@ -131,9 +131,11 @@ export function InviteUserModal({
       >
         <Flex vertical gap="middle">
           {problem && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert data-testid="users-invite-problem" type="error" title={t(`shell.users.invite.${problem}`)} />
           )}
           {rolesFailed && (
+            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
             <Alert data-testid="users-invite-roles-failed" type="warning" title={t('shell.users.invite.rolesFailed')} />
           )}
           <Form form={form} layout="vertical" name="invite" requiredMark={false}>

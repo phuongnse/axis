@@ -164,6 +164,7 @@ function LabelEditor({
         </Flex>
       </Modal>
       {others > 0 && (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert
           data-testid="studio-label-used-by"
           type="warning"

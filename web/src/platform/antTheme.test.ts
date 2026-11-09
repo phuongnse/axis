@@ -170,6 +170,14 @@ describe.each(['light', 'dark'] as const)('the shared field rules in %s mode', (
     expect(rules).toContain('.ant-form-item-margin-offset { display: none; }')
   })
 
+  it('draws the icon of each kind of message in that kind text colour', () => {
+    const rules = fieldRules(mode)
+    expect(rules).toContain(`.ant-alert.ant-alert-info .ant-alert-icon { color: ${colour.infoText}; }`)
+    expect(rules).toContain(`.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`)
+    expect(rules).toContain(`.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`)
+    expect(rules).toContain(`.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`)
+  })
+
   it('draws an unticked checkbox or radio in a field with an error in dangerText', () => {
     expect(fieldRules(mode)).toContain(
       `.ant-form-item-has-error .ant-checkbox:not(.ant-checkbox-checked), .ant-form-item-has-error .ant-radio:not(.ant-radio-checked) { border-color: ${colour.dangerText}; }`,

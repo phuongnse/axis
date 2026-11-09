@@ -282,6 +282,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <NotFoundPage />
   }
   if (load === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="form-load-error" type="error" title={t('shell.form.loadFailed')} />
   }
 
@@ -292,6 +293,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     <ConfigProvider locale={antLocaleFor(locale)}>
       <Flex vertical gap="middle">
         {conflict && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="form-conflict"
             type="warning"
@@ -303,8 +305,10 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
             }
           />
         )}
+        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
         {started && <Alert data-testid="form-started" type="success" title={t('shell.form.processStarted')} />}
         {form.formErrors.length > 0 && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />
         )}
         {steps.progress}

@@ -145,9 +145,11 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
     return <NotFoundPage />
   }
   if (task === assignedElsewhere) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="task-assigned-elsewhere" type="warning" title={t('shell.task.assignedElsewhere')} />
   }
   if (task === 'failed' || releaseTexts.failed) {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
@@ -238,6 +240,7 @@ function TaskBody({
         ]}
       />
       {task.state === 'expired' ? (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="task-expired" type="info" title={t('shell.task.expired')} />
       ) : open ? (
         <>
@@ -258,6 +261,7 @@ function TaskBody({
           />
         </>
       ) : (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="task-completed" type="info" title={t('shell.task.completed')} />
       )}
     </Flex>
@@ -316,6 +320,7 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
   }
   return (
     <Flex vertical gap="small">
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {message !== null && <Alert data-testid="task-command-message" type={message.type} title={message.text} />}
       <Flex gap="small">
         {listed.map((command) => (
@@ -426,10 +431,12 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     return null
   }
   if (ready === 'failed') {
+    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
     return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
   }
   return (
     <Flex vertical gap="middle">
+      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
       {form.formErrors.length > 0 && <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />}
       {steps.progress}
       {/* Enter acts as Next on a step before the last, and does nothing on the last. */}

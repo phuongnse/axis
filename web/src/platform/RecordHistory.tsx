@@ -88,6 +88,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   return (
     <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
       {failed ? (
+        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
         <Alert data-testid="record-history-error" type="error" title={t('shell.history.loadFailed')} />
       ) : (
         <Spin spinning={loading}>

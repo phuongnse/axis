@@ -77,6 +77,7 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
           </Typography.Text>
         )}
         {loadFailed && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="studio-auto-accept-load-error"
             type="warning"
@@ -84,6 +85,7 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
           />
         )}
         {saveFailed && (
+          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
           <Alert
             data-testid="studio-auto-accept-save-error"
             type="error"
