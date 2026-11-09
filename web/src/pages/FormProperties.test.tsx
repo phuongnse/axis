@@ -13,6 +13,8 @@ type Content = Record<string, unknown>
 
 const english: Record<string, string> = platformEnglish
 
+const helpOf = (path: string) => english[`shell.studio.field.form.${path}.help`]
+
 /** Keeps the draft in state, like the editor does, and exposes it as JSON. */
 function Harness({ initial, selected }: { initial: Content; selected: string }) {
   const [draft, setDraft] = useState(initial)
@@ -72,6 +74,16 @@ describe('FormProperties section', () => {
     expect(draft.sections.map((section: { name: string }) => section.name)).toEqual(['b', 'a'])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
     expect(screen.getByTestId('announcement')).toHaveTextContent('Moved a, steps.two, position 1')
+  })
+
+  it('names the name, the title and the visibility of a section by their labels and describes them by their help', () => {
+    renderHarness(stepped, '/sections/0')
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription(helpOf('sections.name'))
+    expect(screen.getByRole('group', { name: 'Title' })).toHaveAccessibleDescription(helpOf('sections.title'))
+    expect(screen.getByRole('textbox', { name: 'Visible when' })).toHaveAccessibleDescription(
+      helpOf('sections.visibleWhen'),
+    )
   })
 
   it('has no Step picker on a form without steps', () => {
@@ -188,6 +200,23 @@ describe('FormProperties field', () => {
     expect(draft.sections[1].fields).toEqual([{ field: 'q' }])
     expect(screen.getByTestId('selected')).toHaveTextContent('/sections/1')
     expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p, Section 2')
+  })
+
+  it('names the read-only checkbox and the conditions of a field by their labels and describes them by their help', () => {
+    renderHarness({ sections: [{ name: 's', fields: [{ field: 'x' }] }] }, '/sections/0/fields/0')
+
+    expect(screen.getByRole('checkbox', { name: 'Read-only' })).toHaveAccessibleDescription(
+      helpOf('sections.fields.readOnly'),
+    )
+    expect(screen.getByRole('textbox', { name: 'Visible when' })).toHaveAccessibleDescription(
+      helpOf('sections.fields.visibleWhen'),
+    )
+    expect(screen.getByRole('textbox', { name: 'Required when' })).toHaveAccessibleDescription(
+      helpOf('sections.fields.requiredWhen'),
+    )
+    expect(screen.getByRole('textbox', { name: 'Read-only when' })).toHaveAccessibleDescription(
+      helpOf('sections.fields.readOnlyWhen'),
+    )
   })
 
   it('writes the width of the field under width and removes it when the box is cleared', async () => {

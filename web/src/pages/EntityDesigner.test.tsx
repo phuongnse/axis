@@ -26,6 +26,9 @@ import { LabelTextsContext } from './labelTextsContext'
 
 const english: Record<string, string> = platformEnglish
 
+const labelOf = (path: string) => english[`shell.studio.field.entity.${path}`]
+const helpOf = (path: string) => english[`shell.studio.field.entity.${path}.help`]
+
 /** The paths under `shell.studio.field.entity.` that the designer draws, each with a label and a help. */
 const drawnPaths = [
   'name',
@@ -313,15 +316,100 @@ describe('EntityDesigner', () => {
     expect(within(screen.getByTestId('studio-field-/fields/0/name')).getByRole('textbox')).toHaveValue('total')
   })
 
-  it('describes each input with its help text', () => {
-    renderDesigner(entity())
+  it('names each entity input by its label and describes it by its help', () => {
+    renderDesigner(entity({ description: { textKey: 'entity.invoice.description' } }))
 
-    expect(screen.getByRole('textbox', { name: 'Entity name' })).toHaveAccessibleDescription(
-      english['shell.studio.field.entity.name.help'],
+    expect(screen.getByRole('textbox', { name: labelOf('name') })).toHaveAccessibleDescription(helpOf('name'))
+    expect(screen.getByRole('group', { name: labelOf('label') })).toHaveAccessibleDescription(helpOf('label'))
+    expect(screen.getByRole('group', { name: labelOf('description') })).toHaveAccessibleDescription(
+      helpOf('description'),
     )
     expect(
-      within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton', { name: 'Max length' }),
-    ).toHaveAccessibleDescription(english['shell.studio.field.entity.fields.maxLength.help'])
+      within(screen.getByTestId('studio-field-/displayField')).getByRole('combobox', {
+        name: labelOf('displayField'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('displayField'))
+    expect(
+      within(screen.getByTestId('studio-field-/fields/1/maxLength')).getByRole('spinbutton', {
+        name: labelOf('fields.maxLength'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('fields.maxLength'))
+  })
+
+  it('names the currency inputs by their labels and describes them by their help', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'code', type: 'text' },
+          { name: 'fixed', type: 'money', currency: 'USD' },
+          { name: 'variable', type: 'money', currencyField: 'code' },
+        ],
+      }),
+    )
+
+    const fixed = within(screen.getByTestId('studio-field-/fields/1'))
+    expect(fixed.getByRole('radiogroup', { name: labelOf('fields.currencySource') })).toHaveAccessibleDescription(
+      helpOf('fields.currencySource'),
+    )
+    expect(fixed.getByRole('textbox', { name: labelOf('fields.currency') })).toHaveAccessibleDescription(
+      helpOf('fields.currency'),
+    )
+    expect(
+      within(screen.getByTestId('studio-field-/fields/2')).getByRole('combobox', {
+        name: labelOf('fields.currencyField'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('fields.currencyField'))
+  })
+
+  it('names the index inputs by their labels and describes them by their help', () => {
+    renderDesigner(entity({ indexes: [{ name: 'index1', fields: ['code'], unique: true }] }))
+
+    const index = within(screen.getByTestId('studio-field-/indexes/0'))
+    expect(index.getByRole('combobox', { name: labelOf('indexes.fields') })).toHaveAccessibleDescription(
+      helpOf('indexes.fields'),
+    )
+    expect(index.getByRole('checkbox', { name: labelOf('indexes.unique') })).toHaveAccessibleDescription(
+      helpOf('indexes.unique'),
+    )
+  })
+
+  it('names the validation inputs by their labels and shows the help of the expression', () => {
+    renderDesigner(
+      entity({
+        validations: [
+          { name: 'totalPositive', expression: 'total > 0', message: { textKey: 'validation.total' }, field: 'total' },
+        ],
+      }),
+    )
+
+    const row = within(screen.getByTestId('studio-field-/validations/0'))
+    expect(
+      within(screen.getByTestId('studio-field-/validations/0/message/textKey')).getByRole('combobox', {
+        name: labelOf('validations.message'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('validations.message'))
+    expect(
+      within(screen.getByTestId('studio-field-/validations/0/field')).getByRole('combobox', {
+        name: labelOf('validations.field'),
+      }),
+    ).toHaveAccessibleDescription(helpOf('validations.field'))
+    expect(row.getByRole('textbox', { name: labelOf('validations.expression') })).toHaveAccessibleDescription(
+      helpOf('validations.expression'),
+    )
+    expect(row.getByText(helpOf('validations.expression'))).toBeVisible()
+  })
+
+  it('shows the help of a computed field expression', () => {
+    renderDesigner(
+      entity({
+        fields: [
+          { name: 'total', type: 'integer' },
+          { name: 'double', type: 'integer', expression: 'total * 2' },
+        ],
+      }),
+    )
+
+    expect(within(screen.getByTestId('studio-field-/fields/1')).getByText(helpOf('fields.expression'))).toBeVisible()
   })
 
   it('shows the description after the name and the label and writes its texts', async () => {

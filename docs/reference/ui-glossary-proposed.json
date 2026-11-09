@@ -90,6 +90,18 @@
       "en": "width",
       "vi": "độ rộng",
       "status": "proposed"
+    },
+    {
+      "concept": "Validation message",
+      "en": "message",
+      "vi": "thông báo",
+      "status": "proposed"
+    },
+    {
+      "concept": "Enum value",
+      "en": "value",
+      "vi": "giá trị",
+      "status": "proposed"
     }
   ]
 }
