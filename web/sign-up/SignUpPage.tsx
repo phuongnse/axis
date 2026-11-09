@@ -1,4 +1,4 @@
-import { Alert, ConfigProvider, Flex, Form, Input, Select, Typography } from 'antd'
+import { Alert, ConfigProvider, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
@@ -93,6 +93,7 @@ export function SignUpPage({
   const [documentsLoad, setDocumentsLoad] = useState(0)
   const [sending, setSending] = useState(false)
   const [formError, setFormError] = useState<string>()
+  const formErrorRef = useRef<HTMLDivElement>(null)
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
   useEffect(() => {
@@ -201,8 +202,15 @@ export function SignUpPage({
     unavailable: { state: 'failed' as const, message: t('signUp.subdomain.unavailable') },
   }[status.state]
 
+  useEffect(() => {
+    if (formError !== undefined) {
+      formErrorRef.current?.scrollIntoView({ block: 'center' })
+      formErrorRef.current?.focus({ preventScroll: true })
+    }
+  }, [formError])
+
   // Proposed: Sign up checks every field on click and sends nothing while one is wrong. A refusal shows under the field
-  // its JSON Pointer names, which it scrolls to, and any other one right above Sign up.
+  // its JSON Pointer names, which it scrolls to, and any other one above the form, which it scrolls to too.
   const send = async (values: SignUpValues) => {
     if (status.state === 'refused' || status.state === 'checking') {
       form.scrollToField('subdomain', { focus: true })
@@ -297,6 +305,13 @@ export function SignUpPage({
           />
         }
       >
+        {/* Proposed: a refusal that names no field shows above the form, which scrolls to it and focuses it, so a person
+            who pressed Sign up at the foot of the long form sees it. */}
+        {formError !== undefined && (
+          <div ref={formErrorRef} tabIndex={-1} style={{ outline: 'none' }}>
+            <Alert type="error" title={formError} />
+          </div>
+        )}
         {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}
         <Form
           form={form}
@@ -410,13 +425,9 @@ export function SignUpPage({
               }}
             />
           </Typography.Paragraph>
-          {/* Proposed: a refusal that names no field shows right above Sign up, where the person pressed it. */}
-          <Flex vertical gap={spacing.md} style={{ marginTop: spacing.lg }}>
-            {formError !== undefined && <Alert type="error" title={formError} />}
-            <AxisButton role="finish" htmlType="submit" block loading={sending}>
-              {t('signUp.send')}
-            </AxisButton>
-          </Flex>
+          <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
+            {t('signUp.send')}
+          </AxisButton>
         </Form>
       </CardPage>
     </ConfigProvider>
