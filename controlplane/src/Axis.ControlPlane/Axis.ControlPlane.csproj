@@ -26,10 +26,11 @@
     <ProjectReference Include="..\..\..\src\Axis.Core\Axis.Core.csproj" />
   </ItemGroup>
 
-  <!-- The platform's security headers, compiled from the platform's own files so they stay exactly the same. -->
+  <!-- The platform's security headers and JSON content type rule, compiled from the platform's own files so they stay exactly the same. -->
   <ItemGroup>
     <Compile Include="..\..\..\src\Axis.Server\Http\SecurityHeaders.cs" Link="Http\%(Filename)%(Extension)" />
     <Compile Include="..\..\..\src\Axis.Server\Http\ResponseCharset.cs" Link="Http\%(Filename)%(Extension)" />
+    <Compile Include="..\..\..\src\Axis.Server\Http\JsonRequest.cs" Link="Http\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>

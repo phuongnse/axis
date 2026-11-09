@@ -1,0 +1,11 @@
+Subject: Confirm your Axis sign-up
+
+Hello {{name}},
+
+Open this link to confirm your email and start the trial at {{tenantAddress}}:
+
+{{confirmLink}}
+
+The link works once, for 24 hours. If you did not sign up, ignore this email: the sign-up lapses.
+
+The Axis team
