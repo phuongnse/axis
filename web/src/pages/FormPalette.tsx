@@ -6,9 +6,9 @@ import type { LayoutAdd } from '../platform/formLayout'
 import type { StudioNameField } from '../platform/studio'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { visuallyHidden } from '../platform/visuallyHidden'
 import { insertField } from './formPaletteSupport'
 import { LabelTextsContext } from './labelTextsContext'
-import { visuallyHidden } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 
 /**

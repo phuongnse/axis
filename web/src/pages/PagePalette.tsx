@@ -10,7 +10,8 @@ import {
   widgetPointerOf,
 } from '../platform/pageWidgets'
 import { useText } from '../platform/texts'
-import { landedText, paletteReasons, usePartLabel, visuallyHidden } from './pagePaletteSupport'
+import { visuallyHidden } from '../platform/visuallyHidden'
+import { landedText, paletteReasons, usePartLabel } from './pagePaletteSupport'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
