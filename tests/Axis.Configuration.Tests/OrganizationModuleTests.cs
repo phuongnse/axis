@@ -9,8 +9,8 @@ using Axis.Expressions.Typing;
 namespace Axis.Configuration.Tests;
 
 /// <summary>
-/// The built-in module <c>organization</c> 1.0.0 under <c>modules/organization</c>, which the test project copies to
-/// the test output as <c>BuiltInModules/organization/1.0.0</c>.
+/// The built-in module <c>organization</c> 1.0.1 under <c>modules/organization</c>, which the test project copies to
+/// the test output as <c>BuiltInModules/organization/1.0.1</c>.
 /// </summary>
 public sealed class OrganizationModuleTests
 {
@@ -23,7 +23,7 @@ public sealed class OrganizationModuleTests
 
         Assert.Empty(catalog.Diagnostics);
         var module = Assert.Single(catalog.Modules, module => module.Manifest.Id == "organization");
-        Assert.Equal(("organization", "1.0.0"), (module.Manifest.Id, module.Manifest.Version));
+        Assert.Equal(("organization", "1.0.1"), (module.Manifest.Id, module.Manifest.Version));
         Assert.Equal(["admin", "member"], module.Manifest.Roles.Select(slot => slot.Name));
     }
 
@@ -130,7 +130,7 @@ public sealed class OrganizationModuleTests
     /// <summary>The rule built from the manifest file of the module, as the compiler builds it.</summary>
     private static ExpressionRule LoadRule()
     {
-        var file = Path.Combine(_modulesPath, "organization", "1.0.0", "rules", "is-delegating.json");
+        var file = Path.Combine(_modulesPath, "organization", "1.0.1", "rules", "is-delegating.json");
         var json = JsonNode.Parse(File.ReadAllText(file))!;
         Assert.Equal("boolean", json["resultType"]!.GetValue<string>());
         var parameters = json["parameters"]!.AsArray()

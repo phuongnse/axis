@@ -110,6 +110,6 @@ test('choosing an outcome after the task was decided shows that it is already co
   expect(completed.status()).toBe(200)
   await approve.click()
 
-  await expect(page.getByText('This task is already completed.', { exact: true })).toBeVisible()
+  await expect(page.getByText('This task is already done.', { exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: /Approve/i })).toHaveCount(0)
 })

@@ -331,9 +331,9 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         {
             var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
             Assert.Equal(id, item.GetProperty("id").GetGuid());
-            Assert.Equal("Email được giữ đến ngày mai", item.GetProperty("subject").GetString());
+            Assert.Equal("Email còn lại sẽ gửi vào ngày mai", item.GetProperty("subject").GetString());
             Assert.Equal(
-                "Tenant này đã gửi đủ 2 email trong hôm nay. Các email còn lại sẽ chờ đến 00:00 UTC.",
+                "Đã gửi đủ 2 email, mức tối đa của hôm nay. Các email còn lại sẽ gửi sau 00:00 UTC.",
                 item.GetProperty("body").GetString());
             Assert.Equal(JsonValueKind.Null, item.GetProperty("releaseId").ValueKind);
             Assert.Equal(JsonValueKind.Null, item.GetProperty("open").ValueKind);
@@ -370,7 +370,7 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
 
         var item = Assert.Single(list.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal("Emails are held until tomorrow", item.GetProperty("subject").GetString());
-        Assert.Equal("This tenant has sent its 2 emails for today. The other emails wait until 00:00 UTC.", item.GetProperty("body").GetString());
+        Assert.Equal("Today's limit of 2 emails is reached. The other emails wait until 00:00 UTC.", item.GetProperty("body").GetString());
     }
 
     [Fact]

@@ -438,7 +438,7 @@ describe('TaskPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
 
-    expect(await screen.findByText('This task is already completed.')).toBeInTheDocument()
+    expect(await screen.findByText('This task is already done.')).toBeInTheDocument()
     await waitFor(() => expect(api.taskReads()).toHaveLength(2))
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
@@ -469,7 +469,7 @@ describe('TaskPage', () => {
 
     renderPage()
 
-    expect(await screen.findByText('This task is already completed.')).toBeInTheDocument()
+    expect(await screen.findByText('This task is already done.')).toBeInTheDocument()
     expect(screen.getByText('Manager approval')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
@@ -765,7 +765,7 @@ describe('TaskPage', () => {
 
     renderPage()
 
-    expect(await screen.findByTestId('task-expired')).toHaveTextContent('The deadline for this task passed.')
+    expect(await screen.findByTestId('task-expired')).toHaveTextContent('This task is past its deadline.')
     expect(screen.queryByTestId('task-completed')).not.toBeInTheDocument()
     expect(screen.getByText('Manager approval')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()

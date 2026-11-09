@@ -824,7 +824,7 @@ the main action. The page designer's canvas draws it and opens nothing.
 4. The dialog lists each error as the row and the field's label, for `/rows/{n}/values/{field}`, as a row error for
    `/rows/{n}`, as a column error for `/columns/{n}`, and as a file error for any other key. A field the table lacks
    shows its name.
-5. Commit shows only when the import is `checked`. It sends `POST {entity}/imports/{id}/commit` and checks every second
+5. Create records shows only when the import is `checked`. It sends `POST {entity}/imports/{id}/commit` and checks every second
    until the import is `committed` or `failed`. On `committed` the dialog closes, a success message shows above the
    table and the current page of rows loads again. A `failed` commit lists its errors in the dialog.
 

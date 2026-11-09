@@ -341,13 +341,14 @@ const texts = {
   'shell.form.next': 'Next',
   'shell.form.back': 'Back',
   'shell.form.reload': 'Reload',
-  'shell.form.conflict': 'This record was changed since you opened it.',
+  'shell.form.conflict': 'This record has changed since you opened it. Reload it to see the latest values.',
   'shell.form.saveFailed': 'The record could not be saved.',
   'shell.form.loadFailed': 'The record could not be loaded.',
   'shell.form.choose': 'Choose…',
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
-  'shell.form.removeRow': 'Remove',
+  'shell.form.removeRow': 'Delete row',
+  'shell.form.removeReference': 'Remove',
   'shell.form.add': 'Add',
   'shell.form.added': 'Added',
   'shell.form.removed': 'Removed',
@@ -818,7 +819,7 @@ describe('FormWidget', () => {
     await userEvent.type(title, '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByTestId('form-conflict')).toHaveTextContent('This record was changed since you opened it.')
+    expect(await screen.findByTestId('form-conflict')).toHaveTextContent('This record has changed since you opened it.')
     await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
 
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Changed elsewhere'))
@@ -1182,7 +1183,7 @@ describe('FormWidget', () => {
 
     await userEvent.clear(quantity)
     await userEvent.type(quantity, '3')
-    await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1])
+    await userEvent.click(screen.getAllByRole('button', { name: 'Delete row' })[1])
     expect(screen.queryByRole('textbox', { name: 'Description 2' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
@@ -1235,7 +1236,7 @@ describe('FormWidget', () => {
     renderForm(null, linesWidget)
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
 
-    const remove = screen.getByRole('button', { name: 'Remove' })
+    const remove = screen.getByRole('button', { name: 'Delete row' })
     expect(remove).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
     expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
@@ -1463,7 +1464,7 @@ describe('FormWidget', () => {
     expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
     expect(screen.queryByRole('textbox', { name: 'Description 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete row' })).not.toBeInTheDocument()
 
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
@@ -1781,6 +1782,7 @@ describe('FormWidget', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.addRow'])
       expect(catalog).toHaveProperty(['shell.form.removeRow'])
+      expect(catalog).toHaveProperty(['shell.form.removeReference'])
     }
   })
 

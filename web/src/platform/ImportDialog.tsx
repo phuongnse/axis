@@ -35,7 +35,7 @@ interface ImportDialogProps {
  * The dialog that imports records from a CSV or xlsx file. The user picks one file and presses Check,
  * which uploads it with the content type of its extension. The dialog reads the import at once and
  * then every second, with no time limit, until it is `checked` or `failed`. It lists each error as
- * its row and the label of its field, or as a row, column or file error. Commit shows only when the
+ * its row and the label of its field, or as a row, column or file error. Create records shows only when the
  * import is `checked`. It sends the commit and checks every second until the import is `committed`,
  * which calls `onCommitted`, or `failed`, which lists its errors. Picking another file starts a new
  * import. Closing the dialog stops the checking. The status and the errors sit in an `aria-live`

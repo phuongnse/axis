@@ -117,7 +117,7 @@ public sealed class SampleApplicationTests
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
         var module = Assert.Single(result.Model.Modules);
-        Assert.Equal(("organization", "1.0.0"), (module.Id, module.Version));
+        Assert.Equal(("organization", "1.0.1"), (module.Id, module.Version));
         Assert.Equal(
             [("admin", "department-manager"), ("member", "employee")],
             module.Roles.OrderBy(slot => slot.Key, StringComparer.Ordinal).Select(slot => (slot.Key, slot.Value)));
@@ -135,7 +135,7 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["department-budgets 1.2.0", "organization 1.0.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
+        Assert.Equal(["department-budgets 1.2.0", "organization 1.0.1"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
         Assert.DoesNotContain(result.Model.Modules, pinned => pinned.Id == "departments");
         var organization = Assert.Single(result.Model.Modules, pinned => pinned.Id == "organization");
         Assert.Equal(

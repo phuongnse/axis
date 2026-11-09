@@ -78,6 +78,6 @@ test('Pat signs in to Purchasing through the organization, an account signs in t
     await logInAtCompany(page)
 
     await expect(page).toHaveURL(`${base}/?signIn=failed`)
-    await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not finish.' })).toBeVisible()
   })
 })

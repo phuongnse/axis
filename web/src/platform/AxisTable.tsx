@@ -1,6 +1,15 @@
 import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
-import { useContext, useState, type CSSProperties, type HTMLAttributes, type Key, type ReactNode } from 'react'
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type HTMLAttributes,
+  type Key,
+  type ReactNode,
+} from 'react'
 import { tableTheme } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { EmptyDash } from './EmptyValue'
@@ -207,6 +216,11 @@ export function AxisTable<T extends object>({
     setDraft(query?.search ?? '')
   }
   const [selectedKeys, setSelectedKeys] = useState<Key[]>([])
+  const tableRef = useRef<HTMLDivElement>(null)
+  // Ant Design has no prop for the focus of its scrolling region, so the attribute is set on the element.
+  useEffect(() => {
+    tableRef.current?.querySelector('.ant-table-content')?.setAttribute('tabindex', '0')
+  })
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
   // The first column identifies the row. A table with the Columns button shows the columns of the choice in the view.
@@ -355,7 +369,7 @@ export function AxisTable<T extends object>({
     }
   }
   return (
-    <Flex vertical gap="middle" aria-busy={loading} data-testid={testId}>
+    <Flex ref={tableRef} vertical gap="middle" aria-busy={loading} data-testid={testId}>
       {hasToolbar && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {(searchable || filterable || arrangeable || toolbar.view !== undefined) && (

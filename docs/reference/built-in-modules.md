@@ -39,7 +39,7 @@ module or template.
 ## The organization module
 
 `organization` holds the departments and the employees of the business, which other modules route
-work by. It keeps no personal data beyond what that needs. Version 1.0.0 holds the entities, data
+work by. It keeps no personal data beyond what that needs. It holds the entities, data
 sources, rule, contracts, role slots, policies, contract scenarios, pages, form and texts below.
 
 - **`Department`:** `code`, unique, in capital letters, `name`, `parent`, a reference to another
@@ -117,7 +117,7 @@ sources, rule, contracts, role slots, policies, contract scenarios, pages, form 
 type. It depends on `organization` `^1.0.0` and maps its slots `admin` and `member` to its own
 slots of the same names.
 
-Version 1.0.0 holds:
+It holds:
 
 - the entities below, and the data sources `RequestTypes`, `Requests`, `Decisions`, `MyRequests` and
   `RequestDecisions`;

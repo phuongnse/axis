@@ -2,7 +2,6 @@
   "placeholders": { "vi": [] },
   "untranslated": {
     "vi": [
-      "shell.console.schedules.trigger",
       "shell.locale.en",
       "shell.locale.vi",
       "shell.studio.identityProvider.clientId",

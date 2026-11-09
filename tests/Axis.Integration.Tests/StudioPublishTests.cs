@@ -301,7 +301,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         using var modules = new TemporaryFolder();
         CopyDirectory(SampleModules.Path, modules.Path);
         Directory.Delete(Path.Combine(modules.Path, "department-budgets", "1.2.0", "scenarios"), recursive: true);
-        Directory.Delete(Path.Combine(modules.Path, "organization", "1.0.0", "scenarios"), recursive: true);
+        Directory.Delete(Path.Combine(modules.Path, "organization", "1.0.1", "scenarios"), recursive: true);
         using var second = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
         Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
 

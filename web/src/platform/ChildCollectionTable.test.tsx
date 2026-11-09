@@ -17,7 +17,7 @@ const texts = {
   'test.description': 'Description',
   'test.quantity': 'Quantity',
   'shell.form.addRow': 'Add row',
-  'shell.form.removeRow': 'Remove row',
+  'shell.form.removeRow': 'Delete row',
   'shell.table.empty': 'No records yet.',
   'shell.table.rowActions': 'Actions',
 }
@@ -115,16 +115,16 @@ describe('the add and remove buttons of a child collection', () => {
     expect(screen.getByRole('textbox', { name: 'Description 2' })).toHaveFocus()
   })
 
-  it('draws Remove row in dangerText in dark mode and shows its name as a tooltip on focus', async () => {
+  it('draws Delete row in dangerText in dark mode and shows its name as a tooltip on focus', async () => {
     renderIn('dark', <Harness initial={oneRow} />)
 
-    const remove = screen.getByRole('button', { name: 'Remove row' })
+    const remove = screen.getByRole('button', { name: 'Delete row' })
     expect(remove).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
     await userEvent.click(screen.getByRole('textbox', { name: 'Quantity 1' }))
     await userEvent.tab()
 
     expect(remove).toHaveFocus()
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Remove row')
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete row')
   })
 })
 
@@ -155,6 +155,6 @@ describe('the cells of a child collection', () => {
     renderIn('light', <Harness readOnly initial={[{ description: null, quantity: '1' }]} />)
 
     expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('—')
-    expect(screen.queryByRole('button', { name: 'Remove row' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete row' })).not.toBeInTheDocument()
   })
 })

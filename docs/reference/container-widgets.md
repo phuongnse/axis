@@ -45,5 +45,5 @@ tab or a closed section asks for no rows until it is shown.
 ## Routes
 
 The route checks of a page, such as `/new`, `/{id}` and the task and instance [addresses](frontend.md#routing), find
-their form, task inbox, process inspector or detail anywhere in the tree. The history panel's "Open instance" link does
+their form, task inbox, process inspector or detail anywhere in the tree. The history panel's "Open process" link does
 the same.

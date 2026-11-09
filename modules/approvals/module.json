@@ -1,7 +1,7 @@
 {
   "kind": "module",
   "id": "approvals",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "label": "Approvals",
   "roles": [
     { "name": "admin", "label": { "textKey": "approvals.roles.admin" } },

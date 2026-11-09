@@ -243,7 +243,7 @@ describe('ConsolePage', () => {
     expect(within(view).getByText('Active').closest('.ant-tag')).toHaveStyle({
       color: designTokensFor('light').colour.successText,
     })
-    for (const title of ['Application', 'Active release', 'Activated']) {
+    for (const title of ['Application', 'Live release', 'Activated']) {
       expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
     }
     const leave = within(view).getByText('Leave').closest('tr')!

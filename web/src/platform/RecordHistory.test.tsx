@@ -44,7 +44,7 @@ const texts: Record<string, string> = {
   'shell.history.fields': 'Changed',
   'shell.history.outcome': 'Outcome',
   'shell.history.step': 'Step',
-  'shell.history.openInstance': 'Open instance',
+  'shell.history.openInstance': 'Open process',
   'shell.history.action.record.created': 'Created',
   'shell.history.action.record.updated': 'Updated',
   'shell.history.action.process.started': 'Process started',
@@ -289,7 +289,7 @@ describe('RecordHistory', () => {
     renderHistory()
 
     const link = await screen.findByTestId('history-inspect-link')
-    expect(link).toHaveTextContent('Open instance')
+    expect(link).toHaveTextContent('Open process')
     expect(link).toHaveAttribute('href', `/steps/approvals/${instanceId}`)
     expect(requests()).toContain('/api/sites/steps/pages/Requests')
     expect(requests()).toContain('/api/sites/steps/pages/Approvals')

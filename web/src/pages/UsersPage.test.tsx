@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import type { UserList, UserRoles } from '../platform/users'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
@@ -443,5 +444,22 @@ describe('UsersPage', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reset' }))
 
     expect(await screen.findByTestId('users-command-problem')).toHaveTextContent('The change was not made.')
+  })
+
+  it('offers the Vietnamese lock action on an active person', async () => {
+    stubServer(() => json(users))
+    const vietnamese: Platform = { ...platform, current: { locale: 'vi', texts: platformVietnamese } }
+    render(
+      <PlatformContext.Provider value={vietnamese}>
+        <TextProvider catalogs={[{ texts: platformVietnamese, fallbackTexts: platformEnglish }]} development={false}>
+          <MemoryRouter>
+            <UsersPage />
+          </MemoryRouter>
+        </TextProvider>
+      </PlatformContext.Provider>,
+    )
+
+    const row = (await screen.findByText('Bob Active')).closest('tr')!
+    expect(within(row).getByRole('button', { name: 'Khóa' })).toBeVisible()
   })
 })
