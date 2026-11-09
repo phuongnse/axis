@@ -1,5 +1,6 @@
-import { Alert, Flex, Form, Input, Modal, Radio, Select, type FormInstance } from 'antd'
+import { Alert, Flex, Form, Input, Modal, Radio, Select } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { placeProblemErrors } from './problemErrors'
 import type { RecordProblem } from './records'
 import { searchUsers, type ReassignBody, type ReassignRole, type UserOption } from './tasks'
 import { useText } from './texts'
@@ -28,15 +29,13 @@ interface ReassignValues {
 
 const reasonMaxLength = 500
 
-type FieldErrors = Parameters<FormInstance<ReassignValues>['setFields']>[0]
-
 /**
  * The dialog that reassigns a task. It asks for a role of `roles` or a person found through the user
  * picker, and for a reason. The picker lists the first people when it opens and searches again as
- * the user types. A `400` shows each message under the field its pointer names, and a message on
- * the whole body above the form. If the picker cannot load, its list stays empty and the role
- * choice still works. Any other failure shows a generic text. The server checks everything, so the
- * client only blocks what it can see is missing.
+ * the user types. A `400` shows each message under the field its pointer names, and any other message
+ * above the form, such as one for the target that is not chosen. If the picker cannot load, its list
+ * stays empty and the role choice still works. Any other failure shows a generic text. The server
+ * checks everything, so the client only blocks what it can see is missing.
  */
 export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDialogProps) {
   const t = useText()
@@ -73,22 +72,12 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
 
   useEffect(() => () => searching.current?.abort(), [])
 
-  const showProblem = (problem: RecordProblem) => {
-    const fields: FieldErrors = []
-    const general: string[] = []
-    for (const [pointer, messages] of Object.entries(problem.errors)) {
-      if (pointer === '/role') {
-        fields.push({ name: 'role', errors: messages })
-      } else if (pointer === '/user') {
-        fields.push({ name: 'user', errors: messages })
-      } else if (pointer === '/reason') {
-        fields.push({ name: 'reason', errors: messages })
-      } else if (pointer === '') {
-        general.push(...messages)
-      }
-    }
-    form.setFields(fields)
-    setErrors(general)
+  const showProblem = (problem: RecordProblem, kind: ReassignValues['kind']) => {
+    const placed = placeProblemErrors<'reason' | 'role' | 'user'>(problem.errors, ([name, ...rest]) =>
+      rest.length === 0 && (name === 'reason' || name === kind) ? name : null,
+    )
+    form.setFields(placed.fields.map(({ field, messages }) => ({ name: field, errors: messages })))
+    setErrors(placed.form)
   }
 
   const send = async () => {
@@ -102,7 +91,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
     try {
       const problem = await onSend(body)
       if (problem !== null) {
-        showProblem(problem)
+        showProblem(problem, values.kind)
       }
     } catch (failure) {
       console.warn('Reassigning the task failed', failure)
