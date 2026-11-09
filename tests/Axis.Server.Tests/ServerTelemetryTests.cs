@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using Axis.Core.Telemetry;
 using Axis.Server.Telemetry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -70,8 +71,11 @@ public sealed class ServerTelemetryTests
 
         var request = Keys(exported, "http.client.request.duration");
         var lookup = Keys(exported, "dns.lookup.duration");
-        Assert.Equal(["error.type", "http.request.method"], request.Order(StringComparer.Ordinal));
-        Assert.Equal(["error.type"], lookup);
+        Assert.Contains("error.type", request);
+        Assert.Contains("http.request.method", request);
+        Assert.Contains("error.type", lookup);
+        // The meter is process-wide, so HTTP calls of other tests can add allowed keys such as url.scheme.
+        Assert.Empty(request.Concat(lookup).Except(AxisMetrics.HttpTagKeys, StringComparer.Ordinal));
     }
 
     private static string[] Keys(List<MetricSnapshot> exported, string name)
