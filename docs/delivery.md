@@ -52,8 +52,13 @@ that holds it.
   [`autopilot`][nexkit-autopilot] setting is on with its scope set to every open issue, so no person
   posts `/nexkit plan` or `/nexkit go`. Milestones group the work and do not order it: the issues of
   several milestones run at once, and only *blocked by* marks make one issue wait for another, in the
-  same milestone or across milestones. A `bug` issue for CI on `main`, an issue for a Dependabot
-  advisory and an issue of the docs audit are in no milestone.
+  same milestone or across milestones.
+- **Some issues are in no milestone.** Every other issue is in the milestone that delivers it. No
+  milestone delivers these kinds, and a milestone groups work but does not order it, as
+  [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) agrees. They are a `bug` issue
+  for CI on `main`, an issue NexKit opens for a flaky test, an issue for a Dependabot advisory, an
+  issue of the docs audit, a `process` issue, a [design issue](#design-changes) and a `refactor`
+  issue, such as one that a design review finds.
 - **Bugs go first, then the work on how Axis is built.** Autopilot's [`priority`][nexkit-labels]
   setting lists the labels whose issues start before the others, in this order: `nexkit:ci` for a
   failure of CI on `main`, `nexkit:dependabot` for an advisory, `bug`, `nexkit:flaky` for a flaky
@@ -238,7 +243,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   longer than 90 s" can be verified, while "Axis.Server.Tests finishes under 90 s" cannot, because
   no check reports the time against the limit.
 - **Docs and concepts.** The issue links to the doc sections it implements, is in the milestone that
-  delivers it, and names the concepts it touches in its own text, in the terms of
+  delivers it or in none when [how issues run](#how-issues-run) says so, and names the concepts it
+  touches in its own text, in the terms of
   [concepts.md](domain/concepts.md), so triage can choose the [profile](#profiles). Its plan and its
   pull request then carry the `Docs:` line of
   [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
@@ -318,9 +324,10 @@ change, a design review and a sync are in the
 - **A new screen is designed first,** as
   [D140](decisions/d140-a-new-screen-is-designed-first-on-a-short-prototype-with-fixtures.md) agrees. A
   new screen or a new way of interacting gets a design review before it is built. A screen made of
-  agreed patterns needs none. Each group of new screens has one design issue with the `on-hold`
-  label, so NexKit does not start it until the review ends, and the issues that build those screens are
-  *blocked by* it. The open design issues are the queue of reviews.
+  agreed patterns needs none. Each group of new screens has one design issue, in no milestone as
+  [how issues run](#how-issues-run) says, with the `on-hold` label, so NexKit does not start it until
+  the review ends, and the issues that build those screens are *blocked by* it. The open design
+  issues are the queue of reviews.
 - **Several changes are a design review.** When the owner reviews the design in words, one change at
   a time, the session prototypes each change in the real widget code on a
   `design/<yyyy-mm-dd>-<topic>` branch, which holds only what the design needs, and the owner sees it
