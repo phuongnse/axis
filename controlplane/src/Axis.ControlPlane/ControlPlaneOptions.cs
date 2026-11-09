@@ -12,7 +12,8 @@ namespace Axis.ControlPlane;
 /// <c>docs/reference/control-plane.md#operators</c>. The region, the tenant domain, the connection string, the mail sender
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
-/// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id and both titles.
+/// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
+/// The sign-up documents are optional as a group, and once one is set, all of them are required.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -258,9 +259,39 @@ public sealed partial class ControlPlaneOptions
             {
                 problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Titles)}:vi is required.");
             }
+
+            if (string.IsNullOrWhiteSpace(application?.Descriptions.En))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Descriptions)}:en is required.");
+            }
+
+            if (string.IsNullOrWhiteSpace(application?.Descriptions.Vi))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpApplicationOptions.Descriptions)}:vi is required.");
+            }
+        }
+
+        if (signUp.HasDocuments)
+        {
+            var prefix = $"{SectionName}:{nameof(SignUp)}";
+            DocumentProblems(problems, $"{prefix}:{nameof(SignUpOptions.Terms)}", signUp.Terms);
+            DocumentProblems(problems, $"{prefix}:{nameof(SignUpOptions.Dpa)}", signUp.Dpa);
+            DocumentProblems(problems, $"{prefix}:{nameof(SignUpOptions.Privacy)}", signUp.Privacy);
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpOptions.LicencesUrl)}", signUp.LicencesUrl);
         }
 
         return problems;
+    }
+
+    private static void DocumentProblems(List<string> problems, string prefix, SignUpDocumentOptions document)
+    {
+        if (string.IsNullOrWhiteSpace(document.Version))
+        {
+            problems.Add($"The setting {prefix}:{nameof(SignUpDocumentOptions.Version)} is required.");
+        }
+
+        AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:en", document.Urls.En);
+        AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:vi", document.Urls.Vi);
     }
 
     private static List<string> DnsProblems(ControlPlaneDnsOptions dns, bool outsideDevelopment)

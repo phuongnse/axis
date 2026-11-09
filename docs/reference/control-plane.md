@@ -189,7 +189,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   optional, and once it is set a DNS provider is required. The cell settings are optional, and once a cell is listed, all of its settings, its secret
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
-  needs an id and both titles. The public URL is optional.
+  needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
+  their settings is set, all of them are required. The public URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, and never its value.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets and the DNS key
@@ -229,6 +230,18 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
+| `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Dpa:Version` | The version of the data processing agreement that a person accepts. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Dpa:Urls:en` | The English address of the data processing agreement | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Dpa:Urls:vi` | The Vietnamese address of the data processing agreement | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Privacy:Version` | The version of the privacy policy that a person accepts. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Privacy:Urls:en` | The English address of the privacy policy | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the

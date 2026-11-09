@@ -430,7 +430,9 @@ public sealed class ControlPlaneOptionsTests
     [InlineData("Id", "ControlPlane:SignUp:Applications:0:Id")]
     [InlineData("Titles:en", "ControlPlane:SignUp:Applications:0:Titles:en")]
     [InlineData("Titles:vi", "ControlPlane:SignUp:Applications:0:Titles:vi")]
-    public void A_sign_up_application_missing_its_id_or_a_title_stops_the_start_and_the_message_names_it(string missing, string setting)
+    [InlineData("Descriptions:en", "ControlPlane:SignUp:Applications:0:Descriptions:en")]
+    [InlineData("Descriptions:vi", "ControlPlane:SignUp:Applications:0:Descriptions:vi")]
+    public void A_sign_up_application_missing_its_id_a_title_or_a_description_stops_the_start_and_the_message_names_it(string missing, string setting)
     {
         var settings = SignUpApplicationSettings("approvals", "Approvals", "Phê duyệt");
         settings[$"ControlPlane:SignUp:Applications:0:{missing}"] = string.Empty;
@@ -466,6 +468,8 @@ public sealed class ControlPlaneOptionsTests
         Assert.Equal("approvals", application.Id);
         Assert.Equal("Approvals", application.Titles.En);
         Assert.Equal("Phê duyệt", application.Titles.Vi);
+        Assert.Equal("Approve requests", application.Descriptions.En);
+        Assert.Equal("Duyệt yêu cầu", application.Descriptions.Vi);
     }
 
     [Fact]
@@ -476,6 +480,73 @@ public sealed class ControlPlaneOptionsTests
         using var client = factory.CreateClient();
 
         Assert.Empty(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.Applications);
+    }
+
+    [Theory]
+    [InlineData("Terms:Version")]
+    [InlineData("Terms:Urls:en")]
+    [InlineData("Terms:Urls:vi")]
+    [InlineData("Dpa:Version")]
+    [InlineData("Dpa:Urls:en")]
+    [InlineData("Dpa:Urls:vi")]
+    [InlineData("Privacy:Version")]
+    [InlineData("Privacy:Urls:en")]
+    [InlineData("Privacy:Urls:vi")]
+    [InlineData("LicencesUrl")]
+    public void A_sign_up_document_missing_one_setting_stops_the_start_and_the_message_names_it(string missing)
+    {
+        var settings = SignUpDocumentSettings();
+        settings[$"ControlPlane:SignUp:{missing}"] = string.Empty;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:SignUp:{missing}", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Terms:Urls:en", "http://example.com/terms/en")]
+    [InlineData("Dpa:Urls:vi", "not a url")]
+    [InlineData("LicencesUrl", "http://example.com/licences")]
+    public void A_sign_up_document_address_that_is_not_an_absolute_https_url_stops_the_start_and_the_message_names_it(string key, string value)
+    {
+        var settings = SignUpDocumentSettings();
+        settings[$"ControlPlane:SignUp:{key}"] = value;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:SignUp:{key}", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_valid_set_of_sign_up_documents_loads()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: SignUpDocumentSettings());
+
+        using var client = factory.CreateClient();
+
+        var signUp = factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp;
+        Assert.True(signUp.HasDocuments);
+        Assert.Equal("2026-01", signUp.Terms.Version);
+        Assert.Equal("https://example.com/terms/en", signUp.Terms.Urls.En);
+        Assert.Equal("https://example.com/terms/vi", signUp.Terms.Urls.Vi);
+        Assert.Equal("2026-02", signUp.Dpa.Version);
+        Assert.Equal("https://example.com/dpa/vi", signUp.Dpa.Urls.Vi);
+        Assert.Equal("2026-03", signUp.Privacy.Version);
+        Assert.Equal("https://example.com/privacy/en", signUp.Privacy.Urls.En);
+        Assert.Equal("https://example.com/licences", signUp.LicencesUrl);
+    }
+
+    [Fact]
+    public void With_no_sign_up_document_the_service_starts()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.False(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.HasDocuments);
     }
 
     [Fact]
@@ -532,6 +603,22 @@ public sealed class ControlPlaneOptionsTests
         ["ControlPlane:SignUp:Applications:0:Id"] = id,
         ["ControlPlane:SignUp:Applications:0:Titles:en"] = en,
         ["ControlPlane:SignUp:Applications:0:Titles:vi"] = vi,
+        ["ControlPlane:SignUp:Applications:0:Descriptions:en"] = "Approve requests",
+        ["ControlPlane:SignUp:Applications:0:Descriptions:vi"] = "Duyệt yêu cầu",
+    };
+
+    private static Dictionary<string, string?> SignUpDocumentSettings() => new()
+    {
+        ["ControlPlane:SignUp:Terms:Version"] = "2026-01",
+        ["ControlPlane:SignUp:Terms:Urls:en"] = "https://example.com/terms/en",
+        ["ControlPlane:SignUp:Terms:Urls:vi"] = "https://example.com/terms/vi",
+        ["ControlPlane:SignUp:Dpa:Version"] = "2026-02",
+        ["ControlPlane:SignUp:Dpa:Urls:en"] = "https://example.com/dpa/en",
+        ["ControlPlane:SignUp:Dpa:Urls:vi"] = "https://example.com/dpa/vi",
+        ["ControlPlane:SignUp:Privacy:Version"] = "2026-03",
+        ["ControlPlane:SignUp:Privacy:Urls:en"] = "https://example.com/privacy/en",
+        ["ControlPlane:SignUp:Privacy:Urls:vi"] = "https://example.com/privacy/vi",
+        ["ControlPlane:SignUp:LicencesUrl"] = "https://example.com/licences",
     };
 
     /// <summary>Empty files that exist, so a test of the settings needs no certificate.</summary>
