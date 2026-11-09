@@ -90,7 +90,8 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
   sentence that links it, but never restates its detail.
 - **Give the reason** when a reader would ask why, in a sentence next to the rule. A longer argument
   is a decision, which the page links.
-- **State a rule's scope by kind.** A rule says what it covers by what those things are, such as
+- **State a rule's scope by kind.** A rule, in the docs, AGENTS.md, a skill or a check, says what it
+  covers by what those things are, such as
   "every text that Axis shows or sends to a person", never by a list of the folders, files, pages or
   cases that hold them today. A new one then falls under the rule without a change, where a list
   would leave it out until someone remembers to add it.
@@ -235,9 +236,10 @@ reads their diff and an agent can read and change them.
 
 Docs drift when a change adds a rule and leaves the old one beside it, when progress is written into
 the text, when one fact lives in two places, when work is built and its page still says planned, and
-when a list of what the code defines misses an entry. These rules close each of them, in three layers:
-every pull request, the tests, and an audit every hundred merges, as
-[D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees.
+when a list of what the code defines misses an entry, and when a setting's value is copied into the
+text. These rules close each of them, in three layers: every pull request, the tests, and an audit
+every few merges, as [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md)
+agrees.
 
 1. **Every pull request states its docs.** Its plan and its description have a line `Docs:` that names
    the doc sections it changes, or says why it changes none. It rewrites the section that describes
@@ -246,8 +248,8 @@ every pull request, the tests, and an audit every hundred merges, as
    code. A pull request that makes any doc statement false fixes it. The review checks the docs diff
    against the code diff: each rule it touches has one home, nothing of an old rule is left, nothing
    it built is still marked planned, and no progress or history entered the text. NexKit's plan and
-   review answer these checks one by one, as the
-   [review checklist](delivery.md#how-pull-requests-merge) in its settings.
+   review check these rules through the [review checklist](delivery.md#how-pull-requests-merge) in
+   its settings.
 2. **A changed decision is a new decision,** which replaces the old one as
    [Decisions](#decisions) says.
 3. **A design review writes reference pages.** The docs change that ends a
@@ -274,7 +276,11 @@ every pull request, the tests, and an audit every hundred merges, as
    `artifacts/openapi/axis-server.json`: every route in it has a row in a table whose header is `Route`,
    or a heading made of the backticked route, and the reverse holds too. A table of another service's
    routes uses another header, such as `Stub route`.
-8. **An audit reads the docs against the code every hundred merges.** The docs audit workflow reads a
+8. **A doc names a NexKit setting, never its value.** The docs, the decisions and the skills say
+   which setting of `.nexkit/config.json` does a job and why it is set as it is, such as "raised above
+   NexKit's default" or "every few merges". The value lives in that file alone, so the owner tunes it
+   with a change to that file and no other. The review refuses a value copied from it.
+9. **An audit reads the docs against the code every few merges.** The docs audit workflow reads a
    quarter of the pages each run, in turn. The pages are every Markdown page under `docs/`, every Markdown file of a
    skill under `.claude/skills/` and AGENTS.md. It reads them as the
    [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md) says. Its model only reads; a
@@ -282,16 +288,16 @@ every pull request, the tests, and an audit every hundred merges, as
    finding that the cap leaves out is reported again by its page's next run. A docs fix that holds a
    *wrong* finding is labelled `bug`, so it runs before the milestones' features: a wrong page misleads
    every agent that reads it. The skill gives the details.
-9. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
-   added only once the whole tree passes it: there are no baselines and no lists of exceptions.
-   - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
-     the repository.
-   - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
-     doc, that the decisions index matches the decision files and that a superseded row names a live
-     decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
-     limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
-     [development users](reference/security.md#development-users) table against the development
-     realm. It also checks the decisions that the code and the docs cite, the sections the code links and
-     the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
-     module per rule under `scripts/lib/docs/`, each with its own test.
-   - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.
+10. **Checks catch what a machine can.** `scripts/lint.sh` runs them on every change. A docs check is
+    added only once the whole tree passes it: there are no baselines and no lists of exceptions.
+    - [`scripts/check-links.mjs`](../scripts/check-links.mjs) checks every relative link and anchor in
+      the repository.
+    - [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that `docs/README.md` lists every
+      doc, that the decisions index matches the decision files and that a superseded row names a live
+      decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
+      limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
+      [development users](reference/security.md#development-users) table against the development
+      realm. It also checks the decisions that the code and the docs cite, the sections the code links and
+      the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
+      module per rule under `scripts/lib/docs/`, each with its own test.
+    - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.

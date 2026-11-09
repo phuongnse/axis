@@ -288,7 +288,7 @@
     "enabled": true,
     "scope": null,
     "answer": "recommended",
-    "max_parallel": 1,
+    "max_parallel": 3,
     "watch_workflows": [],
     "trusted_workflows": [
       "docs-audit.yml"
@@ -331,16 +331,11 @@
   ],
   "review": {
     "checklist": [
-      "The change leaves no doc statement false: what changed is rewritten where it is described, the rule it replaces is deleted, the planned marker of what it builds is removed, and no name it renames or removes is still named under docs/, in AGENTS.md or under .claude/skills/",
-      "Each rule the change touches is stated in one place, and any other place, AGENTS.md included, only links to it in a sentence",
-      "The docs diff adds no progress, history, dates, milestone or issue numbers",
-      "An Agreed decision changes only in wording or links: a change to its choice is a new decision that supersedes it whole",
-      "A doc list of what the code defines that the change adds or extends has a unit test that reads the list from the doc and from the code and compares them",
-      "A change that adds a new kind of route, host, caller, stored secret or integration updates docs/reference/threat-model.md",
-      "The change adds no exception to a check and loosens none: no new entry in an accepted list or rise of a baseline count, and no rule removed, narrowed or skipped in a check script under scripts/ or its test",
-      "No test or check names something that was removed: a removal deletes the thing and its tests, and a rule against a kind of mistake is stated as the current rule, never as a list of removed names",
-      "A rule the change adds or changes, in the docs, AGENTS.md, a skill or a check, states what it covers by kind, never by a list of the folders, files, pages or cases that hold those things today",
-      "A change that adds or changes a screen text, as docs/reference/ui-writing.md defines it, writes each locale from the text's purpose, names each concept by the term in docs/reference/ui-glossary.json and adds a concept with no term to docs/reference/ui-glossary-proposed.json"
+      "The change keeps every rule of docs/writing-docs.md and leaves no doc statement false: read the page and check the diff, code included, against each of its rules",
+      "The change keeps docs/testing.md#rules-for-tests: read that section and check the tests and checks the change adds, changes or removes against each of its rules",
+      "The change adds no exception to a check and loosens none, as docs/delivery.md#how-pull-requests-merge states",
+      "The change keeps docs/reference/shared-widgets.md#the-rule: for each thing it draws, loads or checks, search for the widget, helper or route that already does that job and check that the change uses or extends it, adds no second way to it, and gives a new shared widget its row in that page",
+      "A change that adds or changes a screen text keeps docs/reference/ui-writing.md and its glossary: read the page and check each text against each of its rules"
     ]
   },
   "github_app": {

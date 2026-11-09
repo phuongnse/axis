@@ -1,11 +1,11 @@
 name: CI
 
-# CI runs on main alone (D139). NexKit checks every branch with the same scripts: its own pull
+# CI runs on main alone (D146). NexKit checks every branch with the same scripts: its own pull
 # requests in each round, and a person's at /nexkit review, so a push to a branch starts no CI. A
 # pull request that changes this file runs it, so the change is tried before it merges. On main,
-# NexKit starts CI once every 5 of its merges rather than a push starting it after each one. It also
-# runs on demand. Once a week the schedule runs the dependency and image scans alone, so a new
-# advisory fails CI on main even when nothing merged (D107).
+# NexKit starts CI every few merges, by merge.after_workflows, rather than a push starting it after
+# each one. It also runs on demand. Once a week the schedule runs the dependency and image scans
+# alone, so a new advisory fails CI on main even when nothing merged (D107).
 on:
   pull_request:
     branches: [main]

@@ -36,9 +36,9 @@ Four actors take part in the work, and each has its own part.
   what the owner alone can decide.
 - **The docs audit** is the `docs-audit.yml` workflow, which follows the
   [`axis-docs-audit` skill](../.claude/skills/axis-docs-audit/SKILL.md). It reads a quarter of the docs,
-  the skills and AGENTS.md against the code every hundred merges and opens a NexKit issue for each group
+  the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
   of findings that no open issue covers, code and test fixes first and at most ten a run, as
-  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agrees and the
+  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees and the
   skill says. It changes no file itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
@@ -78,8 +78,8 @@ that holds it.
   request. Any other issue waits until the owner reads it and comments
   [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
-  because its [`dependabot`][nexkit-dependabot] setting is `high`, as
-  [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
+  as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
+  Its [`dependabot`][nexkit-dependabot] setting holds the lowest severity it takes.
   NexKit's App reads the alerts with its *Dependabot alerts: read* permission.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
   recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
@@ -87,12 +87,12 @@ that holds it.
   `/nexkit fix` on the pull request.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
   [`request` skill][nexkit-request]. A milestone ends in two waves, which the `labels` setting gives to
-  two labels: its journey carries `journey` (wave 1), so it starts once every other issue of the
-  milestone is closed, and its docs sweep carries `docs-sweep` (wave 2), so it starts once the
-  journey is closed too. Issues opened later and the parts of a split count without any *blocked by*
-  mark. Autopilot's `max_parallel` setting runs one issue at a time, as
-  [D143](decisions/d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md) agrees, so
-  that the Claude usage limits last for one issue's work.
+  two labels, the journey's first: its journey carries `journey`, so it starts once every other issue
+  of the milestone is closed, and its docs sweep carries `docs-sweep`, so it starts once the journey
+  is closed too. Issues opened later and the parts of a split count without any *blocked by*
+  mark. Autopilot's `max_parallel` setting caps how many issues run at once, so that their agent
+  sessions fit in the Claude usage limits and their rounds of checks in the runner jobs. The owner
+  tunes it, as [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees.
 - **A second Claude subscription takes over at the usage limit,** as the fallback agent in
   `agents`, so NexKit pauses only when both are at their limit.
 - **A parent issue closes when its last part does,** with `close_parent_issues` on.
@@ -105,7 +105,7 @@ that holds it.
   hand-made pull request.
 - **NexKit resolves conflicts with `main` by itself,** with `conflicts.auto_resolve` on. The rules on
   `main` do not want a branch to be up to date, as
-  [D143](decisions/d143-branches-need-not-be-up-to-date-and-one-issue-runs-at-a-time.md) agrees, so a
+  [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees, so a
   pull request merges once its checks pass on its own branch, and a merge does not send the waiting
   pull requests through another round. Two pull requests that pass alone can break `main` together,
   and CI on `main` finds it. `conflicts.max_rounds` is raised above NexKit's default, so a pull
@@ -118,18 +118,18 @@ that holds it.
   need the owner's review, as
   [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
   agrees. NexKit cannot merge it until the owner approves it, and then NexKit merges it. The owner checks
-  one thing: whether the change accepts a risk, adds an exception or loosens a check, and why. The
-  other checks need no person: Axis's review checklist refuses a change that adds an exception to a
-  check or loosens one, so NexKit mentions the owner only when a change does.
-- **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
-  rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
-  check in the diff, the rule that an Agreed [decision](writing-docs.md#decisions) changes only by a
-  new one, the rule that a change adds no exception to a check and loosens none, the rule on
-  removals in [testing](testing.md#rules-for-tests), the rule that a rule
-  [states its scope by kind](writing-docs.md#reference-pages), and the rules of [UI writing](reference/ui-writing.md)
-  and its glossary for a change that adds or changes a screen text. Each item checks one thing. An item not met requests changes
-  like a blocking finding, so a pull request that leaves a doc false or loosens a check does not
-  merge.
+  one thing: whether the change accepts a risk, adds an exception or loosens a check, and why.
+- **A change adds no exception to a check and loosens none:** no new entry in an accepted list or
+  rise of a baseline count, and no rule removed, narrowed or skipped in a check script under
+  `scripts/` or its test. The review checklist refuses such a change, and NexKit then mentions the
+  owner, as [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
+  agrees.
+- **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist]
+  setting holds it. Each item names one doc section that holds rules a review can check in the diff,
+  summarizes it in a sentence and asks the review to check the diff against each of its rules. The
+  rules stay in their section, so a new rule adds no item. A rule that a script or a test can check is
+  checked there, not by the review. An item not met requests changes like a blocking finding, so a pull
+  request that leaves a doc false or loosens a check does not merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
@@ -141,8 +141,10 @@ that holds it.
 
 - **NexKit starts CI, CodeQL, the performance workflow and the docs audit on `main` every few
   merges,** with its `merge.after_workflows` setting, which holds how many merges each waits, as
-  [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md) and
-  [D135](decisions/d135-docs-stay-true-and-an-audit-reads-them-every-hundred-merges.md) agree.
+  [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) and
+  [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agree. CI waits
+  the fewest, then CodeQL and the performance workflow. The docs audit waits the most, because each
+  run costs a model session and its issues add to NexKit's queue.
   None of them runs on a push to `main` or has a schedule of its own for this, so a merge does not
   start them too, and without the setting nothing would test `main`. CI also runs on demand, and on a
   pull request that changes its own workflow file. No push to another branch starts it, because
@@ -163,7 +165,7 @@ that holds it.
   one each. A check round then takes about as long as its slowest job, instead of all of them in a
   row. A check gets a job of its own when sharing one made that job the slowest, and the integration
   and E2E suites are split into shards because one job for either came close to the check's
-  30-minute limit. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
+  `timeout_minutes`. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
   NexKit matches a failed check with the CI job that failed on `main`.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
@@ -327,7 +329,7 @@ change, a design review and a sync are in the
   in the [widget previews](reference/widget-previews.md), on fixtures. A review covers one screen
   or one group of screens, and what it finds outside them becomes an issue. The branch is pushed, so
   the review can go on from any machine, and is never merged. No push to a branch starts CI, as
-  [D139](decisions/d139-ci-runs-on-main-alone-and-nexkit-checks-every-branch.md)
+  [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md)
   agrees. A prototype is never merged, and it never gets `/nexkit review`, because it changes the widgets
   without their tests. When the review ends, the branch's last commit gets a
   `design-review/<yyyy-mm-dd>-<topic>` tag with the same date and topic, which is pushed and never

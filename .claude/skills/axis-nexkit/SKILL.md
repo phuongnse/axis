@@ -17,8 +17,10 @@ owner can answer it. Never approve, merge or close a pull request yourself.
 
 ## Where the values live
 
-Look these up each time. Do not copy them into notes or docs, because they
-change with a NexKit release or a settings change.
+Look these up each time. Do not copy them into notes, because they change
+with a NexKit release or a settings change, and the docs never hold them, as
+[how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct)
+says.
 
 - **NexKit repository and version:** the `nexkit_repository` and `nexkit_ref`
   inputs in the workflow file.

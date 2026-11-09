@@ -1,7 +1,7 @@
 name: Docs audit
 
-# Reads a quarter of the docs against the code and opens a NexKit issue for each finding (D135).
-# NexKit starts it on main once every 100 of its merges, and it also runs on demand. NexKit takes
+# Reads a quarter of the docs against the code and opens a NexKit issue for each finding (D145).
+# NexKit starts it on main every few merges, by merge.after_workflows, and it also runs on demand. NexKit takes
 # its issues because autopilot.trusted_workflows lists this file. The audit job runs Claude Code with read-only tools, no GitHub
 # token in its checkout and no permission to write; the file job runs no model and only opens
 # issues from the findings, so a page that tries to steer the model cannot write to the repository.

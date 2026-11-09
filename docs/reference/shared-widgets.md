@@ -16,6 +16,7 @@ one.
 - A caller that must build what its shared widget should know, such as the label of an option, shows
   that the widget or its data is incomplete. Fix it there, so every caller gets it.
 - If a second mechanism already exists, merge the two in the same change.
+- A new shared widget or helper gets its row in [which widget](#which-widget) in the same change.
 
 ## Which widget
 
