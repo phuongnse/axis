@@ -17,8 +17,9 @@ hold against any layer a business writes.
   employee, each with an optional minimum amount. A business's administrator changes them in the
   running application, with no Studio and no publish. Studio and layers stay for deeper changes.
 - **`organization` holds departments and employees.** A department has a head and a parent, and an
-  employee a line manager and the account they sign in with. It keeps no personal data beyond what
-  routing work needs.
+  employee a line manager and the account they sign in with. It keeps only the contact and routing
+  data an office needs, and no further personal data, see
+  [the organization module](../reference/built-in-modules.md#the-organization-module).
 - **Delegation.** An employee names a delegate and the dates of an absence. While it lasts, an
   approval goes to the delegate, and the decision records whom it was made for.
 - **The contract of approvals.** Nobody decides their own request, and each step is decided once,
