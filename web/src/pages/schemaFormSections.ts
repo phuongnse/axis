@@ -16,4 +16,5 @@ export const sectionsByKind: Record<string, FormSection[]> = {
     { name: 'fileStorage', properties: ['fileStorage'] },
   ],
   role: [{ name: 'general', properties: ['name', 'label', 'description'] }],
+  process: [{ name: 'general', properties: ['name', 'description', 'startCondition'] }],
 }

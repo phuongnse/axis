@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useEffect, useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { TextProvider } from '../platform/TextProvider'
 import { setAt } from '../platform/jsonPatch'
 import type { StudioNames } from '../platform/studio'
@@ -13,6 +14,63 @@ import { useThemeMode } from '../platform/themeMode'
 import { chooseOption, openDropdown, optionTexts, selectRoot } from '../test/antd'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { ProcessEditor } from './ProcessEditor'
+
+const english: Record<string, string> = platformEnglish
+const vietnamese: Record<string, string> = platformVietnamese
+
+/** The label and the help of a process field, by the path of its property. */
+const label = (path: string) => english[`shell.studio.field.process.${path}`]
+const help = (path: string) => english[`shell.studio.field.process.${path}.help`]
+
+/** Every path of the process file that the editor draws a field or a group for, see docs/reference/studio-resource-form.md#fields. */
+const drawnPaths = [
+  'name',
+  'description',
+  'startCondition',
+  'startCondition.expression',
+  'startCondition.message',
+  'entity',
+  'parameters',
+  'parameters.name',
+  'parameters.type',
+  'start',
+  'steps.name',
+  'steps.type',
+  'steps.next',
+  'steps.otherwise',
+  'steps.branches',
+  'steps.branches.when',
+  'steps.branches.next',
+  'steps.label',
+  'steps.assignee',
+  'steps.assignee.user',
+  'steps.assignee.role',
+  'steps.form',
+  'steps.dueIn',
+  'steps.deadline',
+  'steps.deadline.after',
+  'steps.deadline.next',
+  'steps.escalations',
+  'steps.escalations.after',
+  'steps.escalations.reassign',
+  'steps.escalations.reassign.user',
+  'steps.escalations.reassign.role',
+  'steps.escalations.notify',
+  'steps.timer',
+  'steps.wait',
+  'steps.until',
+  'steps.event',
+  'steps.when',
+  'steps.timeout',
+  'steps.timeout.after',
+  'steps.timeout.next',
+  'steps.process',
+  'steps.subject',
+  'steps.outcomes',
+  'steps.outcomes.name',
+  'steps.outcomes.label',
+  'steps.outcomes.next',
+]
 
 // The expression editor is CodeMirror. The mock shows the names it is offered, which is what these tests check.
 vi.mock('./ExpressionEditor', () => ({
@@ -181,10 +239,8 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const editor = screen.getByTestId('studio-process-editor')
     expect(editor.closest(`[data-theme-mode=${mode}]`)).not.toBeNull()
     expect(editor).toBeVisible()
-    expect(screen.getByRole('textbox', { name: platformEnglish['shell.studio.field.process.name'] })).toHaveValue(
-      'PurchaseRequestApproval',
-    )
-    expect(selectRoot(screen.getByRole('combobox', { name: 'Start step' }))).toBeVisible()
+    expect(screen.getByRole('textbox', { name: label('name') })).toHaveValue('PurchaseRequestApproval')
+    expect(selectRoot(screen.getByRole('combobox', { name: label('start') }))).toBeVisible()
     for (let index = 0; index < process.steps.length; index++) {
       expect(screen.getByTestId(`studio-step-${index}`)).toBeVisible()
     }
@@ -233,7 +289,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     ]) {
       expect(within(card).getByTestId(`studio-field-${field}`)).toBeVisible()
     }
-    expect(within(card).getByRole('textbox', { name: 'Due in' })).toHaveValue('P3D')
+    expect(within(card).getByRole('textbox', { name: label('steps.dueIn') })).toHaveValue('P3D')
     expect(within(card).getByRole('radio', { name: 'User' })).toBeChecked()
     expect(within(card).getByRole('button', { name: 'Add outcome' })).toBeVisible()
   })
@@ -298,7 +354,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
     expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: '' }])
     await userEvent.type(field('/steps/1/escalations/0/after').getByRole('textbox'), 'P1D')
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    await userEvent.click(
+      field('/steps/1/escalations/0').getByRole('switch', { name: label('steps.escalations.notify') }),
+    )
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).toEqual({
       to: [],
       channels: [],
@@ -327,7 +385,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     ])
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).not.toHaveProperty('next')
 
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    await userEvent.click(
+      field('/steps/1/escalations/0').getByRole('switch', { name: label('steps.escalations.notify') }),
+    )
     expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: 'P1D' }])
   })
 
@@ -336,7 +396,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
 
     await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    await userEvent.click(
+      field('/steps/1/escalations/0').getByRole('switch', { name: label('steps.escalations.reassign') }),
+    )
     expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({ user: '' })
 
     // The task's own assignee stays a user while the escalation's group switches.
@@ -348,7 +410,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     })
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'department.manager' })
 
-    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    await userEvent.click(
+      field('/steps/1/escalations/0').getByRole('switch', { name: label('steps.escalations.reassign') }),
+    )
     expect(stepOf(latest, 1).escalations).toEqual([{ name: 'escalation1', after: '' }])
   })
 
@@ -406,7 +470,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   it('switches the subject between an entity and parameters and keeps only the chosen key', async () => {
     const latest = renderEditor(process, true)
     const offered = async () =>
-      ((await screen.findByRole('group', { name: 'When' })).getAttribute('data-options') ?? '').split(',')
+      (
+        (await screen.findByRole('group', { name: label('steps.branches.when') })).getAttribute('data-options') ?? ''
+      ).split(',')
     // The radio input of a button group has no pointer events, so the click goes to its label.
     const switchTo = (name: string) => userEvent.click(screen.getByRole('radio', { name }).closest('label')!)
 
@@ -421,7 +487,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Add parameter' }))
     expect(latest.value.parameters).toEqual([{ name: '', type: 'text' }])
-    await userEvent.type(screen.getByRole('textbox', { name: 'Parameter name' }), 'daysOverdue')
+    await userEvent.type(screen.getByRole('textbox', { name: label('parameters.name') }), 'daysOverdue')
     await chooseOption('integer', screen.getByTestId('studio-field-/parameters/0/type'))
     expect(latest.value.parameters).toEqual([{ name: 'daysOverdue', type: 'integer' }])
     const parameterOptions = await offered()
@@ -445,7 +511,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     renderEditor({ ...process, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
 
     expect(screen.getByRole('radio', { name: 'Parameters' })).toBeChecked()
-    expect(screen.getByRole('textbox', { name: 'Parameter name' })).toHaveValue('daysOverdue')
+    expect(screen.getByRole('textbox', { name: label('parameters.name') })).toHaveValue('daysOverdue')
     expect(screen.getByTestId('studio-field-/parameters')).toBeVisible()
   })
 
@@ -453,9 +519,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     renderEditor()
 
     const end = screen.getByTestId('studio-step-3')
-    expect(within(end).getByRole('textbox', { name: 'Step name' })).toHaveValue('done')
+    expect(within(end).getByRole('textbox', { name: label('steps.name') })).toHaveValue('done')
     expect(within(end).queryByTestId('studio-json-only')).toBeNull()
-    expect(within(end).queryByRole('combobox', { name: 'Next step' })).toBeNull()
+    expect(within(end).queryByRole('combobox', { name: label('steps.next') })).toBeNull()
   })
 
   it('offers every step type of the process schema in the type picker and the Add step choice', async () => {
@@ -535,7 +601,7 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     await userEvent.type(within(screen.getByTestId('studio-field-/steps/0/when')).getByRole('textbox'), 'amount > 0')
     await userEvent.click(within(card).getByRole('button', { name: 'Add timeout' }))
     expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
-    await userEvent.type(within(card).getByRole('textbox', { name: 'After' }), 'P2D')
+    await userEvent.type(within(card).getByRole('textbox', { name: label('steps.timeout.after') }), 'P2D')
     await chooseOption('chase', screen.getByTestId('studio-field-/steps/0/timeout/next'))
     await chooseOption('done', screen.getByTestId('studio-field-/steps/0/next'))
 
@@ -564,12 +630,12 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       ],
     })
     const card = screen.getByTestId('studio-step-0')
-    expect(within(card).getByRole('textbox', { name: 'After' })).toHaveValue('P2D')
+    expect(within(card).getByRole('textbox', { name: label('steps.timeout.after') })).toHaveValue('P2D')
 
     await userEvent.click(within(card).getByRole('button', { name: 'Remove timeout' }))
 
     expect(stepOf(latest, 0)).not.toHaveProperty('timeout')
-    expect(within(card).queryByRole('textbox', { name: 'After' })).toBeNull()
+    expect(within(card).queryByRole('textbox', { name: label('steps.timeout.after') })).toBeNull()
     await userEvent.click(within(card).getByRole('button', { name: 'Add timeout' }))
     expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
   })
@@ -591,7 +657,9 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
       true,
     )
 
-    const group = await within(screen.getByTestId('studio-field-/steps/0/when')).findByRole('group', { name: 'When' })
+    const group = await within(screen.getByTestId('studio-field-/steps/0/when')).findByRole('group', {
+      name: label('steps.when'),
+    })
 
     const offered = (group.getAttribute('data-options') ?? '').split(',')
     expect(offered).toContain('amount')
@@ -670,12 +738,12 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     const switchTo = (name: string) => userEvent.click(within(card).getByRole('radio', { name }).closest('label')!)
 
     expect(within(card).getByRole('radio', { name: 'Wait' })).toBeChecked()
-    expect(within(card).getByRole('textbox', { name: 'Duration' })).toHaveValue('PT1H')
-    await userEvent.type(within(card).getByRole('textbox', { name: 'Duration' }), '2')
+    expect(within(card).getByRole('textbox', { name: label('steps.wait') })).toHaveValue('PT1H')
+    await userEvent.type(within(card).getByRole('textbox', { name: label('steps.wait') }), '2')
     expect(stepOf(latest, 4).wait).toBe('PT1H2')
-    await userEvent.clear(within(card).getByRole('textbox', { name: 'Duration' }))
+    await userEvent.clear(within(card).getByRole('textbox', { name: label('steps.wait') }))
     expect(stepOf(latest, 4).wait).toBe('')
-    await userEvent.type(within(card).getByRole('textbox', { name: 'Duration' }), 'PT2H')
+    await userEvent.type(within(card).getByRole('textbox', { name: label('steps.wait') }), 'PT2H')
     await chooseOption('financeCheck', screen.getByTestId('studio-field-/steps/4/next'))
     expect(stepOf(latest, 4)).toEqual({ name: 'pause', type: 'timer', wait: 'PT2H', next: 'financeCheck' })
 
@@ -715,6 +783,177 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   it('shows the expression editor for until when the draft can check expressions', async () => {
     renderEditor({ ...process, steps: [{ name: 'a', type: 'timer', until: 'dueDate', next: 'a' }] }, true)
 
-    expect(await screen.findByRole('group', { name: 'Time' })).toBeVisible()
+    expect(await screen.findByRole('group', { name: label('steps.until') })).toBeVisible()
+  })
+})
+
+/** A process with each step type that has a panel, and every optional part of a task and a wait for event step. */
+const complete = {
+  ...process,
+  steps: [
+    {
+      name: 'review',
+      type: 'task',
+      label: { textKey: 'purchaseRequest.managerApproval' },
+      assignee: { user: 'department.manager' },
+      form: 'PurchaseRequestReview',
+      dueIn: 'P3D',
+      deadline: { after: 'P5D', next: 'choose' },
+      escalations: [
+        {
+          name: 'late',
+          after: 'PT4H',
+          reassign: { user: 'department.head' },
+          notify: { to: [], channels: [], message: { subject: { textKey: '' }, body: { textKey: '' } } },
+        },
+        { name: 'later', after: 'P1D', reassign: { role: 'finance-reviewer' } },
+      ],
+      outcomes: [{ name: 'approve', label: { textKey: 'task.approve' }, next: 'choose' }],
+    },
+    {
+      name: 'choose',
+      type: 'decision',
+      branches: [{ name: 'branch1', when: 'totalAmount > 0', next: 'rest' }],
+      otherwise: 'rest',
+    },
+    { name: 'rest', type: 'timer', wait: 'PT1H', next: 'until' },
+    { name: 'until', type: 'timer', until: 'dueDate', next: 'listen' },
+    {
+      name: 'listen',
+      type: 'waitEvent',
+      event: 'PaymentReceived',
+      when: 'amount > 0',
+      timeout: { after: 'P2D', next: 'child' },
+      next: 'child',
+    },
+    { name: 'child', type: 'subProcess', process: 'OrderFulfilment', subject: 'request', next: 'done' },
+    { name: 'done', type: 'end' },
+  ],
+}
+
+describe('ProcessEditor fields', () => {
+  /** What each field is, as the step card or the form draws it: where it sits, what it is and its path. */
+  const single: [string, 'textbox' | 'combobox' | 'switch', string][] = [
+    ['studio-field-/name', 'textbox', 'name'],
+    ['studio-field-/entity', 'combobox', 'entity'],
+    ['studio-field-/start', 'combobox', 'start'],
+    ['studio-field-/steps/0/name', 'textbox', 'steps.name'],
+    ['studio-field-/steps/0/type', 'combobox', 'steps.type'],
+    ['studio-field-/steps/0/label/textKey', 'combobox', 'steps.label'],
+    ['studio-field-/steps/0/assignee/user', 'textbox', 'steps.assignee.user'],
+    ['studio-field-/steps/0/form', 'combobox', 'steps.form'],
+    ['studio-field-/steps/0/dueIn', 'textbox', 'steps.dueIn'],
+    ['studio-field-/steps/0/deadline/after', 'textbox', 'steps.deadline.after'],
+    ['studio-field-/steps/0/deadline/next', 'combobox', 'steps.deadline.next'],
+    ['studio-field-/steps/0/escalations/0/after', 'textbox', 'steps.escalations.after'],
+    ['studio-field-/steps/0/escalations/0', 'switch', 'steps.escalations.reassign'],
+    ['studio-field-/steps/0/escalations/0/reassign/user', 'textbox', 'steps.escalations.reassign.user'],
+    ['studio-field-/steps/0/escalations/1/reassign/role', 'combobox', 'steps.escalations.reassign.role'],
+    ['studio-field-/steps/0/escalations/0', 'switch', 'steps.escalations.notify'],
+    ['studio-field-/steps/0/outcomes/0/name', 'textbox', 'steps.outcomes.name'],
+    ['studio-field-/steps/0/outcomes/0/label/textKey', 'combobox', 'steps.outcomes.label'],
+    ['studio-field-/steps/0/outcomes/0/next', 'combobox', 'steps.outcomes.next'],
+    ['studio-field-/steps/1/branches/0/when', 'textbox', 'steps.branches.when'],
+    ['studio-field-/steps/1/branches/0/next', 'combobox', 'steps.branches.next'],
+    ['studio-field-/steps/1/otherwise', 'combobox', 'steps.otherwise'],
+    ['studio-field-/steps/2/wait', 'textbox', 'steps.wait'],
+    ['studio-field-/steps/2/next', 'combobox', 'steps.next'],
+    ['studio-field-/steps/3/until', 'textbox', 'steps.until'],
+    ['studio-field-/steps/4/event', 'combobox', 'steps.event'],
+    ['studio-field-/steps/4/when', 'textbox', 'steps.when'],
+    ['studio-field-/steps/4/timeout/after', 'textbox', 'steps.timeout.after'],
+    ['studio-field-/steps/4/timeout/next', 'combobox', 'steps.timeout.next'],
+    ['studio-field-/steps/5/process', 'combobox', 'steps.process'],
+    ['studio-field-/steps/5/subject', 'textbox', 'steps.subject'],
+  ]
+
+  it.each(single)('names %s by its label and describes it by its help', (testId, role, path) => {
+    renderEditor(complete)
+
+    const input = within(screen.getByTestId(testId)).getByRole(role, { name: label(path) })
+
+    expect(input).toHaveAccessibleDescription(help(path))
+    expect(screen.getAllByText(help(path))[0]).toBeVisible()
+  })
+
+  const groups: [string, string][] = [
+    ['studio-field-/description', 'description'],
+    ['studio-field-/steps/0/assignee', 'steps.assignee'],
+    ['studio-field-/steps/0/deadline', 'steps.deadline'],
+    ['studio-field-/steps/0/escalations', 'steps.escalations'],
+    ['studio-field-/steps/0/outcomes', 'steps.outcomes'],
+    ['studio-field-/steps/1/branches', 'steps.branches'],
+    ['studio-field-/steps/2/timer', 'steps.timer'],
+    ['studio-field-/steps/4/timeout', 'steps.timeout'],
+  ]
+
+  it.each(groups)('announces %s as a named group described by its help', (testId, path) => {
+    renderEditor(complete)
+
+    const group = within(screen.getByTestId(testId)).getAllByRole('group', { name: label(path) })[0]
+
+    expect(group).toHaveAccessibleDescription(help(path))
+  })
+
+  it('names the parameters of a process without an entity as a group, and each of their fields by its label', () => {
+    renderEditor({ ...process, entity: undefined, parameters: [{ name: 'daysOverdue', type: 'integer' }] })
+
+    expect(screen.getByRole('group', { name: label('parameters') })).toHaveAccessibleDescription(help('parameters'))
+    expect(screen.getByRole('textbox', { name: label('parameters.name') })).toHaveAccessibleDescription(
+      help('parameters.name'),
+    )
+    expect(
+      within(screen.getByTestId('studio-field-/parameters/0/type')).getByRole('combobox', {
+        name: label('parameters.type'),
+      }),
+    ).toHaveAccessibleDescription(help('parameters.type'))
+  })
+
+  it('shows no text key of the catalogue anywhere', () => {
+    renderEditor({ ...complete, steps: [process.steps[0], ...complete.steps] })
+
+    expect(screen.queryByText(/^shell\.studio\./)).toBeNull()
+  })
+
+  it.each(drawnPaths)('has a label and a help for %s in English and Vietnamese', (path) => {
+    for (const catalogue of [english, vietnamese]) {
+      expect(catalogue[`shell.studio.field.process.${path}`]).toBeTruthy()
+      expect(catalogue[`shell.studio.field.process.${path}.help`]).toBeTruthy()
+    }
+  })
+})
+
+describe('ProcessEditor sections', () => {
+  it('puts the Form tab in General, Subject and Steps sections, each with its heading and line', () => {
+    renderEditor()
+
+    const sections = screen.getAllByTestId(/^studio-section-/)
+    expect(sections.map((section) => section.dataset.testid)).toEqual([
+      'studio-section-general',
+      'studio-section-subject',
+      'studio-section-steps',
+    ])
+    sections.forEach((section, index) => {
+      const key = `shell.studio.section.process.${['general', 'subject', 'steps'][index]}`
+      expect(within(section).getByRole('heading', { name: english[key] })).toBeVisible()
+      expect(within(section).getByText(english[`${key}.line`])).toBeVisible()
+    })
+    expect(within(sections[0]).getByTestId('studio-field-/name')).toBeVisible()
+    expect(within(sections[0]).getByTestId('studio-field-/description')).toBeVisible()
+    expect(within(sections[0]).getByTestId('studio-field-/startCondition')).toBeVisible()
+    expect(within(sections[1]).getByRole('radio', { name: 'Entity' })).toBeChecked()
+    expect(within(sections[1]).getByTestId('studio-field-/entity')).toBeVisible()
+    expect(within(sections[2]).getByTestId('studio-field-/start')).toBeVisible()
+    expect(within(sections[2]).getByTestId('studio-step-0')).toBeVisible()
+    expect(within(sections[2]).getByRole('combobox', { name: 'Add step' })).toBeVisible()
+    expect(screen.queryByTestId('studio-section-rest')).toBeNull()
+  })
+
+  it('names the subject choice by the heading of its section', () => {
+    renderEditor()
+
+    expect(
+      screen.getByRole('radiogroup', { name: english['shell.studio.section.process.subject'] }),
+    ).toBeInTheDocument()
   })
 })
