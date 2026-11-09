@@ -90,7 +90,8 @@ A reference page describes how Axis behaves, as it is, and the agreed work that 
   sentence that links it, but never restates its detail.
 - **Give the reason** when a reader would ask why, in a sentence next to the rule. A longer argument
   is a decision, which the page links.
-- **State a rule's scope by kind.** A rule says what it covers by what those things are, such as
+- **State a rule's scope by kind.** A rule, in the docs, AGENTS.md, a skill or a check, says what it
+  covers by what those things are, such as
   "every text that Axis shows or sends to a person", never by a list of the folders, files, pages or
   cases that hold them today. A new one then falls under the rule without a change, where a list
   would leave it out until someone remembers to add it.
@@ -247,8 +248,8 @@ agrees.
    code. A pull request that makes any doc statement false fixes it. The review checks the docs diff
    against the code diff: each rule it touches has one home, nothing of an old rule is left, nothing
    it built is still marked planned, and no progress or history entered the text. NexKit's plan and
-   review answer these checks one by one, as the
-   [review checklist](delivery.md#how-pull-requests-merge) in its settings.
+   review check these rules through the [review checklist](delivery.md#how-pull-requests-merge) in
+   its settings.
 2. **A changed decision is a new decision,** which replaces the old one as
    [Decisions](#decisions) says.
 3. **A design review writes reference pages.** The docs change that ends a

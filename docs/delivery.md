@@ -118,18 +118,18 @@ that holds it.
   need the owner's review, as
   [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
   agrees. NexKit cannot merge it until the owner approves it, and then NexKit merges it. The owner checks
-  one thing: whether the change accepts a risk, adds an exception or loosens a check, and why. The
-  other checks need no person: Axis's review checklist refuses a change that adds an exception to a
-  check or loosens one, so NexKit mentions the owner only when a change does.
-- **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist] setting holds the
-  rules of [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct) that a review can
-  check in the diff, the rule that an Agreed [decision](writing-docs.md#decisions) changes only by a
-  new one, the rule that a change adds no exception to a check and loosens none, the rule on
-  removals in [testing](testing.md#rules-for-tests), the rule that a rule
-  [states its scope by kind](writing-docs.md#reference-pages), and the rules of [UI writing](reference/ui-writing.md)
-  and its glossary for a change that adds or changes a screen text. Each item checks one thing. An item not met requests changes
-  like a blocking finding, so a pull request that leaves a doc false or loosens a check does not
-  merge.
+  one thing: whether the change accepts a risk, adds an exception or loosens a check, and why.
+- **A change adds no exception to a check and loosens none:** no new entry in an accepted list or
+  rise of a baseline count, and no rule removed, narrowed or skipped in a check script under
+  `scripts/` or its test. The review checklist refuses such a change, and NexKit then mentions the
+  owner, as [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
+  agrees.
+- **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist]
+  setting holds it. Each item names one doc section that holds rules a review can check in the diff,
+  summarizes it in a sentence and asks the review to check the diff against each of its rules. The
+  rules stay in their section, so a new rule adds no item. A rule that a script or a test can check is
+  checked there, not by the review. An item not met requests changes like a blocking finding, so a pull
+  request that leaves a doc false or loosens a check does not merge.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
