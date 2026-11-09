@@ -3,7 +3,6 @@ import { createElement, useEffect, useId, useMemo, useState, type ReactNode } fr
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
-import { colourTokens } from '../platform/designTokens'
 import { EmptyState } from '../platform/EmptyState'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
@@ -110,7 +109,7 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
           width: 32,
           height: 32,
           background: colour.primary,
-          color: colourTokens.surface.light,
+          color: colour.onPrimary,
           borderRadius: radius.base,
         }}
       >

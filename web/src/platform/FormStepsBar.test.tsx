@@ -1,8 +1,30 @@
 import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { contrast } from '../test/contrast'
+import { designTokensFor } from './designTokens'
 import { FormStepsBar } from './FormStepsBar'
+import { ThemeModeProvider } from './theme'
 
 const sevenTitles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
+
+describe('FormStepsBar in dark mode', () => {
+  beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
+  afterEach(() => localStorage.clear())
+
+  it('draws the current number at 4.5:1 or more on its circle, not in the surface colour', () => {
+    render(
+      <ThemeModeProvider>
+        <FormStepsBar titles={['Basics', 'Extras']} current={1} />
+      </ThemeModeProvider>,
+    )
+
+    const circle = within(screen.getAllByRole('listitem')[1]).getByText('2')
+    expect(contrast(circle.style.color, circle.style.backgroundColor)).toBeGreaterThanOrEqual(4.5)
+    const surface = document.createElement('span')
+    surface.style.color = designTokensFor('dark').colour.surface
+    expect(circle.style.color).not.toBe(surface.style.color)
+  })
+})
 
 describe('FormStepsBar', () => {
   it('shows every title below seven steps and marks the current step', () => {

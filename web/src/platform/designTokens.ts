@@ -12,7 +12,8 @@ export interface ColourValue {
  * Ant Design derives their dark shade from the light value, so antTheme.ts passes the light value as the seed. The
  * dark value is the shade that results, which components read through useDesignTokens. The tokens that end in Text
  * colour text in that state colour, and focusRing colours every control's keyboard focus. Each text colour, and
- * focusRing, reaches WCAG contrast on surface and canvas in both modes.
+ * focusRing, reaches WCAG contrast on surface and canvas in both modes. onPrimary colours text and icons on a `primary`
+ * fill and reaches 4.5:1 on it in both modes.
  */
 export const colourTokens = {
   primary: { light: '#5b3fd9', dark: '#5039bb' },
@@ -33,6 +34,7 @@ export const colourTokens = {
   borderSubtle: { light: '#f0f0f0', dark: '#303030' },
   divider: { light: 'rgba(5,5,5,0.06)', dark: 'rgba(253,253,253,0.12)' },
   focusRing: { light: '#5b3fd9', dark: '#a38ee7' },
+  onPrimary: { light: '#ffffff', dark: '#ffffff' },
 } as const satisfies Record<string, ColourValue>
 
 /** Shadows are lists, not colours. The overlay shadow is the only one: dialogs, menus, pickers and popovers cast it. */

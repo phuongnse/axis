@@ -40,13 +40,13 @@ component holds a number of its own.
   breakpoint value of the theme.
 - **Colours.** The colours are `primary`, `success`, `warning`, `danger`, `info`, `primaryText`, `successText`,
   `warningText`, `dangerText`, `infoText`, `canvas`, `surface`, `text`, `textMuted`, `border`, `borderSubtle`,
-  `divider` and `focusRing`, each with a light and a dark value. The first five are seeds, which colour fills, icons
-  and tints. The `*Text` tokens colour text in that state colour: state text, links, the selected tab, the active
-  navigation entry, form validation messages, the current page of a pagination, destructive menu entries and the text
-  of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
-  keyboard focus of every control.
+  `divider`, `focusRing` and `onPrimary`, each with a light and a dark value. The first five are seeds, which colour
+  fills, icons and tints. The `*Text` tokens colour text in that state colour: state text, links, the selected tab, the
+  active navigation entry, form validation messages, the current page of a pagination, destructive menu entries and the
+  text of outlined and danger buttons, see [buttons](actions-and-controls.md#buttons). `focusRing` colours the solid
+  keyboard focus of every control. `onPrimary` colours text and icons on a `primary` fill.
 - **Contrast.** Every text colour reaches 4.5:1, and every border and focus ring 3:1, on `surface` and `canvas` in both
-  modes.
+  modes. `onPrimary` reaches 4.5:1 on `primary` in both modes.
 - **Shadow.** The shadow group holds `overlay`, the only shadow. Dialogs, menus, pickers and popovers cast it, and
   widgets, cards, sections and buttons cast none.
 - **Type, spacing and radius.** Type has the body and code fonts and the font size, spacing runs from `spacing-xs` to
@@ -74,7 +74,7 @@ component holds a number of its own.
   dark mode. `scripts/design-system.sh` builds them into one classic script that sets `window.Axis` with a mount for
   each preview. A mounted widget follows `data-theme` on the page's root element. For the current mode it also reads
   these custom properties from that element, and draws again when one changes:
-  - `--primary` to `--focusRing` for the colours, named as above, so `--primaryText` to `--infoText` and
+  - `--primary` to `--onPrimary` for the colours, named as above, so `--primaryText` to `--infoText` and
     `--focusRing` too;
   - `--shadowOverlay`, `--spacing-xs` to `--spacing-xl`, `--radius-base`, `--font-sans` and `--font-code`.
 

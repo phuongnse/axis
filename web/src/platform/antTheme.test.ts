@@ -34,6 +34,7 @@ describe.each(['light', 'dark'] as const)('the Ant Design theme in %s mode', (mo
       borderSubtle: token.colorBorderSecondary,
       divider: token.colorSplit,
       focusRing: token.controlOutline,
+      onPrimary: token.colorTextLightSolid,
     }).toEqual(colour)
   })
 })
