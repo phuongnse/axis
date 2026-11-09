@@ -62,7 +62,7 @@ test('two software records are picked on an asset form, shown on its detail, and
   await expect(labels).toHaveText(`${word}${excel}`)
 
   await page.goto(`/e2e/assetform/${asset.id}`)
-  await page.getByRole('button', { name: `Delete row ${word}`, exact: true }).click()
+  await page.getByRole('button', { name: `Remove ${word}`, exact: true }).click()
   await expect(page.getByTestId('references-software-announcement')).toHaveText(`Removed ${word}`)
   await saveAsset(page, asset.id)
 

@@ -348,6 +348,7 @@ const texts = {
   'shell.form.clear': 'Clear',
   'shell.form.addRow': 'Add row',
   'shell.form.removeRow': 'Delete row',
+  'shell.form.removeReference': 'Remove',
   'shell.form.add': 'Add',
   'shell.form.added': 'Added',
   'shell.form.removed': 'Removed',
@@ -1003,12 +1004,12 @@ describe('FormWidget', () => {
       within(list)
         .getAllByRole('listitem')
         .map((item) => item.firstChild?.textContent),
-    ).toEqual(['WordDelete row', 'ExcelDelete row'])
+    ).toEqual(['WordRemove', 'ExcelRemove'])
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete row Word' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Word' }))
     expect(announcement).toHaveTextContent('Removed Word')
     expect(screen.getByRole('button', { name: 'Add Software' })).toHaveFocus()
-    expect(screen.queryByRole('button', { name: 'Delete row Word' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Remove Word' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Visio'))
@@ -1059,7 +1060,7 @@ describe('FormWidget', () => {
     renderForm(noteId, softwareWidget)
     await screen.findByText('Excel')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete row Word' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Word' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add Software' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Word'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -1077,7 +1078,7 @@ describe('FormWidget', () => {
     renderForm(noteId, softwareWidget)
 
     expect(await screen.findByText(wordId)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: `Delete row ${wordId}` })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Remove ${wordId}` })).toBeInTheDocument()
   })
 
   it('shows a read-only references field as its labels without Add or Remove buttons', async () => {
@@ -1781,6 +1782,7 @@ describe('FormWidget', () => {
     for (const catalog of [platformEnglish, platformVietnamese]) {
       expect(catalog).toHaveProperty(['shell.form.addRow'])
       expect(catalog).toHaveProperty(['shell.form.removeRow'])
+      expect(catalog).toHaveProperty(['shell.form.removeReference'])
     }
   })
 

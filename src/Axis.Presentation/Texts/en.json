@@ -611,6 +611,7 @@
   "shell.form.upload": "Upload",
   "shell.form.uploaded": "Uploaded",
   "shell.form.removeFile": "Remove",
+  "shell.form.removeReference": "Remove",
   "shell.form.fileTooLarge": "The file is too large.",
   "shell.form.fileTypeRefused": "This type of file is not accepted.",
   "shell.form.uploadFailed": "The file could not be uploaded.",

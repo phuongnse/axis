@@ -611,6 +611,7 @@
   "shell.form.upload": "Tải lên",
   "shell.form.uploaded": "Đã tải lên",
   "shell.form.removeFile": "Gỡ",
+  "shell.form.removeReference": "Gỡ",
   "shell.form.fileTooLarge": "Tệp quá lớn.",
   "shell.form.fileTypeRefused": "Không nhận loại tệp này.",
   "shell.form.uploadFailed": "Không tải lên được tệp.",
