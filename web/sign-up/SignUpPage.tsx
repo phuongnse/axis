@@ -357,12 +357,9 @@ export function SignUpPage({
             <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
               {t('signUp.inbox.notThere')}
             </Typography.Paragraph>
-            <div role="status">
-              {resendState === 'sent' && (
-                <Typography.Text style={{ color: colour.successText }}>{t('signUp.inbox.resent')}</Typography.Text>
-              )}
-            </div>
-            {resendState === 'failed' && <Alert type="error" title={t('signUp.inbox.resendFailed')} />}
+            {/* Proposed: a notice after an action is an info Alert, as the identity provider's card pages give one. */}
+            {resendState === 'sent' && <Alert type="info" showIcon title={t('signUp.inbox.resent')} />}
+            {resendState === 'failed' && <Alert type="error" showIcon title={t('signUp.inbox.resendFailed')} />}
             <AxisButton id="sign-up-resend" role="secondary" block loading={resendState === 'sending'} onClick={resend}>
               {t('signUp.inbox.resend')}
             </AxisButton>
@@ -383,7 +380,7 @@ export function SignUpPage({
                 person who pressed Sign up at the foot of the long form sees it. */}
             {formError !== undefined && (
               <div ref={formErrorRef} tabIndex={-1} style={{ outline: 'none' }}>
-                <Alert type="error" title={formError} />
+                <Alert type="error" showIcon title={formError} />
               </div>
             )}
             {/* Proposed: every field but Start from and the terms box is required, with its mark and its help. */}

@@ -116,6 +116,13 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         colorPrimary: colour.primaryText,
         colorPrimaryHover: colour.primaryText,
       },
+      // Proposed: an alert's icon is drawn in the token's colour, so it takes the text colour that passes 3:1 in both modes.
+      Alert: {
+        colorSuccess: colour.successText,
+        colorWarning: colour.warningText,
+        colorError: colour.dangerText,
+        colorInfo: colour.infoText,
+      },
       // A status tag draws its text in the token's colour, so it takes the text colour that passes contrast.
       Tag: {
         colorSuccess: colour.successText,
