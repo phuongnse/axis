@@ -6,6 +6,6 @@ Your Axis is ready. You can sign in at:
 
 {{tenantAddress}}
 
-If you need help, reply to the team that invited you or contact Axis support.
+If you need help, contact Axis support.
 
 The Axis team

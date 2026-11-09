@@ -9,8 +9,8 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Tests;
 
 /// <summary>
-/// The built-in module <c>approvals</c> 1.0.0 under <c>modules/approvals</c>, which the test project copies to the
-/// test output as <c>BuiltInModules/approvals/1.0.0</c>. It depends on the built-in module <c>organization</c>.
+/// The built-in module <c>approvals</c> 1.0.1 under <c>modules/approvals</c>, which the test project copies to the
+/// test output as <c>BuiltInModules/approvals/1.0.1</c>. It depends on the built-in module <c>organization</c>.
 /// </summary>
 public sealed class ApprovalsModuleTests
 {
@@ -23,7 +23,7 @@ public sealed class ApprovalsModuleTests
 
         Assert.Empty(catalog.Diagnostics);
         var module = Assert.Single(catalog.Modules, module => module.Manifest.Id == "approvals");
-        Assert.Equal(("approvals", "1.0.0"), (module.Manifest.Id, module.Manifest.Version));
+        Assert.Equal(("approvals", "1.0.1"), (module.Manifest.Id, module.Manifest.Version));
         Assert.Equal(["admin", "member"], module.Manifest.Roles.Select(slot => slot.Name));
     }
 
@@ -101,7 +101,7 @@ public sealed class ApprovalsModuleTests
     [Fact]
     public void Every_named_point_of_the_contracts_has_a_contract_scenario_that_covers_it()
     {
-        var contracts = Directory.EnumerateFiles(Path.Combine(_modulesPath, "approvals", "1.0.0", "contracts"), "*.json")
+        var contracts = Directory.EnumerateFiles(Path.Combine(_modulesPath, "approvals", "1.0.1", "contracts"), "*.json")
             .Select(file => JsonSerializer.Deserialize<ContractResource>(File.ReadAllText(file), ApplicationLoader.SerializerOptions)!)
             .ToList();
         var points = ContractPoints.Of(contracts);

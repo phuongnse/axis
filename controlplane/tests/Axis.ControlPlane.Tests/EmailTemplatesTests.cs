@@ -35,6 +35,17 @@ public sealed class EmailTemplatesTests
     }
 
     [Fact]
+    public void The_english_tenant_ready_email_offers_Axis_support_as_the_only_help()
+    {
+        var templates = EmailTemplates.LoadEmbedded();
+        var values = templates.Placeholders("tenantReady").ToDictionary(name => name, name => $"<{name}>");
+
+        var (_, body) = templates.Render("tenantReady", "en", values);
+
+        Assert.Contains("If you need help, contact Axis support.", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_kind_without_a_vi_text_is_rejected_and_the_error_names_it()
     {
         var exception = Assert.Throws<InvalidOperationException>(() => EmailTemplates.Parse([("x.en.txt", Text("Hello"))]));
