@@ -80,6 +80,12 @@
       "status": "proposed"
     },
     {
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
+      "status": "proposed"
+    },
+    {
       "concept": "Action: Reset",
       "en": "Reset",
       "vi": "Đặt lại",

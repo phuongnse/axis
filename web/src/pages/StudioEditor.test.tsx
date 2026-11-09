@@ -566,12 +566,14 @@ describe('StudioEditor for a connector', () => {
     const { fetchMock, url } = stubResource(connectorItem, connectorContent)
     renderResource(connectorItem)
 
-    const urlBinding = await screen.findByRole('textbox', { name: 'URL binding' }, slow)
+    const baseUrl = platformEnglish['shell.studio.field.connector.baseUrl']
+    const token = platformEnglish['shell.studio.field.connector.auth.token']
+    const urlBinding = await screen.findByRole('textbox', { name: baseUrl }, slow)
     expect(urlBinding).toHaveValue('PurchasingSystemUrl')
-    expect(screen.getByRole('textbox', { name: 'Secret binding' })).toHaveValue('PurchasingSystemToken')
+    expect(screen.getByRole('textbox', { name: token })).toHaveValue('PurchasingSystemToken')
 
     await userEvent.type(urlBinding, '2')
-    await userEvent.type(screen.getByRole('textbox', { name: 'Secret binding' }), '2')
+    await userEvent.type(screen.getByRole('textbox', { name: token }), '2')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')
