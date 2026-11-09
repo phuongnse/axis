@@ -191,7 +191,7 @@ be kept right.
 - **Paging.** A long table pages.
 - **How many.** A paged table says what it shows of how many, as "1–20 of 143", with the numbers in the
   language's format.
-- **Too little room** _(planned for M31)_. A table measures its own width, as it changes. Its text columns
+- **Too little room.** A table measures its own width, as it changes. Its text columns
   narrow to 160 px first. Then columns move under their row one at a time, from the right or by a column's
   `priority`, `low` first and `high` last, as "Title: value" on the row's own surface, with no line between
   the row and them. The identifying column never moves. A moved cell with no value is left out, while a

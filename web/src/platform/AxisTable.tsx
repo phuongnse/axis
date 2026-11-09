@@ -3,6 +3,7 @@ import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnT
 import {
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -20,6 +21,7 @@ import { matchesFilter, type FilterGroup, type FilterKind } from './tableFilter'
 import { TableFilterButton, TableFilterChips, type FilterColumn } from './TableFilter'
 import { TableColumnsButton } from './TableColumns'
 import { shownColumns, type TableQuery, type TableSort } from './tableQuery'
+import { makeRoom, type ColumnPriority } from './tableRoom'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
@@ -42,6 +44,8 @@ export type AxisColumn<T> = Omit<TableColumnType<T>, 'width' | 'render'> & {
   key: string
   kind: ColumnKind
   render?: (value: unknown, row: T, index: number) => ReactNode
+  /** Which columns move under their row first when the table is too narrow, see docs/reference/actions-and-controls.md#tables. */
+  priority?: ColumnPriority
   /** The text the search looks in, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
   searchText?: (row: T) => string
   /** The value the column's header sorts by, for a table that holds its rows, see docs/reference/actions-and-controls.md#tables. */
@@ -174,6 +178,9 @@ function valueCompare(locale: string): (left: string | number, right: string | n
 /** The most a free-text value is wide before it wraps, in px, see docs/reference/actions-and-controls.md#tables. */
 const freeTextMaxWidth = 320
 
+/** The least a free-text value is wide before a column moves under its row, in px, see docs/reference/actions-and-controls.md#tables. */
+const freeTextMinWidth = 160
+
 /**
  * The row's actions fold into one menu from this many on, and at narrow width whatever their number, see
  * docs/reference/actions-and-controls.md#tables.
@@ -183,7 +190,7 @@ const foldFrom = 3
 /**
  * The one table of the platform, see docs/reference/actions-and-controls.md#tables. It draws the toolbar in its fixed
  * order, with the Columns button after Search and Filter for a view that turns it on, the columns by their kind, rows and a header of the `tableRow` size, the row actions, folded into one "…" menu
- * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, sideways scrolling when the page is narrower than the columns, and the em
+ * from three on or below 992 px, the row checkboxes and the selection bar of the bulk actions, the paging, the columns that move under their row and then the sideways scrolling when the page is narrower than the columns, and the em
  * dash for an empty cell.
  */
 export function AxisTable<T extends object>({
@@ -223,6 +230,10 @@ export function AxisTable<T extends object>({
   })
   const tokens = useDesignTokens()
   const narrow = useNarrowWidth()
+  // The widths the columns need when drawn and not stretched. A moved column is not drawn, so it is remembered.
+  const naturalWidths = useRef(new Map<string, number>())
+  const [room, setRoom] = useState<{ moved: string[]; scrolls: boolean }>({ moved: [], scrolls: false })
+  const measureRef = useRef<() => void>(() => {})
   // The first column identifies the row. A table with the Columns button shows the columns of the choice in the view.
   const arrangeable = view?.columns === true && query !== undefined
   const keys = columns.map((column) => column.key)
@@ -235,56 +246,71 @@ export function AxisTable<T extends object>({
   const lastKey = shown.at(-1)?.key
   const fold = narrow || (rowActions?.configured ?? 0) >= foldFrom
 
-  const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
-  const antColumns: TableColumnType<T>[] = shown.map(
-    ({ kind, render, onCell, onHeaderCell, searchText: _searchText, sortValue, filter: _filter, ...column }) => {
-      const freeText = kind === 'freeText'
-      const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
-      const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
-      const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
-      return {
-        ...column,
-        ...(sortable
-          ? {
-              sorter: true,
-              sortOrder: query?.sort?.field === column.key ? (query.sort.descending ? 'descend' : 'ascend') : null,
-            }
-          : {}),
-        onHeaderCell: (data, index) => {
-          const own = onHeaderCell?.(data, index)
-          return { ...own, style: { ...sizing, ...own?.style } }
-        },
-        onCell: (row, index) => {
-          const own = onCell?.(row, index)
-          return { ...own, style: { ...sizing, ...own?.style } }
-        },
-        render: (value: unknown, row: T, index: number) => {
-          const cell = render ? render(value, row, index) : value
-          const empty = cell === null || cell === undefined || (!render && cell === '')
-          if (empty) {
-            return blankRow?.(row) ? null : <EmptyDash />
-          }
-          const content = cell as ReactNode
-          return freeText ? (
-            <div style={{ maxWidth: freeTextMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{content}</div>
-          ) : (
-            content
-          )
-        },
+  // The table measures its own width after every draw and when it resizes, then moves columns under their row.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const root = tableRef.current
+      const heads = new Map<string, HTMLElement>()
+      root?.querySelectorAll<HTMLElement>('th[data-column-key]').forEach((head) => {
+        heads.set(head.dataset.columnKey!, head)
+      })
+      if (!root || heads.size === 0) {
+        return
       }
-    },
-  )
-  if (rowActions && rowActions.configured > 0) {
-    const cell = { style: { width: fitContent, whiteSpace: 'nowrap', ...line } satisfies CSSProperties }
-    antColumns.push({
-      key: actionsKey,
-      // A header without text fails the accessibility check, so the column is named for screen readers only.
-      title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-      onHeaderCell: () => cell,
-      onCell: () => cell,
-      render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
-    })
+      const available = root.clientWidth
+      const others =
+        (root.querySelector<HTMLElement>('th.ant-table-selection-column')?.offsetWidth ?? 0) +
+        (heads.get(actionsKey)?.offsetWidth ?? 0)
+      const drawn = shown.reduce((sum, column) => sum + (heads.get(column.key)?.offsetWidth ?? 0), others)
+      const widths = naturalWidths.current
+      const sizes = shown.map((column) => {
+        const head = heads.get(column.key)
+        if (column.kind === 'freeText') {
+          return { key: column.key, width: freeTextMinWidth + 2 * tokens.spacing.lg, priority: column.priority }
+        }
+        // With slack, a table with no free text stretches its last column past what it needs.
+        const stretched = freeTexts === 0 && column.key === lastKey && drawn <= available
+        if (head && (!stretched || !widths.has(column.key))) {
+          widths.set(column.key, head.offsetWidth)
+        }
+        return { key: column.key, width: widths.get(column.key) ?? 0, priority: column.priority }
+      })
+      const next = makeRoom(available, others, sizes)
+      setRoom((current) =>
+        current.scrolls === next.scrolls &&
+        current.moved.length === next.moved.length &&
+        current.moved.every((key, index) => key === next.moved[index])
+          ? current
+          : next,
+      )
+    }
+    measureRef.current = measure
+    measure()
+  })
+  useEffect(() => {
+    const root = tableRef.current
+    if (!root || typeof ResizeObserver === 'undefined') {
+      return
+    }
+    const observer = new ResizeObserver(() => measureRef.current())
+    observer.observe(root)
+    return () => observer.disconnect()
+  }, [])
+
+  /** What a cell shows, or null when it has no value. */
+  const contentOf = (column: AxisColumn<T>, row: T, index: number): ReactNode => {
+    const value = valueAt(row, column.dataIndex)
+    const cell = column.render ? column.render(value, row, index) : value
+    const empty = cell === null || cell === undefined || (!column.render && cell === '')
+    return empty ? null : (cell as ReactNode)
   }
+  const movedColumns = shown.filter((column) => room.moved.includes(column.key))
+  /** The moved cells of a row, in the order of the columns, without those that have no value. */
+  const movedLines = (row: T, index: number) =>
+    movedColumns.flatMap((column) => {
+      const content = contentOf(column, row, index)
+      return content === null ? [] : [{ key: column.key, title: titleText(column), content }]
+    })
 
   const local = view !== undefined && view.total === undefined
   const searchColumns = columns.filter((column) => column.searchText !== undefined)
@@ -318,6 +344,93 @@ export function AxisTable<T extends object>({
       total = view.total ?? 0
       current = query.page
     }
+  }
+
+  // Only a row with a moved value has an expanded row, see docs/reference/actions-and-controls.md#tables.
+  const expandedKeys = new Set<Key>()
+  if (movedColumns.length > 0) {
+    ;(pageRows ?? []).forEach((item, index) => {
+      if (!blankRow?.(item) && movedLines(item, index).length > 0) {
+        expandedKeys.add(rowKey(item))
+      }
+    })
+  }
+  // A row whose moved cells show draws no line below itself, as they sit under it on the same surface.
+  const hasMoved = (row: T) => expandedKeys.has(rowKey(row))
+  const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
+  const open: CSSProperties = { borderBottom: 'none' }
+  const antColumns: TableColumnType<T>[] = shown
+    .filter((column) => !room.moved.includes(column.key))
+    .map(
+      (
+        {
+          kind,
+          render: _render,
+          onCell,
+          onHeaderCell,
+          searchText: _searchText,
+          sortValue,
+          filter: _filter,
+          priority: _priority,
+          ...column
+        },
+        position,
+      ) => {
+        const freeText = kind === 'freeText'
+        const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
+        const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
+        const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
+        const original = shown.find((candidate) => candidate.key === column.key)!
+        return {
+          ...column,
+          ...(position === 0 && room.scrolls ? { fixed: 'start' as const } : {}),
+          ...(sortable
+            ? {
+                sorter: true,
+                sortOrder: query?.sort?.field === column.key ? (query.sort.descending ? 'descend' : 'ascend') : null,
+              }
+            : {}),
+          onHeaderCell: (data, index) => {
+            const own = onHeaderCell?.(data, index)
+            return { ...own, 'data-column-key': column.key, style: { ...sizing, ...own?.style } }
+          },
+          onCell: (row, index) => {
+            const own = onCell?.(row, index)
+            return { ...own, style: { ...sizing, ...(hasMoved(row) ? open : {}), ...own?.style } }
+          },
+          render: (_value: unknown, row: T, index: number) => {
+            const content = contentOf(original, row, index)
+            if (content === null) {
+              return blankRow?.(row) ? null : <EmptyDash />
+            }
+            return freeText ? (
+              <div
+                style={{
+                  minWidth: freeTextMinWidth,
+                  maxWidth: freeTextMaxWidth,
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {content}
+              </div>
+            ) : (
+              content
+            )
+          },
+        }
+      },
+    )
+  if (rowActions && rowActions.configured > 0) {
+    const cell = { style: { width: fitContent, whiteSpace: 'nowrap', ...line } satisfies CSSProperties }
+    antColumns.push({
+      key: actionsKey,
+      // A header without text fails the accessibility check, so the column is named for screen readers only.
+      title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+      onHeaderCell: () => ({ ...cell, 'data-column-key': actionsKey }),
+      onCell: (row) => ({ style: { ...cell.style, ...(hasMoved(row) ? open : {}) } }),
+      render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
+    })
   }
 
   const bulk = (bulkActions?.length ?? 0) > 0
@@ -449,12 +562,25 @@ export function AxisTable<T extends object>({
                       selectedRowKeys: selected.map(rowKey),
                       onChange: (keys) => setSelectedKeys(keys),
                       getCheckboxProps: () => ({ 'aria-label': t('shell.table.selectRow') }),
+                      fixed: room.scrolls,
+                      onCell: (row) => (hasMoved(row) ? { style: open } : {}),
                     }
                   : undefined
               }
               columns={antColumns}
-              // Where the page is narrower than the columns' content, the table scrolls sideways.
-              scroll={{ x: 'max-content' }}
+              // The table moves columns under their row first. Only what stays still and does not fit scrolls sideways.
+              scroll={{ x: true }}
+              // Ant Design otherwise switches to a fixed layout once a column is fixed.
+              tableLayout="auto"
+              expandable={
+                movedColumns.length > 0
+                  ? {
+                      showExpandColumn: false,
+                      expandedRowKeys: [...expandedKeys],
+                      expandedRowRender: (item, index) => <MovedCells lines={movedLines(item, index)} line={line} />,
+                    }
+                  : undefined
+              }
               dataSource={pageRows as T[] | undefined}
               loading={loading}
               locale={{ emptyText: <EmptyState text={emptyText} /> }}
@@ -527,6 +653,39 @@ function held<T>(rows: readonly T[], columns: readonly AxisColumn<T>[], query: T
     }
     return direction * compare(a, b)
   })
+}
+
+/** The value a column's `dataIndex` points to in a row, as Ant Design reads it. Without a `dataIndex` it is the row. */
+function valueAt(row: object, dataIndex: unknown): unknown {
+  if (dataIndex === undefined) {
+    return row
+  }
+  const path: PropertyKey[] = Array.isArray(dataIndex) ? dataIndex : [dataIndex as PropertyKey]
+  return path.reduce<unknown>((value, key) => (value as Record<PropertyKey, unknown> | null | undefined)?.[key], row)
+}
+
+/** The title of a column as a moved cell names it. A title that is computed falls back to the column's key. */
+function titleText<T>(column: AxisColumn<T>): ReactNode {
+  return typeof column.title === 'function' ? column.key : column.title
+}
+
+/** The cells of a row that moved under it, one "Title: value" line each, see docs/reference/actions-and-controls.md#tables. */
+function MovedCells({
+  lines,
+  line,
+}: {
+  lines: { key: string; title: ReactNode; content: ReactNode }[]
+  line: CSSProperties
+}) {
+  return (
+    <Flex vertical style={line}>
+      {lines.map((moved) => (
+        <div key={moved.key}>
+          <span>{moved.title}</span>: {moved.content}
+        </div>
+      ))}
+    </Flex>
+  )
 }
 
 /** A row's actions: icon or text buttons, or one "…" menu of text entries when they fold. */
