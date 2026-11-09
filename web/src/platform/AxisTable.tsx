@@ -441,7 +441,7 @@ export function AxisTable<T extends object>({
       // A header without text fails the accessibility check, so the column is named for screen readers only.
       title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
       onHeaderCell: () => ({ ...cell, 'data-column-key': actionsKey }),
-      onCell: () => ({ style: staysRoom }),
+      onCell: () => ({ style: { ...cell.style, ...staysRoom } }),
       render: (_value: unknown, row: T) => <RowActions actions={rowActions.actions(row)} fold={fold} />,
     })
   }

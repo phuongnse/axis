@@ -715,6 +715,23 @@ describe('AxisTable', () => {
       expect(row.style.getPropertyValue('--axis-moved-height')).toBe('0px')
     })
 
+    it.each([
+      ['has room', 1000],
+      ['moves columns', 450],
+    ])('keeps the row actions on the first line of the row when the table %s', (_case, width) => {
+      fakeWidth(width)
+      const { container } = renderTable({
+        columns,
+        rowActions: { configured: 1, actions: () => [deleteAction] },
+      })
+
+      const cell = container.querySelector('tbody tr:not([aria-hidden]) td:last-child') as HTMLElement
+      expect(within(cell).getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+      expect(cell.style.verticalAlign).toBe('top')
+      expect(cell.style.whiteSpace).toBe('nowrap')
+      expect(cell.style.paddingBottom).toContain('var(--axis-moved-height')
+    })
+
     it('shows every column and no moved lines when the columns fit', () => {
       fakeWidth(1000)
       const { container } = renderTable({ columns })
