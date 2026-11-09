@@ -1203,7 +1203,7 @@ test.describe('the author builds the asset management application with Studio on
 
   test('the author publishes AssetManagement, and release 1 is active', async ({ page }) => {
     await useJourneySession(page, 'author')
-    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+    await page.goto(`${journeyURL}/studio?app=AssetManagement&view=releases`)
 
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     await confirmDialog(page, 'Publish')

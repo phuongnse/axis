@@ -58,7 +58,7 @@ test.describe('an author publishes a module application on the journey tenant, a
   }
 
   async function publishWithLabel(page: Page, label: string) {
-    await page.goto(`${journeyURL}/studio?app=${name}`)
+    await page.goto(`${journeyURL}/studio?app=${name}&view=releases`)
     await expect(page.getByRole('button', { name: 'Publish…', exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'Publish…', exact: true }).click()
     const dialog = await waitForDialog(page)
