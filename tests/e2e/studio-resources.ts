@@ -61,8 +61,8 @@ const kindNames: Record<string, string> = {
   connector: 'Connector',
   endpoint: 'Endpoint',
   webhook: 'Webhook',
-  text: 'Text',
-  scenario: 'Scenario',
+  text: 'Language',
+  scenario: 'Test scenario',
 }
 
 /**
