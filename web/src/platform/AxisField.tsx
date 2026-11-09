@@ -1,6 +1,7 @@
 import { Form, type FormItemProps } from 'antd'
 import { cloneElement, forwardRef, useId, type ReactElement, type Ref } from 'react'
 import { useDesignTokens } from './themeMode'
+import { visuallyHidden } from './visuallyHidden'
 
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
 
@@ -38,9 +39,10 @@ type OwnFieldProps = {
 }
 
 /**
- * Proposed: the answer of a check that runs while the person types, shown under the input where an error shows. Running
- * shows the input busy, `passed` and `refused` say what the check found, and `failed` says the check could not run. While a
- * check is shown it takes the place of the field's own errors, so the screen gives none while the field is empty.
+ * Proposed: the answer of a check that runs while the person types. Running shows the input busy. A check that passed
+ * marks the input with a tick and tells only a screen reader its message, since nothing needs doing. `refused` and
+ * `failed`, a check that could not run, show their message under the input where an error shows. While a check is shown
+ * it takes the place of the field's own errors, so the screen gives none while the field is empty.
  */
 export type FieldCheck = { state: 'running' | 'passed' | 'refused' | 'failed'; message: string }
 
@@ -115,7 +117,11 @@ function FormField({
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
       getValueFromEvent={getValueFromEvent}
-      {...(check === undefined ? {} : { validateStatus: checkStatus[check.state], help: check.message })}
+      {...(check === undefined
+        ? {}
+        : check.state === 'passed'
+          ? { validateStatus: 'success' as const, hasFeedback: true }
+          : { validateStatus: checkStatus[check.state], help: check.message })}
       rules={[
         ...(requiredMessage === undefined
           ? []
@@ -131,13 +137,20 @@ function FormField({
       ]}
     >
       {/* Ant Design gives the one child of a named item its value, its change handler and its accessibility props. */}
-      <HelpedInput help={help} input={children} onChange={children.props.onChange} />
+      <HelpedInput
+        help={help}
+        input={children}
+        onChange={children.props.onChange}
+        announce={check === undefined ? undefined : check.state === 'passed' ? check.message : ''}
+      />
     </Form.Item>
   )
 }
 
 type HelpedInputProps = {
   help: string
+  /** What a live region tells a screen reader alone, such as a passed check. Absent, the field has no live region. */
+  announce?: string
   input: FieldInput
   id?: string
   'aria-describedby'?: string
@@ -146,7 +159,7 @@ type HelpedInputProps = {
 
 /** The help and the input under the label. The help joins the input's description, after the error Ant Design adds. */
 const HelpedInput = forwardRef(function HelpedInput(
-  { help, input, 'aria-describedby': described, ...control }: HelpedInputProps,
+  { help, input, announce, 'aria-describedby': described, ...control }: HelpedInputProps,
   ref: Ref<unknown>,
 ) {
   const { spacing, colour } = useDesignTokens()
@@ -176,6 +189,11 @@ const HelpedInput = forwardRef(function HelpedInput(
         ref,
         'aria-describedby': describedBy,
       } as object)}
+      {announce !== undefined && (
+        <span role="status" style={visuallyHidden}>
+          {announce}
+        </span>
+      )}
     </>
   )
 })

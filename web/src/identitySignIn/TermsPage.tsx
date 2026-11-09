@@ -1,6 +1,6 @@
-import { Alert, Button, Checkbox, Form, Typography } from 'antd'
+import { Alert, Button, Form } from 'antd'
 import { useId, useRef } from 'react'
-import { useDesignTokens } from '../platform/themeMode'
+import { AcceptTermsField } from '../platform/AcceptTermsField'
 import { IdentityFrame } from './IdentityFrame'
 import type { TermsContext } from './signInContext'
 
@@ -14,28 +14,8 @@ import type { TermsContext } from './signInContext'
  */
 export function TermsPage({ context }: { context: TermsContext }) {
   const { texts, error, loginAction, termsUrl, privacyUrl } = context
-  const { colour } = useDesignTokens()
   const formId = useId()
   const submitRef = useRef<HTMLInputElement>(null)
-  const link = (label: string, href: string | undefined) =>
-    href ? (
-      <Typography.Link href={href} target="_blank" rel="noopener noreferrer" style={{ color: colour.primaryText }}>
-        {label}
-      </Typography.Link>
-    ) : (
-      label
-    )
-  const label = (privacyUrl ? texts.accept : texts.acceptTermsOnly)
-    .split(/(\{terms\}|\{privacy\})/)
-    .map((part, index) => {
-      if (part === '{terms}') {
-        return <span key={index}>{link(texts.termsOfService, termsUrl)}</span>
-      }
-      if (part === '{privacy}') {
-        return <span key={index}>{link(texts.privacyPolicy, privacyUrl)}</span>
-      }
-      return part
-    })
   return (
     <IdentityFrame title={texts.title} frame={context}>
       {error && <Alert type="error" showIcon title={error} />}
@@ -48,17 +28,15 @@ export function TermsPage({ context }: { context: TermsContext }) {
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Form.Item
+        <AcceptTermsField
           name="accept"
-          valuePropName="checked"
-          rules={[
-            {
-              validator: (_, value) => (value === true ? Promise.resolve() : Promise.reject(new Error(texts.required))),
-            },
-          ]}
-        >
-          <Checkbox>{label}</Checkbox>
-        </Form.Item>
+          label={privacyUrl ? texts.accept : texts.acceptTermsOnly}
+          links={{
+            terms: { label: texts.termsOfService, href: termsUrl },
+            privacy: { label: texts.privacyPolicy, href: privacyUrl },
+          }}
+          requiredMessage={texts.required}
+        />
         <input ref={submitRef} type="hidden" name="accept" value="true" />
         {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
         <Button type="primary" htmlType="submit" block>

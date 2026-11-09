@@ -23,6 +23,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     colour[name].toLowerCase() === colourTokens[name][mode] ? colourTokens[name].light : colour[name]
   // A field with an error draws its border in the text colour, which meets 3:1 contrast in both modes.
   const errorBorder = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
+  // Proposed: a field with a warning draws its border in the warning text colour, as its message is, for the same reason.
+  const warningBorder = { colorWarning: colour.warningText, colorWarningBorderHover: colour.warningText }
+  // Proposed: the tick of a check that passed sits in the input, so the input gives it the success text colour.
+  const statusBorder = { ...errorBorder, ...warningBorder, colorSuccess: colour.successText }
   return {
     algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
     token: {
@@ -77,15 +81,16 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       ...(reducedMotion && { motion: false }),
     },
     components: {
-      // Proposed: a form's warning message, such as a check that could not run, takes the text colour that passes contrast.
-      Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
-      Input: errorBorder,
-      InputNumber: errorBorder,
-      Select: errorBorder,
-      DatePicker: errorBorder,
-      Mentions: errorBorder,
-      Cascader: errorBorder,
-      TreeSelect: errorBorder,
+      // Proposed: a form's warning message, such as a check that could not run, and the mark of a check that passed take
+      // the text colours that pass contrast.
+      Form: { colorError: colour.dangerText, colorWarning: colour.warningText, colorSuccess: colour.successText },
+      Input: statusBorder,
+      InputNumber: statusBorder,
+      Select: statusBorder,
+      DatePicker: statusBorder,
+      Mentions: statusBorder,
+      Cascader: statusBorder,
+      TreeSelect: statusBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
       Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText, paddingXXS: spacing.xs },

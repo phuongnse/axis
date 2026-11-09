@@ -1,5 +1,6 @@
-import { Checkbox, ConfigProvider, Form, Input, Select } from 'antd'
+import { ConfigProvider, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
+import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
 import { AxisField, type FieldCheck } from '../src/platform/AxisField'
@@ -7,12 +8,27 @@ import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
 import { requiredMark } from '../src/platform/requiredMark'
 import { useText } from '../src/platform/texts'
+import { useDesignTokens } from '../src/platform/themeMode'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
 
 interface SignUpApplication {
   id: string
   titles: Record<SignUpLocale, string>
+}
+
+/** Proposed: a document the person accepts or is told of, at its current version, with its address in each language. */
+interface SignUpDocument {
+  version: string
+  urls: Record<SignUpLocale, string>
+}
+
+/** Proposed: the answer of `GET /api/sign-up/documents`, the region's current legal documents. */
+interface SignUpDocuments {
+  terms: SignUpDocument
+  dpa: SignUpDocument
+  privacy: SignUpDocument
+  licencesUrl: string
 }
 
 type SubdomainStatus =
@@ -43,11 +59,13 @@ export function SignUpPage({
   onLocaleChange: (locale: SignUpLocale) => void
 }) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
   const [applications, setApplications] = useState<SignUpApplication[]>([])
+  const [documents, setDocuments] = useState<SignUpDocuments | null>(null)
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
 
   useEffect(() => {
@@ -60,6 +78,20 @@ export function SignUpPage({
       })
       .catch(() => {
         // The list stays empty. The person can still fill in the rest of the form.
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch('/api/sign-up/documents', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
+      .then(async (response) => {
+        if (response.ok) {
+          setDocuments((await response.json()) as SignUpDocuments)
+        }
+      })
+      .catch(() => {
+        // Without the addresses the box names the documents as plain text, and sending is refused.
       })
     return () => controller.abort()
   }, [])
@@ -128,6 +160,9 @@ export function SignUpPage({
       <CardPage
         title={t('signUp.title')}
         legal={{
+          privacyUrl: documents?.privacy.urls[locale],
+          termsUrl: documents?.terms.urls[locale],
+          licencesUrl: documents?.licencesUrl,
           texts: {
             legal: t('shell.legal.label'),
             privacy: t('shell.legal.privacy'),
@@ -223,9 +258,24 @@ export function SignUpPage({
               }}
             />
           </AxisField>
-          <Form.Item name="terms" valuePropName="checked" style={{ marginBottom: 0 }}>
-            <Checkbox>{t('signUp.terms')}</Checkbox>
-          </Form.Item>
+          {/* Proposed: the business accepts its two agreements; the privacy policy is told, not accepted. */}
+          <AcceptTermsField
+            name="terms"
+            label={t('signUp.terms')}
+            links={{
+              terms: { label: t('signUp.terms.termsOfService'), href: documents?.terms.urls[locale] },
+              dpa: { label: t('signUp.terms.dpa'), href: documents?.dpa.urls[locale] },
+            }}
+            requiredMessage={t('signUp.terms.required')}
+          />
+          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+            <TextWithLinks
+              text={t('signUp.privacyNotice')}
+              links={{
+                privacy: { label: t('signUp.privacyNotice.privacyPolicy'), href: documents?.privacy.urls[locale] },
+              }}
+            />
+          </Typography.Paragraph>
         </Form>
       </CardPage>
     </ConfigProvider>
