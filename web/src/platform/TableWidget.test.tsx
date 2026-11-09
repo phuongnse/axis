@@ -181,12 +181,12 @@ const texts = {
   'shell.table.importFileRequired': 'Choose a file.',
   'shell.table.importCheck': 'Check',
   'shell.table.importChecking': 'Checking the file…',
-  'shell.table.importChecked': 'The file is clean.',
-  'shell.table.importFailed': 'The import failed.',
+  'shell.table.importChecked': 'The file has no errors.',
+  'shell.table.importFailed': 'The file has errors. Fix them and check the file again.',
   'shell.table.importRow': 'Row',
   'shell.table.importColumn': 'Column',
   'shell.table.importFile': 'File',
-  'shell.table.importCommit': 'Commit',
+  'shell.table.importCommit': 'Create records',
   'shell.table.importCommitting': 'Creating the records…',
   'shell.table.imported': 'The records were imported.',
   'shell.table.importDenied': 'You may not import records here.',
@@ -197,10 +197,11 @@ const texts = {
   'shell.table.export': 'Export',
   'shell.table.exportCsv': 'CSV',
   'shell.table.exportXlsx': 'Excel',
-  'shell.table.exportTruncated': 'The file stops at the row limit.',
+  'shell.table.exportTruncated':
+    'The file holds rows up to the limit only. Narrow the search or filters to export the rest.',
   'shell.table.exportDenied': 'You may not export these records.',
-  'shell.table.exportPending': 'A field is being recomputed.',
-  'shell.table.exportTimeout': 'The export took too long.',
+  'shell.table.exportPending': 'A field is still being recomputed. Export again in a few minutes.',
+  'shell.table.exportTimeout': 'The export took too long and stopped. Narrow the search or filters and try again.',
   'shell.table.exportFailed': 'The records could not be exported.',
   'shell.navigate.failed': 'The page could not be opened.',
   'shell.form.cancel': 'Cancel',
@@ -1777,7 +1778,7 @@ describe('TableWidget import', () => {
     expect(screen.queryByRole('button', { name: 'Import…' })).not.toBeInTheDocument()
   })
 
-  it('lists the dry run errors by row and field label and offers no Commit', async () => {
+  it('lists the dry run errors by row and field label and offers no Create records', async () => {
     const { uploads, commits } = stubImport([
       answer('failed', {
         '/rows/2/values/title': ['Required.'],
@@ -1796,7 +1797,7 @@ describe('TableWidget import', () => {
     expect(status).toHaveTextContent('Column 3: Unknown field.')
     expect(status).toHaveTextContent('File: No header.')
     expect(status).toHaveAttribute('aria-live', 'polite')
-    expect(screen.queryByRole('button', { name: 'Commit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create records' })).not.toBeInTheDocument()
     const [url, init] = uploads()[0]
     expect(url).toBe(importsPath)
     expect(new Headers(init?.headers).get('Content-Type')).toBe('text/csv')
@@ -1809,7 +1810,7 @@ describe('TableWidget import', () => {
     renderWidget('', importWidget)
 
     const dialog = await chooseAndCheck()
-    await userEvent.click(await within(dialog).findByRole('button', { name: 'Commit' }))
+    await userEvent.click(await within(dialog).findByRole('button', { name: 'Create records' }))
 
     expect(await screen.findByTestId('table-action-done')).toHaveTextContent('The records were imported.')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -2006,15 +2007,17 @@ describe('TableWidget export', () => {
 
     await chooseExport('CSV')
 
-    expect(await screen.findByTestId('table-export-truncated')).toHaveTextContent('The file stops at the row limit.')
+    expect(await screen.findByTestId('table-export-truncated')).toHaveTextContent(
+      'The file holds rows up to the limit only.',
+    )
     expect(click).toHaveBeenCalledTimes(1)
     click.mockRestore()
   })
 
   it.each([
     [403, 'You may not export these records.'],
-    [409, 'A field is being recomputed.'],
-    [503, 'The export took too long.'],
+    [409, 'A field is still being recomputed.'],
+    [503, 'The export took too long and stopped.'],
     [500, 'The records could not be exported.'],
   ])('shows its own message for an export answered with %i and saves nothing', async (status, message) => {
     stubExport(() => new Response(null, { status }))

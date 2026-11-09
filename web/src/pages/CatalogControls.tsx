@@ -231,7 +231,7 @@ export function TimeZoneSelect({
  * A choice of the tenant's binding names of one kind, see
  * docs/reference/studio-resource-form.md#controls-that-know-what-they-hold. A name that the tenant lacks, or has only as
  * another kind, stays selected, with a line that says activation will refuse it. With `noBinding`, the first option is
- * "The tenant's database, with no binding", which is selected while `value` is `undefined` and calls `onChange` with
+ * "The database, with no binding", which is selected while `value` is `undefined` and calls `onChange` with
  * `undefined`.
  */
 export function BindingSelect({

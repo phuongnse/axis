@@ -56,7 +56,7 @@ interface OpenLookup {
 /**
  * Edits the rows of a child collection as a table drawn on `AxisTable`: one column per child field, each
  * editable cell the same input the form uses for that field type. Add row is the toolbar's main action,
- * above the table on the right, and Remove row is an icon row action. The first input of an added row takes focus. A reference cell shows the label of
+ * above the table on the right, and Delete row is an icon row action. The first input of an added row takes focus. A reference cell shows the label of
  * the record it points to, with a search icon button that opens the reference lookup. A computed cell
  * and every cell of a read-only collection show their value as plain text, with no input. A read-only
  * collection has no add or remove buttons.

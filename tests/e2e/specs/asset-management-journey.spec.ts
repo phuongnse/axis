@@ -1314,7 +1314,7 @@ test.describe('the author builds the asset management application with Studio on
       .locator('input[type=file]')
       .setInputFiles(path.join(import.meta.dirname, '..', 'fixtures', 'asset-management-import.csv'))
     await dialog.getByRole('button', { name: 'Check', exact: true }).click()
-    const commit = dialog.getByRole('button', { name: 'Commit', exact: true })
+    const commit = dialog.getByRole('button', { name: 'Create records', exact: true })
     await expect(commit).toBeVisible()
     await expect(dialog.getByTestId('import-status')).not.toContainText('Row')
     await commit.click()

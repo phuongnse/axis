@@ -29,7 +29,7 @@ The module's manifest is `module.json` at the root of its folder:
 {
   "kind": "module",
   "id": "organization",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "label": "Organization",
   "roles": [
     { "name": "admin", "label": { "textKey": "organization.roles.admin" } },
