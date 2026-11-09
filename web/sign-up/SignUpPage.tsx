@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AcceptTermsField, TextWithLinks } from '../src/platform/AcceptTermsField'
 import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
-import { AxisField, type FieldCheck } from '../src/platform/AxisField'
+import { AxisField, type FieldStatus } from '../src/platform/AxisField'
 import { CardPage } from '../src/platform/CardPage'
 import { PreferencesMenu } from '../src/platform/PreferencesMenu'
 import { requiredMark } from '../src/platform/requiredMark'
@@ -167,7 +167,7 @@ export function SignUpPage({
     : answer?.name === subdomain
       ? answer.status
       : { state: 'checking' }
-  const subdomainCheck: FieldCheck | undefined = {
+  const subdomainStatus: FieldStatus | undefined = {
     idle: undefined,
     checking: { state: 'running' as const, message: t('signUp.subdomain.checking') },
     free: { state: 'passed' as const, message: t('signUp.subdomain.free') },
@@ -245,7 +245,7 @@ export function SignUpPage({
             label={t('signUp.subdomain')}
             help={t('signUp.subdomain.help')}
             requiredMessage={t('signUp.subdomain.required')}
-            check={subdomainCheck}
+            status={subdomainStatus}
           >
             {/* Proposed: the region's tenant domain ends the input, so the person reads their whole address. */}
             <Input

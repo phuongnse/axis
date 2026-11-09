@@ -18,8 +18,8 @@ type FormFieldProps = {
   valuePropName?: FormItemProps['valuePropName']
   /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
   getValueFromEvent?: FormItemProps['getValueFromEvent']
-  /** Proposed: the answer of a check the screen runs while the person types, such as whether a subdomain is free. */
-  check?: FieldCheck
+  /** Proposed: what the screen found about the field beyond its rules, such as whether a subdomain is free. */
+  status?: FieldStatus
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
   children: FieldInput
 }
@@ -33,20 +33,21 @@ type OwnFieldProps = {
   rules?: never
   valuePropName?: never
   getValueFromEvent?: never
-  check?: never
+  status?: never
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
 }
 
 /**
- * Proposed: the answer of a check that runs while the person types. Running shows the input busy. A check that passed
- * leaves the field as it is, since no error is all the person needs to see, and tells only a screen reader its message.
- * `refused` and `failed`, a check that could not run, show their message under the input where an error shows. While a
- * check is shown it takes the place of the field's own errors, so the screen gives none while the field is empty.
+ * Proposed: what the screen found about a field beyond its rules, such as a check run while the person types or choices
+ * that could not load. `running` shows the input busy. `passed` leaves the field as it is, since no error is all the
+ * person needs to see, and tells only a screen reader its message. `refused` shows its message as an error and `failed`,
+ * something that could not be done, as a warning, under the input where an error shows. While a status is shown it takes
+ * the place of the field's own errors, so the screen gives none while the field is empty.
  */
-export type FieldCheck = { state: 'running' | 'passed' | 'refused' | 'failed'; message: string }
+export type FieldStatus = { state: 'running' | 'passed' | 'refused' | 'failed'; message: string }
 
-const checkStatus = { running: 'validating', refused: 'error', failed: 'warning' } as const
+const validateStatus = { running: 'validating', refused: 'error', failed: 'warning' } as const
 
 /** With a `name`, a field of an Ant Design form. Without one, a field the caller holds the value of. */
 export type AxisFieldProps = FormFieldProps | OwnFieldProps
@@ -106,7 +107,7 @@ function FormField({
   rules,
   valuePropName,
   getValueFromEvent,
-  check,
+  status,
   children,
 }: FormFieldProps) {
   const { colour } = useDesignTokens()
@@ -117,11 +118,9 @@ function FormField({
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
       getValueFromEvent={getValueFromEvent}
-      {...(check === undefined
+      {...(status === undefined || status.state === 'passed'
         ? {}
-        : check.state === 'passed'
-          ? {}
-          : { validateStatus: checkStatus[check.state], help: check.message })}
+        : { validateStatus: validateStatus[status.state], help: status.message })}
       rules={[
         ...(requiredMessage === undefined
           ? []
@@ -141,7 +140,7 @@ function FormField({
         help={help}
         input={children}
         onChange={children.props.onChange}
-        announce={check === undefined ? undefined : check.state === 'passed' ? check.message : ''}
+        announce={status === undefined ? undefined : status.state === 'passed' ? status.message : ''}
       />
     </Form.Item>
   )
@@ -149,7 +148,7 @@ function FormField({
 
 type HelpedInputProps = {
   help: string
-  /** What a live region tells a screen reader alone, such as a passed check. Absent, the field has no live region. */
+  /** What a live region tells a screen reader alone, such as a passed status. Absent, the field has no live region. */
   announce?: string
   input: FieldInput
   id?: string
