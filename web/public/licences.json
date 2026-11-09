@@ -1,0 +1,734 @@
+{
+  "npm": [
+    {
+      "name": "@ant-design/colors",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/cssinjs",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/cssinjs-utils",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/fast-color",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/icons",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/icons-svg",
+      "licence": "MIT"
+    },
+    {
+      "name": "@ant-design/react-slick",
+      "licence": "MIT"
+    },
+    {
+      "name": "@babel/runtime",
+      "licence": "MIT"
+    },
+    {
+      "name": "@babel/runtime",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/autocomplete",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/commands",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/lang-json",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/language",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/lint",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/search",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/state",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/streamparser",
+      "licence": "MIT"
+    },
+    {
+      "name": "@codemirror/view",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dagrejs/dagre",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dagrejs/graphlib",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dnd-kit/accessibility",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dnd-kit/core",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dnd-kit/sortable",
+      "licence": "MIT"
+    },
+    {
+      "name": "@dnd-kit/utilities",
+      "licence": "MIT"
+    },
+    {
+      "name": "@emotion/hash",
+      "licence": "MIT"
+    },
+    {
+      "name": "@emotion/unitless",
+      "licence": "MIT"
+    },
+    {
+      "name": "@fontsource-variable/ibm-plex-sans",
+      "licence": "OFL-1.1"
+    },
+    {
+      "name": "@fontsource/ibm-plex-mono",
+      "licence": "OFL-1.1"
+    },
+    {
+      "name": "@lezer/common",
+      "licence": "MIT"
+    },
+    {
+      "name": "@lezer/highlight",
+      "licence": "MIT"
+    },
+    {
+      "name": "@lezer/json",
+      "licence": "MIT"
+    },
+    {
+      "name": "@lezer/lr",
+      "licence": "MIT"
+    },
+    {
+      "name": "@marijn/find-cluster-break",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/async-validator",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/cascader",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/checkbox",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/collapse",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/color-picker",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/context",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/dialog",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/drawer",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/dropdown",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/form",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/image",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/input",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/input-number",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/listy",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/mentions",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/menu",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/mini-decimal",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/motion",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/mutate-observer",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/notification",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/overflow",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/pagination",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/picker",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/portal",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/progress",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/qrcode",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/rate",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/resize-observer",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/segmented",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/select",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/slider",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/steps",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/switch",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/table",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/tabs",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/tooltip",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/tour",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/tree",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/tree-select",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/trigger",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/upload",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/util",
+      "licence": "MIT"
+    },
+    {
+      "name": "@rc-component/virtual-list",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-color",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-drag",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-interpolate",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-selection",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-transition",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/d3-zoom",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/react",
+      "licence": "MIT"
+    },
+    {
+      "name": "@types/react-dom",
+      "licence": "MIT"
+    },
+    {
+      "name": "@xyflow/react",
+      "licence": "MIT"
+    },
+    {
+      "name": "@xyflow/system",
+      "licence": "MIT"
+    },
+    {
+      "name": "antd",
+      "licence": "MIT"
+    },
+    {
+      "name": "classcat",
+      "licence": "MIT"
+    },
+    {
+      "name": "clsx",
+      "licence": "MIT"
+    },
+    {
+      "name": "compute-scroll-into-view",
+      "licence": "MIT"
+    },
+    {
+      "name": "cookie",
+      "licence": "MIT"
+    },
+    {
+      "name": "crelt",
+      "licence": "MIT"
+    },
+    {
+      "name": "csstype",
+      "licence": "MIT"
+    },
+    {
+      "name": "d3-color",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-dispatch",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-drag",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-ease",
+      "licence": "BSD-3-Clause"
+    },
+    {
+      "name": "d3-interpolate",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-selection",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-timer",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-transition",
+      "licence": "ISC"
+    },
+    {
+      "name": "d3-zoom",
+      "licence": "ISC"
+    },
+    {
+      "name": "dayjs",
+      "licence": "MIT"
+    },
+    {
+      "name": "echarts",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "is-mobile",
+      "licence": "MIT"
+    },
+    {
+      "name": "json2mq",
+      "licence": "MIT"
+    },
+    {
+      "name": "react",
+      "licence": "MIT"
+    },
+    {
+      "name": "react-dom",
+      "licence": "MIT"
+    },
+    {
+      "name": "react-is",
+      "licence": "MIT"
+    },
+    {
+      "name": "react-router",
+      "licence": "MIT"
+    },
+    {
+      "name": "scheduler",
+      "licence": "MIT"
+    },
+    {
+      "name": "scroll-into-view-if-needed",
+      "licence": "MIT"
+    },
+    {
+      "name": "set-cookie-parser",
+      "licence": "MIT"
+    },
+    {
+      "name": "string-convert",
+      "licence": "MIT"
+    },
+    {
+      "name": "style-mod",
+      "licence": "MIT"
+    },
+    {
+      "name": "stylis",
+      "licence": "MIT"
+    },
+    {
+      "name": "throttle-debounce",
+      "licence": "MIT"
+    },
+    {
+      "name": "tslib",
+      "licence": "0BSD"
+    },
+    {
+      "name": "use-sync-external-store",
+      "licence": "MIT"
+    },
+    {
+      "name": "w3c-keyname",
+      "licence": "MIT"
+    },
+    {
+      "name": "zrender",
+      "licence": "BSD-3-Clause"
+    },
+    {
+      "name": "zustand",
+      "licence": "MIT"
+    }
+  ],
+  "nuget": [
+    {
+      "name": "AWSSDK.Core",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "AWSSDK.S3",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "BouncyCastle.Cryptography",
+      "licence": "MIT"
+    },
+    {
+      "name": "DnsClient",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "DocumentFormat.OpenXml",
+      "licence": "MIT"
+    },
+    {
+      "name": "DocumentFormat.OpenXml.Framework",
+      "licence": "MIT"
+    },
+    {
+      "name": "Humanizer.Core",
+      "licence": "MIT"
+    },
+    {
+      "name": "Json.More.Net",
+      "licence": "OSMFEULA.txt"
+    },
+    {
+      "name": "JsonPatch.Net",
+      "licence": "OSMFEULA.txt"
+    },
+    {
+      "name": "JsonPointer.Net",
+      "licence": "OSMFEULA.txt"
+    },
+    {
+      "name": "JsonSchema.Net",
+      "licence": "OSMFEULA.txt"
+    },
+    {
+      "name": "MailKit",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.JwtBearer",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.AspNetCore.Authentication.OpenIdConnect",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Bcl.Cryptography",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Analyzers",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.EntityFrameworkCore.Relational",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Caching.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Caching.Memory",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.Binder",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.EnvironmentVariables",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.FileExtensions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Configuration.KeyPerFile",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.DependencyInjection.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Diagnostics.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.FileProviders.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.FileProviders.Physical",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.FileSystemGlobbing",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Hosting.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Logging.Configuration",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Options",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Options.ConfigurationExtensions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.Extensions.Primitives",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Abstractions",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.JsonWebTokens",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Logging",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Protocols.OpenIdConnect",
+      "licence": "MIT"
+    },
+    {
+      "name": "Microsoft.IdentityModel.Tokens",
+      "licence": "MIT"
+    },
+    {
+      "name": "MimeKit",
+      "licence": "MIT"
+    },
+    {
+      "name": "Npgsql",
+      "licence": "PostgreSQL"
+    },
+    {
+      "name": "Npgsql.EntityFrameworkCore.PostgreSQL",
+      "licence": "PostgreSQL"
+    },
+    {
+      "name": "Npgsql.OpenTelemetry",
+      "licence": "PostgreSQL"
+    },
+    {
+      "name": "OpenTelemetry",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Api",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Api.ProviderBuilderExtensions",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Exporter.OpenTelemetryProtocol",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Extensions.Hosting",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Instrumentation.AspNetCore",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "OpenTelemetry.Instrumentation.Http",
+      "licence": "Apache-2.0"
+    },
+    {
+      "name": "System.IdentityModel.Tokens.Jwt",
+      "licence": "MIT"
+    },
+    {
+      "name": "System.IO.Packaging",
+      "licence": "MIT"
+    },
+    {
+      "name": "System.Security.Cryptography.Pkcs",
+      "licence": "MIT"
+    }
+  ]
+}
