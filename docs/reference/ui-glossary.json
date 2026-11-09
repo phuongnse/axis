@@ -76,7 +76,8 @@
       "concept": "Extension package",
       "en": "extension package",
       "vi": "gói mở rộng",
-      "status": "approved"
+      "status": "approved",
+      "note": "\"gói dịch vụ\" is a plan."
     },
     {
       "concept": "Module contract",
@@ -102,6 +103,18 @@
       "concept": "Release",
       "en": "release",
       "vi": "phiên bản",
+      "status": "approved"
+    },
+    {
+      "concept": "Revision",
+      "en": "revision",
+      "vi": "bản sửa đổi",
+      "status": "approved"
+    },
+    {
+      "concept": "Draft",
+      "en": "draft",
+      "vi": "bản nháp",
       "status": "approved"
     },
     {
@@ -163,6 +176,12 @@
       "vi": "kiểu dữ liệu",
       "status": "approved",
       "note": "What a field or a parameter holds: text, number, date, a reference."
+    },
+    {
+      "concept": "Result type",
+      "en": "result type",
+      "vi": "kiểu kết quả",
+      "status": "approved"
     },
     {
       "concept": "Record",
@@ -277,6 +296,12 @@
       "note": "A named, reusable expression with parameters, which validations, filters and processes call."
     },
     {
+      "concept": "Parameter",
+      "en": "parameter",
+      "vi": "tham số",
+      "status": "approved"
+    },
+    {
       "concept": "Validation",
       "en": "validation",
       "vi": "quy tắc kiểm tra",
@@ -290,17 +315,17 @@
       "status": "approved"
     },
     {
+      "concept": "Process instance",
+      "en": "instance",
+      "vi": "lượt chạy quy trình",
+      "status": "approved",
+      "note": "One run of a process. \"phiên bản\" is a release, so it never names an instance. A screen that every person sees says \"process\" in English: \"Open process\", not \"Open instance\"."
+    },
+    {
       "concept": "Step",
       "en": "step",
       "vi": "bước",
       "status": "approved"
-    },
-    {
-      "concept": "Process instance",
-      "en": "process instance",
-      "vi": "lượt chạy",
-      "status": "approved",
-      "note": "One run of a process. Never \"phiên bản\", which is a release."
     },
     {
       "concept": "Job",
@@ -430,6 +455,12 @@
       "status": "approved"
     },
     {
+      "concept": "Grant",
+      "en": "grant",
+      "vi": "quyền",
+      "status": "approved"
+    },
+    {
       "concept": "Policy matrix",
       "en": "policy matrix",
       "vi": "bảng phân quyền",
@@ -457,13 +488,6 @@
       "note": "Kept in English: operators say it."
     },
     {
-      "concept": "Cell",
-      "en": "cell",
-      "vi": "cell",
-      "status": "approved",
-      "note": "Kept in English: operators say it."
-    },
-    {
       "concept": "Host (of a tenant)",
       "en": "host",
       "vi": "tên miền",
@@ -481,6 +505,56 @@
       "concept": "Operator console",
       "en": "operator console",
       "vi": "bảng điều khiển vận hành",
+      "status": "approved"
+    },
+    {
+      "concept": "Tenant subdomain",
+      "en": "subdomain",
+      "vi": "tên miền phụ",
+      "status": "approved"
+    },
+    {
+      "concept": "Platform operator",
+      "en": "platform operator",
+      "vi": "người vận hành nền tảng",
+      "status": "approved"
+    },
+    {
+      "concept": "Cell",
+      "en": "cell",
+      "vi": "cell",
+      "status": "approved",
+      "note": "Kept in English: only platform operators see it."
+    },
+    {
+      "concept": "Cell console",
+      "en": "cell console",
+      "vi": "bảng điều khiển cell",
+      "status": "approved"
+    },
+    {
+      "concept": "Quota",
+      "en": "quota",
+      "vi": "hạn mức",
+      "status": "approved"
+    },
+    {
+      "concept": "Usage",
+      "en": "usage",
+      "vi": "mức sử dụng",
+      "status": "approved"
+    },
+    {
+      "concept": "Plan",
+      "en": "plan",
+      "vi": "gói dịch vụ",
+      "status": "approved",
+      "note": "What a tenant pays for: \"gói dùng thử\", \"gói trả phí\" in a sentence."
+    },
+    {
+      "concept": "Trial",
+      "en": "trial",
+      "vi": "dùng thử",
       "status": "approved"
     },
     {
@@ -507,7 +581,7 @@
       "en": "Remove",
       "vi": "Gỡ",
       "status": "approved",
-      "note": "Takes a thing out of a list or a setting; the thing itself stays."
+      "note": "Takes a thing out of a list or a setting while the thing itself stays: \"Gỡ tệp\", \"Gỡ vai trò\". Delete is \"Xóa\"."
     },
     {
       "concept": "Action: Add",
@@ -581,8 +655,9 @@
     {
       "concept": "Action: Search",
       "en": "Search",
-      "vi": "Tìm",
-      "status": "approved"
+      "vi": "Tìm kiếm",
+      "status": "approved",
+      "note": "A search box and a bare Search action. With an object the verb is \"Tìm\": \"Tìm theo tên\", \"Tìm người theo tên\"."
     },
     {
       "concept": "Action: Filter",

@@ -2,54 +2,6 @@
   "$comment": "The terms that wait for the owner's approval, by locale. The owner approves a term by moving it to ui-glossary.json. See docs/reference/ui-writing.md#the-glossary. status: proposed or decide.",
   "terms": [
     {
-      "concept": "Revision",
-      "en": "revision",
-      "vi": "bản sửa đổi",
-      "status": "proposed"
-    },
-    {
-      "concept": "Tenant subdomain",
-      "en": "subdomain",
-      "vi": "tên miền phụ",
-      "status": "proposed"
-    },
-    {
-      "concept": "Platform operator",
-      "en": "platform operator",
-      "vi": "người vận hành nền tảng",
-      "status": "proposed"
-    },
-    {
-      "concept": "Cell console",
-      "en": "cell console",
-      "vi": "bảng điều khiển cell",
-      "status": "proposed"
-    },
-    {
-      "concept": "Quota",
-      "en": "quota",
-      "vi": "hạn mức",
-      "status": "proposed"
-    },
-    {
-      "concept": "Usage",
-      "en": "usage",
-      "vi": "mức sử dụng",
-      "status": "proposed"
-    },
-    {
-      "concept": "Grant",
-      "en": "grant",
-      "vi": "quyền",
-      "status": "proposed"
-    },
-    {
-      "concept": "Parameter",
-      "en": "parameter",
-      "vi": "tham số",
-      "status": "proposed"
-    },
-    {
       "concept": "Deadline",
       "en": "deadline",
       "vi": "thời hạn chót",
@@ -71,18 +23,6 @@
       "concept": "Timer (step)",
       "en": "timer",
       "vi": "hẹn giờ",
-      "status": "proposed"
-    },
-    {
-      "concept": "Result type",
-      "en": "result type",
-      "vi": "kiểu kết quả",
-      "status": "proposed"
-    },
-    {
-      "concept": "Draft",
-      "en": "draft",
-      "vi": "bản nháp",
       "status": "proposed"
     },
     {
