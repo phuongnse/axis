@@ -135,8 +135,8 @@ describe('ConsolePublishing', () => {
     expect(within(rows[0]!).getByText('Back again')).toBeVisible()
     expect(within(rows[0]!).getByText('Rita Reader')).toBeVisible()
     expect(within(rows[1]!).getByText('System')).toBeVisible()
-    expect(within(releases).getAllByText('Active')).toHaveLength(1)
-    expect(within(rows[0]!).getByText('Active')).toBeVisible()
+    expect(within(releases).getAllByText('Live')).toHaveLength(1)
+    expect(within(rows[0]!).getByText('Live')).toBeVisible()
 
     const requests = screen.getByTestId('console-publishing-requests')
     const requestRows = within(requests).getAllByRole('row').slice(1)
@@ -234,7 +234,7 @@ describe('ConsolePublishing', () => {
     expect(within(view).getByText('Pia Publisher')).toBeVisible()
     expect(within(view).getByText('Queued')).toBeVisible()
     expect(within(view).queryByText('Back again')).toBeNull()
-    expect(within(view).getAllByText('Active')).toHaveLength(1)
+    expect(within(view).getAllByText('Live')).toHaveLength(1)
   })
 
   it('requests the next page of the publish requests', async () => {
