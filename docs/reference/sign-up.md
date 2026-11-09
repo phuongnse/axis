@@ -66,9 +66,8 @@ or from a template.
   warning status says under the choices that Blank is still there.
 - **Applications.** The region's list is the setting `ControlPlane:SignUp:Applications`, see the
   [settings](control-plane.md#settings), and `GET /api/sign-up/applications` serves it as
-  `{ applications: [{ id, titles: { en, vi } }] }`. The page shows each title in its language.
-- **Descriptions** _(planned for M33)_. The same answer adds `descriptions: { en, vi }` to each
-  application, from the settings `ControlPlane:SignUp:Applications:<n>:Descriptions:en` and `:vi`.
+  `{ applications: [{ id, titles: { en, vi }, descriptions: { en, vi } }] }`, from the settings
+  `ControlPlane:SignUp:Applications:<n>:Titles` and `:Descriptions`. The page shows each title in its language.
 - **Blank** _(planned for M33)_. The form sends `application: ""` for Blank. A tenant created without
   an application gets a blank one, see [creating a tenant](tenant-lifecycle.md#creating-a-tenant).
 
@@ -88,12 +87,14 @@ The box accepts the business's agreements.
 
 ### The documents
 
-_(planned for M33)_
-
 `GET /api/sign-up/documents` answers `{ terms, dpa, privacy, licencesUrl }`, where each document is
-`{ version, urls: { en, vi } }`. The page links each document in its language, and the legal line takes
-its Privacy, Terms and Licences addresses from the answer. `POST /api/sign-up` sends `termsVersion`,
-`dpaVersion` and `privacyVersion`, the versions shown, and the control plane records them.
+`{ version, urls: { en, vi } }`, from the settings `ControlPlane:SignUp:Terms`, `:Dpa`, `:Privacy` and
+`:LicencesUrl`, see the [settings](control-plane.md#settings). Without them the route answers `503`.
+
+- **The page links the documents** _(planned for M33)_. The page links each document in its language,
+  and the legal line takes its Privacy, Terms and Licences addresses from the answer.
+- **The versions are sent** _(planned for M33)_. `POST /api/sign-up` sends `termsVersion`, `dpaVersion`
+  and `privacyVersion`, the versions shown, and the control plane records them.
 
 ### Sending the form
 
@@ -126,11 +127,12 @@ The person chooses the subdomain, which becomes the tenant's id, and the page ch
   [status](actions-and-controls.md#fields): checking shows the input busy, a free name shows nothing but
   a status region for a screen reader, a refused name shows its message as an error, and a check that
   could not run shows a warning, all under the input.
+- **The tenant domain.** `GET /api/sign-up/region` answers `{ tenantDomain }` from
+  `ControlPlane:TenantDomain`, see the [settings](control-plane.md#settings).
 - **Ends in the tenant domain** _(planned for M33)_. The input shows the region's tenant domain after what
   the person types, in `textMuted`, such as `contoso-trading` then `.vn.example.com`, so the person reads
-  the whole address as they type. A long subdomain scrolls inside the input. `GET /api/sign-up/region`
-  answers `{ tenantDomain }` from `ControlPlane:TenantDomain`. When it fails, the input shows the
-  subdomain alone, and its help still says it starts the address.
+  the whole address as they type. A long subdomain scrolls inside the input. When the route fails, the
+  input shows the subdomain alone, and its help still says it starts the address.
 - **Held while pending.** _(planned for M33)_ A sign-up holds its subdomain for 24 hours, until it is
   verified or expires. The hold makes the name not free.
 - **The rule.** The rule of a tenant id of [`tenant create`](administration.md#tenant-create), at
@@ -363,6 +365,6 @@ changed.
   the version of the Privacy policy that [the terms box](#the-terms-box) showed.
 - **When.** At sign-up, and again when a new version of either document is published. The
   [billing portal](billing-portal.md) then asks the owner to accept it before any other action.
-- **Versions.** Each document's version and text are settings of the control plane, per language, and
-  [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
+- **Versions.** Each document's version and its address in each language are settings of the control
+  plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
   current is refused. The texts come from a lawyer before sign-up opens.
