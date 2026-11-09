@@ -104,52 +104,56 @@ export function StudioAskAi({
       closeKey="shell.studio.ai.close"
       onClose={onClose}
       testId="studio-ask-ai"
+      top={
+        <>
+          <Form
+            form={form}
+            layout="vertical"
+            requiredMark={requiredMark}
+            initialValues={{ text: '', autoAccept: false }}
+            onFinish={send}
+          >
+            <AxisField
+              name="text"
+              label={t('shell.studio.ai.text')}
+              help={t('shell.studio.ai.text.help')}
+              requiredMessage={t('shell.studio.ai.textRequired')}
+            >
+              <Input.TextArea
+                aria-label={t('shell.studio.ai.text')}
+                autoSize={{ minRows: 4, maxRows: 10 }}
+                maxLength={maxText}
+              />
+            </AxisField>
+            {allowsAutoAccept && (
+              <AxisCheckboxField
+                name="autoAccept"
+                label={t('shell.studio.ai.autoAccept')}
+                help={t('shell.studio.ai.autoAccept.help')}
+              />
+            )}
+            {sendError !== null && <AxisAlert kind="error" message={sendError} style={{ marginBottom: spacing.sm }} />}
+            <AxisActionRow align="center">
+              <AxisButton role="finish" htmlType="submit" disabled={sending || left === 0}>
+                {t('shell.studio.ai.send')}
+              </AxisButton>
+              {left !== null && (
+                <Typography.Text style={{ color: left === 0 ? colour.warningText : colour.textMuted }}>
+                  {left === 0
+                    ? t('shell.studio.ai.noneLeft')
+                    : left === 1
+                      ? t('shell.studio.ai.oneLeft')
+                      : t('shell.studio.ai.left').replace('{count}', String(left))}
+                </Typography.Text>
+              )}
+            </AxisActionRow>
+          </Form>
+          <Typography.Text strong style={{ marginTop: spacing.xs }}>
+            {t('shell.studio.ai.requests')}
+          </Typography.Text>
+        </>
+      }
     >
-      <Form
-        form={form}
-        layout="vertical"
-        requiredMark={requiredMark}
-        initialValues={{ text: '', autoAccept: false }}
-        onFinish={send}
-      >
-        <AxisField
-          name="text"
-          label={t('shell.studio.ai.text')}
-          help={t('shell.studio.ai.text.help')}
-          requiredMessage={t('shell.studio.ai.textRequired')}
-        >
-          <Input.TextArea
-            aria-label={t('shell.studio.ai.text')}
-            autoSize={{ minRows: 4, maxRows: 10 }}
-            maxLength={maxText}
-          />
-        </AxisField>
-        {allowsAutoAccept && (
-          <AxisCheckboxField
-            name="autoAccept"
-            label={t('shell.studio.ai.autoAccept')}
-            help={t('shell.studio.ai.autoAccept.help')}
-          />
-        )}
-        {sendError !== null && <AxisAlert kind="error" message={sendError} style={{ marginBottom: spacing.sm }} />}
-        <AxisActionRow align="center">
-          <AxisButton role="finish" htmlType="submit" disabled={sending || left === 0}>
-            {t('shell.studio.ai.send')}
-          </AxisButton>
-          {left !== null && (
-            <Typography.Text style={{ color: left === 0 ? colour.warningText : colour.textMuted }}>
-              {left === 0
-                ? t('shell.studio.ai.noneLeft')
-                : left === 1
-                  ? t('shell.studio.ai.oneLeft')
-                  : t('shell.studio.ai.left').replace('{count}', String(left))}
-            </Typography.Text>
-          )}
-        </AxisActionRow>
-      </Form>
-      <Typography.Text strong style={{ marginTop: spacing.xs }}>
-        {t('shell.studio.ai.requests')}
-      </Typography.Text>
       {list === 'failed' ? (
         <AxisAlert kind="warning" message={t('shell.studio.ai.listFailed')} />
       ) : list === undefined ? null : list.items.length === 0 ? (
