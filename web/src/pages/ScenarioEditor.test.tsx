@@ -25,6 +25,7 @@ const vietnamese: Record<string, string> = platformVietnamese
 
 /** The English label of a field of the scenario file, by the path of its property. */
 const labelOf = (path: string) => english[`shell.studio.field.scenario.${path}`]
+const helpOf = (path: string) => english[`shell.studio.field.scenario.${path}.help`]
 
 /** Every path of the scenario file that the editor draws a field or a group for, see docs/reference/studio.md#scenario-editor. */
 const drawnPaths = [
@@ -656,6 +657,117 @@ function namedControl(root: HTMLElement, label: string): HTMLElement | null {
     query.queryByRole('group', { name: label })
   )
 }
+
+const stubConnector = { connector: { name: 'Payments', operation: 'charge' }, output: { total: 1 } }
+const stubOperation = { operation: 'billing/Refund', outcome: 'failed' }
+const withStub = (stub: Record<string, unknown>) => ({ ...scenario([fixtures.advanceTime]), stubs: [stub] })
+const onlyStep = (step: Step) => scenario([step])
+
+/** The raw names of the step properties and of their parts, which no control of a step card may be named by. */
+const rawPropertyNames = [
+  ...stepPropertyNames,
+  'assignee kind',
+  'recipient kind',
+  'user',
+  'role',
+  'email',
+  'invalid',
+  'operation',
+]
+
+/** Each drawn path, with the role of its control, the pointer of the wrapper that holds it and an editor value that draws it. */
+const drawnCases: [
+  path: string,
+  role: 'combobox' | 'textbox' | 'group',
+  pointer: string,
+  value: Record<string, unknown>,
+][] = [
+  ['name', 'textbox', '/name', scenario([fixtures.advanceTime])],
+  ['description', 'group', '/description', scenario([fixtures.advanceTime])],
+  ['now', 'textbox', '/now', scenario([fixtures.advanceTime])],
+  ['users.id', 'textbox', '/users/author', scenario([fixtures.advanceTime])],
+  ['users.roles', 'combobox', '/users/author', scenario([fixtures.advanceTime])],
+  ['stubs.source', 'combobox', '/stubs/0/source', withStub(stubConnector)],
+  ['stubs.connector.name', 'combobox', '/stubs/0/connector/name', withStub(stubConnector)],
+  ['stubs.connector.operation', 'combobox', '/stubs/0/connector/operation', withStub(stubConnector)],
+  ['stubs.operation', 'textbox', '/stubs/0/operation', withStub(stubOperation)],
+  ['stubs.result', 'combobox', '/stubs/0/result', withStub(stubConnector)],
+  ['stubs.output', 'group', '/stubs/0', withStub(stubConnector)],
+  ['stubs.output.name', 'textbox', '/stubs/0', withStub(stubConnector)],
+  ['steps.type', 'combobox', '/steps/0/type', onlyStep(fixtures.advanceTime)],
+  ['steps.entity', 'combobox', '/steps/0/entity', onlyStep(fixtures.createRecord)],
+  ['steps.record', 'combobox', '/steps/0/record', onlyStep(fixtures.updateRecord)],
+  ['steps.save', 'textbox', '/steps/0/save', onlyStep(fixtures.createRecord)],
+  ['steps.as', 'combobox', '/steps/0/as', onlyStep(fixtures.createRecord)],
+  ['steps.process', 'combobox', '/steps/0/process', onlyStep(fixtures.startProcess)],
+  ['steps.step', 'combobox', '/steps/0/step', onlyStep(fixtures.completeTask)],
+  ['steps.outcome', 'combobox', '/steps/0/outcome', onlyStep(fixtures.completeTask)],
+  ['steps.state', 'combobox', '/steps/0/state', onlyStep(fixtures.expectInstance)],
+  ['steps.assignee', 'group', '/steps/0/assignee', onlyStep(fixtures.expectTask)],
+  ['steps.assignee.kind', 'combobox', '/steps/0/assignee', onlyStep(fixtures.expectTask)],
+  ['steps.assignee.user', 'combobox', '/steps/0/assignee', onlyStep(fixtures.expectTask)],
+  [
+    'steps.assignee.role',
+    'combobox',
+    '/steps/0/assignee',
+    onlyStep({ type: 'expectTask', record: 'order', step: 'review', assignee: { role: 'manager' } }),
+  ],
+  ['steps.values', 'group', '/steps/0/values', onlyStep(fixtures.createRecord)],
+  ['steps.values', 'textbox', '/steps/0/values', onlyStep({ type: 'expectRecord', record: 'order', values: {} })],
+  ['steps.values.name', 'textbox', '/steps/0/values', onlyStep(fixtures.expectNotification)],
+  ['steps.expect', 'combobox', '/steps/0/expect', onlyStep(fixtures.deleteRecord)],
+  [
+    'steps.expect.invalid',
+    'textbox',
+    '/steps/0/expect',
+    onlyStep({ ...fixtures.deleteRecord, expect: { invalid: '/steps/0/as' } }),
+  ],
+  ['steps.by', 'textbox', '/steps/0/by', onlyStep(fixtures.advanceTime)],
+  ['steps.recipient', 'group', '/steps/0/recipient', onlyStep(fixtures.expectNotification)],
+  ['steps.recipient.kind', 'combobox', '/steps/0/recipient', onlyStep(fixtures.expectNotification)],
+  ['steps.recipient.user', 'combobox', '/steps/0/recipient', onlyStep(fixtures.expectNotification)],
+  [
+    'steps.recipient.role',
+    'combobox',
+    '/steps/0/recipient',
+    onlyStep({ ...fixtures.expectNotification, recipient: { role: 'manager' } }),
+  ],
+  [
+    'steps.recipient.email',
+    'textbox',
+    '/steps/0/recipient',
+    onlyStep({ ...fixtures.expectNotification, recipient: { email: 'clerk@example.com' } }),
+  ],
+  ['steps.channel', 'combobox', '/steps/0/channel', onlyStep(fixtures.expectNotification)],
+]
+
+describe('ScenarioEditor field help and names', () => {
+  it('has a case for every drawn path', () => {
+    expect([...new Set(drawnCases.map(([path]) => path))].sort()).toEqual([...drawnPaths].sort())
+  })
+
+  it.each(drawnCases)('describes the %s field as a %s by its label and help', (path, role, pointer, value) => {
+    renderEditor(value)
+
+    const wrapper = screen.getByTestId(`studio-field-${pointer}`)
+    expect(within(wrapper).getByRole(role, { name: labelOf(path) })).toHaveAccessibleDescription(helpOf(path))
+  })
+
+  it.each(stepTypes)('names no control of a %s step by a raw property name, and shows no text key', (type) => {
+    renderEditor(scenario([fixtures[type]]))
+    const card = screen.getByTestId('studio-field-/steps/0')
+
+    for (const name of rawPropertyNames) {
+      for (const role of ['combobox', 'textbox'] as const) {
+        const named = within(card)
+          .queryAllByRole(role, { name })
+          .filter((control) => control.closest('[data-testid*="/values/"]') === null)
+        expect(named, `${role} named ${name}`).toEqual([])
+      }
+    }
+    expect(card.textContent).not.toContain('shell.studio.')
+  })
+})
 
 describe('ScenarioEditor texts', () => {
   it.each(drawnPaths)('has a label and a help for %s in English and Vietnamese', (path) => {
