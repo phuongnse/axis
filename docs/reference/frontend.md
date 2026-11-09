@@ -890,7 +890,7 @@ builder help is not optional.
 - **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
   that are not fields, such as `modules.addTitle`, move out of it.
 - **Every editor draws its labels through `AxisField`,** _(planned for M31)_ those that draw their own today
-  included, such as the process and page editors.
+  included, such as the page editors.
 
 An application's own forms keep `help` optional, as their author decides.
 

@@ -96,6 +96,7 @@ function Recipients({ pointer, value, onChange }: { pointer: string; value: unkn
                   <NamePicker
                     pointer={`${rowPointer}/role`}
                     label={labels.role}
+                    help=""
                     kind="role"
                     value={row.role}
                     onPick={(next) => onChange(`${rowPointer}/role`, next)}
@@ -220,6 +221,7 @@ function OpenPage({ pointer, value, onChange }: { pointer: string; value: unknow
             <NamePicker
               pointer={`${pointer}/page`}
               label={t('shell.studio.process.openPageName')}
+              help=""
               kind="page"
               value={open.page}
               onPick={(next) => onChange(`${pointer}/page`, next)}
