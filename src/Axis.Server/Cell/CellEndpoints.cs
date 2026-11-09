@@ -39,8 +39,8 @@ namespace Axis.Server.CellApi;
 /// <c>403</c> without the role.
 /// </para>
 /// <para>
-/// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap, restoreCheck }</c>: <c>tenants</c> counts the rows of the cell's tenant directory
-/// whatever their status and leaves out preview tenants, <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
+/// <c>GET /api/cell</c> answers <c>{ id, region, tenants, cap, restoreCheck }</c>: <c>tenants</c> is the count the tenant cap checks, previews
+/// and unfinished creates included, see docs/reference/cells.md#cell-size, <c>cap</c> is <see cref="CellOptions.TenantCap"/> or
 /// <see langword="null"/>, and <c>restoreCheck</c> is <c>{ ranAt, tenantId, passed }</c> of the newest row of <c>platform.restore_checks</c> or
 /// <see langword="null"/> when no check has run. <c>GET /api/cell/jobs?tenant&amp;limit</c> answers <c>{ "items": [...] }</c>, the jobs newest first, each as
 /// the job read answers it, and never with the job's <c>actor</c> or <c>input</c>. <c>tenant</c> keeps one tenant's jobs and an
@@ -236,7 +236,7 @@ internal static partial class CellEndpoints
     private static async Task<IResult> GetCellAsync(NpgsqlDataSource dataSource, CellOptions cell, CancellationToken cancellationToken)
     {
         await using var platform = Open(dataSource);
-        var tenants = await platform.Tenants.AsNoTracking().CountAsync(tenant => tenant.PreviewOf == null, cancellationToken);
+        var tenants = await CountTowardsCapAsync(platform, cancellationToken);
         var restoreCheck = await platform.RestoreChecks.AsNoTracking()
             .OrderByDescending(check => check.RanAt).ThenByDescending(check => check.Id)
             .Select(check => new CellRestoreCheckResponse(check.RanAt, check.TenantId, check.Passed))
@@ -549,6 +549,14 @@ internal static partial class CellEndpoints
         && label[^1] != '-'
         && label.All(c => c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or '-');
 
+    // What the cap counts, see docs/reference/cells.md#cell-size: every directory row, previews included, and each unfinished create with no row yet.
+    private static async Task<int> CountTowardsCapAsync(PlatformDbContext platform, CancellationToken cancellationToken)
+    {
+        var unfinished = platform.Jobs.AsNoTracking().Where(job => job.Kind == "create" && (job.State == "queued" || job.State == "running"));
+        return await platform.Tenants.CountAsync(cancellationToken)
+            + await unfinished.CountAsync(job => !platform.Tenants.Any(tenant => tenant.Id == job.TenantId), cancellationToken);
+    }
+
     private static async Task<IResult> CreateTenantAsync(
         HttpContext httpContext,
         NpgsqlDataSource dataSource,
@@ -601,9 +609,7 @@ internal static partial class CellEndpoints
 
         if (cell.TenantCap is { } cap)
         {
-            var count = await platform.Tenants.CountAsync(cancellationToken)
-                + await unfinished.CountAsync(job => !platform.Tenants.Any(tenant => tenant.Id == job.TenantId), cancellationToken);
-            if (count >= cap)
+            if (await CountTowardsCapAsync(platform, cancellationToken) >= cap)
             {
                 return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This cell is full.");
             }
@@ -946,7 +952,7 @@ internal sealed record CellSessionResponse(string DisplayName);
 internal sealed record CellRestoreCheckResponse(DateTimeOffset RanAt, string TenantId, bool Passed);
 
 /// <summary>
-/// The cell: its id and region, the number of its tenants without preview tenants, its tenant cap or null and its newest restore check or null.
+/// The cell: its id and region, the count the tenant cap checks, its tenant cap or null and its newest restore check or null.
 /// </summary>
 internal sealed record CellResponse(string Id, string Region, int Tenants, int? Cap, CellRestoreCheckResponse? RestoreCheck);
 
