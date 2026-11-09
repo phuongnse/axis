@@ -61,11 +61,13 @@ that holds it.
 - **Bugs go first, then the work on how Axis is built.** Autopilot's [`priority`][nexkit-labels]
   setting lists the labels whose issues start before the others, in this order: `nexkit:ci` for a
   failure of CI on `main`, `nexkit:dependabot` for an advisory, `bug`, `nexkit:flaky` for a flaky
-  test, and `process`. NexKit labels the issues it opens. A `bug` issue that a person opens goes
-  first too, with or without a milestone, so a broken `main` never waits behind a milestone's
-  features. A `process` issue improves how Axis is built: the docs standard, the checks, CI, the
-  delivery workflow or the agent instructions. It goes before the milestones' features, because every
-  later issue is built with what it changes.
+  test, `process`, and `refactor`. NexKit labels the issues it opens. A `bug` issue that a person
+  opens goes first too, with or without a milestone, so a broken `main` never waits behind a
+  milestone's features. A `process` issue improves how Axis is built: the docs standard, the checks,
+  CI, the delivery workflow or the agent instructions. A `refactor` issue moves one concern to one
+  shared mechanism and keeps its behaviour. Both go before the milestones' features, because every
+  later issue is built with what they change, and a feature built first would add one more copy to
+  move.
 - **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
   makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
   issue to stop work on it without closing it. A [design issue](#design-changes) is held until its
