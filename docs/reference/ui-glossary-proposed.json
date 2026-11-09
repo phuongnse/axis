@@ -2,6 +2,30 @@
   "$comment": "The terms that wait for the owner's approval, by locale. The owner approves a term by moving it to ui-glossary.json. See docs/reference/ui-writing.md#the-glossary. status: proposed or decide.",
   "terms": [
     {
+      "concept": "Deadline",
+      "en": "deadline",
+      "vi": "thời hạn chót",
+      "status": "proposed"
+    },
+    {
+      "concept": "Escalation",
+      "en": "escalation",
+      "vi": "leo thang",
+      "status": "proposed"
+    },
+    {
+      "concept": "Outcome (of a task)",
+      "en": "outcome",
+      "vi": "kết quả",
+      "status": "proposed"
+    },
+    {
+      "concept": "Timer (step)",
+      "en": "timer",
+      "vi": "hẹn giờ",
+      "status": "proposed"
+    },
+    {
       "concept": "Application template",
       "en": "template",
       "vi": "mẫu",
@@ -11,6 +35,12 @@
       "concept": "Action: Apply",
       "en": "Apply",
       "vi": "Áp dụng",
+      "status": "proposed"
+    },
+    {
+      "concept": "Connector operation",
+      "en": "operation",
+      "vi": "thao tác",
       "status": "proposed"
     },
     {

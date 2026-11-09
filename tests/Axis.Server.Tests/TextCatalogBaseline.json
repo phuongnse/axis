@@ -5,8 +5,6 @@
       "shell.console.schedules.trigger",
       "shell.locale.en",
       "shell.locale.vi",
-      "shell.studio.connector.clientId",
-      "shell.studio.connector.clientSecret",
       "shell.studio.identityProvider.clientId",
       "shell.studio.identityProvider.clientKey",
       "shell.studio.identityProvider.clientSecret",
