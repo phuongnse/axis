@@ -108,24 +108,6 @@
     "element": "icon \"down\""
   },
   {
-    "preview": "identitySignIn",
-    "state": "Error",
-    "mode": "dark",
-    "element": "icon \"close-circle\""
-  },
-  {
-    "preview": "identitySignIn",
-    "state": "Update your profile",
-    "mode": "dark",
-    "element": "icon \"info-circle\""
-  },
-  {
-    "preview": "identitySignIn",
-    "state": "Wrong password",
-    "mode": "dark",
-    "element": "icon \"close-circle\""
-  },
-  {
     "preview": "processInspector",
     "state": "Typical",
     "mode": "dark",
@@ -220,12 +202,6 @@
     "state": "Session ended",
     "mode": "light",
     "element": "icon \"down\""
-  },
-  {
-    "preview": "signIn",
-    "state": "Sign-in refused",
-    "mode": "light",
-    "element": "icon \"exclamation-circle\""
   },
   {
     "preview": "states",
