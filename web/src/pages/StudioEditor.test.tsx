@@ -305,7 +305,7 @@ describe('StudioEditor for a scenario', () => {
     )
 
     expect(await screen.findByTestId('studio-scenario-step', {}, slow)).toBeInTheDocument()
-    await userEvent.type(screen.getByRole('textbox', { name: 'by' }), '0')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Moves time by' }), '0')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await screen.findByTestId('studio-saved')

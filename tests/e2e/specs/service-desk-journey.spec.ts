@@ -197,16 +197,16 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
     if ('assignee' in step) {
       const [[kind, name]] = Object.entries(step.assignee as Record<string, string>)
-      await pickNamed(page, `${at}/assignee`, 'assignee kind', kind === 'role' ? 'Role' : 'User')
-      await pickNamed(page, `${at}/assignee`, kind, name)
+      await pickNamed(page, `${at}/assignee`, 'Assignee type', kind === 'role' ? 'Role' : 'User')
+      await pickNamed(page, `${at}/assignee`, kind === 'role' ? 'Role' : 'User', name)
     }
     if ('by' in step) {
       await page.getByTestId(`${at}/by`).getByRole('textbox').fill(String(step.by))
     }
     if ('recipient' in step) {
       const [[kind, name]] = Object.entries(step.recipient as Record<string, string>)
-      await pickNamed(page, `${at}/recipient`, 'recipient kind', kind === 'role' ? 'Role' : 'User')
-      await pickNamed(page, `${at}/recipient`, kind, name)
+      await pickNamed(page, `${at}/recipient`, 'Recipient type', kind === 'role' ? 'Role' : 'User')
+      await pickNamed(page, `${at}/recipient`, kind === 'role' ? 'Role' : 'User', name)
     }
     if ('channel' in step) {
       await pick(page, `${at}/channel`, String(step.channel))

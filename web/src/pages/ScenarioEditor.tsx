@@ -1,11 +1,16 @@
-import { Button, Flex, Input, Select, Typography } from 'antd'
-import { useContext } from 'react'
+import { Button, Flex, Input, Select } from 'antd'
+import { useContext, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { findNamed, freshKey, isObject, pointerSegment, renameKey } from '../platform/scenarioSteps'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
-import { Field, KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
+import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
+import { KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
 import type { ChangeHandler } from './SchemaForm'
 
 function StubCard({
@@ -18,6 +23,7 @@ function StubCard({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const texts = useFieldTexts('scenario')
   const names = useContext(StudioNamesContext)
   const connectors = names?.connectors ?? []
   const connector = isObject(stub.connector) ? stub.connector : undefined
@@ -25,82 +31,90 @@ function StubCard({
   const result = stub.outcome === 'failed' ? 'failed' : isObject(stub.output) ? 'output' : undefined
   const output = isObject(stub.output) ? stub.output : {}
   const connectorName = typeof connector?.name === 'string' ? connector.name : undefined
-  const operations = findNamed(connectors, connectorName)?.operations.map((operation) => operation.name) ?? []
+  const operationNames = findNamed(connectors, connectorName)?.operations.map((operation) => operation.name) ?? []
+  const fieldText = (path: string) => texts.field(`stubs.${path}`)
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
       <div data-testid="studio-scenario-stub">
         <Flex vertical gap="small">
-          <Field pointer={`${pointer}/source`} name={t('shell.studio.scenario.source')}>
-            <Select
-              virtual={false}
-              aria-label={t('shell.studio.scenario.source')}
-              value={source ?? null}
-              style={{ minWidth: 200 }}
-              options={[
-                { value: 'connector', label: t('shell.studio.scenario.connector') },
-                { value: 'operation', label: t('shell.studio.scenario.package') },
-              ]}
-              onChange={(next: string) => {
-                onChange(`${pointer}/connector`, next === 'connector' ? { name: '', operation: '' } : undefined)
-                onChange(`${pointer}/operation`, next === 'operation' ? '' : undefined)
-              }}
-            />
-          </Field>
+          <div data-testid={`studio-field-${pointer}/source`}>
+            <AxisField {...fieldText('source')}>
+              <Select
+                virtual={false}
+                value={source ?? null}
+                style={{ minWidth: 200 }}
+                options={[
+                  { value: 'connector', label: t('shell.studio.scenario.connector') },
+                  { value: 'operation', label: t('shell.studio.scenario.package') },
+                ]}
+                onChange={(next: string) => {
+                  onChange(`${pointer}/connector`, next === 'connector' ? { name: '', operation: '' } : undefined)
+                  onChange(`${pointer}/operation`, next === 'operation' ? '' : undefined)
+                }}
+              />
+            </AxisField>
+          </div>
           {connector && (
             <Flex gap="small">
-              <Field pointer={`${pointer}/connector/name`} name={t('shell.studio.scenario.connector')}>
-                <ReferencePicker
-                  name={t('shell.studio.scenario.connector')}
-                  value={connectorName}
-                  required
-                  options={connectors.map((item) => item.name)}
-                  onChange={(next) => onChange(`${pointer}/connector/name`, next ?? '')}
-                />
-              </Field>
-              <Field pointer={`${pointer}/connector/operation`} name="operation">
-                <Select
-                  virtual={false}
-                  aria-label="operation"
-                  showSearch
-                  value={typeof connector.operation === 'string' ? connector.operation : null}
-                  style={{ minWidth: 200 }}
-                  options={operations.map((operation) => ({ value: operation, label: operation }))}
-                  onChange={(next: string) => onChange(`${pointer}/connector/operation`, next)}
-                />
-              </Field>
+              <div data-testid={`studio-field-${pointer}/connector/name`}>
+                <AxisField {...fieldText('connector.name')}>
+                  <ReferencePicker
+                    name={fieldText('connector.name').label}
+                    value={connectorName}
+                    required
+                    options={connectors.map((item) => item.name)}
+                    onChange={(next) => onChange(`${pointer}/connector/name`, next ?? '')}
+                  />
+                </AxisField>
+              </div>
+              <div data-testid={`studio-field-${pointer}/connector/operation`}>
+                <AxisField {...fieldText('connector.operation')}>
+                  <Select
+                    virtual={false}
+                    showSearch
+                    value={typeof connector.operation === 'string' ? connector.operation : null}
+                    style={{ minWidth: 200 }}
+                    options={operationNames.map((operation) => ({ value: operation, label: operation }))}
+                    onChange={(next: string) => onChange(`${pointer}/connector/operation`, next)}
+                  />
+                </AxisField>
+              </div>
             </Flex>
           )}
           {source === 'operation' && (
-            <Field pointer={`${pointer}/operation`} name="operation">
-              <Input
-                aria-label="operation"
-                value={typeof stub.operation === 'string' ? stub.operation : ''}
-                onChange={(event) => onChange(`${pointer}/operation`, event.target.value)}
-              />
-            </Field>
+            <div data-testid={`studio-field-${pointer}/operation`}>
+              <AxisField {...fieldText('operation')}>
+                <Input
+                  value={typeof stub.operation === 'string' ? stub.operation : ''}
+                  onChange={(event) => onChange(`${pointer}/operation`, event.target.value)}
+                />
+              </AxisField>
+            </div>
           )}
-          <Field pointer={`${pointer}/result`} name={t('shell.studio.scenario.result')}>
-            <Select
-              virtual={false}
-              aria-label={t('shell.studio.scenario.result')}
-              value={result ?? null}
-              style={{ minWidth: 200 }}
-              options={[
-                { value: 'output', label: t('shell.studio.scenario.output') },
-                { value: 'failed', label: t('shell.studio.scenario.failed') },
-              ]}
-              onChange={(next: string) => {
-                onChange(`${pointer}/output`, next === 'output' ? {} : undefined)
-                onChange(`${pointer}/outcome`, next === 'failed' ? 'failed' : undefined)
-              }}
-            />
-          </Field>
+          <div data-testid={`studio-field-${pointer}/result`}>
+            <AxisField {...fieldText('result')}>
+              <Select
+                virtual={false}
+                value={result ?? null}
+                style={{ minWidth: 200 }}
+                options={[
+                  { value: 'output', label: t('shell.studio.scenario.output') },
+                  { value: 'failed', label: t('shell.studio.scenario.failed') },
+                ]}
+                onChange={(next: string) => {
+                  onChange(`${pointer}/output`, next === 'output' ? {} : undefined)
+                  onChange(`${pointer}/outcome`, next === 'failed' ? 'failed' : undefined)
+                }}
+              />
+            </AxisField>
+          </div>
           {result === 'output' && (
             <KeyValueRows
               pointer={`${pointer}/output`}
               values={output}
-              keyLabel={t('shell.studio.scenario.outputName')}
+              group={texts.group('stubs.output')}
+              keyField={fieldText('output.name')}
               addLabel={t('shell.studio.scenario.addOutput')}
               prefix="output"
               onChange={onChange}
@@ -123,6 +137,7 @@ function StubCard({
  */
 export function ScenarioEditor({ value, onChange }: { value: Record<string, unknown>; onChange: ChangeHandler }) {
   const t = useText()
+  const texts = useFieldTexts('scenario')
   const names = useContext(StudioNamesContext)
   const users = isObject(value.users) ? value.users : {}
   const userNames = Object.keys(users)
@@ -139,87 +154,103 @@ export function ScenarioEditor({ value, onChange }: { value: Record<string, unkn
     return true
   }
 
+  function section(name: string, children: ReactNode, action?: ReactNode) {
+    const prefix = `shell.studio.section.scenario.${name}`
+    return (
+      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
+        <Flex vertical gap="small">
+          {children}
+        </Flex>
+      </ResourceFormSection>
+    )
+  }
+
   return (
-    <Flex vertical gap="middle" data-testid="studio-scenario">
-      <Field pointer="/name" name={t('shell.studio.scenario.name')}>
-        <Input
-          aria-label={t('shell.studio.scenario.name')}
-          value={typeof value.name === 'string' ? value.name : ''}
-          onChange={(event) => onChange('/name', event.target.value)}
-        />
-      </Field>
-      <Field pointer="/description" name={t('shell.studio.scenario.description')}>
-        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
-      </Field>
-      <Field pointer="/now" name={t('shell.studio.scenario.now')}>
-        <Input
-          aria-label={t('shell.studio.scenario.now')}
-          placeholder="yyyy-MM-ddTHH:mm:ssZ"
-          value={typeof value.now === 'string' ? value.now : ''}
-          onChange={(event) => onChange('/now', event.target.value === '' ? undefined : event.target.value)}
-        />
-      </Field>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.scenario.users')}</Typography.Text>
-        {userNames.map((user) => {
-          const pointer = `/users/${pointerSegment(user)}`
-          const roles = Array.isArray(users[user]) ? (users[user] as string[]) : []
-          return (
-            <Field key={user} pointer={pointer} name={t('shell.studio.scenario.userId')}>
-              <Flex gap="small" align="center">
-                <KeyInput
-                  name={t('shell.studio.scenario.userId')}
-                  value={user}
-                  onRename={(next) => renameUser(user, next)}
+    <div data-testid="studio-scenario">
+      <ResourceFormSections>
+        {section(
+          'general',
+          <>
+            <div data-testid="studio-field-/name">
+              <AxisField {...texts.field('name')}>
+                <Input
+                  value={typeof value.name === 'string' ? value.name : ''}
+                  onChange={(event) => onChange('/name', event.target.value)}
                 />
-                <Select
-                  virtual={false}
-                  aria-label={t('shell.studio.scenario.roles')}
-                  mode="multiple"
-                  style={{ minWidth: 240 }}
-                  value={roles}
-                  options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
-                  onChange={(next: string[]) => onChange(pointer, next)}
+              </AxisField>
+            </div>
+            <div data-testid="studio-field-/description">
+              <AxisFieldGroup {...texts.group('description')}>
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+            <div data-testid="studio-field-/now">
+              <AxisField {...texts.field('now')}>
+                <Input
+                  placeholder="yyyy-MM-ddTHH:mm:ssZ"
+                  value={typeof value.now === 'string' ? value.now : ''}
+                  onChange={(event) => onChange('/now', event.target.value === '' ? undefined : event.target.value)}
                 />
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
-              </Flex>
-            </Field>
-          )
-        })}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange(`/users/${freshKey(users, 'user')}`, [])}>
+              </AxisField>
+            </div>
+          </>,
+        )}
+        {section(
+          'users',
+          userNames.map((user) => {
+            const pointer = `/users/${pointerSegment(user)}`
+            const roles = Array.isArray(users[user]) ? (users[user] as string[]) : []
+            return (
+              <div key={user} data-testid={`studio-field-${pointer}`}>
+                <Flex gap="small" align="flex-end">
+                  <AxisField {...texts.field('users.id')}>
+                    <KeyInput value={user} onRename={(next) => renameUser(user, next)} />
+                  </AxisField>
+                  <AxisField {...texts.field('users.roles')}>
+                    <Select
+                      virtual={false}
+                      mode="multiple"
+                      style={{ minWidth: 240 }}
+                      value={roles}
+                      options={[...new Set([...roleNames, ...roles])].map((role) => ({ value: role, label: role }))}
+                      onChange={(next: string[]) => onChange(pointer, next)}
+                    />
+                  </AxisField>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>
+                </Flex>
+              </div>
+            )
+          }),
+          <AxisButton role="secondary" onClick={() => onChange(`/users/${freshKey(users, 'user')}`, [])}>
             {t('shell.studio.scenario.addUser')}
-          </Button>
-        </div>
-      </Flex>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.scenario.stubs')}</Typography.Text>
-        {stubs.map((stub, index) => (
-          <StubCard key={index} pointer={`/stubs/${index}`} stub={isObject(stub) ? stub : {}} onChange={onChange} />
-        ))}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button
+          </AxisButton>,
+        )}
+        {section(
+          'stubs',
+          stubs.map((stub, index) => (
+            <StubCard key={index} pointer={`/stubs/${index}`} stub={isObject(stub) ? stub : {}} onChange={onChange} />
+          )),
+          <AxisButton
+            role="secondary"
             onClick={() => onChange('/stubs', [...stubs, { connector: { name: '', operation: '' }, output: {} }])}
           >
             {t('shell.studio.scenario.addStub')}
-          </Button>
-        </div>
-      </Flex>
-      <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.scenario.steps')}</Typography.Text>
-        {steps.map((_, index) => (
-          <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
-        ))}
-        <div>
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button onClick={() => onChange('/steps', [...steps, { type: 'advanceTime', by: 'PT1H' }])}>
+          </AxisButton>,
+        )}
+        {section(
+          'steps',
+          steps.map((_, index) => (
+            <ScenarioStep key={index} steps={steps} index={index} users={userNames} onChange={onChange} />
+          )),
+          <AxisButton
+            role="secondary"
+            onClick={() => onChange('/steps', [...steps, { type: 'advanceTime', by: 'PT1H' }])}
+          >
             {t('shell.studio.scenario.addStep')}
-          </Button>
-        </div>
-      </Flex>
-    </Flex>
+          </AxisButton>,
+        )}
+      </ResourceFormSections>
+    </div>
   )
 }
