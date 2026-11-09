@@ -479,8 +479,10 @@ The page editor's Form tab edits a page's title, parameters and widgets, with a 
 and the JSON view stays as the second view of the same draft. The [page designer](#page-designer)
 edits the same draft on a canvas.
 
-- **The page.** The Form tab shows the page's name, its [title](studio-resource-form.md#labels), its
-  [description](#editor), its [parameters](#page-parameters) and its [widget tree](#widget-tree).
+- **The page.** The Form tab shows three [sections](studio-resource-form.md#sections): General, with the
+  page's name, its [title](studio-resource-form.md#labels) and its [description](#editor); the
+  [parameters](#page-parameters); and Widgets, with the [widget tree](#widget-tree). Each page field and
+  each widget name picker has a label and help, named by its path in the page.
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -555,7 +557,8 @@ because a page may open itself with other parameters.
 
 ### Page parameters
 
-A Parameters list sits between the title and the widgets. Each parameter has a name, a type picker over
+The Parameters section sits between General and Widgets. Its Add parameter button sits on the right of the
+heading, and a page with no parameters says so in one line. Each parameter has a name, a type picker over
 `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and `reference`, a Required switch
 and Remove, and Add parameter appends a `text` parameter with an empty name. A `reference` parameter
 also has a target entity picker, and an `enum` parameter its values. A type change removes the `target`

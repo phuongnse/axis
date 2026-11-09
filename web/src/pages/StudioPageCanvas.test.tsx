@@ -269,6 +269,17 @@ describe('a module page', () => {
 })
 
 describe('the Design tab of a page', () => {
+  it('titles the widget tree of the side pane as a Widgets group with its help', async () => {
+    stub(content([{ type: 'kpi' }]))
+    renderEditor()
+
+    await screen.findByTestId('studio-page-canvas', {}, slow)
+    const design = await screen.findByTestId('studio-design-panel', {}, slow)
+    expect(within(design).getByRole('group', { name: 'Widgets' })).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.field.page.widgets.help'],
+    )
+  })
+
   it('opens on the Design tab, then draws the posted draft, and draws again after an edit in the Form tab and the JSON tab', async () => {
     const { fetchMock, posts } = stub(content([{ type: 'kpi' }]))
     renderEditor()
