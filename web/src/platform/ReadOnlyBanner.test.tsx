@@ -81,7 +81,7 @@ describe('ReadOnlyBanner', () => {
     const banner = await screen.findByRole('alert')
 
     expect(banner).toHaveTextContent('This workspace is read-only.')
-    expect(banner).toHaveTextContent('nothing changes or runs until it is paid')
+    expect(banner).toHaveTextContent('nothing can change or run until it is paid')
     expect(screen.getByRole('link', { name: 'Open billing' })).toHaveAttribute('href', billingUrl)
   })
 
@@ -112,7 +112,7 @@ describe('ReadOnlyBanner', () => {
     stubMe({ ...user, users: true, billingUrl })
     renderShell('/', 'vi', platformVietnamese)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Không gian làm việc này chỉ đọc.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Không gian làm việc này đang ở chế độ chỉ xem.')
     expect(screen.getByRole('link', { name: 'Mở trang thanh toán' })).toHaveAttribute('href', billingUrl)
   })
 })

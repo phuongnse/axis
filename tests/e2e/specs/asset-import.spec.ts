@@ -30,12 +30,12 @@ test("an asset manager imports a CSV, sees its error by row and field, fixes it 
   await expect(status).toContainText("Row 1");
   await expect(status).toContainText("Purchase cost");
   await expect(
-    dialog.getByRole("button", { name: "Commit", exact: true }),
+    dialog.getByRole("button", { name: "Create records", exact: true }),
   ).toHaveCount(0);
 
   await dialog.locator("input[type=file]").setInputFiles(csv(5));
   await dialog.getByRole("button", { name: "Check", exact: true }).click();
-  const commit = dialog.getByRole("button", { name: "Commit", exact: true });
+  const commit = dialog.getByRole("button", { name: "Create records", exact: true });
   await expect(commit).toBeVisible();
   await commit.click();
 

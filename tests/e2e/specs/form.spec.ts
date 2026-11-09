@@ -159,7 +159,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
   await chooseTheme(page, 'Dark')
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel(fieldLabel('Quantity 1')).fill('5')
-  await dark.getByRole('button', { name: 'Remove', exact: true }).nth(1).click()
+  await dark.getByRole('button', { name: 'Delete row', exact: true }).nth(1).click()
   await expect(page.getByLabel(/Description 2/i)).toHaveCount(0)
   await dark.getByRole('button', { name: 'Save', exact: true }).click()
 
