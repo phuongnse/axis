@@ -19,10 +19,22 @@ waits for them or needs them.
      `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.open_issues == 0)'`.
    - Links of open issues that point nowhere: each link that
      `node scripts/check-issue-links.mjs` prints on an up-to-date `main`.
-3. Answer with one Markdown table, one row per item, with columns for the
+3. Check the labels and milestones of the open issues:
+   - **No label:** `gh issue list --state open --search 'no:label' --limit 500 --json number,title,url`.
+     The row suggests every label whose description fits, as
+     [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue) says.
+   - **No milestone, though one is due:**
+     `gh issue list --state open --search 'no:milestone' --limit 500 --json number,title,url,labels,body`.
+     Leave out an issue of a kind that
+     [how issues run](../../../docs/delivery.md#how-issues-run) puts in no milestone. Recognise those
+     kinds by their labels, such as `nexkit:flaky` for a flaky test issue, by the hidden `docs-audit`
+     marker in the body of a docs audit issue, and by a link to the Design System artifact or a design
+     review in the body of a design issue. The row suggests the milestone that delivers the issue, or
+     the label of its kind when that label is missing.
+4. Answer with one Markdown table, one row per item, with columns for the
    item, its link and the suggested action. When nothing waits, say so in one
    sentence.
-4. Change nothing until the owner says yes.
+5. Change nothing until the owner says yes.
 
 For a broken link, after the yes, find where the file or heading went
 (`git log --follow`, or the decisions index for a superseded decision). Edit the
