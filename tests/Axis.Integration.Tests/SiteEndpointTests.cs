@@ -285,7 +285,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("ItemSections", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            ["type", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "deadLettersPath", "actions", "rowActions", "toolbarActions", "parameters", "access", "detail", "kpi", "chart"],
+            ["type", "entity", "dataSource", "form", "tasksPath", "process", "instancesPath", "deadLettersPath", "actions", "rowActions", "toolbarActions", "parameters", "priorities", "access", "detail", "kpi", "chart"],
             widget.EnumerateObject().Select(property => property.Name));
         Assert.Equal("form", widget.GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("dataSource").ValueKind);
@@ -310,7 +310,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("MyTasks", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(
-            """{"type":"taskInbox","entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"deadLettersPath":null,"actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"access":null,"detail":null,"kpi":null,"chart":null}""",
+            """{"type":"taskInbox","entity":null,"dataSource":null,"form":null,"tasksPath":"/api/apps/RecordsApp/tasks","process":null,"instancesPath":null,"deadLettersPath":null,"actions":[],"rowActions":[],"toolbarActions":[],"parameters":{},"priorities":{},"access":null,"detail":null,"kpi":null,"chart":null}""",
             widget.GetRawText());
     }
 
@@ -484,6 +484,23 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         // The parts child collection is not readable, so it is left out as a whole.
         Assert.Equal(["name", "department"], EntityFieldNames(metadata));
+    }
+
+    [Fact]
+    public async Task Entity_table_leaves_out_the_priority_of_a_field_the_user_may_not_read()
+    {
+        using var fielded = fixture.CreateClient().SignedInAs("fia");
+        using var reader = fixture.CreateClient().SignedInAs("rita");
+
+        using var fieldedPage = await GetJsonAsync(fielded, "/api/sites/records/pages/items", HostA);
+        using var readerPage = await GetJsonAsync(reader, "/api/sites/records/pages/items", HostA);
+
+        Assert.Equal(
+            """{"name":"high"}""",
+            Assert.Single(fieldedPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("priorities").GetRawText());
+        Assert.Equal(
+            """{"name":"high","quantity":"low"}""",
+            Assert.Single(readerPage.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("priorities").GetRawText());
     }
 
     [Fact]

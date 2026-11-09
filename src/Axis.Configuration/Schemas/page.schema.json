@@ -98,6 +98,12 @@
           "propertyNames": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "parameter", "of": "2/dataSource" } },
           "additionalProperties": { "$ref": "#/$defs/name" }
         },
+        "priorities": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "enum": ["high", "low"] }
+        },
         "columns": {
           "type": "array",
           "minItems": 1,
@@ -159,6 +165,10 @@
           "if": { "required": ["type"], "properties": { "type": { "const": "detail" } } },
           "then": { "required": ["record"], "properties": { "parameters": false } },
           "else": { "properties": { "record": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "table" } } },
+          "else": { "properties": { "priorities": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "columns" } } },

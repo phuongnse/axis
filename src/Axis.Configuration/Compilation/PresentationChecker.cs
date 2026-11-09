@@ -854,12 +854,68 @@ internal static class PresentationChecker
                 }
             }
 
+            CheckPriorities(widget, path, rootEntity, source, Report);
+
             // A toolbar has no row, so its expressions see no names.
             var toolbarScope = ExpressionScopes.ForNavigate(null, []);
             var toolbarActions = widget.ToolbarActions ?? [];
             for (var index = 0; index < toolbarActions.Count; index++)
             {
                 NavigateChecker.Check(toolbarActions[index], $"{path}/toolbarActions/{index}", toolbarScope, page, loaded, findPage, findForm, references, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The names of the columns a table shows: the fields of its data source, or for a grouped data source its
+    /// <c>groupBy</c> fields and measures, or the fields of its entity other than child collections and
+    /// <c>references</c> fields. Both the check and the compiler of <c>priorities</c> read the same names.
+    /// </summary>
+    internal static IReadOnlyList<string> TableColumns(EntityResource? entity, DataSourceResource? source) =>
+        source is not null
+            ? source.Aggregate is { } aggregate
+                ? [.. aggregate.GroupBy.Select(group => group.Field), .. aggregate.Measures.Select(measure => measure.Name)]
+                : [.. source.Fields.Select(field => field.Name)]
+            : entity is null
+                ? []
+                : [.. entity.Fields
+                    .Where(field => FieldTypes.Parse(field.Type) is not (FieldType.ChildCollection or FieldType.References))
+                    .Select(field => field.Name)];
+
+    /// <summary>
+    /// Checks the <c>priorities</c> of a <c>table</c> widget. Each key names a column the table shows, ignoring letter
+    /// case, and no column is named twice. Child collections, <c>references</c> fields and unknown names are not shown.
+    /// </summary>
+    private static void CheckPriorities(
+        WidgetDefinition widget,
+        string path,
+        EntityResource? rootEntity,
+        DataSourceResource? source,
+        Action<string, string, string> report)
+    {
+        if (widget.Priorities is not { } priorities || (rootEntity is null && source is null))
+        {
+            return;
+        }
+
+        var columns = TableColumns(source is null ? rootEntity : null, source);
+        var named = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in priorities.Keys)
+        {
+            var column = columns.FirstOrDefault(candidate => string.Equals(candidate, key, StringComparison.OrdinalIgnoreCase));
+            if (column is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The table shows no column '{key}'. A priority names a field the table shows, or a column of its data source.",
+                    $"{path}/priorities/{key}");
+            }
+            else if (!named.Add(column))
+            {
+                report(
+                    DiagnosticCodes.InvalidWidgetBinding,
+                    $"The column '{column}' has a priority more than once, ignoring letter case.",
+                    $"{path}/priorities/{key}");
             }
         }
     }

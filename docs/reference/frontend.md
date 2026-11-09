@@ -272,6 +272,7 @@ response looks like this:
         { "type": "navigate", "page": "ItemForm", "labelKey": "items.new", "parameters": {}, "record": null, "opensForm": true, "paths": {}, "visibleWhen": null }
       ],
       "parameters": {},
+      "priorities": {},
       "access": {
         "actions": ["read", "create", "update", "delete"],
         "createFields": ["name", "department"],
@@ -318,6 +319,7 @@ A leaf widget carries every key below, never left out. A key that does not apply
 - **`parameters`** is, on a table, a chart or a KPI over a data source, the name of the page parameter that gives each
   data source parameter its value, as `{ "<data source parameter>": "<page parameter>" }`, in the declared names. It
   is `{}` elsewhere and on a widget that binds none.
+- **`priorities`** is `high` or `low` per column of a table, by declared name, and `{}` elsewhere. It omits unreadable fields.
 - **`access`** is described under [access](#access).
 
 A page also has `parameters`, never left out: the typed values it reads from its URL, in file order, or `[]`. Each is
@@ -339,7 +341,7 @@ columns, one holding a table and the other a section with a task inbox:
     {
       "type": "columns",
       "columns": [
-        { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
+        { "width": 8, "widgets": [{ "type": "table", "entity": { "name": "PurchaseRequest", "fields": [{ "name": "title", "type": "text" }] }, "dataSource": null, "form": null, "tasksPath": null, "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "priorities": {}, "access": { "actions": ["read"], "createFields": [], "updateFields": [] } }] },
         {
           "width": 4,
           "widgets": [
@@ -347,7 +349,7 @@ columns, one holding a table and the other a section with a task inbox:
               "type": "section",
               "titleKey": "pages.overview.tasks",
               "collapsed": false,
-              "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "access": null }]
+              "widgets": [{ "type": "taskInbox", "entity": null, "dataSource": null, "form": null, "tasksPath": "/api/apps/PurchaseRequests/tasks", "process": null, "instancesPath": null, "deadLettersPath": null, "actions": [], "rowActions": [], "toolbarActions": [], "parameters": {}, "priorities": {}, "access": null }]
             }
           ]
         }
@@ -540,9 +542,8 @@ label. A child collection and a `references` field have no column.
 - **Identifying column.** The column that names a row is the entity's `displayField` when the table shows it, and
   otherwise the first column. For a data source it is the first column. It comes first. With a `navigate` row action it
   is the link that opens the row, see [opening a row](#opening-a-row).
-- **`priority`** _(planned for M31)_. A `table` widget may name a column's `priority`, `high` or `low`, in its
-  file, for what moves under its row first when a table has
-  [too little room](actions-and-controls.md#tables). A `table` widget has no column chooser.
+- **`priority`**. A `table` widget's `priorities` gives a column `high` or `low` by name, as `{ "amount": "low" }`,
+  for what moves under its row first when [room runs out](actions-and-controls.md#tables). It has no column chooser.
 - **Layout.** Text, reference and file columns are free text, which shares the width left and wraps. Every other
   column, an enum too, fits its content and does not wrap, see [tables](actions-and-controls.md#tables). Every cell
   and the actions column line up at the top, so a row with wrapped text reads along its first line. Number columns sit

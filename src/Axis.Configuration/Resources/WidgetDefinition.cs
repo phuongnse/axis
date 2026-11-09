@@ -41,6 +41,12 @@ public sealed record WidgetDefinition
     /// </summary>
     public IReadOnlyDictionary<string, string>? Parameters { get; init; }
 
+    /// <summary>
+    /// The priority of each column of a <c>table</c> widget, <c>high</c> or <c>low</c>, keyed by column name, or null
+    /// when it sets none.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Priorities { get; init; }
+
     /// <summary>The columns of a <c>columns</c> widget, or null on any other widget.</summary>
     public IReadOnlyList<WidgetColumnDefinition>? Columns { get; init; }
 
