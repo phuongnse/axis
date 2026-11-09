@@ -120,8 +120,9 @@ The person chooses the subdomain, which becomes the tenant's id, and the page ch
 - **Checked as they type.** `GET /api/sign-up/subdomains/{name}` answers `{ free, reason }`. The name
   is not free when it breaks the rule below (`invalid`), when it is
   [reserved](region-directory.md#routing-a-host) (`reserved`), when a tenant has it or its host is in
-  use (`taken`), or when it is held after a deletion (`held`). `reason` is null when the name is free.
-  The answer never says which tenant has it. Without the region directory the route answers `503`.
+  use (`taken`), or when it is held after a deletion or by a pending sign-up (`held`). `reason` is null
+  when the name is free. The answer never says which tenant has it. Without the region directory the
+  route answers `503`.
 - **The status under the input** _(planned for M33)_. The check's answer is the field's
   [status](actions-and-controls.md#fields): checking shows the input busy, a free name shows nothing but
   a status region for a screen reader, a refused name shows its message as an error, and a check that
@@ -131,8 +132,8 @@ The person chooses the subdomain, which becomes the tenant's id, and the page ch
   the whole address as they type. A long subdomain scrolls inside the input. `GET /api/sign-up/region`
   answers `{ tenantDomain }` from `ControlPlane:TenantDomain`. When it fails, the input shows the
   subdomain alone, and its help still says it starts the address.
-- **Held while pending.** _(planned for M33)_ A sign-up holds its subdomain for 24 hours, until it is
-  verified or expires. The hold makes the name not free.
+- **Held while pending.** A sign-up holds its subdomain for 24 hours, until it is verified or expires.
+  The hold makes the name not free.
 - **The rule.** The rule of a tenant id of [`tenant create`](administration.md#tenant-create), at
   most 40 characters.
 

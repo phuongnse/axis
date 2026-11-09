@@ -84,6 +84,83 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Application")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("application");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("business_name");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("language");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("pending")
+                        .HasColumnName("state");
+
+                    b.Property<string>("Subdomain")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subdomain");
+
+                    b.Property<byte[]>("TokenHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("token_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sign_ups");
+
+                    b.HasIndex(new[] { "ExpiresAt" }, "ix_sign_ups_expires_at")
+                        .HasFilter("state = 'pending'");
+
+                    b.HasIndex(new[] { "Subdomain" }, "ux_sign_ups_pending_subdomain")
+                        .IsUnique()
+                        .HasFilter("state = 'pending'");
+
+                    b.ToTable("sign_ups", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
+
+                            t.HasCheckConstraint("ck_sign_ups_state", "state IN ('pending', 'verified', 'expired')");
+
+                            t.HasCheckConstraint("ck_sign_ups_token_hash", "token_hash IS NULL OR octet_length(token_hash) = 32");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.Storage.AuditRecordRow", b =>
                 {
                     b.Property<Guid>("Id")

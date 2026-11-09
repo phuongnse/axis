@@ -79,7 +79,7 @@ public sealed class SendEmailJobTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_email_with_an_unknown_template_a_bad_language_or_a_missing_value_is_never_queued()
+    public async Task An_email_with_an_unknown_template_a_bad_language_a_missing_value_or_the_confirm_template_is_never_queued()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = await _dataSource.OpenConnectionAsync(token);
@@ -88,6 +88,10 @@ public sealed class SendEmailJobTests(MailpitFixture mailpit) : IAsyncLifetime
         await Assert.ThrowsAsync<ArgumentException>(() => EmailJobs.EnqueueAsync(connection, null, _templates, "tenantReady", "fr", "a@example.org", Values(), token));
         await Assert.ThrowsAsync<ArgumentException>(() => EmailJobs.EnqueueAsync(connection, null, _templates, "tenantReady", "en", "a@example.org", new Dictionary<string, string>(), token));
         await Assert.ThrowsAsync<ArgumentException>(() => EmailJobs.EnqueueAsync(connection, null, _templates, "tenantReady", "en", "not an address", Values(), token));
+
+        // The confirm link holds a token, so that template has a job of its own and never a stored payload.
+        var confirmValues = new Dictionary<string, string> { ["name"] = "An", ["tenantAddress"] = "https://acme.vn.example.com", ["confirmLink"] = "https://account.vn.example.com/sign-up/verify#token" };
+        await Assert.ThrowsAsync<ArgumentException>(() => EmailJobs.EnqueueAsync(connection, null, _templates, "signUpConfirm", "en", "a@example.org", confirmValues, token));
 
         Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
     }
