@@ -818,10 +818,13 @@ remove. An empty list removes `signIn`, so the site allows every provider, and t
 
 ## Scenario editor
 
-The scenario editor's Form tab shows the scenario's name, its [description](#editor) and `now`, then its users with their roles,
-its stubs, and its steps as a list with a panel for each step type, and the JSON view stays as the
-second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
+The scenario editor's Form tab has four sections: General, with the scenario's name, its [description](#editor)
+and `now`; Users, with their roles; Stubs; and Steps, a list with a panel for each step type. Add user,
+Add stub and Add step sit on their section's heading. The JSON view stays as the second view of the same
+draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
+- **Field names.** Every field, stub and step property shows a label and help text in the app's
+  languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
   the others, and keys the editor does not show stay in the file. A step can be removed or moved up or
   down.
