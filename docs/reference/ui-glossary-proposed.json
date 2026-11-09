@@ -74,6 +74,30 @@
       "status": "proposed"
     },
     {
+      "concept": "Deadline",
+      "en": "deadline",
+      "vi": "thời hạn chót",
+      "status": "proposed"
+    },
+    {
+      "concept": "Escalation",
+      "en": "escalation",
+      "vi": "leo thang",
+      "status": "proposed"
+    },
+    {
+      "concept": "Outcome (of a task)",
+      "en": "outcome",
+      "vi": "kết quả",
+      "status": "proposed"
+    },
+    {
+      "concept": "Timer (step)",
+      "en": "timer",
+      "vi": "hẹn giờ",
+      "status": "proposed"
+    },
+    {
       "concept": "Result type",
       "en": "result type",
       "vi": "kiểu kết quả",

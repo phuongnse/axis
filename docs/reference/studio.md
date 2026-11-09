@@ -712,8 +712,8 @@ second view of the same draft. The [process designer](process-designer.md) edits
 graph, with the card of the selected step beside it, and describes the panels of the timer,
 sub-process and wait for event steps and of a task's deadline and escalations.
 
-- **The process.** The Form tab shows the process's name, its [description](#editor), its subject, its
-  optional start condition and its start step.
+- **The process.** The Form tab has the General, Subject and Steps [sections](studio-resource-form.md#sections),
+  and each field has a [field text](studio-resource-form.md#fields).
 - **Subject.** A choice between Entity, which shows the entity picker, and Parameters, which shows rows
   of a name and a scalar type, `text`, `integer`, `decimal`, `boolean`, `date` or `date-time`, with Add
   and Remove. Switching replaces the draft in one change, so one undo brings it back: the other key is
