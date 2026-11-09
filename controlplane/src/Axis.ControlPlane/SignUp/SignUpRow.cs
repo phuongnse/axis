@@ -2,7 +2,7 @@ namespace Axis.ControlPlane.SignUp;
 
 /// <summary>
 /// A row of <c>control_plane.sign_ups</c>: one sign-up with the fields of the form, see <c>docs/reference/sign-up.md#verifying-the-email-first</c>.
-/// <see cref="State"/> is <c>pending</c>, <c>verified</c> or <c>expired</c>. Only a pending sign-up holds its subdomain, and one
+/// <see cref="State"/> is <c>pending</c>, <c>verified</c> or <c>expired</c>. The confirm route sets <c>verified</c>. Only a pending sign-up holds its subdomain, and one
 /// subdomain has at most one pending sign-up. <see cref="TokenHash"/> is the SHA-256 of the confirm link's token, never the token.
 /// </summary>
 public sealed class SignUpRow

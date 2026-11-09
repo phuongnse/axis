@@ -84,6 +84,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             signUp.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             signUp.Property(s => s.ExpiresAt).HasColumnName("expires_at");
             signUp.HasIndex(s => s.Subdomain, "ux_sign_ups_pending_subdomain").IsUnique().HasFilter("state = 'pending'");
+            signUp.HasIndex(s => s.TokenHash, "ux_sign_ups_token_hash").IsUnique().HasFilter("token_hash IS NOT NULL");
             signUp.HasIndex(s => s.ExpiresAt, "ix_sign_ups_expires_at").HasFilter("state = 'pending'");
         });
 
