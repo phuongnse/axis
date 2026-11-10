@@ -169,7 +169,7 @@
   "shell.users.modelKey.setTitle": "Đặt khóa mô hình AI",
   "shell.users.modelKey.changeTitle": "Đổi khóa mô hình AI",
   "shell.users.modelKey.field": "Khóa",
-  "shell.users.modelKey.help": "Dán khóa từ nhà cung cấp mô hình AI của bạn. Khóa được lưu ở dạng mã hóa, và chỉ bốn ký tự cuối được hiện lại.",
+  "shell.users.modelKey.help": "Dán khóa từ nhà cung cấp mô hình AI. Hệ thống lưu khóa ở dạng mã hóa và chỉ hiện lại bốn ký tự cuối.",
   "shell.users.modelKey.save": "Lưu",
   "shell.users.modelKey.removeConfirm": "Gỡ khóa mô hình AI?",
   "shell.users.modelKey.remove.ok": "Gỡ",
