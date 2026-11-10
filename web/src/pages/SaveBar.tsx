@@ -97,7 +97,7 @@ export function SaveBar({
 }
 
 /**
- * Proposed: the bar at the foot of the window across the content, over the footer, that holds what finishes a page's
+ * Proposed: the bar at the foot of the window across the content, right above the footer, that holds what finishes a page's
  * task, such as Save, Publish or Accept. It leaves the sidebar and a side panel uncovered, and keeps its height free at
  * the end of the page so nothing hides under it. `SaveBar` draws its content in it. See the review on #3263.
  */
@@ -143,7 +143,8 @@ export function ActionBar({ testId, children }: { testId: string; children: Reac
         gap="middle"
         style={{
           position: 'fixed',
-          bottom: 0,
+          // Proposed: right above the shell's footer, which stays at the window's foot; see the review on #3263.
+          bottom: size.bar,
           left: frame?.left ?? 0,
           width: frame?.width ?? '100%',
           minHeight: size.bar,

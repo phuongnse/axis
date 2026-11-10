@@ -1,5 +1,5 @@
 import { Layout } from 'antd'
-import { useEffect, useState, type Ref } from 'react'
+import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from './about'
 import { LegalLine } from './LegalLine'
 import type { SiteLegal } from './site'
@@ -11,8 +11,8 @@ import { useDesignTokens } from './themeMode'
  * only, the server's version beside it. At the end it holds the legal line: Privacy and Terms when `legal` gives their
  * addresses, and Licences always.
  */
-export function ShellFooter({ legal, ref }: { legal?: SiteLegal | null; ref?: Ref<HTMLElement> }) {
-  const { colour, spacing } = useDesignTokens()
+export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
+  const { colour, size, spacing } = useDesignTokens()
   const t = useText()
   const [year] = useState(() => new Date().getFullYear())
   // `null` when nobody is signed in, `undefined` while it loads or when loading failed.
@@ -32,8 +32,17 @@ export function ShellFooter({ legal, ref }: { legal?: SiteLegal | null; ref?: Re
 
   return (
     <Layout.Footer
-      ref={ref}
       style={{
+        // Proposed: it stays at the window's foot, of the `bar` height, as the header stays at its top; see the
+        // review on #3263.
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 10,
+        boxSizing: 'border-box',
+        minHeight: size.bar,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
         paddingBlock: spacing.xs,
         paddingInline: spacing.lg,
         background: colour.surface,
