@@ -300,7 +300,8 @@
     "max_parallel": 3,
     "watch_workflows": [],
     "trusted_workflows": [
-      "docs-audit.yml"
+      "docs-audit.yml",
+      "ci.yml"
     ],
     "priority": [
       "nexkit:ci",

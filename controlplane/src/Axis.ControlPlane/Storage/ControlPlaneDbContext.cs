@@ -89,6 +89,9 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             signUp.Property(s => s.Subdomain).HasColumnName("subdomain");
             signUp.Property(s => s.Language).HasColumnName("language");
             signUp.Property(s => s.Application).HasColumnName("application");
+            signUp.Property(s => s.TermsVersion).HasColumnName("terms_version");
+            signUp.Property(s => s.DpaVersion).HasColumnName("dpa_version");
+            signUp.Property(s => s.PrivacyVersion).HasColumnName("privacy_version");
             signUp.Property(s => s.State).HasColumnName("state").HasDefaultValue("pending");
             signUp.Property(s => s.TokenHash).HasColumnName("token_hash").HasColumnType("bytea");
             signUp.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");

@@ -23,7 +23,7 @@ export function SignUpEntry() {
     document.documentElement.lang = locale
   }, [locale])
   const text = useMemo(() => signUpText(locale), [locale])
-  const documents = useSignUpDocuments()
+  const { documents, reload } = useSignUpDocuments()
   return (
     <StrictMode>
       <ThemeModeProvider>
@@ -31,7 +31,7 @@ export function SignUpEntry() {
           {window.location.pathname.replace(/\/$/, '') === verifyPath ? (
             <VerifyPage locale={locale} onLocaleChange={setLocale} documents={documents} />
           ) : (
-            <SignUpPage locale={locale} onLocaleChange={setLocale} documents={documents} />
+            <SignUpPage locale={locale} onLocaleChange={setLocale} documents={documents} onDocumentsRefused={reload} />
           )}
         </TextContext.Provider>
       </ThemeModeProvider>

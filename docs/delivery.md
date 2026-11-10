@@ -77,10 +77,11 @@ that holds it.
   review ends.
 - **Autopilot takes only trusted issues.** An issue is trusted when a person with write access opens
   it, or when NexKit's App opens it: for a failure of CI on `main`, a flaky test, a Dependabot advisory
-  or a part of a split. The docs audit's issues are trusted too, because autopilot's
-  [`trusted_workflows`][nexkit-workflow-issues] setting lists `docs-audit.yml`. NexKit checks that the
-  issue came from a run of that workflow on `main` that NexKit or a writer started, never a pull
-  request. Any other issue waits until the owner reads it and comments
+  or a part of a split. The issues of the docs audit and of CI's
+  [shard durations](development.md#shards) job are trusted too, because autopilot's
+  [`trusted_workflows`][nexkit-workflow-issues] setting lists the workflows of both. NexKit
+  checks that the issue came from a run of that workflow on `main` that NexKit or a writer started,
+  never a pull request. Any other issue waits until the owner reads it and comments
   [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
   as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
@@ -164,6 +165,10 @@ that holds it.
   `.nexkit/config.json` is one parallel job that runs the check's commands with its timeout and
   uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
   slowest job, and adding, removing or resharding a check changes CI with it.
+- **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
+  no model refreshes the durations from the run's results. It opens or updates one `process` issue
+  when they drift, and opens one for each test that alone passes the shard budget, as
+  [the shards section](development.md#shards) says.
 
 ### NexKit's checks
 

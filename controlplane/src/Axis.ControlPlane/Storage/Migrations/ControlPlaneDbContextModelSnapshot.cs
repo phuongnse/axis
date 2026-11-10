@@ -142,6 +142,11 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("DpaVersion")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("dpa_version");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text")
@@ -166,6 +171,11 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("normalised_email");
 
+                    b.Property<string>("PrivacyVersion")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("privacy_version");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -177,6 +187,11 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("subdomain");
+
+                    b.Property<string>("TermsVersion")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("terms_version");
 
                     b.Property<byte[]>("TokenHash")
                         .HasColumnType("bytea")
