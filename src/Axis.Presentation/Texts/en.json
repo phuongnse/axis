@@ -1878,6 +1878,7 @@
   "shell.studio.publish.label": "Label",
   "shell.studio.publish.note": "Note",
   "shell.studio.publish.confirm": "Publish",
+  "shell.studio.publish.release": "The release",
   "shell.studio.publish.label.help": "A short name for the release, such as Spring update.",
   "shell.studio.publish.note.help": "What changed and why, for whoever reads the release list.",
   "shell.studio.publish.replaces": "Everything below goes live as a new release, in place of release {number}.",

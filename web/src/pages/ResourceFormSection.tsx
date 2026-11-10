@@ -15,6 +15,8 @@ export function ResourceFormSections({ children }: { children: ReactNode }) {
 /**
  * A section of a resource form, see docs/reference/studio-resource-form.md#sections: a panel with an optional heading,
  * its line and a slot for an action on the right of the heading. A section with no heading is the panel alone.
+ * Proposed: every Studio page draws its sections with it, so the page's canvas holds only its heading, its messages
+ * and its actions, and a heading's line is optional; see the review on #3263.
  */
 export function ResourceFormSection({
   testName,
@@ -25,7 +27,7 @@ export function ResourceFormSection({
   /** In `data-testid="studio-section-<testName>"`. */
   testName: string
   /** The heading and its line. None for the last section of unnamed properties. */
-  heading?: { title: string; line: string }
+  heading?: { title: string; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
@@ -55,7 +57,7 @@ export function ResourceFormSection({
           <Typography.Title id={headingId} level={5} style={{ margin: 0 }}>
             {heading.title}
           </Typography.Title>
-          <Typography.Text type="secondary">{heading.line}</Typography.Text>
+          {heading.line !== undefined && <Typography.Text type="secondary">{heading.line}</Typography.Text>}
         </div>
         {typeof children === 'function' ? <div ref={setSlot} /> : action}
       </Flex>

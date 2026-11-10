@@ -37,6 +37,7 @@ import {
   waitingForAuthor,
 } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
+import { ResourceFormSection } from './ResourceFormSection'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioDiagnosticRow } from './StudioProblems'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -209,7 +210,7 @@ export function StudioAuthoringRequestPage({
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
-  const { colour, radius, size, spacing } = useDesignTokens()
+  const { colour, size, spacing } = useDesignTokens()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
   const stateColour = useRequestStateColour()
@@ -352,25 +353,13 @@ export function StudioAuthoringRequestPage({
   const line = (mine ? t('shell.studio.aiRequest.lineMine') : t('shell.studio.aiRequest.line'))
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
     .replace('{time}', sentTime(request.sentAt))
-  const section = (title: string, body: ReactNode) => (
-    <Flex vertical gap={spacing.xs}>
-      <Typography.Text strong>{title}</Typography.Text>
+  // Each part of the page is a panel on `surface`, and the canvas holds only the heading, messages and actions.
+  const section = (testName: string, title: string, body: ReactNode) => (
+    <ResourceFormSection testName={testName} heading={{ title }}>
       {body}
-    </Flex>
+    </ResourceFormSection>
   )
-  const quoted = (text: string) => (
-    <div
-      style={{
-        whiteSpace: 'pre-wrap',
-        padding: `${spacing.sm}px ${spacing.md}px`,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-      }}
-    >
-      {text}
-    </div>
-  )
+  const quoted = (text: string) => <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
   const stage = stageOf(request.state)
   const running = request.steps.findLast((step) => step.finishedAt === null)
   const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
@@ -443,8 +432,9 @@ export function StudioAuthoringRequestPage({
         }
       />
       {back}
-      {section(t('shell.studio.aiRequest.asked'), quoted(request.text))}
+      {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
       {section(
+        'ai-progress',
         t('shell.studio.aiRequest.progress'),
         <Flex vertical gap="small" data-testid="studio-ai-progress">
           {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
@@ -473,6 +463,7 @@ export function StudioAuthoringRequestPage({
       )}
       {request.plan !== null &&
         section(
+          'ai-plan',
           t('shell.studio.aiRequest.plan'),
           <Flex vertical gap="small">
             <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
@@ -515,6 +506,7 @@ export function StudioAuthoringRequestPage({
       {showsDiff &&
         draft !== null &&
         section(
+          'ai-changes',
           t('shell.studio.aiRequest.changes'),
           changes === undefined ? (
             <Spin />
@@ -529,6 +521,7 @@ export function StudioAuthoringRequestPage({
       {showsDiff &&
         request.checks !== null &&
         section(
+          'ai-checks',
           t('shell.studio.aiRequest.checks'),
           <Flex vertical gap="small" data-testid="studio-ai-checks">
             {problems.length > 0 && (
@@ -594,6 +587,7 @@ export function StudioAuthoringRequestPage({
       )}
       {request.steps.length > 0 &&
         section(
+          'ai-steps',
           t('shell.studio.aiRequest.steps'),
           <AxisTable<StudioAuthoringRequestStep>
             columns={stepColumns}

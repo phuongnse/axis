@@ -16,6 +16,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { authoringRequestAddress } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
+import { ResourceFormSection } from './ResourceFormSection'
 import { StudioPageHeading } from './StudioPageHeading'
 
 /**
@@ -24,7 +25,8 @@ import { StudioPageHeading } from './StudioPageHeading'
  * live, then lists every file that differs from the live release as `StudioChanges` does, each folded, with who changed
  * it since: a person by name, "you" for the reader, or an AI request by its words as a link to its page. Then come the
  * optional label and note and Publish, which sends the publish and goes back to the page Publish… was opened from,
- * where the status line follows it. With nothing to publish it says so and Publish is off.
+ * where the status line follows it. With nothing to publish it says so and Publish is off. The changes and the release's
+ * label and note are each a panel on `surface`, and the canvas holds the heading and the actions.
  */
 export function StudioPublishPage({
   application,
@@ -102,23 +104,29 @@ export function StudioPublishPage({
             : t('shell.studio.publish.replaces').replace('{number}', String(liveNumber))
         }
       />
-      {changes === undefined ? (
-        <Spin />
-      ) : changes === 'failed' ? (
-        <AxisAlert kind="error" message={t('shell.studio.publish.diffFailed')} />
-      ) : changes === null ? null : nothing ? (
-        <Typography.Text>{t('shell.studio.overview.changes.allLive')}</Typography.Text>
-      ) : (
-        <Flex vertical gap={spacing.xs}>
-          <Typography.Text strong>
-            {changes.length === 1
-              ? t('shell.studio.publish.oneFile')
-              : t('shell.studio.publish.files').replace('{count}', String(changes.length))}
-          </Typography.Text>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-            <StudioChanges changes={changes} resources={resources} authors={authors || undefined} folded />
-          </div>
-        </Flex>
+      {changes !== null && (
+        <ResourceFormSection
+          testName="publish-changes"
+          heading={{
+            title: !Array.isArray(changes)
+              ? t('shell.studio.overview.changes')
+              : changes.length === 1
+                ? t('shell.studio.publish.oneFile')
+                : t('shell.studio.publish.files').replace('{count}', String(changes.length)),
+          }}
+        >
+          {changes === undefined ? (
+            <Spin />
+          ) : changes === 'failed' ? (
+            <AxisAlert kind="error" message={t('shell.studio.publish.diffFailed')} />
+          ) : nothing ? (
+            <Typography.Text>{t('shell.studio.overview.changes.allLive')}</Typography.Text>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+              <StudioChanges changes={changes} resources={resources} authors={authors || undefined} folded />
+            </div>
+          )}
+        </ResourceFormSection>
       )}
       <Form
         form={form}
@@ -131,24 +139,28 @@ export function StudioPublishPage({
           window.scrollTo({ top: 0 })
         }}
       >
-        <AxisField name="label" label={t('shell.studio.publish.label')} help={t('shell.studio.publish.label.help')}>
-          <Input maxLength={100} aria-label={t('shell.studio.publish.label')} />
-        </AxisField>
-        <AxisField name="note" label={t('shell.studio.publish.note')} help={t('shell.studio.publish.note.help')}>
-          <Input.TextArea
-            maxLength={2000}
-            autoSize={{ minRows: 3, maxRows: 8 }}
-            aria-label={t('shell.studio.publish.note')}
-          />
-        </AxisField>
-        <AxisActionRow>
-          <AxisButton role="finish" htmlType="submit" disabled={busy || nothing} data-testid="studio-publish-confirm">
-            {t('shell.studio.publish.confirm')}
-          </AxisButton>
-          <AxisButton role="secondary" onClick={() => navigate(-1)}>
-            {t('shell.studio.cancel')}
-          </AxisButton>
-        </AxisActionRow>
+        <ResourceFormSection testName="publish-release" heading={{ title: t('shell.studio.publish.release') }}>
+          <AxisField name="label" label={t('shell.studio.publish.label')} help={t('shell.studio.publish.label.help')}>
+            <Input maxLength={100} aria-label={t('shell.studio.publish.label')} />
+          </AxisField>
+          <AxisField name="note" label={t('shell.studio.publish.note')} help={t('shell.studio.publish.note.help')}>
+            <Input.TextArea
+              maxLength={2000}
+              autoSize={{ minRows: 3, maxRows: 8 }}
+              aria-label={t('shell.studio.publish.note')}
+            />
+          </AxisField>
+        </ResourceFormSection>
+        <div style={{ marginTop: spacing.md }}>
+          <AxisActionRow>
+            <AxisButton role="finish" htmlType="submit" disabled={busy || nothing} data-testid="studio-publish-confirm">
+              {t('shell.studio.publish.confirm')}
+            </AxisButton>
+            <AxisButton role="secondary" onClick={() => navigate(-1)}>
+              {t('shell.studio.cancel')}
+            </AxisButton>
+          </AxisActionRow>
+        </div>
       </Form>
     </Flex>
   )
