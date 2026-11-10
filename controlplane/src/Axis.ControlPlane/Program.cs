@@ -7,6 +7,7 @@ using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
+using Axis.ControlPlane.Subscriptions;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -71,6 +72,10 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
 {
     builder.Services.AddSingleton<IJobHandler, DirectoryCorrection>();
     builder.Services.AddSingleton(new RecurringJob(DirectoryCorrection.JobKind, TimeSpan.FromMinutes(5)));
+
+    // The clock of the subscriptions, queued every hour. It finds each tenant's cell in the directory and calls it.
+    builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
+    builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
 }
 
 // The schedule that queues the recurring jobs above. It is idle when there are none.

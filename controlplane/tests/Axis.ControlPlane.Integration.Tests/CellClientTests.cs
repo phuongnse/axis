@@ -229,6 +229,48 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_delete_sends_the_idempotency_key_and_no_body_and_returns_the_queued_job()
+    {
+        var cell = Build().Get("vn-1");
+        var record = Guid.NewGuid();
+
+        var job = await cell.DeleteAsync("/api/cell/tenants/acme", new CellOperation("delete", record), TestContext.Current.CancellationToken);
+
+        var seen = Assert.Single(_server.Deletes);
+        Assert.Equal("Bearer token-1", seen.Authorization);
+        Assert.Equal($"delete:{record:D}", seen.IdempotencyKey);
+        Assert.Equal(string.Empty, seen.Body);
+        Assert.NotNull(seen.ClientCertificateThumbprint);
+        Assert.Equal(CellJob.Queued, job.State);
+        Assert.Equal("acme", job.TenantId);
+    }
+
+    [Fact]
+    public async Task A_tenant_read_returns_the_status_and_a_tenant_the_cell_does_not_know_is_null()
+    {
+        var cell = Build().Get("vn-1");
+        var token = TestContext.Current.CancellationToken;
+        _server.TenantStatus = "deleting";
+
+        Assert.Equal("deleting", await cell.GetTenantStatusAsync("acme", token));
+
+        _server.TenantStatus = null;
+        Assert.Null(await cell.GetTenantStatusAsync("acme", token));
+    }
+
+    [Fact]
+    public async Task A_tenant_read_answered_with_an_error_throws_with_the_status_and_no_body()
+    {
+        _server.TenantReadStatus = 500;
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() => cell.GetTenantStatusAsync("acme", TestContext.Current.CancellationToken));
+
+        Assert.Equal(500, exception.Status);
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task After_a_401_the_client_gets_one_new_token_and_sends_the_call_again()
     {
         var clients = Build();

@@ -254,6 +254,37 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_first_confirm_starts_one_trialing_subscription_of_30_days_with_one_audit_record_and_a_second_confirm_adds_none()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, subdomain, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+
+        var before = DateTime.UtcNow;
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
+        var after = DateTime.UtcNow;
+
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal("trialing", await Scalar<string>($"SELECT state FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal(id, await Scalar<Guid>($"SELECT sign_up_id FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+        var trialEndsAt = await Scalar<DateTime>($"SELECT trial_ends_at FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'");
+        Assert.InRange(trialEndsAt, before.AddDays(30), after.AddDays(30));
+        Assert.Equal(trialEndsAt, await Scalar<DateTime>($"SELECT next_at FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+        var subscriptionId = await Scalar<Guid>($"SELECT id FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'");
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+        Assert.Equal("account", await Scalar<string>($"SELECT actor_kind FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+        Assert.Equal(id.ToString(), await Scalar<string>($"SELECT actor FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+        Assert.Equal("subscription.trialing", await Scalar<string>($"SELECT action FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+    }
+
+    [Fact]
     public async Task Two_parallel_confirms_verify_the_sign_up_once()
     {
         var cancellation = TestContext.Current.CancellationToken;

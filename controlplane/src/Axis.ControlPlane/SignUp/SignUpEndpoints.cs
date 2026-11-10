@@ -3,8 +3,10 @@ using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Subscriptions;
 using Axis.Server.Http;
 using MimeKit;
 using Npgsql;
@@ -41,7 +43,8 @@ internal static class SignUpEndpoints
         endpoints.MapPost("/api/sign-up/verification", VerifyAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. One conditional update marks a pending, unexpired sign-up verified, so a link
-        // works once and two parallel confirms cannot both succeed. A used or expired link answers 409 with its state.
+        // works once and two parallel confirms cannot both succeed. The same transaction starts the tenant's trialing subscription,
+        // see docs/reference/subscriptions.md#one-clock. A used or expired link answers 409 with its state.
         endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
 
         // The region's built-in applications from the settings, each with its id, its title and its description in both languages.
@@ -211,7 +214,7 @@ internal static class SignUpEndpoints
         };
     }
 
-    private static async Task<IResult> ConfirmAsync(HttpRequest request, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)
+    private static async Task<IResult> ConfirmAsync(HttpRequest request, NpgsqlDataSource controlPlane, TimeProvider clock, CancellationToken cancellationToken)
     {
         var (body, refused) = await ReadBodyAsync(request, cancellationToken);
         if (body is null)
@@ -222,11 +225,52 @@ internal static class SignUpEndpoints
         var hash = TokenHash(body);
         if (hash is not null)
         {
-            await using var confirm = controlPlane.CreateCommand(
-                "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id");
-            confirm.Parameters.AddWithValue("hash", hash);
-            if (await confirm.ExecuteScalarAsync(cancellationToken) is Guid id)
+            await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            Guid id;
+            string subdomain;
+            await using (var confirm = new NpgsqlCommand(
+                "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain",
+                connection,
+                transaction))
             {
+                confirm.Parameters.AddWithValue("hash", hash);
+                await using var reader = await confirm.ExecuteReaderAsync(cancellationToken);
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    id = reader.GetGuid(0);
+                    subdomain = reader.GetString(1);
+                }
+                else
+                {
+                    id = Guid.Empty;
+                    subdomain = "";
+                }
+            }
+
+            if (id != Guid.Empty)
+            {
+                var subscriptionId = Guid.CreateVersion7();
+                var trialEndsAt = clock.GetUtcNow() + SubscriptionClock.TrialLength;
+                await using (var insert = new NpgsqlCommand(
+                    """
+                    INSERT INTO control_plane.subscriptions (id, tenant_id, sign_up_id, state, trial_ends_at, next_at, step_id)
+                    VALUES (@id, @tenantId, @signUpId, 'trialing', @trialEndsAt, @trialEndsAt, @stepId)
+                    """,
+                    connection,
+                    transaction))
+                {
+                    insert.Parameters.AddWithValue("id", subscriptionId);
+                    insert.Parameters.AddWithValue("tenantId", subdomain);
+                    insert.Parameters.AddWithValue("signUpId", id);
+                    insert.Parameters.AddWithValue("trialEndsAt", trialEndsAt);
+                    insert.Parameters.AddWithValue("stepId", Guid.CreateVersion7());
+                    await insert.ExecuteNonQueryAsync(cancellationToken);
+                }
+
+                // The sign-up is the person who confirmed: billing portal accounts do not exist yet.
+                await AuditRecords.AppendAsync(transaction, AuditActorKind.Account, id.ToString(), "subscription.trialing", subscriptionId.ToString(), cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
                 return Results.Ok(new { id });
             }
         }
