@@ -32,7 +32,7 @@ public sealed partial class ControlPlaneSettingsTableTests
         return settings;
     }
 
-    // String, int and bool properties are settings. A list adds an index and a dictionary adds a key. Other classes hold more settings.
+    // String, int and bool properties are settings. A list adds an index and a dictionary adds a key. A list of strings is one setting for each index. Other classes hold more settings.
     private static IEnumerable<string> BoundSettings(Type type, string prefix)
     {
         foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
@@ -43,7 +43,7 @@ public sealed partial class ControlPlaneSettingsTableTests
             {
                 yield return name;
             }
-            else if (propertyType == typeof(Dictionary<string, string>))
+            else if (propertyType == typeof(Dictionary<string, string>) || propertyType == typeof(List<string>))
             {
                 yield return $"{name}:<>";
             }

@@ -111,7 +111,16 @@ keys of the page by JSON Pointer, as the [record API](record-api.md)'s are:
 - Any other key for the form.
 
 A limit answers `429` with `Retry-After` and `limit`: `address` for the client address, which the page
-shows in minutes, or `domain` for the email's domain, which asks the person to try tomorrow.
+shows in minutes, or `domain` for the email's domain, which asks the person to try tomorrow. The
+answer shows in the error alert above the form, in these texts:
+
+| Limit | English | Vietnamese |
+| --- | --- | --- |
+| `address` | Too many sign-ups came from this network. Try again in {minutes} minutes. (`1 minute` for one) | Có quá nhiều lượt đăng ký từ mạng này. Thử lại sau {minutes} phút. |
+| `domain` | Too many sign-ups came for this email's domain today. Try again tomorrow. | Hôm nay có quá nhiều lượt đăng ký cho tên miền của email này. Thử lại vào ngày mai. |
+
+The minutes are `Retry-After` in seconds, rounded up. A `429` without a usable `Retry-After` or with an
+unknown `limit` shows the text of any other failure.
 
 ## The subdomain
 
@@ -155,9 +164,18 @@ cost something.
   [`ControlPlane:SignUp:ChallengeKey`](control-plane.md#settings), and answers `503` without that key.
   The page sends the solution as `altcha` in the body of `POST /api/sign-up`.
 - **Rate limits.** The control plane's `sign_up` partition allows 5 sign-ups an hour from one client
-  address, and 20 a day for one email domain, except the public mailbox domains of a settings list,
-  such as `gmail.com`, which count by address only. Past a limit it answers `429` with `Retry-After`
-  and `limit`, see [sending the form](#sending-the-form).
+  address, and 20 a day for one email domain, except the public mailbox domains of the setting
+  `ControlPlane:SignUp:PublicMailboxDomains`, such as `gmail.com`, which count by address only. Past a
+  limit it answers `429` with `Retry-After` and `limit`, see [sending the form](#sending-the-form).
+  - **Every try counts**, even one the form refuses, and a refused try stores nothing and sends no email.
+  - **By address at a public domain.** Each address of a public mailbox domain counts on its own,
+    compared as the rule of one trial for each email, below, compares them.
+  - **Per replica.** Each replica counts in memory as the platform's [rate limits](headers-and-rate-limits.md#rate-limits)
+    do, so a restart starts the counts again.
+  - **`Retry-After` is the window**, an hour or a day, not the time left in it.
+  - **The client address** is read by the rules of the
+    [forwarded headers](control-plane.md#settings), and each refusal counts in the
+    [metric](headers-and-rate-limits.md#a-refused-request) `axis.rate_limits.refused` with the partition `sign_up`.
 - **Three emails a day for an address.** Each email address, compared as below, gets at most 3 sign-up
   emails of either kind in 24 hours, resends included, so the form cannot fill someone else's inbox. A
   sign-up past that answers `202` and sends nothing, so the limit tells nothing either.

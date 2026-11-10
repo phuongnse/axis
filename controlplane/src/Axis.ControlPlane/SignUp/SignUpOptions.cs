@@ -11,6 +11,12 @@ public sealed class SignUpOptions
     /// <summary>The built-in applications of the region that a person can start from.</summary>
     public List<SignUpApplicationOptions> Applications { get; } = [];
 
+    /// <summary>
+    /// The public mailbox domains, such as <c>gmail.com</c>, whose addresses the sign-up domain limit counts one by one, see
+    /// <c>docs/reference/sign-up.md#bots-and-abuse</c>. Empty by default.
+    /// </summary>
+    public List<string> PublicMailboxDomains { get; } = [];
+
     /// <summary>The terms of service of the region.</summary>
     public SignUpDocumentOptions Terms { get; set; } = new();
 

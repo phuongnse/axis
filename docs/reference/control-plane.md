@@ -198,6 +198,10 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, and never its value.
+- **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
+  `ForwardedHeaders:KnownNetworks` by the rules of [host settings](host-settings.md#forwarded-headers), so the
+  [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
+  for every client.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key and
   the sign-up challenge key may also come from the key-per-file secrets
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
@@ -237,6 +241,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
@@ -302,8 +307,10 @@ The control plane reports its health and telemetry as the platform's hosts do.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.
-- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed`.
+- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed` and the requests that a
+  rate limit refused.
 
   | Metric | Instrument | Unit | Attributes |
   | --- | --- | --- | --- |
   | `axis.controlplane.jobs.failed` | counter | `{job}` | `axis.job.kind`. Never the job id |
+  | `axis.rate_limits.refused` | counter | `{request}` | `axis.partition`, always `sign_up`. Never an address or a domain |
