@@ -14,6 +14,7 @@ namespace Axis.ControlPlane;
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
 /// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
 /// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
+/// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -285,6 +286,20 @@ public sealed partial class ControlPlaneOptions
             problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.ChallengeKey)} must be base64 of at least {SignUpChallenge.MinimumKeyBytes} bytes.");
         }
 
+        if (signUp.DisposableDomains.IsSet)
+        {
+            var prefix = $"{SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.DisposableDomains)}";
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDisposableDomainsOptions.Url)}", signUp.DisposableDomains.Url);
+            if (string.IsNullOrWhiteSpace(signUp.DisposableDomains.Sha256))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpDisposableDomainsOptions.Sha256)} is required.");
+            }
+            else if (!Sha256Hex().IsMatch(signUp.DisposableDomains.Sha256))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpDisposableDomainsOptions.Sha256)} must be 64 hex characters.");
+            }
+        }
+
         if (signUp.HasDocuments)
         {
             var prefix = $"{SectionName}:{nameof(SignUp)}";
@@ -424,4 +439,7 @@ public sealed partial class ControlPlaneOptions
 
     [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
     private static partial Regex CellId();
+
+    [GeneratedRegex("^[0-9a-fA-F]{64}$")]
+    private static partial Regex Sha256Hex();
 }

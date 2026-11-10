@@ -114,7 +114,8 @@ every business change.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
-    (`advanceSubscriptions`) every hour. Under a database lock on the kind, it queues
+    (`advanceSubscriptions`) every hour. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
     every 30 seconds and the job runner runs the job as any other. A job that waits for a retry
@@ -194,8 +195,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
-  their settings is set, all of them are required. The sign-up challenge key is optional. The public
-  URL is optional.
+  their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
+  settings is set, both are required. The public URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
@@ -242,6 +243,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
+| `ControlPlane:SignUp:DisposableDomains:Url` | The address of the open-source list of disposable mailbox domains, one domain per line. Optional | An absolute `https` URL, when either is set |
+| `ControlPlane:SignUp:DisposableDomains:Sha256` | The SHA-256 of that list, as hex. The job refreshes the table only from a list with this hash | 64 hex characters, when either is set |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional. Without the documents `GET /api/sign-up/documents` and `POST /api/sign-up` answer `503`. A [sign-up](sign-up.md#the-documents) must send the current version of each document | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
