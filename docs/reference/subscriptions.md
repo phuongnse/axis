@@ -36,8 +36,12 @@ commerce.
   retries it. Every cell call of a move carries the idempotency key `<operation>:<step id>`. The step
   id is new each time a move commits, so a retry of the same move gets the cell's first job, and a
   later move gets a new key.
+- **The operator can extend a trial.** [`trial extend`](control-plane.md#operators) adds days to the
+  trial end and the next date of a `trialing` subscription. The email windows follow the new end,
+  and an email that is already queued is not sent again.
 - **History is the audit records.** Each move writes the action `subscription.<new state>` with the
-  subscription as its subject, and the table keeps no history of its own.
+  subscription as its subject, and an operator's extension writes `subscription.trialExtended`. The
+  table keeps no history of its own.
 - **`deleting` ends when the cell lets the tenant go.** While `deleting`, each hourly run reads
   `GET /api/cell/tenants/{id}`. A `404` means the cell purged the tenant after its grace, and the
   subscription is `deleted`. So does a tenant whose row the [region directory](region-directory.md)

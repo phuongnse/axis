@@ -42,6 +42,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Axis.ControlPlane.Tests" />
     <InternalsVisibleTo Include="Axis.ControlPlane.Integration.Tests" />
+    <InternalsVisibleTo Include="Axis.ControlPlane.Admin" />
   </ItemGroup>
 
 </Project>
