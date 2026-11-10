@@ -11,10 +11,10 @@ is in [Studio workspace](studio-workspace.md), and what each editor and designer
 
 The form puts a resource's root properties in sections, so that an author reads them in groups that
 each say what they hold. Each section is a panel on `surface`, as the Overview's blocks are, with a
-heading and a line that says what it holds. The application's Settings, for example, has General
-(name, title, description and time zone), Modules, Packages and File storage, then the
-[auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section names goes to a
-last section with no heading.
+heading and a line that says what it holds. An Overview block's heading has no line. The application's
+Settings, for example, has General (name, title, description and time zone), Modules, Packages and File
+storage, then the [auto-accept switch](ai-authoring-in-studio.md#auto-accept). A property that no section
+names goes to a last section with no heading.
 
 - **One field in a section.** A section that holds one field names it in its heading, so the field has
   no label of its own. A section that holds one object shows the object's fields itself.

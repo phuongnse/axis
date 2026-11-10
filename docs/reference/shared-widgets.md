@@ -37,6 +37,7 @@ Each common job has one shared widget or helper:
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
 | A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_, and a `status` for what the screen found about a field |
 | A row of actions                               | `AxisActionRow`                                                                                        |
+| A section of a Studio page                     | `ResourceFormSection`, in `ResourceFormSections`                                                       |
 | A text in the author's language                | `textIn`, else `en` _(planned for M31)_                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |
 | Asking before unsaved changes are left         | `useUnsavedChanges`, which `SaveBar` calls                                                            |
