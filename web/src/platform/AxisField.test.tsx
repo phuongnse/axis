@@ -215,15 +215,27 @@ describe('AxisField status', () => {
   )
 
   it('shows a running status as a busy input in a validating form item', () => {
-    renderForm(nameField({ kind: 'running' }))
+    renderForm(nameField({ state: 'running' }))
 
     const input = screen.getByRole('textbox', { name: 'Name' })
     expect(input).toHaveAttribute('aria-busy', 'true')
     expect(formItem(input)).toHaveClass('ant-form-item-is-validating')
+    expect(formItem(input).querySelector('.ant-form-item-feedback-icon-validating .anticon-loading')).not.toBeNull()
+  })
+
+  it('keeps the same input as its status changes, so typing into it is not interrupted', () => {
+    const { rerender } = renderForm(nameField({ state: 'idle' }))
+    const input = screen.getByRole('textbox', { name: 'Name' })
+
+    rerender(formTree(nameField({ state: 'running' })))
+    rerender(formTree(nameField({ state: 'passed', message: 'Name is free.' })))
+    rerender(formTree(nameField({ state: 'refused', message: 'That name is taken.' })))
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBe(input)
   })
 
   it('announces a passed status and shows its text nowhere else, with no error on the field', () => {
-    renderForm(nameField({ kind: 'passed', message: 'Name is free.' }))
+    renderForm(nameField({ state: 'passed', message: 'Name is free.' }))
 
     expect(within(screen.getByRole('status')).getByText('Name is free.')).toBeInTheDocument()
     expect(screen.getAllByText('Name is free.')).toHaveLength(1)
@@ -231,14 +243,14 @@ describe('AxisField status', () => {
   })
 
   it('shows a refused status as the error of the field', () => {
-    renderForm(nameField({ kind: 'refused', message: 'That name is taken.' }))
+    renderForm(nameField({ state: 'refused', message: 'That name is taken.' }))
 
     expect(screen.getByText('That name is taken.')).toBeInTheDocument()
     expect(hasFieldError(screen.getByRole('textbox', { name: 'Name' }))).toBe(true)
   })
 
-  it('shows a status that could not run as the warning of the field', () => {
-    renderForm(nameField({ kind: 'couldNotRun', message: 'Names could not be checked.' }))
+  it('shows a failed status as the warning of the field', () => {
+    renderForm(nameField({ state: 'failed', message: 'Names could not be checked.' }))
 
     expect(screen.getByText('Names could not be checked.')).toBeInTheDocument()
     const input = screen.getByRole('textbox', { name: 'Name' })
@@ -251,7 +263,7 @@ describe('AxisField status', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
     expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
 
-    rerender(formTree(nameField({ kind: 'refused', message: 'That name is taken.' })))
+    rerender(formTree(nameField({ state: 'refused', message: 'That name is taken.' })))
     expect(screen.getByText('That name is taken.')).toBeInTheDocument()
     expect(screen.queryByText('Enter a name.')).not.toBeInTheDocument()
 
@@ -263,7 +275,7 @@ describe('AxisField status', () => {
   it('takes no status outside a form', () => {
     expect(
       // @ts-expect-error A field outside a form takes no `status`: its form item does not draw one.
-      <AxisField label="Name" help="Letters and digits." status={{ kind: 'running' }}>
+      <AxisField label="Name" help="Letters and digits." status={{ state: 'running' }}>
         <Input value="" onChange={() => {}} />
       </AxisField>,
     ).toBeDefined()
