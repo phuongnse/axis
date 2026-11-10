@@ -1,12 +1,11 @@
 using System.Collections.Concurrent;
-using Axis.Tenancy;
 
 namespace Axis.Agent;
 
 /// <summary>
 /// Claims authoring requests with a lease and runs the step of their state, see <c>docs/reference/authoring-requests.md#durable-requests</c>.
-/// A round takes the tenants in turn and claims at most one request in each. A host that stops, or a step that throws, writes nothing more:
-/// the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
+/// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A host that stops, or a step that throws,
+/// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
@@ -15,26 +14,14 @@ internal sealed partial class AuthoringRequestRunner(
     TimeProvider time,
     ILogger<AuthoringRequestRunner> logger)
 {
-    // The last failure logged for each tenant, so a tenant that fails in every round is logged once until it changes or recovers.
+    // The last failure logged for each tenant, so a tenant that fails in every turn is logged once until it changes or recovers.
     private readonly ConcurrentDictionary<string, string> _failures = new(StringComparer.Ordinal);
 
-    /// <summary>Runs one round over the tenants and answers whether it claimed any request.</summary>
-    public async Task<bool> RunRoundAsync(IReadOnlyList<TenantEntry> tenants, CancellationToken cancellationToken)
+    /// <summary>Runs one turn of the tenant: claims one request and runs one step of it. It answers whether it claimed a request.</summary>
+    public async Task<bool> RunTurnAsync(string tenantId, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(tenants);
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
 
-        var claimedAny = false;
-        foreach (var tenant in tenants)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            claimedAny |= await RunTenantAsync(tenant.Id, cancellationToken);
-        }
-
-        return claimedAny;
-    }
-
-    private async Task<bool> RunTenantAsync(string tenantId, CancellationToken cancellationToken)
-    {
         // A new value for each claim keeps the fence sound when the same host claims the request again, and where the process id is 1 and the machine name repeats.
         var claimedBy = $"{Environment.MachineName}-{Environment.ProcessId}-{Guid.CreateVersion7():N}";
         AuthoringRequestToWork? request;
@@ -61,11 +48,11 @@ internal sealed partial class AuthoringRequestRunner(
             return false;
         }
 
-        await RunRequestAsync(tenantId, request, claimedBy, cancellationToken);
+        await RunStepOfRequestAsync(tenantId, request, claimedBy, cancellationToken);
         return true;
     }
 
-    private async Task RunRequestAsync(string tenantId, AuthoringRequestToWork request, string claimedBy, CancellationToken cancellationToken)
+    private async Task RunStepOfRequestAsync(string tenantId, AuthoringRequestToWork request, string claimedBy, CancellationToken cancellationToken)
     {
         try
         {
@@ -75,30 +62,25 @@ internal sealed partial class AuthoringRequestRunner(
                 return;
             }
 
-            var current = request;
-            while (steps.Find(current.State) is { } step)
+            // The claim only finds a request in a state that has a step.
+            var step = steps.Find(request.State)
+                ?? throw new InvalidOperationException($"The request is in state '{request.State}', which has no registered step.");
+            var stepId = await store.StartStepAsync(tenantId, request.Id, claimedBy, step.Kind, cancellationToken);
+            if (stepId is null)
             {
-                var stepId = await store.StartStepAsync(tenantId, request.Id, claimedBy, step.Kind, cancellationToken);
-                if (stepId is null)
-                {
-                    LogClaimLost(request.Id);
-                    return;
-                }
+                LogClaimLost(request.Id);
+                return;
+            }
 
-                var result = await RunStepAsync(step, tenantId, current, stepId.Value, claimedBy, cancellationToken);
-                if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))
-                {
-                    throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
-                }
+            var result = await RunStepAsync(step, tenantId, request, stepId.Value, claimedBy, cancellationToken);
+            if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
+            }
 
-                var keepClaim = steps.Has(result.NextState);
-                if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, keepClaim, options.Lease, cancellationToken))
-                {
-                    LogClaimLost(request.Id);
-                    return;
-                }
-
-                current = current with { State = result.NextState };
+            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, cancellationToken))
+            {
+                LogClaimLost(request.Id);
             }
         }
         catch (OperationCanceledException)

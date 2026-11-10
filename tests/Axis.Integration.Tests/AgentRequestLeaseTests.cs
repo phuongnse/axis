@@ -8,7 +8,10 @@ using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
-/// <summary>The agent host claims an authoring request with a lease, commits each step, resumes after a stop and writes nothing once its claim is gone.</summary>
+/// <summary>
+/// The agent host takes its tenants in turn and claims an authoring request with a lease for one step, commits the step and frees the request,
+/// resumes after a stop and writes nothing once its claim is gone.
+/// </summary>
 public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private static readonly AuthoringLoopOptions _options = new(TimeSpan.FromSeconds(3), TimeSpan.FromMilliseconds(100));
@@ -124,43 +127,67 @@ public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
-    public async Task A_host_keeps_the_claim_while_the_next_state_has_a_step_and_frees_the_request_when_it_has_none()
+    public async Task A_host_frees_the_request_when_it_commits_each_step_and_claims_it_again_for_the_next()
     {
         var (connectionString, requestId) = await CreateRequestAsync("planning");
-        var working = new TestStep("working", "work", "checking");
-        var planning = new TestStep("planning", "plan", "awaitingApproval");
+        var claims = new List<string>();
+        Func<AuthoringStepContext, CancellationToken, Task> readClaim = async (_, _) =>
+            claims.Add(await ScalarAsync(connectionString, $"SELECT claimed_by FROM axis.authoring_requests WHERE id = '{requestId}'"));
+        var planning = new TestStep("planning", "plan", "working", readClaim);
+        var working = new TestStep("working", "work", "awaitingApproval", readClaim);
         await using var host = BuildAgent(connectionString, new LogCollector(), planning, working);
-        await host.StartAsync(CancellationToken);
-
-        await WaitUntilAsync(async () => await StateAsync(connectionString, requestId) == "awaitingApproval", "The host did not finish the plan.");
-
-        Assert.Equal("awaitingApproval|0|-", await RequestAsync(connectionString, requestId));
-        Assert.Equal("1:plan:done:0:true", await StepsAsync(connectionString, requestId));
-        Assert.Equal(0, working.Runs);
-    }
-
-    [Fact]
-    public async Task A_run_of_short_steps_that_outlasts_the_lease_keeps_the_claim_alive()
-    {
-        var (connectionString, requestId) = await CreateRequestAsync("planning");
-        var stepTime = _options.Lease / 4 + TimeSpan.FromMilliseconds(100);
-        Func<AuthoringStepContext, CancellationToken, Task> pause = (_, token) => Task.Delay(stepTime, token);
-        string? claimed = null;
-        var planning = new TestStep("planning", "plan", "working", pause);
-        var working = new TestStep("working", "work", "checking", pause);
-        var checking = new TestStep("checking", "check", "reviewing", pause);
-        var reviewing = new TestStep("reviewing", "review", "fixing", pause);
-        var fixing = new TestStep("fixing", "fix", "awaitingApproval", async (_, _) =>
-            claimed = await ScalarAsync(connectionString, $"SELECT claimed_until > now() FROM axis.authoring_requests WHERE id = '{requestId}'"));
-        await using var host = BuildAgent(connectionString, new LogCollector(), planning, working, checking, reviewing, fixing);
-        var started = DateTimeOffset.UtcNow;
         await host.StartAsync(CancellationToken);
 
         await WaitUntilAsync(async () => await StateAsync(connectionString, requestId) == "awaitingApproval", "The host did not finish the steps.");
 
-        Assert.True(DateTimeOffset.UtcNow - started > _options.Lease, "The steps must run longer than the lease.");
+        Assert.Equal(2, claims.Count);
+        Assert.All(claims, claim => Assert.False(string.IsNullOrEmpty(claim)));
+        Assert.NotEqual(claims[0], claims[1]);
+        Assert.Equal("awaitingApproval|0|-", await RequestAsync(connectionString, requestId));
+        Assert.Equal("1:plan:done:0:true,2:work:done:0:true", await StepsAsync(connectionString, requestId));
+    }
+
+    [Fact]
+    public async Task A_step_that_outlasts_the_lease_still_holds_the_claim_when_it_ends_and_its_commit_succeeds()
+    {
+        var (connectionString, requestId) = await CreateRequestAsync("planning");
+        string? claimed = null;
+        var planning = new TestStep("planning", "plan", "awaitingApproval", async (_, token) =>
+        {
+            await Task.Delay(_options.Lease + TimeSpan.FromSeconds(1), token);
+            claimed = await ScalarAsync(connectionString, $"SELECT claimed_until > now() FROM axis.authoring_requests WHERE id = '{requestId}'");
+        });
+        await using var host = BuildAgent(connectionString, new LogCollector(), planning);
+        await host.StartAsync(CancellationToken);
+
+        await WaitUntilAsync(async () => await StateAsync(connectionString, requestId) == "awaitingApproval", "The host did not commit the step.");
+
         Assert.Equal("True", claimed);
-        Assert.Equal(5, (await StepsAsync(connectionString, requestId)).Split(',').Length);
+        Assert.Equal("1:plan:done:0:true", await StepsAsync(connectionString, requestId));
+    }
+
+    [Fact]
+    public async Task A_one_step_request_of_one_tenant_finishes_before_the_third_step_of_a_five_step_request_of_another()
+    {
+        var (connectionOfA, requestOfA) = await CreateRequestAsync("planning");
+        var (connectionOfB, requestOfB) = await CreateRequestAsync("fixing");
+        var steps = new[]
+        {
+            new TestStep("planning", "plan", "working"),
+            new TestStep("working", "work", "checking"),
+            new TestStep("checking", "check", "reviewing"),
+            new TestStep("reviewing", "review", "fixing"),
+            new TestStep("fixing", "fix", "awaitingApproval"),
+        };
+        await using var host = BuildAgent([("a", connectionOfA), ("b", connectionOfB)], new LogCollector(), steps);
+        await host.StartAsync(CancellationToken);
+
+        await WaitUntilAsync(async () => await StateAsync(connectionOfA, requestOfA) == "awaitingApproval", "The host did not finish the request of tenant a.");
+
+        Assert.Equal("awaitingApproval", await StateAsync(connectionOfB, requestOfB));
+        var finishedB = await ScalarAsync(connectionOfB, $"SELECT to_char(finished_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') FROM axis.authoring_request_steps WHERE request_id = '{requestOfB}' AND ordinal = 1");
+        var startedThirdOfA = await ScalarAsync(connectionOfA, $"SELECT to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') FROM axis.authoring_request_steps WHERE request_id = '{requestOfA}' AND ordinal = 3");
+        Assert.True(string.CompareOrdinal(finishedB, startedThirdOfA) < 0, $"The step of tenant b finished at {finishedB}, and the third step of tenant a started at {startedThirdOfA}.");
     }
 
     [Fact]
@@ -185,7 +212,10 @@ public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassF
         return (connectionString, requestId);
     }
 
-    private static WebApplication BuildAgent(string connectionString, LogCollector logs, params TestStep[] steps)
+    private static WebApplication BuildAgent(string connectionString, LogCollector logs, params TestStep[] steps) =>
+        BuildAgent([("a", connectionString)], logs, steps);
+
+    private static WebApplication BuildAgent(IReadOnlyList<(string TenantId, string ConnectionString)> tenants, LogCollector logs, params TestStep[] steps)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
@@ -194,9 +224,16 @@ public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassF
             ["Ai:Bindings:main:Kind"] = "anthropic",
             ["Ai:Bindings:main:Model"] = "model-1",
             ["Ai:DefaultBinding"] = "main",
-            ["Tenants:a:Hosts:0"] = "a.example.test",
-            ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
         });
+        foreach (var (tenantId, connectionString) in tenants)
+        {
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test",
+                [$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
+            });
+        }
+
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
         builder.Services.AddSingleton(_options);

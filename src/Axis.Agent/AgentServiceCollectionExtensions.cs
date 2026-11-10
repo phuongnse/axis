@@ -16,7 +16,7 @@ public static class AgentServiceCollectionExtensions
     /// and no secret. With one, it reads its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
-    /// requests it claims with a lease, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
+    /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
     /// registered. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">

@@ -376,7 +376,6 @@
   "Axis.Integration.Tests.TenantRealmAccountRulesTests": 84,
   "Axis.Integration.Tests.TenantRealmAuthoringTests": 44,
   "Axis.Integration.Tests.TenantRealmTests": 17,
-  "Axis.Integration.Tests.TenantRoundsTests": 0,
   "Axis.Integration.Tests.TenantUsageRouteTests": 8,
   "Axis.Integration.Tests.TraceCorrelationTests": 2,
   "Axis.Integration.Tests.TriggerSkipLogTests": 0,
