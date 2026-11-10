@@ -258,7 +258,7 @@ test("the ticket form guides the requester through two steps", async ({ page }) 
   await expect(page.getByLabel(fieldLabel("Title"))).toBeVisible();
   await expect(page.getByLabel(fieldLabel("Description"))).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Status", exact: true })).toHaveCount(0);
-  const steps = page.getByTestId("form-steps");
+  const steps = page.getByTestId("steps-bar");
   await expect(steps).toContainText("Describe the problem");
   await expect(steps).toContainText("Add details");
 

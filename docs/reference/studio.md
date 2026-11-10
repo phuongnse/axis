@@ -797,16 +797,19 @@ Operations heading, and the JSON view stays as the second view of the same draft
 
 ## Identity provider editor
 
-The identity provider editor's Form tab shows the provider's name and `type`, then the fields of that
-type, see [identity provider resource](identity-provider.md#identity-provider-resource), and the JSON
-view stays as the second view of the same draft.
+The identity provider editor's Form tab shows the provider's fields in the five
+[shared sections](studio-resource-form.md#sections) General, Sign-in, Claims, Roles and Assurance, each
+field with its label and [help](frontend.md#platform-field-help), see
+[identity provider resource](identity-provider.md#identity-provider-resource). Sign-in and Claims show
+only for `oidc` and `saml`. General holds the name, `type` and description. Add assurance level sits on
+the Assurance heading, and the JSON view stays as the second view of the same draft.
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
-  bindings it requires, with an empty name. An `accounts` provider shows no label, bindings or claims.
-- **Bindings.** A binding is a name box, labelled as a URL or a secret binding, and no value is shown
-  or stored. `oidc` shows the issuer, the client id, and a choice of client credential: a client
-  secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
-- **Label.** The "Continue with" label has its texts in every locale, see [label texts](#label-texts).
+  bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
+- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+  stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
+  credential: a client secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
+- **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim

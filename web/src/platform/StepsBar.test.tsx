@@ -2,19 +2,19 @@ import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { contrast } from '../test/contrast'
 import { designTokensFor } from './designTokens'
-import { FormStepsBar } from './FormStepsBar'
+import { StepsBar } from './StepsBar'
 import { ThemeModeProvider } from './theme'
 
 const sevenTitles = ['One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven']
 
-describe('FormStepsBar in dark mode', () => {
+describe('StepsBar in dark mode', () => {
   beforeEach(() => localStorage.setItem('axis.themeMode', 'dark'))
   afterEach(() => localStorage.clear())
 
   it('draws the current number at 4.5:1 or more on its circle, not in the surface colour', () => {
     render(
       <ThemeModeProvider>
-        <FormStepsBar titles={['Basics', 'Extras']} current={1} />
+        <StepsBar titles={['Basics', 'Extras']} current={1} />
       </ThemeModeProvider>,
     )
 
@@ -26,9 +26,9 @@ describe('FormStepsBar in dark mode', () => {
   })
 })
 
-describe('FormStepsBar', () => {
+describe('StepsBar', () => {
   it('shows every title below seven steps and marks the current step', () => {
-    render(<FormStepsBar titles={['Basics', 'Extras']} current={1} />)
+    render(<StepsBar titles={['Basics', 'Extras']} current={1} />)
 
     const items = screen.getAllByRole('listitem')
     expect(within(items[0]).getByText('Basics')).toBeVisible()
@@ -38,7 +38,7 @@ describe('FormStepsBar', () => {
   })
 
   it('shows a check mark in place of the number for a finished step below seven steps', () => {
-    render(<FormStepsBar titles={['Basics', 'Extras', 'Review']} current={1} />)
+    render(<StepsBar titles={['Basics', 'Extras', 'Review']} current={1} />)
 
     const items = screen.getAllByRole('listitem')
     expect(items[0].querySelector('.anticon-check')).toBeInTheDocument()
@@ -48,7 +48,7 @@ describe('FormStepsBar', () => {
   })
 
   it('shows only the current title from seven steps, and each other step as a number with its title', () => {
-    render(<FormStepsBar titles={sevenTitles} current={2} />)
+    render(<StepsBar titles={sevenTitles} current={2} />)
 
     const items = screen.getAllByRole('listitem')
     expect(within(items[2]).getByText('Three')).toBeVisible()
@@ -69,5 +69,29 @@ describe('FormStepsBar', () => {
         expect(item.querySelector('.anticon-check')).toBeNull()
       }
     })
+  })
+
+  it('stacks the steps in a column with `vertical`, one step on each line', () => {
+    render(<StepsBar titles={['Basics', 'Extras', 'Review']} current={1} vertical />)
+
+    expect(screen.getByRole('list')).toHaveStyle({ flexDirection: 'column' })
+    const items = screen.getAllByRole('listitem')
+    expect(items).toHaveLength(3)
+    expect(within(items[0]).getByText('Basics')).toBeVisible()
+    expect(within(items[1]).getByText('Extras')).toBeVisible()
+    expect(within(items[2]).getByText('Review')).toBeVisible()
+    expect(items[1]).toHaveAttribute('aria-current', 'step')
+  })
+
+  it.each([false, true])('draws no margin outside the bar with vertical %s', (vertical) => {
+    render(<StepsBar titles={['Basics', 'Extras']} current={0} vertical={vertical} />)
+
+    const style = getComputedStyle(screen.getByRole('list'))
+    expect([style.marginTop, style.marginRight, style.marginBottom, style.marginLeft]).toEqual([
+      '0px',
+      '0px',
+      '0px',
+      '0px',
+    ])
   })
 })
