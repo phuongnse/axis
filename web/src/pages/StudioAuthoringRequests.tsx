@@ -37,7 +37,7 @@ import {
   waitingForAuthor,
 } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
-import { ResourceFormSection, SectionPart, SectionParts } from './ResourceFormSection'
+import { SectionPart, SectionParts } from './ResourceFormSection'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioDiagnosticRow } from './StudioProblems'
@@ -159,26 +159,23 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
   ]
 
   return (
-    <Flex vertical gap="middle" style={{ flex: 1 }}>
+    <Flex vertical gap="middle">
       <StudioPageHeading title={t('shell.studio.aiRequests')} />
-      {/* The page's content is one panel, and its table fills it. */}
-      <ResourceFormSection testName="ai-requests" fill>
-        <AxisTable<StudioAuthoringRequest>
-          columns={columns}
-          rowKey={(row) => row.id}
-          dataSource={Array.isArray(requests) ? requests : []}
-          loading={requests === undefined}
-          emptyText={t('shell.studio.aiRequests.empty')}
-          pagination={false}
-          toolbar={{}}
-          failure={
-            requests === 'failed' ? <AxisAlert kind="error" message={t('shell.studio.ai.listFailed')} /> : undefined
-          }
-          rowAttributes={(row) =>
-            ({ 'data-testid': 'studio-ai-request-row', 'data-id': row.id }) as HTMLAttributes<HTMLElement>
-          }
-        />
-      </ResourceFormSection>
+      <AxisTable<StudioAuthoringRequest>
+        columns={columns}
+        rowKey={(row) => row.id}
+        dataSource={Array.isArray(requests) ? requests : []}
+        loading={requests === undefined}
+        emptyText={t('shell.studio.aiRequests.empty')}
+        pagination={false}
+        toolbar={{}}
+        failure={
+          requests === 'failed' ? <AxisAlert kind="error" message={t('shell.studio.ai.listFailed')} /> : undefined
+        }
+        rowAttributes={(row) =>
+          ({ 'data-testid': 'studio-ai-request-row', 'data-id': row.id }) as HTMLAttributes<HTMLElement>
+        }
+      />
     </Flex>
   )
 }
@@ -191,8 +188,8 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
  * shows its draft's changes, each with the summary its request wrote, then its checks and the reviewer's notes. A
  * failed one says why first. The author of a ready one accepts it, which runs as a publish request whose status shows
  * on the page, or drops it. An accept that met resources changed since the draft read them lists each, and its author
- * makes the change again on the folder as it is now, or drops the request. Below the heading the page is one panel,
- * its parts apart by a rule, with no link back: the sidebar marks AI requests and the browser goes back. Under "Progress" a `StepsBar` shows the loop's stages, then the
+ * makes the change again on the folder as it is now, or drops the request. Below the heading its parts are a rule
+ * apart, on the content's `surface`, with no link back: the sidebar marks AI requests and the browser goes back. Under "Progress" a `StepsBar` shows the loop's stages, then the
  * state in words with the fix round, and while it runs "Now:" with the summary of the step that has not finished.
  * "What AI did" lists every step with its result and when it started.
  */
@@ -358,7 +355,7 @@ export function StudioAuthoringRequestPage({
   const line = (mine ? t('shell.studio.aiRequest.lineMine') : t('shell.studio.aiRequest.line'))
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
     .replace('{time}', sentTime(request.sentAt))
-  // The page reads as one document, so it is one panel on `surface` whose parts a rule separates.
+  // The page reads as one document on the content's `surface`, its parts a rule apart.
   const section = (testName: string, title: string, body: ReactNode) => (
     <SectionPart testName={testName} title={title}>
       {body}
@@ -424,7 +421,7 @@ export function StudioAuthoringRequestPage({
   const problems = request.checks?.diagnostics ?? []
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-ai-request" style={{ flex: 1 }}>
+    <Flex vertical gap="middle" data-testid="studio-ai-request">
       <StudioPageHeading
         title={t('shell.studio.aiRequest.title')}
         line={line}
@@ -436,183 +433,181 @@ export function StudioAuthoringRequestPage({
           ) : undefined
         }
       />
-      <ResourceFormSection testName="ai-request" fill>
-        <SectionParts>
-          {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
-          {section(
-            'ai-progress',
-            t('shell.studio.aiRequest.progress'),
-            <Flex vertical gap="small" data-testid="studio-ai-progress">
-              {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
-              <Flex align="center" gap={spacing.sm}>
-                {following && <Spin size="small" />}
-                <Typography.Text style={{ color: stateColour(request.state) }}>
-                  {stateWords(request, mine)}
-                  {request.round > 1 && request.state !== 'planning' && (
-                    <span style={{ color: colour.textMuted }}>
-                      {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
-                    </span>
-                  )}
-                </Typography.Text>
-              </Flex>
-              {running !== undefined && following && (
+      <SectionParts>
+        {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
+        {section(
+          'ai-progress',
+          t('shell.studio.aiRequest.progress'),
+          <Flex vertical gap="small" data-testid="studio-ai-progress">
+            {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
+            <Flex align="center" gap={spacing.sm}>
+              {following && <Spin size="small" />}
+              <Typography.Text style={{ color: stateColour(request.state) }}>
+                {stateWords(request, mine)}
+                {request.round > 1 && request.state !== 'planning' && (
+                  <span style={{ color: colour.textMuted }}>
+                    {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
+                  </span>
+                )}
+              </Typography.Text>
+            </Flex>
+            {running !== undefined && following && (
+              <Typography.Text style={{ color: colour.textMuted }}>
+                {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
+              </Typography.Text>
+            )}
+            {request.state === 'planning' && (
+              <Typography.Text style={{ color: colour.textMuted }}>
+                {t('shell.studio.aiRequest.planning')}
+              </Typography.Text>
+            )}
+          </Flex>,
+        )}
+        {request.plan !== null &&
+          section(
+            'ai-plan',
+            t('shell.studio.aiRequest.plan'),
+            <Flex vertical gap="small">
+              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
+                {request.plan
+                  .split('\n')
+                  .filter((step) => step.trim() !== '')
+                  .map((step, index) => (
+                    <li key={index}>{step}</li>
+                  ))}
+              </ul>
+              {awaiting && !mine && (
                 <Typography.Text style={{ color: colour.textMuted }}>
-                  {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
-                </Typography.Text>
-              )}
-              {request.state === 'planning' && (
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {t('shell.studio.aiRequest.planning')}
+                  {t('shell.studio.aiRequest.notYours')}
                 </Typography.Text>
               )}
             </Flex>,
           )}
-          {request.plan !== null &&
-            section(
-              'ai-plan',
-              t('shell.studio.aiRequest.plan'),
-              <Flex vertical gap="small">
-                <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
-                  {request.plan
-                    .split('\n')
-                    .filter((step) => step.trim() !== '')
-                    .map((step, index) => (
-                      <li key={index}>{step}</li>
-                    ))}
-                </ul>
-                {awaiting && !mine && (
-                  <Typography.Text style={{ color: colour.textMuted }}>
-                    {t('shell.studio.aiRequest.notYours')}
-                  </Typography.Text>
-                )}
-              </Flex>,
-            )}
-          {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
-          {awaiting && mine && (
-            <AxisActionRow>
-              <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
-                {t('shell.studio.aiRequest.approve')}
-              </AxisButton>
-              <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen(true)}>
-                {t('shell.studio.aiRequest.changePlan')}
-              </AxisButton>
-              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-                {t('shell.studio.aiRequest.drop')}
-              </AxisButton>
-            </AxisActionRow>
+        {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
+        {awaiting && mine && (
+          <AxisActionRow>
+            <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
+              {t('shell.studio.aiRequest.approve')}
+            </AxisButton>
+            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen(true)}>
+              {t('shell.studio.aiRequest.changePlan')}
+            </AxisButton>
+            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+              {t('shell.studio.aiRequest.drop')}
+            </AxisButton>
+          </AxisActionRow>
+        )}
+        {request.state === 'failed' && (
+          <AxisAlert
+            kind="error"
+            message={t('shell.studio.aiRequest.failed')}
+            description={request.failure ?? undefined}
+            data-testid="studio-ai-failure"
+          />
+        )}
+        {showsDiff &&
+          draft !== null &&
+          section(
+            'ai-changes',
+            t('shell.studio.aiRequest.changes'),
+            changes === undefined ? (
+              <Spin />
+            ) : changes === 'failed' ? (
+              <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
+            ) : (
+              <div
+                data-testid="studio-ai-changes"
+                style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
+              >
+                <StudioChanges changes={changes} resources={resources} summaries={summaries} />
+              </div>
+            ),
           )}
-          {request.state === 'failed' && (
-            <AxisAlert
-              kind="error"
-              message={t('shell.studio.aiRequest.failed')}
-              description={request.failure ?? undefined}
-              data-testid="studio-ai-failure"
-            />
-          )}
-          {showsDiff &&
-            draft !== null &&
-            section(
-              'ai-changes',
-              t('shell.studio.aiRequest.changes'),
-              changes === undefined ? (
-                <Spin />
-              ) : changes === 'failed' ? (
-                <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
-              ) : (
-                <div
-                  data-testid="studio-ai-changes"
-                  style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
-                >
-                  <StudioChanges changes={changes} resources={resources} summaries={summaries} />
-                </div>
-              ),
-            )}
-          {showsDiff &&
-            request.checks !== null &&
-            section(
-              'ai-checks',
-              t('shell.studio.aiRequest.checks'),
-              <Flex vertical gap="small" data-testid="studio-ai-checks">
-                {problems.length > 0 && (
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                    {problems.map((diagnostic, index) => (
-                      <li key={index}>
-                        <StudioDiagnosticRow diagnostic={diagnostic} onSelect={onOpen} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <StudioTestResults request={request.checks} onSelect={onOpen} nested />
-                {/* The review runs only once the checks pass, so a request that failed before it has no notes. */}
-                {request.review !== null && (
-                  <>
-                    <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
-                    {request.review.length === 0 ? (
-                      <Typography.Text style={{ color: colour.textMuted }}>
-                        {t('shell.studio.aiRequest.noFindings')}
-                      </Typography.Text>
-                    ) : (
-                      <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
-                        {request.review.map((note, index) => (
-                          <li key={index}>{note}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                )}
-              </Flex>,
-            )}
-          {conflicts.length > 0 ? (
-            <AxisAlert
-              kind="warning"
-              data-testid="studio-ai-conflict"
-              message={t('shell.studio.aiRequest.conflict')}
-              description={
-                <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
-                  {conflicts.map((conflict, index) => (
-                    <li key={index}>{conflict.message}</li>
+        {showsDiff &&
+          request.checks !== null &&
+          section(
+            'ai-checks',
+            t('shell.studio.aiRequest.checks'),
+            <Flex vertical gap="small" data-testid="studio-ai-checks">
+              {problems.length > 0 && (
+                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {problems.map((diagnostic, index) => (
+                    <li key={index}>
+                      <StudioDiagnosticRow diagnostic={diagnostic} onSelect={onOpen} />
+                    </li>
                   ))}
                 </ul>
-              }
-            />
-          ) : (
-            accept !== null && <StudioRequestStatus request={accept} releaseNumber={null} />
-          )}
-          {request.steps.length > 0 &&
-            section(
-              'ai-steps',
-              t('shell.studio.aiRequest.steps'),
-              <AxisTable<StudioAuthoringRequestStep>
-                columns={stepColumns}
-                rowKey={(step) => `${step.startedAt}/${step.kind}`}
-                dataSource={request.steps}
-                pagination={false}
-                toolbar={{}}
-                emptyText=""
-              />,
-            )}
-        </SectionParts>
-        {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
-        {ready && mine && !acceptPending && (
-          <ActionBar testId="studio-ai-request-bar">
-            <span>{stateWords(request, mine)}</span>
-            <AxisActionRow align="center">
-              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-                {t('shell.studio.aiRequest.drop')}
-              </AxisButton>
-              {conflicts.length > 0 ? (
-                <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
-                  {t('shell.studio.aiRequest.retry')}
-                </AxisButton>
-              ) : (
-                <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
-                  {t('shell.studio.aiRequest.accept')}
-                </AxisButton>
               )}
-            </AxisActionRow>
-          </ActionBar>
+              <StudioTestResults request={request.checks} onSelect={onOpen} nested />
+              {/* The review runs only once the checks pass, so a request that failed before it has no notes. */}
+              {request.review !== null && (
+                <>
+                  <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
+                  {request.review.length === 0 ? (
+                    <Typography.Text style={{ color: colour.textMuted }}>
+                      {t('shell.studio.aiRequest.noFindings')}
+                    </Typography.Text>
+                  ) : (
+                    <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+                      {request.review.map((note, index) => (
+                        <li key={index}>{note}</li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </Flex>,
+          )}
+        {conflicts.length > 0 ? (
+          <AxisAlert
+            kind="warning"
+            data-testid="studio-ai-conflict"
+            message={t('shell.studio.aiRequest.conflict')}
+            description={
+              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+                {conflicts.map((conflict, index) => (
+                  <li key={index}>{conflict.message}</li>
+                ))}
+              </ul>
+            }
+          />
+        ) : (
+          accept !== null && <StudioRequestStatus request={accept} releaseNumber={null} />
         )}
-      </ResourceFormSection>
+        {request.steps.length > 0 &&
+          section(
+            'ai-steps',
+            t('shell.studio.aiRequest.steps'),
+            <AxisTable<StudioAuthoringRequestStep>
+              columns={stepColumns}
+              rowKey={(step) => `${step.startedAt}/${step.kind}`}
+              dataSource={request.steps}
+              pagination={false}
+              toolbar={{}}
+              emptyText=""
+            />,
+          )}
+      </SectionParts>
+      {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
+      {ready && mine && !acceptPending && (
+        <ActionBar testId="studio-ai-request-bar">
+          <span>{stateWords(request, mine)}</span>
+          <AxisActionRow align="center">
+            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+              {t('shell.studio.aiRequest.drop')}
+            </AxisButton>
+            {conflicts.length > 0 ? (
+              <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
+                {t('shell.studio.aiRequest.retry')}
+              </AxisButton>
+            ) : (
+              <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
+                {t('shell.studio.aiRequest.accept')}
+              </AxisButton>
+            )}
+          </AxisActionRow>
+        </ActionBar>
+      )}
       <Modal
         forceRender
         open={changeOpen}

@@ -15,14 +15,12 @@ export function ResourceFormSections({ children }: { children: ReactNode }) {
 /**
  * A section of a resource form, see docs/reference/studio-resource-form.md#sections: a panel with an optional heading,
  * its line and a slot for an action on the right of the heading. A section with no heading is the panel alone.
- * Proposed: every Studio page draws its sections with it, so the page's canvas holds only its heading, its messages
- * and its actions, and a heading's line is optional; see the review on #3263.
+ * Proposed: a heading's line is optional; see the review on #3263.
  */
 export function ResourceFormSection({
   testName,
   heading,
   action,
-  fill = false,
   children,
 }: {
   /** In `data-testid="studio-section-<testName>"`. */
@@ -31,11 +29,6 @@ export function ResourceFormSection({
   heading?: { title: string; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode
-  /**
-   * Proposed: the page's one panel reaches at least the window's foot, as the sidebar and a side panel do, while each
-   * column up to the shell's content grows to fill; see the review on #3263.
-   */
-  fill?: boolean
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
   children: ReactNode | ((actionSlot: HTMLElement | null) => ReactNode)
 }) {
@@ -47,16 +40,6 @@ export function ResourceFormSection({
     border: `1px solid ${colour.borderSubtle}`,
     borderRadius: radius.base,
     padding: spacing.md,
-    // The page's one panel runs to the window's foot like the sidebar: square corners, no rule at its foot, and over
-    // the content's padding there.
-    ...(fill
-      ? {
-          flex: '1 0 auto',
-          borderRadius: 0,
-          borderBottom: 'none',
-          marginBottom: 'calc(-1 * var(--shell-content-padding, 0px))',
-        }
-      : {}),
   }
   const body = typeof children === 'function' ? children(slot) : children
   if (heading === undefined) {
@@ -83,8 +66,8 @@ export function ResourceFormSection({
 }
 
 /**
- * Proposed: the parts of one panel, for a page that reads as one document, such as an AI request's page: each
- * `SectionPart` has its heading, and a `borderSubtle` rule sits above every part but the first. Anything between parts,
+ * Proposed: the parts of a page, which the content's `surface` holds with no panel: each `SectionPart` has its heading,
+ * and a `borderSubtle` rule sits above every part but the first. Anything between parts,
  * such as a message or a row of actions, belongs to the part above it. See the review on #3263.
  */
 export function SectionParts({ children }: { children: ReactNode }) {

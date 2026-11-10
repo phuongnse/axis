@@ -259,7 +259,7 @@ export function StudioPublishing({
   }))
 
   return (
-    <Flex vertical gap="middle" style={{ flex: 1 }}>
+    <Flex vertical gap="middle">
       <StudioBand
         diagnostics={diagnostics}
         history={history}
@@ -314,7 +314,7 @@ export function StudioPublishing({
           )}
         </AxisActionRow>
       </StudioBand>
-      <Flex gap="middle" style={{ flex: 1 }}>
+      <Flex gap="middle" align="flex-start">
         <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
           {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
           {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}

@@ -1,16 +1,7 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Flex, Layout, Typography, type ThemeConfig } from 'antd'
 import dayjs from 'dayjs'
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
@@ -269,18 +260,8 @@ export function Shell({
             )}
             <Layout>
               {!hasAccount && <ReadOnlyBanner />}
-              {/* Proposed: the content is a column, so a page's panel can reach the window's foot, see the review on #3263. */}
-              <Layout.Content
-                style={
-                  {
-                    padding: claimed ? spacing.md : spacing.lg,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    // A page's panel that fills the content reaches over the padding at its foot.
-                    '--shell-content-padding': `${claimed ? spacing.md : spacing.lg}px`,
-                  } as CSSProperties
-                }
-              >
+              {/* Proposed: the content is on surface, flush with the header, the sidebar and a side panel, see the review on #3263. */}
+              <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg, background: colour.surface }}>
                 <ShellSidebarContext.Provider value={sidebarContext}>
                   <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
