@@ -1,4 +1,4 @@
-import { DownOutlined, RightOutlined, UndoOutlined } from '@ant-design/icons'
+import { RightOutlined, UndoOutlined } from '@ant-design/icons'
 import { Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { lazy, Suspense, useContext, useEffect, useState, type HTMLAttributes } from 'react'
@@ -373,7 +373,11 @@ function ChangedFile({
           role="icon"
           nameKey={open ? 'shell.studio.diff.hide' : 'shell.studio.diff.show'}
           nameSuffix={name}
-          icon={open ? <DownOutlined /> : <RightOutlined />}
+          // The fold's arrow points right and turns down when open, as Ant Design's Collapse draws it; a down arrow alone is
+          // the caret of a menu trigger, see docs/reference/actions-and-controls.md#menus.
+          icon={
+            <RightOutlined style={{ transform: open ? 'rotate(90deg)' : undefined, transition: 'transform 0.2s' }} />
+          }
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         />
