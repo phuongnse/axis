@@ -1,10 +1,13 @@
 import { Flex, Form, Input, Modal, Radio, Select } from 'antd'
 import { AxisAlert } from './AxisAlert'
+import { AxisField } from './AxisField'
+import { AxisFieldGroup } from './AxisFieldGroup'
 import { useState } from 'react'
 import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
 import { placeProblemErrors } from './problemErrors'
 import type { RecordProblem } from './records'
 import { buildResolveBody } from './recordBody'
+import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -93,41 +96,43 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
       destroyOnHidden
     >
       <Flex vertical gap="middle">
-        <Form form={form} layout="vertical">
-          <Form.Item
+        <Form form={form} layout="vertical" requiredMark={requiredMark}>
+          <AxisField
             name="reason"
             label={t('shell.inspector.commands.reason')}
-            rules={[
-              { required: true, whitespace: true, message: t('shell.inspector.commands.reasonRequired') },
-              { max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') },
-            ]}
+            help={t('shell.inspector.commands.reason.help')}
+            requiredMessage={t('shell.inspector.commands.reasonRequired')}
+            rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
           >
             <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-          </Form.Item>
-          <Form.Item
+          </AxisField>
+          <AxisField
             name="outcome"
             label={t('shell.inspector.commands.outcome')}
-            rules={[{ required: true, message: t('shell.inspector.commands.outcomeRequired') }]}
+            help={t('shell.inspector.commands.outcome.help')}
+            requiredMessage={t('shell.inspector.commands.outcomeRequired')}
           >
             <Radio.Group
+              role="radiogroup"
+              aria-label={t('shell.inspector.commands.outcome')}
               options={[
                 { value: 'succeeded', label: t('shell.inspector.commands.outcomeSucceeded') },
                 { value: 'failed', label: t('shell.inspector.commands.outcomeFailed') },
               ]}
             />
-          </Form.Item>
+          </AxisField>
           {outcome === 'succeeded' && outputs.length > 0 && (
-            <fieldset style={{ border: 0, margin: 0, padding: 0 }} data-testid="inspector-resolve-outputs">
-              <legend>{t('shell.inspector.commands.outputs')}</legend>
+            <AxisFieldGroup
+              title={t('shell.inspector.commands.outputs')}
+              help={t('shell.inspector.commands.outputs.help')}
+            >
               {outputs.map((output) => (
-                <Form.Item
+                <AxisField
                   key={output.name}
                   name={['output', output.name]}
                   label={`${output.name} (${output.type})`}
-                  required={output.required}
-                  rules={
-                    output.required ? [{ required: true, message: t('shell.inspector.commands.outputRequired') }] : []
-                  }
+                  help={t('shell.inspector.commands.output.help')}
+                  requiredMessage={output.required ? t('shell.inspector.commands.outputRequired') : undefined}
                 >
                   {output.type === 'boolean' ? (
                     <Select
@@ -141,9 +146,9 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
                   ) : (
                     <Input />
                   )}
-                </Form.Item>
+                </AxisField>
               ))}
-            </fieldset>
+            </AxisFieldGroup>
           )}
         </Form>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}

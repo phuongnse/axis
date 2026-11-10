@@ -1,7 +1,9 @@
 import { Flex, Form, Input, Modal } from 'antd'
 import { AxisAlert } from './AxisAlert'
+import { AxisField } from './AxisField'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
+import { requiredMark } from './requiredMark'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -63,17 +65,16 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
     >
       <Flex vertical gap="middle">
         {children}
-        <Form form={form} layout="vertical">
-          <Form.Item
+        <Form form={form} layout="vertical" requiredMark={requiredMark}>
+          <AxisField
             name="reason"
             label={t('shell.inspector.commands.reason')}
-            rules={[
-              { required: true, whitespace: true, message: t('shell.inspector.commands.reasonRequired') },
-              { max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') },
-            ]}
+            help={t('shell.inspector.commands.reason.help')}
+            requiredMessage={t('shell.inspector.commands.reasonRequired')}
+            rules={[{ max: reasonMaxLength, message: t('shell.inspector.commands.reasonTooLong') }]}
           >
             <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
-          </Form.Item>
+          </AxisField>
         </Form>
         {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>

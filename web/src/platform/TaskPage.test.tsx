@@ -614,6 +614,27 @@ describe('TaskPage', () => {
       return screen.findByRole('dialog')
     }
 
+    it('gives each field of the dialog its help', async () => {
+      stubTaskApi({ reads })
+      renderPage()
+      const dialog = await openDialog()
+
+      expect(within(dialog).getByRole('radiogroup', { name: 'Reassign to' })).toHaveAccessibleDescription(
+        platformEnglish['shell.task.reassignTarget.help'],
+      )
+      expect(within(dialog).getByRole('combobox', { name: 'Role' })).toHaveAccessibleDescription(
+        platformEnglish['shell.task.reassignRole.help'],
+      )
+      expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveAccessibleDescription(
+        platformEnglish['shell.task.reassignReason.help'],
+      )
+
+      await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
+      expect(within(dialog).getByRole('combobox', { name: 'Person' })).toHaveAccessibleDescription(
+        platformEnglish['shell.task.reassignPerson.help'],
+      )
+    })
+
     it('sends the chosen role with the reason and goes to the inbox', async () => {
       const api = stubTaskApi({ reads })
       renderPage()
@@ -623,7 +644,7 @@ describe('TaskPage', () => {
       expect(await screen.findByTitle('procurement')).toBeInTheDocument()
       expect(screen.getByTitle('Finance team')).toBeInTheDocument()
       await userEvent.click(screen.getByTitle('procurement'))
-      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Agent on leave.')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Agent on leave.')
       await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/e2e\/tasks$/))
@@ -645,7 +666,7 @@ describe('TaskPage', () => {
       await userEvent.type(picker, 'bao')
       await waitFor(() => expect(screen.queryByTitle('Ann Lee')).not.toBeInTheDocument())
       await userEvent.click(await screen.findByTitle('Bao Tran'))
-      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Knows the vendor.')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Knows the vendor.')
       await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/e2e\/tasks$/))
@@ -689,7 +710,7 @@ describe('TaskPage', () => {
           await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
           await userEvent.click(await screen.findByTitle('procurement'))
         }
-        await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Because.')
         await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
         const message = await within(dialog).findByText('Not allowed here.')
@@ -715,7 +736,7 @@ describe('TaskPage', () => {
 
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
       await userEvent.click(await screen.findByTitle('procurement'))
-      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Because.')
       await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
       expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent('Choose one target.')
@@ -733,7 +754,7 @@ describe('TaskPage', () => {
       await userEvent.click(within(dialog).getByRole('radio', { name: 'Person' }))
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Person' }))
       await userEvent.click(await screen.findByTitle('Ann Lee'))
-      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Because.')
       await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
       expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent('Not a role.')
@@ -750,7 +771,7 @@ describe('TaskPage', () => {
 
         await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
         await userEvent.click(await screen.findByTitle('procurement'))
-        await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+        await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Because.')
         await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -771,13 +792,13 @@ describe('TaskPage', () => {
 
       await userEvent.click(within(dialog).getByRole('combobox', { name: 'Role' }))
       await userEvent.click(await screen.findByTitle('procurement'))
-      await userEvent.type(within(dialog).getByLabelText('Reason'), 'Because.')
+      await userEvent.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Because.')
       await userEvent.click(within(dialog).getByRole('button', { name: 'Reassign' }))
 
       expect(await within(dialog).findByTestId('task-reassign-error')).toHaveTextContent(
         'The action could not be done.',
       )
-      expect(within(dialog).getByLabelText('Reason')).toHaveValue('Because.')
+      expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveValue('Because.')
     })
 
     it('keeps the dialog usable when the people cannot be listed', async () => {

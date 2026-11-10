@@ -136,7 +136,9 @@ describe('ConsoleInstancePage', () => {
 
     await userEvent.click(await screen.findByTestId('inspector-command-retry'))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'The manager is set now' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), {
+      target: { value: 'The manager is set now' },
+    })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByTestId('inspector-command-retry')).toBeNull())

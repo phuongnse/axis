@@ -401,7 +401,7 @@ describe('ProcessInspectorWidget', () => {
     await user.click(await screen.findByTestId(`inspector-dead-letter-redeliver-${retryableId}`))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Redeliver', { selector: '.ant-modal-title' })).toBeInTheDocument()
-    await user.type(within(dialog).getByLabelText('Reason'), 'The trigger is back')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'The trigger is back')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -451,7 +451,7 @@ describe('ProcessInspectorWidget', () => {
     await user.click(screen.getByTitle('2'))
     await user.click(await screen.findByTestId(`inspector-dead-letter-discard-${settledId}`))
     const dialog = await screen.findByRole('dialog')
-    await user.type(within(dialog).getByLabelText('Reason'), 'Not needed')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Not needed')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
@@ -480,7 +480,7 @@ describe('ProcessInspectorWidget', () => {
     await user.click(await screen.findByTestId(`inspector-dead-letter-discard-${retryableId}`))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Discard', { selector: '.ant-modal-title' })).toBeInTheDocument()
-    await user.type(within(dialog).getByLabelText('Reason'), 'Not needed')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Not needed')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
