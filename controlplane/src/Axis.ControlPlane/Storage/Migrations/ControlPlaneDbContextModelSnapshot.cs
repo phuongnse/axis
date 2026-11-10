@@ -84,6 +84,21 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.SignUp.DisposableDomainRow", b =>
+                {
+                    b.Property<string>("Domain")
+                        .HasColumnType("text")
+                        .HasColumnName("domain");
+
+                    b.HasKey("Domain")
+                        .HasName("pk_disposable_domains");
+
+                    b.ToTable("disposable_domains", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_disposable_domains_domain", "domain = lower(domain)");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpChallengeRow", b =>
                 {
                     b.Property<byte[]>("Challenge")

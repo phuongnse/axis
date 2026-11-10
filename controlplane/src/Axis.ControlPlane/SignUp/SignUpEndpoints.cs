@@ -41,8 +41,8 @@ internal static class SignUpEndpoints
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
         // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key and the directory),
-        // the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit and
-        // the subdomain, see docs/reference/sign-up.md#bots-and-abuse. A missing, malformed, wrong, expired or used solution is refused
+        // the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit, a disposable
+        // email domain and the subdomain, see docs/reference/sign-up.md#bots-and-abuse. A missing, malformed, wrong, expired or used solution is refused
         // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
         // 24 hours and queues the confirm email in the same transaction. An address that already verified a sign-up gets the trial-used
         // email instead: nothing is stored and no subdomain is held, and the answer is the same. The answer has no body yet. Without the
@@ -166,6 +166,11 @@ internal static class SignUpEndpoints
         if (email is not null && !errors.ContainsKey("/email") && limits.RefuseDomain(context, email) is { } domainLimit)
         {
             return domainLimit;
+        }
+
+        if (email is not null && !errors.ContainsKey("/email") && await DisposableDomains.IsListedAsync(controlPlane, email, cancellationToken))
+        {
+            errors["/email"] = ["signUp.email.disposable"];
         }
 
         // A blank application is the empty text, and the form must send it, so a form that left the field out is refused.
