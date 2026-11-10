@@ -53,7 +53,7 @@ function startAttempt(): Attempt {
       const solution = await solver.promise
       return solution ? { challenge, number: solution.number, took: solution.took } : null
     } catch {
-      // No challenge or no solution. The route does not check the solution yet, so the form goes without it.
+      // No challenge or no solution, so the form goes without one and the route then refuses it under /altcha.
       return null
     }
   })()

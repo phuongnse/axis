@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json.Nodes;
 
 namespace Axis.ControlPlane.SignUp;
 
@@ -28,4 +30,65 @@ internal static class SignUpChallenge
         var signature = Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(challenge)));
         return new { algorithm = "SHA-256", challenge, maxnumber = MaxNumber, salt, signature };
     }
+
+    /// <summary>
+    /// Checks the solution a sign-up carries as <c>altcha</c>, the base64 of the JSON that the page builds, see
+    /// <c>docs/reference/sign-up.md#bots-and-abuse</c>. The answer is the SHA-256 challenge and the time the solution expires, or null
+    /// when it is malformed, wrong, signed with another key or expired. It does not tell whether the solution was used before.
+    /// </summary>
+    public static (byte[] Challenge, DateTimeOffset ExpiresAt)? Verify(byte[] key, string? altcha, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(altcha))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(Convert.FromBase64String(altcha)) is not JsonObject payload
+                || Text(payload, "algorithm") != "SHA-256"
+                || Text(payload, "challenge") is not { } challenge
+                || Text(payload, "salt") is not { } salt
+                || Text(payload, "signature") is not { } signature
+                || payload["number"] is not JsonValue numberValue
+                || !numberValue.TryGetValue<long>(out var number)
+                || number is < 0 or > MaxNumber)
+            {
+                return null;
+            }
+
+            var query = salt.Split('?');
+            if (query.Length != 2
+                || query[1].Split('&').FirstOrDefault(pair => pair.StartsWith("expires=", StringComparison.Ordinal)) is not { } expiresPair
+                || !long.TryParse(expiresPair["expires=".Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var expires))
+            {
+                return null;
+            }
+
+            var expiresAt = DateTimeOffset.FromUnixTimeSeconds(expires);
+            if (expiresAt <= now)
+            {
+                return null;
+            }
+
+            var expected = SHA256.HashData(Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{salt}{number}")));
+            var claimed = Convert.FromHexString(challenge);
+            var signed = HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(challenge));
+            if (!CryptographicOperations.FixedTimeEquals(expected, claimed)
+                || !CryptographicOperations.FixedTimeEquals(signed, Convert.FromHexString(signature)))
+            {
+                return null;
+            }
+
+            return (expected, expiresAt);
+        }
+        catch (Exception exception) when (exception is FormatException or System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    // The text of a field that is a string, or null.
+    private static string? Text(JsonObject payload, string name) =>
+        payload[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
 }

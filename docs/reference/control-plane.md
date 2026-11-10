@@ -113,7 +113,7 @@ every business change.
     and not `ControlPlane:` settings.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
-    (`expireSignUps`), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
+    (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) every hour. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -251,7 +251,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Version` | The version of the privacy policy that a person accepts. Optional | Not empty, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:en` | The English address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
-| `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` answers `503`. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
+| `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` and `POST /api/sign-up` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
