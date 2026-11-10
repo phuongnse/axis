@@ -91,7 +91,13 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       TreeSelect: fieldBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
-      Dropdown: { colorError: colour.dangerText, colorPrimary: colour.primaryText, paddingXXS: spacing.xs },
+      // Proposed: a menu's item, in a dropdown or the sidebar, has `radius-base` corners, see the review on #3263.
+      Dropdown: {
+        colorError: colour.dangerText,
+        colorPrimary: colour.primaryText,
+        paddingXXS: spacing.xs,
+        borderRadiusSM: radius.base,
+      },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
       Tabs: {
@@ -103,6 +109,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
       },
       Menu: {
+        itemBorderRadius: radius.base,
+        itemMarginInline: spacing.xs,
         itemSelectedColor: colour.primaryText,
         horizontalItemSelectedColor: colour.primaryText,
         collapsedWidth: 64,
@@ -210,6 +218,11 @@ export function diffTints(mode: ThemeMode): { added: string; addedWord: string; 
     removed: token.colorErrorBg,
     removedWord: token.colorErrorBorder,
   }
+}
+
+/** Proposed: the tint Ant Design gives an item under the pointer, for a list that draws its items as a menu does. */
+export function hoverItemTint(mode: ThemeMode): string {
+  return theme.getDesignToken(antThemeFor(mode)).controlItemBgHover
 }
 
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
