@@ -19,6 +19,7 @@ internal static class SignUpEndpoints
     private const int MaxTextLength = 200;
     private const int MaxEmailLength = 254;
     private const int TokenBytes = 32;
+    private const string SecretHeader = "Sign-Up-Secret";
 
     public static void MapSignUpEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -62,6 +63,11 @@ internal static class SignUpEndpoints
         // answers the progress secret, 32 random bytes in base64url, and stores only its SHA-256. The secret is never logged. A used or expired link answers 409 with its state. So does a link whose address
         // another sign-up verified first: the unique index of the verified email refuses it, nothing changes and it answers confirmed.
         endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
+
+        // See docs/reference/sign-up.md#provisioning. It answers 404 with no body for an unknown id, a pending sign-up, a missing secret or
+        // a wrong one, so a caller learns nothing about a sign-up it does not hold. The SHA-256 of the secret is compared with the stored
+        // hash in constant time. The secret travels in a header, so it is in no request line and no log.
+        endpoints.MapGet("/api/sign-up/{id}", ProgressAsync);
 
         // The region's built-in applications from the settings, each with its id, its title and its description in both languages.
         endpoints.MapGet("/api/sign-up/applications", (ControlPlaneOptions options) => Results.Ok(new
@@ -430,6 +436,43 @@ internal static class SignUpEndpoints
         return Results.Json(new { state = found.State is "confirmed" ? "confirmed" : "expired" }, statusCode: StatusCodes.Status409Conflict);
     }
 
+    private static async Task<IResult> ProgressAsync(string id, HttpRequest request, ControlPlaneOptions options, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)
+    {
+        var given = SecretHash(request.Headers[SecretHeader].ToString());
+        if (given is null || !Guid.TryParse(id, out var signUpId))
+        {
+            return Results.NotFound();
+        }
+
+        await using var read = controlPlane.CreateCommand(
+            """
+            SELECT s.secret_hash, s.subdomain, s.provisioning,
+                   EXISTS (SELECT 1 FROM control_plane.jobs j WHERE j.kind = @kind AND j.state = 'failed'
+                           AND j.payload = jsonb_build_object('signUpId', s.id::text))
+            FROM control_plane.sign_ups s
+            WHERE s.id = @id AND s.state = 'verified' AND s.secret_hash IS NOT NULL
+            """);
+        read.Parameters.AddWithValue("kind", ProvisionTenantJobHandler.JobKind);
+        read.Parameters.AddWithValue("id", signUpId);
+        await using var reader = await read.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken) || !CryptographicOperations.FixedTimeEquals((byte[])reader[0], given))
+        {
+            return Results.NotFound();
+        }
+
+        // Waiting for a cell and a job that has not started both leave the set-up not begun. Delayed is a cell job that ended failed, or the end of the job's retries.
+        var provisioning = reader.IsDBNull(2) ? null : reader.GetString(2);
+        var step = provisioning switch
+        {
+            "ready" => "ready",
+            "delayed" => "delayed",
+            _ when reader.GetBoolean(3) => "delayed",
+            "creating" => "creating",
+            _ => "verified",
+        };
+        return Results.Ok(new { step, address = SignUpAddress.Of(options, reader.GetString(1)) });
+    }
+
     // The state of a link: pending within its 24 hours, confirmed or expired. No row, or a link that ran out before the expiry job marked it, is expired.
     private static async Task<(string State, string Email, string BusinessName, string Subdomain)> FindAsync(NpgsqlDataSource controlPlane, byte[]? hash, CancellationToken cancellationToken)
     {
@@ -455,15 +498,19 @@ internal static class SignUpEndpoints
     }
 
     // The SHA-256 of the token of a body, or null when the token is missing, not a string or not 32 bytes of base64url.
-    private static byte[]? TokenHash(JsonObject body)
+    private static byte[]? TokenHash(JsonObject body) =>
+        body["token"] is JsonValue value && value.TryGetValue<string>(out var token) ? SecretHash(token) : null;
+
+    // The SHA-256 of a token or secret, or null when it is missing or not 32 bytes of base64url.
+    private static byte[]? SecretHash(string? text)
     {
-        if (body["token"] is not JsonValue value || !value.TryGetValue<string>(out var token))
+        if (text is null)
         {
             return null;
         }
 
         var bytes = new byte[TokenBytes];
-        var status = Base64Url.DecodeFromChars(token, bytes, out _, out var written);
+        var status = Base64Url.DecodeFromChars(text, bytes, out _, out var written);
         return status == OperationStatus.Done && written == TokenBytes ? SHA256.HashData(bytes) : null;
     }
 

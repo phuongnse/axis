@@ -396,6 +396,78 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_progress_route_answers_the_step_and_the_address_to_the_holder_of_the_secret()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, subdomain, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        var secret = await ConfirmedSecretAsync(client, token);
+
+        // This host has no cell, so it registers no provisioning job handler and the sign-up stays as the confirm left it. Waiting for a
+        // cell is the same step as a job that has not started.
+        await AssertProgressAsync("verified");
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'queued' WHERE id = '{id}'", cancellation);
+        await AssertProgressAsync("verified");
+
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'creating' WHERE id = '{id}'", cancellation);
+        await AssertProgressAsync("creating");
+
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'delayed' WHERE id = '{id}'", cancellation);
+        await AssertProgressAsync("delayed");
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'creating' WHERE id = '{id}'", cancellation);
+
+        await ControlPlaneDatabase.ExecuteAsync(
+            _controlPlane,
+            $"INSERT INTO control_plane.jobs (id, kind, payload, state, next_attempt_at, finished_at) VALUES (gen_random_uuid(), 'provisionTenant', jsonb_build_object('signUpId', '{id}'), 'failed', now(), now())",
+            cancellation);
+        await AssertProgressAsync("delayed");
+
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'ready' WHERE id = '{id}'", cancellation);
+        await AssertProgressAsync("ready");
+
+        async Task AssertProgressAsync(string step)
+        {
+            var response = await ProgressAsync(client, id.ToString(), secret);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var answer = await response.Content.ReadFromJsonAsync<JsonElement>(cancellation);
+            Assert.Equal(step, answer.GetProperty("step").GetString());
+            Assert.Equal($"https://{subdomain}.vn.example.com", answer.GetProperty("address").GetString());
+        }
+    }
+
+    [Fact]
+    public async Task The_progress_route_answers_404_with_an_empty_body_to_a_wrong_secret_no_secret_or_an_unknown_id()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, _, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        var secret = await ConfirmedSecretAsync(client, token);
+        var (pendingAddress, _, _) = await SignUpAsync(client);
+        var pending = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{pendingAddress}'");
+
+        var refused = new (string Case, string Id, string? Secret)[]
+        {
+            ("a wrong secret", id.ToString(), Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))),
+            ("no secret", id.ToString(), null),
+            ("a malformed secret", id.ToString(), "not-a-secret"),
+            ("an unknown id", Guid.CreateVersion7().ToString(), secret),
+            ("a malformed id", "not-a-uuid", secret),
+            ("a pending sign-up", pending.ToString(), secret),
+        };
+        foreach (var (name, requestId, requestSecret) in refused)
+        {
+            var response = await ProgressAsync(client, requestId, requestSecret);
+
+            Assert.True(response.StatusCode == HttpStatusCode.NotFound, $"{name} answered {(int)response.StatusCode}.");
+            Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync(cancellation));
+        }
+    }
+
+    [Fact]
     public async Task The_first_confirm_starts_one_trialing_subscription_of_30_days_with_one_audit_record_and_a_second_confirm_adds_none()
     {
         var cancellation = TestContext.Current.CancellationToken;
@@ -1061,6 +1133,27 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         request.Headers.Add("X-Forwarded-For", clientAddress);
         request.Headers.Add("User-Agent", userAgent);
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // The progress route, with the secret header only when a secret is given.
+    private static async Task<HttpResponseMessage> ProgressAsync(HttpClient client, string id, string? secret)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, $"/api/sign-up/{id}");
+        if (secret is not null)
+        {
+            request.Headers.Add("Sign-Up-Secret", secret);
+        }
+
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // Confirms the link and answers the progress secret.
+    private static async Task<string> ConfirmedSecretAsync(HttpClient client, string token)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        var response = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("secret").GetString()!;
     }
 
     // Gives every request the address of the one proxy that the control plane trusts, before the forwarded headers are read.
