@@ -18,14 +18,17 @@
 // The fourth rewrites tests/Axis.Integration.Tests/class-durations.json from xUnit JUnit files, such
 // as the artifacts/test-results/Axis.Integration.Tests.xml of each shard of a full run, and the
 // Axis.ControlPlane.Integration.Tests.xml of shard 1. A class missing from them keeps its entry, and an
-// entry whose class no longer exists is dropped.
+// entry whose class no longer exists is dropped. It also measures the parallelism under `parallelism`:
+// the seconds of all tests over the wall time of the Axis.Integration.Tests suites.
 //
 // A class is a type whose name ends in Tests, in a .cs file of the test project that holds a [Fact]
 // or a [Theory]. Classes that share an xUnit [Collection] stay in one shard, as one unit. Each class
 // weighs its seconds in class-durations.json. A class without an entry weighs its number of tests
 // times the median seconds per test of the classes that have one, or its number of tests when none
 // has. Shard 1 starts with the seconds of the control plane suite, which it runs beside its classes.
-// The units go one at a time, the heaviest first, to the shard that is then the lightest.
+// The units go one at a time, the heaviest first, to the shard that is then the lightest. A shard's
+// estimate is its seconds over the parallelism, or its heaviest unit when that is longer, because the
+// classes of one collection run one after another.
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,6 +42,9 @@ export const isPerformance = (name) => name.endsWith('PerformanceTests')
 
 /** The key in class-durations.json of the control plane suite, which shard 1 runs beside its classes (see scripts/integration.sh). */
 export const controlPlane = 'Axis.ControlPlane.Integration.Tests'
+
+/** The key in class-durations.json of the classes' parallelism: their seconds over the wall time of their suites. */
+export const parallelismKey = 'parallelism'
 
 /** The test classes of one C# source: [{ name, collection, tests }], with name its full name. */
 export function parseSource(source) {
@@ -100,14 +106,21 @@ export function split(classes, total, firstShardSeconds = 0) {
   return packLightest(units(classes), total, firstShardSeconds).map((shard) => shard.names.sort())
 }
 
+/** The estimated seconds of a shard: its seconds over the parallelism, or its heaviest unit when that is longer. */
+export function estimate(seconds, heaviest, parallelism) {
+  return Math.max(heaviest, seconds / parallelism)
+}
+
 /** The fewest shards that fit the budget, and an `Over budget:` line for each unit that alone does not. */
-export function count(classes, firstShardSeconds, budget = budgetSeconds, max = maxShards) {
+export function count(classes, firstShardSeconds, budget = budgetSeconds, max = maxShards.integration, parallelism = 1) {
   const all = units(classes)
-  const longest = (total) => Math.max(...packLightest(all, total, firstShardSeconds).map((shard) => shard.seconds))
+  const heaviest = all[0]?.seconds ?? 0
+  const longest = (total) =>
+    Math.max(...packLightest(all, total, firstShardSeconds).map((shard) => estimate(shard.seconds, heaviest, parallelism)))
   const line = (name, seconds) =>
     `Over budget: ${name} takes about ${Math.round(seconds)} s, longer than the budget of ${budget} s.`
   const overBudget = []
-  if (firstShardSeconds > budget) overBudget.push(line(controlPlane, firstShardSeconds))
+  if (firstShardSeconds / parallelism > budget) overBudget.push(line(controlPlane, firstShardSeconds / parallelism))
   for (const unit of all) {
     if (unit.seconds <= budget) continue
     const members = [...unit.names].sort().join(', ')
@@ -128,19 +141,41 @@ export function filterArgs(shards, index) {
   ]
 }
 
+/** The value of an attribute in the attributes of an XML element, or undefined. */
+const attribute = (attributes, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(` ${attributes}`)?.[1]
+
 /** The seconds of each class in xUnit JUnit texts, by full class name. */
 export function junitDurations(texts) {
   const durations = {}
   for (const text of texts) {
     for (const [, attributes] of text.matchAll(/<testcase\s([^>]*?)\/?>/g)) {
-      const attribute = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(` ${attributes}`)?.[1]
-      const name = attribute('classname')
+      const name = attribute(attributes, 'classname')
       if (!name) continue
       const key = name.startsWith(`${controlPlane}.`) ? controlPlane : name
-      durations[key] = (durations[key] ?? 0) + Number(attribute('time') ?? 0)
+      durations[key] = (durations[key] ?? 0) + Number(attribute(attributes, 'time') ?? 0)
     }
   }
   return Object.fromEntries(Object.entries(durations).map(([name, seconds]) => [name, Math.round(seconds)]))
+}
+
+/**
+ * The parallelism of xUnit JUnit texts: the seconds of all tests over the wall time of the Axis.Integration.Tests
+ * suites, or undefined when there is no such suite.
+ */
+export function junitParallelism(texts) {
+  let testSeconds = 0
+  let wallSeconds = 0
+  for (const text of texts) {
+    for (const [, attributes] of text.matchAll(/<testcase\s([^>]*?)\/?>/g)) {
+      testSeconds += Number(attribute(attributes, 'time') ?? 0)
+    }
+    for (const [, attributes] of text.matchAll(/<testsuite\s([^>]*)>/g)) {
+      if (attribute(attributes, 'name')?.includes(controlPlane)) continue
+      wallSeconds += Number(attribute(attributes, 'time') ?? 0)
+    }
+  }
+  if (wallSeconds === 0) return undefined
+  return Math.round((testSeconds / wallSeconds) * 100) / 100
 }
 
 /** Runs the command line and returns the text for stdout. Throws on a malformed shard. */
@@ -149,13 +184,23 @@ export function main(args, dir = project, warn = (line) => console.error(line)) 
   const durations = JSON.parse(readFileSync(file, 'utf8'))
   const classes = readClasses(dir)
   if (args[0] === '--durations') {
-    const measured = junitDurations(args.slice(1).map((junit) => readFileSync(junit, 'utf8')))
-    const merged = mergeDurations(durations, measured, [...classes.map((c) => c.name), controlPlane])
+    const texts = args.slice(1).map((junit) => readFileSync(junit, 'utf8'))
+    const measured = junitDurations(texts)
+    const parallelism = junitParallelism(texts)
+    const fresh = parallelism === undefined ? measured : { ...measured, [parallelismKey]: parallelism }
+    const names = [...classes.map((c) => c.name), controlPlane, parallelismKey]
+    const merged = mergeDurations(durations, fresh, names)
     writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`)
     return `${Object.keys(measured).length} classes measured, ${Object.keys(merged).length} kept in ${file}.`
   }
   if (args[0] === '--count') {
-    const { total, overBudget } = count(weigh(classes, durations), durations[controlPlane] ?? 0)
+    const { total, overBudget } = count(
+      weigh(classes, durations),
+      durations[controlPlane] ?? 0,
+      budgetSeconds,
+      maxShards.integration,
+      durations[parallelismKey] ?? 1,
+    )
     for (const line of overBudget) warn(line)
     return String(total)
   }

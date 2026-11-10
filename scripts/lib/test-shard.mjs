@@ -61,7 +61,7 @@ export function shardFiles(files, index, total, workers) {
 }
 
 /** The fewest test shards that fit the budget, and an `Over budget:` line for each file that alone does not. */
-export function count(files, workers, budget = budgetSeconds, max = maxShards) {
+export function count(files, workers, budget = budgetSeconds, max = maxShards.test) {
   const longest = (vitestShards) =>
     Math.max(...pack(files, vitestShards, workers).map((shard) => estimate(shard, workers)))
   const overBudget = files
