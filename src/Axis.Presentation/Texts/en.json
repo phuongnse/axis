@@ -1994,6 +1994,8 @@
   "shell.studio.ai.state.failed": "Failed",
   "shell.studio.ai.waiting": "Waiting for you",
   "shell.studio.ai.allRequests": "All AI requests",
+  "shell.studio.ai.mcp": "Use your own AI app",
+  "shell.studio.ai.mcp.help": "An AI app that supports MCP can work on your applications too, once your administrator allows it. Give it this address:",
   "shell.studio.requests": "AI requests",
   "shell.studio.requests.request": "Request",
   "shell.studio.requests.state": "State",

@@ -1994,6 +1994,8 @@
   "shell.studio.ai.state.failed": "Không thành công",
   "shell.studio.ai.waiting": "Đang chờ bạn",
   "shell.studio.ai.allRequests": "Xem tất cả yêu cầu AI",
+  "shell.studio.ai.mcp": "Dùng ứng dụng AI của bạn",
+  "shell.studio.ai.mcp.help": "Ứng dụng AI hỗ trợ MCP cũng làm việc được với các ứng dụng của bạn, khi quản trị viên cho phép. Hãy đưa cho nó địa chỉ này:",
   "shell.studio.requests": "Yêu cầu AI",
   "shell.studio.requests.request": "Yêu cầu",
   "shell.studio.requests.state": "Trạng thái",

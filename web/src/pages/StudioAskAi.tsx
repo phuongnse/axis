@@ -33,7 +33,8 @@ const maxText = 4000
  * when AI has written it, and the panel stays open and empty for the next one. Under the form only the author's
  * requests that wait for them show, under "Waiting for you": each one's text is a link to its page, and under it its
  * state and when it was sent. The request whose page is open is on the selected tint. Last, "All AI requests" leads to
- * the page that lists every request. The panel goes with the page and never holds a request, see
+ * the page that lists every request, and under a line the MCP server's address on the tenant's host, with a copy
+ * button, for an AI app of the author's own. The panel goes with the page and never holds a request, see
  * docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioAskAi({
@@ -178,6 +179,17 @@ export function StudioAskAi({
         <Link to={authoringRequestAddress(application)} data-testid="studio-ai-all-requests">
           {t('shell.studio.ai.allRequests')}
         </Link>
+        {/* Proposed: the MCP server's address, see docs/reference/ai-authoring-in-studio.md#connected-apps. */}
+        <Flex
+          vertical
+          gap={spacing.xs}
+          data-testid="studio-ai-mcp"
+          style={{ marginTop: spacing.sm, paddingTop: spacing.md, borderTop: `1px solid ${colour.borderSubtle}` }}
+        >
+          <Typography.Text strong>{t('shell.studio.ai.mcp')}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.ai.mcp.help')}</Typography.Text>
+          <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
+        </Flex>
       </Flex>
     </StudioSidePanel>
   )
