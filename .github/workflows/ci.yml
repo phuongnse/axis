@@ -114,6 +114,34 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # After every check job of a run on main passed, refreshes the shard durations from the run's JUnit
+  # files and opens or updates one process issue when they drift or a split passes the budget. It
+  # runs no model and commits nothing (docs/development.md#shards).
+  durations:
+    name: Shard durations
+    needs: checks
+    if: ${{ github.ref == 'refs/heads/main' && needs.checks.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: test-results-*
+          path: results
+      - name: Refresh the shard durations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/shard-durations.mjs results "$GITHUB_RUN_ID"
+
   # Builds the production images and scans them and the identity provider image with Trivy. It fails
   # on a high or critical finding that scripts/scan-images-accepted.json does not cover (D107).
   image-scan:

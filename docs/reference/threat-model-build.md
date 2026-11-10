@@ -64,7 +64,7 @@ Spoofing does not apply to the pipeline's own steps, which act as NexKit's GitHu
 
 ### CI and secrets
 
-The check workflows run with read access and no secret, and the docs audit gives its Claude token only to a job that reads. NexKit's own jobs hold the write access and the secrets.
+The check workflows run with read access and no secret, and the docs audit gives its Claude token only to a job that reads. Two jobs with no model may also write issues: the docs audit's and CI's [shard durations](../development.md#shards) job. NexKit's own jobs hold the write access to the repository and the secrets.
 
 ```mermaid
 flowchart LR
@@ -72,7 +72,7 @@ flowchart LR
         Push[A hand-made pull request, or NexKit's start on main]
     end
     subgraph checks [Check workflows]
-        Ci[CI, CodeQL, Performance and Docs audit with read access]
+        Ci[CI, CodeQL, Performance and Docs audit with read access, two jobs that write issues]
     end
     subgraph nexkitjobs [NexKit jobs]
         Jobs[NexKit jobs with write access]
@@ -85,7 +85,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| B3 | A workflow token pushes to `main` without the checks. | CI and secrets | Elevation of privilege | High | **Mitigated** | CI, CodeQL, Performance and Docs audit run with `contents: read`, and only the docs audit's job with no model may open and edit issues. The [rules on main](../delivery.md#decisions) require NexKit's checks, and NexKit's App is not on their bypass list. Only NexKit's jobs that write mint the App's token, and none of them runs an agent or the repository's code. |
+| B3 | A workflow token pushes to `main` without the checks. | CI and secrets | Elevation of privilege | High | **Mitigated** | CI, CodeQL, Performance and Docs audit run with `contents: read`. Only two jobs with no model may open and edit issues: the docs audit's, and CI's shard durations job, which runs only on `main` after every check job passed. The scripts they run are the reviewed code of `main`, and their tokens cannot write the repository. The [rules on main](../delivery.md#decisions) require NexKit's checks, and NexKit's App is not on their bypass list. Only NexKit's jobs that write mint the App's token, and none of them runs an agent or the repository's code. |
 | B6 | A secret, such as an agent's subscription token, leaks into a log or reaches a job that does not need it. | CI and secrets | Information disclosure | High | **Mitigated** | The CI, CodeQL, Performance and Load test workflows use no secret. The Docs audit workflow passes the Claude token only to its audit job, whose checkout keeps no GitHub token. `.github/workflows/nexkit.yml` says the NexKit pipeline passes each job only the secrets that `.nexkit/config.json` names for it, so the App's key reaches only the jobs that write, and the agent jobs get only their agents' secrets. |
 
 Spoofing does not apply to a workflow run, which signs in no one and acts through its own token. Denial of service on the runners is rated in B9.
