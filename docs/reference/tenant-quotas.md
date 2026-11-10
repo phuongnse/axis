@@ -37,7 +37,7 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
   can also set the first rows.
 - **The operator as actor** _(planned for M33)_. The audit record of a quota change names the operator
   or the machine caller in its `actor` column.
-- **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's
+- **From a plan.** The [control plane](control-plane.md) writes a SaaS tenant's
   rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
 - **Authoring requests.** `authoringRequests` counts the requests sent since 00:00 UTC on the first
   day of the month, once each, when the author sends it. A dropped or failed request still counts,

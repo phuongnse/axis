@@ -82,6 +82,8 @@ over a private network with mutual TLS.
 - **One tenant.** The client also sends `DELETE /api/cell/tenants/{id}` with an `Idempotency-Key`
   and no body, and reads `GET /api/cell/tenants/{id}` for the tenant's `status`, which is empty when
   the cell answers `404`. The [subscription clock](subscriptions.md#one-clock) uses them.
+- **Quotas.** The client also sends `PUT /api/cell/tenants/{id}/quotas` with a `set` of quota values and
+  no `Idempotency-Key`, and accepts only `200`. The [quota write](plans.md#from-a-plan-to-the-quotas) uses it.
 
 ## Its own work
 
@@ -114,7 +116,8 @@ every business change.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
-    (`advanceSubscriptions`) every hour. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    (`advanceSubscriptions`) every hour. When the directory and a cell are set, it also queues the
+    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -196,9 +199,19 @@ The platform operator, who runs the cells, runs the control plane too, from the 
   values. A job that is not a `sendEmail` job, or that is still `queued` or `running`, is refused and
   nothing is queued. The audit record has the action `email.resent` and the resent job as its
   subject.
+- **`quota override <tenant> <quota> <value> --until <yyyy-MM-dd> --reason <text> --operator <name>`.**
+  Sets an [override](plans.md#from-a-plan-to-the-quotas) of one quota of the tenant's subscription, so
+  that the control plane writes `value` to the cell until 00:00 UTC of the end date. It prints the
+  subscription's id, the quota, the value, the end and the id of the queued `writeQuotas` job, and never
+  the reason. `quota` is a key of the [quotas](tenant-quotas.md#quotas) and `value` a whole number of
+  digits from 0. A missing or blank `--reason` or `--until`, an unknown quota, a value that is not
+  digits and a date that is not `yyyy-MM-dd` are usage errors. An end date that is not in the future is
+  refused, and so is a tenant with no subscription that pins a plan and is neither `deleting` nor
+  `deleted`. Nothing is stored, audited or queued in any of these cases. The audit record has the action `quota.overridden` and the
+  subscription as its subject, and the override and the job commit with it in one transaction.
 - **`--operator` is required.** A change command names the operator who runs it, and a missing or
   blank name is a usage error. The audit record of the change has the actor kind `operator` and
-  that name as its actor. Both commands commit the change and its audit record in one transaction.
+  that name as its actor. Every change command commits the change and its audit record in one transaction.
 - **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
   that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
   record.

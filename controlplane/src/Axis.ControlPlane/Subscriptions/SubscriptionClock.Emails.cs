@@ -1,6 +1,7 @@
 using System.Globalization;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
+using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using MimeKit;
 using Npgsql;
@@ -115,8 +116,8 @@ internal sealed partial class SubscriptionClock
         }
 
         // A tenant with no directory row, or in a cell that is not one of the region's, is not provisioned yet.
-        var cellId = await FindCellIdAsync(candidate.TenantId, cancellationToken);
-        var cell = cellId is null ? null : cells.All.FirstOrDefault(client => string.Equals(client.CellId, cellId, StringComparison.Ordinal));
+        var cellId = await TenantCells.FindCellIdAsync(directory, candidate.TenantId, cancellationToken);
+        var cell = TenantCells.Client(cells, cellId);
         if (cell is null)
         {
             return [];

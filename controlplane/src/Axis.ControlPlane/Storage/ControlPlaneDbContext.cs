@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -34,6 +34,10 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
 
     public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
+
+    public DbSet<SubscriptionAddOnRow> SubscriptionAddOns => Set<SubscriptionAddOnRow>();
+
+    public DbSet<QuotaOverrideRow> QuotaOverrides => Set<QuotaOverrideRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
 
@@ -161,6 +165,35 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             email.Property(e => e.Kind).HasColumnName("kind");
             email.Property(e => e.QueuedAt).HasColumnName("queued_at").HasDefaultValueSql("now()");
             email.HasOne<SubscriptionRow>().WithMany().HasForeignKey(e => e.SubscriptionId).HasConstraintName("fk_subscription_emails_subscription_id").OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<SubscriptionAddOnRow>(addOn =>
+        {
+            addOn.ToTable("subscription_add_ons", table => table.HasCheckConstraint("ck_subscription_add_ons_quantity", "quantity >= 1"));
+            addOn.HasKey(a => new { a.SubscriptionId, a.AddOnCode }).HasName("pk_subscription_add_ons");
+            addOn.Property(a => a.SubscriptionId).HasColumnName("subscription_id");
+            addOn.Property(a => a.AddOnCode).HasColumnName("add_on_code");
+            addOn.Property(a => a.Quantity).HasColumnName("quantity");
+            addOn.Property(a => a.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            addOn.HasOne<SubscriptionRow>().WithMany().HasForeignKey(a => a.SubscriptionId).HasConstraintName("fk_subscription_add_ons_subscription_id").OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<QuotaOverrideRow>(quotaOverride =>
+        {
+            quotaOverride.ToTable("quota_overrides", table =>
+            {
+                table.HasCheckConstraint("ck_quota_overrides_value", "value >= 0");
+                table.HasCheckConstraint("ck_quota_overrides_reason", "btrim(reason) <> ''");
+            });
+            quotaOverride.HasKey(o => new { o.SubscriptionId, o.Quota }).HasName("pk_quota_overrides");
+            quotaOverride.Property(o => o.SubscriptionId).HasColumnName("subscription_id");
+            quotaOverride.Property(o => o.Quota).HasColumnName("quota");
+            quotaOverride.Property(o => o.Value).HasColumnName("value").HasColumnType("bigint");
+            quotaOverride.Property(o => o.Reason).HasColumnName("reason");
+            quotaOverride.Property(o => o.Until).HasColumnName("until");
+            quotaOverride.Property(o => o.Operator).HasColumnName("operator");
+            quotaOverride.Property(o => o.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            quotaOverride.HasOne<SubscriptionRow>().WithMany().HasForeignKey(o => o.SubscriptionId).HasConstraintName("fk_quota_overrides_subscription_id").OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<LedgerEntryRow>(entry =>
