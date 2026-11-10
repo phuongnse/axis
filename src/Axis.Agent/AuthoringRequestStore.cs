@@ -189,9 +189,8 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     }
 
     /// <summary>
-    /// Commits a finished step with the request's next state in one transaction. The host keeps the claim when <paramref name="keepClaim"/> is
-    /// <c>true</c>, extending the lease by <paramref name="lease"/>, and frees the request otherwise. It answers <c>false</c> and writes nothing
-    /// when the host no longer holds the claim.
+    /// Commits a finished step with the request's next state in one transaction. The commit frees the request, so a later claim runs the
+    /// next step. It answers <c>false</c> and writes nothing when the host no longer holds the claim.
     /// </summary>
     public async Task<bool> FinishStepAsync(
         string tenantId,
@@ -201,8 +200,6 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string nextState,
         string? outcome,
         string? inputSummary,
-        bool keepClaim,
-        TimeSpan lease,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
@@ -212,16 +209,14 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             UPDATE axis.authoring_requests
             SET state = @next,
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
-                claimed_by = CASE WHEN @keep THEN claimed_by END,
-                claimed_until = CASE WHEN @keep THEN clock_timestamp() + @lease END
+                claimed_by = NULL,
+                claimed_until = NULL
             WHERE id = @id AND claimed_by = @me
             """,
             connection,
             transaction))
         {
             command.Parameters.AddWithValue("next", nextState);
-            command.Parameters.AddWithValue("keep", keepClaim);
-            command.Parameters.AddWithValue("lease", lease);
             command.Parameters.AddWithValue("id", requestId);
             command.Parameters.AddWithValue("me", claimedBy);
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
