@@ -245,6 +245,20 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grants[1]).queryByText('All fields')).not.toBeInTheDocument()
   })
 
+  it('draws the record filter of an editable grant as a labelled field with its help', async () => {
+    stubFetch()
+    renderMatrix()
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-employee-entity-PurchaseRequest'))
+
+    const grants = screen.getAllByTestId('studio-matrix-own-grant')
+    expect(grants).toHaveLength(2)
+    for (const grant of grants) {
+      expect(within(grant).getByText('Record filter').tagName).toBe('LABEL')
+      expect(within(grant).getByText(platformEnglish['shell.studio.matrix.filter.help'])).toBeInTheDocument()
+    }
+  })
+
   it('offers no checkbox and no Add grant on a read-only row', async () => {
     const fetchMock = stubFetch()
     renderMatrix()

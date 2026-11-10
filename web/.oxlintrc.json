@@ -57,6 +57,7 @@
     "axis/no-antd-button": "error",
     "axis/no-antd-alert": "error",
     "axis/no-preset-tag-colour": "error",
+    "axis/field-label-through-axis-field": "error",
     "no-restricted-imports": [
       "error",
       { "paths": [{ "name": "antd", "importNames": ["Table"], "message": "Use AxisTable." }] }
@@ -79,6 +80,20 @@
       "rules": { "no-restricted-imports": "off" }
     },
     {
+      // The sign-in pages draw their own labels, and the record form and a table's filter bar are application forms.
+      // AxisField and AxisFieldGroup draw the labels, and the design-system previews show them. See
+      // docs/reference/frontend.md#platform-field-help.
+      "files": [
+        "src/identitySignIn/**",
+        "src/platform/useRecordForm.tsx",
+        "src/platform/FilterBar.tsx",
+        "src/platform/AxisField.tsx",
+        "src/platform/AxisFieldGroup.tsx",
+        "src/designSystem/**"
+      ],
+      "rules": { "axis/field-label-through-axis-field": "off" }
+    },
+    {
       // The design-system previews patch HTMLFormElement.prototype.requestSubmit to show a submit, and no user input
       // reaches that code.
       "files": ["src/designSystem/formSubmission.ts"],
@@ -96,6 +111,7 @@
         "axis/no-antd-button": "off",
         "axis/no-antd-alert": "off",
         "axis/no-preset-tag-colour": "off",
+        "axis/field-label-through-axis-field": "off",
         "no-restricted-imports": "off",
         "no-restricted-properties": [
           "error",

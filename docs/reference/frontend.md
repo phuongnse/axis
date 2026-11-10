@@ -891,8 +891,8 @@ builder help is not optional.
 - **`AxisField` requires `help`,** so a screen cannot leave it out.
 - **A test** fails when a `shell.studio.field.*` text has no `.help` in every locale. Texts under that prefix
   that are not fields, such as `modules.addTitle`, move out of it.
-- **Every editor draws its labels through `AxisField`,** _(planned for M31)_ those that draw their own today
-  included, such as the connector and process editors.
+- **Every platform field label is drawn through `AxisField` or `AxisFieldGroup`** _(planned for M31)_, the connector and process editors included.
+- **Lint rule `axis/field-label-through-axis-field` refuses a hand-drawn label.** [Shared widgets](shared-widgets.md#what-the-build-checks) lists where it is off.
 
 An application's own forms keep `help` optional, as their author decides.
 

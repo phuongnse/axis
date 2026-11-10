@@ -104,14 +104,15 @@ cannot use up a replica.
   the SPA's static files and pages have no limit.
 - **The control plane** _(planned for M33)_. The [control plane](control-plane.md) is another service with limits of
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
-  [billing portal](billing-portal.md#rules)'s.
+  [billing portal](billing-portal.md#rules)'s. It counts its refusals in the same metric, with `sign_up` as
+  `axis.partition`, see [the control plane's metrics](control-plane.md).
 
 ### A refused request
 
 - **The answer.** A request over a limit answers `429` problem details titled "Too many requests.", with a
   `Retry-After` header in seconds. The route never runs, so it writes nothing and no audit record.
 - **The metric.** `axis.rate_limits.refused` counts the refused requests, with the attribute `axis.partition`:
-  `sign_in`, `session`, `bearer`, `publishing` or `mcp`, and `sign_up`, the [control plane](control-plane.md)'s. It carries no tenant, user or address.
+  `sign_in`, `session`, `bearer`, `publishing` or `mcp`. It carries no tenant, user or address.
 
 ### Rate limit tests
 

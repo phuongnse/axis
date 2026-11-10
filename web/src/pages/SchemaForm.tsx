@@ -275,7 +275,7 @@ function fieldTexts(
  * The expression editor while it loads. `AxisField` gives its input an id and a description, which the editor does not
  * take yet, so they stop here and never reach `Suspense`. The editor keeps its own name.
  */
-function ExpressionInput({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
+export function ExpressionInput({ fallback, children }: { fallback: ReactNode; children: ReactNode }) {
   return <Suspense fallback={fallback}>{children}</Suspense>
 }
 

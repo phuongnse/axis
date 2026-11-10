@@ -98,6 +98,11 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
       exact: true,
       level: 4,
     }),
+  signUp: (page) =>
+    figure(page, "Typical").getByRole("textbox", {
+      name: "Full name",
+      exact: true,
+    }),
 };
 
 /** A key element of each state of the shell, sign-in and identity sign-in previews, relative to the state's figure. */

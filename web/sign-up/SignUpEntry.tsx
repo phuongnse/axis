@@ -1,8 +1,9 @@
-import { StrictMode, useCallback, useEffect, useState } from 'react'
+import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { TextContext } from '../src/platform/texts'
 import { ThemeModeProvider } from '../src/platform/theme'
+import { useSignUpDocuments } from './documents'
 import { SignUpPage } from './SignUpPage'
-import { signUpTexts, type SignUpLocale } from './texts'
+import { signUpText, type SignUpLocale } from './texts'
 import { VerifyPage } from './VerifyPage'
 
 function browserLocale(): SignUpLocale {
@@ -21,18 +22,16 @@ export function SignUpEntry() {
   useEffect(() => {
     document.documentElement.lang = locale
   }, [locale])
-  const text = useCallback(
-    (key: string) => signUpTexts[locale][key as keyof (typeof signUpTexts)[SignUpLocale]] ?? key,
-    [locale],
-  )
+  const text = useMemo(() => signUpText(locale), [locale])
+  const documents = useSignUpDocuments()
   return (
     <StrictMode>
       <ThemeModeProvider>
         <TextContext.Provider value={text}>
           {window.location.pathname.replace(/\/$/, '') === verifyPath ? (
-            <VerifyPage locale={locale} onLocaleChange={setLocale} />
+            <VerifyPage locale={locale} onLocaleChange={setLocale} documents={documents} />
           ) : (
-            <SignUpPage locale={locale} onLocaleChange={setLocale} />
+            <SignUpPage locale={locale} onLocaleChange={setLocale} documents={documents} />
           )}
         </TextContext.Provider>
       </ThemeModeProvider>
