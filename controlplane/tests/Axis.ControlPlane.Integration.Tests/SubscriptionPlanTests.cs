@@ -51,7 +51,9 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
         var subscription = await SeedAsync("pinned", "plan_code, plan_version, currency, period", "'team', 1, 'VND', 'year'");
         var catalogue = Catalogue(version1: true);
 
-        var pinned = await SubscriptionPlans.ReadAsync(_dataSource, subscription, catalogue, token);
+        await using var connection = await _dataSource.OpenConnectionAsync(token);
+
+        var pinned = await SubscriptionPlans.ReadAsync(connection, null, subscription, catalogue, token);
 
         Assert.NotNull(pinned);
         Assert.Equal(1, pinned.Plan.Version);
@@ -66,9 +68,11 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
     [Fact]
     public async Task A_subscription_with_no_pinned_plan_reads_as_none()
     {
+        var token = TestContext.Current.CancellationToken;
         var subscription = await SeedAsync("unpinned", "", "");
+        await using var connection = await _dataSource.OpenConnectionAsync(token);
 
-        Assert.Null(await SubscriptionPlans.ReadAsync(_dataSource, subscription, Catalogue(version1: true), TestContext.Current.CancellationToken));
+        Assert.Null(await SubscriptionPlans.ReadAsync(connection, null, subscription, Catalogue(version1: true), token));
     }
 
     [Fact]

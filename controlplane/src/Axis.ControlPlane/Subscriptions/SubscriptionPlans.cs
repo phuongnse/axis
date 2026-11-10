@@ -34,11 +34,16 @@ internal static class SubscriptionPlans
         return pins;
     }
 
-    /// <summary>The plan that the subscription pinned, or null when it pinned none. The version must be in the catalogue, which the start checks.</summary>
-    public static async Task<PinnedPlan?> ReadAsync(NpgsqlDataSource dataSource, Guid subscriptionId, PlanCatalogue catalogue, CancellationToken cancellationToken)
+    /// <summary>
+    /// The plan that the subscription pinned, or null when it pinned none. The version must be in the catalogue, which the start checks. It reads
+    /// in the <paramref name="transaction"/> when one is given.
+    /// </summary>
+    public static async Task<PinnedPlan?> ReadAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid subscriptionId, PlanCatalogue catalogue, CancellationToken cancellationToken)
     {
-        await using var command = dataSource.CreateCommand(
-            "SELECT plan_code, plan_version, currency, period FROM control_plane.subscriptions WHERE id = $1");
+        await using var command = new NpgsqlCommand(
+            "SELECT plan_code, plan_version, currency, period FROM control_plane.subscriptions WHERE id = $1",
+            connection,
+            transaction);
         command.Parameters.AddWithValue(subscriptionId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken) || reader.IsDBNull(0))
@@ -51,5 +56,34 @@ internal static class SubscriptionPlans
         var plan = catalogue.Find(code, version)
             ?? throw new InvalidOperationException($"The setting ControlPlane:Plans has no plan {code} version {version}, which the subscription pins.");
         return new PinnedPlan(plan, reader.IsDBNull(2) ? null : reader.GetString(2), reader.IsDBNull(3) ? null : reader.GetString(3));
+    }
+
+    /// <summary>
+    /// The add-ons that the subscription holds, with the packs of each, ordered by code. An add-on code that <paramref name="plan"/> does not list
+    /// throws, because the pinned plan version must list every add-on the subscription holds. It reads in the <paramref name="transaction"/> when one is given.
+    /// </summary>
+    public static async Task<IReadOnlyList<(PlanAddOn AddOn, int Quantity)>> ReadAddOnsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        Guid subscriptionId,
+        PlanVersion plan,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT add_on_code, quantity FROM control_plane.subscription_add_ons WHERE subscription_id = $1 ORDER BY add_on_code",
+            connection,
+            transaction);
+        command.Parameters.AddWithValue(subscriptionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var addOns = new List<(PlanAddOn, int)>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var code = reader.GetString(0);
+            var addOn = plan.AddOns.FirstOrDefault(candidate => string.Equals(candidate.Code, code, StringComparison.Ordinal))
+                ?? throw new InvalidOperationException($"The subscription {subscriptionId} holds the add-on {code}, which its pinned plan version does not list.");
+            addOns.Add((addOn, reader.GetInt32(1)));
+        }
+
+        return addOns;
     }
 }

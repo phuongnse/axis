@@ -56,12 +56,17 @@ internal sealed partial class SubscriptionQuotas(
             tenantId = reader.GetString(0);
         }
 
-        if (await SubscriptionPlans.ReadAsync(controlPlane, id, catalogue, cancellationToken) is not { } pinned)
+        Dictionary<string, long> set;
+        await using (var connection = await controlPlane.OpenConnectionAsync(cancellationToken))
         {
-            return;
+            if (await SubscriptionPlans.ReadAsync(connection, null, id, catalogue, cancellationToken) is not { } pinned)
+            {
+                return;
+            }
+
+            set = await BuildAsync(connection, id, pinned.Plan, cancellationToken);
         }
 
-        var set = await BuildAsync(id, pinned.Plan, cancellationToken);
         var cellId = await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken);
         var cell = TenantCells.Client(cells, cellId);
         if (cell is null)
@@ -82,26 +87,18 @@ internal sealed partial class SubscriptionQuotas(
     }
 
     // The plan's quotas, users from the included users and the add-on packs, and then the overrides that have not ended.
-    private async Task<Dictionary<string, long>> BuildAsync(Guid id, PlanVersion plan, CancellationToken cancellationToken)
+    private async Task<Dictionary<string, long>> BuildAsync(NpgsqlConnection connection, Guid id, PlanVersion plan, CancellationToken cancellationToken)
     {
         var set = new Dictionary<string, long>(plan.Quotas, StringComparer.Ordinal);
         var users = plan.IncludedUsers;
-        await using (var addOns = controlPlane.CreateCommand("SELECT add_on_code, quantity FROM control_plane.subscription_add_ons WHERE subscription_id = $1"))
+        foreach (var (addOn, quantity) in await SubscriptionPlans.ReadAddOnsAsync(connection, null, id, plan, cancellationToken))
         {
-            addOns.Parameters.AddWithValue(id);
-            await using var reader = await addOns.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                var code = reader.GetString(0);
-                var addOn = plan.AddOns.FirstOrDefault(candidate => string.Equals(candidate.Code, code, StringComparison.Ordinal))
-                    ?? throw new InvalidOperationException($"The subscription {id} holds the add-on {code}, which its pinned plan version does not list.");
-                users = checked(users + (addOn.Users * reader.GetInt32(1)));
-            }
+            users = checked(users + (addOn.Users * quantity));
         }
 
         set[QuotaKeys.Users] = users;
 
-        await using var overrides = controlPlane.CreateCommand("SELECT quota, value FROM control_plane.quota_overrides WHERE subscription_id = $1 AND until > $2");
+        await using var overrides = new NpgsqlCommand("SELECT quota, value FROM control_plane.quota_overrides WHERE subscription_id = $1 AND until > $2", connection);
         overrides.Parameters.AddWithValue(id);
         overrides.Parameters.AddWithValue(clock.GetUtcNow());
         await using var overrideReader = await overrides.ExecuteReaderAsync(cancellationToken);

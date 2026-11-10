@@ -24,6 +24,121 @@ namespace Axis.ControlPlane.Storage.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Axis.ControlPlane.Billing.InvoiceLineRow", b =>
+                {
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<int>("LineNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_number");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("code");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("InvoiceId", "LineNumber")
+                        .HasName("pk_invoice_lines");
+
+                    b.ToTable("invoice_lines", "billing", t =>
+                        {
+                            t.HasCheckConstraint("ck_invoice_lines_kind", "kind IN ('plan', 'addOn')");
+
+                            t.HasCheckConstraint("ck_invoice_lines_line_number", "line_number >= 1");
+
+                            t.HasCheckConstraint("ck_invoice_lines_quantity", "quantity >= 1");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Billing.InvoiceRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("currency");
+
+                    b.Property<DateTimeOffset>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("Period")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("period");
+
+                    b.Property<DateTimeOffset?>("PeriodStart")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_start");
+
+                    b.Property<string>("PlanCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("plan_code");
+
+                    b.Property<int>("PlanVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_version");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("open")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_invoices");
+
+                    b.HasIndex(new[] { "SubscriptionId" }, "ix_invoices_subscription_id");
+
+                    b.HasIndex(new[] { "SubscriptionId", "PeriodStart" }, "ux_invoices_period")
+                        .IsUnique()
+                        .HasFilter("kind = 'period'");
+
+                    b.ToTable("invoices", "billing", t =>
+                        {
+                            t.HasCheckConstraint("ck_invoices_currency", "currency IN ('VND', 'USD')");
+
+                            t.HasCheckConstraint("ck_invoices_kind", "kind IN ('period', 'change')");
+
+                            t.HasCheckConstraint("ck_invoices_period", "period IN ('month', 'year')");
+
+                            t.HasCheckConstraint("ck_invoices_period_start", "(kind = 'period') = (period_start IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_invoices_status", "status IN ('open', 'paid', 'void')");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.Billing.LedgerEntryRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -69,6 +184,8 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_ledger_entries");
+
+                    b.HasIndex(new[] { "InvoiceId" }, "ix_ledger_entries_invoice_id");
 
                     b.HasIndex(new[] { "SubscriptionId" }, "ix_ledger_entries_subscription_id");
 
@@ -576,6 +693,26 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                             t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
                         });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Billing.InvoiceLineRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Billing.InvoiceRow", null)
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoice_lines_invoice_id");
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Billing.InvoiceRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_invoices_subscription_id");
                 });
 
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.QuotaOverrideRow", b =>
