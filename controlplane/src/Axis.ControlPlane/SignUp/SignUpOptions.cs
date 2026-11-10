@@ -5,6 +5,7 @@ namespace Axis.ControlPlane.SignUp;
 /// <c>docs/reference/control-plane.md#settings</c>. The applications are optional. The documents are optional as a group,
 /// and once one of their settings is set, all of them are required.
 /// The challenge key is optional. The disposable domain list is optional as a pair, and once one of its settings is set, both are required.
+/// The trial quotas are optional.
 /// </summary>
 public sealed class SignUpOptions
 {
@@ -40,6 +41,13 @@ public sealed class SignUpOptions
     /// <c>docs/reference/sign-up.md#bots-and-abuse</c>. Optional.
     /// </summary>
     public SignUpDisposableDomainsOptions DisposableDomains { get; set; } = new();
+
+    /// <summary>
+    /// The quotas that a new trial gets, by quota key, see the settings table in <c>docs/reference/control-plane.md#settings</c>. A key that is absent is
+    /// not set, so the cell's default applies. A <c>null</c> value is no limit. Optional. It is internal so the binder skips it:
+    /// <see cref="ControlPlaneOptions.Load"/> reads it from the configuration, because the binder would merge <c>null</c> and absent.
+    /// </summary>
+    internal IReadOnlyDictionary<string, long?> TrialQuotas { get; set; } = new Dictionary<string, long?>(StringComparer.Ordinal);
 
     internal bool HasDocuments => !string.IsNullOrWhiteSpace(LicencesUrl) || new[] { Terms, Dpa, Privacy }.Any(IsSet);
 
