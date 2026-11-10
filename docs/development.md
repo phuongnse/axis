@@ -860,6 +860,10 @@ non-zero.
 widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. The query
 parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
 
+The server serves the harness, the modules it loads and the files in `web/`. Paths that begin with `/api` or
+`/health` go to the Axis server, and answer `502` while it is not running. Any other path that names none of
+these, such as the one Chrome's developer tools request when they open, answers `404`.
+
 ## Running a host on its own
 
 A host can also run alone, outside `scripts/dev.sh`. To run the worker, run
