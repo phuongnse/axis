@@ -2,7 +2,7 @@ Subject: Bản dùng thử Axis đã kết thúc, không gian làm việc ở ch
 
 Chào {{name}},
 
-Bản dùng thử đã kết thúc nên không gian làm việc tại {{tenantAddress}} đang ở chế độ chỉ xem. Mọi người vẫn đăng nhập và xem được, nhưng không thay đổi được gì.
+Bản dùng thử đã kết thúc nên không gian làm việc tại {{tenantAddress}} đang ở chế độ chỉ xem. Bạn vẫn đăng nhập và xem được, nhưng không thay đổi được gì.
 
 Lúc {{nextStepAt}}, hệ thống bắt đầu xóa không gian làm việc cùng toàn bộ dữ liệu. Để ngăn việc này, hãy thanh toán trên trang thanh toán:
 
