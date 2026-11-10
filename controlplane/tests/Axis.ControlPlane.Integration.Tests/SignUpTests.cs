@@ -197,6 +197,39 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         await AssertNothingStoredAsync();
     }
 
+    [Theory]
+    [InlineData("x@mailinator.com")]
+    [InlineData("x@sub.mailinator.com")]
+    [InlineData("X@Mailinator.COM")]
+    public async Task An_email_of_a_disposable_domain_or_a_subdomain_of_one_is_refused_and_nothing_is_stored(string email)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, "INSERT INTO control_plane.disposable_domains (domain) VALUES ('mailinator.com')", cancellation);
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, email, NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = await ErrorsAsync(response);
+        Assert.Equal(["/email"], errors.Keys);
+        Assert.Equal("signUp.email.disposable", errors["/email"]);
+        await AssertNothingStoredAsync();
+    }
+
+    [Fact]
+    public async Task An_email_of_a_domain_that_only_ends_like_a_disposable_domain_is_accepted()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, "INSERT INTO control_plane.disposable_domains (domain) VALUES ('mailinator.com')", cancellation);
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, $"{Guid.NewGuid():N}@notmailinator.com", NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
     [Fact]
     public async Task A_form_that_leaves_out_fields_or_is_not_a_JSON_object_is_refused_and_nothing_is_stored()
     {

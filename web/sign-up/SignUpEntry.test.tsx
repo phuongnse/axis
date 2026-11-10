@@ -106,17 +106,34 @@ function signUpCalls(fetchMock: ReturnType<typeof stubServer>) {
   return fetchMock.mock.calls.filter(([input, init]) => input === '/api/sign-up' && init?.method === 'POST')
 }
 
-function subdomainStatus() {
-  return within(formItem(screen.getByRole('textbox', { name: 'Subdomain' }))).getByRole('status')
+function subdomainStatus(name = 'Subdomain') {
+  return within(formItem(screen.getByRole('textbox', { name }))).getByRole('status')
+}
+
+const fieldNames = {
+  en: {
+    fullName: 'Full name',
+    email: 'Work email',
+    businessName: 'Business name',
+    subdomain: 'Subdomain',
+    free: 'This subdomain is free.',
+  },
+  vi: {
+    fullName: 'Họ và tên',
+    email: 'Email công việc',
+    businessName: 'Tên doanh nghiệp',
+    subdomain: 'Tên miền phụ',
+    free: 'Tên miền phụ này còn trống.',
+  },
 }
 
 /** Fills every field but the application, and waits until the subdomain check says the name is free. */
-async function fillForm(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByRole('textbox', { name: 'Full name' }), 'Ana Nguyen')
-  await user.type(screen.getByRole('textbox', { name: 'Work email' }), 'ana@example.com')
-  await user.type(screen.getByRole('textbox', { name: 'Business name' }), 'Acme')
+async function fillForm(user: ReturnType<typeof userEvent.setup>, names = fieldNames.en) {
+  await user.type(screen.getByRole('textbox', { name: names.fullName }), 'Ana Nguyen')
+  await user.type(screen.getByRole('textbox', { name: names.email }), 'ana@example.com')
+  await user.type(screen.getByRole('textbox', { name: names.businessName }), 'Acme')
   await user.click(screen.getByRole('checkbox'))
-  await waitFor(() => expect(subdomainStatus()).toHaveTextContent('This subdomain is free.'), {
+  await waitFor(() => expect(subdomainStatus(names.subdomain)).toHaveTextContent(names.free), {
     timeout: 5000,
   })
 }
@@ -620,6 +637,23 @@ describe('SignUpEntry', () => {
 
     await screen.findByRole('heading', { name: 'Check your inbox' })
     expect(JSON.parse(String(signUpCalls(fetchMock)[1][1]?.body))).toMatchObject({ termsVersion: '2026-12-01' })
+  })
+
+  it.each([
+    ['en-US', fieldNames.en, 'Sign up', 'This email is from a disposable mailbox service. Enter your work email.'],
+    ['vi-VN', fieldNames.vi, 'Đăng ký', 'Không thể đăng ký bằng hộp thư dùng tạm. Nhập email công việc.'],
+  ])('shows a refusal of a disposable email inside the email field in %s', async (language, names, submit, text) => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue(language)
+    stubServer(undefined, () => answer({ errors: { '/email': ['signUp.email.disposable'] } }, 400))
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user, names)
+
+    await user.click(screen.getByRole('button', { name: submit }))
+
+    const email = screen.getByRole('textbox', { name: names.email })
+    expect(await within(formItem(email)).findByText(text)).toBeInTheDocument()
+    expect(email).toHaveFocus()
   })
 
   it('shows a failed sign-up in an error alert above the form', async () => {
