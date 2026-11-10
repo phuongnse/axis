@@ -36,13 +36,15 @@ export function IdentityFrame({
       <CardPage
         organization={frame.realmName}
         title={title}
-        locales={frame.locales.map((locale) => locale.tag)}
-        locale={frame.locale}
-        onLocaleChange={(tag) => {
-          const target = frame.locales.find((locale) => locale.tag === tag)
-          if (target) {
-            window.location.assign(target.url)
-          }
+        preferences={{
+          locales: frame.locales.map((locale) => locale.tag),
+          locale: frame.locale,
+          onLocaleChange: (tag) => {
+            const target = frame.locales.find((locale) => locale.tag === tag)
+            if (target) {
+              window.location.assign(target.url)
+            }
+          },
         }}
         legal={frame.legal}
       >
