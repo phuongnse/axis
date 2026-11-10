@@ -18,6 +18,7 @@ import {
   type StudioReleaseChange,
   type StudioResourceItem,
   type StudioRevision,
+  type StudioRevisionChange,
   type StudioRevisionDiff,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
@@ -229,8 +230,6 @@ export function StudioRevisionPage({
 }) {
   const t = useText()
   const time = useRevisionTime()
-  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, radius, spacing, type } = useDesignTokens()
   const { generation, lost } = useStudioConnection()
   const [diff, setDiff] = useState<{ revisionId: string; value: StudioRevisionDiff | null }>()
 
@@ -268,7 +267,38 @@ export function StudioRevisionPage({
   }
 
   const { revision } = loaded
-  const changes = loaded.resources.map((resource): StudioReleaseChange => ({
+  const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
+    (part): part is string => part !== null,
+  )
+
+  return (
+    <Flex vertical gap="middle" data-testid="studio-revision">
+      <StudioPageHeading title={revision.summary} line={line} />
+      {back}
+      <StudioChanges changes={loaded.resources} resources={resources} />
+    </Flex>
+  )
+}
+
+/**
+ * Each resource a revision or a draft added, changed or removed: its name, kind and change, then, when given, its
+ * summary in words, and its JSON before and after side by side. A side where the file does not exist shows the em dash.
+ * Proposed: a draft's page gives each file the summary its request wrote, see the review on #3263.
+ */
+export function StudioChanges({
+  changes,
+  resources,
+  summaries,
+}: {
+  changes: StudioRevisionChange[]
+  resources: StudioResourceItem[]
+  /** The summary in words of each file, by its file. */
+  summaries?: ReadonlyMap<string, string>
+}) {
+  const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const { colour, radius, spacing, type } = useDesignTokens()
+  const rows = changes.map((resource): StudioReleaseChange => ({
     path: resource.file,
     change: resource.change,
     kind: resource.kind,
@@ -276,10 +306,7 @@ export function StudioRevisionPage({
     titles: null,
     locale: null,
   }))
-  const byKey = new Map(loaded.resources.map((resource) => [`${resource.change}:${resource.file}`, resource]))
-  const line = [revisionAuthor(revision, t), time(revision.time), revisionClient(revision, t)].filter(
-    (part): part is string => part !== null,
-  )
+  const byKey = new Map(changes.map((resource) => [`${resource.change}:${resource.file}`, resource]))
   const block = (testId: string, title: string, text: string | null) => (
     <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
       <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
@@ -301,11 +328,10 @@ export function StudioRevisionPage({
   )
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-revision">
-      <StudioPageHeading title={revision.summary} line={line} />
-      {back}
-      {changeRows(changes, resources, locale, t).map((row) => {
+    <>
+      {changeRows(rows, resources, locale, t).map((row) => {
         const resource = byKey.get(row.key)
+        const summary = resource === undefined ? undefined : summaries?.get(resource.file)
         return (
           <section key={row.key} data-testid="studio-revision-change" data-file={resource?.file}>
             <Flex vertical gap="small">
@@ -316,6 +342,7 @@ export function StudioRevisionPage({
                 </Typography.Text>
                 <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
               </Flex>
+              {summary !== undefined && <Typography.Text>{summary}</Typography.Text>}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
                 {block('studio-revision-before', t('shell.studio.history.before'), resource?.before ?? null)}
                 {block('studio-revision-after', t('shell.studio.history.after'), resource?.after ?? null)}
@@ -324,6 +351,6 @@ export function StudioRevisionPage({
           </section>
         )
       })}
-    </Flex>
+    </>
   )
 }

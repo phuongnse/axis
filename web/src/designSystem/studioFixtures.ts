@@ -4,6 +4,8 @@ import type {
   StudioAuthoringRequestDetail,
   StudioAuthoringRequestList,
   StudioAuthoringRequestStep,
+  StudioRequest,
+  StudioRevisionChange,
   StudioBindings,
   StudioCatalog,
   StudioDiagnostic,
@@ -457,7 +459,233 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
           ...loopSteps(1, state === 'planning', start, gap),
         ]
       : loopSteps(count, running, start, gap)
-  return { ...request, state, round, plan, steps }
+  const accept = acceptOf(request)
+  if (accept?.status === 'succeeded') {
+    state = 'accepted'
+  }
+  const hasDraft = !['planning', 'awaitingApproval', 'dropped', 'accepted'].includes(state)
+  const diff = draftChanges[request.id] ?? genericChanges(request)
+  return {
+    ...request,
+    state,
+    round,
+    plan,
+    steps,
+    draft: hasDraft ? draftOf(request.id) : null,
+    checks: checksOf(request, state),
+    review: state === 'ready' ? (reviews[request.id] ?? []) : null,
+    changes: diff.map(({ file, summary }) => ({ file, summary })),
+    failure: state === 'failed' ? (failures[request.id] ?? null) : null,
+    accept,
+  }
+}
+
+// Proposed: what a request's draft changed, its checks, its review and the accepts of the preview, see the review on
+// #3263. A draft's id follows its request's.
+const draftOf = (id: string) => id.replace('a1e00000', 'd1a00000')
+const json = (value: unknown) => JSON.stringify(value)
+
+function change(
+  file: string,
+  kind: string,
+  name: string,
+  before: unknown,
+  after: unknown,
+  summary: string,
+): StudioRevisionChange & { summary: string } {
+  return {
+    file,
+    change: before === null ? 'added' : after === null ? 'removed' : 'changed',
+    id: null,
+    kind,
+    name,
+    before: before === null ? null : json(before),
+    after: after === null ? null : json(after),
+    summary,
+  }
+}
+
+const requestEntity = { kind: 'entity', name: 'PurchaseRequest', fields: [{ name: 'title', type: 'text' }] }
+const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[]> = {
+  [aiRequests[0].id]: [
+    change(
+      'entities/supplier.json',
+      'entity',
+      'Supplier',
+      null,
+      { kind: 'entity', name: 'Supplier', fields: [{ name: 'name' }, { name: 'taxCode' }, { name: 'email' }] },
+      'A new entity for suppliers, with a name, a tax code and an email address.',
+    ),
+    change(
+      'entities/purchase-request.json',
+      'entity',
+      'PurchaseRequest',
+      requestEntity,
+      { ...requestEntity, fields: [...requestEntity.fields, { name: 'supplier', type: 'reference', required: true }] },
+      'The purchase request gets a required Supplier field, chosen from the active suppliers.',
+    ),
+    change(
+      'pages/request-list.json',
+      'page',
+      'RequestList',
+      { kind: 'page', name: 'RequestList', columns: ['title', 'amount'] },
+      { kind: 'page', name: 'RequestList', columns: ['title', 'supplier', 'amount'] },
+      'The request list shows the supplier as a column after the title.',
+    ),
+    change(
+      'scenarios/request-saves-with-supplier.json',
+      'scenario',
+      'RequestSavesWithSupplier',
+      null,
+      { kind: 'scenario', name: 'RequestSavesWithSupplier' },
+      'A new scenario: a request saves with its supplier.',
+    ),
+  ],
+  [aiRequests[2].id]: [
+    change(
+      'processes/purchase-approval.json',
+      'process',
+      'PurchaseApproval',
+      { kind: 'process', name: 'PurchaseApproval', steps: ['approve'] },
+      { kind: 'process', name: 'PurchaseApproval', steps: ['approve', 'notifyRequester'] },
+      'After the approval step, the process emails the requester whether the request was approved or rejected.',
+    ),
+    change(
+      'scenarios/requester-is-told.json',
+      'scenario',
+      'RequesterIsTold',
+      null,
+      { kind: 'scenario', name: 'RequesterIsTold' },
+      'A new scenario: the requester gets one email for an approval and one for a rejection.',
+    ),
+  ],
+  [aiRequests[4].id]: [
+    change(
+      'connectors/purchasing-system.json',
+      'connector',
+      'PurchasingSystem',
+      null,
+      { kind: 'connector', name: 'PurchasingSystem' },
+      'A connector to the purchasing system, with its address and sign-in.',
+    ),
+    change(
+      'triggers/nightly-supplier-import.json',
+      'trigger',
+      'NightlySupplierImport',
+      null,
+      { kind: 'trigger', name: 'NightlySupplierImport', schedule: '0 2 * * *' },
+      'A trigger that imports the suppliers every night at 2 AM.',
+    ),
+  ],
+}
+
+function genericChanges(request: StudioAuthoringRequest): (StudioRevisionChange & { summary: string })[] {
+  return [
+    change(
+      'entities/purchase-request.json',
+      'entity',
+      'PurchaseRequest',
+      requestEntity,
+      { ...requestEntity, changed: true },
+      `Changed as asked: "${request.text}"`,
+    ),
+  ]
+}
+
+function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest['state']): StudioRequest | null {
+  if (state !== 'ready' && state !== 'failed') {
+    return null
+  }
+  const scenario = (name: string, outcome: 'passed' | 'failed', message: string | null = null) => ({
+    name,
+    resourceId: 'a5e00000-0000-4000-8000-000000000001',
+    file: `scenarios/${name}.json`,
+    outcome,
+    durationMs: 140,
+    step: outcome === 'failed' ? 1 : null,
+    path: null,
+    message,
+  })
+  const failed = state === 'failed'
+  return {
+    id: request.id.replace('a1e00000', 'c4e00000'),
+    application,
+    kind: 'test',
+    target: 'tenant',
+    status: failed ? 'failed' : 'succeeded',
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics:
+      request.id === aiRequests[2].id
+        ? [
+            {
+              code: 'AXC0102',
+              severity: 'warning',
+              message: 'The email has no Vietnamese text, so Vietnamese requesters get the English one.',
+              file: 'processes/purchase-approval.json',
+              path: '/steps/1/email',
+              resourceId: null,
+            },
+          ]
+        : [],
+    scenarios: failed
+      ? [scenario('NightlySupplierImport', 'failed', 'The purchasing system did not answer at its test address.')]
+      : [scenario('RequestSavesWithSupplier', 'passed'), scenario('RequestIsApproved', 'passed')],
+  }
+}
+
+const reviews: Record<string, string[]> = {
+  [aiRequests[2].id]: [
+    'The email names the approver, as the request asked.',
+    'The rejection email could also say why. The request did not ask for it, so the draft leaves it out.',
+  ],
+}
+
+const failures: Record<string, string> = {
+  [aiRequests[4].id]:
+    "The checks still failed after 3 fix rounds: the purchasing system did not answer at its test address. Ask your administrator for the connector's test address, then send the request again.",
+}
+
+// The accepts the preview asked for, each running for two seconds. The email request meets a conflict the first time.
+const accepts = new Map<string, { at: number; retried: boolean }>()
+const retried = new Set<string>()
+
+function acceptOf(request: StudioAuthoringRequest): StudioRequest | null {
+  const asked = accepts.get(request.id)
+  if (asked === undefined) {
+    return null
+  }
+  const done = Date.now() - asked.at > 2000
+  const conflict = request.id === aiRequests[2].id && !asked.retried
+  if (done && !conflict) {
+    actedOn.set(request.id, { state: 'accepted', at: asked.at })
+  }
+  return {
+    id: request.id.replace('a1e00000', 'acc00000'),
+    application,
+    kind: 'accept',
+    target: 'tenant',
+    status: !done ? 'running' : conflict ? 'failed' : 'succeeded',
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics:
+      done && conflict
+        ? [
+            {
+              code: 'AXC0377',
+              severity: 'error',
+              message:
+                'PurchaseApproval (processes/purchase-approval.json): Linh Tran changed it on Nov 10 at 9:12 AM, after AI read it.',
+              file: 'processes/purchase-approval.json',
+              path: '',
+              resourceId: null,
+            },
+          ]
+        : [],
+    scenarios: null,
+  }
 }
 
 /** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
@@ -495,7 +723,28 @@ function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Rec
   }
   // The preview's own sends take the ids of requests 100 to 103.
   const sendable = [0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true).id)
+  const acceptRoute = (id: string) => (): unknown => {
+    accepts.set(id, { at: Date.now(), retried: retried.has(id) })
+    return acceptOf(all().find((item) => item.id === id)!)
+  }
+  const retry = (id: string) => (): unknown => {
+    retried.add(id)
+    accepts.delete(id)
+    return act(id, 'working')()
+  }
+  const acceptStatus = (id: string) => (): unknown => acceptOf(all().find((item) => item.id === id)!)
   const requestRoutes = [...list.items.map((item) => item.id), ...sendable].flatMap((id) => [
+    [`${folderPath}/authoring-requests/${id}/accept`, acceptRoute(id)],
+    [`${folderPath}/authoring-requests/${id}/retry`, retry(id)],
+    [`${folderPath}/requests/${id.replace('a1e00000', 'acc00000')}`, acceptStatus(id)],
+    [
+      `${folderPath}/drafts/${draftOf(id)}/diff`,
+      () => {
+        const request = all().find((item) => item.id === id)!
+        const resources = (draftChanges[id] ?? genericChanges(request)).map(({ summary: _summary, ...entry }) => entry)
+        return { start: 'a'.repeat(40), tip: 'b'.repeat(40), resources, cursor: null }
+      },
+    ],
     [`${folderPath}/authoring-requests/${id}`, one(id)],
     [`${folderPath}/authoring-requests/${id}/approve`, act(id, 'working')],
     [`${folderPath}/authoring-requests/${id}/change-plan`, act(id, 'planning')],

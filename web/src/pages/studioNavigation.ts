@@ -38,7 +38,7 @@ export function studioNavigation(
     { key: 'releases', path: path({ view: 'releases' }), icon: 'tag', label: t('shell.studio.releases') },
     { key: 'history', path: path({ view: 'history' }), icon: 'clock', label: t('shell.studio.history') },
     ...(aiRequests
-      ? [{ key: 'requests', path: path({ view: 'requests' }), icon: 'inbox', label: t('shell.studio.requests') }]
+      ? [{ key: 'requests', path: path({ view: 'requests' }), icon: 'inbox', label: t('shell.studio.aiRequests') }]
       : []),
   ]
   if (manifest !== undefined) {

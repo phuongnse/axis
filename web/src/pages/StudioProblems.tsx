@@ -41,7 +41,7 @@ export function StudioProblems({
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {ordered.map((diagnostic, index) => (
             <li key={index}>
-              <DiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
+              <StudioDiagnosticRow diagnostic={diagnostic} onSelect={onSelect} />
             </li>
           ))}
         </ul>
@@ -50,8 +50,11 @@ export function StudioProblems({
   )
 }
 
-/** One problem: severity, code, message, file and path. It is a button when it names a resource. */
-function DiagnosticRow({
+/**
+ * One problem: severity, code, message, file and path. It is a button when it names a resource. Proposed: a request's
+ * page shows its checks' problems with it too.
+ */
+export function StudioDiagnosticRow({
   diagnostic,
   onSelect,
 }: {

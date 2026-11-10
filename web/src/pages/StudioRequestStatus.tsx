@@ -32,6 +32,8 @@ export function StudioRequestStatus({
       message =
         kind === 'validate' ? (
           t('shell.studio.request.validated')
+        ) : kind === 'accept' ? (
+          t('shell.studio.request.accepted')
         ) : kind === 'test' ? (
           t('shell.studio.request.tested')
         ) : preview ? (
@@ -58,7 +60,9 @@ export function StudioRequestStatus({
               ? 'shell.studio.request.activationFailed'
               : kind === 'test'
                 ? 'shell.studio.request.testFailed'
-                : 'shell.studio.request.validateFailed',
+                : kind === 'accept'
+                  ? 'shell.studio.request.acceptFailed'
+                  : 'shell.studio.request.validateFailed',
       )
       break
   }

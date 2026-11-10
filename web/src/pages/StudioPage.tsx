@@ -634,7 +634,9 @@ function StudioWorkspace() {
                     application={application!}
                     requestId={params.get('request')!}
                     userId={userId}
+                    resources={resources}
                     onChanged={() => setRequestsRevision((value) => value + 1)}
+                    onOpen={selectDiagnostic}
                   />
                 ) : (
                   <StudioAuthoringRequests application={application!} userId={userId} />

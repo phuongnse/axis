@@ -1028,7 +1028,7 @@ export interface StudioSkippedScenarioResult {
 export interface StudioRequest {
   id: string
   application: string
-  kind: 'validate' | 'publish' | 'activate' | 'test'
+  kind: 'validate' | 'publish' | 'activate' | 'test' | 'accept'
   target: 'tenant' | 'preview'
   status: StudioRequestStatus
   label: string | null
@@ -1746,9 +1746,55 @@ export interface StudioAuthoringRequestStep {
   finishedAt: string | null
 }
 
-/** One authoring request with its steps in order, as the read route answers it. */
+/**
+ * One authoring request with its steps in order, as the read route answers it. Proposed: the read route also answers
+ * the request's `draft`, the `checks` of its last round as the request that ran them, the reviewer's `review` notes,
+ * one `summary` in words for each file the draft `changes`, why it `failure`d, and its latest `accept`, each `null`
+ * until there is one.
+ */
 export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
   steps: StudioAuthoringRequestStep[]
+  draft: string | null
+  checks: StudioRequest | null
+  review: string[] | null
+  changes: { file: string; summary: string }[]
+  failure: string | null
+  accept: StudioRequest | null
+}
+
+/** Reads the whole diff of the signed-in user's draft, page after page, see docs/reference/authoring-revisions.md#draft-diff. */
+export async function fetchDraftDiff(
+  application: string,
+  draft: string,
+  signal?: AbortSignal,
+): Promise<StudioRevisionChange[]> {
+  const base = `/api/studio/apps/${encodeURIComponent(application)}/drafts/${encodeURIComponent(draft)}/diff`
+  const resources: StudioRevisionChange[] = []
+  let cursor: string | null = null
+  do {
+    const path: string = cursor === null ? base : `${base}?${new URLSearchParams({ cursor })}`
+    const response = await studioFetch(path, { signal })
+    if (!response.ok) {
+      throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+    }
+    const page = (await response.json()) as { resources: StudioRevisionChange[]; cursor: string | null }
+    resources.push(...page.resources)
+    cursor = page.cursor
+  } while (cursor !== null)
+  return resources
+}
+
+/**
+ * Proposed: asks for an accept of a ready request's draft, which answers `202` with the publish request of the kind
+ * `accept`, followed at `.../requests/{id}` as any publish request is, see docs/reference/authoring-requests.md#accepting.
+ */
+export async function acceptAuthoringRequest(application: string, id: string): Promise<StudioRequest> {
+  const path = authoringRequestsPath(application, id, 'accept')
+  const response = await studioFetch(path, { method: 'POST' })
+  if (!response.ok) {
+    throw new Error(`'${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioRequest
 }
 
 /** The address of an application's authoring requests. */
@@ -1776,13 +1822,13 @@ export async function fetchAuthoringRequest(
 }
 
 /**
- * Proposed: approves the plan, changes it with the author's comment, or drops the request, and answers the request as
- * it now is.
+ * Proposed: approves the plan, changes it with the author's comment, drops the request, or, after an accept met a
+ * conflict, retries it on a new draft from the folder as it is now. Each answers the request as it now is.
  */
 export async function actOnAuthoringRequest(
   application: string,
   id: string,
-  action: 'approve' | 'change-plan' | 'drop',
+  action: 'approve' | 'change-plan' | 'drop' | 'retry',
   comment?: string,
 ): Promise<StudioAuthoringRequest> {
   const path = authoringRequestsPath(application, id, action)
