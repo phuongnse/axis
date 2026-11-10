@@ -1,4 +1,5 @@
-import { Alert, Card, Flex, Pagination, Space, Spin, Typography } from 'antd'
+import { Card, Flex, Pagination, Space, Spin, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { EmptyState } from './EmptyState'
@@ -88,8 +89,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   return (
     <Card data-testid="record-history" aria-busy={loading} title={t('shell.history.title')} size="small">
       {failed ? (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="record-history-error" type="error" title={t('shell.history.loadFailed')} />
+        <AxisAlert data-testid="record-history-error" kind="error" message={t('shell.history.loadFailed')} />
       ) : (
         <Spin spinning={loading}>
           {!loading && items.length === 0 ? (

@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
+  controlPlane,
+  count,
   filterArgs,
   junitDurations,
   main,
@@ -15,6 +17,43 @@ import {
 } from './lib/integration-shard.mjs'
 
 const testClass = (name, seconds, collection) => ({ name: `N.${name}`, seconds, collection, tests: 1 })
+
+describe('count', () => {
+  const four = [testClass('ATests', 10), testClass('BTests', 10), testClass('CTests', 10), testClass('DTests', 10)]
+
+  test('prints the fewest shards whose longest shard fits the budget', () => {
+    // Four 10 s classes take 40 s in one shard and 20 s in each of two.
+    assert.equal(count(four, 0, 25, 6).total, 2)
+    assert.equal(count(four, 0, 45, 6).total, 1)
+  })
+
+  test('prints the cap when no count up to the cap fits the budget', () => {
+    assert.equal(count(four, 0, 5, 3).total, 3)
+  })
+
+  test('names a class that alone takes longer than the budget, and still counts', () => {
+    const classes = [testClass('HeavyTests', 30), testClass('LightTests', 5)]
+    assert.deepEqual(count(classes, 0, 20, 6), {
+      total: 6,
+      overBudget: ['Over budget: N.HeavyTests takes about 30 s, longer than the budget of 20 s.'],
+    })
+  })
+
+  test('names a collection that alone takes longer than the budget by its classes', () => {
+    const classes = [testClass('ATests', 15, 'Scratch'), testClass('ZTests', 15, 'Scratch')]
+    assert.deepEqual(count(classes, 0, 20, 6), {
+      total: 6,
+      overBudget: ['Over budget: collection Scratch (N.ATests, N.ZTests) takes about 30 s, longer than the budget of 20 s.'],
+    })
+  })
+
+  test('names the control plane suite when its seconds alone take longer than the budget', () => {
+    assert.deepEqual(count([testClass('PTests', 5)], 25, 20, 6), {
+      total: 6,
+      overBudget: [`Over budget: ${controlPlane} takes about 25 s, longer than the budget of 20 s.`],
+    })
+  })
+})
 
 describe('parseSource', () => {
   test('finds the test classes of a file with their namespace, collection and number of tests', () => {
@@ -182,6 +221,29 @@ describe('main', () => {
       assert.equal(main(['--classes', '1/2'], dir), 'N.ATests')
       assert.equal(main(['1/2'], dir), '--filter-class\nN.ATests')
       assert.equal(main(['2/2'], dir), '--filter-not-class\n*PerformanceTests\n--filter-not-class\nN.ATests')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count prints 1 when the suite fits the budget, and no warning', () => {
+    const dir = project()
+    try {
+      const warnings = []
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '1')
+      assert.deepEqual(warnings, [])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count prints the count alone and warns about each class over the budget', () => {
+    const dir = project()
+    try {
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 1000, "N.BTests": 5 }\n')
+      const warnings = []
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '6')
+      assert.deepEqual(warnings, ['Over budget: N.ATests takes about 1000 s, longer than the budget of 900 s.'])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

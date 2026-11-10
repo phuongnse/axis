@@ -1,4 +1,5 @@
-import { Alert, Flex, Input, Modal } from 'antd'
+import { Flex, Input, Modal } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
@@ -313,8 +314,7 @@ export function StudioPublishing({
       </StudioBand>
       <Flex gap="middle" align="flex-start">
         <Flex vertical gap="middle" style={{ flex: 1, minWidth: 0 }}>
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {sendError !== null && <Alert data-testid="studio-request-error" type="error" title={sendError} />}
+          {sendError !== null && <AxisAlert data-testid="studio-request-error" kind="error" message={sendError} />}
           {request && <StudioRequestStatus request={request} releaseNumber={releaseNumber} />}
           {request && (request.kind === 'test' || (request.scenarios?.length ?? 0) > 0) && (
             <StudioTestResults request={request} onSelect={onOpenScenario} />

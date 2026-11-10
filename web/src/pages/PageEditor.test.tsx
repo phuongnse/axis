@@ -239,6 +239,7 @@ describe('PageEditor page', () => {
 
 describe('PageEditor sections', () => {
   const english: Record<string, string> = platformEnglish
+  const label = (path: string) => english[`shell.studio.field.page.${path}`]
   const help = (path: string) => english[`shell.studio.field.page.${path}.help`]
 
   it('draws General, Parameters and Widgets in that order, each with its heading and line', () => {
@@ -404,6 +405,101 @@ describe('PageEditor sections', () => {
 
     expect(
       within(screen.getByRole('region', { name: 'Widgets' })).queryByRole('group', { name: 'Widgets' }),
+    ).not.toBeInTheDocument()
+  })
+
+  const navigateToReview = { type: 'navigate', page: 'ReviewList', label: { textKey: 'pages.review.title' } }
+  const navigateToUnsaved = {
+    type: 'navigate',
+    page: 'Unsaved',
+    label: { textKey: 'pages.review.title' },
+    record: 'id',
+  }
+  const fieldCases: [string, Record<string, unknown>, [string, string][]][] = [
+    [
+      'table with navigate and delete row actions and a navigate toolbar action',
+      {
+        type: 'table',
+        dataSource: 'PurchaseRequestList',
+        rowActions: [
+          { ...navigateToReview, record: 'id', parameters: { request: 'id' } },
+          { type: 'delete', label: { textKey: 'pages.review.title' }, visibleWhen: "status == 'open'" },
+        ],
+        toolbarActions: [{ ...navigateToUnsaved, parameters: { request: 'id' } }],
+      },
+      [
+        ['combobox', 'widgets.type'],
+        ['group', 'widgets.rowActions'],
+        ['group', 'widgets.rowActions.label'],
+        ['textbox', 'widgets.rowActions.record'],
+        ['group', 'widgets.rowActions.parameters'],
+        ['textbox', 'widgets.rowActions.visibleWhen'],
+        ['group', 'widgets.toolbarActions'],
+        ['group', 'widgets.toolbarActions.label'],
+        ['textbox', 'widgets.toolbarActions.record'],
+        ['group', 'widgets.toolbarActions.parameters'],
+      ],
+    ],
+    [
+      'form with a start and a navigate action',
+      {
+        type: 'form',
+        entity: 'PurchaseRequest',
+        actions: [
+          { type: 'startProcess', process: 'PurchaseRequestApproval', label: { textKey: 'pages.review.title' } },
+          navigateToUnsaved,
+        ],
+      },
+      [
+        ['combobox', 'widgets.type'],
+        ['group', 'widgets.actions'],
+        ['combobox', 'widgets.actions.process'],
+        ['group', 'widgets.actions.label'],
+        ['textbox', 'widgets.actions.record'],
+        ['group', 'widgets.actions.parameters'],
+      ],
+    ],
+    [
+      'detail with a record and a navigate action',
+      {
+        type: 'detail',
+        entity: 'PurchaseRequest',
+        record: 'request',
+        actions: [navigateToUnsaved],
+      },
+      [
+        ['combobox', 'widgets.type'],
+        ['combobox', 'widgets.record'],
+        ['group', 'widgets.actions'],
+        ['group', 'widgets.actions.label'],
+        ['textbox', 'widgets.actions.record'],
+        ['group', 'widgets.actions.parameters'],
+      ],
+    ],
+    [
+      'processInspector',
+      { type: 'processInspector', process: 'PurchaseRequestApproval' },
+      [
+        ['combobox', 'widgets.type'],
+        ['combobox', 'widgets.process'],
+      ],
+    ],
+  ]
+
+  it.each(fieldCases)('labels and helps each field of a %s panel', (_name, widget, expectations) => {
+    renderEditor(
+      page(widget, {
+        parameters: [{ name: 'request', type: 'reference', target: 'PurchaseRequest', required: true }],
+      }),
+    )
+
+    for (const [role, path] of expectations) {
+      for (const element of screen.getAllByRole(role, { name: label(path) })) {
+        expect(element).toHaveAccessibleDescription(help(path))
+      }
+    }
+    expect(
+      within(screen.getByTestId('studio-field-/widgets/0')).queryByText(/^shell\.studio\.field\./),
     ).not.toBeInTheDocument()
   })
 })

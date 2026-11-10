@@ -1,4 +1,5 @@
-import { Alert, Flex, Switch, Typography } from 'antd'
+import { Flex, Switch, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchStudioSettings, saveStudioSettings } from '../platform/studio'
 import { useText } from '../platform/texts'
@@ -77,19 +78,17 @@ export function StudioAutoAccept({ application, publisher }: { application: stri
           </Typography.Text>
         )}
         {loadFailed && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="studio-auto-accept-load-error"
-            type="warning"
-            title={t('shell.studio.autoAccept.loadFailed')}
+            kind="warning"
+            message={t('shell.studio.autoAccept.loadFailed')}
           />
         )}
         {saveFailed && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="studio-auto-accept-save-error"
-            type="error"
-            title={t('shell.studio.autoAccept.saveFailed')}
+            kind="error"
+            message={t('shell.studio.autoAccept.saveFailed')}
           />
         )}
       </Flex>

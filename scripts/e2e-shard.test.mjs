@@ -3,9 +3,46 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { estimate, isSerial, junitDurations, main, mergeDurations, readSpecs, split } from './lib/e2e-shard.mjs'
+import {
+  count,
+  estimate,
+  isSerial,
+  junitDurations,
+  main,
+  mergeDurations,
+  readSpecs,
+  split,
+} from './lib/e2e-shard.mjs'
 
 const spec = (name, seconds, serial = false) => ({ path: `specs/${name}.spec.ts`, seconds, serial })
+
+describe('count', () => {
+  const four = [spec('a', 100), spec('b', 100), spec('c', 100), spec('d', 100)]
+
+  test('prints the fewest shards whose longest estimated shard fits the budget', () => {
+    // Four 100 s specs take 200 s on two workers, and two shards of two specs take 100 s each.
+    assert.deepEqual(count(four, 2, 150, 6), { total: 2, overBudget: [] })
+    assert.deepEqual(count(four, 2, 250, 6), { total: 1, overBudget: [] })
+  })
+
+  test('prints the cap when no count up to the cap fits the budget', () => {
+    // Three shards still leave one with two 100 s specs, which runs 100 s on two workers, past the 50 s budget.
+    assert.deepEqual(count(four, 2, 50, 3), { total: 3, overBudget: [] })
+  })
+
+  test('names each spec that alone takes longer than the budget, and still counts', () => {
+    const specs = [spec('big', 1000, true), spec('small', 10)]
+    assert.deepEqual(count(specs, 2, 900, 6), {
+      total: 6,
+      overBudget: ['Over budget: specs/big.spec.ts takes about 1000 s, longer than the budget of 900 s.'],
+    })
+  })
+
+  test('counts a parallel spec by its seconds on the workers', () => {
+    // 1600 s shares two workers to 800 s, so it fits the 900 s budget.
+    assert.deepEqual(count([spec('wide', 1600)], 2, 900, 6), { total: 1, overBudget: [] })
+  })
+})
 
 describe('estimate', () => {
   test('shares the workers between independent tests', () => {
@@ -82,6 +119,22 @@ describe('readSpecs and main', () => {
       )
       const printed = ['1/2', '2/2'].flatMap((shard) => main([shard], dir).split('\n'))
       assert.deepEqual(printed.sort(), specs.map((s) => s.path).sort())
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count prints the count alone and warns about each spec over the budget', () => {
+    const dir = fixture(
+      { 'specs/big.spec.ts': 1000, 'specs/a.spec.ts': 10 },
+      { 'big.spec.ts': "test.describe.configure({ mode: 'serial' })", 'a.spec.ts': '' },
+    )
+    const warnings = []
+    try {
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '6')
+      assert.deepEqual(warnings, [
+        'Over budget: specs/big.spec.ts takes about 1000 s, longer than the budget of 900 s.',
+      ])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

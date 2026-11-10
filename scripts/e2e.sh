@@ -8,7 +8,9 @@
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The axis realm sends its emails, such as a password reset link, to Mailpit. This script starts Mailpit on a Docker
-# network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end.
+# network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end. Mailpit also
+# publishes its SMTP and API ports on 127.0.0.1: the control plane sends its emails to the SMTP port, and Playwright
+# reads them through the API at AXIS_E2E_MAILPIT_URL.
 # This script also starts MinIO, an S3-compatible store, with the bucket axis-exports and a KMS key, because the export
 # job stores its ZIP encrypted in a bucket that exists. It gives Playwright the five settings of Cell:ExportStorage as
 # AXIS_E2E_EXPORT_STORAGE_URL, _BUCKET, _REGION, _ACCESS_KEY and _SECRET_KEY, and removes the container at the end. Only
@@ -47,7 +49,8 @@
 # the stub, so an approved purchase request creates its purchase order there.
 # The control plane runs from the build output on $AXIS_E2E_CONTROL_PLANE_PORT (default 5290) in Testing, with its
 # own database axis_controlplane and the region directory's database axis_directory. Specs find it at
-# $AXIS_E2E_CONTROL_PLANE_URL. The run fails if it never answers.
+# $AXIS_E2E_CONTROL_PLANE_URL. It sends its emails to Mailpit, and the links in them start with that address. The run
+# fails if it never answers.
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
 # roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
 # requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
@@ -87,7 +90,8 @@
 # is relative to the repository root. With arguments only the matching specs run, after the setup project.
 # A change is checked in minutes, and the full run stays the check.
 # AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI and NexKit's checks can split the suite
-# over several machines. Without arguments a shard runs the specs that scripts/lib/e2e-shard.mjs gives it,
+# over several machines. NEXKIT_SHARD takes the same shard when AXIS_E2E_SHARD is unset, and AXIS_E2E_SHARD wins
+# when both are set. Without arguments a shard runs the specs that scripts/lib/e2e-shard.mjs gives it,
 # split by the durations in tests/e2e/spec-durations.json. With arguments Playwright's --shard splits the
 # matching tests. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a file.
 # Without it the whole suite runs.
@@ -104,24 +108,30 @@ for argument in "$@"; do
   esac
 done
 
-# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright.
+# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright. NEXKIT_SHARD does the same when AXIS_E2E_SHARD is unset.
 playwright_suite=playwright
-if [ -n "${AXIS_E2E_SHARD:-}" ]; then
-  if ! [[ "$AXIS_E2E_SHARD" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
-    echo "AXIS_E2E_SHARD must be a shard such as 1/3, not '$AXIS_E2E_SHARD'." >&2
+shard_variable=AXIS_E2E_SHARD
+shard="${AXIS_E2E_SHARD:-}"
+if [ -z "$shard" ] && [ -n "${NEXKIT_SHARD:-}" ]; then
+  shard_variable=NEXKIT_SHARD
+  shard="$NEXKIT_SHARD"
+fi
+if [ -n "$shard" ]; then
+  if ! [[ "$shard" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+    echo "$shard_variable must be a shard such as 1/3, not '$shard'." >&2
     exit 2
   fi
   playwright_suite="playwright-${BASH_REMATCH[1]}"
   if [ "${#playwright_args[@]}" -eq 0 ]; then
     # Every shard computes the same split, so a failed split stops the run rather than leave specs out.
-    shard_specs="$(node scripts/lib/e2e-shard.mjs "$AXIS_E2E_SHARD")"
+    shard_specs="$(node scripts/lib/e2e-shard.mjs "$shard")"
     if [ -z "$shard_specs" ]; then
-      echo "Shard $AXIS_E2E_SHARD has no spec. Use fewer shards." >&2
+      echo "Shard $shard has no spec. Use fewer shards." >&2
       exit 2
     fi
     mapfile -t playwright_args <<<"$shard_specs"
   else
-    playwright_args=("--shard=$AXIS_E2E_SHARD" "${playwright_args[@]}")
+    playwright_args=("--shard=$shard" "${playwright_args[@]}")
   fi
 fi
 
@@ -203,7 +213,11 @@ if affected playwright; then
   keycloak_port="${AXIS_E2E_KEYCLOAK_PORT:-8180}"
   # The realm names Mailpit by its alias, so both containers join a network of their own.
   docker network create "$network" >/dev/null
-  docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit "$mailpit_image" >/dev/null
+  docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit \
+    -p 127.0.0.1::1025 -p 127.0.0.1::8025 "$mailpit_image" >/dev/null
+  mailpit_smtp_port="$(docker port "$mailpit_container" 1025/tcp | head -n1 | sed 's/.*://')"
+  mailpit_api_port="$(docker port "$mailpit_container" 8025/tcp | head -n1 | sed 's/.*://')"
+  export AXIS_E2E_MAILPIT_URL="http://127.0.0.1:$mailpit_api_port"
   # MinIO accepts the server-side encryption of the export upload only when it has a KMS key.
   minio_kms_key="$(openssl rand -base64 32)"
   docker run -d --name "$minio_container" -e MINIO_ROOT_USER="$minio_user" -e MINIO_ROOT_PASSWORD="$minio_password" \
@@ -304,13 +318,14 @@ if affected playwright; then
   control_plane_log="$root/artifacts/logs/e2e-controlplane.log"
   : >"$control_plane_log"
   export AXIS_E2E_CONTROL_PLANE_URL="http://127.0.0.1:${AXIS_E2E_CONTROL_PLANE_PORT:-5290}"
-  # /health/ready would also probe the mail relay, which has no host port in this run, so this waits for /health/live.
+  # The control plane is up when /health/live answers.
   ASPNETCORE_URLS="$AXIS_E2E_CONTROL_PLANE_URL" ASPNETCORE_ENVIRONMENT=Testing \
     ControlPlane__Region=vn ControlPlane__TenantDomain=vn.example.com \
     ControlPlane__ConnectionString="Host=127.0.0.1;Port=$port;Database=axis_controlplane;Username=axis_controlplane;Password=axis" \
     ControlPlane__DirectoryConnectionString="Host=127.0.0.1;Port=$port;Database=axis_directory;Username=axis_directory;Password=axis" \
     ControlPlane__Dns__Provider=InMemory ControlPlane__MailFrom=no-reply@vn.example.com \
-    ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port=1025 ControlPlane__Mail__UseTls=false \
+    ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port="$mailpit_smtp_port" ControlPlane__Mail__UseTls=false \
+    ControlPlane__PublicUrl="$AXIS_E2E_CONTROL_PLANE_URL" \
     dotnet controlplane/src/Axis.ControlPlane/bin/Release/net10.0/Axis.ControlPlane.dll \
     --contentRoot "$root/controlplane/src/Axis.ControlPlane" >>"$control_plane_log" 2>&1 &
   control_plane_pid=$!

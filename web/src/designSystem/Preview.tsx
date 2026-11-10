@@ -74,10 +74,12 @@ function Chooser({ states }: { states: readonly PreviewState[] }) {
   })
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+      <style>{'[data-fixtures] .ant-segmented-group { flex-wrap: wrap; }'}</style>
+      <div data-fixtures style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm }}>
         <span style={{ color: colour.textMuted }}>Fixtures</span>
         <Segmented
           aria-label="Fixtures"
+          style={{ maxWidth: '100%' }}
           options={states.map(({ caption }) => caption)}
           value={state.caption}
           onChange={(caption) => {

@@ -1,5 +1,6 @@
 import { AlignLeftOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons'
-import { Alert, Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
+import { Button, ConfigProvider, Flex, message, Modal, Tabs } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import {
   lazy,
   Suspense,
@@ -699,8 +700,9 @@ export function StudioEditor({
   })
 
   if (loadFailed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
+    return (
+      <AxisAlert data-testid="studio-resource-load-error" kind="error" message={t('shell.studio.loadResourceFailed')} />
+    )
   }
   if (!loaded) {
     return null
@@ -989,11 +991,10 @@ export function StudioEditor({
     }
     return (
       <>
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        <Alert
+        <AxisAlert
           data-testid="studio-form-read-only"
-          type="warning"
-          title={t('shell.studio.jsonError.readOnly')}
+          kind="warning"
+          message={t('shell.studio.jsonError.readOnly')}
           action={
             <AxisButton role="secondary" onClick={() => setTab('json')}>
               {t('shell.studio.goToJson')}
@@ -1262,20 +1263,17 @@ export function StudioEditor({
               </LabelTextsContext.Provider>
             </ExpressionCheckContext.Provider>
             {conflict && (
-              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-              <Alert
+              <AxisAlert
                 data-testid="studio-conflict"
-                type="warning"
-                title={t('shell.studio.conflict')}
+                kind="warning"
+                message={t('shell.studio.conflict')}
                 // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                 action={<Button onClick={reload}>{t('shell.studio.reload')}</Button>}
               />
             )}
-            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-            {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
+            {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}
             {deleteFailed && (
-              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-              <Alert data-testid="studio-delete-error" type="error" title={t('shell.studio.deleteFailed')} />
+              <AxisAlert data-testid="studio-delete-error" kind="error" message={t('shell.studio.deleteFailed')} />
             )}
             <AxisActionRow align="center">
               {saved && <span data-testid="studio-saved">{t('shell.studio.saved')}</span>}
@@ -1300,11 +1298,10 @@ export function StudioEditor({
               onCancel={() => setDeleteOpen(false)}
             >
               {item.usedBy > 0 && (
-                // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-                <Alert
+                <AxisAlert
                   data-testid="studio-delete-warning"
-                  type="warning"
-                  title={
+                  kind="warning"
+                  message={
                     <>
                       {t('shell.studio.deleteUsedBy')} <strong>{item.usedBy}</strong>
                     </>

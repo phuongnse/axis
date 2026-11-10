@@ -35,7 +35,9 @@ Three actors take part in the work, the owner, the local agent session and NexKi
   the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
   of findings that no open issue covers, code and test fixes first and at most ten a run, as
   [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees and the
-  skill says. It changes no file itself.
+  skill says. It also points each broken link of an open issue at its new home, once a job that runs
+  no model has checked that home on `main`, and changes nothing else in the issue. It changes no file
+  itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
 
@@ -126,13 +128,15 @@ that holds it.
   rise of a baseline count, and no rule removed, narrowed or skipped in a check script under
   `scripts/` or its test. The review checklist refuses such a change, and NexKit then mentions the
   owner, as [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
-  agrees.
+  agrees. The item is marked `person` in the checklist, so no fix round undoes the change: the owner's
+  approval of the reviewed commit accepts it, and NexKit then merges it.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist]
   setting holds it. Each item names one doc section that holds rules a review can check in the diff,
   summarizes it in a sentence and asks the review to check the diff against each of its rules. The
   rules stay in their section, so a new rule adds no item. A rule that a script or a test can check is
   checked there, not by the review. An item not met requests changes like a blocking finding, so a pull
-  request that leaves a doc false or loosens a check does not merge.
+  request that leaves a doc false does not merge. An item the owner decides, marked `person`, starts no
+  fix round, and its pull request waits for the owner's approval.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
@@ -205,6 +209,10 @@ that holds it.
   merges nothing there. The owner merges once both are green, with no admin bypass. The bypass is left
   for a pull request that needs the owner's code-owner review and that the owner opened, since GitHub
   does not let an author approve their own pull request.
+- **One that closes an issue carries the issue's labels and milestone.** NexKit sets them only on the
+  pull requests it opens, so whoever opens a hand-made pull request sets them as they open it, the owner
+  or the local agent session. One that closes no issue, such as a NexKit version bump, gets labels by the
+  owner's choice.
 
 ## Profiles
 

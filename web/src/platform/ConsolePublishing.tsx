@@ -1,4 +1,5 @@
-import { Alert, Card, Flex, Select, Tag, Typography } from 'antd'
+import { Card, Flex, Select, Tag, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import {
@@ -191,8 +192,11 @@ export function ConsolePublishing({ applications, locale }: ConsolePublishingPro
           }}
         />
         {load.failed && !loading ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="console-publishing-error" type="error" title={t('shell.console.publishing.loadFailed')} />
+          <AxisAlert
+            data-testid="console-publishing-error"
+            kind="error"
+            message={t('shell.console.publishing.loadFailed')}
+          />
         ) : (
           <>
             <Flex vertical gap="small">

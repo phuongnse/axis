@@ -23,8 +23,8 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                        | Docker          |
 | `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
 | `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
-| `scripts/docs-audit.mjs`        | The docs audit of the `docs-audit.yml` workflow: picks a run's pages, reads them, opens the issues  | Network         |
-| `scripts/check-issue-links.mjs` | Prints the links of open issues that no open issue blocks, to a missing file or heading of `main`   | Network         |
+| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes | Network         |
+| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
 | `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |
@@ -164,8 +164,10 @@ runs Playwright in Chromium. It:
 - creates the `journey` tenant for Studio journeys, with its own database `axis_journey`, its roles
   `axis_journey_schema` and `axis_journey_runtime`, and its server on `127.0.0.2`, which the worker
   and the publisher serve too;
-- starts the control plane with its databases `axis_controlplane` and `axis_directory`, see
-  [the E2E stack](testing.md#the-e2e-stack);
+- starts Mailpit with its SMTP and API ports published on 127.0.0.1, and gives Playwright its API address
+  as `AXIS_E2E_MAILPIT_URL`;
+- starts the control plane with its databases `axis_controlplane` and `axis_directory`, which sends its emails
+  to that Mailpit, see [the E2E stack](testing.md#the-e2e-stack);
 - makes a throwaway TLS certificate for the run, which the https server of each spec that runs `tenant create`
   uses, on `AXIS_E2E_TENANT_HTTPS_PORT` (default 5283) and the ports after it, one offset for each spec;
 - builds and checks the design-system bundle in `artifacts/design-system` for its spec, see
@@ -378,7 +380,8 @@ NexKit's checks split the E2E and integration tests into shards, one check each,
 checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
 The smoke tests run in a job of their own, so the shards hold only their own tests.
 
-- **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. Its Playwright results go
+- **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. `NEXKIT_SHARD` works the
+  same way beside it, and `AXIS_E2E_SHARD` wins when both are set. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
   by how many tests they hold: each spec weighs its seconds in `tests/e2e/spec-durations.json`, and a
   new spec weighs the median. A serial spec, such as a Studio journey, runs on one worker from start
@@ -386,6 +389,7 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   minutes, refresh the durations from the JUnit files of a full run on `main`:
   `node scripts/lib/e2e-shard.mjs --durations artifacts/test-results/playwright-*.xml`.
 - **Integration.** Set `AXIS_INTEGRATION_SHARD`, such as `AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh`.
+  `NEXKIT_SHARD` works the same way beside it, and `AXIS_INTEGRATION_SHARD` wins when both are set.
   A shard runs whole test classes of `Axis.Integration.Tests`, which `scripts/lib/integration-shard.mjs`
   gives it: classes that share an xUnit collection stay together, and the heaviest go first to the
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
@@ -398,6 +402,11 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
   and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
   `node scripts/lib/integration-shard.mjs --durations <those files>`.
+- **Shard count.** `node scripts/lib/e2e-shard.mjs --count` and `node scripts/lib/integration-shard.mjs --count`
+  print the fewest shards whose longest estimated shard fits the time budget. They never print more than
+  the most shards allowed. Both values live in `scripts/lib/shards.mjs`. A spec, test class, collection
+  or the control plane suite that alone takes longer than the budget gets an `Over budget:` line on
+  stderr. The count still prints, because no number of shards makes such a spec or class fit.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs

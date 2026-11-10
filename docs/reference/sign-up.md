@@ -193,11 +193,11 @@ An unverified sign-up expires after 24 hours with nothing created, and its subdo
 Once the sign-up is accepted, the card's title becomes "Check your inbox", in `vi` "Kiểm tra hộp thư".
 The card is the same for a new email and for one that already had a trial.
 
-- **What it says.** It names the address the email went to, says to look in the spam folder, wait a
+- **What it says** _(planned for M33)_. It names the address the email went to, says to look in the spam folder, wait a
   minute or send it again, and offers Send again, a secondary button, and Change email, a plain one. The
   focus moves into the new step.
 - **Change email** brings the form back with every value kept and the focus on the email.
-- **Send again.** `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
+- **Send again** _(planned for M33)_. `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
   token, and a resend counts toward the address's [three sign-up emails a day](#bots-and-abuse). A sent
   resend shows a notice that the email was sent again in an info `AxisAlert`, and a failed one an error
   `AxisAlert`. Every error `AxisAlert` of the sign-up pages carries its icon, in the text colour of its
@@ -208,17 +208,22 @@ The card is the same for a new email and for one that already had a trial.
 The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm your sign-up", in `vi`
 "Xác nhận đăng ký".
 
-- **It asks to confirm.** It checks the link first, with "Checking the link.", then says "Confirm to
+- **It asks to confirm.** It checks the link first, with "Checking the link.", in `vi` "Đang kiểm tra liên kết.", then says "Confirm to
   start the trial for **{business}** at **{address}**. You sign in with **{email}**.", in `vi` "Xác nhận
   để bắt đầu dùng thử cho **{business}** tại **{address}**. Bạn sẽ đăng nhập bằng **{email}**.". The
   person sees what starts before anything is created. `FilledText` fills the sentence, so each language
   keeps its word order. Confirm is the finish button.
-- **A failure keeps the page.** A check that fails offers Try again. A confirm that fails shows its
-  error above the sentence and keeps Confirm.
-- **Already confirmed.** A link already used says "Already confirmed": "This sign-up is confirmed. An
-  email tells you when you can sign in."
-- **Expired.** An expired link says "This link has expired": "A link works once, for 24 hours. Sign up
-  again to get a new one.", with Sign up again as the finish button to `/sign-up`. An unknown token
+- **A failure keeps the page.** A check that fails shows "The link could not be checked. Try again.",
+  in `vi` "Không kiểm tra được liên kết. Thử lại.", and offers Try again, in `vi` "Thử lại". A confirm
+  that fails shows "The sign-up could not be confirmed. Try again.", in `vi` "Không xác nhận được đăng
+  ký. Thử lại.", above the sentence and keeps Confirm.
+- **Already confirmed.** A link already used says "Already confirmed", in `vi` "Đã xác nhận": "This
+  sign-up is confirmed. An email tells you when you can sign in.", in `vi` "Đã xác nhận đăng ký này. Bạn
+  sẽ nhận email khi có thể đăng nhập."
+- **Expired.** An expired link says "This link has expired", in `vi` "Liên kết đã hết hạn": "A link works
+  once, for 24 hours. Sign up again to get a new one.", in `vi` "Liên kết chỉ dùng được một lần, trong 24
+  giờ. Hãy đăng ký lại để nhận liên kết mới.", with Sign up again, in `vi` "Đăng ký lại", as the finish
+  button to `/sign-up`. An unknown token
   answers as an expired one, so the page tells nothing of a sign-up it does not hold.
 - **The fragment.** A token or a secret travels after `#`, so no request line, server log or referrer
   carries it. The page reads the fragment and sends the value in a request body, or in a header for
@@ -228,7 +233,7 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   `{ state: "expired" }`. It changes nothing.
 - **Confirming.** `POST /api/sign-up/confirm` takes `{ token }` and answers `{ id, secret }` for the
   progress page. When the link was used or expired while the page was open, it answers `409` with
-  `{ state }`.
+  `{ state }`, and the page shows that state, not an error.
 
 ### The emails
 

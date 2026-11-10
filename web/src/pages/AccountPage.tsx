@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Tag, Typography } from 'antd'
+import { Button, Flex, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useState } from 'react'
 import { accountActionUrl, reauthenticateUrl } from '../platform/api'
 import { AxisTable } from '../platform/AxisTable'
@@ -89,8 +90,11 @@ export function AccountPage() {
       breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.sessions.title') }]}
     >
       {authenticatorsFailed && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="authenticators-error" type="error" title={t('shell.account.authenticators.loadFailed')} />
+        <AxisAlert
+          data-testid="authenticators-error"
+          kind="error"
+          message={t('shell.account.authenticators.loadFailed')}
+        />
       )}
       {authenticators?.account && (
         <>
@@ -147,19 +151,17 @@ export function AccountPage() {
           </Flex>
         </>
       )}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {loadFailed && <Alert data-testid="sessions-error" type="error" title={t('shell.account.sessions.loadFailed')} />}
+      {loadFailed && (
+        <AxisAlert data-testid="sessions-error" kind="error" message={t('shell.account.sessions.loadFailed')} />
+      )}
       {endFailed && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="sessions-end-error" type="error" title={t('shell.account.sessions.endFailed')} />
+        <AxisAlert data-testid="sessions-end-error" kind="error" message={t('shell.account.sessions.endFailed')} />
       )}
       {sessions && !sessions.endAllowed && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert
+        <AxisAlert
           data-testid="sessions-reauthenticate"
-          type="info"
-          showIcon
-          title={t('shell.account.sessions.reauthenticate')}
+          kind="info"
+          message={t('shell.account.sessions.reauthenticate')}
           action={
             // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             <Button size="small" onClick={() => assignLocation(reauthenticateUrl('/account'))}>

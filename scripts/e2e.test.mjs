@@ -17,7 +17,7 @@ const stubs = {
   docker: `#!/usr/bin/env bash
 ${log('docker')}case "$1" in
   run) echo stub-container ;;
-  port) echo 127.0.0.1:5432 ;;
+  port) case "$3" in 1025/tcp) echo 127.0.0.1:41025 ;; 8025/tcp) echo 127.0.0.1:48025 ;; *) echo 127.0.0.1:5432 ;; esac ;;
   inspect) echo true ;;
 esac
 exit 0
@@ -28,6 +28,7 @@ ${log('curl')}exit 0
   // The worker and the publisher report every tenant ready, then run until the script stops them.
   dotnet: `#!/usr/bin/env bash
 ${log('dotnet')}case "$*" in
+  *Axis.ControlPlane.dll*) echo "control-plane-env ControlPlane__Mail__Port=$ControlPlane__Mail__Port ControlPlane__PublicUrl=$ControlPlane__PublicUrl" >> "$STUB_LOG" ;;
   *Axis.Worker.dll*) echo 'Tenant default is ready for work'; echo 'Tenant journey is ready for work' ;;
   *Axis.Admin.dll*) echo 'default ready'; echo 'journey ready' ;;
 esac
@@ -37,6 +38,7 @@ exec sleep 60
   // ready, as the real run does, then writes one passing test to its JUnit file.
   npm: `#!/usr/bin/env bash
 ${log('npm')}if [ "$1 $2" = "run build:keycloak-theme" ]; then exit 0; fi
+if [ "$1" = "test" ]; then echo "playwright-env AXIS_E2E_MAILPIT_URL=$AXIS_E2E_MAILPIT_URL" >> "$STUB_LOG"; fi
 for _ in $(seq 1 100); do
   if grep -q 'journey is ready' "$AXIS_E2E_WORKER_LOG" 2>/dev/null &&
     grep -q 'journey ready' "$PWD/artifacts/logs/e2e-publisher.log" 2>/dev/null; then break; fi
@@ -46,7 +48,7 @@ echo '<testsuites><testsuite name="s" tests="1"><testcase name="t" time="0"/></t
 `,
 }
 
-function runE2e(shard, args = []) {
+function runE2e(shard, args = [], extraEnv = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-e2e-'))
   try {
     for (const file of [
@@ -55,6 +57,7 @@ function runE2e(shard, args = []) {
       'scripts/lib/affected.mjs',
       '.nexkit/config.json',
       'scripts/lib/e2e-shard.mjs',
+      'scripts/lib/shards.mjs',
       'scripts/test-report.mjs',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
@@ -102,10 +105,12 @@ function runE2e(shard, args = []) {
       'CI',
       'AXIS_TEST_RESULTS_DIR',
       'AXIS_E2E_SHARD',
+      'NEXKIT_SHARD',
     ]) {
       delete env[name]
     }
     if (shard !== undefined) env.AXIS_E2E_SHARD = shard
+    Object.assign(env, extraEnv)
 
     const result = spawnSync('bash', ['scripts/e2e.sh', ...args], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
@@ -148,6 +153,22 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(run.results('playwright-1'))
     for (const suite of smokeSuites) assert.ok(!run.results(suite), suite)
     assert.match(run.stdout, /^\| playwright-1 \| 1 \| 0 \| 0 \| /m)
+  })
+
+  test('NEXKIT_SHARD runs the same shard as AXIS_E2E_SHARD', () => {
+    const run = runE2e(undefined, [], { NEXKIT_SHARD: '2/3' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.equal(playwrightCall(run), playwrightCall(runE2e('2/3')))
+    assert.ok(run.results('playwright-2'))
+  })
+
+  test('AXIS_E2E_SHARD wins over NEXKIT_SHARD when both are set', () => {
+    const run = runE2e('1/3', [], { NEXKIT_SHARD: '2/3' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.match(playwrightCall(run), / -- specs\/journey\.spec\.ts$/)
+    assert.ok(run.results('playwright-1'))
   })
 
   test("a shard with arguments leaves the split to Playwright's --shard over the matching tests", () => {
@@ -211,6 +232,21 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(run.calls.includes(`docker network rm ${network}`), run.calls.join('\n'))
   })
 
+  test('Mailpit publishes its SMTP and API ports on 127.0.0.1, the control plane sends its mail there, and Playwright gets the API address', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const mailpit = run.calls.find((call) => call.startsWith('docker run ') && call.includes('axllent/mailpit'))
+    assert.ok(mailpit, run.calls.join('\n'))
+    assert.match(mailpit, / -p 127\.0\.0\.1::1025 /)
+    assert.match(mailpit, / -p 127\.0\.0\.1::8025 /)
+    assert.ok(
+      run.calls.includes('control-plane-env ControlPlane__Mail__Port=41025 ControlPlane__PublicUrl=http://127.0.0.1:5290'),
+      run.calls.join('\n'),
+    )
+    assert.ok(run.calls.includes('playwright-env AXIS_E2E_MAILPIT_URL=http://127.0.0.1:48025'), run.calls.join('\n'))
+  })
+
   test('MinIO starts with a default bucket and a KMS key before the build and Playwright, and is removed at the end', () => {
     const run = runE2e()
 
@@ -264,6 +300,14 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
       assert.ok(!run.calls.some((call) => call.startsWith('docker ')), run.calls.join('\n'))
     })
   }
+
+  test('a malformed NEXKIT_SHARD stops the script and names NEXKIT_SHARD', () => {
+    const run = runE2e(undefined, [], { NEXKIT_SHARD: '4/3' })
+
+    assert.equal(run.status, 2)
+    assert.match(run.stderr, /NEXKIT_SHARD must be a shard such as 1\/3, not '4\/3'/)
+    assert.ok(!run.calls.some((call) => call.startsWith('docker ')), run.calls.join('\n'))
+  })
 })
 
 describe('docs/development.md lists the E2E logs that scripts/e2e.sh writes', () => {

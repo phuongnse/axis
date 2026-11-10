@@ -7,7 +7,8 @@ description: How the docs audit reads Axis's docs, skills and AGENTS.md against 
 
 The rules are in [how the docs stay correct](../../../docs/writing-docs.md#how-the-docs-stay-correct)
 and [D145](../../../docs/decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md).
-This skill says how to read a page. The audit changes no file.
+This skill says how to read a page. The audit changes no file:
+it opens issues and edits only the broken links of open issues.
 
 ## A run of the workflow
 
@@ -25,6 +26,9 @@ This skill says how to read a page. The audit changes no file.
    open issue or an earlier issue of the run covers, opens at most ten issues and marks each with the run
    that found it. It opens the `unbuilt` issues first, then the `untested-list` issues, then one docs issue
    per page. It prints each finding the cap leaves out, and the next run of that finding's page reports it again.
+
+The workflow also points each broken link of an open issue at its new home, as
+[broken links](broken-links.md) says.
 
 A run in the owner's local session for named pages follows [reading a page](#reading-a-page) and
 reports the findings to the owner instead.

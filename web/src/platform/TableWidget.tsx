@@ -1,5 +1,6 @@
 import { DeleteOutlined } from '@ant-design/icons'
-import { Alert, Dropdown, Modal } from 'antd'
+import { Dropdown, Modal } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { AxisButton } from './AxisButton'
@@ -634,13 +635,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               locale={locale}
             />
           )}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
+          {actionError !== null && <AxisAlert data-testid="table-action-error" kind="error" message={actionError} />}
+          {actionDone !== null && <AxisAlert data-testid="table-action-done" kind="success" message={actionDone} />}
           {exportTruncated && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert data-testid="table-export-truncated" type="warning" title={t('shell.table.exportTruncated')} />
+            <AxisAlert data-testid="table-export-truncated" kind="warning" message={t('shell.table.exportTruncated')} />
           )}
           {importing && (
             <ImportDialog
@@ -671,8 +669,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         </>
       }
       failure={
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        failed ? <Alert data-testid="records-error" type="error" title={t('shell.table.loadFailed')} /> : undefined
+        failed ? (
+          <AxisAlert data-testid="records-error" kind="error" message={t('shell.table.loadFailed')} />
+        ) : undefined
       }
     />
   )

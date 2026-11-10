@@ -1,4 +1,5 @@
-import { Alert, Flex, Tag, Typography } from 'antd'
+import { Flex, Tag, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -146,8 +147,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     return <div data-testid="detail" aria-busy="true" />
   }
   if (load === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="detail-load-error" type="error" title={t('shell.form.loadFailed')} />
+    return <AxisAlert data-testid="detail-load-error" kind="error" message={t('shell.form.loadFailed')} />
   }
   if (load === 'missing' || record === null) {
     return <NotFoundPage />
@@ -230,10 +230,8 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
 
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {started && <Alert data-testid="detail-started" type="success" title={t('shell.form.processStarted')} />}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {errors.length > 0 && <Alert data-testid="detail-error" type="error" title={errors.join(' ')} />}
+      {started && <AxisAlert data-testid="detail-started" kind="success" message={t('shell.form.processStarted')} />}
+      {errors.length > 0 && <AxisAlert data-testid="detail-error" kind="error" message={errors.join(' ')} />}
       {sections.map((section, index) => (
         <Fragment key={index}>
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}

@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import {
+  chooseHomes,
   claudeArgs,
   groupsOf,
+  homesArgs,
   issuesFrom,
   maxIssues,
   pagesFor,
   parseAnswer,
+  parseHomes,
   readers,
   readGroups,
   shares,
@@ -97,6 +100,44 @@ describe('claudeArgs', () => {
 
   test('lists the pages of the group in the prompt', () => {
     assert.match(claudeArgs(['docs/a.md'])[1], /^- docs\/a\.md$/m)
+  })
+})
+
+describe('chooseHomes', () => {
+  test('asks nothing when there is no link', async () => {
+    let asked = 0
+    const ask = async () => {
+      asked++
+      return '{}'
+    }
+    assert.deepEqual(await chooseHomes([], ask), [])
+    assert.equal(asked, 0)
+  })
+
+  test('asks once with the links and takes the homes, a missing home as null', async () => {
+    const links = [{ issue: 7, link: 'docs/old.md', renamedTo: 'docs/new.md' }]
+    const homes = [
+      { issue: 7, link: 'docs/old.md', home: 'docs/new.md' },
+      { issue: 8, link: 'docs/x.md', home: null },
+    ]
+    const asked = []
+    const answer = await chooseHomes(links, async (list) => {
+      asked.push(list)
+      return JSON.stringify({ structured_output: { homes } })
+    })
+    assert.deepEqual(asked, [links])
+    assert.deepEqual(answer, homes)
+  })
+
+  test('fails on an answer with no homes', () => {
+    assert.throws(() => parseHomes(JSON.stringify({ structured_output: {} })), /no homes/)
+  })
+
+  test('gives Claude Code the read-only tools and the links as data in the prompt', () => {
+    const args = homesArgs([{ issue: 7, link: 'docs/old.md' }])
+    assert.equal(args[args.indexOf('--tools') + 1], 'Read,Grep,Glob')
+    assert.match(args[1], /"A link's new home"/)
+    assert.match(args[1], /"link": "docs\/old\.md"/)
   })
 })
 

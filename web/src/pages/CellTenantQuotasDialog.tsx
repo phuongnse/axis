@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, InputNumber, Modal, Radio, Typography } from 'antd'
+import { Flex, Form, InputNumber, Modal, Radio, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { setCellTenantQuotas, type CellQuota } from '../platform/cell'
@@ -104,8 +105,7 @@ export function CellTenantQuotasDialog({ tenant, quotas, onSaved, onRefused, onC
               </Flex>
             )
           })}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {error && <Alert data-testid="cell-tenant-quotas-error" type="error" title={error} />}
+          {error && <AxisAlert data-testid="cell-tenant-quotas-error" kind="error" message={error} />}
         </Flex>
       </Form>
     </Modal>

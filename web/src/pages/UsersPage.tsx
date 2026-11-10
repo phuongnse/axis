@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Input, Modal, Result, Tag, Typography } from 'antd'
+import { Button, Flex, Input, Modal, Result, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
@@ -140,8 +141,7 @@ export function UsersPage() {
           <Result status="403" title={t('shell.users.forbidden')} />
         </div>
       )}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {loadFailed && <Alert data-testid="users-error" type="error" title={t('shell.users.loadFailed')} />}
+      {loadFailed && <AxisAlert data-testid="users-error" kind="error" message={t('shell.users.loadFailed')} />}
       {list && !refusal && (
         <>
           <AxisTable<UserListItem>
@@ -180,10 +180,8 @@ export function UsersPage() {
             }}
             below={
               <>
-                {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-                {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
-                {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-                {problem && <Alert data-testid="users-command-problem" type="error" title={t(problem)} />}
+                {done && <AxisAlert data-testid="users-done" kind="success" message={t(`shell.users.${done}.done`)} />}
+                {problem && <AxisAlert data-testid="users-command-problem" kind="error" message={t(problem)} />}
               </>
             }
             columns={[

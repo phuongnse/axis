@@ -1,5 +1,6 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { formatValue } from './formatValue'
@@ -113,11 +114,10 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
       <Flex vertical gap="small">
         <Typography.Title level={5}>{t('shell.inspector.deadLetters.title')}</Typography.Title>
         {load.failed && !loading ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="inspector-dead-letters-error"
-            type="error"
-            title={t('shell.inspector.deadLetters.loadFailed')}
+            kind="error"
+            message={t('shell.inspector.deadLetters.loadFailed')}
           />
         ) : (
           <AxisTable<DeadLetterItem>

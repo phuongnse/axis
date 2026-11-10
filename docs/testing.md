@@ -227,8 +227,10 @@ webhook delivers.
 output on `AXIS_E2E_CONTROL_PLANE_PORT` (default 5290), and fails if it does not answer. Specs find it at
 `AXIS_E2E_CONTROL_PLANE_URL`. It runs in `Testing`, with its own database `axis_controlplane` and the region
 directory's database `axis_directory`, both created through `psql`. It uses the `InMemory` DNS provider and sends
-no mail. It serves the [sign-up page](reference/sign-up.md#the-page), and the sign-up spec seeds its own tenant in
-the directory, so the subdomain check finds a taken name.
+its emails to the run's Mailpit, and the links in them start with `AXIS_E2E_CONTROL_PLANE_URL`. Specs read Mailpit
+at `AXIS_E2E_MAILPIT_URL`, through `tests/e2e/mailpit.ts`. It serves the
+[sign-up page](reference/sign-up.md#the-page), and the sign-up spec seeds its own tenant in the directory, so the
+subdomain check finds a taken name.
 
 **Logs.** The worker output goes to `artifacts/logs/e2e-worker.log`, the journey server output to
 `artifacts/logs/e2e-journey-server.log`, the stub output to `artifacts/logs/e2e-purchasing.log` and the control

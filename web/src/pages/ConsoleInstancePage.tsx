@@ -1,4 +1,5 @@
-import { Alert, Result } from 'antd'
+import { Result } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { consoleInstancesPath } from '../platform/console'
@@ -57,12 +58,14 @@ export function ConsoleInstancePage() {
         </div>
       )}
       {instance === null && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="console-instance-not-found" type="warning" title={t('shell.console.instance.notFound')} />
+        <AxisAlert
+          data-testid="console-instance-not-found"
+          kind="warning"
+          message={t('shell.console.instance.notFound')}
+        />
       )}
       {instance === 'failed' && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="console-instance-error" type="error" title={t('shell.console.instance.loadFailed')} />
+        <AxisAlert data-testid="console-instance-error" kind="error" message={t('shell.console.instance.loadFailed')} />
       )}
       {typeof instance === 'object' && instance !== null && (
         <InstanceDetailView

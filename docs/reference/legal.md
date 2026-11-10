@@ -85,7 +85,7 @@ A person accepts the tenant's terms in a step of the identity provider, once and
   the box with an error and sends nothing. Continue records when the person accepted. Declining ends the sign-in at
   `/?signIn=declined`, Axis's sign-in card, which says that signing in needs the terms accepted, see
   [the shell's sign-in card](shell.md#the-sign-in-card).
-- **One box, drawn once** _(planned for M33)_. `AcceptTermsField` draws the box, on this step and on the
+- **One box, drawn once**. `AcceptTermsField` draws the box, on this step and on the
   [sign-up page](sign-up.md#the-terms-box). It is a required box that never starts ticked, names each
   document as a link that opens in a new tab and marks itself with its message when the form is finished
   unticked.

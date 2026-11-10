@@ -45,10 +45,10 @@ Each common job has one shared widget or helper:
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
-| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line _(planned for M33)_ |
-| A required box that accepts terms, each document a link | `AcceptTermsField` _(planned for M33)_ |
-| A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language _(planned for M33)_ |
-| The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line _(planned for M33)_ |
+| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line |
+| A required box that accepts terms, each document a link | `AcceptTermsField`, which never starts ticked and links each document in a new tab through `FilledText` |
+| A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language |
+| The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line |
 | The application a new tenant or a new application starts from | `StartFromField`, with Blank first _(planned for M33)_ |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 | Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
@@ -69,7 +69,7 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
   `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`
   expression. It cannot see a colour picked from a lookup table.
-- **An older use carries its reason.** Each `Button`, `Alert` and `Tag` that predates the rules has an
+- **An older use carries its reason.** Each `Button` and `Tag` that predates the rules has an
   `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
   `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
   older uses only go down.

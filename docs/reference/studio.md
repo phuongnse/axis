@@ -486,7 +486,8 @@ edits the same draft on a canvas.
 - **The page.** The Form tab shows three [sections](studio-resource-form.md#sections): General, with the
   page's name, its [title](studio-resource-form.md#labels) and its [description](#editor); the
   [parameters](#page-parameters); and Widgets, with the [widget tree](#widget-tree). Each page field and
-  each widget name picker has a label and help, named by its path in the page.
+  each widget name picker, and each field of the `table`, `form`, `detail`, `taskInbox` and `processInspector`
+  panels and of their actions, has a label and help, named by its path in the page.
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -544,8 +545,9 @@ a picker and a label, with Add measure and Remove measure, which is off when one
 ### Navigate actions
 
 A navigate action has a page picker, a [label](studio-resource-form.md#labels), an optional `record`
-expression and parameter expressions. The page picker lists every page, the current one included,
-because a page may open itself with other parameters.
+expression and parameter expressions. The page picker, label, record and parameters each show their
+label and help. The page picker lists every page, the current one included, because a page may open
+itself with other parameters.
 
 - **Adding one.** A table offers only Add navigate action, and a form also Add action for
   `startProcess`. A new action is named `<action type><n>`, such as `navigate1`, with the first free
@@ -797,16 +799,19 @@ Operations heading, and the JSON view stays as the second view of the same draft
 
 ## Identity provider editor
 
-The identity provider editor's Form tab shows the provider's name and `type`, then the fields of that
-type, see [identity provider resource](identity-provider.md#identity-provider-resource), and the JSON
-view stays as the second view of the same draft.
+The identity provider editor's Form tab shows the provider's fields in the five
+[shared sections](studio-resource-form.md#sections) General, Sign-in, Claims, Roles and Assurance, each
+field with its label and [help](frontend.md#platform-field-help), see
+[identity provider resource](identity-provider.md#identity-provider-resource). Sign-in and Claims show
+only for `oidc` and `saml`. General holds the name, `type` and description. Add assurance level sits on
+the Assurance heading, and the JSON view stays as the second view of the same draft.
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
-  bindings it requires, with an empty name. An `accounts` provider shows no label, bindings or claims.
-- **Bindings.** A binding is a name box, labelled as a URL or a secret binding, and no value is shown
-  or stored. `oidc` shows the issuer, the client id, and a choice of client credential: a client
-  secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
-- **Label.** The "Continue with" label has its texts in every locale, see [label texts](#label-texts).
+  bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
+- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+  stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
+  credential: a client secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
+- **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim

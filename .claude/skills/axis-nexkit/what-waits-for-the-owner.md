@@ -17,8 +17,9 @@ waits for them or needs them.
      `nexkit/review` are green.
    - Milestones with no open issue:
      `gh api repos/{owner}/{repo}/milestones --jq '.[] | select(.open_issues == 0)'`.
-   - Links of open issues that point nowhere: each link that
-     `node scripts/check-issue-links.mjs` prints on an up-to-date `main`.
+   - Links of open issues that the docs audit could not fix: the `Not relinked:` lines in the log of
+     its latest run, from `gh run list --workflow docs-audit.yml --branch main --limit 1` and
+     `gh run view <id> --log`. The row links that run.
 3. Check the labels and milestones of the open issues:
    - **No label:** `gh issue list --state open --search 'no:label' --limit 500 --json number,title,url`.
      The row suggests every label whose description fits, as
@@ -35,8 +36,3 @@ waits for them or needs them.
    item, its link and the suggested action. When nothing waits, say so in one
    sentence.
 5. Change nothing until the owner says yes.
-
-For a broken link, after the yes, find where the file or heading went
-(`git log --follow`, or the decisions index for a superseded decision). Edit the
-issue to link the new place with `gh issue edit --body-file`, and change
-nothing else in it.

@@ -1,4 +1,5 @@
-import { Alert, Flex, Select } from 'antd'
+import { Flex, Select } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AxisTable, type AxisColumn, type AxisTableProps } from './AxisTable'
@@ -179,12 +180,10 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
     )
 
   if (load.forbidden && !loading) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="inspector-forbidden" type="warning" title={t('shell.inspector.forbidden')} />
+    return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
   }
   if (failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="inspector-error" type="error" title={t('shell.inspector.loadFailed')} />
+    return <AxisAlert data-testid="inspector-error" kind="error" message={t('shell.inspector.loadFailed')} />
   }
   return (
     <Flex vertical gap="middle">
