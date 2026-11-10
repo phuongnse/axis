@@ -50,7 +50,6 @@ import {
   requestId,
   sectionWidget,
   signUpApplications,
-  signUpChallenge,
   signUpDocuments,
   signUpRegion,
   siteTexts,
@@ -332,7 +331,8 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 1200,
       routes: {
         '/api/sign-up/applications': () => signUpApplications,
-        '/api/sign-up/challenge': signUpChallenge,
+        // No challenge, so the page sends the form without a proof of work and solves nothing in the preview.
+        '/api/sign-up/challenge': () => new Response(null, { status: 404 }),
         '/api/sign-up/documents': () => signUpDocuments,
         '/api/sign-up/region': () => signUpRegion,
       },

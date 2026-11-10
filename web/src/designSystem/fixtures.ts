@@ -1209,9 +1209,6 @@ export const signUpDocuments = {
 
 export const signUpRegion = { tenantDomain: 'vn.example.com' }
 
-/** The challenge is solved out of sight and never shown, so the preview keeps the request pending. */
-export const signUpChallenge = () => new Promise<never>(() => {})
-
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
 export const fixtureScopes = [
   `${apiPath}/`,

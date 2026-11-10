@@ -271,6 +271,14 @@ public sealed partial class ControlPlaneOptions
             }
         }
 
+        for (var index = 0; index < signUp.PublicMailboxDomains.Count; index++)
+        {
+            if (Uri.CheckHostName(signUp.PublicMailboxDomains[index]) != UriHostNameType.Dns)
+            {
+                problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.PublicMailboxDomains)}:{index.ToString(CultureInfo.InvariantCulture)} must be a domain name.");
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(signUp.ChallengeKey)
             && !(Convert.TryFromBase64String(signUp.ChallengeKey, new byte[signUp.ChallengeKey.Length], out var written) && written >= SignUpChallenge.MinimumKeyBytes))
         {

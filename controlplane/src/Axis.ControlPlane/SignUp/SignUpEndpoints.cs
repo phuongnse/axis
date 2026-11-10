@@ -40,7 +40,8 @@ internal static class SignUpEndpoints
                 ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
-        // See docs/reference/sign-up.md#sending-the-form. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
+        // See docs/reference/sign-up.md#sending-the-form. It checks the limits of docs/reference/sign-up.md#bots-and-abuse first: the
+        // client address before the body is read, the email's domain once the email is valid, and both before any write. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
         // and queues the confirm email in the same transaction. The answer has no body yet. The body may carry the solved challenge as
         // altcha, which the route does not check yet, see docs/reference/sign-up.md#bots-and-abuse. Without the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
@@ -93,12 +94,19 @@ internal static class SignUpEndpoints
     };
 
     private static async Task<IResult> SignUpAsync(
-        HttpRequest request,
+        HttpContext context,
         IServiceProvider services,
         ControlPlaneOptions options,
+        SignUpLimits limits,
         NpgsqlDataSource controlPlane,
         CancellationToken cancellationToken)
     {
+        var request = context.Request;
+        if (limits.RefuseAddress(context) is { } addressLimit)
+        {
+            return addressLimit;
+        }
+
         var check = services.GetService<SubdomainCheck>();
         if (check is null)
         {
@@ -135,6 +143,11 @@ internal static class SignUpEndpoints
         if (email is not null && !errors.ContainsKey("/email") && !(MailboxAddress.TryParse(email, out var mailbox) && mailbox.Address == email))
         {
             errors["/email"] = ["signUp.email.invalid"];
+        }
+
+        if (email is not null && !errors.ContainsKey("/email") && limits.RefuseDomain(context, email) is { } domainLimit)
+        {
+            return domainLimit;
         }
 
         // A blank application is the empty text, and the form must send it, so a form that left the field out is refused.

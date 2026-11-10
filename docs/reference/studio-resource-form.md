@@ -23,7 +23,10 @@ names goes to a last section with no heading.
 - **One rhythm.** The sections are `spacing-md` apart.
 - **One shared part.** The section is one shared part that the generic form draws and the typed editors can
   draw too.
-- **Every Studio form is built from it.** _(planned for M31)_ A typed editor draws its sections through it.
+- **Used by the generic form and most editors.** The generic form and the page, process, connector, identity
+  provider and scenario editors draw their sections through it.
+- **Every Studio form is built from it.** _(planned for M33)_ The entity designer and the seed editor draw their
+  sections through it too.
 
 ## Fields
 
