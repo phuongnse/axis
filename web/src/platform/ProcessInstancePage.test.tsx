@@ -536,7 +536,9 @@ describe('ProcessInstancePage', () => {
     await userEvent.click(screen.getByTestId('inspector-command-cancel'))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Close')).toBeInTheDocument()
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Requested by finance' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), {
+      target: { value: 'Requested by finance' },
+    })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByTestId('inspector-command-cancel')).not.toBeInTheDocument())
@@ -544,6 +546,19 @@ describe('ProcessInstancePage', () => {
     const post = fetchMock.mock.calls.find(([, init]) => init?.method === 'POST')!
     expect(post[0]).toBe(`${instancesPath}/${instanceId}/cancel`)
     expect(JSON.parse(post[1]!.body as string)).toEqual({ reason: 'Requested by finance' })
+  })
+
+  it('gives the reason of a command its help', async () => {
+    stubApi({ detail: { status: 200, body: detailWith(['cancel']) } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId('inspector-command-cancel'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveAccessibleDescription(
+      platformEnglish['shell.inspector.commands.reason.help'],
+    )
   })
 
   it('blocks a blank reason and sends nothing', async () => {
@@ -554,7 +569,7 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId('inspector-command-cancel'))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: '   ' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: '   ' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
@@ -572,7 +587,7 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId('inspector-command-cancel'))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Too late' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Too late' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
@@ -590,11 +605,37 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId('inspector-command-cancel'))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Try' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(
       'The command could not be sent.',
+    )
+  })
+
+  it('gives each resolve field its help and names the outputs as a group', async () => {
+    stubApi({ detail: { status: 200, body: detailWithResolvable() } })
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('textbox', { name: 'Reason' })).toHaveAccessibleDescription(
+      platformEnglish['shell.inspector.commands.reason.help'],
+    )
+    expect(within(dialog).getByRole('radiogroup', { name: 'Outcome' })).toHaveAccessibleDescription(
+      platformEnglish['shell.inspector.commands.outcome.help'],
+    )
+
+    await userEvent.click(within(dialog).getByLabelText('Succeeded'))
+    const outputs = within(dialog).getByRole('group', { name: 'Outputs' })
+    expect(outputs).toHaveAccessibleDescription(platformEnglish['shell.inspector.commands.outputs.help'])
+    const outputHelp = platformEnglish['shell.inspector.commands.output.help']
+    expect(within(outputs).getByRole('textbox', { name: 'orderNumber (text)' })).toHaveAccessibleDescription(outputHelp)
+    expect(within(outputs).getByRole('textbox', { name: 'total (decimal)' })).toHaveAccessibleDescription(outputHelp)
+    expect(within(outputs).getByRole('combobox', { name: 'confirmed (boolean)' })).toHaveAccessibleDescription(
+      outputHelp,
     )
   })
 
@@ -606,11 +647,13 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'The order exists' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'The order exists' } })
     await userEvent.click(within(dialog).getByLabelText('Succeeded'))
-    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: 'PO-2026-0001' } })
-    fireEvent.change(within(dialog).getByLabelText('total (decimal)'), { target: { value: '1250.50' } })
-    await userEvent.click(within(dialog).getByLabelText('confirmed (boolean)'))
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'orderNumber (text)' }), {
+      target: { value: 'PO-2026-0001' },
+    })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'total (decimal)' }), { target: { value: '1250.50' } })
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'confirmed (boolean)' }))
     await userEvent.click(await screen.findByTitle('true'))
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
@@ -634,7 +677,9 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'No order was found' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), {
+      target: { value: 'No order was found' },
+    })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
     expect(await within(dialog).findByText('Choose an outcome.')).toBeInTheDocument()
 
@@ -668,12 +713,12 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Try' } })
     await userEvent.click(within(dialog).getByLabelText('Succeeded'))
-    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: '12' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'orderNumber (text)' }), { target: { value: '12' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
-    const field = formItem(within(dialog).getByLabelText('orderNumber (text)'))
+    const field = formItem(within(dialog).getByRole('textbox', { name: 'orderNumber (text)' }))
     expect(await within(field).findByText('Must be text.')).toBeInTheDocument()
     expect(within(dialog).getByTestId('inspector-command-error')).toHaveTextContent('The request has errors.')
     expect(screen.getByRole('dialog')).toBeInTheDocument()
@@ -696,9 +741,9 @@ describe('ProcessInstancePage', () => {
     await screen.findByTestId('inspector-instance')
     await userEvent.click(screen.getByTestId(`inspector-resolve-${resolvableCallId}`))
     const dialog = await screen.findByRole('dialog')
-    fireEvent.change(within(dialog).getByLabelText('Reason'), { target: { value: 'Try' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'Reason' }), { target: { value: 'Try' } })
     await userEvent.click(within(dialog).getByLabelText('Succeeded'))
-    fireEvent.change(within(dialog).getByLabelText('orderNumber (text)'), { target: { value: '12' } })
+    fireEvent.change(within(dialog).getByRole('textbox', { name: 'orderNumber (text)' }), { target: { value: '12' } })
     await userEvent.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     expect(await within(dialog).findByTestId('inspector-command-error')).toHaveTextContent(

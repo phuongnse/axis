@@ -422,7 +422,7 @@ describe('ConsolePage', () => {
     expect(await within(dialog).findByText('Enter a reason.')).toBeInTheDocument()
     expect(server.requests.filter((request) => request.startsWith('POST'))).toEqual([])
 
-    await user.type(within(dialog).getByLabelText('Reason'), 'The receiver is back')
+    await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'The receiver is back')
     await user.click(within(dialog).getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
