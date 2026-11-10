@@ -318,7 +318,7 @@ if affected playwright; then
   control_plane_log="$root/artifacts/logs/e2e-controlplane.log"
   : >"$control_plane_log"
   export AXIS_E2E_CONTROL_PLANE_URL="http://127.0.0.1:${AXIS_E2E_CONTROL_PLANE_PORT:-5290}"
-  # The control plane is up when /health/live answers.
+  # The control plane is up when /health/live answers. ControlPlane__SignUp__ChallengeKey is a test key: the sign-up page solves a real challenge.
   ASPNETCORE_URLS="$AXIS_E2E_CONTROL_PLANE_URL" ASPNETCORE_ENVIRONMENT=Testing \
     ControlPlane__Region=vn ControlPlane__TenantDomain=vn.example.com \
     ControlPlane__ConnectionString="Host=127.0.0.1;Port=$port;Database=axis_controlplane;Username=axis_controlplane;Password=axis" \
@@ -326,6 +326,7 @@ if affected playwright; then
     ControlPlane__Dns__Provider=InMemory ControlPlane__MailFrom=no-reply@vn.example.com \
     ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port="$mailpit_smtp_port" ControlPlane__Mail__UseTls=false \
     ControlPlane__PublicUrl="$AXIS_E2E_CONTROL_PLANE_URL" \
+    ControlPlane__SignUp__ChallengeKey=ZTJlLXNpZ24tdXAtY2hhbGxlbmdlLWtleS1mb3ItdGVzdHM= \
     dotnet controlplane/src/Axis.ControlPlane/bin/Release/net10.0/Axis.ControlPlane.dll \
     --contentRoot "$root/controlplane/src/Axis.ControlPlane" >>"$control_plane_log" 2>&1 &
   control_plane_pid=$!

@@ -64,6 +64,7 @@
       "properties": {
         "connectionString": { "$ref": "#/definitions/secretReference" },
         "mailPassword": { "$ref": "#/definitions/secretReference" },
+        "challengeKey": { "$ref": "#/definitions/secretReference" },
         "certificate": { "$ref": "#/definitions/tlsSecretReference" }
       },
       "additionalProperties": false

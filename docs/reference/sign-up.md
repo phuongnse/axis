@@ -100,8 +100,9 @@ The box accepts the business's agreements.
 
 _(planned for M33)_
 
-`POST /api/sign-up` takes `fullName`, `email`, `businessName`, `subdomain`, `language`, `application`
-and the three document versions, and answers `202` with `{ resend }` when it is accepted, see
+`POST /api/sign-up` takes `fullName`, `email`, `businessName`, `subdomain`, `language`, `application`,
+the three document versions and the `altcha` solution of the [proof of work](#bots-and-abuse), and
+answers `202` with `{ resend }` when it is accepted, see
 [verifying the email first](#verifying-the-email-first). A refusal is a problem whose `errors` are text
 keys of the page by JSON Pointer, as the [record API](record-api.md)'s are:
 
@@ -158,7 +159,10 @@ cost something.
 - **Proof of work.** The form needs an ALTCHA solution. The control plane serves the challenge itself
   at `GET /api/sign-up/challenge`: an HMAC-signed challenge that expires after 10 minutes and is
   accepted once. The browser solves it while the person types, so a person barely waits and a bot
-  pays for each try. No sign-up data goes to a bot-check service.
+  pays for each try. No sign-up data goes to a bot-check service. The route answers
+  `{ algorithm, challenge, maxnumber, salt, signature }`, signed with
+  [`ControlPlane:SignUp:ChallengeKey`](control-plane.md#settings), and answers `503` without that key.
+  The page sends the solution as `altcha` in the body of `POST /api/sign-up`.
 - **Rate limits.** The control plane's `sign_up` partition allows 5 sign-ups an hour from one client
   address, and 20 a day for one email domain, except the public mailbox domains of the setting
   `ControlPlane:SignUp:PublicMailboxDomains`, such as `gmail.com`, which count by address only. Past a

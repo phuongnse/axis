@@ -13,7 +13,7 @@ namespace Axis.ControlPlane;
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
 /// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
-/// The sign-up documents are optional as a group, and once one is set, all of them are required.
+/// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -277,6 +277,12 @@ public sealed partial class ControlPlaneOptions
             {
                 problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.PublicMailboxDomains)}:{index.ToString(CultureInfo.InvariantCulture)} must be a domain name.");
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(signUp.ChallengeKey)
+            && !(Convert.TryFromBase64String(signUp.ChallengeKey, new byte[signUp.ChallengeKey.Length], out var written) && written >= SignUpChallenge.MinimumKeyBytes))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.ChallengeKey)} must be base64 of at least {SignUpChallenge.MinimumKeyBytes} bytes.");
         }
 
         if (signUp.HasDocuments)

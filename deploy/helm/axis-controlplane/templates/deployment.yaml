@@ -114,6 +114,13 @@ spec:
                     - key: {{ $.Values.secrets.mailPassword.key | default "ControlPlane__Mail__Password" | quote }}
                       path: ControlPlane__Mail__Password
               {{- end }}
+              {{- with .Values.secrets.challengeKey.name }}
+              - secret:
+                  name: {{ . | quote }}
+                  items:
+                    - key: {{ $.Values.secrets.challengeKey.key | default "ControlPlane__SignUp__ChallengeKey" | quote }}
+                      path: ControlPlane__SignUp__ChallengeKey
+              {{- end }}
         - name: tmp
           emptyDir: {}
         - name: controlplane-tls
