@@ -5,6 +5,7 @@ import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
+import { EmptyDash } from '../platform/EmptyValue'
 import { requiredMark } from '../platform/requiredMark'
 import {
   actOnAuthoringRequest,
@@ -13,10 +14,13 @@ import {
   ServerUnreachableError,
   type StudioAuthoringRequest,
   type StudioAuthoringRequestDetail,
+  type StudioAuthoringRequestState,
+  type StudioAuthoringRequestStep,
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { StepsBar } from '../platform/StepsBar'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
 import {
@@ -27,6 +31,35 @@ import {
   waitingForAuthor,
 } from './authoringRequests'
 import { StudioPageHeading } from './StudioPageHeading'
+
+/** Proposed: the stages of a request's loop, which a `StepsBar` shows on its page. */
+const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
+
+/**
+ * The stage a state is in: fixing goes back to the checks, and an accepted request has finished every stage. A dropped
+ * or failed request shows no stages.
+ */
+function stageOf(state: StudioAuthoringRequestState): number | null {
+  switch (state) {
+    case 'planning':
+      return 0
+    case 'awaitingApproval':
+      return 1
+    case 'working':
+      return 2
+    case 'checking':
+    case 'fixing':
+      return 3
+    case 'reviewing':
+      return 4
+    case 'ready':
+      return 5
+    case 'accepted':
+      return stageKeys.length
+    default:
+      return null
+  }
+}
 
 /** A request's sending time in the UI locale, to the minute. */
 function useSentTime(): (time: string) => string {
@@ -139,8 +172,10 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
  * Proposed: the page of one AI request, where Send leads. Its heading says who sent it when, then come its words and
  * its state. While AI writes the plan, a spinner says so, and the page follows the request until it waits for its
  * author or ends. In `awaitingApproval` the plan shows in plain words, one line a bullet, and its author approves it, asks for another
- * with a comment or drops the request; anyone else reads that it waits for its author. The progress of the work, the
- * diff and Accept are steps 2 and 4 of the review on #3263.
+ * with a comment or drops the request; anyone else reads that it waits for its author. The
+ * diff and Accept are step 4 of the review on #3263. Under "Progress" a `StepsBar` shows the loop's stages, then the
+ * state in words with the fix round, and while it runs "Now:" with the summary of the step that has not finished.
+ * "What AI did" lists every step with its result and when it started.
  */
 export function StudioAuthoringRequestPage({
   application,
@@ -159,6 +194,7 @@ export function StudioAuthoringRequestPage({
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
   const stateColour = useRequestStateColour()
+  const stageTitles = stageKeys.map((key) => t(`shell.studio.request.stage.${key}`))
   const { generation, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<{ id: string; request: StudioAuthoringRequestDetail | null }>()
   const [follow, setFollow] = useState(0)
@@ -265,6 +301,37 @@ export function StudioAuthoringRequestPage({
       {text}
     </div>
   )
+  const stage = stageOf(request.state)
+  const running = request.steps.findLast((step) => step.finishedAt === null)
+  const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
+    {
+      key: 'step',
+      kind: 'freeText',
+      title: t('shell.studio.request.step'),
+      // A change of plan keeps the author's comment as its summary.
+      render: (_, step) =>
+        step.kind === 'planChange'
+          ? t('shell.studio.request.planChange').replace('{comment}', step.summary)
+          : step.summary,
+    },
+    {
+      key: 'result',
+      kind: 'freeText',
+      title: t('shell.studio.request.result'),
+      render: (_, step) =>
+        step.finishedAt === null ? (
+          <span style={{ color: colour.textMuted }}>{t('shell.studio.request.stepRunning')}</span>
+        ) : (
+          (step.outcome ?? <EmptyDash />)
+        ),
+    },
+    {
+      key: 'started',
+      kind: 'fixed',
+      title: t('shell.studio.request.started'),
+      render: (_, step) => sentTime(step.startedAt),
+    },
+  ]
   const canDrop = mine && request.state !== 'accepted' && request.state !== 'dropped'
   const awaiting = request.state === 'awaitingApproval'
 
@@ -284,21 +351,29 @@ export function StudioAuthoringRequestPage({
       {back}
       {section(t('shell.studio.request.asked'), quoted(request.text))}
       {section(
-        t('shell.studio.requests.state'),
-        <Flex align="center" gap={spacing.sm}>
-          {following && <Spin size="small" />}
-          <Typography.Text style={{ color: stateColour(request.state) }}>
-            {stateWords(request, mine)}
-            {request.round > 1 && request.state !== 'planning' && (
-              <span style={{ color: colour.textMuted }}>
-                {t('shell.studio.request.round').replace('{round}', String(request.round))}
-              </span>
-            )}
-          </Typography.Text>
+        t('shell.studio.request.progress'),
+        <Flex vertical gap="small" data-testid="studio-ai-progress">
+          {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
+          <Flex align="center" gap={spacing.sm}>
+            {following && <Spin size="small" />}
+            <Typography.Text style={{ color: stateColour(request.state) }}>
+              {stateWords(request, mine)}
+              {request.round > 1 && request.state !== 'planning' && (
+                <span style={{ color: colour.textMuted }}>
+                  {t('shell.studio.request.round').replace('{round}', String(request.round))}
+                </span>
+              )}
+            </Typography.Text>
+          </Flex>
+          {running !== undefined && following && (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.request.now').replace('{step}', running.summary)}
+            </Typography.Text>
+          )}
+          {request.state === 'planning' && (
+            <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.request.planning')}</Typography.Text>
+          )}
         </Flex>,
-      )}
-      {request.state === 'planning' && (
-        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.request.planning')}</Typography.Text>
       )}
       {request.plan !== null &&
         section(
@@ -333,6 +408,18 @@ export function StudioAuthoringRequestPage({
           </AxisButton>
         </AxisActionRow>
       )}
+      {request.steps.length > 0 &&
+        section(
+          t('shell.studio.request.steps'),
+          <AxisTable<StudioAuthoringRequestStep>
+            columns={stepColumns}
+            rowKey={(step) => `${step.startedAt}/${step.kind}`}
+            dataSource={request.steps}
+            pagination={false}
+            toolbar={{}}
+            emptyText=""
+          />,
+        )}
       <Modal
         forceRender
         open={changeOpen}

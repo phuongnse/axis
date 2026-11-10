@@ -1,7 +1,9 @@
 import type {
   StudioApplication,
   StudioAuthoringRequest,
+  StudioAuthoringRequestDetail,
   StudioAuthoringRequestList,
+  StudioAuthoringRequestStep,
   StudioBindings,
   StudioCatalog,
   StudioDiagnostic,
@@ -349,28 +351,113 @@ const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan }
 // What the preview's own sends and actions changed, so the list and each request's page follow them.
 const sentRequests: { request: StudioAuthoringRequest; at: number }[] = []
 const actedOn = new Map<string, { state: StudioAuthoringRequest['state']; at: number }>()
+const planComments = new Map<string, string[]>()
+
+// Proposed: the steps of a request's loop, each with its kind, its summary and its outcome. A fix round adds a fix and a
+// second check, see docs/reference/authoring-requests.md#states.
+const loop: [string, string, string][] = [
+  ['plan', 'Read the application and wrote a plan', 'Plan written'],
+  ['work', 'Made the change in a draft', 'Draft saved, 4 resources changed'],
+  [
+    'check',
+    "Ran the compiler and the application's 8 scenarios",
+    '1 scenario failed: a request without a supplier was saved',
+  ],
+  ['fix', 'Worked on what the checks found', 'Draft saved, 1 resource changed'],
+  ['check', "Ran the compiler and the application's 8 scenarios", 'All 8 scenarios passed'],
+  ['review', 'A second AI read the draft against the request and the plan', 'No findings'],
+]
+
+/** How many steps of the loop a state has started, and whether the last one still runs. */
+const progress: Record<StudioAuthoringRequest['state'], [number, boolean]> = {
+  planning: [1, true],
+  awaitingApproval: [1, false],
+  working: [2, true],
+  checking: [3, true],
+  fixing: [4, true],
+  reviewing: [6, true],
+  ready: [6, false],
+  accepted: [6, false],
+  dropped: [1, false],
+  failed: [3, false],
+}
+
+/** After an approval the preview's request moves on every four seconds, through one fix round, to `ready`. */
+const afterApproval: [StudioAuthoringRequest['state'], number, number, boolean][] = [
+  ['working', 1, 2, true],
+  ['checking', 1, 3, true],
+  ['fixing', 2, 4, true],
+  ['checking', 2, 5, true],
+  ['reviewing', 2, 6, true],
+  ['ready', 2, 6, false],
+]
+
+/** The first `count` steps of the loop, `gap` milliseconds apart from `start`, the last one running when asked. */
+function loopSteps(count: number, running: boolean, start: number, gap: number): StudioAuthoringRequestStep[] {
+  return loop.slice(0, count).map(([kind, summary, outcome], index) => {
+    const last = running && index === count - 1
+    return {
+      kind,
+      summary,
+      outcome: last ? null : outcome,
+      tokens: 0,
+      startedAt: new Date(start + index * gap).toISOString(),
+      finishedAt: last ? null : new Date(start + (index + 1) * gap).toISOString(),
+    }
+  })
+}
 
 /**
- * A sent request, or one whose plan was changed, writes its plan for four seconds, then waits for its author with a plan
- * made of its words.
+ * A request as it is now, with its steps. A sent request, or one whose plan was changed, writes its plan for four
+ * seconds, then waits for its author with a plan made of its words. An approved one then moves on through its loop.
  */
-function asNow(request: StudioAuthoringRequest): StudioAuthoringRequest {
+function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
   const sent = sentRequests.find((item) => item.request.id === request.id)
   const acted = actedOn.get(request.id)
-  const since = acted?.at ?? sent?.at
-  const writing = acted?.state ?? (sent !== undefined ? 'planning' : request.state)
-  const planned = writing === 'planning' && since !== undefined && Date.now() - since > 4000
-  const state = planned ? 'awaitingApproval' : writing
+  let { state, round } = request
+  let [count, running] = progress[state]
+  let start = Date.parse(request.sentAt)
+  let gap = 60_000
+  if (sent !== undefined || acted !== undefined) {
+    const since = acted?.at ?? sent!.at
+    const elapsed = Date.now() - since
+    const from = acted?.state ?? 'planning'
+    gap = 4000
+    start = from === 'working' ? since - gap : since
+    if (from === 'working') {
+      ;[state, round, count, running] = afterApproval[Math.min(afterApproval.length - 1, Math.floor(elapsed / gap))]
+    } else {
+      state = from === 'planning' ? (elapsed > gap ? 'awaitingApproval' : 'planning') : from
+      ;[count, running] = progress[state]
+    }
+  }
   const plan =
-    plans[request.id] ??
-    (planned
-      ? [
+    state === 'planning'
+      ? null
+      : (plans[request.id] ??
+        [
           `Change the application as asked: "${request.text}"`,
           'Use no module: nothing built in does this.',
           'Add one scenario that checks the change.',
-        ].join('\n')
-      : null)
-  return { ...request, state, plan: state === 'planning' ? null : plan }
+        ].join('\n'))
+  // Each change of plan is a `planChange` step whose summary is the comment, then the plan is written again.
+  const comments = planComments.get(request.id) ?? []
+  const steps =
+    comments.length > 0 && (state === 'planning' || state === 'awaitingApproval')
+      ? [
+          ...loopSteps(1, false, start - 2 * gap, gap),
+          ...comments.map((comment) => ({
+            kind: 'planChange',
+            summary: comment,
+            outcome: null,
+            tokens: 0,
+            startedAt: new Date(start - gap).toISOString(),
+            finishedAt: new Date(start - gap).toISOString(),
+          })),
+          ...loopSteps(1, state === 'planning', start, gap),
+        ]
+      : loopSteps(count, running, start, gap)
+  return { ...request, state, round, plan, steps }
 }
 
 /** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
@@ -378,12 +465,18 @@ function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Rec
   const all = () => [...sentRequests.map((item) => item.request), ...list.items]
   const one = (id: string) => (): unknown => {
     const request = all().find((item) => item.id === id)
-    return request === undefined ? new Response(null, { status: 404 }) : { ...asNow(request), steps: [] }
+    return request === undefined ? new Response(null, { status: 404 }) : asNow(request)
   }
-  const act = (id: string, state: StudioAuthoringRequest['state']) => (): unknown => {
-    actedOn.set(id, { state, at: Date.now() })
-    return asNow(all().find((item) => item.id === id)!)
-  }
+  const act =
+    (id: string, state: StudioAuthoringRequest['state']) =>
+    (init?: RequestInit): unknown => {
+      actedOn.set(id, { state, at: Date.now() })
+      if (typeof init?.body === 'string') {
+        const { comment } = JSON.parse(init.body) as { comment: string }
+        planComments.set(id, [...(planComments.get(id) ?? []), comment])
+      }
+      return asNow(all().find((item) => item.id === id)!)
+    }
   const routes: Record<string, FixtureRoute> = {
     ...workspaceRoutes(typicalFolder),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
