@@ -40,10 +40,12 @@ internal static class SignUpEndpoints
                 ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
-        // See docs/reference/sign-up.md#sending-the-form. It checks the limits of docs/reference/sign-up.md#bots-and-abuse first: the
-        // client address before the body is read, the email's domain once the email is valid, and both before any write. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
-        // and queues the confirm email in the same transaction. The answer has no body yet. The body may carry the solved challenge as
-        // altcha, which the route does not check yet, see docs/reference/sign-up.md#bots-and-abuse. Without the directory the route answers 503.
+        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key and the directory),
+        // the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit and
+        // the subdomain, see docs/reference/sign-up.md#bots-and-abuse. A missing, malformed, wrong, expired or used solution is refused
+        // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
+        // 24 hours and queues the confirm email in the same transaction. The answer has no body yet. Without the key or the directory the
+        // route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
@@ -99,12 +101,13 @@ internal static class SignUpEndpoints
         ControlPlaneOptions options,
         SignUpLimits limits,
         NpgsqlDataSource controlPlane,
+        TimeProvider clock,
         CancellationToken cancellationToken)
     {
         var request = context.Request;
-        if (limits.RefuseAddress(context) is { } addressLimit)
+        if (string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey))
         {
-            return addressLimit;
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
         }
 
         var check = services.GetService<SubdomainCheck>();
@@ -117,6 +120,18 @@ internal static class SignUpEndpoints
         if (body is null)
         {
             return refused!;
+        }
+
+        // One answer for every failed solution, so a caller learns nothing about which check it failed.
+        var solution = SignUpChallenge.Verify(Convert.FromBase64String(options.SignUp.ChallengeKey), Required(body, "altcha"), clock.GetUtcNow());
+        if (solution is null || !await UseChallengeAsync(controlPlane, solution.Value, cancellationToken))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["/altcha"] = ["signUp.altcha.refused"] });
+        }
+
+        if (limits.RefuseAddress(context) is { } addressLimit)
+        {
+            return addressLimit;
         }
 
         // Every field is checked in one pass, so the person sees all that is wrong at once.
@@ -216,6 +231,16 @@ internal static class SignUpEndpoints
         }
 
         return Results.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    // Stores a solution as used. The conditional insert is atomic, so of two parallel sign-ups with one solution, on any replica, only one inserts.
+    private static async Task<bool> UseChallengeAsync(NpgsqlDataSource controlPlane, (byte[] Challenge, DateTimeOffset ExpiresAt) solution, CancellationToken cancellationToken)
+    {
+        await using var insert = controlPlane.CreateCommand(
+            "INSERT INTO control_plane.sign_up_challenges (challenge, expires_at) VALUES (@challenge, @expiresAt) ON CONFLICT DO NOTHING");
+        insert.Parameters.AddWithValue("challenge", solution.Challenge);
+        insert.Parameters.AddWithValue("expiresAt", solution.ExpiresAt);
+        return await insert.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     private static async Task<IResult> VerifyAsync(HttpRequest request, ControlPlaneOptions options, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)
