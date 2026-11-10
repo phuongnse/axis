@@ -893,7 +893,9 @@ describe('PageEditor navigate actions', () => {
     renderEditor(page({ ...table, rowActions: [toReviewList] }))
 
     const row = screen.getByTestId(`${rows}/0/parameters/request`)
-    expect(row).toHaveTextContent('request, reference, required')
+    expect(within(row).getByLabelText('request')).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.page.requiredParameterExpression.help'].replace('{type}', 'reference'),
+    )
     expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('')
     expect(screen.queryByRole('button', { name: 'Add mapping' })).not.toBeInTheDocument()
   })
@@ -947,6 +949,9 @@ describe('PageEditor navigate actions', () => {
 
     const row = screen.getByTestId(`${rows}/0/parameters/extra`)
     expect(row).toHaveTextContent('Not a parameter of this page')
+    expect(within(row).getByLabelText('extra')).toHaveAccessibleDescription(
+      platformEnglish['shell.studio.page.undeclaredParameter.help'],
+    )
     expect(within(row).getByRole('textbox', { name: 'Expression' })).toHaveValue('id')
     await userEvent.click(within(row).getByRole('button', { name: 'Remove' }))
 
@@ -1559,6 +1564,9 @@ describe('PageEditor kpi and chart panels', () => {
 
   it('binds a KPI and a chart parameter to a page parameter of the same type', async () => {
     const savedKpi = renderStateful(page({ ...kpi, dataSource: 'OpenTotals' }, { parameters: pageParameters }))
+    expect(
+      within(screen.getByTestId('studio-field-/widgets/0/parameters/inRegion')).getByLabelText('inRegion'),
+    ).toHaveAccessibleDescription(platformEnglish['shell.studio.page.parameterBinding.help'].replace('{type}', 'text'))
     expect(await listed('studio-field-/widgets/0/parameters/inRegion')).toEqual(['region'])
     await userEvent.keyboard('{Escape}')
     await chooseOption('region', screen.getByTestId('studio-field-/widgets/0/parameters/inRegion'))

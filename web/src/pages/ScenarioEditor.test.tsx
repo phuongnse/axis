@@ -401,6 +401,20 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     expect(screen.getByRole('textbox', { name: 'extra' })).toHaveValue('x')
   })
 
+  it('labels each value by its field, with the field type in the help, and a key the entity lacks by its help', () => {
+    renderEditor(scenario([{ ...fixtures.createRecord, values: { code: 'A1', size: 2, other: 'x' } }]))
+
+    expect(screen.getByLabelText('code')).toHaveAccessibleDescription(
+      english['shell.studio.scenario.value.help'].replace('{type}', 'text'),
+    )
+    expect(screen.getByLabelText('size')).toHaveAccessibleDescription(
+      english['shell.studio.scenario.value.help'].replace('{type}', 'integer'),
+    )
+    expect(screen.getByLabelText('other')).toHaveAccessibleDescription(
+      english['shell.studio.scenario.unnamedValue.help'],
+    )
+  })
+
   it.each([
     ['1500', 1500],
     ['-1', -1],

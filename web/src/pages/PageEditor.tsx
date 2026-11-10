@@ -1,5 +1,5 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
-import { lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
@@ -30,19 +30,17 @@ import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { WarningLine } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
 import { useFieldTexts } from './fieldTexts'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
+import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -818,6 +816,7 @@ function ParameterBindings({
   pageParameters: unknown
   onChange: ChangeHandler
 }) {
+  const t = useText()
   const names = useContext(StudioNamesContext)
   const parameters = names === undefined ? undefined : dataSourceParameters(names, dataSource)
   if (parameters === undefined || parameters.length === 0) {
@@ -851,14 +850,18 @@ function ParameterBindings({
           )
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
-              <Typography.Text type="secondary">{`${parameter.name}, ${parameter.type}`}</Typography.Text>
-              <ReferencePicker
-                name={parameter.name}
-                value={typeof current === 'string' ? current : undefined}
-                required={false}
-                options={options}
-                onChange={(next) => onChange(rowPointer, next)}
-              />
+              <AxisField
+                label={parameter.name}
+                help={t('shell.studio.page.parameterBinding.help').replace('{type}', parameter.type)}
+              >
+                <ReferencePicker
+                  name={parameter.name}
+                  value={typeof current === 'string' ? current : undefined}
+                  required={false}
+                  options={options}
+                  onChange={(next) => onChange(rowPointer, next)}
+                />
+              </AxisField>
             </div>
           )
         })}
@@ -1403,8 +1406,9 @@ function pageNamed(names: StudioNames | undefined, name: unknown): StudioNamePag
 }
 
 /**
- * One expression for each parameter the target page declares, and nothing for a parameter left empty. A value the
- * page does not declare stays visible with a note and Remove, because the compiler refuses it.
+ * One expression for each parameter the target page declares, labelled by the parameter's name, and nothing for a
+ * parameter left empty. A value the page does not declare stays visible with a note under it and Remove, because the
+ * compiler refuses it.
  */
 function ParameterExpressions({
   pointer,
@@ -1418,7 +1422,6 @@ function ParameterExpressions({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const check = useContext(ExpressionCheckContext)
 
   if (value !== undefined && !isContent(value)) {
     return (
@@ -1433,32 +1436,6 @@ function ParameterExpressions({
   const undeclared = entries.filter(([key]) => !declared.includes(key.toLowerCase()))
   const expressionName = t('shell.studio.process.expression')
 
-  function expression(rowPointer: string, current: string) {
-    if (check) {
-      return (
-        <Suspense fallback={<Input aria-label={expressionName} value={current} readOnly aria-busy="true" />}>
-          <LazyExpressionEditor
-            application={check.application}
-            resourceId={check.resourceId}
-            path={rowPointer}
-            name={expressionName}
-            value={current}
-            required={false}
-            options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
-            onChange={onChange}
-          />
-        </Suspense>
-      )
-    }
-    return (
-      <Input
-        aria-label={expressionName}
-        value={current}
-        onChange={(event) => onChange(rowPointer, event.target.value === '' ? undefined : event.target.value)}
-      />
-    )
-  }
-
   return (
     <PageFieldGroup pointer={pointer}>
       <Flex vertical gap="small">
@@ -1467,31 +1444,50 @@ function ParameterExpressions({
             entries.find(([name]) => name.toLowerCase() === parameter.name.toLowerCase())?.[0] ?? parameter.name
           const rowPointer = `${pointer}/${escapeSegment(key)}`
           const current = value?.[key]
+          const help = t(
+            parameter.required
+              ? 'shell.studio.page.requiredParameterExpression.help'
+              : 'shell.studio.page.parameterExpression.help',
+          ).replace('{type}', parameter.type)
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
-              <Typography.Text type="secondary">
-                {`${parameter.name}, ${parameter.type}${parameter.required ? `, ${t('shell.studio.field.page.parameters.required').toLowerCase()}` : ''}`}
-              </Typography.Text>
-              {expression(rowPointer, typeof current === 'string' ? current : '')}
+              <AxisField label={parameter.name} help={help}>
+                <Expression
+                  pointer={rowPointer}
+                  name={expressionName}
+                  value={typeof current === 'string' ? current : ''}
+                  required={false}
+                  onChange={onChange}
+                />
+              </AxisField>
             </div>
           )
         })}
         {undeclared.map(([key, entry]) => {
           const rowPointer = `${pointer}/${escapeSegment(key)}`
           return (
-            <Flex key={key} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
-              <div>
-                <Typography.Text>{key}</Typography.Text>
-                <div>
-                  <Typography.Text type="warning">{t('shell.studio.page.undeclaredParameter')}</Typography.Text>
+            <div key={key} data-testid={`studio-field-${rowPointer}`}>
+              <Flex gap="small" align="flex-end" wrap>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <AxisField label={key} help={t('shell.studio.page.undeclaredParameter.help')}>
+                    <Expression
+                      pointer={rowPointer}
+                      name={expressionName}
+                      value={typeof entry === 'string' ? entry : ''}
+                      required={false}
+                      onChange={onChange}
+                    />
+                  </AxisField>
                 </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 240 }}>
-                {expression(rowPointer, typeof entry === 'string' ? entry : '')}
-              </div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
-            </Flex>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                <Button onClick={() => onChange(rowPointer, undefined)}>
+                  {t('shell.studio.process.removeMapping')}
+                </Button>
+              </Flex>
+              <WarningLine testId="studio-parameter-undeclared">
+                {t('shell.studio.page.undeclaredParameter')}
+              </WarningLine>
+            </div>
           )
         })}
       </Flex>
