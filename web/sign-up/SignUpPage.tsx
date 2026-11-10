@@ -1,13 +1,17 @@
-import { Checkbox, Flex, Form, Input, Select, Typography } from 'antd'
+import { Flex, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../src/platform/api'
+import { AcceptTermsField } from '../src/platform/AcceptTermsField'
 import { AxisAlert } from '../src/platform/AxisAlert'
 import { AxisButton } from '../src/platform/AxisButton'
 import { AxisField, type AxisFieldStatus } from '../src/platform/AxisField'
+import { FilledText } from '../src/platform/FilledText'
 import { placeProblemErrors } from '../src/platform/problemErrors'
 import { requiredMark } from '../src/platform/requiredMark'
+import { StartFromField } from '../src/platform/StartFromField'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
+import type { SignUpDocuments } from './documents'
 import { SignUpFrame } from './SignUpFrame'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
@@ -15,6 +19,7 @@ import { signUpLocales, type SignUpLocale } from './texts'
 interface SignUpApplication {
   id: string
   titles: Record<SignUpLocale, string>
+  descriptions: Record<SignUpLocale, string>
 }
 
 type SubdomainStatus =
@@ -31,7 +36,7 @@ interface SubdomainAnswer {
 }
 
 /** The fields of the form in the order the page shows them, which is the order a click checks them in. */
-const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'application', 'language'] as const
+const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'language', 'application'] as const
 type FormField = (typeof formFields)[number]
 
 interface SignUpValues {
@@ -73,17 +78,20 @@ function subdomainStatusOf(status: SubdomainStatus, t: (key: string) => string):
 export function SignUpPage({
   locale,
   onLocaleChange,
+  documents,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
+  documents: SignUpDocuments | undefined
 }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
-  const [applications, setApplications] = useState<SignUpApplication[]>([])
+  const [applications, setApplications] = useState<SignUpApplication[] | 'failed'>()
+  const [tenantDomain, setTenantDomain] = useState<string>()
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
   const [sending, setSending] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
@@ -96,12 +104,28 @@ export function SignUpPage({
     const controller = new AbortController()
     apiFetch('/api/sign-up/applications', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
       .then(async (response) => {
+        setApplications(
+          response.ok ? ((await response.json()) as { applications: SignUpApplication[] }).applications : 'failed',
+        )
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setApplications('failed')
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch('/api/sign-up/region', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
+      .then(async (response) => {
         if (response.ok) {
-          setApplications(((await response.json()) as { applications: SignUpApplication[] }).applications)
+          setTenantDomain(((await response.json()) as { tenantDomain: string }).tenantDomain)
         }
       })
       .catch(() => {
-        // The list stays empty. The person can still fill in the rest of the form.
+        // The subdomain shows alone when the region does not answer.
       })
     return () => controller.abort()
   }, [])
@@ -176,6 +200,13 @@ export function SignUpPage({
       ? answer.status
       : { state: 'checking' }
   const subdomainStatus = subdomainStatusOf(status, t)
+  const choices = Array.isArray(applications)
+    ? applications.map((application) => ({
+        id: application.id,
+        title: application.titles[locale],
+        description: application.descriptions[locale],
+      }))
+    : applications
 
   const showRefusal = (errors: Record<string, string[]>) => {
     const placed = placeProblemErrors<FormField>(errors, fieldOf)
@@ -242,6 +273,7 @@ export function SignUpPage({
       onLocaleChange={onLocaleChange}
       title={sent ? t('signUp.inbox.title') : t('signUp.title')}
       titleRef={titleRef}
+      documents={documents}
     >
       {formErrors.length > 0 && (
         <div ref={formErrorRef} tabIndex={-1}>
@@ -312,17 +344,14 @@ export function SignUpPage({
             <Input
               autoComplete="off"
               spellCheck={false}
+              suffix={
+                tenantDomain === undefined ? undefined : (
+                  <span style={{ color: colour.textMuted }}>.{tenantDomain}</span>
+                )
+              }
               onChange={() => {
                 subdomainEdited.current = true
               }}
-            />
-          </AxisField>
-          <AxisField label={t('signUp.application')} help={t('signUp.application.help')} name="application">
-            <Select
-              options={applications.map((application) => ({
-                value: application.id,
-                label: application.titles[locale],
-              }))}
             />
           </AxisField>
           <AxisField
@@ -338,19 +367,42 @@ export function SignUpPage({
               }}
             />
           </AxisField>
-          <Form.Item
+          <StartFromField
+            name="application"
+            label={t('signUp.startFrom')}
+            help={t('signUp.startFrom.help')}
+            blank={t('signUp.startFrom.blank')}
+            choices={choices}
+            failedMessage={t('signUp.startFrom.failed')}
+          />
+          <AcceptTermsField
             name="terms"
-            valuePropName="checked"
-            style={{ marginBottom: 0 }}
-            rules={[
-              {
-                validator: (_rule, checked: boolean) =>
-                  checked ? Promise.resolve() : Promise.reject(new Error(t('signUp.terms.required'))),
-              },
-            ]}
-          >
-            <Checkbox>{t('signUp.terms')}</Checkbox>
-          </Form.Item>
+            text={t('signUp.terms')}
+            documents={{
+              terms: { label: t('signUp.terms.termsOfService'), href: documents?.terms.urls[locale] },
+              dpa: { label: t('signUp.terms.dpa'), href: documents?.dpa.urls[locale] },
+            }}
+            requiredMessage={t('signUp.terms.required')}
+          />
+          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+            <FilledText
+              text={t('signUp.privacyNotice')}
+              parts={{
+                privacy: documents ? (
+                  <Typography.Link
+                    href={documents.privacy.urls[locale]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: colour.primaryText }}
+                  >
+                    {t('signUp.privacyNotice.privacyPolicy')}
+                  </Typography.Link>
+                ) : (
+                  t('signUp.privacyNotice.privacyPolicy')
+                ),
+              }}
+            />
+          </Typography.Paragraph>
           <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
             {t('signUp.submit')}
           </AxisButton>

@@ -84,7 +84,14 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       Form: { colorError: colour.dangerText, colorWarning: colour.warningText },
       Input: fieldBorder,
       InputNumber: fieldBorder,
-      Select: fieldBorder,
+      // The arrow takes the muted text colour: Ant Design's quaternary text misses 3:1 on a field.
+      Select: { ...fieldBorder, colorTextQuaternary: colour.textMuted },
+      // A checked radio takes primaryText: primary misses 3:1 on surface in dark mode.
+      Radio: {
+        colorPrimary: colour.primaryText,
+        colorPrimaryHover: colour.primaryText,
+        colorPrimaryActive: colour.primaryText,
+      },
       DatePicker: fieldBorder,
       Mentions: fieldBorder,
       Cascader: fieldBorder,

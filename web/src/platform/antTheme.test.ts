@@ -48,6 +48,11 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     expect(token.colorTextPlaceholder).toBe(colour.textMuted)
   })
 
+  it('draws a select arrow in the muted text colour and a checked radio in primaryText', () => {
+    expect(config.components?.Select).toMatchObject({ colorTextQuaternary: colour.textMuted })
+    expect(config.components?.Radio).toMatchObject({ colorPrimary: colour.primaryText })
+  })
+
   it('gives a tab label no padding above it at any size and keeps the padding below', () => {
     const tabs = config.components?.Tabs
     expect(tabs).toMatchObject({

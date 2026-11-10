@@ -36,4 +36,5 @@ export const cardGroups: readonly { name: string; previews: readonly string[] }[
   { name: 'Shared states', previews: ['states'] },
   { name: 'Shell', previews: ['shell', 'signIn', 'identitySignIn'] },
   { name: 'Studio', previews: ['studio'] },
+  { name: 'Sign-up', previews: ['signUp'] },
 ]

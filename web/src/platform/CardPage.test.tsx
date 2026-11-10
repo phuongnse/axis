@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createRef, type RefObject } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { identityFrameTexts, identityLegal } from '../designSystem/fixtures'
 import { CardPage } from './CardPage'
@@ -20,13 +21,15 @@ const texts = new Map<string, string>([
 
 function renderPage({
   organization,
+  titleRef,
   onLocaleChange = vi.fn(),
-}: { organization?: string; onLocaleChange?: () => void } = {}) {
+}: { organization?: string; titleRef?: RefObject<HTMLElement | null>; onLocaleChange?: () => void } = {}) {
   return render(
     <TextContext.Provider value={(key) => texts.get(key) ?? key}>
       <CardPage
         organization={organization}
         title="Sign in"
+        titleRef={titleRef}
         locales={['en', 'vi']}
         locale="en"
         onLocaleChange={onLocaleChange}
@@ -47,6 +50,15 @@ describe('CardPage', () => {
 
     renderPage()
     expect(screen.getByTestId('organization-heading')).toHaveTextContent('Axis')
+  })
+
+  it('moves the focus to the title through titleRef', () => {
+    const titleRef = createRef<HTMLElement>()
+    renderPage({ titleRef })
+
+    titleRef.current?.focus()
+
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toHaveFocus()
   })
 
   it('draws the title above the children in the card', () => {

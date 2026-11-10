@@ -1,69 +1,54 @@
-import { Card, ConfigProvider, Flex, Typography } from 'antd'
+import { ConfigProvider } from 'antd'
 import type { ReactNode, RefObject } from 'react'
 import { antLocaleFor } from '../src/platform/antLocale'
-import { OrganizationHeading } from '../src/platform/OrganizationHeading'
-import { PreferencesMenu } from '../src/platform/PreferencesMenu'
-import { useDesignTokens } from '../src/platform/themeMode'
+import { CardPage } from '../src/platform/CardPage'
+import { useText } from '../src/platform/texts'
+import type { SignUpDocuments } from './documents'
 import { signUpLocales, type SignUpLocale } from './texts'
 
 /**
- * The card that every page of the sign-up bundle draws: the preferences menu, the organization heading and a titled card
- * that holds the page's content. The title takes the focus when its `titleRef` is focused, as a page moves to its next step.
+ * The frame of every sign-up page: the shared card page in the page's language, with the legal line's Privacy, Terms and
+ * Licences addresses from the region's documents, see docs/reference/sign-up.md#the-page. The title takes the focus
+ * through `titleRef`, as a page moves to its next step.
  */
 export function SignUpFrame({
   locale,
   onLocaleChange,
   title,
   titleRef,
+  documents,
   children,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
   title: string
   titleRef: RefObject<HTMLElement | null>
+  documents: SignUpDocuments | undefined
   children: ReactNode
 }) {
-  const { colour, spacing, radius } = useDesignTokens()
+  const t = useText()
   return (
     <ConfigProvider locale={antLocaleFor(locale)}>
-      <Flex
-        vertical
-        align="center"
-        gap={spacing.md}
-        style={{
-          position: 'relative',
-          paddingBlock: spacing.lg,
-          background: colour.canvas,
-          minHeight: '100vh',
-          boxSizing: 'border-box',
+      <CardPage
+        title={title}
+        titleRef={titleRef}
+        locales={signUpLocales}
+        locale={locale}
+        onLocaleChange={(next) => onLocaleChange(next as SignUpLocale)}
+        legal={{
+          privacyUrl: documents?.privacy.urls[locale],
+          termsUrl: documents?.terms.urls[locale],
+          licencesUrl: documents?.licencesUrl,
+          texts: {
+            legal: t('shell.legal.label'),
+            privacy: t('shell.legal.privacy'),
+            terms: t('shell.legal.terms'),
+            licences: t('shell.legal.licences'),
+          },
         }}
       >
-        <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg }}>
-          <PreferencesMenu
-            locales={signUpLocales}
-            locale={locale}
-            onLocaleChange={(next) => onLocaleChange(next as SignUpLocale)}
-          />
-        </div>
-        <OrganizationHeading />
-        <Card
-          style={{
-            width: '100%',
-            maxWidth: 480,
-            background: colour.surface,
-            borderColor: colour.borderSubtle,
-            borderRadius: radius.base,
-          }}
-          styles={{ body: { padding: spacing.xl } }}
-        >
-          <Flex vertical gap={spacing.md}>
-            <Typography.Title ref={titleRef} level={4} tabIndex={-1} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            {children}
-          </Flex>
-        </Card>
-      </Flex>
+        {children}
+      </CardPage>
     </ConfigProvider>
   )
 }

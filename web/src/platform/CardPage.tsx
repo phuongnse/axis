@@ -1,5 +1,5 @@
 import { Card, Flex, Typography } from 'antd'
-import type { ReactNode } from 'react'
+import type { ReactNode, RefObject } from 'react'
 import { useState } from 'react'
 import { LegalLine, type LegalLinks } from './LegalLine'
 import { OrganizationHeading } from './OrganizationHeading'
@@ -14,6 +14,7 @@ import { useDesignTokens } from './themeMode'
 export function CardPage({
   organization,
   title,
+  titleRef,
   locales,
   locale,
   onLocaleChange,
@@ -22,6 +23,8 @@ export function CardPage({
 }: {
   organization?: string
   title: string
+  /** Lets the page move the focus to the title, as a page does when its next step opens. */
+  titleRef?: RefObject<HTMLElement | null>
   locales: readonly string[]
   locale: string
   onLocaleChange: (locale: string) => void
@@ -59,7 +62,7 @@ export function CardPage({
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
+          <Typography.Title ref={titleRef} level={4} tabIndex={titleRef ? -1 : undefined} style={{ margin: 0 }}>
             {title}
           </Typography.Title>
           {children}
