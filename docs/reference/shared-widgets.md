@@ -66,6 +66,11 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   that may use it.
 - **`no-restricted-imports`** refuses a named `Table` import from `antd`. `AxisTable.tsx` is the one
   file that may use it. It does not see an import from a deep path such as `antd/es/table`.
+- **`axis/field-label-through-axis-field`** refuses a hand-drawn field label: a `label` on Ant Design's
+  `Form.Item`, a raw `<label>` or `<legend>`, or a text straight before an input. `AxisField` and
+  `AxisFieldGroup` draw the labels. It is off in sign-in pages, the record form, a table's filter bar, `AxisField`,
+  `AxisFieldGroup`, widget previews and tests. It matches syntax, so it does not see a label after its input, a text
+  before a wrapper such as `Form.Item`, or a label drawn through a helper of the file's own.
 - **`axis/no-preset-tag-colour`** refuses a `Tag` whose `color` is an Ant Design colour name, with or
   without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
   `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`
