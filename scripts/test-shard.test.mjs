@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { count, estimate, junitDurations, main, readFiles, shardFiles, split } from './lib/test-shard.mjs'
-import { mergeDurations } from './lib/shards.mjs'
+import { maxShards, mergeDurations } from './lib/shards.mjs'
 
 const file = (name, seconds) => ({ path: name, seconds })
 const names = (files) => files.map((f) => f.path).sort()
@@ -61,17 +61,18 @@ describe('estimate and count', () => {
   const eight = Array.from({ length: 8 }, (_, i) => file(`f${i}.test.ts`, 100))
 
   test('prints the fewest shards that fit the budget, counting shard 1 and never less than 2', () => {
-    assert.deepEqual(count(eight, 1, 250), { total: 5, overBudget: [] })
-    assert.deepEqual(count(eight, 1, 1000), { total: 2, overBudget: [] })
+    assert.deepEqual(count(eight, 1, 250, 6), { total: 5, overBudget: [] })
+    assert.deepEqual(count(eight, 1, 1000, 6), { total: 2, overBudget: [] })
   })
 
   test('prints the cap when no count up to it fits the budget', () => {
-    assert.deepEqual(count(eight, 1, 150), { total: 6, overBudget: [] })
+    assert.deepEqual(count(eight, 1, 150, 6), { total: 6, overBudget: [] })
+    assert.deepEqual(count(eight, 1, 150), { total: maxShards.test, overBudget: [] })
   })
 
   test('names each file that alone takes longer than the budget, and still counts', () => {
     const specs = [file('big.test.ts', 1000), file('small.test.ts', 10)]
-    assert.deepEqual(count(specs, 4, 900), {
+    assert.deepEqual(count(specs, 4, 900, 6), {
       total: 6,
       overBudget: ['Over budget: big.test.ts takes about 1000 s, longer than the budget of 900 s.'],
     })
@@ -134,7 +135,7 @@ describe('readFiles and main', () => {
     try {
       assert.equal(
         main(['--count'], dir, (line) => warnings.push(line)),
-        '6',
+        String(maxShards.test),
       )
       assert.deepEqual(warnings, ['Over budget: big.test.ts takes about 1000 s, longer than the budget of 900 s.'])
     } finally {

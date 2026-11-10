@@ -6,8 +6,13 @@
 /** The estimated seconds of tests that one shard may take. */
 export const budgetSeconds = 15 * 60
 
-/** The most shards --count prints for each split. A sharded check's max in .nexkit/config.json must match its entry (#3610). */
-export const maxShards = { e2e: 3, integration: 3, smoke: 6, test: 6 }
+/**
+ * The most shards --count prints for each split. A sharded check's max in .nexkit/config.json matches its entry,
+ * since NexKit fails a check whose count passes its max (docs/development.md#shards). Two rounds at these caps,
+ * with build-lint and smoke, fit within the jobs GitHub runs at once. Smoke runs as one check, since NexKit's max
+ * is at least 2, so its cap only bounds the count that the durations job reads.
+ */
+export const maxShards = { e2e: 3, integration: 3, smoke: 6, test: 2 }
 
 /** The median of the values, or undefined when there are none. */
 export function median(values) {
@@ -57,4 +62,47 @@ export function packLightest(units, total, firstShardSeconds = 0) {
     lightest.seconds += unit.seconds
   }
   return shards
+}
+
+/** The jobs GitHub's Free plan runs at once for the account (docs/development.md#shards). */
+export const jobLimit = 20
+
+/** The split of each sharded check, by the check's name, and the script the check runs. */
+export const shardedChecks = {
+  e2e: { split: 'e2e', run: 'scripts/e2e.sh' },
+  integration: { split: 'integration', run: 'scripts/integration.sh' },
+  test: { split: 'test', run: 'scripts/test.sh' },
+}
+
+/**
+ * What is wrong with the checks of a .nexkit/config.json: a sharded check missing or listed twice, one whose count is
+ * not its split's --count or whose max is not its split's cap, a fixed shard such as e2e-1 left over, or caps that
+ * leave no room for two rounds within the job limit. Returns one line per problem.
+ */
+export function configProblems(config) {
+  const problems = []
+  const checks = config.checks ?? []
+  for (const [name, { split, run }] of Object.entries(shardedChecks)) {
+    const found = checks.filter((check) => check.name === name)
+    if (found.length !== 1) {
+      problems.push(`${name} is listed ${found.length} times, not once.`)
+      continue
+    }
+    const [check] = found
+    if (check.run !== run) problems.push(`${name} runs '${check.run}', not '${run}'.`)
+    const count = `node scripts/lib/${split}-shard.mjs --count`
+    if (check.shards?.count !== count) problems.push(`${name} counts its shards with '${check.shards?.count}', not '${count}'.`)
+    if (check.shards?.max !== maxShards[split]) {
+      problems.push(`${name} has max ${check.shards?.max}, not its split's cap of ${maxShards[split]}.`)
+    }
+  }
+  for (const check of checks) {
+    if (/^(e2e|integration|test)-\d+$/.test(check.name)) problems.push(`${check.name} is a fixed shard; its check has shards.`)
+  }
+  const jobs = new Set(checks.filter((check) => !check.shards).map((check) => check.group ?? check.name)).size
+  const round = jobs + checks.reduce((sum, check) => sum + (check.shards?.max ?? 0), 0)
+  if (2 * round > jobLimit) {
+    problems.push(`A round at its caps runs ${round} jobs, so two rounds pass the ${jobLimit} jobs GitHub runs at once.`)
+  }
+  return problems
 }
