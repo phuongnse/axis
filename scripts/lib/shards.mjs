@@ -1,6 +1,7 @@
-// The shard budget, the most shards that --count prints, and the helpers that the E2E, integration and
-// unit test splits share: scripts/lib/e2e-shard.mjs, scripts/lib/integration-shard.mjs and
-// scripts/lib/test-shard.mjs. The budget leaves room under the check timeouts in .nexkit/config.json.
+// The shard budget, the most shards that --count prints, and the helpers that the E2E, integration, smoke
+// and unit test splits share: scripts/lib/e2e-shard.mjs, scripts/lib/integration-shard.mjs,
+// scripts/lib/smoke-shard.mjs and scripts/lib/test-shard.mjs. The budget leaves room under the check
+// timeouts in .nexkit/config.json.
 
 /** The estimated seconds of tests that one shard may take. */
 export const budgetSeconds = 15 * 60
@@ -37,4 +38,23 @@ export function parseShard(text) {
   const match = /^([1-9][0-9]*)\/([1-9][0-9]*)$/.exec(text ?? '')
   if (!match || Number(match[1]) > Number(match[2])) throw new Error(`A shard such as 1/3, not '${text}'.`)
   return { index: Number(match[1]), total: Number(match[2]) }
+}
+
+/**
+ * Packs units, each { names, seconds } and sorted heaviest first, over `total` shards. Each unit goes to the
+ * shard that is then the lightest. Shard 1 starts at `firstShardSeconds`.
+ */
+export function packLightest(units, total, firstShardSeconds = 0) {
+  const shards = Array.from({ length: total }, () => ({
+    names: [],
+    seconds: 0,
+  }))
+  shards[0].seconds = firstShardSeconds
+  for (const unit of units) {
+    let lightest = shards[0]
+    for (const shard of shards) if (shard.seconds < lightest.seconds) lightest = shard
+    lightest.names.push(...unit.names)
+    lightest.seconds += unit.seconds
+  }
+  return shards
 }

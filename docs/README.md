@@ -216,10 +216,11 @@ Read by people who change how Axis stores data.
 
 ## Working on Axis
 
-| Doc                                 | What it holds                                                                                                      | Read it when                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
-| [AGENTS.md](../AGENTS.md)           | The working rules and the commands, for people and agents                                                          | You start any change                           |
-| [Development](development.md)       | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users         | You run Axis or its tests locally              |
-| [Testing](testing.md)               | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub | You write or change a test                     |
-| [Delivery](delivery.md)             | How work flows through NexKit                                                                                      | You file an issue, plan or open a pull request |
-| [Writing the docs](writing-docs.md) | What goes in which doc, how to write it, and how the docs stay correct                                             | You add or change a doc                        |
+| Doc                                       | What it holds                                                                                                      | Read it when                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| [AGENTS.md](../AGENTS.md)                 | The working rules and the commands, for people and agents                                                          | You start any change                           |
+| [Development](development.md)             | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users         | You run Axis or its tests locally              |
+| [Production images](production-images.md) | The production images and the admin tool, built the same in development as in an install                           | You build or change a production image         |
+| [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub | You write or change a test                     |
+| [Delivery](delivery.md)                   | How work flows through NexKit                                                                                      | You file an issue, plan or open a pull request |
+| [Writing the docs](writing-docs.md)       | What goes in which doc, how to write it, and how the docs stay correct                                             | You add or change a doc                        |

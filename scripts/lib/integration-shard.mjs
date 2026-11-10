@@ -29,7 +29,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { budgetSeconds, maxShards, median, mergeDurations, parseShard, shardCount } from './shards.mjs'
+import { budgetSeconds, maxShards, median, mergeDurations, packLightest, parseShard, shardCount } from './shards.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const project = path.join(root, 'tests/Axis.Integration.Tests')
@@ -95,28 +95,15 @@ function units(classes) {
   return [...grouped.values()].sort((a, b) => b.seconds - a.seconds || (a.names[0] < b.names[0] ? -1 : 1))
 }
 
-/** Packs units over `total` shards, the lightest first. Shard 1 starts at `firstShardSeconds`. */
-function pack(sorted, total, firstShardSeconds) {
-  const shards = Array.from({ length: total }, () => ({ names: [], seconds: 0 }))
-  shards[0].seconds = firstShardSeconds
-  for (const unit of sorted) {
-    let lightest = shards[0]
-    for (const shard of shards) if (shard.seconds < lightest.seconds) lightest = shard
-    lightest.names.push(...unit.names)
-    lightest.seconds += unit.seconds
-  }
-  return shards
-}
-
 /** Splits weighed classes over `total` shards and returns the class names of each. Shard 1 starts at `firstShardSeconds`. */
 export function split(classes, total, firstShardSeconds = 0) {
-  return pack(units(classes), total, firstShardSeconds).map((shard) => shard.names.sort())
+  return packLightest(units(classes), total, firstShardSeconds).map((shard) => shard.names.sort())
 }
 
 /** The fewest shards that fit the budget, and an `Over budget:` line for each unit that alone does not. */
 export function count(classes, firstShardSeconds, budget = budgetSeconds, max = maxShards) {
   const all = units(classes)
-  const longest = (total) => Math.max(...pack(all, total, firstShardSeconds).map((shard) => shard.seconds))
+  const longest = (total) => Math.max(...packLightest(all, total, firstShardSeconds).map((shard) => shard.seconds))
   const line = (name, seconds) =>
     `Over budget: ${name} takes about ${Math.round(seconds)} s, longer than the budget of ${budget} s.`
   const overBudget = []

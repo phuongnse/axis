@@ -174,7 +174,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Production admin tool, built on the admin-tools stage so a build with another version reuses the package layer,
-# see docs/development.md#production-images-and-axisadmin.
+# see docs/production-images.md#production-images-and-axisadmin.
 FROM admin-tools AS axis-admin
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
