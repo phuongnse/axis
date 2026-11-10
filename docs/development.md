@@ -478,7 +478,9 @@ The production images and the admin tool are the same in development as in an in
 `axis-controlplane`, which hold no samples, development settings or source control metadata. Build one
 with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. The default target is
 the development server. The `images` and `onprem` smoke tests build each image up to three times, with
-waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times.
+waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times. Each production stage installs
+its system packages before it declares `AXIS_VERSION`. Docker caches that layer, so a build with a new
+version and the two smoke tests download the packages once.
 
 `Axis.Admin` is the console tool that the platform operator runs. It creates, suspends, resumes,
 lists, backs up and restores tenants, and it migrates and activates them. Run it with
