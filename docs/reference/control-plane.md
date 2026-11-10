@@ -175,9 +175,15 @@ every business change.
 
 The platform operator, who runs the cells, runs the control plane too, from the command line.
 
-- **Commands** _(planned for M33)_. `Axis.ControlPlane.Admin` holds the operator's commands: extend
-  a trial, resend an email, and list a region's sign-ups and subscriptions. Each writes an audit
-  record.
+- **Region lists.** `Axis.ControlPlane.Admin`, in `/app/admin` of the image, lists the region's rows.
+  `sign-ups list` prints each sign-up's id, subdomain, state, created and, for a pending sign-up,
+  expires. `subscriptions list` prints each subscription's id, tenant, sign-up, state, trial ends,
+  next and created. Neither prints a name, a business name or an email address. The tool reads the
+  same `ControlPlane:` settings and runs the same start checks as the service. It exits 0 when it
+  works, 1 when the database cannot be read and 2 for a usage or settings error, which names the
+  setting and never its value. It writes no audit record, because it changes nothing.
+- **Commands** _(planned for M33)_. `Axis.ControlPlane.Admin` also extends a trial and resends an
+  email. Each writes an audit record.
 - **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
   that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
   record.
@@ -276,7 +282,8 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   non-root user of the base image in the Production environment, works on a read-only root file
   system, carries the version as the OCI label `org.opencontainers.image.version`, holds the built
   [sign-up page](sign-up.md#the-page) in its web root, and holds no sample, extension package or
-  module.
+  module. It also holds the operator's commands in `/app/admin`, run as
+  `kubectl exec deploy/<release> -- dotnet /app/admin/Axis.ControlPlane.Admin.dll sign-ups list`.
 - **Chart.** `deploy/helm/axis-controlplane` installs one Deployment and one ClusterIP Service. The
   Deployment has startup, liveness and readiness probes on `/health/live` and `/health/ready`.
 - **HTTPS only.** The control plane listens on port 8443 with the certificate of a Kubernetes TLS
@@ -296,7 +303,8 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   `secrets.connectionString.name` or `secrets.certificate.name` is not set.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
   Kubernetes schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the
-  image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS.
+  image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS and runs
+  `sign-ups list` in it.
 
 ## Health and telemetry
 

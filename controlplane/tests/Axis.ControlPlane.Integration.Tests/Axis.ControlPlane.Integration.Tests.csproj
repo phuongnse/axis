@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Axis.ControlPlane.Admin\Axis.ControlPlane.Admin.csproj" />
     <ProjectReference Include="..\..\src\Axis.ControlPlane\Axis.ControlPlane.csproj" />
   </ItemGroup>
 

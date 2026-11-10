@@ -171,7 +171,8 @@ Axis ships as production images, as
 - `axis-server`, `axis-worker` and `axis-agent` run the hosts. They hold no sample and no development setting.
 - `axis-admin` runs `Axis.Admin` and the publisher, `axis-admin publisher`, and holds the
   PostgreSQL 18 client tools.
-- `axis-controlplane` runs `Axis.ControlPlane`. It is not part of an installation, and
+- `axis-controlplane` runs `Axis.ControlPlane` and also holds the operator's commands,
+  `Axis.ControlPlane.Admin`. It is not part of an installation, and
   `deploy/helm/axis-controlplane/` installs it, see [control plane](reference/control-plane.md#image-and-chart).
 - `deploy/compose/` and `deploy/helm/axis/` install the four installation images on one machine and
   on Kubernetes.

@@ -52,6 +52,7 @@ tests/
 controlplane/
   src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations,
                           its job queue and audit records, health and telemetry
+  src/Axis.ControlPlane.Admin/  the operator's commands of the control plane
   tests/                  its unit tests, and its integration tests on PostgreSQL (Testcontainers)
 modules/                  built-in modules, as configuration, installed with Axis: organization and
                           approvals
