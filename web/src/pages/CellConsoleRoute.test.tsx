@@ -73,7 +73,7 @@ describe('CellConsoleRoute', () => {
     stubServer(401)
     renderApp('/?signIn=failed')
 
-    expect(await screen.findByTestId('sign-in-card')).toBeInTheDocument()
+    expect(await screen.findByTestId('card-page-card')).toBeInTheDocument()
     expect(screen.getByTestId('sign-in-failed')).toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
   })

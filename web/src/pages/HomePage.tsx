@@ -1,12 +1,12 @@
-import { Button, Card, Flex, Spin, Typography } from 'antd'
+import { Button, Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { CardPage } from '../platform/CardPage'
 import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { EmptyState } from '../platform/EmptyState'
 import { navigationIcon } from '../platform/navigationIcons'
-import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, localized, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
@@ -37,49 +37,33 @@ function cardOfAddress(pathname: string, search: string): SignInCardState | null
 
 /**
  * The card on `/` that replaces the page when nobody is signed in: after a refused sign-in, a declined terms step or
- * sign-out. Its button runs `onSignIn`, which starts the tenant's sign-in by default.
+ * sign-out. Its button runs `onSignIn`, which starts the tenant's sign-in by default. The shell's header and footer hold
+ * the language and theme gear and the legal line, so the card leaves them out.
  */
 export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCardState; onSignIn?: () => void }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const declined = state === 'declined'
   const refused = state === 'refused' || declined
 
   return (
-    <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
-      <OrganizationHeading />
-      <Card
-        data-testid="sign-in-card"
-        style={{
-          width: '100%',
-          maxWidth: 400,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
-        }}
-        styles={{ body: { padding: spacing.xl } }}
-      >
-        <Flex vertical gap={spacing.md}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            {t(refused ? 'shell.home.signIn.title' : 'shell.home.signedOut.title')}
-          </Typography.Title>
-          {refused ? (
-            <AxisAlert
-              data-testid={declined ? 'sign-in-declined' : 'sign-in-failed'}
-              kind="warning"
-              message={t(declined ? 'shell.home.signInDeclined' : 'shell.home.signInFailed')}
-            />
-          ) : (
-            <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
-              {t('shell.home.signedOut.message')}
-            </Typography.Paragraph>
-          )}
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button type="primary" block onClick={() => onSignIn()}>
-            {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
-          </Button>
-        </Flex>
-      </Card>
-    </Flex>
+    <CardPage title={t(refused ? 'shell.home.signIn.title' : 'shell.home.signedOut.title')}>
+      {refused ? (
+        <AxisAlert
+          data-testid={declined ? 'sign-in-declined' : 'sign-in-failed'}
+          kind="warning"
+          message={t(declined ? 'shell.home.signInDeclined' : 'shell.home.signInFailed')}
+        />
+      ) : (
+        <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+          {t('shell.home.signedOut.message')}
+        </Typography.Paragraph>
+      )}
+      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+      <Button type="primary" block onClick={() => onSignIn()}>
+        {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
+      </Button>
+    </CardPage>
   )
 }
 

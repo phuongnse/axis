@@ -207,7 +207,9 @@ addresses of [the sign-in card](#the-sign-in-card).
 Axis shows a card only where going straight to sign-in would loop or surprise. It has the identity
 provider's frame: the organization's mark and name above one card in the middle of the page, or Axis
 while the organization is not known, see [theme](identity-provider.md#theme). A tenant has no name until
-`tenant create` takes one, see [realms](identity-provider.md#realms). The card is on `surface` with a
+`tenant create` takes one, see [realms](identity-provider.md#realms). The [card page](shared-widgets.md#which-widget)
+draws the card, as wide as the `small` dialog size token. It leaves out the language menu and the legal line, because
+the shell's header and footer have them. The card is on `surface` with a
 `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. The header shows no second Sign in
 button there, and nothing starts sign-in until the person clicks the card's button. A signed-in person
 who opens any of these addresses sees the launcher.

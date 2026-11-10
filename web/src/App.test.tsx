@@ -635,7 +635,7 @@ describe('App', () => {
     expect(tools.textContent).toBe('Tools')
     expect(tools.nextElementSibling).toBe(screen.getAllByTestId('home-grid').at(-1))
     expect(applications.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-page-card')).not.toBeInTheDocument()
   })
 
   it('hides the Tools heading when the person holds no tool', async () => {
@@ -889,7 +889,7 @@ describe('App', () => {
     renderApp()
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/')))
-    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-page-card')).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Applications' })).not.toBeInTheDocument()
   })
 
@@ -979,7 +979,7 @@ describe('App', () => {
     renderApp('/?signedOut')
 
     expect(await screen.findByRole('heading', { name: 'Applications' })).toBeInTheDocument()
-    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-page-card')).not.toBeInTheDocument()
   })
 
   it('keeps the sign-in card at most 400 px wide', async () => {
@@ -987,7 +987,17 @@ describe('App', () => {
 
     renderApp('/?signedOut')
 
-    expect(await screen.findByTestId('sign-in-card')).toHaveStyle({ maxWidth: '400px' })
+    expect(await screen.findByTestId('card-page-card')).toHaveStyle({ maxWidth: '400px' })
+  })
+
+  it('draws the sign-in card without a second Language and theme button or legal line', async () => {
+    stubServer({ me: null })
+
+    renderApp('/?signedOut')
+
+    await screen.findByTestId('card-page-card')
+    expect(screen.getAllByRole('button', { name: 'Language and theme' })).toHaveLength(1)
+    expect(screen.queryByTestId('card-page-legal')).not.toBeInTheDocument()
   })
 
   it('draws the 32 px Axis heading above the sign-in card and no mark inside it', async () => {
@@ -995,7 +1005,7 @@ describe('App', () => {
 
     renderApp('/?signedOut')
 
-    const card = await screen.findByTestId('sign-in-card')
+    const card = await screen.findByTestId('card-page-card')
     const heading = screen.getByTestId('organization-heading')
     expect(within(heading).getByText('Axis', { exact: true })).toBeVisible()
     expect(heading.querySelector('[aria-hidden="true"]')).toHaveStyle({ width: '32px', height: '32px' })
