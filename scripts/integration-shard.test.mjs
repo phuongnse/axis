@@ -9,12 +9,12 @@ import {
   filterArgs,
   junitDurations,
   main,
-  mergeDurations,
   parseSource,
   readClasses,
   split,
   weigh,
 } from './lib/integration-shard.mjs'
+import { mergeDurations } from './lib/shards.mjs'
 
 const testClass = (name, seconds, collection) => ({ name: `N.${name}`, seconds, collection, tests: 1 })
 

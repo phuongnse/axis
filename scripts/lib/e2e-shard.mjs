@@ -22,7 +22,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { budgetSeconds, maxShards, parseShard, shardCount } from './shards.mjs'
+import { budgetSeconds, maxShards, median, mergeDurations, parseShard, shardCount } from './shards.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const e2e = path.join(root, 'tests/e2e')
@@ -79,18 +79,10 @@ export function count(specs, workers, budget = budgetSeconds, max = maxShards) {
   return { total: shardCount(longest, budget, max), overBudget }
 }
 
-/** The median of the known durations, for a spec without one. */
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b)
-  if (sorted.length === 0) return 1
-  const middle = Math.floor(sorted.length / 2)
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
-}
-
 /** Reads the specs of tests/e2e/specs with their weights. */
 export function readSpecs(dir = e2e) {
   const durations = JSON.parse(readFileSync(path.join(dir, 'spec-durations.json'), 'utf8'))
-  const fallback = median(Object.values(durations))
+  const fallback = median(Object.values(durations)) ?? 1
   return readdirSync(path.join(dir, 'specs'))
     .filter((name) => name.endsWith('.spec.ts'))
     .map((name) => {
@@ -114,16 +106,6 @@ export function junitDurations(texts) {
     }
   }
   return durations
-}
-
-/** The new durations: measured ones replace known ones, and only specs that exist are kept. */
-export function mergeDurations(known, measured, specPaths) {
-  const merged = {}
-  for (const specPath of [...specPaths].sort()) {
-    const seconds = measured[specPath] ?? known[specPath]
-    if (seconds !== undefined) merged[specPath] = seconds
-  }
-  return merged
 }
 
 /** Runs the command line and returns the text for stdout. Throws on a malformed shard. */

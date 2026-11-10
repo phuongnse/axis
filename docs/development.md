@@ -121,6 +121,9 @@ on purpose with a reason. `RouteTableDocTests` reads the same file and every `Ro
 heading under `docs/`. It fails, naming each route, when one side has a route that the other lacks.
 See [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
 
+Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`, to run one shard of these suites,
+see [test runs and reports](#test-runs-and-reports).
+
 When Vitest starts, it runs one worker for each GiB of free memory above 1 GiB, and no more workers than CPU
 cores. The count is never below 2 or above 6. `vitestWorkers` in `web/vitestWorkers.ts` computes it, and
 `web/vite.config.ts` passes it the free memory and the core count. A worker holds about 1 GB, so too many
@@ -380,6 +383,14 @@ NexKit's checks split the E2E and integration tests into shards, one check each,
 checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
 The smoke tests run in a job of their own, so the shards hold only their own tests.
 
+- **Unit tests.** Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`. `NEXKIT_SHARD` works
+  the same way beside it, and `AXIS_TEST_SHARD` wins when both are set. Shard 1 runs the .NET unit tests,
+  the control plane's unit tests and the scripts' own tests, and no Vitest file. Shards 2 to N split the
+  Vitest files between them. A file weighs its seconds in `web/vitest-durations.json`, and a new file
+  weighs the median. A shard's results go to `artifacts/test-results/web-<n>.xml`. With `1/1` or no shard,
+  the whole suite runs, and NexKit's `test` check runs with no shard. When the shards drift apart by
+  minutes, refresh the durations from a full run on `main`:
+  `node scripts/lib/test-shard.mjs --durations artifacts/test-results/web*.xml`.
 - **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. `NEXKIT_SHARD` works the
   same way beside it, and `AXIS_E2E_SHARD` wins when both are set. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
@@ -402,11 +413,13 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
   and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
   `node scripts/lib/integration-shard.mjs --durations <those files>`.
-- **Shard count.** `node scripts/lib/e2e-shard.mjs --count` and `node scripts/lib/integration-shard.mjs --count`
-  print the fewest shards whose longest estimated shard fits the time budget. They never print more than
-  the most shards allowed. Both values live in `scripts/lib/shards.mjs`. A spec, test class, collection
-  or the control plane suite that alone takes longer than the budget gets an `Over budget:` line on
-  stderr. The count still prints, because no number of shards makes such a spec or class fit.
+- **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`
+  and `node scripts/lib/test-shard.mjs --count` print the fewest shards whose longest estimated shard fits
+  the time budget. The unit test count includes shard 1, so it is never below 2. The counts never exceed
+  the most shards allowed. The budget and that most live in `scripts/lib/shards.mjs`. A spec, test class,
+  collection, the control plane suite or a Vitest file that alone takes longer than the budget gets an
+  `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
+  class or file fit.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
