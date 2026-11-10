@@ -22,7 +22,8 @@ commerce.
   `readOnly`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
   `plan_version`, `currency` (`VND` or `USD`), `period` (`month` or `year`) and `created_at`. The
   plan, currency and period are empty until a plan is bought, see
-  [the catalogue](plans.md#the-catalogue). A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
+  [the catalogue](plans.md#the-catalogue). The currency is fixed once the subscription has a ledger
+  entry, see [invoices](payments.md#invoices). A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
   trial ending 30 days later, and writes the first audit record with the sign-up as actor. A tenant
   has one subscription that is not `deleted`. `next_at` is the date of the next move, and it is empty
   once the subscription is `deleted`. The dates come from the control plane's clock.

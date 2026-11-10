@@ -32,8 +32,20 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
   credit. A plan change or an add-on makes an invoice at once, with any prorated charge or credit.
 - **Not the e-invoice.** This is Axis's own record of what is owed. The legal invoice of a payment in
   Vietnam is the [e-invoice](e-invoices.md), issued once it is paid.
-- **One currency** _(planned for M34)_. A subscription's currency is set by its first payment: `VND`
-  when it pays in Vietnam, `USD` when it pays abroad. It does not change.
+- **Paid.** Recording a payment against an invoice appends one `payment` entry to the
+  [ledger](#the-ledger), and a repeated idempotency key adds nothing. Payments settle the
+  subscription's open invoices oldest first, by `created_at` and then `id`, from ledger sums: the
+  subscription's `payment` and `refund` entries are pooled, and an invoice is `paid` once those payments
+  cover it and every older invoice that is not `void`. A smaller payment leaves the invoice `open`, and
+  its amount due is what the payments do not cover, between 0 and its amount. A larger one leaves a
+  credit that lowers the next invoice's amount due, and an invoice that the credit already covers is
+  `paid` when it is created. A refund never reopens a `paid` invoice.
+- **One currency.** Once a subscription has a ledger entry, the database refuses any change to its
+  currency with `restrict_violation`, even from a superuser. The first invoice's charge is such an
+  entry, so the currency is fixed before any payment. A payment in another currency than the
+  subscription's is refused and writes nothing.
+- **Currency by where it pays** _(planned for M34)_. A subscription pays in `VND` when it pays in
+  Vietnam and in `USD` when it pays abroad.
 
 ## Paying in Vietnam
 
@@ -48,9 +60,6 @@ In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 - **No automatic charge.** A bank transfer cannot be pulled, so each period the owner or a billing
   contact pays its invoice. The reminders of [the timeline](subscriptions.md#the-timeline) ask them
   to.
-- **Paid.** An invoice is paid when the payments recorded against it reach its amount. A smaller
-  payment is recorded and the rest stays due. A larger one leaves a credit that the next invoice
-  uses.
 - **A transfer without a link.** A transfer that reaches Axis's account outside PayOS is recorded by
   the operator against its invoice, with `Axis.ControlPlane.Admin`, see
   [operators](control-plane.md#operators).
