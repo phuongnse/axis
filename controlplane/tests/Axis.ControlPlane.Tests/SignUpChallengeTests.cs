@@ -78,6 +78,39 @@ public sealed class SignUpChallengeTests
         Assert.Null(SignUpChallenge.Verify(_key, altcha, _now));
     }
 
+    [Fact]
+    public void A_salt_that_takes_a_digit_of_the_number_into_its_expiry_is_refused_next_to_the_served_one_that_passes()
+    {
+        var challenge = JsonSerializer.SerializeToElement(SignUpChallenge.Create(_key, _now));
+        var served = challenge.GetProperty("salt").GetString()!;
+        Assert.EndsWith("&", served, StringComparison.Ordinal);
+        Assert.NotNull(SignUpChallenge.Verify(_key, Payload(challenge, Solve(challenge)), _now));
+
+        // Without the closing "&" the hash of salt + "12345" is also the hash of salt + "1" with the number 2345, and the expiry
+        // would read as a date centuries away. The challenge below is signed, so only the shape of the salt can refuse it.
+        var open = served[..^1];
+        var hash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{open}12345")));
+        var signature = Convert.ToHexStringLower(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(hash)));
+
+        Assert.Null(SignUpChallenge.Verify(_key, Solution(open, 12345, hash, signature), _now));
+        Assert.Null(SignUpChallenge.Verify(_key, Solution(open + "1", 2345, hash, signature), _now));
+    }
+
+    [Theory]
+    [InlineData("0123456789abcdef01234567?expires=1800000600&x=1")]
+    [InlineData("0123456789abcdef01234567?expires=1800000600&&")]
+    [InlineData("0123456789abcdef01234567?expires=-1&")]
+    [InlineData("0123456789abcdef01234567?expires=&")]
+    [InlineData("0123456789abcdef01234567?expires=99999999999999&")]
+    [InlineData("?expires=1800000600&")]
+    public void A_salt_that_is_not_the_served_shape_is_refused_even_when_it_is_signed(string salt)
+    {
+        var challenge = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{salt}7")));
+        var signature = Convert.ToHexStringLower(HMACSHA256.HashData(_key, Encoding.UTF8.GetBytes(challenge)));
+
+        Assert.Null(SignUpChallenge.Verify(_key, Solution(salt, 7, challenge, signature), _now));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -88,6 +121,9 @@ public sealed class SignUpChallengeTests
     [InlineData("e30=")]
     public void A_missing_blank_non_base64_non_JSON_or_empty_solution_is_refused(string? altcha) =>
         Assert.Null(SignUpChallenge.Verify(_key, altcha, _now));
+
+    private static string Solution(string salt, int number, string challenge, string signature) =>
+        Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new { algorithm = "SHA-256", challenge, number, salt, signature }));
 
     // The number that hashes with the salt to the challenge, found the way the page finds it.
     private static int Solve(JsonElement challenge)

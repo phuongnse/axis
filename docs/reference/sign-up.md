@@ -172,7 +172,9 @@ cost something.
   pays for each try. No sign-up data goes to a bot-check service. The route answers
   `{ algorithm, challenge, maxnumber, salt, signature }`, signed with
   [`ControlPlane:SignUp:ChallengeKey`](control-plane.md#settings), and answers `503` without that key.
-  `POST /api/sign-up` answers `503` without it too, as no solution can pass.
+  `POST /api/sign-up` answers `503` without it too, as no solution can pass. The salt is random hex,
+  then `?expires=` and the expiry in Unix seconds, then a closing `&`, and the route refuses any other
+  shape, so a caller cannot move digits between the salt and the number to push the expiry out.
   The page sends the solution as `altcha` in the body of `POST /api/sign-up`. The route checks the
   solution before the limits and the form's fields, and refuses a missing, malformed, wrong, expired
   or used one under `/altcha`, see [sending the form](#sending-the-form). It stores each accepted

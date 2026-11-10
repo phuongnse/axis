@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Axis.ControlPlane.SignUp;
 
@@ -9,7 +10,7 @@ namespace Axis.ControlPlane.SignUp;
 /// The ALTCHA proof-of-work challenge of the sign-up page, see <c>docs/reference/sign-up.md#bots-and-abuse</c>. The browser finds the
 /// number that hashes to the challenge, and the signature lets the control plane tell a challenge it served from one a caller made up.
 /// </summary>
-internal static class SignUpChallenge
+internal static partial class SignUpChallenge
 {
     /// <summary>The fewest bytes of the key that signs the challenges.</summary>
     public const int MinimumKeyBytes = 32;
@@ -24,7 +25,7 @@ internal static class SignUpChallenge
 
     public static object Create(byte[] key, DateTimeOffset now)
     {
-        var salt = $"{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(SaltBytes))}?expires={(now + Lifetime).ToUnixTimeSeconds()}";
+        var salt = $"{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(SaltBytes))}?expires={(now + Lifetime).ToUnixTimeSeconds()}&";
         var number = RandomNumberGenerator.GetInt32(0, MaxNumber + 1);
         var challenge = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes($"{salt}{number}")));
         var signature = Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(challenge)));
@@ -57,10 +58,12 @@ internal static class SignUpChallenge
                 return null;
             }
 
-            var query = salt.Split('?');
-            if (query.Length != 2
-                || query[1].Split('&').FirstOrDefault(pair => pair.StartsWith("expires=", StringComparison.Ordinal)) is not { } expiresPair
-                || !long.TryParse(expiresPair["expires=".Length..], NumberStyles.None, CultureInfo.InvariantCulture, out var expires))
+            // The salt ends with "&", so a caller cannot move a digit of the expiry into the number: salt + "1" with number 2345
+            // would hash like salt with 12345 and push the expiry centuries away.
+            var shape = SaltShape().Match(salt);
+            if (!shape.Success
+                || !long.TryParse(shape.Groups["expires"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var expires)
+                || expires > DateTimeOffset.MaxValue.ToUnixTimeSeconds())
             {
                 return null;
             }
@@ -87,6 +90,10 @@ internal static class SignUpChallenge
             return null;
         }
     }
+
+    // The salt as Create serves it: the random hex, then the expiry, and the "&" that closes it.
+    [GeneratedRegex(@"^[0-9a-f]{24}\?expires=(?<expires>[0-9]{1,12})&$", RegexOptions.CultureInvariant)]
+    private static partial Regex SaltShape();
 
     // The text of a field that is a string, or null.
     private static string? Text(JsonObject payload, string name) =>

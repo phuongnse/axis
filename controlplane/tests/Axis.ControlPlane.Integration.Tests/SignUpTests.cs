@@ -748,7 +748,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     // A solution signed with the key, whatever its number or expiry: the challenge hashes the real number and the payload claims another.
     private static string Forge(byte[] key, long expires, int number, int claimed)
     {
-        var salt = $"{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}?expires={expires}";
+        var salt = $"{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}?expires={expires}&";
         var challenge = Hash(salt, number);
         var signature = Convert.ToHexStringLower(HMACSHA256.HashData(key, System.Text.Encoding.UTF8.GetBytes(challenge)));
         return Payload(challenge, salt, signature, claimed);
