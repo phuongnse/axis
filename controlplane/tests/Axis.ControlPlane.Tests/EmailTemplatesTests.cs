@@ -1,9 +1,12 @@
+using System.Text.RegularExpressions;
 using Axis.ControlPlane.Emails;
 
 namespace Axis.ControlPlane.Tests;
 
-public sealed class EmailTemplatesTests
+public sealed partial class EmailTemplatesTests
 {
+    private static readonly string[] _timelineKinds = ["trialStarted", "trialEndsIn7Days", "trialEndsTomorrow", "tenantReadOnly", "deletionIn7Days", "tenantDeleted"];
+
     [Fact]
     public void Every_shipped_kind_has_an_en_and_a_vi_text_that_render()
     {
@@ -122,6 +125,49 @@ public sealed class EmailTemplatesTests
         Assert.Throws<ArgumentException>(() => templates.Render("z", "fr", new Dictionary<string, string> { ["name"] = "An" }));
         Assert.Throws<ArgumentException>(() => templates.Render("nope", "en", new Dictionary<string, string> { ["name"] = "An" }));
     }
+
+    [Fact]
+    public void The_six_timeline_emails_hold_no_secret_or_payment_field_and_link_only_to_the_billing_portal_and_differ_by_language()
+    {
+        var templates = EmailTemplates.LoadEmbedded();
+
+        foreach (var kind in _timelineKinds)
+        {
+            Assert.Contains(kind, templates.Kinds);
+            var placeholders = templates.Placeholders(kind);
+            Assert.All(placeholders, name => Assert.False(SecretOrPayment().IsMatch(name), $"{kind} has the placeholder {name}."));
+
+            // A link is a placeholder that holds the whole address, so the only one allowed is the billing portal.
+            Assert.All(placeholders.Where(name => name.EndsWith("Url", StringComparison.Ordinal)), name => Assert.Equal("billingPortalUrl", name));
+
+            var values = placeholders.ToDictionary(name => name, name => $"<{name}>");
+            foreach (var language in EmailTemplates.Languages)
+            {
+                var (subject, body) = templates.Render(kind, language, values);
+                var text = subject + "\n" + body;
+                Assert.DoesNotContain("http", text.Replace("<billingPortalUrl>", "", StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("!", text, StringComparison.Ordinal);
+            }
+
+            Assert.NotEqual(templates.Render(kind, "en", values).Subject, templates.Render(kind, "vi", values).Subject);
+        }
+    }
+
+    [Fact]
+    public void The_timeline_emails_that_name_a_next_step_hold_its_date_and_the_billing_portal_and_the_deletion_email_holds_neither()
+    {
+        var templates = EmailTemplates.LoadEmbedded();
+
+        foreach (var kind in _timelineKinds.Where(kind => kind != "tenantDeleted"))
+        {
+            Assert.Equal(["billingPortalUrl", "name", "nextStepAt", "tenantAddress"], templates.Placeholders(kind).Order(StringComparer.Ordinal));
+        }
+
+        Assert.Equal(["name", "tenantAddress"], templates.Placeholders("tenantDeleted").Order(StringComparer.Ordinal));
+    }
+
+    [GeneratedRegex("password|token|secret|otp|card|bank|iban|account|payment|price|amount", RegexOptions.IgnoreCase)]
+    private static partial Regex SecretOrPayment();
 
     private static string Text(string body) => $"Subject: Subject {body}\r\n\r\n{body}\r\n";
 }

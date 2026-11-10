@@ -1,0 +1,9 @@
+Subject: The Axis workspace has been deleted
+
+Hello {{name}},
+
+The workspace at {{tenantAddress}} and all its data have been deleted.
+
+If you need help, contact Axis support.
+
+The Axis team

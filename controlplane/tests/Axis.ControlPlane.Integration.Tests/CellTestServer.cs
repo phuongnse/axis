@@ -75,6 +75,12 @@ internal sealed class CellTestServer : IAsyncDisposable
     /// <summary>When set, the tenant read route answers this status and no tenant.</summary>
     public int? TenantReadStatus { get; set; }
 
+    /// <summary>The administrators that the administrators route answers, as <c>{ email, displayName, language }</c>. Null answers <c>404</c>.</summary>
+    public IReadOnlyList<(string Email, string? DisplayName, string? Language)>? Administrators { get; set; }
+
+    /// <summary>When set, the administrators route answers this status and no list.</summary>
+    public int? AdministratorsStatus { get; set; }
+
     /// <summary>Makes the next <paramref name="count"/> calls to the cell, the token requests excepted, answer <c>401</c>.</summary>
     public void RefuseNext(int count) => Volatile.Write(ref _refusals, count);
 
@@ -191,6 +197,23 @@ internal sealed class CellTestServer : IAsyncDisposable
             return Results.Json(
                 new { id = Guid.Parse("22222222-2222-2222-2222-222222222222"), kind = "delete", tenantId = id, state = "queued", createdAt = DateTimeOffset.UnixEpoch },
                 statusCode: StatusCodes.Status202Accepted);
+        });
+
+        app.MapGet("/api/cell/tenants/{id}/administrators", () =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            if (AdministratorsStatus is { } status)
+            {
+                return Results.StatusCode(status);
+            }
+
+            return Administrators is { } administrators
+                ? Results.Json(new { items = administrators.Select(administrator => new { email = administrator.Email, displayName = administrator.DisplayName, language = administrator.Language }) })
+                : Results.StatusCode(StatusCodes.Status404NotFound);
         });
 
         app.MapGet("/api/cell/tenants/{id}", (string id) =>

@@ -127,8 +127,8 @@ every business change.
 - **Emails.** The control plane sends its own emails, from a mail domain of its own,
   `ControlPlane:MailFrom`, with SPF, DKIM and DMARC. It never uses a cell's mail domain, so one
   tenant's sending never touches a sign-up or a payment reminder. Every email is in `en` and `vi`, in
-  the language the person chose at sign-up. SPF, DKIM and DMARC are DNS and relay setup, outside the
-  repository.
+  the language the person chose at sign-up, or, for a tenant administrator, in the realm. SPF, DKIM
+  and DMARC are DNS and relay setup, outside the repository.
   - **The `sendEmail` job.** Every email is one durable job of the kind `sendEmail`, so a restart
     loses none. Code queues it through one helper, `EmailJobs.EnqueueAsync`, which may run in the
     transaction of the change that needs the email. The payload is

@@ -29,7 +29,8 @@ commerce.
   tenant's cell in the [region directory](region-directory.md). A move calls the cell, follows its
   job, and then commits the new state, the next date and one audit record in one transaction, with
   the job as actor. The 30 days of `readOnly` count from the run that made the tenant read-only, so a
-  late run delays the next step and never shortens the wait.
+  late run delays the next step and never shortens the wait. After its moves, the run queues the
+  due [emails](#emails).
 - **A failed call is retried.** A call to the cell that fails, or a job that does not end in time,
   leaves the subscription as it was. The run goes on with the others and then fails, so the job queue
   retries it. Every cell call of a move carries the idempotency key `<operation>:<step id>`. The step
@@ -83,7 +84,7 @@ comes after them.
 | 30 days in `readOnly` for a trial, 90 for a paid tenant | `deleting`: the control plane calls `DELETE /api/cell/tenants/{id}` | Same |
 | 7 days later | The cell purges the tenant, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) | Same |
 
-- **The emails** _(planned for M33)_. The emails of the rows above, see [emails](#emails).
+- **The emails.** The emails of the rows above, see [emails](#emails).
 - **A paid tenant's timeline** _(planned for M34)_. The column of a paid tenant that stops paying
   comes with paid plans.
 - **Export until the deletion.** While `readOnly`, a tenant administrator exports the data from the
@@ -120,18 +121,33 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
 
 ## Emails
 
-_(planned for M33)_
-
 The control plane emails the people of a subscription before each step, so nobody is surprised by
 one.
 
 - **Who gets them.** Every administrator of the tenant, read through
-  `GET /api/cell/tenants/{id}/administrators`, and every
-  [billing contact](billing-portal.md#people) of the subscription, each once.
-- **From where.** The control plane's own mail domain, in the subscription's language, see
-  [its own work](control-plane.md#its-own-work).
+  `GET /api/cell/tenants/{id}/administrators`, and the person who signed up, the first
+  [owner](billing-portal.md#people), each address once. The deletion's email goes to the owner only,
+  because the cell has purged the tenant and its administrators by then.
+- **Other owners and billing contacts** _(planned for M34)_. The other owners and billing contacts of
+  the billing portal get them too.
+- **In their language.** An administrator gets the email in the language set in the realm, and the
+  owner in the language chosen at sign-up. An administrator with neither `en` nor `vi` gets the
+  language of the sign-up.
+- **From where.** The control plane's own mail domain, see [its own work](control-plane.md#its-own-work).
 - **Which.** Those of [the timeline](#the-timeline), plus: the trial has started, and the deletion is
-  done. Each states the date of the next step and what stops it.
+  done. Each states the date and time of the next step in UTC and what stops it.
+- **When.** After its moves, each hourly run queues the one email that is due for each subscription,
+  see [the hourly job](#one-clock). Each email's window starts on its day: the trial's start, then
+  day 23, day 29, the move to `readOnly`, 7 days before the deletion, and the move to `deleted`. A
+  run that comes after a window has closed skips that email and sends the one of the current window.
+  The tenant must exist in its cell, so the first email can come up to an hour after the tenant is
+  ready. A failed read of the administrators queues nothing for that subscription, and the run
+  fails, so the job queue retries it.
+- **Once per subscription and kind.** The `control_plane.subscription_emails` table holds
+  `subscription_id`, `kind` and `queued_at`, with the key (`subscription_id`, `kind`). The row is
+  written in the same transaction as the `sendEmail` jobs, so a rerun, a retry or two runs that
+  overlap send nothing twice. A deletion that is cancelled sends no second read-only or deletion
+  email.
 - **Billing emails** _(planned for M34)_. A payment is received, an e-invoice is issued, a plan or
   add-on changes, and a subscription is cancelled. Each states the date of the next step and what
   stops it.

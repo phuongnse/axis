@@ -1,0 +1,9 @@
+Subject: Axis đã xóa không gian làm việc
+
+Chào {{name}},
+
+Đã xóa không gian làm việc tại {{tenantAddress}} cùng toàn bộ dữ liệu.
+
+Nếu cần hỗ trợ, hãy liên hệ với đội ngũ hỗ trợ Axis.
+
+Đội ngũ Axis

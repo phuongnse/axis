@@ -1,0 +1,13 @@
+Subject: Axis sẽ xóa không gian làm việc sau 7 ngày
+
+Chào {{name}},
+
+Không gian làm việc tại {{tenantAddress}} đang ở chế độ chỉ xem. Lúc {{nextStepAt}}, sau 7 ngày, bắt đầu xóa không gian làm việc cùng toàn bộ dữ liệu, và dữ liệu sẽ mất. Không thể hoàn tác.
+
+Để ngăn việc này, hãy thanh toán trên trang thanh toán:
+
+{{billingPortalUrl}}
+
+Hãy xuất dữ liệu trước: quản trị viên có thể làm việc này từ ứng dụng cho đến thời điểm đó.
+
+Đội ngũ Axis

@@ -1,0 +1,13 @@
+Subject: The Axis trial has ended and the workspace is read-only
+
+Hello {{name}},
+
+The trial has ended, so the workspace at {{tenantAddress}} is now read-only. People can still sign in and read, but nothing can change.
+
+On {{nextStepAt}} the deletion of the workspace and all its data starts. To stop it, pay in the billing portal:
+
+{{billingPortalUrl}}
+
+Until then an administrator can export the data from the application.
+
+The Axis team

@@ -15,8 +15,8 @@ namespace Axis.ControlPlane.Cells;
 /// <see cref="CellOperation"/>, and so does a <c>DELETE</c>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
-/// <see cref="ListTenantsAsync"/> reads the cell's tenant list and <see cref="GetTenantStatusAsync"/> one tenant's status, with the same
-/// token and the same failures.
+/// <see cref="ListTenantsAsync"/> reads the cell's tenant list, <see cref="GetTenantStatusAsync"/> one tenant's status and
+/// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures.
 /// </summary>
 internal sealed class CellClient : IDisposable
 {
@@ -103,6 +103,17 @@ internal sealed class CellClient : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         return CallAsync(HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}", null, null, ReadTenantStatusAsync, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the administrators of one tenant, <c>GET /api/cell/tenants/{id}/administrators</c>, as each one's email, display name and
+    /// language. A cell that does not know the tenant answers <c>404</c>, and the result is null.
+    /// </summary>
+    public Task<IReadOnlyList<CellAdministrator>?> ListAdministratorsAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        return CallAsync(
+            HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}/administrators", null, null, ReadAdministratorsAsync, cancellationToken);
     }
 
     /// <summary>
@@ -254,6 +265,35 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a tenant list.", status);
+    }
+
+    private async Task<IReadOnlyList<CellAdministrator>?> ReadAdministratorsAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    {
+        var status = (int)response.StatusCode;
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
+        }
+
+        try
+        {
+            var list = await response.Content.ReadFromJsonAsync<CellAdministratorList>(JsonSerializerOptions.Web, cancellationToken);
+            if (list?.Items is { } items && items.All(item => !string.IsNullOrWhiteSpace(item?.Email)))
+            {
+                return [.. items.Select(item => new CellAdministrator(item!.Email!, item.DisplayName, item.Language))];
+            }
+        }
+        catch (JsonException)
+        {
+            // The body is not an administrator list, which the fixed text below says without quoting it.
+        }
+
+        throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not an administrator list.", status);
     }
 
     private async Task<string?> ReadTenantStatusAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)

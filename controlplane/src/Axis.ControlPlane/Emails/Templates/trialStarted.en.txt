@@ -1,0 +1,13 @@
+Subject: Your Axis trial has started
+
+Hello {{name}},
+
+The trial has started. Sign in at:
+
+{{tenantAddress}}
+
+The trial ends on {{nextStepAt}}. After that the workspace is read-only: it can be read, but nothing can change. To keep it working, pay in the billing portal before then:
+
+{{billingPortalUrl}}
+
+The Axis team
