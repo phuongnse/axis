@@ -435,19 +435,17 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
   class or file fit.
 - **Durations.** CI keeps the durations true, so nobody has to notice that the shards drift apart. When
-  every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its `Shard durations` job
-  downloads the run's `test-results-*` artifacts and runs `scripts/shard-durations.mjs`. The job runs no
-  model, holds only `contents: read` and `issues: write`, and commits nothing. The script rewrites each
-  durations file with its split's `--durations` command and reads each split's `--count`. A file drifts
-  when its entries that moved by at least a few seconds add up to more than a set share of its old total,
-  and an added or removed entry counts in full. Both values live in the script, and the few seconds leave
-  out the noise of one run on a short test. When a file drifts or a split prints `Over budget:`, the script
-  opens one `process` issue, or updates the one that is open, with the new files and a criterion to split
-  each spec, class, file or suite that passes the budget. NexKit's round then commits the files. The
-  same commands work by hand on the JUnit files of a run: `node scripts/lib/test-shard.mjs --durations
-  web*.xml`, `e2e-shard.mjs --durations playwright-*.xml`, `integration-shard.mjs --durations` with each
-  shard's `Axis.Integration.Tests.xml` and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, and
-  `smoke-shard.mjs --durations {dev-script,compose,images,onprem}.xml`.
+  every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its `Shard durations` job runs
+  `scripts/shard-durations.mjs` on the run's `test-results-*` artifacts. The job runs no model, holds
+  only `contents: read` and `issues: write`, and commits nothing. The script rewrites each durations file
+  with its split's `--durations` command and reads each split's `--count`. A file drifts when its entries
+  that moved by at least a few seconds, which leaves out one run's noise, add up to more than a set share
+  of its old total. Both values live in the script. For drifted files the script opens one `process`
+  issue with the new files, or updates the open one, and NexKit's round commits them. Each spec, class,
+  file or suite that `--count` reports `Over budget:` gets a `process` issue of its own, to split it or
+  make it faster, unless its issue is open. By hand, each split's `--durations` takes a run's JUnit
+  files: `web*.xml`, `playwright-*.xml`, each integration shard's `Axis.Integration.Tests.xml` with shard
+  1's `Axis.ControlPlane.Integration.Tests.xml`, and `{dev-script,compose,images,onprem}.xml`.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
