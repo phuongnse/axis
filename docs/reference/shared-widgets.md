@@ -47,7 +47,7 @@ Each common job has one shared widget or helper:
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
 | A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line _(planned for M33)_ |
 | A required box that accepts terms, each document a link | `AcceptTermsField` _(planned for M33)_ |
-| A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language _(planned for M33)_ |
+| A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language |
 | The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line |
 | The application a new tenant or a new application starts from | `StartFromField`, with Blank first _(planned for M33)_ |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
