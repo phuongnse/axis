@@ -50,6 +50,7 @@ import {
   requestId,
   sectionWidget,
   signUpApplications,
+  signUpChallenge,
   signUpDocuments,
   signUpRegion,
   siteTexts,
@@ -331,6 +332,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 1200,
       routes: {
         '/api/sign-up/applications': () => signUpApplications,
+        '/api/sign-up/challenge': signUpChallenge,
         '/api/sign-up/documents': () => signUpDocuments,
         '/api/sign-up/region': () => signUpRegion,
       },
