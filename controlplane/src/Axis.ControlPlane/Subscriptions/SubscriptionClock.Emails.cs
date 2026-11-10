@@ -185,7 +185,7 @@ internal sealed partial class SubscriptionClock
             {
                 ["name"] = recipient.Name,
                 ["tenantAddress"] = SignUpAddress.Of(options, candidate.TenantId),
-                ["billingPortalUrl"] = $"{options.PublicUrl}/tenants/{Uri.EscapeDataString(candidate.TenantId)}",
+                ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, candidate.TenantId),
             };
             if (nextStep is { } at)
             {

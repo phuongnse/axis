@@ -1,0 +1,12 @@
+Subject: This email already had an Axis trial
+
+Hello {{name}},
+
+Someone, maybe you, tried to sign up for Axis with this email. It already had a trial, so no other one starts.
+
+Sign in at:
+{{tenantAddress}}
+
+If this was not you, ignore this email.
+
+The Axis team
