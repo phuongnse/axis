@@ -278,7 +278,8 @@ export function Shell({
                   style={{
                     position: 'sticky',
                     top: headerHeight,
-                    height: `calc(100vh - ${headerHeight}px)`,
+                    // As the sidebar's nav, a design-system frame's height stands for the window's.
+                    height: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
                     display: 'flex',
                     flexDirection: 'column',
                   }}
