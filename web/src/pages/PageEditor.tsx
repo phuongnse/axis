@@ -1,7 +1,7 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
 import { lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
-import { AxisField } from '../platform/AxisField'
+import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { EmptyState } from '../platform/EmptyState'
 import { getAt } from '../platform/jsonPatch'
@@ -520,8 +520,27 @@ function partCount(widget: Content): number {
   return Array.isArray(parts) ? parts.length : -1
 }
 
+/** A field of the page property at `pointer`, labelled and helped by its path, see {@link pageFieldPath}. */
+function PageField({ pointer, children }: { pointer: string; children: AxisFieldProps['children'] }) {
+  const { field } = useFieldTexts('page')
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <AxisField {...field(pageFieldPath(pointer))}>{children}</AxisField>
+    </div>
+  )
+}
+
+/** A group of the page property at `pointer`, titled and helped by its path, see {@link pageFieldPath}. */
+function PageFieldGroup({ pointer, children }: { pointer: string; children: ReactNode }) {
+  const { group } = useFieldTexts('page')
+  return (
+    <div data-testid={`studio-field-${pointer}`}>
+      <AxisFieldGroup {...group(pageFieldPath(pointer))}>{children}</AxisFieldGroup>
+    </div>
+  )
+}
+
 /** The picker of a name, or a plain box while the application's names have not loaded. */
-/** A name picker of a page property, labelled and helped by the property's path, see {@link pageFieldPath}. */
 function NameField({
   pointer,
   kind,
@@ -542,7 +561,7 @@ function NameField({
   onPick: (next: string | undefined) => void
 }) {
   const { field } = useFieldTexts('page')
-  const { label, help } = field(pageFieldPath(pointer))
+  const { label } = field(pageFieldPath(pointer))
   const names = useContext(StudioNamesContext)
   const value = typeof current === 'string' ? current : undefined
   const options =
@@ -553,18 +572,16 @@ function NameField({
         )
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <AxisField label={label} help={help}>
-        {names === undefined ? (
-          <Input
-            value={text(value)}
-            onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
-          />
-        ) : (
-          <ReferencePicker name={label} value={value} required={required} options={options} onChange={onPick} />
-        )}
-      </AxisField>
-    </div>
+    <PageField pointer={pointer}>
+      {names === undefined ? (
+        <Input
+          value={text(value)}
+          onChange={(event) => onPick(event.target.value === '' && !required ? undefined : event.target.value)}
+        />
+      ) : (
+        <ReferencePicker name={label} value={value} required={required} options={options} onChange={onPick} />
+      )}
+    </PageField>
   )
 }
 
@@ -628,10 +645,8 @@ function WidgetPanel({
 
   return (
     <Flex vertical gap="small" data-testid={`studio-field-${base}`}>
-      <div data-testid={`studio-field-${base}/type`}>
-        <div>{t('shell.studio.page.widgetType')}</div>
+      <PageField pointer={`${base}/type`}>
         <Select
-          aria-label={t('shell.studio.page.widgetType')}
           virtual={false}
           style={{ minWidth: 240 }}
           value={type}
@@ -642,7 +657,7 @@ function WidgetPanel({
             }
           }}
         />
-      </div>
+      </PageField>
       {type === 'table' && (
         <>
           <NameField
@@ -661,8 +676,6 @@ function WidgetPanel({
           />
           <Actions
             pointer={`${base}/rowActions`}
-            path="widgets.rowActions"
-            title={t('shell.studio.page.rowActions')}
             actions={widget.rowActions}
             startProcess={false}
             deleteAction
@@ -674,8 +687,6 @@ function WidgetPanel({
           />
           <Actions
             pointer={`${base}/toolbarActions`}
-            path="widgets.toolbarActions"
-            title={t('shell.studio.page.toolbarActions')}
             actions={widget.toolbarActions}
             startProcess={false}
             deleteAction={false}
@@ -714,8 +725,6 @@ function WidgetPanel({
           )}
           <Actions
             pointer={`${base}/actions`}
-            path="widgets.actions"
-            title={t('shell.studio.page.actions')}
             actions={widget.actions}
             startProcess
             deleteAction={false}
@@ -985,12 +994,7 @@ function KpiPanel({
           ) : isContent(navigate) ? (
             <>
               <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
-              <NavigateFields
-                pointer={`${base}/navigate`}
-                path="widgets.navigate"
-                action={navigate}
-                onChange={onChange}
-              />
+              <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
               <div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
@@ -1165,7 +1169,7 @@ function RecordField({
   parameters: unknown
   onPick: (next: string | undefined) => void
 }) {
-  const t = useText()
+  const { field } = useFieldTexts('page')
   const wanted = typeof entity === 'string' && entity !== '' ? entity.toLowerCase() : undefined
   const options = (Array.isArray(parameters) ? parameters : []).flatMap((parameter) => {
     if (!isContent(parameter) || typeof parameter.name !== 'string') {
@@ -1178,16 +1182,15 @@ function RecordField({
   })
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <div>{t('shell.studio.page.record')}</div>
+    <PageField pointer={pointer}>
       <ReferencePicker
-        name={t('shell.studio.page.record')}
+        name={field(pageFieldPath(pointer)).label}
         value={typeof current === 'string' ? current : undefined}
         required
         options={options}
         onChange={onPick}
       />
-    </div>
+    </PageField>
   )
 }
 
@@ -1360,28 +1363,15 @@ function SectionPanel({ base, widget, onChange }: { base: string; widget: Conten
 
 /** The label of an action. */
 function ActionLabel({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
-  const t = useText()
-
   return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <div>{t('shell.studio.page.actionLabel')}</div>
+    <PageFieldGroup pointer={pointer}>
       <LabelTexts pointer={pointer} value={value} onChange={onChange} />
-    </div>
+    </PageFieldGroup>
   )
 }
 
 /** The fields of a `navigate` action: its page, label, optional `record` expression and parameter expressions. */
-function NavigateFields({
-  pointer,
-  path,
-  action,
-  onChange,
-}: {
-  pointer: string
-  path: string
-  action: Content
-  onChange: ChangeHandler
-}) {
+function NavigateFields({ pointer, action, onChange }: { pointer: string; action: Content; onChange: ChangeHandler }) {
   const t = useText()
   const { group } = useFieldTexts('page')
   const names = useContext(StudioNamesContext)
@@ -1401,20 +1391,18 @@ function NavigateFields({
     <>
       <NameField pointer={`${pointer}/page`} kind="page" current={action.page} required onPick={pick} />
       <ActionLabel pointer={`${pointer}/label`} value={action.label} onChange={onChange} />
-      <div data-testid={`studio-field-${pointer}/record`}>
-        <div>{t('shell.studio.page.actionRecord')}</div>
+      <PageField pointer={`${pointer}/record`}>
         <Input
-          aria-label={t('shell.studio.page.actionRecord')}
           value={text(action.record)}
           onChange={(event) =>
             onChange(`${pointer}/record`, event.target.value === '' ? undefined : event.target.value)
           }
         />
-      </div>
+      </PageField>
       {page === undefined ? (
         <MappingRows
           pointer={`${pointer}/parameters`}
-          {...group(`${path}.parameters`)}
+          {...group(pageFieldPath(`${pointer}/parameters`))}
           value={action.parameters}
           keyLabel={t('shell.studio.page.parameterName')}
           target={{ kind: 'expression' }}
@@ -1460,10 +1448,9 @@ function ParameterExpressions({
 
   if (value !== undefined && !isContent(value)) {
     return (
-      <div data-testid={`studio-field-${pointer}`}>
-        <div>{t('shell.studio.page.actionParameters')}</div>
+      <PageFieldGroup pointer={pointer}>
         <JsonOnly />
-      </div>
+      </PageFieldGroup>
     )
   }
 
@@ -1499,9 +1486,8 @@ function ParameterExpressions({
   }
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
+    <PageFieldGroup pointer={pointer}>
       <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.page.actionParameters')}</Typography.Text>
         {page.parameters.map((parameter) => {
           const key =
             entries.find(([name]) => name.toLowerCase() === parameter.name.toLowerCase())?.[0] ?? parameter.name
@@ -1510,7 +1496,7 @@ function ParameterExpressions({
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
               <Typography.Text type="secondary">
-                {`${parameter.name}, ${parameter.type}${parameter.required ? `, ${t('shell.studio.page.parameterRequired').toLowerCase()}` : ''}`}
+                {`${parameter.name}, ${parameter.type}${parameter.required ? `, ${t('shell.studio.field.page.parameters.required').toLowerCase()}` : ''}`}
               </Typography.Text>
               {expression(rowPointer, typeof current === 'string' ? current : '')}
             </div>
@@ -1535,7 +1521,7 @@ function ParameterExpressions({
           )
         })}
       </Flex>
-    </div>
+    </PageFieldGroup>
   )
 }
 
@@ -1550,8 +1536,6 @@ function ParameterExpressions({
  */
 function Actions({
   pointer,
-  path,
-  title,
   actions,
   startProcess,
   deleteAction,
@@ -1562,9 +1546,6 @@ function Actions({
   onChange,
 }: {
   pointer: string
-  /** The path of the list in the page file, from the root, which names the texts of its navigate actions' parameters. */
-  path: string
-  title: string
   actions: unknown
   startProcess: boolean
   deleteAction: boolean
@@ -1585,9 +1566,8 @@ function Actions({
   }
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
+    <PageFieldGroup pointer={pointer}>
       <Flex vertical gap="small">
-        <Typography.Text strong>{title}</Typography.Text>
         {actions !== undefined && !Array.isArray(actions) ? (
           <JsonOnly />
         ) : (
@@ -1611,7 +1591,7 @@ function Actions({
                       <LayerMarkTag layer={layer} list={pointer} index={position} name={action.name} />
                     )}
                     {action.type === 'navigate' ? (
-                      <NavigateFields pointer={actionPointer} path={path} action={action} onChange={onChange} />
+                      <NavigateFields pointer={actionPointer} action={action} onChange={onChange} />
                     ) : action.type === 'startProcess' ? (
                       <>
                         <NameField
@@ -1626,10 +1606,8 @@ function Actions({
                     ) : action.type === 'delete' ? (
                       <>
                         <ActionLabel pointer={`${actionPointer}/label`} value={action.label} onChange={onChange} />
-                        <div data-testid={`studio-field-${actionPointer}/visibleWhen`}>
-                          <div>{t('shell.studio.page.actionVisibleWhen')}</div>
+                        <PageField pointer={`${actionPointer}/visibleWhen`}>
                           <Input
-                            aria-label={t('shell.studio.page.actionVisibleWhen')}
                             value={text(action.visibleWhen)}
                             onChange={(event) =>
                               onChange(
@@ -1638,7 +1616,7 @@ function Actions({
                               )
                             }
                           />
-                        </div>
+                        </PageField>
                       </>
                     ) : (
                       <div data-testid={`studio-field-${actionPointer}`}>
@@ -1683,7 +1661,7 @@ function Actions({
           </>
         )}
       </Flex>
-    </div>
+    </PageFieldGroup>
   )
 }
 
