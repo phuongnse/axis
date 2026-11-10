@@ -12,10 +12,11 @@ namespace Axis.ControlPlane.Cells;
 /// token of the cell's operator realm. The token comes from the client credentials grant and stays until
 /// <see cref="CellClientOptions.TokenRefreshMargin"/> before it expires. A <c>401</c> from the cell drops the token, and the
 /// call is sent once more with a new one. Every <c>POST</c> carries the <c>Idempotency-Key</c> of its
-/// <see cref="CellOperation"/>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
+/// <see cref="CellOperation"/>, and so does a <c>DELETE</c>. A failure throws <see cref="CellCallException"/> with a fixed text: it never holds a
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
-/// <see cref="ListTenantsAsync"/> reads the cell's tenant list with the same token and the same failures.
+/// <see cref="ListTenantsAsync"/> reads the cell's tenant list and <see cref="GetTenantStatusAsync"/> one tenant's status, with the same
+/// token and the same failures.
 /// </summary>
 internal sealed class CellClient : IDisposable
 {
@@ -69,6 +70,18 @@ internal sealed class CellClient : IDisposable
             (response, call, token) => ReadJobAsync(response, HttpMethod.Post, call, token), cancellationToken);
     }
 
+    /// <summary>
+    /// Sends a <c>DELETE</c> that changes a tenant, with no body, and returns the queued job. <paramref name="path"/> is under
+    /// <c>/api/cell/</c>. A retry with the same <paramref name="operation"/> gets the first job again.
+    /// </summary>
+    public Task<CellJob> DeleteAsync(string path, CellOperation operation, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        return CallAsync(
+            HttpMethod.Delete, path, operation.IdempotencyKey, null,
+            (response, call, token) => ReadJobAsync(response, HttpMethod.Delete, call, token), cancellationToken);
+    }
+
     /// <summary>Reads a job with its steps and its error.</summary>
     public Task<CellJob> GetJobAsync(Guid id, CancellationToken cancellationToken) =>
         CallAsync(
@@ -81,6 +94,16 @@ internal sealed class CellClient : IDisposable
     /// </summary>
     public Task<IReadOnlyList<CellTenant>> ListTenantsAsync(CancellationToken cancellationToken) =>
         CallAsync(HttpMethod.Get, "/api/cell/tenants", null, null, ReadTenantsAsync, cancellationToken);
+
+    /// <summary>
+    /// Reads one tenant, <c>GET /api/cell/tenants/{id}</c>, and returns its <c>status</c>, <c>deleting</c> while a deletion is
+    /// scheduled. A cell that does not know the tenant answers <c>404</c>, and the result is null.
+    /// </summary>
+    public Task<string?> GetTenantStatusAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        return CallAsync(HttpMethod.Get, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}", null, null, ReadTenantStatusAsync, cancellationToken);
+    }
 
     /// <summary>
     /// Polls a job until it is <c>succeeded</c> or <c>failed</c>, and returns it with its steps and error. The wait starts at
@@ -180,9 +203,9 @@ internal sealed class CellClient : IDisposable
     private async Task<CellJob> ReadJobAsync(HttpResponseMessage response, HttpMethod method, string call, CancellationToken cancellationToken)
     {
         var status = (int)response.StatusCode;
-        var accepted = method == HttpMethod.Post
-            ? response.StatusCode is HttpStatusCode.Accepted or HttpStatusCode.OK
-            : response.StatusCode == HttpStatusCode.OK;
+        var accepted = method == HttpMethod.Get
+            ? response.StatusCode == HttpStatusCode.OK
+            : response.StatusCode is HttpStatusCode.Accepted or HttpStatusCode.OK;
         if (!accepted)
         {
             if (response.StatusCode == HttpStatusCode.Conflict && await IsFullAnswerAsync(response, cancellationToken))
@@ -231,6 +254,39 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a tenant list.", status);
+    }
+
+    private async Task<string?> ReadTenantStatusAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    {
+        var status = (int)response.StatusCode;
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
+        }
+
+        try
+        {
+            using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object
+                && root.TryGetProperty("status", out var value)
+                && value.ValueKind == JsonValueKind.String
+                && value.GetString() is { Length: > 0 } text)
+            {
+                return text;
+            }
+        }
+        catch (JsonException)
+        {
+            // The body is not a tenant, which the fixed text below says without quoting it.
+        }
+
+        throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a tenant.", status);
     }
 
     private static async Task<bool> IsFullAnswerAsync(HttpResponseMessage response, CancellationToken cancellationToken)

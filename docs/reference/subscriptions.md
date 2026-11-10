@@ -7,8 +7,6 @@ tell people what comes next.
 
 ## One clock
 
-_(planned for M33)_
-
 One state machine in the control plane owns every date of a subscription, and the cell knows no
 commerce.
 
@@ -20,10 +18,34 @@ commerce.
   and a deletion. A cell never counts days for billing.
 - **Runs as jobs.** A job checks each subscription's next date every hour, so a restart or an outage
   delays a step and never skips one. Every change of state writes an audit record.
+- **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
+  `readOnly`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id` and `created_at`. A
+  [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
+  trial ending 30 days later, and writes the first audit record with the sign-up as actor. A tenant
+  has one subscription that is not `deleted`. `next_at` is the date of the next move, and it is empty
+  once the subscription is `deleted`. The dates come from the control plane's clock.
+- **The hourly job.** The recurring job `advanceSubscriptions` makes one move for each subscription
+  whose `next_at` has passed, oldest first, and never two for one subscription in a run. It finds the
+  tenant's cell in the [region directory](region-directory.md). A move calls the cell, follows its
+  job, and then commits the new state, the next date and one audit record in one transaction, with
+  the job as actor. The 30 days of `readOnly` count from the run that made the tenant read-only, so a
+  late run delays the next step and never shortens the wait.
+- **A failed call is retried.** A call to the cell that fails, or a job that does not end in time,
+  leaves the subscription as it was. The run goes on with the others and then fails, so the job queue
+  retries it. Every cell call of a move carries the idempotency key `<operation>:<step id>`. The step
+  id is new each time a move commits, so a retry of the same move gets the cell's first job, and a
+  later move gets a new key.
+- **History is the audit records.** Each move writes the action `subscription.<new state>` with the
+  subscription as its subject, and the table keeps no history of its own.
+- **`deleting` ends when the cell lets the tenant go.** While `deleting`, each hourly run reads
+  `GET /api/cell/tenants/{id}`. A `404` means the cell purged the tenant after its grace, and the
+  subscription is `deleted`. So does a tenant whose row the [region directory](region-directory.md)
+  dropped after the purge. The control plane does not count the grace.
+- **A cancelled deletion.** When the cell reports a status other than `deleting`, an operator
+  cancelled the deletion. The control plane resumes the tenant if it is suspended, makes it
+  read-only, and sets the subscription back to `readOnly` with a new 30-day wait.
 
 ## States
-
-_(planned for M33)_
 
 A subscription is in one of these states, and each state says how the tenant works.
 
@@ -48,8 +70,6 @@ A subscription is in one of these states, and each state says how the tenant wor
 
 ## The timeline
 
-_(planned for M33)_
-
 The days count from the trial's end or from a missed payment, and the cell's 7-day deletion grace
 comes after them.
 
@@ -63,6 +83,7 @@ comes after them.
 | 30 days in `readOnly` for a trial, 90 for a paid tenant | `deleting`: the control plane calls `DELETE /api/cell/tenants/{id}` | Same |
 | 7 days later | The cell purges the tenant, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) | Same |
 
+- **The emails** _(planned for M33)_. The emails of the rows above, see [emails](#emails).
 - **A paid tenant's timeline** _(planned for M34)_. The column of a paid tenant that stops paying
   comes with paid plans.
 - **Export until the deletion.** While `readOnly`, a tenant administrator exports the data from the

@@ -1,12 +1,13 @@
 using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.SignUp;
+using Axis.ControlPlane.Subscriptions;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> and the append-only <c>billing.ledger_entries</c>: the sign-up and billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>subscriptions</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -25,6 +26,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<AuditRecordRow> AuditRecords => Set<AuditRecordRow>();
 
     public DbSet<SignUpRow> SignUps => Set<SignUpRow>();
+
+    public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
 
@@ -86,6 +89,24 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             signUp.HasIndex(s => s.Subdomain, "ux_sign_ups_pending_subdomain").IsUnique().HasFilter("state = 'pending'");
             signUp.HasIndex(s => s.TokenHash, "ux_sign_ups_token_hash").IsUnique().HasFilter("token_hash IS NOT NULL");
             signUp.HasIndex(s => s.ExpiresAt, "ix_sign_ups_expires_at").HasFilter("state = 'pending'");
+        });
+
+        modelBuilder.Entity<SubscriptionRow>(subscription =>
+        {
+            subscription.ToTable("subscriptions", table => table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')"));
+            subscription.HasKey(s => s.Id).HasName("pk_subscriptions");
+            subscription.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            subscription.Property(s => s.TenantId).HasColumnName("tenant_id");
+            subscription.Property(s => s.SignUpId).HasColumnName("sign_up_id");
+            subscription.Property(s => s.State).HasColumnName("state");
+            subscription.Property(s => s.TrialEndsAt).HasColumnName("trial_ends_at");
+            subscription.Property(s => s.NextAt).HasColumnName("next_at");
+            subscription.Property(s => s.StepId).HasColumnName("step_id").ValueGeneratedNever();
+            subscription.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            subscription.HasOne<SignUpRow>().WithMany().HasForeignKey(s => s.SignUpId).HasConstraintName("fk_subscriptions_sign_up_id").OnDelete(DeleteBehavior.Restrict);
+            subscription.HasIndex(s => s.SignUpId, "ix_subscriptions_sign_up_id");
+            subscription.HasIndex(s => s.TenantId, "ux_subscriptions_tenant_id").IsUnique().HasFilter("state <> 'deleted'");
+            subscription.HasIndex(s => s.NextAt, "ix_subscriptions_next_at").HasFilter("state <> 'deleted'");
         });
 
         modelBuilder.Entity<LedgerEntryRow>(entry =>

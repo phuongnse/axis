@@ -21,6 +21,7 @@ internal sealed class CellTestServer : IAsyncDisposable
 {
     private readonly string _folder = Directory.CreateTempSubdirectory("axis-cell-server").FullName;
     private readonly ConcurrentQueue<SeenRequest> _posts = new();
+    private readonly ConcurrentQueue<SeenRequest> _deletes = new();
     private readonly ConcurrentQueue<string> _tokenRequests = new();
     private readonly List<string> _jobStates = [];
     private WebApplication _app = null!;
@@ -54,6 +55,9 @@ internal sealed class CellTestServer : IAsyncDisposable
     /// <summary>What each run of the <c>POST</c> route saw.</summary>
     public IReadOnlyCollection<SeenRequest> Posts => _posts;
 
+    /// <summary>What each run of the <c>DELETE</c> route saw.</summary>
+    public IReadOnlyCollection<SeenRequest> Deletes => _deletes;
+
     public int JobReads => Volatile.Read(ref _jobReads);
 
     /// <summary>When set, the create route answers <c>409</c> with this title. Otherwise it queues a job.</summary>
@@ -64,6 +68,12 @@ internal sealed class CellTestServer : IAsyncDisposable
 
     /// <summary>When set, the tenant list route answers this status and no list.</summary>
     public int? TenantListStatus { get; set; }
+
+    /// <summary>The <c>status</c> that the tenant read route answers. Null answers <c>404</c>.</summary>
+    public string? TenantStatus { get; set; }
+
+    /// <summary>When set, the tenant read route answers this status and no tenant.</summary>
+    public int? TenantReadStatus { get; set; }
 
     /// <summary>Makes the next <paramref name="count"/> calls to the cell, the token requests excepted, answer <c>401</c>.</summary>
     public void RefuseNext(int count) => Volatile.Write(ref _refusals, count);
@@ -163,6 +173,41 @@ internal sealed class CellTestServer : IAsyncDisposable
             return Results.Json(
                 new { id = Guid.Parse("11111111-1111-1111-1111-111111111111"), kind = "suspend", tenantId = id, state = "queued", createdAt = DateTimeOffset.UnixEpoch },
                 statusCode: StatusCodes.Status202Accepted);
+        });
+
+        app.MapDelete("/api/cell/tenants/{id}", async (HttpContext context, string id) =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            using var reader = new StreamReader(context.Request.Body);
+            _deletes.Enqueue(new SeenRequest(
+                context.Request.Headers.Authorization.ToString(),
+                context.Request.Headers["Idempotency-Key"].ToString(),
+                await reader.ReadToEndAsync(),
+                context.Connection.ClientCertificate?.Thumbprint));
+            return Results.Json(
+                new { id = Guid.Parse("22222222-2222-2222-2222-222222222222"), kind = "delete", tenantId = id, state = "queued", createdAt = DateTimeOffset.UnixEpoch },
+                statusCode: StatusCodes.Status202Accepted);
+        });
+
+        app.MapGet("/api/cell/tenants/{id}", (string id) =>
+        {
+            if (Refuse())
+            {
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+            }
+
+            if (TenantReadStatus is { } status)
+            {
+                return Results.StatusCode(status);
+            }
+
+            return TenantStatus is { } tenantStatus
+                ? Results.Json(new { id, status = tenantStatus, application = (string?)null, hosts = Array.Empty<string>(), failedWork = (object?)null })
+                : Results.StatusCode(StatusCodes.Status404NotFound);
         });
 
         app.MapPost("/api/cell/tenants", () =>

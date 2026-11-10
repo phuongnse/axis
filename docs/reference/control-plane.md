@@ -79,6 +79,9 @@ over a private network with mutual TLS.
 - **The tenant list.** The client also reads `GET /api/cell/tenants` with the same token and
   errors, and keeps each tenant's id and hosts. The directory's
   [correction](region-directory.md#picking-a-cell) uses it.
+- **One tenant.** The client also sends `DELETE /api/cell/tenants/{id}` with an `Idempotency-Key`
+  and no body, and reads `GET /api/cell/tenants/{id}` for the tenant's `status`, which is empty when
+  the cell answers `404`. The [subscription clock](subscriptions.md#one-clock) uses them.
 
 ## Its own work
 
@@ -110,7 +113,8 @@ every business change.
     and not `ControlPlane:` settings.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
-    (`expireSignUps`), each every 5 minutes. Under a database lock on the kind, it queues
+    (`expireSignUps`), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
+    (`advanceSubscriptions`) every hour. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
     every 30 seconds and the job runner runs the job as any other. A job that waits for a retry

@@ -272,6 +272,72 @@ namespace Axis.ControlPlane.Storage.Migrations
                             t.HasCheckConstraint("ck_jobs_state", "state IN ('queued', 'running', 'succeeded', 'failed')");
                         });
                 });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset?>("NextAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_at");
+
+                    b.Property<Guid>("SignUpId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sign_up_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("StepId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("step_id");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("TrialEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("trial_ends_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_subscriptions");
+
+                    b.HasIndex(new[] { "NextAt" }, "ix_subscriptions_next_at")
+                        .HasFilter("state <> 'deleted'");
+
+                    b.HasIndex(new[] { "SignUpId" }, "ix_subscriptions_sign_up_id");
+
+                    b.HasIndex(new[] { "TenantId" }, "ux_subscriptions_tenant_id")
+                        .IsUnique()
+                        .HasFilter("state <> 'deleted'");
+
+                    b.ToTable("subscriptions", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.SignUp.SignUpRow", null)
+                        .WithMany()
+                        .HasForeignKey("SignUpId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscriptions_sign_up_id");
+                });
 #pragma warning restore 612, 618
         }
     }
