@@ -109,7 +109,10 @@ keys of the page by JSON Pointer, as the [record API](record-api.md)'s are:
 - `/altcha` for a solution that is missing, malformed, wrong, expired or already used. One answer
   covers all five, so a bot learns nothing about which check failed. The page shows it in the error
   alert above the form, in the texts below, and its next click solves a new challenge.
-- `/email` for a disposable domain, and `/subdomain` for a name that is not free.
+- `/email` for a disposable domain, and `/subdomain` for a name that is not free. A disposable domain is
+  `signUp.email.disposable`, which the page shows under the Work email field: "This email is from a
+  disposable mailbox service. Enter your work email.", in `vi` "Không thể đăng ký bằng hộp thư dùng tạm.
+  Nhập email công việc."
 - `/termsVersion`, `/dpaVersion` or `/privacyVersion` for a version that is no longer current.
 - Any other key for the form.
 
@@ -208,7 +211,11 @@ cost something.
   [billing portal](billing-portal.md) when its trial has ended. A subdomain that is taken is still
   told, as it is public in DNS.
 - **Disposable domains.** An email of a domain on a list of disposable mailbox providers is refused.
-  The control plane refreshes the list each week from an open-source list, pinned by its hash.
+  The list is the `control_plane.disposable_domains` table, whose domains are lower case. The domain of
+  the email is compared in lower case, and a subdomain of a listed domain is refused too: with
+  `mailinator.com` listed, `x@sub.mailinator.com` is refused and `x@notmailinator.com` is not. A bare
+  top-level domain such as `com` never matches. The control plane refreshes the list each week from an
+  open-source list, pinned by its hash.
 
 ## Verifying the email first
 
