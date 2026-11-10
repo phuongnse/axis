@@ -1,6 +1,6 @@
 {
-  "compose": 150,
+  "compose": 146,
   "dev-script": 356,
-  "images": 35,
-  "onprem": 86
+  "images": 28,
+  "onprem": 89
 }
