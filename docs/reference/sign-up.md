@@ -397,8 +397,7 @@ sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart 
 - **No cell left.** The sign-up is `queued` and the job queues itself again, due 5 minutes later, and
   ends as succeeded. The wait for an operator to open a cell does not use up the job's retries.
 - **A failed create job** _(planned for M33)_. The job is run again, up to 3 times. After that the
-  operator is alerted, and the person gets an email that the team is on it. Until then a failed cell job
-  fails the run, and the job queue retries it.
+  operator is alerted, and the person gets an email that the team is on it.
 - **Progress** _(planned for M33)_. After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
   as [the verify page](#the-verify-page) says. When the person closes the page, the email still tells
