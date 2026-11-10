@@ -168,7 +168,8 @@ every business change.
     code has only an append and a read.
   - **Who writes it.** The handler or the command that makes the change appends the record in the
     same transaction as the change. A job's record has the actor kind `job` and the job id as the
-    actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
+    actor. An operator command's record has the actor kind `operator` and the `--operator` name as
+    the actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
     business change.
 
 ## Operators
@@ -180,10 +181,24 @@ The platform operator, who runs the cells, runs the control plane too, from the 
   expires. `subscriptions list` prints each subscription's id, tenant, sign-up, state, trial ends,
   next and created. Neither prints a name, a business name or an email address. The tool reads the
   same `ControlPlane:` settings and runs the same start checks as the service. It exits 0 when it
-  works, 1 when the database cannot be read and 2 for a usage or settings error, which names the
-  setting and never its value. It writes no audit record, because it changes nothing.
-- **Commands** _(planned for M33)_. `Axis.ControlPlane.Admin` also extends a trial and resends an
-  email. Each writes an audit record.
+  works, 1 when the database cannot be read or when a change is refused, and 2 for a usage or
+  settings error, which names the setting and never its value. A lists command writes no audit
+  record, because it changes nothing.
+- **`trial extend <tenant> --days <n> --operator <name>`.** Adds `n` days to the trial end and the
+  next date of the tenant's `trialing` subscription, and prints the subscription's id and its new
+  dates. `n` is a whole number from 1 to 365. A tenant whose subscription is not `trialing`, or that
+  has none, is refused and nothing changes. The audit record has the action
+  `subscription.trialExtended` and the subscription as its subject. See
+  [one clock](subscriptions.md#one-clock) for what the extension does to the emails.
+- **`email resend <job id> --operator <name>`.** Queues the email of a `sendEmail` job again as a
+  new job, through the same helper as any email, so the payload is checked again against today's
+  templates. The job runner then sends it. It prints the new job's id and never the address or the
+  values. A job that is not a `sendEmail` job, or that is still `queued` or `running`, is refused and
+  nothing is queued. The audit record has the action `email.resent` and the resent job as its
+  subject.
+- **`--operator` is required.** A change command names the operator who runs it, and a missing or
+  blank name is a usage error. The audit record of the change has the actor kind `operator` and
+  that name as its actor. Both commands commit the change and its audit record in one transaction.
 - **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
   that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
   record.
