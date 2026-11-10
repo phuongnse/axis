@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
+import { Button, Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
@@ -23,8 +24,7 @@ function SignInBody({ context }: { context: SignInContext }) {
   const goTo = (url: string) => window.location.assign(url)
   return (
     <>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {notice && <Alert type="info" showIcon title={notice} />}
+      {notice && <AxisAlert kind="info" message={notice} />}
       {only && (
         <Typography.Paragraph style={{ margin: 0 }}>
           {texts.providerOnly.replace('{provider}', providers[0].label)}
@@ -37,8 +37,7 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Button>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {accounts && error && <Alert type="error" showIcon title={error} />}
+      {accounts && error && <AxisAlert kind="error" message={error} />}
       {accounts && <AccountForm context={context} />}
     </>
   )

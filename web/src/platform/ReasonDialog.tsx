@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, Input, Modal } from 'antd'
+import { Flex, Form, Input, Modal } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useState, type ReactNode } from 'react'
 import type { CommandResult } from './inspection'
 import { useText } from './texts'
@@ -74,8 +75,7 @@ export function ReasonDialog({ title, onSend, onClose, onChanged, children }: Re
             <Input.TextArea rows={3} showCount maxLength={reasonMaxLength} />
           </Form.Item>
         </Form>
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
+        {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>
     </Modal>
   )

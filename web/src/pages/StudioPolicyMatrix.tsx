@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { diffPatch, setAt } from '../platform/jsonPatch'
@@ -371,8 +372,7 @@ function OwnGrants({
   )
 
   if (state === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert type="error" title={t('shell.studio.matrix.loadFailed')} />
+    return <AxisAlert kind="error" message={t('shell.studio.matrix.loadFailed')} />
   }
   if (state === undefined) {
     return null
@@ -525,23 +525,19 @@ function OwnGrants({
         </Button>
       </Flex>
       {saved && !changed && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="studio-matrix-saved" type="success" showIcon title={t('shell.studio.matrix.saved')} />
+        <AxisAlert data-testid="studio-matrix-saved" kind="success" message={t('shell.studio.matrix.saved')} />
       )}
       {conflict && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert
+        <AxisAlert
           data-testid="studio-matrix-conflict"
-          type="warning"
-          showIcon
-          title={t('shell.studio.matrix.conflict')}
+          kind="warning"
+          message={t('shell.studio.matrix.conflict')}
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           action={<Button onClick={reload}>{t('shell.studio.matrix.reload')}</Button>}
         />
       )}
       {failed && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="studio-matrix-invalid" type="error" showIcon title={t('shell.studio.matrix.invalid')} />
+        <AxisAlert data-testid="studio-matrix-invalid" kind="error" message={t('shell.studio.matrix.invalid')} />
       )}
     </Flex>
   )
@@ -591,8 +587,9 @@ export function StudioPolicyMatrix({
     return null
   }
   if (state.matrix === null) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="studio-matrix-load-error" type="error" title={t('shell.studio.matrix.loadFailed')} />
+    return (
+      <AxisAlert data-testid="studio-matrix-load-error" kind="error" message={t('shell.studio.matrix.loadFailed')} />
+    )
   }
   return (
     <StudioPolicyMatrixTable

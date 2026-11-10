@@ -1,4 +1,5 @@
-import { Alert, Col, Flex, Input, Row, Typography } from 'antd'
+import { Col, Flex, Input, Row, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from '../platform/about'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -66,8 +67,7 @@ export function LicencesPage() {
           {t('shell.licences.source')}
         </a>
       </Flex>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {loadFailed && <Alert data-testid="licences-error" type="error" title={t('shell.licences.loadFailed')} />}
+      {loadFailed && <AxisAlert data-testid="licences-error" kind="error" message={t('shell.licences.loadFailed')} />}
       {licences && (
         <>
           <Input

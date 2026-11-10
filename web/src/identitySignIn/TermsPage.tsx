@@ -1,4 +1,5 @@
-import { Alert, Button, Form } from 'antd'
+import { Button, Form } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { AcceptTermsField } from '../platform/AcceptTermsField'
 import { IdentityFrame } from './IdentityFrame'
@@ -18,8 +19,7 @@ export function TermsPage({ context }: { context: TermsContext }) {
   const submitRef = useRef<HTMLInputElement>(null)
   return (
     <IdentityFrame title={texts.title} frame={context}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Form
         name={formId}
         method="post"

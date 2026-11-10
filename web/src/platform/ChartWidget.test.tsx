@@ -290,7 +290,7 @@ describe('ChartWidget', () => {
     renderChart()
 
     expect(await screen.findByTestId('chart-error')).toHaveTextContent('The chart could not be loaded.')
-    await waitFor(() => expect(screen.queryByRole('img')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.queryByRole('img', { name: 'Notes by category' })).not.toBeInTheDocument())
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 })

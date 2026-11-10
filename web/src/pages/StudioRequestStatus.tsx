@@ -1,13 +1,14 @@
-import { Alert, Spin } from 'antd'
+import { Flex, Spin } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import type { StudioRequest } from '../platform/studio'
 import { useText } from '../platform/texts'
 
 /**
- * The status line of a Studio request. A queued or running request shows a spinner, a succeeded one shows its
- * outcome, and a failed one shows an error. A succeeded publish or activate names its release number once it is
- * known. A preview, which is a publish request with target `preview`, has its own texts and shows no release number.
- * A test has its own texts too, and shows no release number. A failed one never shows one, even when the request
- * names a release, so a failure never looks like a success.
+ * The status line of a Studio request. A queued or running request shows the info icon, with a spinner beside its
+ * text. A succeeded one shows its outcome, and a failed one shows an error. A succeeded publish or activate names its
+ * release number once it is known. A preview, which is a publish request with target `preview`, has its own texts and
+ * shows no release number. A test has its own texts too, and shows no release number. A failed one never shows one,
+ * even when the request names a release, so a failure never looks like a success.
  */
 export function StudioRequestStatus({
   request,
@@ -63,14 +64,20 @@ export function StudioRequestStatus({
   }
   const pending = request.status === 'queued' || request.status === 'running'
   return (
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    <Alert
+    <AxisAlert
       data-testid="studio-request-status"
       data-status={request.status}
-      type={pending ? 'info' : request.status === 'succeeded' ? 'success' : 'error'}
-      showIcon={!pending}
-      icon={pending ? <Spin size="small" /> : undefined}
-      title={message}
+      kind={pending ? 'info' : request.status === 'succeeded' ? 'success' : 'error'}
+      message={
+        pending ? (
+          <Flex gap="small" align="center">
+            <Spin size="small" />
+            {message}
+          </Flex>
+        ) : (
+          message
+        )
+      }
     />
   )
 }

@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Input, Typography } from 'antd'
+import { Button, Flex, Form, Input, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { CodeField } from './CodeField'
@@ -20,8 +21,7 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Flex vertical align="center" gap={8}>
         <img src={`data:image/png;base64,${qrCode}`} alt={texts.qrCode} width={160} height={160} />
         <Typography.Text type="secondary">{texts.manualKey}</Typography.Text>

@@ -1,4 +1,5 @@
-import { Alert, Select } from 'antd'
+import { Select } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -156,8 +157,7 @@ export function StudioUsedBy({
       view={{ query: view, onChange: setView }}
       loading={usedBy === undefined && !failed}
       emptyText={t('shell.studio.usedBy.none')}
-      // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-      failure={failed ? <Alert type="error" title={t('shell.studio.referencesFailed')} /> : undefined}
+      failure={failed ? <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} /> : undefined}
       toolbar={{
         view: (
           <Select

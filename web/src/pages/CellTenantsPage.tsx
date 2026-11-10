@@ -1,4 +1,5 @@
-import { Alert, Flex, Input, Select, Tag } from 'antd'
+import { Flex, Input, Select, Tag } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
@@ -171,8 +172,9 @@ export function CellTenantsPage() {
 
   return (
     <PageLayout title={t('shell.cell.tenants.title')}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {failed && <Alert data-testid="cell-tenants-error" type="error" title={t('shell.cell.tenants.loadFailed')} />}
+      {failed && (
+        <AxisAlert data-testid="cell-tenants-error" kind="error" message={t('shell.cell.tenants.loadFailed')} />
+      )}
       {visible && (
         <AxisTable<CellTenant>
           testId="cell-tenants"

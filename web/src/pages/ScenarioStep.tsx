@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { Button, Card, Flex, Input, Select, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import type { ReactNode } from 'react'
 import { useContext, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
@@ -186,8 +187,7 @@ function JsonValues({
           }}
         />
       </AxisField>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {invalid && <Alert type="error" title={t('shell.studio.scenario.notJson')} />}
+      {invalid && <AxisAlert kind="error" message={t('shell.studio.scenario.notJson')} />}
     </Flex>
   )
 }

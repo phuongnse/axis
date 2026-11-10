@@ -183,7 +183,7 @@ describe('SignInPage', () => {
 
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent(notice)
-    expect(alert).toHaveClass('ant-alert-info')
+    expect(within(alert).getByRole('img', { name: 'info-circle', hidden: true })).toBeInTheDocument()
     expect(alert.compareDocumentPosition(form(container)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 

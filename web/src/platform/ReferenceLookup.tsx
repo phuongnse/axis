@@ -1,4 +1,5 @@
-import { Alert, Input, Modal } from 'antd'
+import { Input, Modal } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import { fetchRecords, type RecordItem, type RecordPage, type RecordValue } from './records'
@@ -130,8 +131,7 @@ function LookupList({ field, onPick }: Pick<ReferenceLookupProps, 'field' | 'onP
       }}
       failure={
         failed ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="reference-lookup-error" type="error" title={t('shell.table.loadFailed')} />
+          <AxisAlert data-testid="reference-lookup-error" kind="error" message={t('shell.table.loadFailed')} />
         ) : undefined
       }
       rowAttributes={(record) => ({

@@ -1,4 +1,4 @@
-import { Alert } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
 import { useText } from './texts'
@@ -28,12 +28,11 @@ export function ReadOnlyBanner() {
   }
 
   return (
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    <Alert
+    <AxisAlert
       banner
-      type="warning"
+      kind="warning"
       data-testid="read-only-banner"
-      title={t('shell.readOnly.title')}
+      message={t('shell.readOnly.title')}
       description={t('shell.readOnly.description')}
       action={user.billingUrl ? <a href={user.billingUrl}>{t('shell.readOnly.billing')}</a> : undefined}
     />

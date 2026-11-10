@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { TextProvider } from '../platform/TextProvider'
@@ -51,6 +51,8 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
 
     expect(status).toHaveAttribute('data-status', 'running')
     expect(status).toHaveTextContent('Running')
+    expect(within(status).getByRole('img', { name: 'info-circle', hidden: true })).toBeInTheDocument()
+    expect(status.querySelector('[aria-busy="true"]')).not.toBeNull()
   })
 
   it('shows the release number of a succeeded publish', () => {
@@ -58,6 +60,7 @@ describe.each(['light', 'dark'])('StudioRequestStatus in %s mode', (mode) => {
 
     expect(status).toHaveAttribute('data-status', 'succeeded')
     expect(status).toHaveTextContent('Published')
+    expect(within(status).getByRole('img', { name: 'check-circle', hidden: true })).toBeInTheDocument()
     expect(screen.getByTestId('studio-release-number')).toHaveTextContent('3')
   })
 

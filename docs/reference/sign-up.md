@@ -193,11 +193,11 @@ An unverified sign-up expires after 24 hours with nothing created, and its subdo
 Once the sign-up is accepted, the card's title becomes "Check your inbox", in `vi` "Kiểm tra hộp thư".
 The card is the same for a new email and for one that already had a trial.
 
-- **What it says.** It names the address the email went to, says to look in the spam folder, wait a
+- **What it says** _(planned for M33)_. It names the address the email went to, says to look in the spam folder, wait a
   minute or send it again, and offers Send again, a secondary button, and Change email, a plain one. The
   focus moves into the new step.
 - **Change email** brings the form back with every value kept and the focus on the email.
-- **Send again.** `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
+- **Send again** _(planned for M33)_. `POST /api/sign-up/resend` takes `{ resend }` and answers `202`, alike for every
   token, and a resend counts toward the address's [three sign-up emails a day](#bots-and-abuse). A sent
   resend shows a notice that the email was sent again in an info `AxisAlert`, and a failed one an error
   `AxisAlert`. Every error `AxisAlert` of the sign-up pages carries its icon, in the text colour of its

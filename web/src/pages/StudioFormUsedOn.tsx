@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Tag, Typography } from 'antd'
+import { Button, Flex, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import type { StudioReference, StudioReferenceNode } from '../platform/studio'
 import { useText } from '../platform/texts'
 
@@ -24,8 +25,7 @@ export function StudioFormUsedOn({
     <section data-testid="studio-form-used-on">
       <Typography.Title level={5}>{t('shell.studio.design.usedOn')}</Typography.Title>
       {entries === 'failed' ? (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert type="error" title={t('shell.studio.referencesFailed')} />
+        <AxisAlert kind="error" message={t('shell.studio.referencesFailed')} />
       ) : entries.length === 0 ? (
         <Typography.Text type="secondary">{t('shell.studio.design.usedOnNone')}</Typography.Text>
       ) : (

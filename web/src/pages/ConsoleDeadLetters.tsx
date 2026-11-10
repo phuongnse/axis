@@ -1,5 +1,6 @@
 import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, Card, Flex, Select, Tag } from 'antd'
+import { Card, Flex, Select, Tag } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import {
@@ -147,11 +148,10 @@ export function ConsoleDeadLetters({ applications, locale }: ConsoleDeadLettersP
           }}
         />
         {load.failed && !loading ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="console-dead-letters-error"
-            type="error"
-            title={t('shell.console.deadLetters.loadFailed')}
+            kind="error"
+            message={t('shell.console.deadLetters.loadFailed')}
           />
         ) : (
           <AxisTable<ConsoleDeadLetterItem>

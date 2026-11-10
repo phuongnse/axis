@@ -1,4 +1,5 @@
-import { Alert, Result, Typography } from 'antd'
+import { Result, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { cellSignInUrl, isSignInCardAddress, startSignIn } from '../platform/api'
@@ -32,8 +33,7 @@ function Refused({ kind }: { kind: 'unauthorized' | 'forbidden' | 'failed' }) {
     )
   }
   if (kind === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="cell-error" type="error" title={t('shell.cell.loadFailed')} />
+    return <AxisAlert data-testid="cell-error" kind="error" message={t('shell.cell.loadFailed')} />
   }
   return <SignInCard state="refused" onSignIn={() => startSignIn(cellSignInUrl)} />
 }

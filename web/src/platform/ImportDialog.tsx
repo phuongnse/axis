@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from './AxisButton'
@@ -267,8 +268,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               ))}
             </ul>
           )}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {problem !== null && <Alert data-testid="import-problem" type="error" title={problem} />}
+          {problem !== null && <AxisAlert data-testid="import-problem" kind="error" message={problem} />}
         </div>
       </Flex>
     </Modal>

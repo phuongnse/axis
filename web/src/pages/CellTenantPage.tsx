@@ -1,4 +1,5 @@
-import { Alert, Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
@@ -250,8 +251,9 @@ export function CellTenantPage() {
 
   return (
     <PageLayout title={id}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {tenantFailed && <Alert data-testid="cell-tenant-error" type="error" title={t('shell.cell.tenant.loadFailed')} />}
+      {tenantFailed && (
+        <AxisAlert data-testid="cell-tenant-error" kind="error" message={t('shell.cell.tenant.loadFailed')} />
+      )}
       {tenant && (
         <>
           <Card>
@@ -406,8 +408,7 @@ export function CellTenantPage() {
                 />
               </Flex>
             )}
-            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-            {actionError && <Alert data-testid="cell-tenant-action-error" type="error" title={actionError} />}
+            {actionError && <AxisAlert data-testid="cell-tenant-action-error" kind="error" message={actionError} />}
           </Flex>
         </Modal>
       )}
@@ -425,15 +426,19 @@ export function CellTenantPage() {
         >
           <Flex vertical gap="small">
             <Typography.Text>{t('shell.cell.tenant.downloadBody')}</Typography.Text>
-            {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-            {downloadError && <Alert data-testid="cell-tenant-download-error" type="error" title={downloadError} />}
+            {downloadError && (
+              <AxisAlert data-testid="cell-tenant-download-error" kind="error" message={downloadError} />
+            )}
           </Flex>
         </Modal>
       )}
       <Card title={t('shell.cell.tenant.jobs')}>
         {jobsFailed && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="cell-tenant-jobs-error" type="error" title={t('shell.cell.tenant.jobsLoadFailed')} />
+          <AxisAlert
+            data-testid="cell-tenant-jobs-error"
+            kind="error"
+            message={t('shell.cell.tenant.jobsLoadFailed')}
+          />
         )}
         {jobs && <CellJobTable jobs={jobs} locale={locale} />}
       </Card>

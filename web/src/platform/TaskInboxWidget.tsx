@@ -1,4 +1,5 @@
-import { Alert, Space, Tag, type TableProps } from 'antd'
+import { Space, Tag, type TableProps } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -154,8 +155,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   }
 
   if (failed || releaseTexts.failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="tasks-error" type="error" title={t('shell.tasks.loadFailed')} />
+    return <AxisAlert data-testid="tasks-error" kind="error" message={t('shell.tasks.loadFailed')} />
   }
   return (
     <AxisTable<TaskListItem>

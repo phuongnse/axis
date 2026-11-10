@@ -1,4 +1,5 @@
-import { Alert, Card, Flex, Select, Tag } from 'antd'
+import { Card, Flex, Select, Tag } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from './AxisTable'
 import {
@@ -156,11 +157,10 @@ export function ConsoleWebhookDeliveries({ applications, locale }: ConsoleWebhoo
           />
         </Flex>
         {load.failed && !loading ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="console-webhook-deliveries-error"
-            type="error"
-            title={t('shell.console.webhooks.loadFailed')}
+            kind="error"
+            message={t('shell.console.webhooks.loadFailed')}
           />
         ) : (
           <AxisTable<ConsoleWebhookDelivery>

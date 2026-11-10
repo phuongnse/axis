@@ -98,8 +98,10 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   is, with no tick and no text, since no error is all the person needs, and a status region tells a
   screen reader its message. A refused one shows its message as an error, and something that could not
   be done shows its message as a warning, under the input where an error shows, never in an alert of its
-  own. While a status is shown it takes the place of the field's own errors. A field outside a form takes
-  no status, because the form item is what draws the message, the border and the spinner.
+  own. While a status is shown it takes the place of the field's own errors. Before any check runs, the
+  status is `idle`, which shows nothing, so the input stays in place as the status changes and keeps its
+  focus. A field outside a form takes no status, because the form item is what draws the message, the
+  border and the spinner.
 - **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
   a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
   with its help.
