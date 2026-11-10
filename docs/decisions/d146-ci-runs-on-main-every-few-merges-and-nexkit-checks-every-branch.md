@@ -23,10 +23,12 @@ request on request, with the same scripts that CI runs, and sets the statuses th
   `merge.after_workflows` setting, which holds how many merges each workflow waits. NexKit counts the
   commits on `main` since a workflow's latest run there. CI waits the fewest merges, because it finds
   most of what breaks `main`. CodeQL waits more, and the performance workflow more again, because
-  their findings change little from one merge to the next. No count is a multiple of another, so the
-  workflows seldom start at the same merge. The owner tunes the counts in `.nexkit/config.json`
-  alone, as [D145](d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees for every
-  NexKit setting.
+  their findings change little from one merge to the next. The counts of CI, CodeQL and the
+  performance workflow are not multiples of one another, so these three seldom start at the same
+  merge. The docs audit's count is outside this rule, because its run takes few runner jobs. The
+  owner tunes the counts in `.nexkit/config.json` alone, as
+  [D145](d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees for every NexKit
+  setting.
 - **No push to `main` starts them, and CI's only schedule is its weekly scan.** A push trigger for
   `main` would run them after every merge as well. Each runs on demand. The weekly run covers the
   dependency and image scans alone, as
