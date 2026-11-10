@@ -505,6 +505,21 @@ function change(
   }
 }
 
+// A process long enough that its diff folds the unchanged lines.
+const approvalProcess = (extra: object[]) => ({
+  kind: 'process',
+  name: 'PurchaseApproval',
+  entity: 'PurchaseRequest',
+  start: 'submitted',
+  steps: [
+    { name: 'submit', kind: 'task', assignee: '=requester', form: 'RequestForm' },
+    { name: 'review', kind: 'task', assignee: 'role:Manager', form: 'ReviewForm', due: 'P2D' },
+    { name: 'approve', kind: 'decision', assignee: 'role:Approver', outcomes: ['approved', 'rejected'] },
+    ...extra,
+  ],
+  end: ['approved', 'rejected'],
+})
+
 const requestEntity = { kind: 'entity', name: 'PurchaseRequest', fields: [{ name: 'title', type: 'text' }] }
 const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[]> = {
   [aiRequests[0].id]: [
@@ -546,8 +561,8 @@ const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[
       'processes/purchase-approval.json',
       'process',
       'PurchaseApproval',
-      { kind: 'process', name: 'PurchaseApproval', steps: ['approve'] },
-      { kind: 'process', name: 'PurchaseApproval', steps: ['approve', 'notifyRequester'] },
+      approvalProcess([]),
+      approvalProcess([{ name: 'notifyRequester', kind: 'email', to: '=requester.email', template: 'decisionMade' }]),
       'After the approval step, the process emails the requester whether the request was approved or rejected.',
     ),
     change(

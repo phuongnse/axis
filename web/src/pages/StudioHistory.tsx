@@ -1,10 +1,9 @@
-import { UndoOutlined } from '@ant-design/icons'
+import { DownOutlined, RightOutlined, UndoOutlined } from '@ant-design/icons'
 import { Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
+import { lazy, Suspense, useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
-import { EmptyDash } from '../platform/EmptyValue'
 import { QuotaRefusedError } from '../platform/quota'
 import {
   changeRows,
@@ -25,7 +24,11 @@ import { useStudioConnection } from '../platform/studioConnection'
 import { kindSingular } from '../platform/studioKinds'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { AxisButton } from '../platform/AxisButton'
 import { PlatformContext } from './context'
+import type { DiffCounts } from './JsonDiff'
+
+const LazyJsonDiff = lazy(() => import('./JsonDiff'))
 import { StudioPageHeading } from './StudioPageHeading'
 
 /** What an undo left on the page: the later revisions that block it, or why it failed. */
@@ -281,9 +284,10 @@ export function StudioRevisionPage({
 }
 
 /**
- * Each resource a revision or a draft added, changed or removed: its name, kind and change, then, when given, its
- * summary in words, and its JSON before and after side by side. A side where the file does not exist shows the em dash.
- * Proposed: a draft's page gives each file the summary its request wrote, see the review on #3263.
+ * Each resource a revision or a draft added, changed or removed, as one block as GitHub shows a file: a header with a
+ * button that folds the block, its name, kind and change, and the lines added and removed, then, when given, its summary
+ * in words, and its diff in `JsonDiff`, unified, with the JSON indented. Proposed: the GitHub-like diff and a draft's
+ * summaries, see the review on #3263.
  */
 export function StudioChanges({
   changes,
@@ -297,7 +301,6 @@ export function StudioChanges({
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
-  const { colour, radius, spacing, type } = useDesignTokens()
   const rows = changes.map((resource): StudioReleaseChange => ({
     path: resource.file,
     change: resource.change,
@@ -307,50 +310,103 @@ export function StudioChanges({
     locale: null,
   }))
   const byKey = new Map(changes.map((resource) => [`${resource.change}:${resource.file}`, resource]))
-  const block = (testId: string, title: string, text: string | null) => (
-    <Flex vertical gap={spacing.xs} style={{ minWidth: 0 }}>
-      <Typography.Text style={{ color: colour.textMuted }}>{title}</Typography.Text>
-      <pre
-        data-testid={testId}
-        style={{
-          margin: 0,
-          padding: spacing.sm,
-          overflow: 'auto',
-          fontFamily: type.codeFontFamily,
-          background: colour.surface,
-          border: `1px solid ${colour.borderSubtle}`,
-          borderRadius: radius.base,
-        }}
-      >
-        {text === null ? <EmptyDash /> : prettyJson(text)}
-      </pre>
-    </Flex>
-  )
 
   return (
     <>
       {changeRows(rows, resources, locale, t).map((row) => {
         const resource = byKey.get(row.key)
-        const summary = resource === undefined ? undefined : summaries?.get(resource.file)
         return (
-          <section key={row.key} data-testid="studio-revision-change" data-file={resource?.file}>
-            <Flex vertical gap="small">
-              <Flex wrap gap="small" align="baseline">
-                <Typography.Text strong>{row.name}</Typography.Text>
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {row.kind === null ? '—' : kindSingular(row.kind, t)}
-                </Typography.Text>
-                <Typography.Text>{t(`shell.studio.overview.change.${row.change}`)}</Typography.Text>
-              </Flex>
-              {summary !== undefined && <Typography.Text>{summary}</Typography.Text>}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: spacing.md }}>
-                {block('studio-revision-before', t('shell.studio.history.before'), resource?.before ?? null)}
-                {block('studio-revision-after', t('shell.studio.history.after'), resource?.after ?? null)}
-              </div>
-            </Flex>
-          </section>
+          <ChangedFile
+            key={row.key}
+            name={row.name}
+            kind={row.kind === null ? '—' : kindSingular(row.kind, t)}
+            change={t(`shell.studio.overview.change.${row.change}`)}
+            file={resource?.file}
+            summary={resource === undefined ? undefined : summaries?.get(resource.file)}
+            before={resource?.before ?? null}
+            after={resource?.after ?? null}
+          />
         )
       })}
     </>
+  )
+}
+
+/** One file of `StudioChanges`, open until its header's button folds it. */
+function ChangedFile({
+  name,
+  kind,
+  change,
+  file,
+  summary,
+  before,
+  after,
+}: {
+  name: string
+  kind: string
+  change: string
+  file: string | undefined
+  summary: string | undefined
+  before: string | null
+  after: string | null
+}) {
+  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
+  const [open, setOpen] = useState(true)
+  const [counts, setCounts] = useState<DiffCounts>()
+  return (
+    <section
+      data-testid="studio-revision-change"
+      data-file={file}
+      style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base, background: colour.surface }}
+    >
+      <Flex
+        wrap
+        gap="small"
+        align="center"
+        style={{
+          padding: `${spacing.xs / 2}px ${spacing.sm}px ${spacing.xs / 2}px ${spacing.xs / 2}px`,
+          borderBottom: open || summary !== undefined ? `1px solid ${colour.borderSubtle}` : undefined,
+        }}
+      >
+        <AxisButton
+          role="icon"
+          nameKey={open ? 'shell.studio.diff.hide' : 'shell.studio.diff.show'}
+          nameSuffix={name}
+          icon={open ? <DownOutlined /> : <RightOutlined />}
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        />
+        <Typography.Text strong>{name}</Typography.Text>
+        <Typography.Text style={{ color: colour.textMuted }}>{kind}</Typography.Text>
+        <Typography.Text>{change}</Typography.Text>
+        {counts !== undefined && (
+          <span
+            style={{ marginInlineStart: 'auto' }}
+            aria-label={t('shell.studio.diff.counts')
+              .replace('{added}', String(counts.added))
+              .replace('{removed}', String(counts.removed))}
+          >
+            <span aria-hidden style={{ color: colour.successText }}>{`+${counts.added}`}</span>{' '}
+            <span aria-hidden style={{ color: colour.dangerText }}>{`−${counts.removed}`}</span>
+          </span>
+        )}
+      </Flex>
+      {summary !== undefined && (
+        <Typography.Paragraph style={{ margin: 0, padding: `${spacing.xs}px ${spacing.sm}px` }}>
+          {summary}
+        </Typography.Paragraph>
+      )}
+      <div hidden={!open}>
+        <Suspense fallback={<Spin />}>
+          <LazyJsonDiff
+            before={before === null ? '' : prettyJson(before)}
+            after={after === null ? '' : prettyJson(after)}
+            label={t('shell.studio.diff.label').replace('{name}', name)}
+            onCounts={setCounts}
+          />
+        </Suspense>
+      </div>
+    </section>
   )
 }

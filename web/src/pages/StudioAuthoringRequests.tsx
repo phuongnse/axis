@@ -521,9 +521,9 @@ export function StudioAuthoringRequestPage({
           ) : changes === 'failed' ? (
             <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
           ) : (
-            <Flex vertical gap="middle" data-testid="studio-ai-changes">
+            <div data-testid="studio-ai-changes" style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
               <StudioChanges changes={changes} resources={resources} summaries={summaries} />
-            </Flex>
+            </div>
           ),
         )}
       {showsDiff &&

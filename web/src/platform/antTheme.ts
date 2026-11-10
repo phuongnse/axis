@@ -198,6 +198,20 @@ export function selectedItemTint(mode: ThemeMode): string {
   return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
 }
 
+/**
+ * Proposed: the tints of a diff, from Ant Design's success and error backgrounds: a line added or removed, and the
+ * deeper tint of the words that changed in it. See the review on #3263.
+ */
+export function diffTints(mode: ThemeMode): { added: string; addedWord: string; removed: string; removedWord: string } {
+  const token = theme.getDesignToken(antThemeFor(mode))
+  return {
+    added: token.colorSuccessBg,
+    addedWord: token.colorSuccessBorder,
+    removed: token.colorErrorBg,
+    removedWord: token.colorErrorBorder,
+  }
+}
+
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
 
