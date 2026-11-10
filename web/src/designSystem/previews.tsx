@@ -302,14 +302,15 @@ export const previews: Record<string, readonly PreviewState[]> = {
         ),
         frameHeight: 900,
       })),
-      // Proposed: at narrow width the request panel takes the window's width, over the page.
+      // Proposed: at narrow width the request panel takes the window's width, over the page. The frame scrolls as a
+      // 700 by 760 window does.
       {
         caption: 'Ask AI, narrow width',
         fixtures: studioFixtures.askAi,
         entry: `/studio?app=${application}`,
         draw: () => (
           <NarrowWidthOverride.Provider value>
-            <div style={{ maxWidth: 390 }}>
+            <div style={{ maxWidth: 700, height: 760, overflowY: 'auto' }}>
               <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
                 <ShellPreview />
               </ClickOnMount>
