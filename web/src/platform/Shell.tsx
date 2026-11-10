@@ -1,7 +1,16 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Flex, Layout, Typography, type ThemeConfig } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type RefObject,
+  type ReactNode,
+} from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
@@ -67,17 +76,62 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
- * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
- * Proposed: a page can open a side panel in a right column with `ShellAside`, which reaches the bottom of the window
- * beside the content column and its footer; at narrow width the panel takes the window's width, over the page, and a
- * page with a sidebar keeps its footer in the content column. See the review on #3263.
+ * A footer runs under the page, with the copyright at the start and the legal links at the end. Proposed: it runs
+ * across the whole window as the header does, under the sidebar and a side panel too, and while it shows they end
+ * above it. A page can open a side panel in a right column with `ShellAside`; at narrow width the panel takes the
+ * window's width, over the page. See the review on #3263.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
  * and the account button. While the tenant is read-only, a banner tops the content
  * column on every page, see `ReadOnlyBanner`. A shell given `account` has no tenant and shows no banner.
  */
+/**
+ * How many pixels of an element its scroll container's view shows, or the window's: the nearest ancestor that scrolls,
+ * as a design-system frame does, else the window. It follows every scroll, resize and change of layout.
+ */
+function useShownHeight(ref: RefObject<HTMLElement | null>): number {
+  const [shown, setShown] = useState(0)
+  useEffect(() => {
+    const element = ref.current
+    if (!element) {
+      return
+    }
+    let scroller = element.parentElement
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) {
+      scroller = scroller.parentElement
+    }
+    let frame = 0
+    const measure = () => {
+      frame = 0
+      const bottom = scroller ? scroller.getBoundingClientRect().bottom : window.innerHeight
+      const box = element.getBoundingClientRect()
+      setShown(Math.round(Math.max(0, Math.min(box.height, bottom - box.top))))
+    }
+    const schedule = () => {
+      frame ||= requestAnimationFrame(measure)
+    }
+    measure()
+    // A scroll moves the element, and a change of layout, such as another page, moves it too: the intersection
+    // observer, with a threshold for every step of its height, tells of both.
+    document.addEventListener('scroll', schedule, true)
+    window.addEventListener('resize', schedule)
+    const thresholds = Array.from({ length: 41 }, (_, step) => step / 40)
+    const observer =
+      typeof IntersectionObserver === 'undefined'
+        ? undefined
+        : new IntersectionObserver(schedule, { root: scroller, threshold: thresholds })
+    observer?.observe(element)
+    return () => {
+      cancelAnimationFrame(frame)
+      document.removeEventListener('scroll', schedule, true)
+      window.removeEventListener('resize', schedule)
+      observer?.disconnect()
+    }
+  }, [ref])
+  return shown
+}
+
 export function Shell({
   titleKey,
   navigation,
@@ -124,7 +178,11 @@ export function Shell({
   const hasSidebar = claimed || navigation.length > 1
   const sidebar = hasSidebar && !narrow
   // As the sidebar's nav, a design-system frame's height stands for the window's.
-  const asideHeight = `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`
+  // Proposed: the sidebar's navigation and a side panel end above the footer while it shows, so the footer never
+  // pushes them under the header; `footerShown` is how much of it the window shows.
+  const footerRef = useRef<HTMLElement>(null)
+  const footerShown = useShownHeight(footerRef)
+  const asideHeight = `calc(var(--shell-min-height, 100vh) - ${headerHeight + footerShown}px)`
   const home = navigation[0]?.path ?? '/'
   const entries = navigation.map((item) => ({ ...item, label: t(item.labelKey) }))
   // The page's own navigation, or the site's.
@@ -235,7 +293,7 @@ export function Shell({
               {preferences}
             </nav>
           )}
-          <Layout hasSider={sidebar}>
+          <Layout hasSider={sidebar} style={{ position: 'relative' }}>
             {sidebar && (
               <Layout.Sider
                 id="shell-sidebar"
@@ -251,7 +309,7 @@ export function Shell({
                   style={{
                     position: 'sticky',
                     top: headerHeight,
-                    maxHeight: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
+                    maxHeight: `calc(var(--shell-min-height, 100vh) - ${headerHeight + footerShown}px)`,
                     overflowY: 'auto',
                   }}
                 >
@@ -259,7 +317,8 @@ export function Shell({
                 </nav>
               </Layout.Sider>
             )}
-            <Layout>
+            {/* Proposed: beside a side panel the content leaves the panel's width free, as the panel lies over the row. */}
+            <Layout style={{ marginInlineEnd: asideClaims > 0 && !narrow ? sizeTokens.sidePanel : undefined }}>
               {!hasAccount && <ReadOnlyBanner />}
               {/* Proposed: the content is on surface, flush with the header, the sidebar and a side panel, see the review on #3263. */}
               <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg, background: colour.surface }}>
@@ -267,7 +326,6 @@ export function Shell({
                   <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
               </Layout.Content>
-              {hasSidebar && <ShellFooter legal={legal} />}
             </Layout>
             {asideClaims > 0 && (
               // Proposed: the right column, as tall as the page, with its side panel under the header to the window's
@@ -286,7 +344,11 @@ export function Shell({
                         background: colour.surface,
                       }
                     : {
-                        flex: 'none',
+                        // It lies over the row's end, as tall as the row, so it never makes the page taller.
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        insetInlineEnd: 0,
                         width: sizeTokens.sidePanel,
                         background: colour.surface,
                         borderInlineStart: `1px solid ${colour.borderSubtle}`,
@@ -306,7 +368,8 @@ export function Shell({
               </div>
             )}
           </Layout>
-          {!hasSidebar && <ShellFooter legal={legal} />}
+          {/* Proposed: the footer runs across the window as the header does, see the review on #3263. */}
+          <ShellFooter legal={legal} ref={footerRef} />
         </Layout>
       </ConfigProvider>
     </div>

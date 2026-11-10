@@ -1,5 +1,5 @@
 import { Layout } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type Ref } from 'react'
 import { fetchAboutVersion } from './about'
 import { LegalLine } from './LegalLine'
 import type { SiteLegal } from './site'
@@ -11,7 +11,7 @@ import { useDesignTokens } from './themeMode'
  * only, the server's version beside it. At the end it holds the legal line: Privacy and Terms when `legal` gives their
  * addresses, and Licences always.
  */
-export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
+export function ShellFooter({ legal, ref }: { legal?: SiteLegal | null; ref?: Ref<HTMLElement> }) {
   const { colour, spacing } = useDesignTokens()
   const t = useText()
   const [year] = useState(() => new Date().getFullYear())
@@ -32,6 +32,7 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
 
   return (
     <Layout.Footer
+      ref={ref}
       style={{
         paddingBlock: spacing.xs,
         paddingInline: spacing.lg,

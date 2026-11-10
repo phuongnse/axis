@@ -580,12 +580,14 @@ describe('Shell scrolling', () => {
 })
 
 describe('Shell footer', () => {
-  it('sits under the content column beside a sidebar, and not in the sidebar', () => {
+  // Proposed: the footer runs across the window as the header does, beside a sidebar too, see the review on #3263.
+  it('runs across the page, under the sidebar and the content, beside a sidebar', () => {
     renderShell('en', ['/'], notesNavigation)
 
     const parent = screen.getByRole('contentinfo').parentElement!
+    expect(parent).toBe(screen.getByRole('banner').parentElement)
+    expect(parent).toContainElement(document.getElementById('shell-sidebar'))
     expect(parent).toContainElement(screen.getByRole('main'))
-    expect(parent).not.toContainElement(document.getElementById('shell-sidebar'))
   })
 
   it('runs across the page, beside the header, on a one-page site', () => {
