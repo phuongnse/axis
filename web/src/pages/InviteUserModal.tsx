@@ -1,5 +1,6 @@
 import { Checkbox, Flex, Form, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisField } from '../platform/AxisField'
 import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -142,20 +143,23 @@ export function InviteUserModal({
             />
           )}
           <Form form={form} layout="vertical" name="invite" requiredMark={false}>
-            <Form.Item
+            <AxisField
               name="email"
               label={t('shell.users.invite.email')}
-              rules={[{ required: true, whitespace: true }, { type: 'email' }]}
+              help={t('shell.users.invite.email.help')}
+              requiredMessage={t('shell.users.invite.emailRequired')}
+              rules={[{ type: 'email' }]}
             >
               <Input type="email" maxLength={200} />
-            </Form.Item>
-            <Form.Item
+            </AxisField>
+            <AxisField
               name="displayName"
               label={t('shell.users.invite.displayName')}
-              rules={[{ required: true, whitespace: true }]}
+              help={t('shell.users.invite.displayName.help')}
+              requiredMessage={t('shell.users.invite.displayNameRequired')}
             >
               <Input maxLength={200} />
-            </Form.Item>
+            </AxisField>
           </Form>
           {sections.length > 0 && (
             <Flex vertical gap="small">

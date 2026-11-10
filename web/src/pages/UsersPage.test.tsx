@@ -275,6 +275,18 @@ describe('UsersPage', () => {
     expect(form.querySelector('form')).toHaveClass('ant-form-vertical')
   })
 
+  it('gives the email and the display name of the invite form their help', async () => {
+    stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
+    const form = await confirmation('Invite a person')
+
+    expect(within(form).getByLabelText('Email')).toHaveAccessibleDescription('The invitation goes to this address.')
+    expect(within(form).getByLabelText('Display name')).toHaveAccessibleDescription(
+      'The name that shows for the person in the users list.',
+    )
+  })
+
   it('asks for the fields of the form before it asks to invite', async () => {
     const fetchMock = stubInvitations()
     renderPage()
@@ -284,6 +296,7 @@ describe('UsersPage', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
 
     await vi.waitFor(() => expect(form.querySelectorAll('.ant-form-item-explain-error').length).toBe(2))
+    expect(within(form).getByText('Enter a display name.')).toBeInTheDocument()
     expect(screen.queryByText('Invite this person?')).toBeNull()
     expect(posts(fetchMock)).toHaveLength(0)
   })

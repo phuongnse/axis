@@ -1,5 +1,6 @@
 import { Flex, Form, Input, Modal } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
+import { AxisField } from '../platform/AxisField'
 import { useRef, useState } from 'react'
 import { CellJobTable } from '../platform/CellJobTable'
 import { createCellTenant, type CellJob, type CellTenantRequest } from '../platform/cell'
@@ -113,28 +114,32 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
         <Flex vertical gap="middle">
           {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
           <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={false}>
-            <Form.Item
+            <AxisField
               name="id"
               label={t('shell.cell.create.id')}
-              rules={[{ required: true, whitespace: true }, { pattern: idPattern }]}
+              help={t('shell.cell.create.id.help')}
+              requiredMessage={t('shell.cell.create.idRequired')}
+              rules={[{ pattern: idPattern }]}
             >
               <Input maxLength={50} />
-            </Form.Item>
-            <Form.Item
+            </AxisField>
+            <AxisField
               name="application"
               label={t('shell.cell.create.application')}
-              extra={t('shell.cell.create.applicationHint')}
-              rules={[{ required: true, whitespace: true }]}
+              help={t('shell.cell.create.application.help')}
+              requiredMessage={t('shell.cell.create.applicationRequired')}
             >
               <Input maxLength={200} />
-            </Form.Item>
-            <Form.Item
+            </AxisField>
+            <AxisField
               name="administrator"
               label={t('shell.cell.create.administrator')}
-              rules={[{ required: true, whitespace: true }, { type: 'email' }]}
+              help={t('shell.cell.create.administrator.help')}
+              requiredMessage={t('shell.cell.create.administratorRequired')}
+              rules={[{ type: 'email' }]}
             >
               <Input type="email" maxLength={200} />
-            </Form.Item>
+            </AxisField>
           </Form>
         </Flex>
       )}
