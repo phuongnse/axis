@@ -48,7 +48,7 @@ sends nothing outside the region.
   and sends nothing while the subdomain is refused or still being checked. The button is busy while the
   sign-up is sent and is never off because the form is wrong. A success goes on to
   [check your inbox](#verifying-the-email-first).
-- **A refusal shows where the person can put it right** _(planned for M33)_. A refusal of a field shows
+- **A refusal shows where the person can put it right**. A refusal of a field shows
   under that field, which the page scrolls to and focuses. Any other refusal shows in an error
   `AxisAlert` above the form, as the form widget's does, and the page scrolls to it and focuses it, so a
   person who pressed Sign up at the foot of the long form sees it. A refused document version unticks
@@ -89,12 +89,15 @@ The box accepts the business's agreements.
 
 `GET /api/sign-up/documents` answers `{ terms, dpa, privacy, licencesUrl }`, where each document is
 `{ version, urls: { en, vi } }`, from the settings `ControlPlane:SignUp:Terms`, `:Dpa`, `:Privacy` and
-`:LicencesUrl`, see the [settings](control-plane.md#settings). Without them the route answers `503`.
+`:LicencesUrl`, see the [settings](control-plane.md#settings). Without them the route answers `503`, and so
+does `POST /api/sign-up`.
 
 - **The page links the documents**. The page links each document in its language,
   and the legal line takes its Privacy, Terms and Licences addresses from the answer.
-- **The versions are sent** _(planned for M33)_. `POST /api/sign-up` sends `termsVersion`, `dpaVersion`
-  and `privacyVersion`, the versions shown, and the control plane records them.
+- **The versions are sent**. `POST /api/sign-up` sends `termsVersion`, `dpaVersion` and `privacyVersion`,
+  the versions shown. The control plane refuses a missing version, or one that is not the region's
+  current version exactly, and stores the three on the pending sign-up. When the documents did not load,
+  the page sends none, and the refusal loads them again.
 
 ### Sending the form
 
@@ -113,7 +116,8 @@ keys of the page by JSON Pointer, as the [record API](record-api.md)'s are:
   `signUp.email.disposable`, which the page shows under the Work email field: "This email is from a
   disposable mailbox service. Enter your work email.", in `vi` "Không thể đăng ký bằng hộp thư dùng tạm.
   Nhập email công việc."
-- `/termsVersion`, `/dpaVersion` or `/privacyVersion` for a version that is no longer current.
+- `/termsVersion`, `/dpaVersion` or `/privacyVersion` for a version that is missing or no longer current.
+  The key is `signUp.terms.required`, and the page shows it under the terms box.
 - Any other key for the form.
 
 A limit answers `429` with `Retry-After` and `limit`: `address` for the client address, which the page

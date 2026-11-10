@@ -37,7 +37,7 @@ interface SubdomainAnswer {
 }
 
 /** The fields of the form in the order the page shows them, which is the order a click checks them in. */
-const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'language', 'application'] as const
+const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'language', 'application', 'terms'] as const
 type FormField = (typeof formFields)[number]
 
 interface SignUpValues {
@@ -51,7 +51,13 @@ interface SignUpValues {
 
 const checkDelay = 300
 
+/** The document versions that the form sends, which a refusal puts under the terms box. */
+const versionKeys = ['termsVersion', 'dpaVersion', 'privacyVersion']
+
 function fieldOf(segments: string[]): FormField | null {
+  if (segments.length === 1 && versionKeys.includes(segments[0])) {
+    return 'terms'
+  }
   return formFields.find((field) => segments.length === 1 && segments[0] === field) ?? null
 }
 
@@ -80,10 +86,13 @@ export function SignUpPage({
   locale,
   onLocaleChange,
   documents,
+  onDocumentsRefused,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
   documents: SignUpDocuments | undefined
+  /** Called when the control plane refuses a document version, so the page loads the documents again. */
+  onDocumentsRefused: () => void
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
@@ -213,8 +222,16 @@ export function SignUpPage({
   const showRefusal = (errors: Record<string, string[]>) => {
     const placed = placeProblemErrors<FormField>(errors, fieldOf)
     form.setFields(
-      placed.fields.map(({ field, messages }) => ({ name: field, errors: messages.map((message) => t(message)) })),
+      placed.fields.map(({ field, messages }) => ({
+        name: field,
+        errors: messages.map((message) => t(message)),
+        // A refused version means the box was ticked for documents that are no longer current, so it asks for the box again.
+        ...(field === 'terms' ? { value: false } : {}),
+      })),
     )
+    if (placed.fields.some(({ field }) => field === 'terms')) {
+      onDocumentsRefused()
+    }
     const first = formFields.find((field) => placed.fields.some((refused) => refused.field === field))
     if (first) {
       form.scrollToField(first, { focus: true })
@@ -265,6 +282,9 @@ export function SignUpPage({
             subdomain: values.subdomain,
             language: values.language,
             application: values.application ?? '',
+            termsVersion: documents?.terms.version,
+            dpaVersion: documents?.dpa.version,
+            privacyVersion: documents?.privacy.version,
             ...(altcha ? { altcha } : {}),
           }),
         },
