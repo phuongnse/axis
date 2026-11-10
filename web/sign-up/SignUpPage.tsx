@@ -15,6 +15,7 @@ import type { SignUpDocuments } from './documents'
 import { SignUpFrame } from './SignUpFrame'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
+import { useProofOfWork } from './useProofOfWork'
 
 interface SignUpApplication {
   id: string
@@ -99,6 +100,7 @@ export function SignUpPage({
   const formErrorRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLElement>(null)
   const focusEmail = useRef(false)
+  const proofOfWork = useProofOfWork()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -224,6 +226,24 @@ export function SignUpPage({
     setFormErrors(shown)
   }
 
+  // The message of a 429: the wait in minutes from Retry-After for the address limit, or tomorrow for the domain limit.
+  // See docs/reference/sign-up.md#sending-the-form. An answer without a usable wait or a known limit gets the failed text.
+  const limitMessage = async (response: Response) => {
+    const limit = ((await response.json().catch(() => ({}))) as { limit?: string }).limit
+    if (limit === 'domain') {
+      return t('signUp.limit.domain')
+    }
+    const header = response.headers.get('Retry-After')
+    const seconds = header !== null && /^\d+$/.test(header) ? Number(header) : 0
+    if (limit !== 'address' || seconds <= 0) {
+      return t('signUp.failed')
+    }
+    const minutes = Math.ceil(seconds / 60)
+    return minutes === 1
+      ? t('signUp.limit.address.one')
+      : t('signUp.limit.address').replace('{minutes}', new Intl.NumberFormat(locale).format(minutes))
+  }
+
   const send = async (values: SignUpValues) => {
     if (status.state === 'checking' || status.state === 'refused') {
       form.scrollToField('subdomain', { focus: true })
@@ -232,6 +252,7 @@ export function SignUpPage({
     setSending(true)
     setFormErrors([])
     try {
+      const altcha = await proofOfWork.solution()
       const response = await apiFetch(
         '/api/sign-up',
         {
@@ -244,18 +265,26 @@ export function SignUpPage({
             subdomain: values.subdomain,
             language: values.language,
             application: values.application ?? '',
+            ...(altcha ? { altcha } : {}),
           }),
         },
         { promptSignInOnUnauthorized: false },
       )
       if (response.status === 202) {
         setSent({ email: values.email.trim() })
-      } else if (response.status === 400) {
-        showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
       } else {
-        setFormErrors([t('signUp.failed')])
+        // A solved challenge is for one try, so the next try solves a new one.
+        proofOfWork.renew()
+        if (response.status === 400) {
+          showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
+        } else if (response.status === 429) {
+          setFormErrors([await limitMessage(response)])
+        } else {
+          setFormErrors([t('signUp.failed')])
+        }
       }
     } catch {
+      proofOfWork.renew()
       setFormErrors([t('signUp.failed')])
     } finally {
       setSending(false)

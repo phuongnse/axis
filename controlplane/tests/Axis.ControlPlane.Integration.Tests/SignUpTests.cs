@@ -1,4 +1,5 @@
 using System.Buffers.Text;
+using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
@@ -7,6 +8,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Jobs;
+using Axis.Core.Telemetry;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,6 +26,10 @@ namespace Axis.ControlPlane.Integration.Tests;
 public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
 {
     private const string DirectoryDatabase = "axis_directory";
+    private const string Proxy = "10.0.0.5";
+    private const string CompanyDomain = "contoso.example";
+
+    private static readonly byte[] _challengeKey = Enumerable.Range(0, 32).Select(index => (byte)index).ToArray();
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
     private NpgsqlDataSource _controlPlane = null!;
@@ -52,7 +59,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         var address = NewAddress();
         var subdomain = NewSubdomain();
 
-        var response = await client.PostAsJsonAsync("/api/sign-up", Form(address, subdomain, language: "vi", application: "approvals"), cancellation);
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, subdomain, language: "vi", application: "approvals"), cancellation);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var message = await WaitForMessageAsync(address);
@@ -87,13 +94,13 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         using var client = factory.CreateClient();
         var subdomain = NewSubdomain();
         var first = NewAddress();
-        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", Form(first, subdomain), cancellation)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, first, subdomain), cancellation)).StatusCode);
 
         var check = await CheckAsync(client, subdomain);
         Assert.False(check.GetProperty("free").GetBoolean());
         Assert.Equal("held", check.GetProperty("reason").GetString());
         var second = NewAddress();
-        var refused = await client.PostAsJsonAsync("/api/sign-up", Form(second, subdomain), cancellation);
+        var refused = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, second, subdomain), cancellation);
         Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         Assert.Equal("signUp.subdomain.held", (await ErrorsAsync(refused))["/subdomain"]);
         Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE email = '{second}'"));
@@ -111,7 +118,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
 
         Assert.Equal("expired", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE email = '{first}'"));
         Assert.True((await CheckAsync(client, subdomain)).GetProperty("free").GetBoolean());
-        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", Form(second, subdomain), cancellation)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, second, subdomain), cancellation)).StatusCode);
         Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE subdomain = '{subdomain}' AND state = 'pending'"));
     }
 
@@ -123,13 +130,13 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         using var client = factory.CreateClient();
         var subdomain = NewSubdomain();
         var first = NewAddress();
-        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", Form(first, subdomain), cancellation)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, first, subdomain), cancellation)).StatusCode);
         await ControlPlaneDatabase.ExecuteAsync(
             _controlPlane,
             $"UPDATE control_plane.sign_ups SET expires_at = now() - interval '1 minute' WHERE email = '{first}'",
             cancellation);
 
-        var response = await client.PostAsJsonAsync("/api/sign-up", Form(NewAddress(), subdomain), cancellation);
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, NewAddress(), subdomain), cancellation);
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         Assert.Equal("expired", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE email = '{first}'"));
@@ -144,9 +151,11 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         using var client = factory.CreateClient();
         var subdomain = NewSubdomain();
 
+        var forms = new[] { await SolvedFormAsync(client, NewAddress(), subdomain), await SolvedFormAsync(client, NewAddress(), subdomain) };
+
         var responses = await Task.WhenAll(
-            client.PostAsJsonAsync("/api/sign-up", Form(NewAddress(), subdomain), cancellation),
-            client.PostAsJsonAsync("/api/sign-up", Form(NewAddress(), subdomain), cancellation));
+            client.PostAsJsonAsync("/api/sign-up", forms[0], cancellation),
+            client.PostAsJsonAsync("/api/sign-up", forms[1], cancellation));
 
         Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Accepted);
         var refused = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.BadRequest);
@@ -173,7 +182,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         var cancellation = TestContext.Current.CancellationToken;
         using var factory = await FactoryAsync();
         using var client = factory.CreateClient();
-        var form = Form(NewAddress(), NewSubdomain());
+        var form = await SolvedFormAsync(client, NewAddress(), NewSubdomain());
         form[field] = value == "TooLong" ? new string('a', 201) : value;
 
         var response = await client.PostAsJsonAsync("/api/sign-up", form, cancellation);
@@ -193,7 +202,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         using var client = factory.CreateClient();
 
         // Every wrong field is named at once, a missing application included.
-        var response = await client.PostAsJsonAsync("/api/sign-up", new Dictionary<string, object?> { ["email"] = 5, ["language"] = "fr" }, cancellation);
+        var response = await client.PostAsJsonAsync("/api/sign-up", new Dictionary<string, object?> { ["altcha"] = await SolveAsync(client), ["email"] = 5, ["language"] = "fr" }, cancellation);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = await ErrorsAsync(response);
         Assert.Equal(
@@ -352,10 +361,302 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task A_sign_up_with_a_freshly_solved_challenge_answers_202_and_stores_the_solution_as_used_until_it_expires()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE email = '{address}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges WHERE octet_length(challenge) = 32 AND expires_at > now()"));
+    }
+
+    [Fact]
+    public async Task A_sign_up_with_a_missing_malformed_wrong_or_expired_solution_is_refused_under_altcha_and_nothing_is_stored_while_a_signed_one_passes()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var future = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds();
+        var otherKey = Enumerable.Range(0, 32).Select(index => (byte)(index + 1)).ToArray();
+        var solutions = new (string Case, string? Altcha)[]
+        {
+            ("missing", null),
+            ("blank", "  "),
+            ("not base64", "not base64!"),
+            ("not json", Convert.ToBase64String("not json"u8)),
+            ("wrong number", Forge(_challengeKey, future, number: 5, claimed: 6)),
+            ("another key", Forge(otherKey, future, number: 5, claimed: 5)),
+            ("expired", Forge(_challengeKey, DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds(), number: 5, claimed: 5)),
+        };
+
+        foreach (var (name, altcha) in solutions)
+        {
+            var form = Form(NewAddress(), NewSubdomain());
+            if (altcha is not null)
+            {
+                form["altcha"] = altcha;
+            }
+
+            var response = await client.PostAsJsonAsync("/api/sign-up", form, cancellation);
+
+            Assert.True(response.StatusCode == HttpStatusCode.BadRequest, name);
+            var errors = await ErrorsAsync(response);
+            Assert.Equal(["/altcha"], errors.Keys);
+            Assert.Equal("signUp.altcha.refused", errors["/altcha"]);
+            await AssertNothingStoredAsync();
+        }
+
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges"));
+        var signed = Form(NewAddress(), NewSubdomain());
+        signed["altcha"] = Forge(_challengeKey, future, number: 5, claimed: 5);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", signed, cancellation)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_second_sign_up_that_reuses_an_accepted_solution_is_refused_under_altcha_and_stores_no_row_for_its_email()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var first = await SolvedFormAsync(client, NewAddress(), NewSubdomain());
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", first, cancellation)).StatusCode);
+        var secondAddress = NewAddress();
+        var second = Form(secondAddress, NewSubdomain());
+        second["altcha"] = first["altcha"];
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", second, cancellation);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("signUp.altcha.refused", (await ErrorsAsync(response))["/altcha"]);
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE email = '{secondAddress}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges"));
+    }
+
+    [Fact]
+    public async Task Two_parallel_sign_ups_with_one_solution_store_one_and_refuse_the_other_under_altcha()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var altcha = await SolveAsync(client);
+        var forms = new[] { Form(NewAddress(), NewSubdomain()), Form(NewAddress(), NewSubdomain()) };
+        forms[0]["altcha"] = altcha;
+        forms[1]["altcha"] = altcha;
+
+        var responses = await Task.WhenAll(
+            client.PostAsJsonAsync("/api/sign-up", forms[0], cancellation),
+            client.PostAsJsonAsync("/api/sign-up", forms[1], cancellation));
+
+        Assert.Single(responses, response => response.StatusCode == HttpStatusCode.Accepted);
+        var refused = Assert.Single(responses, response => response.StatusCode == HttpStatusCode.BadRequest);
+        Assert.Equal("signUp.altcha.refused", (await ErrorsAsync(refused))["/altcha"]);
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_ups"));
+    }
+
+    [Fact]
+    public async Task A_solution_is_used_up_by_a_try_that_a_field_check_refuses()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var form = await SolvedFormAsync(client, NewAddress(), NewSubdomain(), language: "fr");
+
+        var wrongField = await client.PostAsJsonAsync("/api/sign-up", form, cancellation);
+        form["language"] = "en";
+        var again = await client.PostAsJsonAsync("/api/sign-up", form, cancellation);
+
+        Assert.Equal(HttpStatusCode.BadRequest, wrongField.StatusCode);
+        Assert.Equal(["/language"], (await ErrorsAsync(wrongField)).Keys);
+        Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
+        Assert.Equal(["/altcha"], (await ErrorsAsync(again)).Keys);
+        await AssertNothingStoredAsync();
+    }
+
+    [Fact]
+    public async Task Six_tries_without_a_solution_from_one_client_address_are_refused_under_altcha_and_do_not_count_so_a_seventh_with_a_solution_answers_202()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        for (var attempt = 0; attempt < 6; attempt++)
+        {
+            var refused = await TryAsync(client, "203.0.113.1", solve: false);
+            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+            Assert.Equal("signUp.altcha.refused", (await ErrorsAsync(refused))["/altcha"]);
+        }
+
+        var accepted = await TryAsync(client, "203.0.113.1");
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_ups"));
+    }
+
+    [Fact]
+    public async Task The_expiry_job_deletes_used_solutions_past_their_expiry_and_keeps_the_others()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+
+        // Starting the host applies the migrations.
+        using var client = factory.CreateClient();
+        await ControlPlaneDatabase.ExecuteAsync(
+            _controlPlane,
+            """
+            INSERT INTO control_plane.sign_up_challenges (challenge, expires_at) VALUES
+                (sha256('past'::bytea), now() - interval '1 minute'),
+                (sha256('future'::bytea), now() + interval '5 minutes')
+            """,
+            cancellation);
+
+        var expiry = factory.Services.GetServices<IJobHandler>().Single(handler => handler.Kind == "expireSignUps");
+        await expiry.RunAsync(new ClaimedJob(Guid.CreateVersion7(), "expireSignUps", [], 1), cancellation);
+
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges WHERE challenge = sha256('past'::bytea)"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges WHERE challenge = sha256('future'::bytea)"));
+    }
+
     private string ControlPlaneConnectionString => $"{_container.GetConnectionString()};Timeout=5;Command Timeout=5";
 
     private string DirectoryConnectionString =>
         new NpgsqlConnectionStringBuilder(ControlPlaneConnectionString) { Database = DirectoryDatabase, Pooling = false }.ConnectionString;
+
+    [Fact]
+    public async Task The_sixth_try_in_an_hour_from_one_client_address_answers_429_with_retry_after_and_limit_address_and_another_address_passes()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            Assert.Equal(HttpStatusCode.Accepted, (await TryAsync(client, "203.0.113.1")).StatusCode);
+        }
+
+        var refusedAddress = NewAddress();
+        var refused = await TryAsync(client, "203.0.113.1", refusedAddress);
+        var other = await TryAsync(client, "203.0.113.2");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.True(refused.Headers.RetryAfter?.Delta > TimeSpan.Zero);
+        var problem = await refused.Content.ReadFromJsonAsync<JsonElement>(cancellation);
+        Assert.Equal("address", problem.GetProperty("limit").GetString());
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE email = '{refusedAddress}'"));
+        Assert.Empty(await mailpit.MessagesToAsync(refusedAddress, cancellation));
+        Assert.Equal(HttpStatusCode.Accepted, other.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_try_with_an_invalid_body_counts_toward_the_address_limit()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, (await TryAsync(client, "203.0.113.1", form: new Dictionary<string, object?>())).StatusCode);
+        }
+
+        var refused = await TryAsync(client, "203.0.113.1");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Equal("address", (await refused.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("limit").GetString());
+    }
+
+    [Fact]
+    public async Task The_21st_try_in_a_day_for_one_company_domain_answers_429_with_limit_domain_whatever_the_client_address()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var response = await TryAsync(client, $"198.51.100.{attempt + 1}", $"{Guid.NewGuid():N}@{CompanyDomain}");
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        }
+
+        var refusedAddress = $"{Guid.NewGuid():N}@{CompanyDomain.ToUpperInvariant()}";
+        var refused = await TryAsync(client, "198.51.100.100", refusedAddress);
+        var otherDomain = await TryAsync(client, "198.51.100.101");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.True(refused.Headers.RetryAfter?.Delta > TimeSpan.Zero);
+        Assert.Equal("domain", (await refused.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("limit").GetString());
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE lower(email) = '{refusedAddress.ToLowerInvariant()}'"));
+        Assert.Equal(HttpStatusCode.Accepted, otherDomain.StatusCode);
+    }
+
+    [Fact]
+    public async Task Addresses_at_a_public_mailbox_domain_count_one_by_one_and_never_reach_the_domain_limit()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        for (var attempt = 0; attempt < 25; attempt++)
+        {
+            var response = await TryAsync(client, $"192.0.2.{attempt + 1}", $"{Guid.NewGuid():N}@gmail.com");
+            Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task At_a_public_mailbox_domain_one_address_counts_in_lower_case_without_its_tag()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var name = Guid.NewGuid().ToString("N");
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var tagged = await TryAsync(client, $"192.0.2.{attempt + 1}", $"{name}+{attempt}@gmail.com");
+            Assert.Equal(HttpStatusCode.Accepted, tagged.StatusCode);
+        }
+
+        var refused = await TryAsync(client, "192.0.2.100", $"{name.ToUpperInvariant()}@Gmail.com");
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+        Assert.Equal("domain", (await refused.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("limit").GetString());
+    }
+
+    [Fact]
+    public async Task Each_refused_try_adds_one_to_the_refusal_metric_with_the_sign_up_partition()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var meterFactory = factory.Services.GetRequiredService<IMeterFactory>();
+        var measurements = new List<(long Value, string? Partition)>();
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (ReferenceEquals(instrument.Meter.Scope, meterFactory) && instrument.Name == AxisMetrics.RateLimitRefusals)
+            {
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+        {
+            var partition = tags.ToArray().Single(tag => tag.Key == AxisTelemetry.PartitionTag).Value as string;
+            lock (measurements)
+            {
+                measurements.Add((measurement, partition));
+            }
+        });
+        listener.Start();
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            Assert.Equal(HttpStatusCode.Accepted, (await TryAsync(client, "203.0.113.1")).StatusCode);
+        }
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await TryAsync(client, "203.0.113.1")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await TryAsync(client, "203.0.113.1")).StatusCode);
+
+        lock (measurements)
+        {
+            Assert.Equal([(1L, "sign_up"), (1L, "sign_up")], measurements);
+        }
+    }
 
     private async Task<WebApplicationFactory<Program>> FactoryAsync()
     {
@@ -373,13 +674,91 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:Mail:Host", host);
             builder.UseSetting("ControlPlane:Mail:Port", port.ToString(CultureInfo.InvariantCulture));
             builder.UseSetting("ControlPlane:Mail:UseTls", "false");
+            builder.UseSetting("ControlPlane:SignUp:ChallengeKey", Convert.ToBase64String(_challengeKey));
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Id", "approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:en", "Approvals");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Titles:vi", "Phê duyệt");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:en", "Approve requests");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:vi", "Duyệt yêu cầu");
+            builder.UseSetting("ControlPlane:SignUp:PublicMailboxDomains:0", "gmail.com");
+
+            // The test server has no client address, so the filter gives every request the one proxy the control plane trusts.
+            // A test then picks the client address with X-Forwarded-For. A request without the header shares one address.
+            builder.UseSetting("ForwardedHeaders:KnownProxies:0", Proxy);
+            builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, ProxyStartupFilter>());
         });
     }
+
+    // One sign-up try from the client address that X-Forwarded-For names. The form is a valid one unless the test gives it, and it
+    // carries a freshly solved challenge unless solve is false.
+    private static async Task<HttpResponseMessage> TryAsync(HttpClient client, string clientAddress, string? email = null, Dictionary<string, object?>? form = null, bool solve = true)
+    {
+        form ??= Form(email ?? NewAddress(), NewSubdomain());
+        if (solve)
+        {
+            form["altcha"] = await SolveAsync(client);
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/sign-up") { Content = JsonContent.Create(form) };
+        request.Headers.Add("X-Forwarded-For", clientAddress);
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // Gives every request the address of the one proxy that the control plane trusts, before the forwarded headers are read.
+    private sealed class ProxyStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use((context, nextMiddleware) =>
+            {
+                context.Connection.RemoteIpAddress = IPAddress.Parse(Proxy);
+                return nextMiddleware(context);
+            });
+            next(app);
+        };
+    }
+
+    // The form with a freshly fetched and solved challenge as altcha.
+    private static async Task<Dictionary<string, object?>> SolvedFormAsync(HttpClient client, string email, string subdomain, string language = "en", string application = "")
+    {
+        var form = Form(email, subdomain, language, application);
+        form["altcha"] = await SolveAsync(client);
+        return form;
+    }
+
+    // Fetches a challenge and finds its number the way the page does, then builds the text the page sends as altcha.
+    private static async Task<string> SolveAsync(HttpClient client)
+    {
+        var response = await client.GetAsync("/api/sign-up/challenge", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var challenge = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var salt = challenge.GetProperty("salt").GetString()!;
+        var target = challenge.GetProperty("challenge").GetString()!;
+        for (var number = 0; number <= challenge.GetProperty("maxnumber").GetInt32(); number++)
+        {
+            if (Hash(salt, number) == target)
+            {
+                return Payload(challenge.GetProperty("challenge").GetString()!, salt, challenge.GetProperty("signature").GetString()!, number);
+            }
+        }
+
+        throw new InvalidOperationException("The challenge has no solution.");
+    }
+
+    // A solution signed with the key, whatever its number or expiry: the challenge hashes the real number and the payload claims another.
+    private static string Forge(byte[] key, long expires, int number, int claimed)
+    {
+        var salt = $"{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}?expires={expires}&";
+        var challenge = Hash(salt, number);
+        var signature = Convert.ToHexStringLower(HMACSHA256.HashData(key, System.Text.Encoding.UTF8.GetBytes(challenge)));
+        return Payload(challenge, salt, signature, claimed);
+    }
+
+    private static string Hash(string salt, int number) =>
+        Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{salt}{number.ToString(CultureInfo.InvariantCulture)}")));
+
+    private static string Payload(string challenge, string salt, string signature, int number) =>
+        Convert.ToBase64String(JsonSerializer.SerializeToUtf8Bytes(new { algorithm = "SHA-256", challenge, number, salt, signature }));
 
     private static string NewAddress() => $"{Guid.NewGuid():N}@example.org";
 
@@ -400,7 +779,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     {
         var address = NewAddress();
         var subdomain = NewSubdomain();
-        var response = await client.PostAsJsonAsync("/api/sign-up", Form(address, subdomain), TestContext.Current.CancellationToken);
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, subdomain), TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var message = await WaitForMessageAsync(address);
         return (address, subdomain, TokenPattern().Match(message.Text).Groups[1].Value);

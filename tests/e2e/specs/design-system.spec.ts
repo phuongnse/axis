@@ -619,7 +619,7 @@ for (const mode of modes) {
       const heading = state.getByTestId("organization-heading");
       await expect(heading).toContainText("Axis");
       const headingBox = await heading.boundingBox();
-      const cardBox = await state.getByTestId("sign-in-card").boundingBox();
+      const cardBox = await state.getByTestId("card-page-card").boundingBox();
       if (!headingBox || !cardBox) {
         throw new Error("The heading or the sign-in card has no box");
       }

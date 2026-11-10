@@ -32,9 +32,11 @@ export function SignUpFrame({
       <CardPage
         title={title}
         titleRef={titleRef}
-        locales={signUpLocales}
-        locale={locale}
-        onLocaleChange={(next) => onLocaleChange(next as SignUpLocale)}
+        preferences={{
+          locales: signUpLocales,
+          locale,
+          onLocaleChange: (next) => onLocaleChange(next as SignUpLocale),
+        }}
         legal={{
           privacyUrl: documents?.privacy.urls[locale],
           termsUrl: documents?.terms.urls[locale],

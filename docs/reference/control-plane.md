@@ -113,7 +113,7 @@ every business change.
     and not `ControlPlane:` settings.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
-    (`expireSignUps`), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
+    (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) every hour. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -194,14 +194,19 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
-  their settings is set, all of them are required. The public URL is optional.
+  their settings is set, all of them are required. The sign-up challenge key is optional. The public
+  URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, and never its value.
-- **Secrets as files.** The connection strings, the mail password, the cells' secrets and the DNS key
-  may also come from the key-per-file secrets `/run/secrets/ControlPlane__ConnectionString`,
-  `/run/secrets/ControlPlane__DirectoryConnectionString`,
-  `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>` and
-  `/run/secrets/ControlPlane__Dns__Key`.
+- **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
+  `ForwardedHeaders:KnownNetworks` by the rules of [host settings](host-settings.md#forwarded-headers), so the
+  [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
+  for every client.
+- **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key and
+  the sign-up challenge key may also come from the key-per-file secrets
+  `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
+  `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
+  `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
 - **Plans and providers** _(planned for M34)_. `ControlPlane:` settings also hold the
   [plans](plans.md) and the payment and e-invoice providers' non-secret values.
 
@@ -236,6 +241,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
@@ -245,6 +251,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Version` | The version of the privacy policy that a person accepts. Optional | Not empty, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:en` | The English address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` and `POST /api/sign-up` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
@@ -276,7 +283,9 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   Secret, and optionally its key, that holds the connection string, which the chart mounts as the file
   `/run/secrets/ControlPlane__ConnectionString`. `secrets.mailPassword` does the same for the relay
   password, as `/run/secrets/ControlPlane__Mail__Password`, and is left out when the relay needs no
-  sign-in. `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret
+  sign-in. `secrets.challengeKey` does the same for the sign-up challenge key, as
+  `/run/secrets/ControlPlane__SignUp__ChallengeKey`, and is left out when no Secret is named.
+  `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret
   value and creates no Secret, and its schema rejects a `value` in a secret reference.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
   `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
@@ -298,8 +307,10 @@ The control plane reports its health and telemetry as the platform's hosts do.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.
-- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed`.
+- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed` and the requests that a
+  rate limit refused.
 
   | Metric | Instrument | Unit | Attributes |
   | --- | --- | --- | --- |
   | `axis.controlplane.jobs.failed` | counter | `{job}` | `axis.job.kind`. Never the job id |
+  | `axis.rate_limits.refused` | counter | `{request}` | `axis.partition`, always `sign_up`. Never an address or a domain |

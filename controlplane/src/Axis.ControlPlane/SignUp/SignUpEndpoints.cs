@@ -34,8 +34,18 @@ internal static class SignUpEndpoints
             return Results.Ok(await check.CheckAsync(name, cancellationToken));
         });
 
-        // See docs/reference/sign-up.md#sending-the-form. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
-        // and queues the confirm email in the same transaction. The answer has no body yet. Without the directory the route answers 503.
+        // The proof-of-work challenge, see docs/reference/sign-up.md#bots-and-abuse. Without the key the route cannot sign one.
+        endpoints.MapGet("/api/sign-up/challenge", (ControlPlaneOptions options, TimeProvider clock) =>
+            string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey)
+                ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
+                : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
+
+        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key and the directory),
+        // the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit and
+        // the subdomain, see docs/reference/sign-up.md#bots-and-abuse. A missing, malformed, wrong, expired or used solution is refused
+        // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
+        // 24 hours and queues the confirm email in the same transaction. The answer has no body yet. Without the key or the directory the
+        // route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
@@ -86,12 +96,20 @@ internal static class SignUpEndpoints
     };
 
     private static async Task<IResult> SignUpAsync(
-        HttpRequest request,
+        HttpContext context,
         IServiceProvider services,
         ControlPlaneOptions options,
+        SignUpLimits limits,
         NpgsqlDataSource controlPlane,
+        TimeProvider clock,
         CancellationToken cancellationToken)
     {
+        var request = context.Request;
+        if (string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
         var check = services.GetService<SubdomainCheck>();
         if (check is null)
         {
@@ -102,6 +120,18 @@ internal static class SignUpEndpoints
         if (body is null)
         {
             return refused!;
+        }
+
+        // One answer for every failed solution, so a caller learns nothing about which check it failed.
+        var solution = SignUpChallenge.Verify(Convert.FromBase64String(options.SignUp.ChallengeKey), Required(body, "altcha"), clock.GetUtcNow());
+        if (solution is null || !await UseChallengeAsync(controlPlane, solution.Value, cancellationToken))
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["/altcha"] = ["signUp.altcha.refused"] });
+        }
+
+        if (limits.RefuseAddress(context) is { } addressLimit)
+        {
+            return addressLimit;
         }
 
         // Every field is checked in one pass, so the person sees all that is wrong at once.
@@ -128,6 +158,11 @@ internal static class SignUpEndpoints
         if (email is not null && !errors.ContainsKey("/email") && !(MailboxAddress.TryParse(email, out var mailbox) && mailbox.Address == email))
         {
             errors["/email"] = ["signUp.email.invalid"];
+        }
+
+        if (email is not null && !errors.ContainsKey("/email") && limits.RefuseDomain(context, email) is { } domainLimit)
+        {
+            return domainLimit;
         }
 
         // A blank application is the empty text, and the form must send it, so a form that left the field out is refused.
@@ -196,6 +231,16 @@ internal static class SignUpEndpoints
         }
 
         return Results.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    // Stores a solution as used. The conditional insert is atomic, so of two parallel sign-ups with one solution, on any replica, only one inserts.
+    private static async Task<bool> UseChallengeAsync(NpgsqlDataSource controlPlane, (byte[] Challenge, DateTimeOffset ExpiresAt) solution, CancellationToken cancellationToken)
+    {
+        await using var insert = controlPlane.CreateCommand(
+            "INSERT INTO control_plane.sign_up_challenges (challenge, expires_at) VALUES (@challenge, @expiresAt) ON CONFLICT DO NOTHING");
+        insert.Parameters.AddWithValue("challenge", solution.Challenge);
+        insert.Parameters.AddWithValue("expiresAt", solution.ExpiresAt);
+        return await insert.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
     private static async Task<IResult> VerifyAsync(HttpRequest request, ControlPlaneOptions options, NpgsqlDataSource controlPlane, CancellationToken cancellationToken)

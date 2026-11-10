@@ -357,6 +357,19 @@ public sealed class ControlPlaneOptionsTests
     }
 
     [Theory]
+    [InlineData("not base64 challenge key!")]
+    [InlineData("c2l4dGVlbi1ieXRlcy1vaw==")]
+    public void A_challenge_key_that_is_not_base64_of_at_least_32_bytes_stops_the_start_and_the_message_holds_no_value(string key)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:SignUp:ChallengeKey"] = key });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:ChallengeKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(key, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("ControlPlane:Dns:Port", "0")]
     [InlineData("ControlPlane:Dns:Port", "70000")]
     [InlineData("ControlPlane:Dns:Zone", "not a zone")]
@@ -455,6 +468,41 @@ public sealed class ControlPlaneOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
         Assert.Contains("ControlPlane:SignUp:Applications:1:Id", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("not a domain")]
+    [InlineData("user@gmail.com")]
+    [InlineData("https://gmail.com")]
+    [InlineData("203.0.113.1")]
+    public void A_public_mailbox_domain_that_is_not_a_domain_name_stops_the_start_and_the_message_names_the_setting(string entry)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = entry,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:PublicMailboxDomains:1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:SignUp:PublicMailboxDomains:0", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_public_mailbox_domains_load()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = "outlook.com",
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal(["gmail.com", "outlook.com"], factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.PublicMailboxDomains);
     }
 
     [Fact]

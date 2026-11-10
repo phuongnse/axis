@@ -26,14 +26,14 @@ opens the same view.
 - **A view.** `&kind=<kind>` shows that kind's list, `&view=releases` the Releases entry,
   `&view=release&release=<number>` a [release page](studio-workspace.md#release-page) under it and
   `&view=policies` the [policy matrix](#policy-matrix).
-- **A field** _(planned for M31)_. `&field=<name>` opens a field's
+- **A field** _(planned for M33)_. `&field=<name>` opens a field's
   [drawer](entity-designer.md#field-drawer) on an entity's page.
-- **Back is the browser's** _(planned for M31)_. Studio has no Back or Next of its own and no breadcrumb.
+- **Back is the browser's.** Studio has no Back or Next of its own and no breadcrumb.
   Every view has its own address and each move is a history entry, except that a search replaces its
-  entry, so the browser's Back and Forward step through it, and `<ScrollRestoration>` returns the author
-  to where they were on a long page. A second Back would be one concern with two mechanisms. Where the
-  author is comes from the sidebar's marked entry, which also leads up to the list, and the
+  entry, so the browser's Back and Forward step through it. A second Back would be one concern with two
+  mechanisms. Where the author is comes from the sidebar's marked entry, which also leads up to the list, and the
   [page heading](studio-workspace.md#page-heading).
+- **Scroll position** _(planned for M33)_. Going Back returns the author to where they were on a long page.
 
 ## New application
 
@@ -87,20 +87,20 @@ diagnostics as its kind allows. Where the dialogs open, and which kinds they off
 A kind's sidebar entry opens its list, see [workspace](studio-workspace.md#workspace), and picking a
 resource opens it alone, under its [name](studio-workspace.md#names), with its editor below.
 
-- **One list for every kind** _(planned for M31)_. A kind's list is the
+- **One list for every kind** _(planned for M33)_. A kind's list is the
   [standard table](actions-and-controls.md#tables), with the same columns for every kind: Name,
   Description, Status, Last modified by and Last modified at. Every column always shows, and a cell with
   no value shows the dash. Name is a link. A list does not show the inside of a resource, such as its
   fields or references, a file name, or a count that leads nowhere.
-- **A module's resources** _(planned for M31)_. The resources of the modules that the application uses
+- **A module's resources** _(planned for M33)_. The resources of the modules that the application uses
   are in the same list, from the application's [names](authoring.md#names), named without the
   `<module>/` prefix and with a neutral tag of the module's label beside the name. There is no Module
   column. A kind with no label in its format, such as a policy, keeps its name. A module's resource has a
   status, as a new module version or a layer changes it.
-- **Status** _(planned for M31)_. New, Changed or Published, from the
+- **Status** _(planned for M33)_. New, Changed or Published, from the
   [resource activity route](studio-resource-form.md#resource-activity). While it loads the cell says so, and when it
   fails it says Unavailable.
-- **Its controls** _(planned for M31)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
+- **Its controls** _(planned for M33)_. The list has Refresh and page sizes of 10, 20, 50 and 100, and sorts by
   Name, Status, in the order New, Changed, Published, Last modified by and Last modified at. It searches
   the name, the description, the module and the status, and filters on its columns in the browser, so the
   module, a tag and not a column, is not a filter.
@@ -136,8 +136,10 @@ what changed.
   [editors by kind](#editors-by-kind), and keeps the JSON view as the second view of the same draft. A
   typed editor saves through the same JSON Patch and never drops a value it does not show, so unknown
   keys stay as they are.
-- **The form's layout** _(planned for M31)_. The sections, field names, labels, lists and
-  save bar of every form follow [Studio resource form](studio-resource-form.md).
+- **The form's layout.** The generic form and the typed editors that use [Studio resource form](studio-resource-form.md)
+  share its sections, field names, labels, lists and save bar.
+- **Every form's layout** _(planned for M33)_. The entity designer and the seed editor follow it too, see
+  [sections](entity-designer.md#sections).
 - **A description.** Every kind that may have a
   [`description`](resource-files.md#resource-file-shape) shows it in the form, and each editor of its own
   shows it after the name and the label.
@@ -302,7 +304,7 @@ picks what exists.
 - **The select** is searchable, ignoring letter case. A module process, page or policy shows as
   `<module id>/<name>`, so a site's navigation can pick a module page and a `startProcess` action a
   module process.
-- **A choice shows its label** _(planned for M31)_. `ReferencePicker` names each choice by its label, from
+- **A choice shows its label** _(planned for M33)_. `ReferencePicker` names each choice by its label, from
   `labelKey` in the [names](authoring.md#names), as the tables do. The name shows only instead of a missing
   label, and in `textMuted` after the label of options that share one. The search finds either, and the
   file keeps the name. Columns, parameters and operations have no label in their format, so they show
@@ -348,7 +350,7 @@ resource, and Undo steps through it.
   answered, and the names and the release history load again.
 - **A shared key.** A label whose key other labels use says how many, from `usedBy` in the names
   answer, so the author knows that the edit changes them too.
-- **One language rule** _(planned for M31)_. A label shows in the author's language, else in `en`, as a
+- **One language rule** _(planned for M33)_. A label shows in the author's language, else in `en`, as a
   resource's title does, so a table and a picker never name one resource two ways. The label editor's own
   rule, a box in the author's language or else the application's first, is about which language is
   edited, and stays.
@@ -371,31 +373,31 @@ It is CodeMirror 6, in a chunk that loads only when Studio first shows an expres
   [the place](authoring.md#expression-check). With no answer, or an answer of `400` or `401`, the last
   result stays on screen. A `401` does not show the sign-in prompt, so the draft is kept. The editor
   never blocks Save.
-- **What the place needs** _(planned for M31)_. A line under the box says what the place needs, as "Needs to
+- **What the place needs** _(planned for M33)_. A line under the box says what the place needs, as "Needs to
   give yes or no", until the expression gives a type, then "Gives yes or no", in the words the designer
   names types by. A validation, a condition or a filter needs a boolean, and a computed field or a
   default the field's type.
-- **An error in words** _(planned for M31)_. An error reads first in words, with its code after it, small. An
+- **An error in words** _(planned for M33)_. An error reads first in words, with its code after it, small. An
   empty expression is not sent to be checked. The box wraps long lines and grows with them.
-- **A function's signature** _(planned for M31)_. Inside a call, a line shows the function's signature, with the
+- **A function's signature** _(planned for M33)_. Inside a call, a line shows the function's signature, with the
   parameter at the cursor in bold, and what it does.
-- **Expand** _(planned for M31)_. An icon beside the box opens the expression in a large dialog, with a panel of
+- **Expand** _(planned for M33)_. An icon beside the box opens the expression in a large dialog, with a panel of
   three tabs, Fields, Operators and Functions, and every rule allowed there. A click inserts the name at
   the cursor. A search looks in all three and lists what it finds best first: a name that is the words,
   then one that starts with them, then one that holds them, then one whose description does.
-- **Completion that explains** _(planned for M31)_. Completion names each choice: a field by its label and type,
+- **Completion that explains** _(planned for M33)_. Completion names each choice: a field by its label and type,
   and a rule or a function by its signature, with what it does and an example beside the list.
-- **Completion knows where the cursor stands** _(planned for M31)_. After a value it offers the operators that
+- **Completion knows where the cursor stands** _(planned for M33)_. After a value it offers the operators that
   value's type takes, the comparisons first, and after a clause that already compares, only `and` and
   `or`. Inside quotes after an enum field it offers that field's values in their order and closes the
   quote. Elsewhere it offers the fields, the values, `not`, the rules and the functions, those that give
   the type the place needs first. It opens by itself after a space that follows a value and after a
   quote that follows an enum field.
-- **The language's own words** _(planned for M31)_. Completion and the panel offer the comparisons, `is null`,
+- **The language's own words** _(planned for M33)_. Completion and the panel offer the comparisons, `is null`,
   `is not null`, `and`, `or`, `not`, `in (…)`, the arithmetic and the values `true`, `false`, `null`,
   `'text'` and `date('…')`, each with what it does and an example. A code editor stays the one way to
   write an expression, because an expression gives a value of any type, not only yes or no.
-- **Only what the place allows** _(planned for M31)_. The server answers
+- **Only what the place allows** _(planned for M33)_. The server answers
   [the scope of a place](authoring.md#expression-scope), so the client keeps no list of functions: no
   aggregate in a default, and no `now()`, `today()` or `toDate()` in a computed field (`AXC0086`).
 - **Completion.** Typing a word, or Ctrl+Space, opens a list of the names in scope, and the arrow keys

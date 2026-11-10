@@ -409,7 +409,9 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
   by how many tests they hold: each spec weighs its seconds in `tests/e2e/spec-durations.json`, and a
   new spec weighs the median. A serial spec, such as a Studio journey, runs on one worker from start
-  to end, so the split gives a long one a shard with little else.
+  to end, so the split gives a long one a shard with little else. The count adds the shard setup, the
+  seconds a shard pays besides its specs, under `shard setup` in the same file. `--durations` measures it
+  as each file's wall time minus its specs' estimate, averaged.
 - **Integration.** Set `AXIS_INTEGRATION_SHARD`, such as `AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh`.
   `NEXKIT_SHARD` works the same way beside it, and `AXIS_INTEGRATION_SHARD` wins when both are set.
   A shard runs whole test classes of `Axis.Integration.Tests`, which `scripts/lib/integration-shard.mjs`
@@ -417,7 +419,10 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
   or, without an entry, its number of tests times the median seconds per test. Shard 1 also runs
   `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
-  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The last shard runs
+  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The count estimates a
+  shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
+  a collection runs its classes one after another. `--durations` measures the parallelism as all test
+  seconds over the wall time of the suites. The last shard runs
   every class that the other shards do not, so a class the split does not find still runs. The
   scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them.
   A shard cannot be combined with arguments.
@@ -430,22 +435,19 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
 - **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
   `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
   shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is
-  never below 2. The counts never exceed the most shards allowed. The budget and that most live in
-  `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
-  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
-  class or file fit.
-- **Durations.** CI keeps the durations true, so nobody has to notice that the shards drift apart. When
-  every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its `Shard durations` job runs
-  `scripts/shard-durations.mjs` on the run's `test-results-*` artifacts. The job runs no model, holds
-  only `contents: read` and `issues: write`, and commits nothing. The script rewrites each durations file
-  with its split's `--durations` command and reads each split's `--count`. A file drifts when its entries
-  that moved by at least a few seconds, which leaves out one run's noise, add up to more than a set share
-  of its old total. Both values live in the script. For drifted files the script opens one `process`
-  issue with the new files, or updates the open one, and NexKit's round commits them. Each spec, class,
-  file or suite that `--count` reports `Over budget:` gets a `process` issue of its own, to split it or
-  make it faster, unless its issue is open. By hand, each split's `--durations` takes a run's JUnit
-  files: `web*.xml`, `playwright-*.xml`, each integration shard's `Axis.Integration.Tests.xml` with shard
-  1's `Axis.ControlPlane.Integration.Tests.xml`, and `{dev-script,compose,images,onprem}.xml`.
+  never below 2. Each count stops at the cap of its split, which lives in `scripts/lib/shards.mjs`: 3 for E2E
+  and integration, and 6 for smoke and unit tests. A sharded check's `max` must match its cap. The budget
+  also lives there. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
+  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
+  prints, because no number of shards makes such a spec, class or file fit.
+- **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its
+  `Shard durations` job, with no model, only `contents: read` and `issues: write`, and no commit, runs
+  `scripts/shard-durations.mjs` on the run's `test-results-*` artifacts. It rewrites each durations file
+  with its split's `--durations` and reads each `--count`. A file drifts when its entries that moved by
+  at least a few seconds, past one run's noise, add up to more than a set share of its old total, both
+  set in the script. Drifted files go into one `process` issue, opened or updated, and NexKit's round
+  commits them. Each unit that `--count` reports `Over budget:` gets a `process` issue of its own, to split
+  it or make it faster, unless its issue is open. By hand, `--durations` takes a run's JUnit files.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
@@ -614,7 +616,7 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
   `samples/keycloak/axis-realm.json` names `mailpit:1025`. Keycloak reaches Mailpit by the name
   `mailpit` on the Docker network: Compose has it already, and `scripts/e2e.sh` starts Mailpit and
   Keycloak on a network of their own.
-- **The whole identity provider in the Axis theme** _(planned for M31)_. Every other page of the
+- **The whole identity provider in the Axis theme** _(planned for M33)_. Every other page of the
   identity provider is the Axis theme, the realm's `emailTheme` is `axis`, and the realm sets the
   example legal links and the terms step of [legal](reference/legal.md), so every link and the terms
   page show.
@@ -660,7 +662,7 @@ organization's own identity provider, which the `axis` realm brokers to.
   with the password `axis`.
 - In E2E, Keycloak listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its
   container, so the `axis` realm reaches the `company` realm at the address the browser uses.
-- **Its own look** _(planned for M31)_. Its login theme `example-company`, in
+- **Its own look** _(planned for M33)_. Its login theme `example-company`, in
   `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a person sees that
   they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never
   ships.
@@ -753,7 +755,7 @@ Docker, .NET and Node, and works on a fresh clone.
    since the last install. It installs no Playwright browser.
 2. It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service
    mounts, and copies the email theme with it. It fails when one of the theme's files is missing.
-3. **Sample themes and licences** _(planned for M31)_. It copies the sample themes of
+3. **Sample themes and licences** _(planned for M33)_. It copies the sample themes of
    `samples/keycloak/themes` beside the Axis theme, and writes the list of
    [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and

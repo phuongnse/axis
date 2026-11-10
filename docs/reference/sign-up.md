@@ -100,17 +100,37 @@ The box accepts the business's agreements.
 
 _(planned for M33)_
 
-`POST /api/sign-up` takes `fullName`, `email`, `businessName`, `subdomain`, `language`, `application`
-and the three document versions, and answers `202` with `{ resend }` when it is accepted, see
+`POST /api/sign-up` takes `fullName`, `email`, `businessName`, `subdomain`, `language`, `application`,
+the three document versions and the `altcha` solution of the [proof of work](#bots-and-abuse), and
+answers `202` with `{ resend }` when it is accepted, see
 [verifying the email first](#verifying-the-email-first). A refusal is a problem whose `errors` are text
 keys of the page by JSON Pointer, as the [record API](record-api.md)'s are:
 
+- `/altcha` for a solution that is missing, malformed, wrong, expired or already used. One answer
+  covers all five, so a bot learns nothing about which check failed. The page shows it in the error
+  alert above the form, in the texts below, and its next click solves a new challenge.
 - `/email` for a disposable domain, and `/subdomain` for a name that is not free.
 - `/termsVersion`, `/dpaVersion` or `/privacyVersion` for a version that is no longer current.
 - Any other key for the form.
 
 A limit answers `429` with `Retry-After` and `limit`: `address` for the client address, which the page
-shows in minutes, or `domain` for the email's domain, which asks the person to try tomorrow.
+shows in minutes, or `domain` for the email's domain, which asks the person to try tomorrow. The
+answer shows in the error alert above the form, in these texts:
+
+| Limit | English | Vietnamese |
+| --- | --- | --- |
+| `address` | Too many sign-ups came from this network. Try again in {minutes} minutes. (`1 minute` for one) | Có quá nhiều lượt đăng ký từ mạng này. Thử lại sau {minutes} phút. |
+| `domain` | Too many sign-ups came for this email's domain today. Try again tomorrow. | Hôm nay có quá nhiều lượt đăng ký cho tên miền của email này. Thử lại vào ngày mai. |
+
+The `/altcha` refusal (`signUp.altcha.refused`) shows in the same alert, in these texts. They name
+no bot check, as the [glossary](ui-glossary.json) has no term for it:
+
+| Refusal | English | Vietnamese |
+| --- | --- | --- |
+| `/altcha` | The sign-up could not be checked. Try again. | Không kiểm tra được lượt đăng ký. Thử lại. |
+
+The minutes are `Retry-After` in seconds, rounded up. A `429` without a usable `Retry-After` or with an
+unknown `limit` shows the text of any other failure.
 
 ## The subdomain
 
@@ -149,11 +169,32 @@ cost something.
 - **Proof of work.** The form needs an ALTCHA solution. The control plane serves the challenge itself
   at `GET /api/sign-up/challenge`: an HMAC-signed challenge that expires after 10 minutes and is
   accepted once. The browser solves it while the person types, so a person barely waits and a bot
-  pays for each try. No sign-up data goes to a bot-check service.
+  pays for each try. No sign-up data goes to a bot-check service. The route answers
+  `{ algorithm, challenge, maxnumber, salt, signature }`, signed with
+  [`ControlPlane:SignUp:ChallengeKey`](control-plane.md#settings), and answers `503` without that key.
+  `POST /api/sign-up` answers `503` without it too, as no solution can pass. The salt is random hex,
+  then `?expires=` and the expiry in Unix seconds, then a closing `&`, and the route refuses any other
+  shape, so a caller cannot move digits between the salt and the number to push the expiry out.
+  The page sends the solution as `altcha` in the body of `POST /api/sign-up`. The route checks the
+  solution before the limits and the form's fields, and refuses a missing, malformed, wrong, expired
+  or used one under `/altcha`, see [sending the form](#sending-the-form). It stores each accepted
+  solution in the control plane's database until it expires, so it works once across replicas, even
+  when a limit or a field then refuses the try. The `expireSignUps` job deletes the rows that have
+  expired.
 - **Rate limits.** The control plane's `sign_up` partition allows 5 sign-ups an hour from one client
-  address, and 20 a day for one email domain, except the public mailbox domains of a settings list,
-  such as `gmail.com`, which count by address only. Past a limit it answers `429` with `Retry-After`
-  and `limit`, see [sending the form](#sending-the-form).
+  address, and 20 a day for one email domain, except the public mailbox domains of the setting
+  `ControlPlane:SignUp:PublicMailboxDomains`, such as `gmail.com`, which count by address only. Past a
+  limit it answers `429` with `Retry-After` and `limit`, see [sending the form](#sending-the-form).
+  - **Every try with an accepted solution counts**, even one the form refuses. A try without one is
+    refused first and does not count. A refused try stores no sign-up and sends no email.
+  - **By address at a public domain.** Each address of a public mailbox domain counts on its own,
+    compared as the rule of one trial for each email, below, compares them.
+  - **Per replica.** Each replica counts in memory as the platform's [rate limits](headers-and-rate-limits.md#rate-limits)
+    do, so a restart starts the counts again.
+  - **`Retry-After` is the window**, an hour or a day, not the time left in it.
+  - **The client address** is read by the rules of the
+    [forwarded headers](control-plane.md#settings), and each refusal counts in the
+    [metric](headers-and-rate-limits.md#a-refused-request) `axis.rate_limits.refused` with the partition `sign_up`.
 - **Three emails a day for an address.** Each email address, compared as below, gets at most 3 sign-up
   emails of either kind in 24 hours, resends included, so the form cannot fill someone else's inbox. A
   sign-up past that answers `202` and sends nothing, so the limit tells nothing either.
@@ -175,7 +216,7 @@ _(planned for M33)_
 
 No tenant exists until the person proves the email is theirs.
 
-1. **Pending.** `POST /api/sign-up` checks the form, the challenge and the limits, stores a pending
+1. **Pending.** `POST /api/sign-up` checks the challenge, then the limits, then the form, stores a pending
    sign-up, and sends the confirm email with a link that holds a random 256-bit token after `#`. The
    control plane keeps only the token's hash. It answers `202` with `{ resend }`, an opaque token for
    Send again, and the answer is alike for a new email and for one that already had a trial.

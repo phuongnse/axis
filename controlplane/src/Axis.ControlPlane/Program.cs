@@ -22,6 +22,14 @@ builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 var options = ControlPlaneOptions.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(options);
 
+// The proxies whose forwarded headers are trusted, by the platform's rules: the client address is then the real one, see
+// docs/reference/control-plane.md#settings. Read before any database work too, so a bad value stops the start.
+var forwardedHeaders = ForwardedHeadersSettings.Load(builder.Configuration);
+builder.Services.PostConfigure<ForwardedHeadersOptions>(forwardedHeaders.Apply);
+
+// The sign-up limits, kept in memory by each replica, see docs/reference/sign-up.md#bots-and-abuse.
+builder.Services.AddSingleton<SignUpLimits>();
+
 // Read next to the settings, so a kind without both languages stops the start.
 builder.Services.AddSingleton(EmailTemplates.LoadEmbedded());
 
@@ -95,6 +103,13 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 
 // Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
+
+// Before the routes, so the sign-up limits see the client address. The built-in middleware skips the proxy check when a
+// request has no client address, so such a request is kept out of it. Off when no proxy is named.
+if (!forwardedHeaders.IsEmpty)
+{
+    app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
+}
 
 app.UseStaticFiles();
 

@@ -55,3 +55,9 @@ secrets:
   mailPassword:
     name: ""
     key: ControlPlane__Mail__Password
+  # ControlPlane:SignUp:ChallengeKey, the base64 HMAC-SHA256 key (at least 32 bytes) that signs the sign-up page's proof-of-work
+  # challenges. The chart mounts it as the file /run/secrets/ControlPlane__SignUp__ChallengeKey. Optional: leave the name empty and
+  # GET /api/sign-up/challenge and POST /api/sign-up answer 503.
+  challengeKey:
+    name: ""
+    key: ControlPlane__SignUp__ChallengeKey

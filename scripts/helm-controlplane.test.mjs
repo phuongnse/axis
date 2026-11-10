@@ -112,7 +112,7 @@ describe('the Axis control plane Helm chart', () => {
   }
 
   test('rejects a secret value in the values, and never prints it', () => {
-    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak']) {
+    for (const setting of ['secrets.connectionString.value=leak', 'controlPlane.connectionString=leak', 'secrets.certificate.value=leak', 'secrets.mailPassword.value=leak', 'secrets.challengeKey.value=leak']) {
       const result = render('--set', setting)
       assert.notEqual(result.status, 0, setting)
       assert.doesNotMatch(result.stdout, /leak/, setting)
@@ -142,6 +142,19 @@ describe('the Axis control plane Helm chart', () => {
   test('sets no user name and mounts no password when the values leave them out', () => {
     const deployment = find(renderOk('--set', 'controlPlane.mail.userName=', '--set', 'secrets.mailPassword.name='), 'Deployment', 'axis-controlplane')
     assert.doesNotMatch(deployment, /ControlPlane__Mail__UserName|ControlPlane__Mail__Password/)
+  })
+
+  test('mounts the sign-up challenge key as ControlPlane__SignUp__ChallengeKey', () => {
+    const deployment = find(renderOk(), 'Deployment', 'axis-controlplane')
+    assert.match(
+      deployment,
+      /- secret:\n\s+name: "axis-controlplane-sign-up"\n\s+items:\n\s+- key: "ControlPlane__SignUp__ChallengeKey"\n\s+path: ControlPlane__SignUp__ChallengeKey\n/,
+    )
+  })
+
+  test('mounts no challenge key when the values name no Secret', () => {
+    const deployment = find(renderOk('--set', 'secrets.challengeKey.name='), 'Deployment', 'axis-controlplane')
+    assert.doesNotMatch(deployment, /ControlPlane__SignUp__ChallengeKey/)
   })
 
   test('applies the image registry, tag and pull Secrets', () => {

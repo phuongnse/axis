@@ -4,11 +4,18 @@ namespace Axis.ControlPlane.SignUp;
 /// The <c>ControlPlane:SignUp</c> settings: what the sign-up page offers, see the settings table in
 /// <c>docs/reference/control-plane.md#settings</c>. The applications are optional. The documents are optional as a group,
 /// and once one of their settings is set, all of them are required.
+/// The challenge key is optional.
 /// </summary>
 public sealed class SignUpOptions
 {
     /// <summary>The built-in applications of the region that a person can start from.</summary>
     public List<SignUpApplicationOptions> Applications { get; } = [];
+
+    /// <summary>
+    /// The public mailbox domains, such as <c>gmail.com</c>, whose addresses the sign-up domain limit counts one by one, see
+    /// <c>docs/reference/sign-up.md#bots-and-abuse</c>. Empty by default.
+    /// </summary>
+    public List<string> PublicMailboxDomains { get; } = [];
 
     /// <summary>The terms of service of the region.</summary>
     public SignUpDocumentOptions Terms { get; set; } = new();
@@ -21,6 +28,12 @@ public sealed class SignUpOptions
 
     /// <summary>The address of the region's licences page, which the legal line links.</summary>
     public string? LicencesUrl { get; set; }
+
+    /// <summary>
+    /// The base64 HMAC-SHA256 key that signs the proof-of-work challenges of the sign-up page. Optional. It comes from the key-per-file secret
+    /// <c>ControlPlane__SignUp__ChallengeKey</c>, never from a plain setting.
+    /// </summary>
+    public string? ChallengeKey { get; set; }
 
     internal bool HasDocuments => !string.IsNullOrWhiteSpace(LicencesUrl) || new[] { Terms, Dpa, Privacy }.Any(IsSet);
 
