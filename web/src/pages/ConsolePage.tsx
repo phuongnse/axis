@@ -1,4 +1,5 @@
-import { Alert, Card, Flex, Result, Select, Tag } from 'antd'
+import { Card, Flex, Result, Select, Tag } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
@@ -94,8 +95,7 @@ export function ConsolePage() {
           <Result status="403" title={t('shell.console.forbidden')} />
         </div>
       )}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {loadFailed && <Alert data-testid="console-error" type="error" title={t('shell.console.loadFailed')} />}
+      {loadFailed && <AxisAlert data-testid="console-error" kind="error" message={t('shell.console.loadFailed')} />}
       {tenant && !forbidden && (
         <Card data-testid="console-tenant" title={t('shell.console.tenant.title')}>
           <Flex vertical gap="middle">
@@ -161,11 +161,10 @@ export function ConsolePage() {
               }}
             />
             {failedWorkFailed && (
-              // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-              <Alert
+              <AxisAlert
                 data-testid="console-failed-work-error"
-                type="error"
-                title={t('shell.console.failedWork.loadFailed')}
+                kind="error"
+                message={t('shell.console.failedWork.loadFailed')}
               />
             )}
             <AxisTable<ConsoleFailedWorkItem>

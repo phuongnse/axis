@@ -1,4 +1,5 @@
-import { Alert, Typography } from 'antd'
+import { Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { AxisButton } from '../platform/AxisButton'
 import { FilledText } from '../platform/FilledText'
 import { useDesignTokens } from '../platform/themeMode'
@@ -17,8 +18,7 @@ export function ConsentPage({ context }: { context: ConsentContext }) {
   const { colour } = useDesignTokens()
   return (
     <IdentityFrame title={texts.title} frame={context}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Typography.Paragraph style={{ margin: 0 }}>
         <FilledText text={texts.intro} parts={{ client: <strong>{clientName}</strong> }} />
       </Typography.Paragraph>

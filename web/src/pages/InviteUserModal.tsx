@@ -1,4 +1,5 @@
-import { Alert, Checkbox, Flex, Form, Input, Modal, Typography } from 'antd'
+import { Checkbox, Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -131,12 +132,14 @@ export function InviteUserModal({
       >
         <Flex vertical gap="middle">
           {problem && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert data-testid="users-invite-problem" type="error" title={t(`shell.users.invite.${problem}`)} />
+            <AxisAlert data-testid="users-invite-problem" kind="error" message={t(`shell.users.invite.${problem}`)} />
           )}
           {rolesFailed && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert data-testid="users-invite-roles-failed" type="warning" title={t('shell.users.invite.rolesFailed')} />
+            <AxisAlert
+              data-testid="users-invite-roles-failed"
+              kind="warning"
+              message={t('shell.users.invite.rolesFailed')}
+            />
           )}
           <Form form={form} layout="vertical" name="invite" requiredMark={false}>
             <Form.Item

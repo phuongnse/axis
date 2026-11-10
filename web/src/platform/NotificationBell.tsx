@@ -1,5 +1,6 @@
 import { BellOutlined } from '@ant-design/icons'
-import { Alert, Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
+import { Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
@@ -127,10 +128,8 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
       <Announcement>{named}</Announcement>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
         <Flex vertical gap={spacing.md}>
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {failed && <Alert type="error" showIcon title={t('shell.notifications.loadFailed')} />}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {markFailed && <Alert type="error" showIcon title={t('shell.notifications.markFailed')} />}
+          {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
+          {markFailed && <AxisAlert kind="error" message={t('shell.notifications.markFailed')} />}
           {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
           <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>
             {t('shell.notifications.markAllRead')}

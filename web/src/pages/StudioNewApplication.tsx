@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
+import { Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
@@ -180,8 +181,7 @@ export function StudioNewApplication({
             </Radio.Group>
           </AxisField>
           {templates === 'failed' && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert type="warning" showIcon title={t('shell.studio.newApplication.templatesFailed')} />
+            <AxisAlert kind="warning" message={t('shell.studio.newApplication.templatesFailed')} />
           )}
         </Form>
       </Modal>

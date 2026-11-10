@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Typography } from 'antd'
+import { Button, Flex, Form, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { CodeField } from './CodeField'
 import { IdentityFrame } from './IdentityFrame'
@@ -17,8 +18,7 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Form
         form={form}
         name={formId}

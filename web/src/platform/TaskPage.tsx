@@ -1,4 +1,5 @@
-import { Alert, Button, Descriptions, Flex, Form, Space, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Form, Space, Tag, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -145,12 +146,12 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
     return <NotFoundPage />
   }
   if (task === assignedElsewhere) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="task-assigned-elsewhere" type="warning" title={t('shell.task.assignedElsewhere')} />
+    return (
+      <AxisAlert data-testid="task-assigned-elsewhere" kind="warning" message={t('shell.task.assignedElsewhere')} />
+    )
   }
   if (task === 'failed' || releaseTexts.failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
+    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads, so the form is not remounted.
   if (!releaseCatalog) {
@@ -240,8 +241,7 @@ function TaskBody({
         ]}
       />
       {task.state === 'expired' ? (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="task-expired" type="info" title={t('shell.task.expired')} />
+        <AxisAlert data-testid="task-expired" kind="info" message={t('shell.task.expired')} />
       ) : open ? (
         <>
           <TaskCommands
@@ -261,8 +261,7 @@ function TaskBody({
           />
         </>
       ) : (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert data-testid="task-completed" type="info" title={t('shell.task.completed')} />
+        <AxisAlert data-testid="task-completed" kind="info" message={t('shell.task.completed')} />
       )}
     </Flex>
   )
@@ -320,8 +319,7 @@ function TaskCommands({ commands, reassignRoles, usersPath, onCommand, onReassig
   }
   return (
     <Flex vertical gap="small">
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {message !== null && <Alert data-testid="task-command-message" type={message.type} title={message.text} />}
+      {message !== null && <AxisAlert data-testid="task-command-message" kind={message.type} message={message.text} />}
       <Flex gap="small">
         {listed.map((command) => (
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
@@ -431,8 +429,7 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
     return null
   }
   if (ready === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="task-load-error" type="error" title={t('shell.task.loadFailed')} />
+    return <AxisAlert data-testid="task-load-error" kind="error" message={t('shell.task.loadFailed')} />
   }
   return (
     <Flex vertical gap="middle">

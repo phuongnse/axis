@@ -1,4 +1,5 @@
-import { Alert, Card, Flex, Select } from 'antd'
+import { Card, Flex, Select } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { fetchConsoleSchedules, type ConsoleApplication, type ConsoleScheduleItem } from '../platform/console'
@@ -112,8 +113,11 @@ export function ConsoleSchedules({ applications, locale }: ConsoleSchedulesProps
           onChange={(value) => setApplication(value || undefined)}
         />
         {load.failed && !loading ? (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="console-schedules-error" type="error" title={t('shell.console.schedules.loadFailed')} />
+          <AxisAlert
+            data-testid="console-schedules-error"
+            kind="error"
+            message={t('shell.console.schedules.loadFailed')}
+          />
         ) : (
           <AxisTable<ConsoleScheduleItem>
             rowKey={(item) => `${item.applicationId}:${item.triggerId}`}

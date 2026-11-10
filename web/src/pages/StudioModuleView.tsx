@@ -1,4 +1,5 @@
-import { Alert, Flex } from 'antd'
+import { Flex } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import type { ModuleResourceItem, StudioDiagnostic, StudioResource, StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { StudioModuleContract } from './StudioModuleContract'
@@ -15,8 +16,9 @@ function StudioModuleJson({ application, module, id }: { application: string; mo
   const { content, loadFailed } = useStudioModuleContent(application, module, id)
 
   if (loadFailed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
+    return (
+      <AxisAlert data-testid="studio-resource-load-error" kind="error" message={t('shell.studio.loadResourceFailed')} />
+    )
   }
   if (!content) {
     return null

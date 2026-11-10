@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, Input, Modal, Radio, Select } from 'antd'
+import { Flex, Form, Input, Modal, Radio, Select } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { placeProblemErrors } from './problemErrors'
 import type { RecordProblem } from './records'
@@ -114,8 +115,7 @@ export function ReassignDialog({ roles, usersPath, onSend, onClose }: ReassignDi
       destroyOnHidden
     >
       <Flex vertical gap="middle">
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {errors.length > 0 && <Alert data-testid="task-reassign-error" type="error" title={errors.join(' ')} />}
+        {errors.length > 0 && <AxisAlert data-testid="task-reassign-error" kind="error" message={errors.join(' ')} />}
         <Form form={form} layout="vertical" initialValues={{ kind: 'role' }}>
           <Form.Item name="kind" label={t('shell.task.reassignTarget')}>
             <Radio.Group

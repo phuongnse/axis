@@ -1,4 +1,4 @@
-import { Alert } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchCellJobs, type CellJob } from '../platform/cell'
 import { CellJobTable } from '../platform/CellJobTable'
@@ -37,8 +37,7 @@ export function CellJobsPage() {
 
   return (
     <PageLayout title={t('shell.cell.jobs.title')}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {failed && <Alert data-testid="cell-jobs-error" type="error" title={t('shell.cell.jobs.loadFailed')} />}
+      {failed && <AxisAlert data-testid="cell-jobs-error" kind="error" message={t('shell.cell.jobs.loadFailed')} />}
       {jobs && <CellJobTable jobs={jobs} locale={locale} />}
     </PageLayout>
   )

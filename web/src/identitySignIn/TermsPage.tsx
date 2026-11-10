@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Form, Typography } from 'antd'
+import { Button, Checkbox, Form, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { FilledText } from '../platform/FilledText'
 import { useDesignTokens } from '../platform/themeMode'
@@ -28,8 +29,7 @@ export function TermsPage({ context }: { context: TermsContext }) {
     )
   return (
     <IdentityFrame title={texts.title} frame={context}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Form
         name={formId}
         method="post"

@@ -1,5 +1,6 @@
 import { UndoOutlined } from '@ant-design/icons'
-import { Alert, Flex, Spin, Typography } from 'antd'
+import { Flex, Spin, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useEffect, useState, type HTMLAttributes } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
@@ -153,17 +154,15 @@ export function StudioHistory({
         toolbar={{}}
         failure={
           revisions === 'failed' ? (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert data-testid="studio-history-error" type="error" title={t('shell.studio.history.loadFailed')} />
+            <AxisAlert data-testid="studio-history-error" kind="error" message={t('shell.studio.history.loadFailed')} />
           ) : undefined
         }
         below={
           outcome === null ? undefined : outcome.kind === 'blocked' ? (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert
+            <AxisAlert
               data-testid="studio-history-blocked"
-              type="warning"
-              title={t('shell.studio.history.blocked')}
+              kind="warning"
+              message={t('shell.studio.history.blocked')}
               description={
                 <Flex vertical>
                   {outcome.revisions.map((blocker) => (
@@ -177,8 +176,7 @@ export function StudioHistory({
               }
             />
           ) : (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert data-testid="studio-history-failed" type="error" title={outcome.message} />
+            <AxisAlert data-testid="studio-history-failed" kind="error" message={outcome.message} />
           )
         }
         rowAttributes={(row) =>

@@ -1,4 +1,5 @@
-import { Alert, Button, Form, Input, Typography } from 'antd'
+import { Button, Form, Input, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
@@ -16,8 +17,7 @@ export function ResetPasswordPage({ context }: { context: ResetPasswordContext }
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Form
         name={formId}
         method="post"

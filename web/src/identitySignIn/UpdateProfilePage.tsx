@@ -1,4 +1,5 @@
-import { Alert, Button, Form, Input } from 'antd'
+import { Button, Form, Input } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useId, useRef } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
@@ -26,10 +27,8 @@ export function UpdateProfilePage({ context }: { context: UpdateProfileContext }
   }, [])
   return (
     <IdentityFrame title={context.title} frame={context}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {notice && <Alert type="info" showIcon title={notice} />}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {notice && <AxisAlert kind="info" message={notice} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <Form
         form={form}
         name={formId}
