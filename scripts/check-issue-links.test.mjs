@@ -29,6 +29,11 @@ describe('brokenLinks', () => {
     assert.deepEqual(brokenLinks(issues, root), [])
   })
 
+  test('keeps the anchor of a link to a missing file', () => {
+    const issues = [{ number: 7, body: `[gone](${base}/docs/old.md#rules)` }]
+    assert.deepEqual(brokenLinks(issues, root), [{ issue: 7, link: 'docs/old.md#rules' }])
+  })
+
   test('reports a missing file and a missing anchor, with the issue', () => {
     const issues = [
       { number: 7, body: `[gone](${base}/docs/decisions/d1-gone.md)` },
@@ -134,9 +139,23 @@ describe('relinkIssues', () => {
       { issue: 9, link: 'docs/old.md', home: 'docs/guide.md' },
       { issue: 7, link: 'docs/other.md', home: 'docs/guide.md' },
     ]
-    assert.deepEqual(relinkIssues([{ issue: 7, link: 'docs/old.md' }], homes, options), { fixed: 0, skipped: 0 })
+    assert.deepEqual(relinkIssues([{ issue: 7, link: 'docs/old.md' }], homes, options), { fixed: 0, skipped: 1 })
     assert.deepEqual(edits, [])
-    assert.deepEqual(lines, [])
+    assert.deepEqual(lines, ['Not relinked: #7 docs/old.md: no home'])
+  })
+
+  test('prints a listed link that has no answer, and every link when there are no answers', () => {
+    const { edits, lines, options } = effects({ 7: `(${base}/docs/old.md) (${base}/docs/other.md)` })
+    const links = [
+      { issue: 7, link: 'docs/old.md' },
+      { issue: 7, link: 'docs/other.md' },
+    ]
+    relinkIssues(links, [{ issue: 7, link: 'docs/old.md', home: 'docs/guide.md' }], options)
+    assert.deepEqual(lines, ['Not relinked: #7 docs/other.md: no home', 'Relinked #7: docs/old.md -> docs/guide.md'])
+    assert.equal(edits.length, 1)
+    lines.length = 0
+    assert.deepEqual(relinkIssues(links, [], options), { fixed: 0, skipped: 2 })
+    assert.deepEqual(lines, ['Not relinked: #7 docs/old.md: no home', 'Not relinked: #7 docs/other.md: no home'])
   })
 
   test('leaves a link that is gone from the issue since the listing, and prints it', () => {
@@ -176,6 +195,20 @@ describe('whereWent', () => {
     const facts = whereWent('docs/gone.md', root)
     assert.match(facts.deletedIn, /^[0-9a-f]{40} Delete the gone page$/)
     assert.equal(facts.renamedTo, undefined)
+  })
+
+  test('relinks a link to a section of a renamed page, from the listing through to the edit', () => {
+    const body = `See [the rules](${base}/docs/old.md#rules).`
+    const links = brokenLinks([{ number: 7, body }], root).map((l) => ({ ...l, ...whereWent(l.link, root) }))
+    assert.deepEqual(links, [
+      { issue: 7, link: 'docs/old.md#rules', deletedIn: links[0].deletedIn, renamedTo: 'docs/new.md', headings: ['old', 'rules'] },
+    ])
+    const edits = []
+    const lines = []
+    const options = { root, view: () => body, edit: (n, text) => edits.push({ n, text }), log: (line) => lines.push(line) }
+    relinkIssues(links, [{ issue: 7, link: 'docs/old.md#rules', home: 'docs/new.md#rules' }], options)
+    assert.deepEqual(edits, [{ n: 7, text: `See [the rules](${base}/docs/new.md#rules).` }])
+    assert.deepEqual(lines, ['Relinked #7: docs/old.md#rules -> docs/new.md#rules'])
   })
 
   test('reports the headings a file has now when its heading is missing', () => {

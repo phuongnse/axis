@@ -49,11 +49,11 @@ export function brokenLinks(issues, root) {
     for (const match of (body ?? '').matchAll(linkPattern)) {
       const relative = decodeURIComponent(match[1])
       const file = path.join(root, relative)
+      const anchor = match[2]
       if (!existsSync(file)) {
-        broken.push({ issue: number, link: relative })
+        broken.push({ issue: number, link: anchor ? `${relative}#${anchor}` : relative })
         continue
       }
-      const anchor = match[2]
       if (!anchor || !relative.endsWith('.md') || /^L\d+/.test(anchor)) continue
       if (!cache.has(file)) cache.set(file, anchorsOf(readFileSync(file, 'utf8')))
       if (!cache.get(file).has(anchor)) broken.push({ issue: number, link: `${relative}#${anchor}` })
@@ -125,18 +125,23 @@ function homeProblem(home, root) {
 
 /**
  * Points each listed link at its checked home. An answer for a link the listing did not report is ignored. A
- * link with no home, a home that is not on main or a link gone from the issue is logged and left as it is.
+ * listed link with no answer or no home, a home that is not on main or a link gone from the issue is logged
+ * and left as it is, so every broken link is either fixed or printed.
  */
 export function relinkIssues(links, homes, { root, view, edit, log }) {
-  const listed = new Set(links.map((l) => `${l.issue} ${l.link}`))
-  const byIssue = new Map()
-  const seen = new Set()
+  const answers = new Map()
   for (const answer of homes) {
     const key = `${answer.issue} ${answer.link}`
-    if (!listed.has(key) || seen.has(key)) continue
+    if (!answers.has(key)) answers.set(key, answer.home)
+  }
+  const byIssue = new Map()
+  const seen = new Set()
+  for (const { issue, link } of links) {
+    const key = `${issue} ${link}`
+    if (seen.has(key)) continue
     seen.add(key)
-    if (!byIssue.has(answer.issue)) byIssue.set(answer.issue, [])
-    byIssue.get(answer.issue).push(answer)
+    if (!byIssue.has(issue)) byIssue.set(issue, [])
+    byIssue.get(issue).push({ link, home: answers.get(key) ?? null })
   }
   let fixed = 0
   let skipped = 0
@@ -168,7 +173,9 @@ export function relinkIssues(links, homes, { root, view, edit, log }) {
   return { fixed, skipped }
 }
 
-function readList(file) {
+/** Reads a JSON list from a file, taking a missing or empty file as an empty list. */
+export function readList(file) {
+  if (!file) return []
   if (!existsSync(file)) return []
   const text = readFileSync(file, 'utf8').trim()
   return text ? JSON.parse(text) : []

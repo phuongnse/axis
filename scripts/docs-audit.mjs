@@ -1,7 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readList } from './check-issue-links.mjs'
 
 // The docs audit of D145, in four commands that the docs-audit workflow runs:
 //
@@ -305,11 +306,7 @@ export async function chooseHomes(links, ask) {
   return parseHomes(await ask(links))
 }
 
-function linksIn(file) {
-  if (!file || !existsSync(file)) return []
-  const text = readFileSync(file, 'utf8').trim()
-  return text ? JSON.parse(text) : []
-}
+
 
 export function groupsOf(pages) {
   const groups = []
@@ -368,7 +365,7 @@ async function main([command, ...args]) {
     console.log(JSON.stringify(await read(Number(args[0])), null, 2))
   } else if (command === 'homes') {
     const ask = (list) => runAsync(process.env.CLAUDE ?? 'claude', homesArgs(list), { cwd: root })
-    console.log(JSON.stringify(await chooseHomes(linksIn(args[0]), ask), null, 2))
+    console.log(JSON.stringify(await chooseHomes(readList(args[0]), ask), null, 2))
   } else if (command === 'file') {
     console.log(`Opened ${file(args[0], args[1])} issues.`)
   } else {
