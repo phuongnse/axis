@@ -268,6 +268,9 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   để bắt đầu dùng thử cho **{business}** tại **{address}**. Bạn sẽ đăng nhập bằng **{email}**.". The
   person sees what starts before anything is created. `FilledText` fills the sentence, so each language
   keeps its word order. Confirm is the finish button.
+- **After Confirm.** A confirm that succeeds replaces the page, in place and in the browser history, with
+  [the progress page](#provisioning) at `/sign-up/progress#<id>.<secret>`, so Back does not return to the
+  used link.
 - **A failure keeps the page.** A check that fails shows "The link could not be checked. Try again.",
   in `vi` "Không kiểm tra được liên kết. Thử lại.", and offers Try again, in `vi` "Thử lại". A confirm
   that fails shows "The sign-up could not be confirmed. Try again.", in `vi` "Không xác nhận được đăng
@@ -410,25 +413,30 @@ sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart 
   - `ready` once the trial is ready.
   - `delayed` when a `provisionTenant` job of the sign-up has ended `failed` because its retries ran
     out, and the trial is not ready yet.
-- **Progress** _(planned for M33)_. After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
+- **Progress.** After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
   as [the verify page](#the-verify-page) says. The page asks the progress route. When the person closes the page, the email still tells
   them.
   - **The steps.** A vertical `StepsBar` shows one step on each line: Confirmed, Setting up and Ready,
     in `vi` Đã xác nhận, Đang chuẩn bị and Sẵn sàng.
-  - **While it is set up.** From the moment it opens, the page says "Setting up the trial. You can close
+  - **While it is set up.** From the moment it opens, the page is titled "Setting up the trial", in `vi`
+    "Đang chuẩn bị bản dùng thử", and says "Setting up the trial. You can close
     this page: an email tells you when you can sign in.", in `vi` "Đang chuẩn bị bản dùng thử. Có thể
     đóng trang này: bạn sẽ nhận email khi có thể đăng nhập.", because it opens only after a Confirm that
     succeeded. The sentence is a status region, so a screen reader hears each change. The page asks
     every 2 seconds until the trial is ready, through `useFollowJob`.
-  - **Ready.** The page is titled "The trial is ready" and says "The trial is ready at {address}. Open the
-    invitation email to set your password, then sign in.", with the address as a link. It has no Sign in
-    button, as the person has no password until the invitation.
+  - **Ready.** The page is titled "The trial is ready", in `vi` "Bản dùng thử đã sẵn sàng", and says "The
+    trial is ready at {address}. Open the invitation email to set your password, then sign in.", in `vi`
+    "Bản dùng thử đã sẵn sàng tại {address}. Mở email mời để đặt mật khẩu, rồi đăng nhập.", with the
+    address as a link. All three steps show a check mark, and none is current. It has no Sign in button, as
+    the person has no password until the invitation.
   - **Delayed.** A set-up that needs more time, after the cell job's retries, shows an info `AxisAlert`,
-    "The trial needs more time to set up. Our team is on it, and you do not need to do anything.", and
-    the page keeps asking.
-  - **Unknown.** An unknown id or a wrong secret is titled "The progress cannot be shown" and says only
-    that an email follows.
+    "The trial needs more time to set up. Our team is on it, and you do not need to do anything.", in `vi`
+    "Bản dùng thử cần thêm thời gian để chuẩn bị. Đội ngũ của chúng tôi đang xử lý, bạn không cần làm gì.",
+    and the page keeps asking. A read that fails, such as a network error, is asked again without an error.
+  - **Unknown.** An unknown id or a wrong secret is titled "The progress cannot be shown", in `vi` "Không
+    hiện được tiến độ", and says only "An email tells you when you can sign in.", in `vi` "Bạn sẽ nhận
+    email khi có thể đăng nhập." It shows no steps and tells nothing about the sign-up.
 - **What the person does next.** They follow the invitation, set their password and second factor,
   and open the application. The application's administrators are the people who hold
   `Users:AdministratorRole`, see [the administrator role](user-administration.md#the-administrator-role).

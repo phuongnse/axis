@@ -39,6 +39,9 @@ function stubServer(verification: () => Response, confirm: () => Response = () =
     if (input === '/api/sign-up/confirm') {
       return confirm()
     }
+    if (input === '/api/sign-up/x') {
+      return answer({ step: 'verified', address: 'https://acme.vn.example.com' })
+    }
     if (input === '/api/sign-up/documents') {
       return answer(documents)
     }
@@ -123,14 +126,17 @@ describe('the verify page', () => {
     expect(fetchMock.mock.calls.filter(([input]) => input === '/api/sign-up/verification')).toHaveLength(2)
   })
 
-  it('confirms with the fragment in the body and then shows already confirmed', async () => {
+  it('confirms with the fragment in the body and then goes to the progress page, in place of the verify link', async () => {
     const fetchMock = stubServer(() => answer(pending))
     const user = userEvent.setup()
     render(<SignUpEntry />)
 
     await user.click(await screen.findByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByRole('heading', { name: 'Already confirmed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Setting up the trial' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Setting up the trial. You can close this page')
+    expect(window.location.pathname).toBe('/sign-up/progress')
+    expect(window.location.hash).toBe('#x.y')
     expect(bodyOf(fetchMock, '/api/sign-up/confirm')).toEqual({ token: 'abc' })
   })
 
