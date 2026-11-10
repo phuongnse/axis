@@ -410,6 +410,7 @@ exit 0
     delete env.NEXKIT_VERIFIED_SHA;
     delete env.GITHUB_ACTIONS;
     delete env.GITHUB_STEP_SUMMARY;
+    delete env.NEXKIT_SHARD;
   });
 
   after(() => rmSync(dir, { recursive: true, force: true }));
@@ -505,6 +506,19 @@ exit 0
       const expecting = shards.filter(({ result }) => result.stdout.includes(suite));
       assert.equal(expecting.length, 1, suite);
     }
+  });
+
+  test("integration.sh reads NEXKIT_SHARD as its shard, the same as AXIS_INTEGRATION_SHARD", () => {
+    const shardCall = (variable) => {
+      run("scripts/integration.sh", "src/Axis.Engine/Foo.cs", {
+        [variable]: "2/3",
+      });
+      return integrationCall(dotnetCalls());
+    };
+
+    const call = shardCall("NEXKIT_SHARD");
+    assert.ok(call.includes("--filter-class Axis.Integration.Tests."), call);
+    assert.equal(call, shardCall("AXIS_INTEGRATION_SHARD"));
   });
 
   test("integration.sh refuses a malformed shard and a shard with arguments", () => {

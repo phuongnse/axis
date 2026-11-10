@@ -17,7 +17,8 @@
 # Without arguments the performance tests, whose classes end in PerformanceTests, never run here:
 # scripts/performance.sh runs them, in a workflow of its own on main.
 # AXIS_INTEGRATION_SHARD, such as 2/3, runs one shard of Axis.Integration.Tests, so CI and NexKit's
-# checks can split the suite over parallel jobs. scripts/lib/integration-shard.mjs gives each shard its
+# checks can split the suite over parallel jobs. NEXKIT_SHARD takes the same shard when AXIS_INTEGRATION_SHARD
+# is unset, and AXIS_INTEGRATION_SHARD wins when both are set. scripts/lib/integration-shard.mjs gives each shard its
 # test classes by their durations in tests/Axis.Integration.Tests/class-durations.json. A shard expects
 # the scenario suites only when it holds the class that writes them: ScenarioRunnerTests. Shard 1 also
 # runs the control plane suite. The shard cannot be combined with arguments.
@@ -29,24 +30,30 @@ source scripts/lib/test-results.sh
 filter=(--filter-not-class '*PerformanceTests')
 shard_classes=
 control_plane=true
-if [ -n "${AXIS_INTEGRATION_SHARD:-}" ]; then
-  if ! [[ "$AXIS_INTEGRATION_SHARD" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
-    echo "AXIS_INTEGRATION_SHARD must be a shard such as 1/3, not '$AXIS_INTEGRATION_SHARD'." >&2
+shard_variable=AXIS_INTEGRATION_SHARD
+shard="${AXIS_INTEGRATION_SHARD:-}"
+if [ -z "$shard" ] && [ -n "${NEXKIT_SHARD:-}" ]; then
+  shard_variable=NEXKIT_SHARD
+  shard="$NEXKIT_SHARD"
+fi
+if [ -n "$shard" ]; then
+  if ! [[ "$shard" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+    echo "$shard_variable must be a shard such as 1/3, not '$shard'." >&2
     exit 2
   fi
   shard_index="${BASH_REMATCH[1]}"
   if [ "$#" -gt 0 ]; then
-    echo "AXIS_INTEGRATION_SHARD cannot be combined with arguments: run the matching tests without a shard." >&2
+    echo "$shard_variable cannot be combined with arguments: run the matching tests without a shard." >&2
     exit 2
   fi
-  shard_classes="$(node scripts/lib/integration-shard.mjs --classes "$AXIS_INTEGRATION_SHARD")"
-  shard_filter="$(node scripts/lib/integration-shard.mjs "$AXIS_INTEGRATION_SHARD")"
+  shard_classes="$(node scripts/lib/integration-shard.mjs --classes "$shard")"
+  shard_filter="$(node scripts/lib/integration-shard.mjs "$shard")"
   mapfile -t filter <<<"$shard_filter"
   [ "$shard_index" = 1 ] || control_plane=false
 fi
 
 # Whether this run holds the test class NAME, which writes scenario suites.
-holds() { [ -z "${AXIS_INTEGRATION_SHARD:-}" ] || grep -qx "Axis.Integration.Tests.$1" <<<"$shard_classes"; }
+holds() { [ -z "$shard" ] || grep -qx "Axis.Integration.Tests.$1" <<<"$shard_classes"; }
 
 scenario_suites=()
 if holds ScenarioRunnerTests; then

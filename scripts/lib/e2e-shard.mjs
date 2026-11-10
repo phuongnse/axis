@@ -1,11 +1,15 @@
 // Splits the Playwright specs over the E2E shards by how long they run.
 //
 // Usage: node scripts/lib/e2e-shard.mjs K/N
+//        node scripts/lib/e2e-shard.mjs --count
 //        node scripts/lib/e2e-shard.mjs --durations JUNIT...
 //
 // The first prints the specs of shard K of N, one path per line relative to tests/e2e, such as
 // specs/form.spec.ts. Every shard computes the same split, so each spec runs in exactly one shard.
-// The second rewrites tests/e2e/spec-durations.json from Playwright JUnit files, such as the
+// The second prints the fewest shards whose longest estimated shard fits the budget in
+// scripts/lib/shards.mjs, at most its cap. A spec that alone takes longer than the budget gets an
+// `Over budget:` line on stderr, and the count still prints.
+// The third rewrites tests/e2e/spec-durations.json from Playwright JUnit files, such as the
 // artifacts/test-results/playwright-*.xml of a full run. A spec missing from them keeps its entry,
 // and an entry whose spec no longer exists is dropped.
 //
@@ -18,6 +22,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { budgetSeconds, maxShards, parseShard, shardCount } from './shards.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const e2e = path.join(root, 'tests/e2e')
@@ -56,6 +61,22 @@ export function split(specs, total, workers) {
     shards[best].push(spec)
   }
   return shards.map((shard) => shard.map((spec) => spec.path).sort())
+}
+
+/** The fewest shards that fit the budget, and an `Over budget:` line for each spec that alone does not. */
+export function count(specs, workers, budget = budgetSeconds, max = maxShards) {
+  const longest = (total) =>
+    Math.max(
+      ...split(specs, total, workers).map((paths) => estimate(specs.filter((s) => paths.includes(s.path)), workers)),
+    )
+  const overBudget = []
+  for (const spec of specs) {
+    const seconds = Math.round(estimate([spec], workers))
+    if (seconds > budget) {
+      overBudget.push(`Over budget: ${spec.path} takes about ${seconds} s, longer than the budget of ${budget} s.`)
+    }
+  }
+  return { total: shardCount(longest, budget, max), overBudget }
 }
 
 /** The median of the known durations, for a spec without one. */
@@ -106,7 +127,12 @@ export function mergeDurations(known, measured, specPaths) {
 }
 
 /** Runs the command line and returns the text for stdout. Throws on a malformed shard. */
-export function main(args, dir = e2e) {
+export function main(args, dir = e2e, warn = (line) => console.error(line)) {
+  if (args[0] === '--count') {
+    const { total, overBudget } = count(readSpecs(dir), workers)
+    for (const line of overBudget) warn(line)
+    return String(total)
+  }
   if (args[0] === '--durations') {
     const file = path.join(dir, 'spec-durations.json')
     const measured = junitDurations(args.slice(1).map((junit) => readFileSync(junit, 'utf8')))
@@ -115,10 +141,8 @@ export function main(args, dir = e2e) {
     writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`)
     return `${Object.keys(measured).length} specs measured, ${Object.keys(merged).length} kept in ${file}.`
   }
-  const match = /^([1-9][0-9]*)\/([1-9][0-9]*)$/.exec(args[0] ?? '')
-  if (!match || Number(match[1]) > Number(match[2])) throw new Error(`A shard such as 1/3, not '${args[0]}'.`)
-  const shards = split(readSpecs(dir), Number(match[2]), workers)
-  return shards[Number(match[1]) - 1].join('\n')
+  const { index, total } = parseShard(args[0])
+  return split(readSpecs(dir), total, workers)[index - 1].join('\n')
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
