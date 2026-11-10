@@ -1,4 +1,5 @@
-import { Alert, ConfigProvider, Flex, Form } from 'antd'
+import { ConfigProvider, Flex, Form } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -283,8 +284,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     return <NotFoundPage />
   }
   if (load === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="form-load-error" type="error" title={t('shell.form.loadFailed')} />
+    return <AxisAlert data-testid="form-load-error" kind="error" message={t('shell.form.loadFailed')} />
   }
 
   // The footer is an action row only where it draws a solid button. Without one, a main action stays outlined.
@@ -294,11 +294,10 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
     <ConfigProvider locale={antLocaleFor(locale)}>
       <Flex vertical gap="middle">
         {conflict && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="form-conflict"
-            type="warning"
-            title={t('shell.form.conflict')}
+            kind="warning"
+            message={t('shell.form.conflict')}
             action={
               <AxisButton role="secondary" onClick={reload}>
                 {t('shell.form.reload')}
@@ -306,8 +305,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
             }
           />
         )}
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {started && <Alert data-testid="form-started" type="success" title={t('shell.form.processStarted')} />}
+        {started && <AxisAlert data-testid="form-started" kind="success" message={t('shell.form.processStarted')} />}
         {form.formError}
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and saves on the last. */}

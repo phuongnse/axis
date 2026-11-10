@@ -69,7 +69,7 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
   `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`
   expression. It cannot see a colour picked from a lookup table.
-- **An older use carries its reason.** Each `Button`, `Alert` and `Tag` that predates the rules has an
+- **An older use carries its reason.** Each `Button` and `Tag` that predates the rules has an
   `oxlint-disable-next-line <rule> -- <reason>` comment on the line before it. With
   `--report-unused-disable-directives`, a comment that its line no longer needs fails the lint, so the
   older uses only go down.

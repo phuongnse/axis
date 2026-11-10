@@ -1,5 +1,4 @@
 import {
-  Alert,
   Button,
   Checkbox,
   ConfigProvider,
@@ -12,6 +11,7 @@ import {
   Typography,
   DatePicker,
 } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import dayjs from 'dayjs'
 import { useContext } from 'react'
 import { AxisField } from '../platform/AxisField'
@@ -390,11 +390,10 @@ function Fields({
             onChange={onChange}
           />
           {warnings?.get(index) && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert
-              type="warning"
+            <AxisAlert
+              kind="warning"
               data-testid={`studio-migration-warning-/fields/${index}`}
-              title={t(
+              message={t(
                 warnings.get(index) === 'enum'
                   ? 'shell.studio.entity.migration.enumWarning'
                   : 'shell.studio.entity.migration.uniqueWarning',

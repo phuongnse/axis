@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Modal, Tag } from 'antd'
+import { Button, Flex, Modal, Tag } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { diffPatch, escapePointerSegment, getAt, setAt } from '../platform/jsonPatch'
@@ -219,8 +220,9 @@ export function StudioModuleEditor({
   useUnsavedChanges(patch.length > 0)
 
   if (loadFailed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
+    return (
+      <AxisAlert data-testid="studio-resource-load-error" kind="error" message={t('shell.studio.loadResourceFailed')} />
+    )
   }
   if (
     !loaded ||
@@ -493,17 +495,15 @@ export function StudioModuleEditor({
         <EntityDesigner value={draft} onChange={change} layer={designerLayer(entityKeyedLists)} />
       )}
       {conflict && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert
+        <AxisAlert
           data-testid="studio-conflict"
-          type="warning"
-          title={t('shell.studio.conflict')}
+          kind="warning"
+          message={t('shell.studio.conflict')}
           // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
           action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
         />
       )}
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
+      {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}
       <AxisActionRow align="center">
         <AxisButton
           role="finish"

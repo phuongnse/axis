@@ -1,4 +1,5 @@
-import { Alert, Typography } from 'antd'
+import { Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { IdentityFrame } from './IdentityFrame'
 import type { ErrorContext } from './signInContext'
 
@@ -7,8 +8,7 @@ export function ErrorPage({ context }: { context: ErrorContext }) {
   const { title, error, backUrl, texts } = context
   return (
     <IdentityFrame title={title} frame={context}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      <Alert type="error" showIcon title={error} />
+      <AxisAlert kind="error" message={error} />
       {backUrl && <Typography.Link href={backUrl}>{texts.backToApplication}</Typography.Link>}
     </IdentityFrame>
   )

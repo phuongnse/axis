@@ -1,4 +1,5 @@
-import { Alert, Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from './AxisTable'
@@ -110,16 +111,13 @@ export function ProcessInstancePage({
     return null
   }
   if (instance === null) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="inspector-not-found" type="warning" title={t('shell.inspector.notFound')} />
+    return <AxisAlert data-testid="inspector-not-found" kind="warning" message={t('shell.inspector.notFound')} />
   }
   if (instance === forbidden) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="inspector-forbidden" type="warning" title={t('shell.inspector.forbidden')} />
+    return <AxisAlert data-testid="inspector-forbidden" kind="warning" message={t('shell.inspector.forbidden')} />
   }
   if (instance === 'failed' || releaseTexts.failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="inspector-error" type="error" title={t('shell.inspector.loadFailed')} />
+    return <AxisAlert data-testid="inspector-error" kind="error" message={t('shell.inspector.loadFailed')} />
   }
   // The previous release texts stay on screen while a new locale loads.
   if (!releaseCatalog) {
@@ -461,11 +459,10 @@ function InstanceCommands({ instance, instancesPath, onChanged }: InstanceComman
           onChanged={onChanged}
         >
           {open === 'retry' && retryWarns(instance) && (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert
+            <AxisAlert
               data-testid="inspector-retry-warning"
-              type="warning"
-              title={t('shell.inspector.commands.retryWarning')}
+              kind="warning"
+              message={t('shell.inspector.commands.retryWarning')}
             />
           )}
         </ReasonDialog>

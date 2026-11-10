@@ -1,5 +1,6 @@
 import { TranslationOutlined } from '@ant-design/icons'
-import { Alert, Flex, Input, Modal } from 'antd'
+import { Flex, Input, Modal } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useContext, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { getAt } from '../platform/jsonPatch'
@@ -164,11 +165,10 @@ function LabelEditor({
         </Flex>
       </Modal>
       {others > 0 && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert
+        <AxisAlert
           data-testid="studio-label-used-by"
-          type="warning"
-          title={
+          kind="warning"
+          message={
             <>
               {t('shell.studio.labelUsedBy')} <strong>{others}</strong>
             </>

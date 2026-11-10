@@ -1,4 +1,5 @@
-import { Alert, Card, Descriptions } from 'antd'
+import { Card, Descriptions } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { fetchCell, type Cell } from '../platform/cell'
 import { EmptyDash } from '../platform/EmptyValue'
@@ -37,8 +38,7 @@ export function CellPage() {
 
   return (
     <PageLayout title={t('shell.cell.overview.title')}>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {failed && <Alert data-testid="cell-error" type="error" title={t('shell.cell.loadFailed')} />}
+      {failed && <AxisAlert data-testid="cell-error" kind="error" message={t('shell.cell.loadFailed')} />}
       {cell && (
         <Card data-testid="cell-overview">
           <Descriptions

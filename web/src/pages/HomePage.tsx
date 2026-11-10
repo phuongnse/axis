@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Flex, Spin, Typography } from 'antd'
+import { Button, Card, Flex, Spin, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { createElement, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { isSignInCardAddress, startSignIn } from '../platform/api'
@@ -62,13 +63,10 @@ export function SignInCard({ state, onSignIn = startSignIn }: { state: SignInCar
             {t(refused ? 'shell.home.signIn.title' : 'shell.home.signedOut.title')}
           </Typography.Title>
           {refused ? (
-            // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-            <Alert
+            <AxisAlert
               data-testid={declined ? 'sign-in-declined' : 'sign-in-failed'}
-              role="alert"
-              type="warning"
-              showIcon
-              title={t(declined ? 'shell.home.signInDeclined' : 'shell.home.signInFailed')}
+              kind="warning"
+              message={t(declined ? 'shell.home.signInDeclined' : 'shell.home.signInFailed')}
             />
           ) : (
             <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
@@ -243,8 +241,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
 
   let body: ReactNode
   if (sites === 'failed') {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    body = <Alert data-testid="applications-error" type="error" title={t('shell.home.applications.loadFailed')} />
+    body = <AxisAlert data-testid="applications-error" kind="error" message={t('shell.home.applications.loadFailed')} />
   } else if (groups.length === 0) {
     body = <EmptyState text={t('shell.home.applications.empty')} />
   } else {

@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Typography } from 'antd'
+import { Button, Flex, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { IdentityFrame } from './IdentityFrame'
 import type { SelectAuthenticatorContext } from './signInContext'
 
@@ -12,8 +13,7 @@ export function SelectAuthenticatorPage({ context }: { context: SelectAuthentica
   return (
     <IdentityFrame title={texts.title} frame={context}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
-      {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-      {error && <Alert type="error" showIcon title={error} />}
+      {error && <AxisAlert kind="error" message={error} />}
       <form method="post" action={loginAction}>
         <Flex vertical gap="small">
           {methods.map((method) => (

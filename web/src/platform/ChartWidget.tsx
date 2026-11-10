@@ -1,4 +1,5 @@
-import { Alert, Card } from 'antd'
+import { Card } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useMemo, useState } from 'react'
 import { boundParameterQuery } from './boundParameters'
 import { Chart } from './Chart'
@@ -110,8 +111,7 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
   if (loading) {
     content = t('shell.chart.loading')
   } else if (failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    content = <Alert data-testid="chart-error" type="error" title={t('shell.chart.loadFailed')} />
+    content = <AxisAlert data-testid="chart-error" kind="error" message={t('shell.chart.loadFailed')} />
   } else if (rows.length === 0) {
     content = <div data-testid="chart-empty">{t('shell.chart.empty')}</div>
   } else {
@@ -119,8 +119,7 @@ export function ChartWidget({ widget, locale, pageValues }: ChartWidgetProps) {
       <>
         <Chart title={title} kind={kind} categories={categories} series={series} />
         {state.totalCount > maxGroups && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="chart-truncated" type="info" title={t('shell.chart.truncated')} />
+          <AxisAlert data-testid="chart-truncated" kind="info" message={t('shell.chart.truncated')} />
         )}
         <table style={visuallyHidden}>
           <caption>{title}</caption>
