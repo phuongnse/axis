@@ -20,6 +20,7 @@ import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantExportSection } from './TenantExportSection'
+import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
 
 const pageSize = 20
@@ -57,7 +58,8 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * person's page, which shows their roles. The Invite button opens the form that invites a person. An invited account has a Resend
  * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
- * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data and Usage sections.
+ * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data and Usage sections. An administrator also has the Model key section where the installation
+ * allows tenant keys.
  */
 export function UsersPage() {
   const t = useText()
@@ -250,6 +252,7 @@ export function UsersPage() {
           />
           <TenantExportSection />
           <TenantUsageSection />
+          <TenantModelKeySection />
         </>
       )}
       {inviting && (

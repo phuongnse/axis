@@ -108,6 +108,13 @@
       "en": "billing portal",
       "vi": "trang thanh toán",
       "status": "proposed"
+    },
+    {
+      "concept": "Model key",
+      "en": "model key",
+      "vi": "khóa mô hình AI",
+      "status": "proposed",
+      "note": "A tenant's own key for the AI model provider, set on the users page."
     }
   ]
 }
