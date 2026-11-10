@@ -1,5 +1,6 @@
 import { Alert, Button, Checkbox, Form, Typography } from 'antd'
 import { useId, useRef } from 'react'
+import { FilledText } from '../platform/FilledText'
 import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
 import type { TermsContext } from './signInContext'
@@ -25,17 +26,6 @@ export function TermsPage({ context }: { context: TermsContext }) {
     ) : (
       label
     )
-  const label = (privacyUrl ? texts.accept : texts.acceptTermsOnly)
-    .split(/(\{terms\}|\{privacy\})/)
-    .map((part, index) => {
-      if (part === '{terms}') {
-        return <span key={index}>{link(texts.termsOfService, termsUrl)}</span>
-      }
-      if (part === '{privacy}') {
-        return <span key={index}>{link(texts.privacyPolicy, privacyUrl)}</span>
-      }
-      return part
-    })
   return (
     <IdentityFrame title={texts.title} frame={context}>
       {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
@@ -58,7 +48,15 @@ export function TermsPage({ context }: { context: TermsContext }) {
             },
           ]}
         >
-          <Checkbox>{label}</Checkbox>
+          <Checkbox>
+            <FilledText
+              text={privacyUrl ? texts.accept : texts.acceptTermsOnly}
+              parts={{
+                terms: link(texts.termsOfService, termsUrl),
+                privacy: link(texts.privacyPolicy, privacyUrl),
+              }}
+            />
+          </Checkbox>
         </Form.Item>
         <input ref={submitRef} type="hidden" name="accept" value="true" />
         {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
