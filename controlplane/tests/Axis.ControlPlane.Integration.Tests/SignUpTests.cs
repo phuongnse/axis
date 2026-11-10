@@ -394,6 +394,71 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_confirm_records_one_acceptance_of_the_terms_and_one_of_the_dpa_with_the_versions_time_address_and_user_agent()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, subdomain, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+
+        var before = DateTime.UtcNow;
+        Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(client, token, "203.0.113.7", "AxisTest/1.0")).StatusCode);
+        var after = DateTime.UtcNow;
+
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal("dpa,terms", await Scalar<string>($"SELECT string_agg(document, ',' ORDER BY document) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal(TermsVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'terms'"));
+        Assert.Equal(DpaVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'dpa'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND privacy_version = '{PrivacyVersion}'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND account = '{id}'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND host(client_address) = '203.0.113.7'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND user_agent = 'AxisTest/1.0'"));
+        foreach (var document in new[] { "terms", "dpa" })
+        {
+            var acceptedAt = await Scalar<DateTime>($"SELECT accepted_at FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = '{document}'");
+            Assert.InRange(acceptedAt, before.AddSeconds(-1), after.AddSeconds(1));
+        }
+
+        Assert.Equal(HttpStatusCode.Conflict, (await ConfirmAsync(client, token, "203.0.113.8", "AxisTest/2.0")).StatusCode);
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+    }
+
+    [Fact]
+    public async Task A_confirm_that_finds_nothing_to_confirm_records_no_acceptance()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var unknown = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+
+        Assert.Equal(HttpStatusCode.Conflict, (await ConfirmAsync(client, unknown, "203.0.113.7", "AxisTest/1.0")).StatusCode);
+
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.terms_acceptances"));
+    }
+
+    [Fact]
+    public async Task A_confirm_after_newer_versions_are_configured_records_the_versions_that_the_form_sent()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        string subdomain;
+        string token;
+        using (var first = await FactoryAsync())
+        {
+            using var client = first.CreateClient();
+            (_, subdomain, token) = await SignUpAsync(client);
+        }
+
+        using var second = await FactoryAsync(termsVersion: "2026-04", dpaVersion: "2026-05", privacyVersion: "2026-06");
+        using var newClient = second.CreateClient();
+
+        Assert.Equal(HttpStatusCode.OK, (await newClient.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
+
+        Assert.Equal(TermsVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'terms'"));
+        Assert.Equal(DpaVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'dpa'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND privacy_version = '{PrivacyVersion}'"));
+    }
+
+    [Fact]
     public async Task Two_parallel_confirms_verify_the_sign_up_once()
     {
         var cancellation = TestContext.Current.CancellationToken;
@@ -899,7 +964,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
-    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true)
+    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion)
     {
         var host = await mailpit.SmtpHostAsync();
         var port = await mailpit.SmtpPortAsync();
@@ -924,7 +989,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:SignUp:PublicMailboxDomains:0", "gmail.com");
             if (documents)
             {
-                foreach (var (name, version) in new[] { ("Terms", TermsVersion), ("Dpa", DpaVersion), ("Privacy", PrivacyVersion) })
+                foreach (var (name, version) in new[] { ("Terms", termsVersion), ("Dpa", dpaVersion), ("Privacy", privacyVersion) })
                 {
                     builder.UseSetting($"ControlPlane:SignUp:{name}:Version", version);
                     builder.UseSetting($"ControlPlane:SignUp:{name}:Urls:en", $"https://example.com/{name.ToLowerInvariant()}/en");
@@ -953,6 +1018,15 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/sign-up") { Content = JsonContent.Create(form) };
         request.Headers.Add("X-Forwarded-For", clientAddress);
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // One confirm from the client address that X-Forwarded-For names and with the user agent the test gives.
+    private static async Task<HttpResponseMessage> ConfirmAsync(HttpClient client, string token, string clientAddress, string userAgent)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/sign-up/confirm") { Content = JsonContent.Create(new { token }) };
+        request.Headers.Add("X-Forwarded-For", clientAddress);
+        request.Headers.Add("User-Agent", userAgent);
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
