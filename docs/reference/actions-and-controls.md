@@ -102,19 +102,19 @@ These rules hold for every Ant Design form in the SPA and in the identity provid
   status is `idle`, which shows nothing, so the input stays in place as the status changes and keeps its
   focus. A field outside a form takes no status, because the form item is what draws the message, the
   border and the spinner.
-- **Every Studio and console field is drawn through them** _(planned for M31)_, with `AxisCheckboxField` as
+- **Every Studio and console field is drawn through them** _(planned for M33)_, with `AxisCheckboxField` as
   a yes-or-no field with its help under its label and `AxisChoiceField` as a choice among a few ways, each
   with its help.
-- **Every field has help** _(planned for M31)_, as [platform field help](frontend.md#platform-field-help) says.
-- **Nothing between help and input** _(planned for M31)_. Guidance goes into the help, never on a line of
+- **Every field has help** _(planned for M33)_, as [platform field help](frontend.md#platform-field-help) says.
+- **Nothing between help and input** _(planned for M33)_. Guidance goes into the help, never on a line of
   its own.
-- **One field to a row** _(planned for M31)_. Two fields share a row only when they truly belong together,
+- **One field to a row** _(planned for M33)_. Two fields share a row only when they truly belong together,
   such as a range's minimum and maximum, through `AxisFieldRow`, and they stack at narrow width.
-- **Every required field is marked** _(planned for M31)_. A platform field follows the form widget's
+- **Every required field is marked** _(planned for M33)_. A platform field follows the form widget's
   [required mark](form-widget.md#field-look), in every form and dialog, even where every field is
   required, such as New resource. Only the sign-in page marks none, as everyone knows both its fields are
   needed. A field never says "(optional)".
-- **A field is checked on click** _(planned for M31)_. A finish button is never disabled because the
+- **A field is checked on click** _(planned for M33)_. A finish button is never disabled because the
   input is not valid: that says nothing of what is missing, has low contrast and cannot be focused. A
   click checks the fields, shows under each one that is wrong what to do, such as "Enter a name.", and
   focuses the first. A message goes once the field is put right. A button is disabled only while its
@@ -158,7 +158,7 @@ be kept right.
   list has no search. An action on the page as a whole, such as New entity… on a kind's list, sits on the
   [page heading](studio-workspace.md#page-heading), not the toolbar. A `table` widget keeps the toolbar
   actions its author configures.
-- **Every control in one table** _(planned for M31)_. `AxisTable` has every control below, and each view
+- **Every control in one table.** `AxisTable` has every control below, and each view
   turns on what it needs. Search, filter, sort, page and columns live in the address.
 - **Sort.** A column sorts from its header when its values have an order a person uses: names, people,
   statuses, dates and numbers. Long text, files, lists and actions do not. A header only sorts, as there is
@@ -176,7 +176,7 @@ be kept right.
   out. A chip stands for each condition and group, with Clear all. A table that holds all its rows filters
   them itself. A table paged on the server sends its filter to the server as the record API's `filter`. The
   filter lives in the address as `filter`, in the shape of [the record API's filter](record-api.md#paging-and-sorting).
-- **Filter on every table** _(planned for M31)_. Every column of every table can be filtered on, a data source
+- **Filter on every table** _(planned for M33)_. Every column of every table can be filtered on, a data source
   table's included.
 - **Columns control.** A table whose view turns it on has Columns, an icon button after Search and Filter. It
   opens a dialog that shows, hides and orders the columns, with Reset, Cancel and Apply. Reset sets the dialog
@@ -184,8 +184,8 @@ be kept right.
   first, stays first and always shows. A hidden column is still searched and filtered on. The choice lives in
   the address as `columns`, the keys of the shown columns in order, and is left out when every column shows in
   its first order. A change of columns keeps the page.
-- **Each person's columns** _(planned for M31)_. The platform keeps each person's choice of columns.
-- **Saved views** _(planned for M31)_. A person saves a table's search, filter and sort as a view.
+- **Each person's columns** _(planned for M33)_. The platform keeps each person's choice of columns.
+- **Saved views** _(planned for M33)_. A person saves a table's search, filter and sort as a view.
 - **Columns.** A column whose values have a fixed form, such as a number, a date, a date and time, a
   status tag or the row's icon actions, is as wide as its content and never wraps. The columns of free
   text share the width left in equal parts, and their text wraps. A table with no free text gives the
@@ -245,7 +245,7 @@ These rules hold for every dialog, through the shared `ConfigProvider`.
 - **Its body scrolls at its edge.** The body reaches the frame's edges and keeps the padding inside
   it, so the thin scrollbar runs at the dialog's right edge and a field's focus ring has room at its
   sides.
-- **A dialog holds only what it edits** _(planned for M31)_. A table may show what its row's dialog does not
+- **A dialog holds only what it edits** _(planned for M33)_. A table may show what its row's dialog does not
   edit, as long as the cell leads to where it is edited, so each thing is seen in one place and edited
   in one place.
 - **It draws on `surface`,** as panels do, so everything inside sits on the colour it was made for,
@@ -258,13 +258,13 @@ one.
 
 - **A field the object always has always shows.** Empty, it reads "Not set" on a form or a detail and
   the muted dash in a table cell, see [text](#text).
-- **A list that is a standing part of the object always shows.** _(planned for M31)_ Empty, it says in
+- **A list that is a standing part of the object always shows.** _(planned for M33)_ Empty, it says in
   one line what that means.
-- **Hide only what does not apply or is not allowed.** _(planned for M31)_ A part that does not apply to
+- **Hide only what does not apply or is not allowed.** _(planned for M33)_ A part that does not apply to
   the object's kind or state, or a field the person may not read, is left out.
-- **Loading and failing are never empty.** _(planned for M31)_ A part that is still loading or failed to
+- **Loading and failing are never empty.** _(planned for M33)_ A part that is still loading or failed to
   load says so, never Not set.
-- **One empty state.** _(planned for M31)_ `EmptyState` draws every empty table and list: Ant Design's
+- **One empty state.** _(planned for M33)_ `EmptyState` draws every empty table and list: Ant Design's
   simple picture and one line in `textMuted`, because Ant Design's own empty text fails 4.5:1. The line
   is "No data yet." unless the emptiness says something the reader needs.
 

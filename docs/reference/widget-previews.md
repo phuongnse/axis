@@ -72,7 +72,7 @@ change that adds a state to a widget adds that state to the widget's preview in 
 | Studio          | `studio`, see [shell](shell.md#design-system-previews). It draws Studio in the shell, in seven states that share the `/api/studio/apps` path, so it shows one state at a time: Typical, Empty, Loading, Failed, Many rows, Long names and Access denied                                                                                                                                                                                                                                                                                                                                         |
 | Sign-up | `signUp`: the [sign-up page](sign-up.md#the-page) over fixtures, in one state |
 
-- **More Studio previews** _(planned for M31)_. The Studio group also gets `studioPageDesign`,
+- **More Studio previews** _(planned for M33)_. The Studio group also gets `studioPageDesign`,
   `studioFormDesign` and `studioProcessDesign`.
 
 ## The spec

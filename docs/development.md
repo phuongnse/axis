@@ -610,7 +610,7 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
   `samples/keycloak/axis-realm.json` names `mailpit:1025`. Keycloak reaches Mailpit by the name
   `mailpit` on the Docker network: Compose has it already, and `scripts/e2e.sh` starts Mailpit and
   Keycloak on a network of their own.
-- **The whole identity provider in the Axis theme** _(planned for M31)_. Every other page of the
+- **The whole identity provider in the Axis theme** _(planned for M33)_. Every other page of the
   identity provider is the Axis theme, the realm's `emailTheme` is `axis`, and the realm sets the
   example legal links and the terms step of [legal](reference/legal.md), so every link and the terms
   page show.
@@ -656,7 +656,7 @@ organization's own identity provider, which the `axis` realm brokers to.
   with the password `axis`.
 - In E2E, Keycloak listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its
   container, so the `axis` realm reaches the `company` realm at the address the browser uses.
-- **Its own look** _(planned for M31)_. Its login theme `example-company`, in
+- **Its own look** _(planned for M33)_. Its login theme `example-company`, in
   `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a person sees that
   they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never
   ships.
@@ -749,7 +749,7 @@ Docker, .NET and Node, and works on a fresh clone.
    since the last install. It installs no Playwright browser.
 2. It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service
    mounts, and copies the email theme with it. It fails when one of the theme's files is missing.
-3. **Sample themes and licences** _(planned for M31)_. It copies the sample themes of
+3. **Sample themes and licences** _(planned for M33)_. It copies the sample themes of
    `samples/keycloak/themes` beside the Axis theme, and writes the list of
    [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
