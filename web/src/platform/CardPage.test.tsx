@@ -30,9 +30,7 @@ function renderPage({
         organization={organization}
         title="Sign in"
         titleRef={titleRef}
-        locales={['en', 'vi']}
-        locale="en"
-        onLocaleChange={onLocaleChange}
+        preferences={{ locales: ['en', 'vi'], locale: 'en', onLocaleChange }}
         legal={identityLegal}
       >
         <p>Body</p>
@@ -85,6 +83,23 @@ describe('CardPage', () => {
 
     expect(container.querySelector('.ant-card')).toHaveStyle({ maxWidth: width })
     expect(screen.getByTestId('card-page-legal')).toHaveStyle({ maxWidth: width })
+  })
+
+  it("draws no 'Language and theme' button and no legal line when the frame has its own", () => {
+    render(
+      <TextContext.Provider value={(key) => texts.get(key) ?? key}>
+        <CardPage title="Sign in">
+          <p>Body</p>
+        </CardPage>
+      </TextContext.Provider>,
+      { wrapper: ThemeModeProvider },
+    )
+
+    expect(screen.queryByRole('button', { name: 'Language and theme' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-page-legal')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Legal' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByText('Body')).toBeInTheDocument()
   })
 
   it('draws the legal line after the card, with the copyright and the links', () => {
