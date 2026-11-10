@@ -592,27 +592,27 @@ export function StudioAuthoringRequestPage({
               />,
             )}
         </SectionParts>
+        {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
+        {ready && mine && !acceptPending && (
+          <ActionBar testId="studio-ai-request-bar">
+            <span>{stateWords(request, mine)}</span>
+            <AxisActionRow align="center">
+              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+                {t('shell.studio.aiRequest.drop')}
+              </AxisButton>
+              {conflicts.length > 0 ? (
+                <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
+                  {t('shell.studio.aiRequest.retry')}
+                </AxisButton>
+              ) : (
+                <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
+                  {t('shell.studio.aiRequest.accept')}
+                </AxisButton>
+              )}
+            </AxisActionRow>
+          </ActionBar>
+        )}
       </ResourceFormSection>
-      {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
-      {ready && mine && !acceptPending && (
-        <ActionBar testId="studio-ai-request-bar">
-          <span>{stateWords(request, mine)}</span>
-          <AxisActionRow align="center">
-            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-              {t('shell.studio.aiRequest.drop')}
-            </AxisButton>
-            {conflicts.length > 0 ? (
-              <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
-                {t('shell.studio.aiRequest.retry')}
-              </AxisButton>
-            ) : (
-              <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
-                {t('shell.studio.aiRequest.accept')}
-              </AxisButton>
-            )}
-          </AxisActionRow>
-        </ActionBar>
-      )}
       <Modal
         forceRender
         open={changeOpen}

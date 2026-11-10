@@ -47,7 +47,16 @@ export function ResourceFormSection({
     border: `1px solid ${colour.borderSubtle}`,
     borderRadius: radius.base,
     padding: spacing.md,
-    ...(fill ? { flex: '1 0 auto' } : {}),
+    // The page's one panel runs to the window's foot like the sidebar: square corners, no rule at its foot, and over
+    // the content's padding there.
+    ...(fill
+      ? {
+          flex: '1 0 auto',
+          borderRadius: 0,
+          borderBottom: 'none',
+          marginBottom: 'calc(-1 * var(--shell-content-padding, 0px))',
+        }
+      : {}),
   }
   const body = typeof children === 'function' ? children(slot) : children
   if (heading === undefined) {

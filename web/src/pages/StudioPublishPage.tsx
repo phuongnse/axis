@@ -167,23 +167,28 @@ export function StudioPublishPage({
               </div>
             </SectionPart>
           </SectionParts>
+          {/* What finishes the page's task, publishing, sits in the bar at the foot of the window. */}
+          <ActionBar testId="studio-publish-bar">
+            <span>
+              {Array.isArray(changes) && changes.length > 0
+                ? t('shell.studio.publish.goesLive').replace('{number}', String((liveNumber ?? 0) + 1))
+                : ''}
+            </span>
+            <AxisActionRow align="center">
+              <AxisButton role="secondary" onClick={() => navigate(-1)}>
+                {t('shell.studio.cancel')}
+              </AxisButton>
+              <AxisButton
+                role="finish"
+                htmlType="submit"
+                disabled={busy || nothing}
+                data-testid="studio-publish-confirm"
+              >
+                {t('shell.studio.publish.confirm')}
+              </AxisButton>
+            </AxisActionRow>
+          </ActionBar>
         </ResourceFormSection>
-        {/* What finishes the page's task, publishing, sits in the bar at the foot of the window. */}
-        <ActionBar testId="studio-publish-bar">
-          <span>
-            {Array.isArray(changes) && changes.length > 0
-              ? t('shell.studio.publish.goesLive').replace('{number}', String((liveNumber ?? 0) + 1))
-              : ''}
-          </span>
-          <AxisActionRow align="center">
-            <AxisButton role="secondary" onClick={() => navigate(-1)}>
-              {t('shell.studio.cancel')}
-            </AxisButton>
-            <AxisButton role="finish" htmlType="submit" disabled={busy || nothing} data-testid="studio-publish-confirm">
-              {t('shell.studio.publish.confirm')}
-            </AxisButton>
-          </AxisActionRow>
-        </ActionBar>
       </Form>
     </Flex>
   )
