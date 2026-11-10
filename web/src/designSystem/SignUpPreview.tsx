@@ -8,10 +8,10 @@ import { signUpText, type SignUpLocale } from '../../sign-up/texts'
 export function SignUpPreview() {
   const [locale, setLocale] = useState<SignUpLocale>('en')
   const text = useMemo(() => signUpText(locale), [locale])
-  const documents = useSignUpDocuments()
+  const { documents, reload } = useSignUpDocuments()
   return (
     <TextContext.Provider value={text}>
-      <SignUpPage locale={locale} onLocaleChange={setLocale} documents={documents} />
+      <SignUpPage locale={locale} onLocaleChange={setLocale} documents={documents} onDocumentsRefused={reload} />
     </TextContext.Provider>
   )
 }

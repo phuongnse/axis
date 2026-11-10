@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../src/platform/api'
 import type { SignUpLocale } from './texts'
 
@@ -16,9 +16,13 @@ export interface SignUpDocuments {
   licencesUrl: string
 }
 
-/** The region's documents once they load, undefined while they load or when they fail. */
-export function useSignUpDocuments(): SignUpDocuments | undefined {
+/**
+ * The region's documents once they load, undefined while they first load or when they fail. `reload` fetches them again and
+ * keeps the last ones shown until the new ones arrive.
+ */
+export function useSignUpDocuments(): { documents: SignUpDocuments | undefined; reload: () => void } {
   const [documents, setDocuments] = useState<SignUpDocuments>()
+  const [loads, setLoads] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
     apiFetch('/api/sign-up/documents', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
@@ -31,6 +35,7 @@ export function useSignUpDocuments(): SignUpDocuments | undefined {
         // The pages name the documents as plain text, and the legal line shows no links.
       })
     return () => controller.abort()
-  }, [])
-  return documents
+  }, [loads])
+  const reload = useCallback(() => setLoads((count) => count + 1), [])
+  return { documents, reload }
 }

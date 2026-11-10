@@ -23,6 +23,15 @@ public sealed class SignUpRow
     /// <summary>The id of the built-in application to start from, or an empty text for a blank one.</summary>
     public string Application { get; set; } = "";
 
+    /// <summary>The version of the terms of service the person saw, see <c>docs/reference/sign-up.md#the-documents</c>.</summary>
+    public string TermsVersion { get; set; } = "";
+
+    /// <summary>The version of the data processing agreement the person saw.</summary>
+    public string DpaVersion { get; set; } = "";
+
+    /// <summary>The version of the privacy policy the person saw.</summary>
+    public string PrivacyVersion { get; set; } = "";
+
     public string State { get; set; } = "pending";
 
     /// <summary>The 32 bytes of the SHA-256 of the token, or null before the confirm email is made.</summary>

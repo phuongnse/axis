@@ -242,7 +242,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
-| `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional. Without the documents `GET /api/sign-up/documents` and `POST /api/sign-up` answer `503`. A [sign-up](sign-up.md#the-documents) must send the current version of each document | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Dpa:Version` | The version of the data processing agreement that a person accepts. Optional | Not empty, when a document is set |
