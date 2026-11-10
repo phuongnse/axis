@@ -162,7 +162,8 @@ that holds it.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
   start. On any other branch a newer push stops the older run.
 - **CI's jobs come from [NexKit's checks](#nexkits-checks):** each check, or `group` of checks, in
-  `.nexkit/config.json` is one parallel job that runs the check's commands with its timeout and
+  `.nexkit/config.json` is one parallel job, and a sharded check is one job per shard, named
+  `<name>-k`, as many as its count prints. Each job runs its commands with the check's timeout and
   uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
   slowest job, and adding, removing or resharding a check changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
@@ -173,12 +174,13 @@ that holds it.
 ### NexKit's checks
 
 - **The checks run in parallel jobs,** with `parallel_checks` on: the build and lint share one job,
-  the group `build-lint`, and the unit tests, the smoke tests and each integration and E2E shard get
-  one each. A check round then takes about as long as its slowest job, instead of all of them in a
-  row. A check gets a job of its own when sharing one made that job the slowest, and the integration
-  and E2E suites are split into shards because one job for either came close to the check's
-  `timeout_minutes`. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
-  NexKit matches a failed check with the CI job that failed on `main`.
+  the group `build-lint`, the smoke tests get one, and the unit, integration and E2E tests get one per
+  shard, as many as their split counts up to its cap, as [the shards section](development.md#shards)
+  says. A check round then takes about as long as its slowest job, instead of all of them in a row. A
+  check gets a job of its own when sharing one made that job the slowest, and a suite splits into
+  shards so that no job comes close to the check's `timeout_minutes`. [CI on main](#ci-on-main) runs
+  the same count commands and checks as jobs of the same names, so NexKit matches a failed check with
+  the CI job that failed on `main`.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
 - **NexKit reads CI's evidence.** Its [`evidence`][nexkit-evidence] setting names the test result

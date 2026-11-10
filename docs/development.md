@@ -148,7 +148,7 @@ runs them.
 - **`AXIS_INTEGRATION_SHARD`**, such as `1/3`, runs only that shard, see
   [test runs and reports](#test-runs-and-reports).
 - **A skip.** The script skips every suite when NexKit gives a commit to compare with and every
-  file changed since it is in the `unaffected_by` list of the integration checks in
+  file changed since it is in the `unaffected_by` list of the integration check in
   `.nexkit/config.json`, see [skipped suites](#skipped-suites).
 
 ### End-to-end tests
@@ -392,18 +392,19 @@ change since NexKit's commit can affect.
 
 ### Shards
 
-NexKit's checks split the E2E and integration tests into shards, one check each, such as `e2e-1` and
-`integration-1`, as [D97](decisions/d97-reliable-test-runs.md) says, and
-[CI on main](delivery.md#ci-on-main) runs those checks as its jobs. `.nexkit/config.json` holds the
-checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
-The smoke tests run in a job of their own, so the shards hold only their own tests.
+NexKit's `e2e`, `integration` and `test` checks run in as many shards as their split's `--count` prints, as
+[D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and [CI on
+main](delivery.md#ci-on-main) runs the same. A check's `max` matches its split's cap, since NexKit fails a count
+above it. Two NexKit rounds at their caps fit within the jobs GitHub runs at once, as `nexkit-shards.test.mjs`
+checks, and beside CI on `main` and its two scans a few jobs may wait. Smoke stays one check, since a sharded
+check's `max` is at least 2 and a second smoke job would take two rounds past the limit.
 
 - **Unit tests.** Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`. `NEXKIT_SHARD` works
   the same way beside it, and `AXIS_TEST_SHARD` wins when both are set. Shard 1 runs the .NET unit tests,
   the control plane's unit tests and the scripts' own tests, and no Vitest file. Shards 2 to N split the
   Vitest files between them. A file weighs its seconds in `web/vitest-durations.json`, and a new file
   weighs the median. A shard's results go to `artifacts/test-results/web-<n>.xml`. With `1/1` or no shard,
-  the whole suite runs, and NexKit's `test` check runs with no shard.
+  the whole suite runs.
 - **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. `NEXKIT_SHARD` works the
   same way beside it, and `AXIS_E2E_SHARD` wins when both are set. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
@@ -431,13 +432,12 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
   `scripts/smoke-durations.json`, and a test without an entry weighs the median. A shard builds the production
   images only when it holds `images` or `onprem`. The image builds are not in those seconds, so such a shard
-  takes longer than its estimate. NexKit's `smoke` check runs with no shard.
+  takes longer than its estimate.
 - **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
   `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
   shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is
-  never below 2. Each count stops at the cap of its split, which lives in `scripts/lib/shards.mjs`: 3 for E2E
-  and integration, and 6 for smoke and unit tests. A sharded check's `max` must match its cap. The budget
-  also lives there. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
+  never below 2. Each count stops at its split's cap, and the caps and the budget live in
+  `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
   file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
   prints, because no number of shards makes such a spec, class or file fit.
 - **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its

@@ -25,20 +25,46 @@ concurrency:
 
 jobs:
   # Reads the checks of .nexkit/config.json and lists one matrix entry per check, or per group of
-  # checks, with its commands, timeout and result folders. The matrix is built here, in a protected
-  # path, so no script an agent may change decides what CI runs.
+  # checks, with its commands, timeout and result folders. A sharded check becomes its shards, as
+  # NexKit's shards job makes them: its count command runs, and the last line it prints, a whole
+  # number N from 1 to its max, gives the checks <name>-1 to <name>-N, each with NEXKIT_SHARD=k/N. A
+  # count that fails or prints anything else fails this job, since nothing guesses a number. The
+  # matrix is built here, in a protected path, so a script an agent may change decides only how many
+  # shards run, never more than the max (docs/development.md#shards).
   matrix:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       matrix: ${{ steps.read.outputs.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
       - id: read
         run: |
-          matrix=$(jq -c '
-            reduce .checks[] as $c ([]; ($c.group // $c.name) as $n
+          counts='{}'
+          while IFS=$'\t' read -r name max command; do
+            echo "::group::count the shards of $name: $command"
+            output=$(timeout 5m bash -c "$command" </dev/null) || { echo "::error::$name: \`$command\` failed"; exit 1; }
+            echo "$output"
+            echo "::endgroup::"
+            number=$({ grep -v '^[[:space:]]*$' <<<"$output" || true; } | tail -n 1 | tr -d '[:space:]')
+            if ! [[ "$number" =~ ^[0-9]+$ ]] || [ "$number" -lt 1 ] || [ "$number" -gt "$max" ]; then
+              echo "::error::$name: \`$command\` printed '$number' last, not a whole number from 1 to $max"
+              exit 1
+            fi
+            counts=$(jq -c --arg name "$name" --argjson number "$number" '. + {($name): $number}' <<<"$counts")
+          done < <(jq -r '.checks[] | select(.shards) | [.name, .shards.max, .shards.count] | @tsv' .nexkit/config.json)
+          matrix=$(jq -c --argjson counts "$counts" '
+            [.checks[] | if .shards then
+                (. as $c | $counts[$c.name] as $n | range(1; $n + 1) as $k
+                  | ($c | del(.shards)) + {name: "\($c.name)-\($k)", run: "NEXKIT_SHARD=\($k)/\($n) \($c.run)"})
+              else . end]
+            | reduce .[] as $c ([]; ($c.group // $c.name) as $n
               | if any(.[]; .name == $n) then map(if .name == $n then .checks += [$c] else . end)
                 else . + [{name: $n, checks: [$c]}] end)
             | {include: map({
@@ -48,8 +74,8 @@ jobs:
                 results: ([.checks[] | .results // [] | .[]] | unique | join("\n"))})}' .nexkit/config.json)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  # CI runs one job per check or group of .nexkit/config.json, which the matrix job reads, so a failed
-  # NexKit check and the CI job of the same name run the same command.
+  # CI runs one job per check, per group, or per shard of a sharded check of .nexkit/config.json, which
+  # the matrix job reads, so a failed NexKit check and the CI job of the same name run the same command.
   checks:
     if: github.event_name != 'schedule'
     needs: matrix
@@ -115,8 +141,8 @@ jobs:
           retention-days: 14
 
   # After every check job of a run on main passed, refreshes the shard durations from the run's JUnit
-  # files and opens or updates one process issue when they drift or a split passes the budget. It
-  # runs no model and commits nothing (docs/development.md#shards).
+  # files. It opens or updates one process issue when they drift, and opens one for each test that
+  # alone passes the budget. It runs no model and commits nothing (docs/development.md#shards).
   durations:
     name: Shard durations
     needs: checks
