@@ -25,7 +25,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
 | `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes | Network         |
 | `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them | Network         |
-| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes the durations from a run and opens or updates their issue | Network         |
+| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue  | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
 | `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |
@@ -440,14 +440,14 @@ check's `max` is at least 2 and a second smoke job would take two rounds past th
   file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
   prints, because no number of shards makes such a spec, class or file fit.
 - **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its
-  `Shard durations` job, with no model, only `contents: read` and `issues: write`, and no commit, runs
-  `scripts/shard-durations.mjs` on the run's `test-results-*` artifacts. It rewrites each durations file
-  with its split's `--durations` and reads each `--count`. A file drifts when its entries that moved past
-  one run's noise add up to more than a set share of its old total, both set in the script. Drifted files
-  go into one `process` issue, opened or updated, which NexKit's round commits. Each `Over budget:` unit
-  gets a `process` issue of its own, to split it or make it faster, unless its issue is open. By hand,
-  `--durations` takes `web*.xml`, `playwright-*.xml`, each integration shard's `Axis.Integration.Tests.xml`
-  with shard 1's `Axis.ControlPlane.Integration.Tests.xml`, and `{dev-script,compose,images,onprem}.xml`.
+  `Shard durations` job, with no model, no commit and only `contents: read`, `actions: read` and `issues:
+  write`, runs `scripts/shard-durations.mjs` on the `test-results-*` artifacts of the run and of the latest
+  successful runs on `main` before it. Each split's `--durations` measures each run from the file as it was,
+  each entry becomes the median of its measures, and each `--count` is read. A file drifts when its entries
+  that moved past one run's noise pass a set share of its old total. The script sets the runs, the noise and
+  the share. Drifted files go into one `process` issue, which NexKit's round commits, and each `Over budget:`
+  unit gets its own unless one is open. By hand, `--durations` takes `web*.xml`, `playwright-*.xml`, each
+  integration shard's `Axis.Integration.Tests.xml` with shard 1's control plane one, and the smoke suites' files.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
