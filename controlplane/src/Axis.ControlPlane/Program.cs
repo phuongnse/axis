@@ -4,6 +4,7 @@ using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
@@ -21,6 +22,9 @@ builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 // Read before any database work, so a missing or wrong setting stops the start.
 var options = ControlPlaneOptions.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(options);
+
+// The plan versions, built from the checked settings. The migration start then checks the versions that subscriptions pin.
+builder.Services.AddSingleton(PlanCatalogue.Create(options.Plans));
 
 // The proxies whose forwarded headers are trusted, by the platform's rules: the client address is then the real one, see
 // docs/reference/control-plane.md#settings. Read before any database work too, so a bad value stops the start.

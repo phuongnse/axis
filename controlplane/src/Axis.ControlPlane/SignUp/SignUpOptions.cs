@@ -84,7 +84,7 @@ public sealed class SignUpApplicationOptions
     public SignUpTexts Descriptions { get; set; } = new();
 }
 
-/// <summary>A text of the sign-up page in its two languages.</summary>
+/// <summary>A text in its two languages.</summary>
 public sealed class SignUpTexts
 {
     /// <summary>The English text.</summary>

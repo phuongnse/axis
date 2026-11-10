@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.SignUp;
 using Axis.Tenancy;
 using MimeKit;
@@ -16,6 +17,7 @@ namespace Axis.ControlPlane;
 /// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
 /// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
 /// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
+/// The plans are optional, and each needs a code, a version, both names, included users, every quota except the users, and a price in each currency, unless it is a trial plan, which has no price. A number is plain digits.
 /// The sign-up trial quotas are optional, and each must be a quota key with a whole number of zero or more, or empty.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
@@ -73,6 +75,9 @@ public sealed partial class ControlPlaneOptions
 
     /// <summary>What the sign-up page offers. Optional.</summary>
     public SignUpOptions SignUp { get; set; } = new();
+
+    /// <summary>The plan versions that Axis SaaS sells, see <c>docs/reference/plans.md#the-catalogue</c>. Optional.</summary>
+    public List<PlanOptions> Plans { get; } = [];
 
     /// <summary>Reads and checks the settings, and returns them.</summary>
     /// <exception cref="InvalidOperationException">
@@ -175,6 +180,7 @@ public sealed partial class ControlPlaneOptions
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
         problems.AddRange(SignUpProblems(options.SignUp));
+        problems.AddRange(PlanCatalogue.Problems(options.Plans));
 
         if (problems.Count > 0)
         {
