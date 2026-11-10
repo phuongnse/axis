@@ -457,6 +457,41 @@ public sealed class ControlPlaneOptionsTests
         Assert.Contains("ControlPlane:SignUp:Applications:1:Id", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("not a domain")]
+    [InlineData("user@gmail.com")]
+    [InlineData("https://gmail.com")]
+    [InlineData("203.0.113.1")]
+    public void A_public_mailbox_domain_that_is_not_a_domain_name_stops_the_start_and_the_message_names_the_setting(string entry)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = entry,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:PublicMailboxDomains:1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:SignUp:PublicMailboxDomains:0", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_public_mailbox_domains_load()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = "outlook.com",
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal(["gmail.com", "outlook.com"], factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.PublicMailboxDomains);
+    }
+
     [Fact]
     public void A_valid_sign_up_application_loads()
     {

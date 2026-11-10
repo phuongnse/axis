@@ -271,6 +271,14 @@ public sealed partial class ControlPlaneOptions
             }
         }
 
+        for (var index = 0; index < signUp.PublicMailboxDomains.Count; index++)
+        {
+            if (Uri.CheckHostName(signUp.PublicMailboxDomains[index]) != UriHostNameType.Dns)
+            {
+                problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.PublicMailboxDomains)}:{index.ToString(CultureInfo.InvariantCulture)} must be a domain name.");
+            }
+        }
+
         if (signUp.HasDocuments)
         {
             var prefix = $"{SectionName}:{nameof(SignUp)}";

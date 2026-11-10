@@ -258,4 +258,47 @@ describe('SignUpEntry', () => {
     expect(alert.parentElement).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Sign up' })).toBeEnabled()
   })
+
+  it.each([
+    ['address', { 'Retry-After': '600' }, 'Try again in 10 minutes.'],
+    ['domain', {}, 'Try again tomorrow.'],
+  ])('shows the %s limit of a 429 answer in the error alert', async (limit, headers, message) => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    stubServer(
+      undefined,
+      () =>
+        new Response(JSON.stringify({ status: 429, limit }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/problem+json', ...headers },
+        }),
+    )
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(message)
+    expect(alert.parentElement).toHaveFocus()
+  })
+
+  it('shows the failed text for a 429 answer without a wait', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    stubServer(
+      undefined,
+      () =>
+        new Response(JSON.stringify({ status: 429, limit: 'address' }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/problem+json' },
+        }),
+    )
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('The sign-up could not be sent. Try again.')
+  })
 })
