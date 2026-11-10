@@ -357,6 +357,19 @@ public sealed class ControlPlaneOptionsTests
     }
 
     [Theory]
+    [InlineData("not base64 challenge key!")]
+    [InlineData("c2l4dGVlbi1ieXRlcy1vaw==")]
+    public void A_challenge_key_that_is_not_base64_of_at_least_32_bytes_stops_the_start_and_the_message_holds_no_value(string key)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:SignUp:ChallengeKey"] = key });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:ChallengeKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(key, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("ControlPlane:Dns:Port", "0")]
     [InlineData("ControlPlane:Dns:Port", "70000")]
     [InlineData("ControlPlane:Dns:Zone", "not a zone")]

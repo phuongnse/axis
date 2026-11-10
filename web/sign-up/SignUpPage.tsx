@@ -11,6 +11,7 @@ import { useDesignTokens } from '../src/platform/themeMode'
 import { SignUpFrame } from './SignUpFrame'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
+import { useProofOfWork } from './useProofOfWork'
 
 interface SignUpApplication {
   id: string
@@ -91,6 +92,7 @@ export function SignUpPage({
   const formErrorRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLElement>(null)
   const focusEmail = useRef(false)
+  const proofOfWork = useProofOfWork()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -201,6 +203,7 @@ export function SignUpPage({
     setSending(true)
     setFormErrors([])
     try {
+      const altcha = await proofOfWork.solution()
       const response = await apiFetch(
         '/api/sign-up',
         {
@@ -213,18 +216,24 @@ export function SignUpPage({
             subdomain: values.subdomain,
             language: values.language,
             application: values.application ?? '',
+            ...(altcha ? { altcha } : {}),
           }),
         },
         { promptSignInOnUnauthorized: false },
       )
       if (response.status === 202) {
         setSent({ email: values.email.trim() })
-      } else if (response.status === 400) {
-        showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
       } else {
-        setFormErrors([t('signUp.failed')])
+        // A solved challenge is for one try, so the next try solves a new one.
+        proofOfWork.renew()
+        if (response.status === 400) {
+          showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
+        } else {
+          setFormErrors([t('signUp.failed')])
+        }
       }
     } catch {
+      proofOfWork.renew()
       setFormErrors([t('signUp.failed')])
     } finally {
       setSending(false)
