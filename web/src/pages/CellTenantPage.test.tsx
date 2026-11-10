@@ -668,6 +668,9 @@ describe('CellTenantPage', () => {
     const deleteButton = within(dialog).getByRole('button', { name: /Delete$/ })
     const input = within(dialog).getByLabelText('Type acme to confirm')
 
+    expect(input).toHaveAccessibleDescription(
+      'Type the ID exactly, with the same case. Delete turns on when it matches.',
+    )
     expect(deleteButton).toBeDisabled()
     await user.type(input, 'acm')
     expect(deleteButton).toBeDisabled()

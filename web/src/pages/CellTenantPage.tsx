@@ -1,8 +1,9 @@
 import { Card, Descriptions, Flex, Input, Modal, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { useEffect, useId, useRef, useState } from 'react'
-import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { CellJobTable } from '../platform/CellJobTable'
 import {
@@ -94,7 +95,6 @@ export function CellTenantPage() {
   const [confirming, setConfirming] = useState<CellTenantAction | null>(null)
   // The text typed to confirm a deletion. It starts empty whenever a confirmation opens.
   const [typed, setTyped] = useState('')
-  const typedId = useId()
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -397,16 +397,17 @@ export function CellTenantPage() {
           <Flex vertical gap="small">
             <Typography.Text>{t(actionTexts[confirming].body)}</Typography.Text>
             {confirming === 'delete' && (
-              <Flex vertical gap="small">
-                <label htmlFor={typedId}>{t('shell.cell.tenant.deleteTypeId').replace('{tenant}', id)}</label>
+              <AxisField
+                label={t('shell.cell.tenant.deleteTypeId').replace('{tenant}', id)}
+                help={t('shell.cell.tenant.deleteTypeId.help')}
+              >
                 <Input
-                  id={typedId}
                   data-testid="cell-tenant-delete-id"
                   value={typed}
                   autoComplete="off"
                   onChange={(event) => setTyped(event.target.value)}
                 />
-              </Flex>
+              </AxisField>
             )}
             {actionError && <AxisAlert data-testid="cell-tenant-action-error" kind="error" message={actionError} />}
           </Flex>
