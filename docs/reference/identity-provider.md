@@ -557,8 +557,7 @@ Every page has one frame: the organization's mark and name above one card in the
   picking a theme switches light or dark mode at once. A theme choice is kept in the browser per
   origin, so one made on the identity provider's host does not carry over to Axis on another host.
 - **Tokens.** The page follows light and dark mode and the Axis tokens and fonts, as the SPA does.
-- **One frame, drawn once** _(planned for M33)_. The [card page](shared-widgets.md#which-widget) draws
-  this frame for the identity provider's pages and for the [sign-up pages](sign-up.md#the-page), as wide
+- **One frame, drawn once.** The [card page](shared-widgets.md#which-widget) draws this frame, as wide
   as the `small` dialog size token. `IdentityFrame` only feeds it the identity provider's context. The
   frame fills a design-system frame by `--shell-min-height`, as the shell does.
 

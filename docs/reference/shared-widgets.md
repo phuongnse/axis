@@ -45,7 +45,7 @@ Each common job has one shared widget or helper:
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
-| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line _(planned for M33)_ |
+| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line |
 | A required box that accepts terms, each document a link | `AcceptTermsField`, which never starts ticked and links each document in a new tab through `FilledText` |
 | A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language |
 | The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line |
