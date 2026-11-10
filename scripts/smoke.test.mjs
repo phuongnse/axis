@@ -17,7 +17,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const suites = { 'dev-script': 'dev', compose: 'compose', images: 'images', onprem: 'onprem' }
 const hash = createHash('sha256').update(stageText(root, 'admin-tools')).digest('hex').slice(0, 12)
 
-function runSmoke({ changed, failing = [], saved = [], dockerFails = '' } = {}) {
+function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: extra = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-smoke-'))
   try {
     for (const file of [
@@ -31,10 +31,16 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '' } = {}) 
       'scripts/lib/images.mjs',
       'scripts/lib/docker-build.mjs',
       'scripts/lib/smoke-images.mjs',
+      'scripts/lib/smoke-shard.mjs',
+      'scripts/lib/shards.mjs',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
     }
+    writeFileSync(
+      join(dir, 'scripts/smoke-durations.json'),
+      JSON.stringify({ 'dev-script': 360, compose: 150, images: 150, onprem: 180 }),
+    )
     mkdirSync(join(dir, 'samples/modules/department-budgets'), { recursive: true })
     writeFileSync(join(dir, 'samples/modules/department-budgets/module.json'), '{"id":"department-budgets","version":"1.2.0"}')
     for (const [suite, file] of Object.entries(suites)) {
@@ -85,10 +91,13 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '' } = {}) 
       'GITHUB_ACTIONS',
       'GITHUB_STEP_SUMMARY',
       'AXIS_TEST_RESULTS_DIR',
+      'AXIS_SMOKE_SHARD',
+      'NEXKIT_SHARD',
     ]) {
       delete env[name]
     }
     if (changed !== undefined) env.NEXKIT_BASE_SHA = 'abc'
+    Object.assign(env, extra)
 
     const result = spawnSync('bash', ['scripts/smoke.sh'], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
     const written = Object.keys(suites).filter((suite) => existsSync(join(dir, 'artifacts/test-results', `${suite}.xml`)))
@@ -181,5 +190,68 @@ describe('scripts/smoke.sh', () => {
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.deepEqual(run.written, Object.keys(suites))
+  })
+})
+
+describe('scripts/smoke.sh runs one shard with AXIS_SMOKE_SHARD or NEXKIT_SHARD', () => {
+  const allBuilds = [...production, 'admin-tools'].sort()
+
+  test('shard 1 of 3 runs dev-script alone and builds nothing', () => {
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '1/3' } })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.written, ['dev-script'])
+    assert.doesNotMatch(run.stdout, /^\| (compose|images|onprem) \|/m)
+    assert.deepEqual(builds(run), [], run.docker.join('\n'))
+  })
+
+  test('shard 2 of 3 runs onprem and builds each production image once, then removes them', () => {
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '2/3' } })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.written, ['onprem'])
+    assert.deepEqual(builds(run).map(targetOf).sort(), allBuilds, run.docker.join('\n'))
+    for (const target of production) assert.ok(run.docker.some((line) => line.startsWith(`rmi -f ${target}:`)), run.docker.join('\n'))
+  })
+
+  test('shard 3 of 3 runs compose and images and builds each production image once', () => {
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '3/3' } })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.written, ['compose', 'images'])
+    assert.deepEqual(builds(run).map(targetOf).sort(), allBuilds, run.docker.join('\n'))
+  })
+
+  test('a shard whose suites a change cannot affect builds nothing', () => {
+    const run = runSmoke({ changed: 'docs/x.md', env: { AXIS_SMOKE_SHARD: '2/3' } })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.written, [])
+    assert.deepEqual(run.docker, [], 'a docs change builds nothing')
+  })
+
+  test('NEXKIT_SHARD runs a shard, and AXIS_SMOKE_SHARD wins when both are set', () => {
+    assert.deepEqual(runSmoke({ env: { NEXKIT_SHARD: '2/3' } }).written, ['onprem'])
+    assert.deepEqual(runSmoke({ env: { NEXKIT_SHARD: '1/3', AXIS_SMOKE_SHARD: '3/3' } }).written, ['compose', 'images'])
+  })
+
+  test('a malformed shard exits with code 2 before any suite runs', () => {
+    for (const shard of ['4/3', '0/3', 'abc']) {
+      const run = runSmoke({ env: { AXIS_SMOKE_SHARD: shard } })
+      assert.equal(run.status, 2, run.stdout + run.stderr)
+      assert.match(run.stderr, new RegExp(`AXIS_SMOKE_SHARD must be a shard such as 1/3, not '${shard}'`))
+      assert.deepEqual(run.written, [])
+    }
+    const fromNexkit = runSmoke({ env: { NEXKIT_SHARD: '4/3' } })
+    assert.equal(fromNexkit.status, 2, fromNexkit.stdout + fromNexkit.stderr)
+    assert.match(fromNexkit.stderr, /NEXKIT_SHARD must be a shard such as 1\/3, not '4\/3'/)
+  })
+
+  test('a shard past the smoke suites exits with code 2 and names the fault', () => {
+    const run = runSmoke({ env: { AXIS_SMOKE_SHARD: '5/5' } })
+
+    assert.equal(run.status, 2, run.stdout + run.stderr)
+    assert.match(run.stderr, /Shard 5\/5 has no smoke suite\. Use fewer shards\./)
+    assert.deepEqual(run.written, [])
   })
 })

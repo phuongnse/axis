@@ -199,7 +199,7 @@ in [Testing](testing.md).
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
 agent host. The test removes the Compose project at the end.
 
-`scripts/smoke.sh` builds the production images once, before `images` and `onprem`, which both use them,
+`scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
 and removes them when it exits. A change that skips both tests builds nothing. The PostgreSQL tools layer of
 `axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
 image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
@@ -209,6 +209,9 @@ when the `Dockerfile` changes, or when GitHub drops the cache after 7 days witho
 weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
 The [image scan](#workflows-outside-nexkits-checks) never uses the saved layer: it builds from scratch and sees
 each new package release.
+
+Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`, to run only the smoke tests of one
+[shard](#shards). A shard builds the production images only when it holds `images` or `onprem`.
 
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
@@ -424,12 +427,20 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
   and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
   `node scripts/lib/integration-shard.mjs --durations <those files>`.
-- **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`
-  and `node scripts/lib/test-shard.mjs --count` print the fewest shards whose longest estimated shard fits
-  the time budget. The unit test count includes shard 1, so it is never below 2. The counts never exceed
-  the most shards allowed. The budget and that most live in `scripts/lib/shards.mjs`. A spec, test class,
-  collection, the control plane suite or a Vitest file that alone takes longer than the budget gets an
-  `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
+- **Smoke.** Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`. `NEXKIT_SHARD` works the
+  same way beside it, and `AXIS_SMOKE_SHARD` wins when both are set. A shard runs the smoke tests that
+  `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
+  `scripts/smoke-durations.json`, and a test without an entry weighs the median. A shard builds the production
+  images only when it holds `images` or `onprem`. The image builds are not in those seconds, so such a shard
+  takes longer than its estimate. NexKit's `smoke` check runs with no shard. When the shards drift apart by
+  minutes, refresh the durations from the JUnit files of a full run on `main`:
+  `node scripts/lib/smoke-shard.mjs --durations artifacts/test-results/{dev-script,compose,images,onprem}.xml`.
+- **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
+  `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
+  shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is
+  never below 2. The counts never exceed the most shards allowed. The budget and that most live in
+  `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
+  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
   class or file fit.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
@@ -481,24 +492,6 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 | Planner statistics                         | A seed that a plan depends on runs `ANALYZE` over every row                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | The MinIO test container cuts a connection | `MinioFixture.ReadObjectAsync` reads an object and `MinioFixture.UploadObjectAsync` uploads one, and each tries again from the start up to five times when the connection drops or MinIO answers that the client disconnected, waiting half a second, then 1, 2 and 4 seconds                                                                                                                                                                                                                                                                                                                                                                                              |
 | A read of the page that does not wait      | A step that acts on what a list shows waits for it with a retrying assertion such as `toHaveCount`, not a single `count()` right after a click or a change of address, and a step that needs to know which files the server wrote reads them from the folder                                                                                                                                                                                                                                                                                                                                                                                                               |
-
-## Production images and Axis.Admin
-
-The production images and the admin tool are the same in development as in an install. The
-`Dockerfile` has five production targets, `axis-server`, `axis-worker`, `axis-agent`, `axis-admin` and
-`axis-controlplane`, which hold no samples, development settings or source control metadata. Build one
-with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. The default target is
-the development server. `scripts/smoke.sh` builds each image once, up to three attempts with
-waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times. The `axis-admin`
-stage builds on the `admin-tools` stage, which installs the system packages and declares no `AXIS_VERSION`. Docker
-caches that layer, so a build with a new version does not download the packages again, and the
-[smoke tests](#smoke-tests) save it for later runs.
-
-`Axis.Admin` is the console tool that the platform operator runs. It creates, suspends, resumes,
-lists, backs up and restores tenants, and it migrates and activates them. Run it with
-`dotnet run --project src/Axis.Admin -- <command>`, or with the `axis-admin` image. See
-[administration](reference/administration.md). The production install is in `deploy/compose/`
-and `deploy/helm/axis/`, see [installation](reference/installation.md).
 
 ## Docker Compose
 
