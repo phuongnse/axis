@@ -41,7 +41,7 @@ internal static class SignUpEndpoints
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
         // See docs/reference/sign-up.md#sending-the-form. It checks the limits of docs/reference/sign-up.md#bots-and-abuse first: the
-        // client address before the body is read, the email's domain once the email is valid, and both before any write. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
+        // client address before the body is read, the email's domain once the email is valid, and both before any write. It refuses an email of a disposable domain. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
         // and queues the confirm email in the same transaction. The answer has no body yet. The body may carry the solved challenge as
         // altcha, which the route does not check yet, see docs/reference/sign-up.md#bots-and-abuse. Without the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
@@ -148,6 +148,11 @@ internal static class SignUpEndpoints
         if (email is not null && !errors.ContainsKey("/email") && limits.RefuseDomain(context, email) is { } domainLimit)
         {
             return domainLimit;
+        }
+
+        if (email is not null && !errors.ContainsKey("/email") && await DisposableDomains.IsListedAsync(controlPlane, email, cancellationToken))
+        {
+            errors["/email"] = ["signUp.email.disposable"];
         }
 
         // A blank application is the empty text, and the form must send it, so a form that left the field out is refused.
