@@ -272,6 +272,42 @@ describe('AxisField status', () => {
     expect(await screen.findByText('Enter a name.')).toBeInTheDocument()
   })
 
+  it('starts at its initial value and returns to it on reset', async () => {
+    const finish = vi.fn()
+    render(
+      <ThemeModeProvider initialMode="light">
+        <ConfigProvider theme={{ token: { motion: false } }}>
+          <TextProvider catalogs={catalogs} development={false}>
+            <Form layout="vertical" onFinish={finish}>
+              <AxisField label="Name" help="Letters and digits." name="name" initialValue="Contoso">
+                <Input />
+              </AxisField>
+              <button type="submit">Submit</button>
+              <Form.Item shouldUpdate noStyle>
+                {(form) => (
+                  <button type="button" onClick={() => form.resetFields()}>
+                    Reset
+                  </button>
+                )}
+              </Form.Item>
+            </Form>
+          </TextProvider>
+        </ConfigProvider>
+      </ThemeModeProvider>,
+    )
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    expect(input).toHaveValue('Contoso')
+
+    await userEvent.clear(input)
+    await userEvent.type(input, 'Fabrikam')
+    await userEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Contoso')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(finish).toHaveBeenCalledTimes(1))
+    expect(finish.mock.calls[0][0]).toEqual({ name: 'Contoso' })
+  })
+
   it('takes no status outside a form', () => {
     expect(
       // @ts-expect-error A field outside a form takes no `status`: its form item does not draw one.

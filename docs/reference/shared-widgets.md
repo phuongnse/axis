@@ -49,7 +49,7 @@ Each common job has one shared widget or helper:
 | A required box that accepts terms, each document a link | `AcceptTermsField`, which never starts ticked and links each document in a new tab through `FilledText` |
 | A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language |
 | The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line |
-| The application a new tenant or a new application starts from | `StartFromField`, with Blank first _(planned for M33)_ |
+| The application a new tenant or a new application starts from | `StartFromField`, with Blank first and chosen, and a warning `status` when the list does not load |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 | Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
 
