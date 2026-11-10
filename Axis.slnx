@@ -20,6 +20,7 @@
     <Project Path="src/Axis.Worker/Axis.Worker.csproj" />
   </Folder>
   <Folder Name="/controlplane/src/">
+    <Project Path="controlplane/src/Axis.ControlPlane.Admin/Axis.ControlPlane.Admin.csproj" />
     <Project Path="controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj" />
   </Folder>
   <Folder Name="/controlplane/tests/">

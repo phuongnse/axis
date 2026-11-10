@@ -161,6 +161,7 @@ test('no image holds samples, development settings or source control metadata', 
     }
     if (target === 'axis-controlplane') {
       assert.ok(paths.includes('app/wwwroot/sign-up.html'), 'the control plane holds no sign-up page')
+      assert.ok(paths.includes('app/admin/Axis.ControlPlane.Admin.dll'), 'the control plane holds no operator commands')
     }
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
@@ -259,18 +260,20 @@ test('the control plane starts read-only with its connection string in /run/secr
   const secrets = writeSecrets('controlplane', {
     ControlPlane__ConnectionString: `Host=${postgres};Database=axis;Username=axis;Password=images-test${verifyFull('/run/test-ca/ca.crt')}`,
   })
-  await waitLive(
-    startReadOnly('axis-controlplane', secrets, 8080, [
-      '-e',
-      'ControlPlane__Region=vn',
-      '-e',
-      'ControlPlane__TenantDomain=vn.example.com',
-      '-e',
-      'ControlPlane__MailFrom=no-reply@vn.example.com',
-      '-e',
-      'ControlPlane__Mail__Host=mail.invalid',
-    ]),
-  )
+  const started = startReadOnly('axis-controlplane', secrets, 8080, [
+    '-e',
+    'ControlPlane__Region=vn',
+    '-e',
+    'ControlPlane__TenantDomain=vn.example.com',
+    '-e',
+    'ControlPlane__MailFrom=no-reply@vn.example.com',
+    '-e',
+    'ControlPlane__Mail__Host=mail.invalid',
+  ])
+  await waitLive(started)
+  // The operator's commands read the same settings and the schema that the service has migrated.
+  const list = run(['exec', started.id, 'dotnet', '/app/admin/Axis.ControlPlane.Admin.dll', 'sign-ups', 'list'])
+  assert.ok(list.startsWith('id'), 'sign-ups list printed no header')
 })
 
 test('the admin tool prints its version and has the PostgreSQL 18 tools', { timeout }, () => {
