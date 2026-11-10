@@ -415,7 +415,7 @@ describe('PageEditor sections', () => {
     label: { textKey: 'pages.review.title' },
     record: 'id',
   }
-  const fieldCases: [string, Record<string, unknown>, [string, string][]][] = [
+  const fieldCases: [string, Record<string, unknown>, [string, string, string?][]][] = [
     [
       'table with navigate and delete row actions and a navigate toolbar action',
       {
@@ -484,6 +484,83 @@ describe('PageEditor sections', () => {
         ['combobox', 'widgets.process'],
       ],
     ],
+    [
+      'kpi with a comparison and a navigate action',
+      {
+        type: 'kpi',
+        dataSource: 'OpenTotals',
+        measure: 'openCount',
+        label: { textKey: 'pages.review.title' },
+        comparison: { measure: 'urgentCount', label: { textKey: 'pages.review.description' } },
+        navigate: { type: 'navigate', page: 'ReviewList', label: { textKey: 'pages.review.title' }, record: 'id' },
+      },
+      [
+        ['combobox', 'widgets.type'],
+        ['group', 'widgets.parameters'],
+        ['combobox', 'widgets.measure', '/widgets/0/measure'],
+        ['group', 'widgets.label', '/widgets/0/label'],
+        ['group', 'widgets.comparison'],
+        ['combobox', 'widgets.comparison.measure', '/widgets/0/comparison/measure'],
+        ['group', 'widgets.comparison.label', '/widgets/0/comparison/label'],
+        ['group', 'widgets.navigate'],
+        ['combobox', 'widgets.navigate.page'],
+        ['group', 'widgets.navigate.label'],
+        ['textbox', 'widgets.navigate.record'],
+        ['group', 'widgets.navigate.parameters'],
+      ],
+    ],
+    [
+      'chart',
+      {
+        type: 'chart',
+        dataSource: 'RequestsByCategory',
+        kind: 'bar',
+        category: 'category',
+        measures: [{ name: 'total', label: { textKey: 'pages.review.title' } }],
+        title: { textKey: 'pages.review.title' },
+      },
+      [
+        ['combobox', 'widgets.type'],
+        ['group', 'widgets.parameters'],
+        ['combobox', 'widgets.kind'],
+        ['combobox', 'widgets.category'],
+        ['group', 'widgets.title', '/widgets/0/title'],
+        ['group', 'widgets.measures'],
+        ['combobox', 'widgets.measures.name', '/widgets/0/measures/0/name'],
+        ['group', 'widgets.measures.label', '/widgets/0/measures/0/label'],
+      ],
+    ],
+    [
+      'columns',
+      {
+        type: 'columns',
+        columns: [
+          { width: 6, widgets: [{ type: 'taskInbox' }] },
+          { width: 6, widgets: [{ type: 'taskInbox' }] },
+        ],
+      },
+      [
+        ['textbox', 'widgets.type'],
+        ['spinbutton', 'widgets.columns.width'],
+      ],
+    ],
+    [
+      'tabs',
+      { type: 'tabs', tabs: [{ label: { textKey: 'pages.review.title' }, widgets: [{ type: 'taskInbox' }] }] },
+      [
+        ['textbox', 'widgets.type'],
+        ['group', 'widgets.tabs.label'],
+      ],
+    ],
+    [
+      'section',
+      { type: 'section', title: { textKey: 'pages.review.title' }, widgets: [{ type: 'taskInbox' }] },
+      [
+        ['textbox', 'widgets.type'],
+        ['group', 'widgets.title', '/widgets/0/title'],
+        ['switch', 'widgets.collapsed'],
+      ],
+    ],
   ]
 
   it.each(fieldCases)('labels and helps each field of a %s panel', (_name, widget, expectations) => {
@@ -493,8 +570,9 @@ describe('PageEditor sections', () => {
       }),
     )
 
-    for (const [role, path] of expectations) {
-      for (const element of screen.getAllByRole(role, { name: label(path) })) {
+    for (const [role, path, pointer] of expectations) {
+      const container = pointer === undefined ? document.body : screen.getByTestId(`studio-field-${pointer}`)
+      for (const element of within(container).getAllByRole(role, { name: label(path) })) {
         expect(element).toHaveAccessibleDescription(help(path))
       }
     }
@@ -1313,12 +1391,14 @@ describe('PageEditor widget tree', () => {
     ])
   })
 
-  it('shows the type of a container as fixed text and gives it a panel', async () => {
+  it('shows the type of a container in a read-only box and gives it a panel', async () => {
     renderEditor(tree())
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
     const panel = screen.getByTestId('studio-field-/widgets/0')
-    expect(within(panel).getByTestId('studio-field-/widgets/0/type')).toHaveTextContent('columns')
+    const type = within(panel).getByRole('textbox', { name: 'Widget type' })
+    expect(type).toHaveValue('columns')
+    expect(type).toHaveAttribute('readonly')
     expect(within(panel).queryByRole('combobox', { name: 'Widget type' })).not.toBeInTheDocument()
     expect(within(panel).queryByTestId('studio-json-only')).not.toBeInTheDocument()
     expect(within(panel).getByTestId('studio-field-/widgets/0/columns/0/width')).toBeVisible()
@@ -1329,7 +1409,9 @@ describe('PageEditor widget tree', () => {
 
     await userEvent.click(screen.getByTestId('studio-widget-/widgets/0'))
     const panel = screen.getByTestId('studio-field-/widgets/0')
-    expect(within(panel).getByTestId('studio-field-/widgets/0/type')).toHaveTextContent('columns')
+    const type = within(panel).getByRole('textbox', { name: 'Widget type' })
+    expect(type).toHaveValue('columns')
+    expect(type).toHaveAttribute('readonly')
     expect(within(panel).getByTestId('studio-json-only')).toBeVisible()
   })
 
