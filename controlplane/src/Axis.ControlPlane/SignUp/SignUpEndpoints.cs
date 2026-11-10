@@ -34,8 +34,15 @@ internal static class SignUpEndpoints
             return Results.Ok(await check.CheckAsync(name, cancellationToken));
         });
 
+        // The proof-of-work challenge, see docs/reference/sign-up.md#bots-and-abuse. Without the key the route cannot sign one.
+        endpoints.MapGet("/api/sign-up/challenge", (ControlPlaneOptions options, TimeProvider clock) =>
+            string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey)
+                ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
+                : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
+
         // See docs/reference/sign-up.md#sending-the-form. It checks the form, stores a pending sign-up that holds its subdomain for 24 hours
-        // and queues the confirm email in the same transaction. The answer has no body yet. Without the directory the route answers 503.
+        // and queues the confirm email in the same transaction. The answer has no body yet. The body may carry the solved challenge as
+        // altcha, which the route does not check yet, see docs/reference/sign-up.md#bots-and-abuse. Without the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or

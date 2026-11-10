@@ -4,6 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { formItem, isRequiredLabel } from '../src/test/antd'
 import { SignUpEntry } from './SignUpEntry'
 
+// Web Crypto is unreliable under jsdom, so the solver answers at once. The end-to-end sign-up journey runs the real one.
+const solveChallenge = vi.hoisted(() =>
+  vi.fn((_challenge: string, _salt: string, _algorithm?: string, _max?: number) => ({
+    promise: Promise.resolve({ number: 42, took: 1 }),
+    controller: new AbortController(),
+  })),
+)
+vi.mock('altcha-lib/v1', () => ({ solveChallenge }))
+
 const applications = {
   applications: [
     {
@@ -36,6 +45,17 @@ function answer(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+/** A challenge for the n-th fetch, so a second fetch is told apart from the first. */
+function challengeOf(n: number) {
+  return {
+    algorithm: 'SHA-256',
+    challenge: `challenge-${n}`,
+    maxnumber: 100000,
+    salt: `salt-${n}?expires=4102444800`,
+    signature: `signature-${n}`,
+  }
+}
+
 function stubServer(
   subdomain: (name: string) => Response = () => answer({ free: true, reason: null }),
   signUp: () => Response = () => new Response(null, { status: 202 }),
@@ -49,7 +69,12 @@ function stubServer(
     regionAnswer?: () => Response
   } = {},
 ) {
+  let challenges = 0
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
+    if (input === '/api/sign-up/challenge') {
+      challenges += 1
+      return answer(challengeOf(challenges))
+    }
     if (input === '/api/sign-up/applications') {
       return applicationsAnswer()
     }
@@ -66,6 +91,15 @@ function stubServer(
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
+}
+
+function challengeFetches(fetchMock: ReturnType<typeof stubServer>) {
+  return fetchMock.mock.calls.filter(([input]) => input === '/api/sign-up/challenge')
+}
+
+/** The solved challenge that a sign-up call carries as altcha. */
+function altchaOf(call: ReturnType<typeof signUpCalls>[number]) {
+  return JSON.parse(atob((JSON.parse(String(call[1]?.body)) as { altcha: string }).altcha)) as unknown
 }
 
 function signUpCalls(fetchMock: ReturnType<typeof stubServer>) {
@@ -94,6 +128,7 @@ describe('SignUpEntry', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    solveChallenge.mockClear()
   })
 
   it('starts in Vietnamese for a Vietnamese browser and switches to English', async () => {
@@ -396,6 +431,16 @@ describe('SignUpEntry', () => {
       subdomain: 'acme',
       language: 'en',
       application: '',
+      altcha: btoa(
+        JSON.stringify({
+          algorithm: 'SHA-256',
+          challenge: 'challenge-1',
+          number: 42,
+          salt: 'salt-1?expires=4102444800',
+          signature: 'signature-1',
+          took: 1,
+        }),
+      ),
     })
 
     await user.click(screen.getByRole('button', { name: 'Change email' }))
@@ -404,6 +449,56 @@ describe('SignUpEntry', () => {
     expect(screen.getByRole('textbox', { name: 'Full name' })).toHaveValue('Ana Nguyen')
     expect(screen.getByRole('textbox', { name: 'Work email' })).toHaveValue('ana@example.com')
     expect(screen.getByRole('textbox', { name: 'Work email' })).toHaveFocus()
+  })
+
+  it('sends the solved challenge as altcha and solves a new one after a refusal', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    let refusals = 1
+    const fetchMock = stubServer(undefined, () =>
+      refusals-- > 0
+        ? answer({ errors: { '/email': ['signUp.email.invalid'] } }, 400)
+        : new Response(null, { status: 202 }),
+    )
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+    expect(challengeFetches(fetchMock)).toHaveLength(1)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await waitFor(() => expect(challengeFetches(fetchMock)).toHaveLength(2))
+    expect(solveChallenge).toHaveBeenCalledWith('challenge-1', 'salt-1?expires=4102444800', 'SHA-256', 100000)
+    expect(altchaOf(signUpCalls(fetchMock)[0])).toEqual({
+      algorithm: 'SHA-256',
+      challenge: 'challenge-1',
+      number: 42,
+      salt: 'salt-1?expires=4102444800',
+      signature: 'signature-1',
+      took: 1,
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await screen.findByRole('heading', { name: 'Check your inbox' })
+    expect(solveChallenge).toHaveBeenCalledWith('challenge-2', 'salt-2?expires=4102444800', 'SHA-256', 100000)
+    expect(altchaOf(signUpCalls(fetchMock)[1])).toMatchObject({ challenge: 'challenge-2', signature: 'signature-2' })
+  })
+
+  it('sends the form without altcha when the control plane has no challenge', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    const fetchMock = stubServer()
+    const server = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) =>
+      input === '/api/sign-up/challenge' ? answer({}, 503) : server(input, init),
+    )
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    expect(await screen.findByRole('heading', { name: 'Check your inbox' })).toBeInTheDocument()
+    expect(JSON.parse(String(signUpCalls(fetchMock)[0][1]?.body))).not.toHaveProperty('altcha')
   })
 
   it('shows a refusal of the subdomain inside the subdomain field', async () => {
