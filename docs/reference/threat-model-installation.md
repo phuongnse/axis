@@ -225,18 +225,13 @@ The controls are in [cell console](cell-console.md#sign-in), [what the console n
 [product threat model](threat-model-product.md), because it is about the caller and the server: a tenant realm token or a
 token without the operator role reads the cell's tenants, and a tenant host answers `404` for every path under `/api/cell/`.
 
-Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
-
-- (Spoofing, High) an attacker takes over an operator account and acts on every tenant of the cell. Sign-in needs a
-  password and a second factor in the operator realm, which has accounts only.
-- (Tampering, Medium) a replayed job repeats a change to a tenant, such as a create or a delete. Each `POST` needs an
-  `Idempotency-Key`, and the same key with the same body answers the first job again.
-- (Information disclosure, High) an export is read by someone who is not a caller of the provisioning API, or kept
-  past its 7 days. The download answers only that caller and writes an audit record.
-- (Information disclosure, High) a console view leaks a record value or a secret. The console shows counts and never a
-  record, a file, a secret or a tenant user's name.
-- (Spoofing, High) a host is served before its owner is verified, so one tenant takes another's name. The cell adds a
-  host only once its DNS record matches.
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I24 | An attacker takes over an operator account and acts on every tenant of the cell. | Cell console and provisioning API | Spoofing | High | **Mitigated** | `AdminCellOperatorInviteTests` (the operator realm requires an authenticator code and has no identity provider) and `CellConsoleSignInTests` (a signed-in operator without the role gets 403, and a tenant session cookie gets 401 on the console host). |
+| I25 | A replayed job repeats a change to a tenant, such as a create or a delete. | Cell console and provisioning API | Tampering | Medium | **Mitigated** | `CellProvisioningApiTests` (the same key and body answer the first job, another request with that key answers 422, and parallel retries with one key queue one job). |
+| I26 | An export is read by someone who is not a caller of the provisioning API, or kept past its 7 days. | Cell console and provisioning API | Information disclosure | High | **Mitigated** | `CellProvisioningApiTests` (a tenant realm token or a token without the role cannot download and no record is written, an operator download writes one record naming the operator, and the sweep deletes a ZIP older than 7 days so the download answers 410). |
+| I27 | A console view leaks a record value or a secret. | Cell console and provisioning API | Information disclosure | High | **Mitigated** | `CellProvisioningApiTests` (every field of the tenant list and detail is on an allowed list and holds no secret, binding or tenant user). |
+| I28 | A host is served before its owner is verified, so one tenant takes another's name. | Cell console and provisioning API | Spoofing | High | **Mitigated** | `TenantHostVerificationTests` (a wrong token, a missing record or a failed lookup leaves the request pending and its host answers 404) and `CellProvisioningApiTests` (a requested host that is not verified answers 404 on a tenant route). |
 
 Repudiation does not need a row: each job writes a platform audit record with the actor, see
 [provisioning API](tenant-lifecycle.md#provisioning-api).

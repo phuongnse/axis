@@ -71,7 +71,7 @@ They need:
 
 - **A built-in application to start from,** changed to fit in Studio, that keeps its upgrades.
 - **Vietnamese and English.**
-- **Axis as a service** _(planned for M31)_, with nothing to install.
+- **Axis as a service**, with nothing to install.
 - **Sign-up and a trial** _(planned for M33)_, so they try Axis before they pay.
 - **Paying online** _(planned for M34)_.
 - **Their data kept safe** as Vietnam's personal data rules ask.
@@ -92,11 +92,11 @@ The reasons are in [D117](decisions/d117-small-businesses-first-and-the-mileston
 
 The same software runs in three ways.
 
-- **SaaS, shared** _(planned for M31)_. Many customers share a cell, which is one full installation of
+- **SaaS, shared**. Many customers share a cell, which is one full installation of
   Axis in a region that Axis runs. Each tenant, one customer's own space in the cell, keeps its own
   database, sign-in realm, files, Studio applications and quotas. Quotas are its limits on storage,
   users and applications. This is how small businesses and individuals use Axis.
-- **SaaS, dedicated** _(planned for M31)_. One customer has a cell of its own that Axis runs.
+- **SaaS, dedicated**. One customer has a cell of its own that Axis runs.
 - **Self-hosted.** The customer installs Axis on premises or in its own cloud, see
   [installation](reference/installation.md). This serves large organizations, banks and government.
 
