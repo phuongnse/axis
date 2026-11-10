@@ -20,7 +20,8 @@ UMD build.
 - **Mounting.** The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an
   element. It draws every state of the preview in one card, each under its caption, and returns a
   function that unmounts them all. A preview whose states answer the same fixture paths draws one
-  state at a time, under a Fixtures control that picks it, see
+  state at a time, under a Fixtures control that picks it and wraps its captions onto more lines when they do
+  not fit, see
   [D142](../decisions/d142-widget-previews-show-the-states-a-design-change-touches-one-at-a-time-where-they-share-fixtures.md).
 - **Style sheets.** The bundle is one file, so the style sheet of a library it imports, such as React
   Flow's, becomes a style element that the script adds to the page.
@@ -82,7 +83,8 @@ on sideways scroll. It also proves that each card's states show, that the cards 
 that a mounted widget follows `data-theme` and `--primary` and a validation message `--dangerText`,
 that a form submits inside the sandbox, and that no fixture reaches the server's web root. It clicks
 through Studio's sidebar in the `studio` preview, opens a state with `&state=` and picks one in the
-Fixtures control. A unit test compares the groups of the cards table with the groups in `cardOrder.ts`.
+Fixtures control. It also checks that the Fixtures control wraps its captions onto more lines in a 360 px frame.
+A unit test compares the groups of the cards table with the groups in `cardOrder.ts`.
 
 `tests/e2e/specs/design-system-contrast.spec.ts` opens every preview in light and in dark mode, and sweeps each of its
 states. It checks text at 4.5:1, or 3:1 when the text is large: 24 px, or 18.66 px and bold. The background is the

@@ -48,6 +48,10 @@ title and description in the UI locale and `en` as the fallback, and a built-in 
 sends nothing while one is wrong. A `409` or a `400` shows under the name. A success adds the application to the list and to the application row's menu, opens
 it, and loads its resources and diagnostics.
 
+- **One field to start from** _(planned for M33)_. `StartFromField` draws the choice, as the
+  [sign-up page](sign-up.md#start-from) does: Blank first, then the templates. When the list does not
+  load, its warning status says under the choices that Blank is still there.
+
 ## New resource
 
 New resource… creates a resource from its kind's starter, so a new resource opens with as few
@@ -795,16 +799,19 @@ Operations heading, and the JSON view stays as the second view of the same draft
 
 ## Identity provider editor
 
-The identity provider editor's Form tab shows the provider's name and `type`, then the fields of that
-type, see [identity provider resource](identity-provider.md#identity-provider-resource), and the JSON
-view stays as the second view of the same draft.
+The identity provider editor's Form tab shows the provider's fields in the five
+[shared sections](studio-resource-form.md#sections) General, Sign-in, Claims, Roles and Assurance, each
+field with its label and [help](frontend.md#platform-field-help), see
+[identity provider resource](identity-provider.md#identity-provider-resource). Sign-in and Claims show
+only for `oidc` and `saml`. General holds the name, `type` and description. Add assurance level sits on
+the Assurance heading, and the JSON view stays as the second view of the same draft.
 
 - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new type forbids and adds the
-  bindings it requires, with an empty name. An `accounts` provider shows no label, bindings or claims.
-- **Bindings.** A binding is a name box, labelled as a URL or a secret binding, and no value is shown
-  or stored. `oidc` shows the issuer, the client id, and a choice of client credential: a client
-  secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
-- **Label.** The "Continue with" label has its texts in every locale, see [label texts](#label-texts).
+  bindings it requires, with an empty name. An `accounts` provider shows only General, Roles and Assurance.
+- **Bindings.** A binding is a name box, and its help says which kind it is and that only the name is
+  stored. No value is shown or stored. `oidc` shows the issuer, the client ID, and a choice of client
+  credential: a client secret, or a client key for `private_key_jwt`. `saml` shows the metadata.
+- **Label.** The "Continue with" label sits in Sign-in, after the bindings, and has its texts in every locale, see [label texts](#label-texts).
 - **Claims.** The display name, email and locale claims are name boxes that show their defaults,
   `name`, `email` and `locale`, until the author types another name.
 - **Roles.** The roles claim is a name box that shows `roles` by default. `values` are rows of a claim
@@ -820,10 +827,13 @@ remove. An empty list removes `signIn`, so the site allows every provider, and t
 
 ## Scenario editor
 
-The scenario editor's Form tab shows the scenario's name, its [description](#editor) and `now`, then its users with their roles,
-its stubs, and its steps as a list with a panel for each step type, and the JSON view stays as the
-second view of the same draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
+The scenario editor's Form tab has four sections: General, with the scenario's name, its [description](#editor)
+and `now`; Users, with their roles; Stubs; and Steps, a list with a panel for each step type. Add user,
+Add stub and Add step sit on their section's heading. The JSON view stays as the second view of the same
+draft. Scenarios themselves are in [test scenarios](test-scenarios.md).
 
+- **Field names.** Every field, stub and step property shows a label and help text in the app's
+  languages, so a person sees "Moves time by" and not the property name `by`.
 - **Steps.** Each step has a type. Changing the type keeps the properties the new type takes and drops
   the others, and keys the editor does not show stay in the file. A step can be removed or moved up or
   down.

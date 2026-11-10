@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, Input, Modal } from 'antd'
+import { Flex, Form, Input, Modal } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useRef, useState } from 'react'
 import { CellJobTable } from '../platform/CellJobTable'
 import { createCellTenant, type CellJob, type CellTenantRequest } from '../platform/cell'
@@ -110,8 +111,7 @@ export function CreateCellTenantModal({ onClose, onEnded }: { onClose: () => voi
         <CellJobTable jobs={[job]} locale={locale} />
       ) : (
         <Flex vertical gap="middle">
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {error && <Alert data-testid="cell-create-error" type="error" title={error} />}
+          {error && <AxisAlert data-testid="cell-create-error" kind="error" message={error} />}
           <Form form={form} layout="vertical" name="create-cell-tenant" requiredMark={false}>
             <Form.Item
               name="id"

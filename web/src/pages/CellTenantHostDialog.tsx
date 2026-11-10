@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, Input, Modal, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -133,8 +134,7 @@ export function CellTenantHostDialog({ tenant, onRefused, onClose }: CellTenantH
             </AxisField>
           </Form>
         )}
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {error && <Alert data-testid="cell-tenant-host-error" type="error" title={error} />}
+        {error && <AxisAlert data-testid="cell-tenant-host-error" kind="error" message={error} />}
       </Flex>
     </Modal>
   )

@@ -407,6 +407,34 @@ describe('TaskPage', () => {
     expect(screen.getByTestId('location').textContent).toBe(`/e2e/tasks/${taskId}`)
   })
 
+  it('scrolls a finish error above the form into view and focuses it', async () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    try {
+      stubTaskApi({
+        complete: {
+          status: 400,
+          body: {
+            title: 'One or more validation errors occurred.',
+            status: 400,
+            errors: { '/outcome': ["Must be one of the step's outcomes."] },
+          },
+        },
+      })
+      renderPage()
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Approve' }))
+
+      const error = await screen.findByTestId('form-error')
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      expect(scrollIntoView.mock.contexts).toEqual([error])
+      expect(error).toHaveFocus()
+      expect(within(error).getByRole('alert')).toHaveTextContent("Must be one of the step's outcomes.")
+    } finally {
+      delete (Element.prototype as Partial<Element>).scrollIntoView
+    }
+  })
+
   it('shows that the task is assigned to someone else when the read answers 403', async () => {
     stubTaskApi({ reads: [{ status: 403, body: { title: 'This task is assigned to someone else.', status: 403 } }] })
 
@@ -844,8 +872,8 @@ describe('TaskPage', () => {
 
       expect(await screen.findByLabelText('Comments')).toBeInTheDocument()
       expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
-      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step one')
-      expect(screen.getByTestId('form-steps')).toHaveTextContent('Step two')
+      expect(screen.getByTestId('steps-bar')).toHaveTextContent('Step one')
+      expect(screen.getByTestId('steps-bar')).toHaveTextContent('Step two')
       expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Next'])
       await waitFor(() => expect(api.stateRequests()).toHaveLength(1))
 

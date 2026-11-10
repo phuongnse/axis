@@ -1,4 +1,5 @@
-import { Alert, Button, Checkbox, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import { Button, Checkbox, Flex, Form, Input, Modal, Select, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { createContext, lazy, Suspense, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
@@ -155,12 +156,10 @@ function Point({ value }: { value: string }) {
         </>
       )}
       {conflict && (
-        // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-        <Alert
+        <AxisAlert
           data-testid="studio-contract-relax-conflict"
-          type="warning"
-          showIcon
-          title={t('shell.studio.contract.relaxConflict')}
+          kind="warning"
+          message={t('shell.studio.contract.relaxConflict')}
         />
       )}
       <Modal
@@ -549,8 +548,9 @@ export function StudioModuleContract({
   useUnsavedChanges(patch.length > 0)
 
   if (loadFailed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    return <Alert data-testid="studio-resource-load-error" type="error" title={t('shell.studio.loadResourceFailed')} />
+    return (
+      <AxisAlert data-testid="studio-resource-load-error" kind="error" message={t('shell.studio.loadResourceFailed')} />
+    )
   }
   if (!loaded) {
     return null
@@ -675,8 +675,7 @@ export function StudioModuleContract({
   return (
     <RelaxContextValue.Provider value={relax}>
       <Flex vertical gap="middle">
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        <Alert data-testid="studio-contract-add-only" type="info" title={t('shell.studio.contract.addOnly')} />
+        <AxisAlert data-testid="studio-contract-add-only" kind="info" message={t('shell.studio.contract.addOnly')} />
         {view.states.length > 0 && (
           <Suspense fallback={null}>
             <StudioContractLifecycle states={view.states} edges={view.edges} />
@@ -826,17 +825,15 @@ export function StudioModuleContract({
           ]}
         />
         {conflict && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert
+          <AxisAlert
             data-testid="studio-conflict"
-            type="warning"
-            title={t('shell.studio.conflict')}
+            kind="warning"
+            message={t('shell.studio.conflict')}
             // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
             action={<Button onClick={() => void reload()}>{t('shell.studio.reload')}</Button>}
           />
         )}
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {saveError !== null && <Alert data-testid="studio-save-error" type="error" title={saveError} />}
+        {saveError !== null && <AxisAlert data-testid="studio-save-error" kind="error" message={saveError} />}
         <AxisActionRow align="center">
           <AxisButton
             role="finish"

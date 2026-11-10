@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { Button, Flex, Form, Modal, Typography, Upload, type UploadFile } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import type { UploadChangeParam } from 'antd/es/upload'
 import { useEffect, useRef, useState } from 'react'
 import { AxisActionRow, AxisButton } from './AxisButton'
@@ -15,9 +16,7 @@ import { requiredMark } from './requiredMark'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-
-/** How long the dialog waits between two checks of an import. */
-const pollDelay = 1000
+import { useFollowJob } from './useFollowJob'
 
 type Phase = 'idle' | 'uploading' | 'checking' | 'checked' | 'committing' | 'failed'
 
@@ -60,49 +59,38 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
     committedHandler.current = onCommitted
   }, [onCommitted])
 
-  useEffect(() => {
-    if (watch === null) {
-      return
-    }
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout>
-
-    async function check() {
-      try {
-        const result = await fetchImport(importsPath, watch!.id, controller.signal)
-        if (!result.ok) {
-          setProblem(t('shell.table.importUploadFailed'))
-          setPhase(watch!.commit ? 'checked' : 'idle')
-          return
-        }
-        const { state, errors: found } = result.import
-        // A queued commit leaves the import checked until the worker ends it.
-        if (state === 'pending' || (watch!.commit && state === 'checked')) {
-          timer = setTimeout(() => void check(), pollDelay)
-        } else if (state === 'checked') {
-          setPhase('checked')
-        } else if (state === 'failed') {
-          setErrors(importErrorRows(found))
-          setPhase('failed')
-        } else {
-          committedHandler.current()
-        }
-      } catch (error) {
-        if (controller.signal.aborted) {
-          return
-        }
-        console.warn(`Checking the import '${watch!.id}' failed`, error)
+  useFollowJob(watch ? `${importsPath}/${watch.id}/${watch.commit ? 'commit' : 'check'}` : null, {
+    read: (signal) => fetchImport(importsPath, watch!.id, signal),
+    // A queued commit leaves the import checked until the worker ends it.
+    ends: (result) =>
+      !result.ok || !(result.import.state === 'pending' || (watch!.commit && result.import.state === 'checked')),
+    interval: 1000,
+    onEnd: (result) => {
+      // Clearing the watch lets a retried check or commit of the same import start a new following.
+      setWatch(null)
+      if (!result.ok) {
         setProblem(t('shell.table.importUploadFailed'))
         setPhase(watch!.commit ? 'checked' : 'idle')
+        return
       }
-    }
-
-    void check()
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [watch, importsPath, t])
+      const { state, errors: found } = result.import
+      if (state === 'checked') {
+        setPhase('checked')
+      } else if (state === 'failed') {
+        setErrors(importErrorRows(found))
+        setPhase('failed')
+      } else {
+        committedHandler.current()
+      }
+    },
+    onError: (error) => {
+      console.warn(`Checking the import '${watch!.id}' failed`, error)
+      setWatch(null)
+      setProblem(t('shell.table.importUploadFailed'))
+      setPhase(watch!.commit ? 'checked' : 'idle')
+      return 'stop'
+    },
+  })
 
   // Picking a file, or removing it, drops the import of the file before.
   const reset = () => {
@@ -280,8 +268,7 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
               ))}
             </ul>
           )}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {problem !== null && <Alert data-testid="import-problem" type="error" title={problem} />}
+          {problem !== null && <AxisAlert data-testid="import-problem" kind="error" message={problem} />}
         </div>
       </Flex>
     </Modal>

@@ -1,4 +1,5 @@
-import { Alert, Flex, Form, Input, Modal, Radio, Select } from 'antd'
+import { Flex, Form, Input, Modal, Radio, Select } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useState } from 'react'
 import { resolveCall, type CallOutput, type InstanceCall } from './inspection'
 import { placeProblemErrors } from './problemErrors'
@@ -145,8 +146,7 @@ export function ResolveDialog({ call, outputs, instanceId, instancesPath, onClos
             </fieldset>
           )}
         </Form>
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {error !== undefined && <Alert data-testid="inspector-command-error" type="error" title={error} />}
+        {error !== undefined && <AxisAlert data-testid="inspector-command-error" kind="error" message={error} />}
       </Flex>
     </Modal>
   )

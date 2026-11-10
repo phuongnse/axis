@@ -1,11 +1,12 @@
 using Axis.ControlPlane.Billing;
+using Axis.ControlPlane.SignUp;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c> and the append-only <c>billing.ledger_entries</c>: the sign-up and billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> and the append-only <c>billing.ledger_entries</c>: the sign-up and billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -22,6 +23,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<JobRow> Jobs => Set<JobRow>();
 
     public DbSet<AuditRecordRow> AuditRecords => Set<AuditRecordRow>();
+
+    public DbSet<SignUpRow> SignUps => Set<SignUpRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
 
@@ -58,6 +61,31 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             record.Property(r => r.Actor).HasColumnName("actor");
             record.Property(r => r.Action).HasColumnName("action");
             record.Property(r => r.Subject).HasColumnName("subject");
+        });
+
+        modelBuilder.Entity<SignUpRow>(signUp =>
+        {
+            signUp.ToTable("sign_ups", table =>
+            {
+                table.HasCheckConstraint("ck_sign_ups_state", "state IN ('pending', 'verified', 'expired')");
+                table.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
+                table.HasCheckConstraint("ck_sign_ups_token_hash", "token_hash IS NULL OR octet_length(token_hash) = 32");
+            });
+            signUp.HasKey(s => s.Id).HasName("pk_sign_ups");
+            signUp.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
+            signUp.Property(s => s.FullName).HasColumnName("full_name");
+            signUp.Property(s => s.Email).HasColumnName("email");
+            signUp.Property(s => s.BusinessName).HasColumnName("business_name");
+            signUp.Property(s => s.Subdomain).HasColumnName("subdomain");
+            signUp.Property(s => s.Language).HasColumnName("language");
+            signUp.Property(s => s.Application).HasColumnName("application");
+            signUp.Property(s => s.State).HasColumnName("state").HasDefaultValue("pending");
+            signUp.Property(s => s.TokenHash).HasColumnName("token_hash").HasColumnType("bytea");
+            signUp.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            signUp.Property(s => s.ExpiresAt).HasColumnName("expires_at");
+            signUp.HasIndex(s => s.Subdomain, "ux_sign_ups_pending_subdomain").IsUnique().HasFilter("state = 'pending'");
+            signUp.HasIndex(s => s.TokenHash, "ux_sign_ups_token_hash").IsUnique().HasFilter("token_hash IS NOT NULL");
+            signUp.HasIndex(s => s.ExpiresAt, "ix_sign_ups_expires_at").HasFilter("state = 'pending'");
         });
 
         modelBuilder.Entity<LedgerEntryRow>(entry =>

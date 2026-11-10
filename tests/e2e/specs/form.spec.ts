@@ -375,8 +375,8 @@ test('a wizard is filled with the keyboard only: Next checks the step, Back keep
   const save = page.getByRole('button', { name: 'Save', exact: true })
 
   await page.goto('/e2e/notewizard/new')
-  await expect(page.getByTestId('form-steps')).toContainText('Basics')
-  await expect(page.getByTestId('form-steps')).toContainText('Extras')
+  await expect(page.getByTestId('steps-bar')).toContainText('Basics')
+  await expect(page.getByTestId('steps-bar')).toContainText('Extras')
   await expect(save).toBeHidden()
 
   // An empty title blocks Next, so the form stays on the first step with the message.

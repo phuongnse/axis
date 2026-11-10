@@ -109,7 +109,8 @@ every business change.
     on the 10th attempt, is `failed` the same way without running. These timings are code defaults
     and not `ControlPlane:` settings.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
-    such as the directory's correction every 5 minutes. Under a database lock on the kind, it queues
+    such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
+    (`expireSignUps`), each every 5 minutes. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
     every 30 seconds and the job runner runs the job as any other. A job that waits for a retry
@@ -130,8 +131,15 @@ every business change.
     `{ template, language, to, values }`. The helper rejects an unknown template, a language other
     than `en` or `vi`, an address that is not an email address and a missing value, so a bad email
     fails when it is queued and not on the tenth retry. A payload is stored in the database, so it
-    never holds a password, a token or a payment detail: an email that needs a link with a token needs
-    its own design.
+    never holds a password, a token or a payment detail, and the helper refuses the template
+    `signUpConfirm`, whose link holds a token.
+  - **An email with a token.** The confirm email of a sign-up is the job `sendSignUpConfirm`, with
+    the payload `{ signUpId }` only. The job reads the name, the address, the subdomain and the
+    language from the sign-up, makes the token when it sends, 32 random bytes written as base64url, and
+    writes only the token's SHA-256 to the sign-up before it sends the link
+    `<ControlPlane:PublicUrl>/sign-up/verify#<token>`. A retry makes a new token, so only the link of
+    the latest email that was sent works. It sends through the same relay helper as `sendEmail`. A
+    sign-up that is no longer pending is skipped. The token and the link are never logged.
   - **Templates.** A template is a plain text file embedded in the service, named
     `<kind>.<language>.txt`, such as `tenantReady.vi.txt`. Its first line is `Subject: …`, a blank
     line follows, and the rest is the body. A placeholder is written `{{name}}`. The kinds are found
@@ -181,7 +189,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   optional, and once it is set a DNS provider is required. The cell settings are optional, and once a cell is listed, all of its settings, its secret
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
-  needs an id and both titles.
+  needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
+  their settings is set, all of them are required. The public URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, and never its value.
 - **Secrets as files.** The connection strings, the mail password, the cells' secrets and the DNS key
@@ -196,6 +205,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | --- | --- | --- |
 | `ControlPlane:Region` | The region code, such as `vn` | Lowercase letters and digits only |
 | `ControlPlane:TenantDomain` | The domain of the region's tenant subdomains, such as `vn.example.com` | A valid domain name |
+| `ControlPlane:PublicUrl` | The address that the links of the control plane's emails start with. Optional. Default `https://account.<ControlPlane:TenantDomain>` | An absolute URL, and `https` outside Development and Testing |
 | `ControlPlane:ConnectionString` | The connection to the control plane's own PostgreSQL | A valid Npgsql connection string. Outside Development and Testing it must set `SSL Mode=VerifyFull` |
 | `ControlPlane:DirectoryConnectionString` | The connection to the [region directory](region-directory.md)'s own PostgreSQL. Optional | When set, the same checks as `ControlPlane:ConnectionString`, and `ControlPlane:Dns:Provider` is required |
 | `ControlPlane:MailFrom` | The address every email of the control plane comes from | A valid email address |
@@ -220,6 +230,18 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
+| `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
+| `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Dpa:Version` | The version of the data processing agreement that a person accepts. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Dpa:Urls:en` | The English address of the data processing agreement | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Dpa:Urls:vi` | The Vietnamese address of the data processing agreement | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Privacy:Version` | The version of the privacy policy that a person accepts. Optional | Not empty, when a document is set |
+| `ControlPlane:SignUp:Privacy:Urls:en` | The English address of the privacy policy | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
+| `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the

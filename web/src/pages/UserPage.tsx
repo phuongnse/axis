@@ -1,4 +1,5 @@
-import { Alert, Flex, Modal, Result, Tag, Typography } from 'antd'
+import { Flex, Modal, Result, Tag, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { AxisButton } from '../platform/AxisButton'
@@ -127,8 +128,9 @@ export function UserPage() {
               {t('shell.users.email')}: {roles.email ?? t('shell.value.notSet')}
             </Typography.Text>
           )}
-          {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-          {problem && <Alert data-testid="user-roles-problem" type="error" title={t(`shell.users.roles.${problem}`)} />}
+          {problem && (
+            <AxisAlert data-testid="user-roles-problem" kind="error" message={t(`shell.users.roles.${problem}`)} />
+          )}
           {sections.map((section) => (
             <section key={section.key} data-testid="user-roles-section" aria-label={section.title}>
               <Typography.Title level={5}>{section.title}</Typography.Title>

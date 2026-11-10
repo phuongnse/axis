@@ -175,7 +175,7 @@ test.describe('the author builds the asset management application with Studio on
         await pick(page, `${at}/expect`, 'invalid')
         await page
           .getByTestId(`${at}/expect`)
-          .getByRole('textbox', { name: 'invalid', exact: true })
+          .getByRole('textbox', { name: 'Path', exact: true })
           .fill((expected as { invalid: string }).invalid)
       }
     }

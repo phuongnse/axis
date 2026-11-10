@@ -1,11 +1,11 @@
 import { Flex, Typography } from 'antd'
 import { useRef, useState, type ChangeEvent } from 'react'
+import { Announcement } from './Announcement'
 import { AxisButton } from './AxisButton'
 import { fileUrl, uploadFile } from './files'
 import type { FileValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
-import { visuallyHidden } from './visuallyHidden'
 
 interface FileLinkProps {
   field: Pick<FieldMetadata, 'downloadPath'>
@@ -144,9 +144,7 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false 
           <Typography.Text type="danger">{error}</Typography.Text>
         </span>
       )}
-      <div role="status" aria-live="polite" style={visuallyHidden} data-testid={`file-${field.name}-announcement`}>
-        {announcement}
-      </div>
+      <Announcement testId={`file-${field.name}-announcement`}>{announcement}</Announcement>
     </div>
   )
 }

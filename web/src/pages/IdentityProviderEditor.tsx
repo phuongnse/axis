@@ -1,9 +1,14 @@
 import { Button, Flex, Input, Radio, Select, Typography } from 'antd'
-import { useContext } from 'react'
+import { useContext, type ReactNode } from 'react'
+import { AxisButton } from '../platform/AxisButton'
+import { AxisField } from '../platform/AxisField'
+import { AxisFieldGroup } from '../platform/AxisFieldGroup'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
+import { useFieldTexts } from './fieldTexts'
 import { LabelTexts } from './LabelTexts'
 import { ReferencePicker } from './ReferencePicker'
+import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
 
 type Content = Record<string, unknown>
@@ -19,9 +24,9 @@ const forbiddenKeys: Record<string, string[]> = {
 
 /** The claim names that apply when a provider sets none. */
 const claimDefaults = [
-  { key: 'displayName', placeholder: 'name', label: 'shell.studio.identityProvider.displayNameClaim' },
-  { key: 'email', placeholder: 'email', label: 'shell.studio.identityProvider.emailClaim' },
-  { key: 'locale', placeholder: 'locale', label: 'shell.studio.identityProvider.localeClaim' },
+  { key: 'displayName', placeholder: 'name' },
+  { key: 'email', placeholder: 'email' },
+  { key: 'locale', placeholder: 'locale' },
 ] as const
 
 function isContent(value: unknown): value is Content {
@@ -38,13 +43,17 @@ function bindingName(value: unknown): string {
 }
 
 /**
- * The editor of an identity provider. It shows the name and the type, then the fields that the type takes: the
- * bindings, the "Continue with" label, the claims, the role mapping and the assurance levels. A binding is only a
- * name: the box neither shows nor writes a value, because values live in tenant settings. The editor edits the draft
- * through `onChange`, so a key it does not show stays as it is.
+ * The editor of an identity provider, in the shared sections General, Sign-in, Claims, Roles and Assurance, see
+ * docs/reference/studio.md#identity-provider-editor. General holds the name, the type and the description. Sign-in
+ * and Claims show only for `oidc` and `saml`: the bindings, the client credential and the "Continue with" label, and
+ * the claims. Roles holds the role mapping and Assurance the assurance levels. Each field is drawn through
+ * `AxisField` with its label and help. A binding is only a name: the box neither shows nor writes a value, because
+ * values live in tenant settings. The editor edits the draft through `onChange`, so a key it does not show stays as it
+ * is.
  */
 export function IdentityProviderEditor({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
   const t = useText()
+  const { field, group } = useFieldTexts('identityProvider')
   const names = useContext(StudioNamesContext)
   const type = typeof value.type === 'string' ? value.type : undefined
   const claims = isContent(value.claims) ? value.claims : {}
@@ -129,181 +138,211 @@ export function IdentityProviderEditor({ value, onChange }: { value: Content; on
 
   function textField(
     pointer: string,
-    name: string,
+    path: string,
     current: unknown,
     placeholder?: string,
     write?: (next: string) => void,
   ) {
     return (
       <div data-testid={`studio-field-${pointer}`}>
-        <div>{name}</div>
-        <Input
-          aria-label={name}
-          placeholder={placeholder}
-          value={text(current)}
-          onChange={(event) => (write ?? ((next: string) => onChange(pointer, next)))(event.target.value)}
-        />
+        <AxisField {...field(path)}>
+          <Input
+            placeholder={placeholder}
+            value={text(current)}
+            onChange={(event) => (write ?? ((next: string) => onChange(pointer, next)))(event.target.value)}
+          />
+        </AxisField>
       </div>
     )
   }
 
-  function bindingField(key: string, name: string, kind: 'url' | 'secret') {
-    const kindText = t(
-      kind === 'url' ? 'shell.studio.identityProvider.urlBinding' : 'shell.studio.identityProvider.secretBinding',
-    )
+  function bindingField(key: string) {
     return (
       <div data-testid={`studio-field-/${key}`}>
-        <div>
-          {name} <Typography.Text type="secondary">({kindText})</Typography.Text>
-        </div>
-        <Input
-          aria-label={`${name} (${kindText})`}
-          value={bindingName(value[key])}
-          onChange={(event) => onChange(`/${key}/binding`, event.target.value)}
-        />
-        <Typography.Text type="secondary">{t('shell.studio.identityProvider.bindingHint')}</Typography.Text>
+        <AxisField {...field(key)}>
+          <Input
+            value={bindingName(value[key])}
+            onChange={(event) => onChange(`/${key}/binding`, event.target.value)}
+          />
+        </AxisField>
       </div>
     )
   }
 
-  return (
-    <Flex vertical gap="small" data-testid="studio-identity-provider-editor">
-      {textField('/name', t('shell.studio.identityProvider.name'), value.name)}
-      <div data-testid="studio-field-/type">
-        <div>{t('shell.studio.identityProvider.type')}</div>
-        <Select
-          aria-label={t('shell.studio.identityProvider.type')}
-          style={{ minWidth: 240 }}
-          virtual={false}
-          value={type}
-          options={types.map((option) => ({ value: option, label: option }))}
-          onChange={(next: string) => changeType(next)}
-        />
-      </div>
-      {type === 'oidc' && (
-        <>
-          {bindingField('issuer', t('shell.studio.identityProvider.issuer'), 'url')}
-          {bindingField('clientId', t('shell.studio.identityProvider.clientId'), 'secret')}
-          <div data-testid="studio-field-/clientCredential">
-            <div>{t('shell.studio.identityProvider.clientCredential')}</div>
-            <Radio.Group
-              aria-label={t('shell.studio.identityProvider.clientCredential')}
-              value={usesKey ? 'clientKey' : 'clientSecret'}
-              options={[
-                { value: 'clientSecret', label: t('shell.studio.identityProvider.clientSecret') },
-                { value: 'clientKey', label: t('shell.studio.identityProvider.clientKey') },
-              ]}
-              onChange={(event) => changeCredential(event.target.value as 'clientSecret' | 'clientKey')}
-            />
-          </div>
-          {usesKey
-            ? bindingField('clientKey', t('shell.studio.identityProvider.clientKey'), 'secret')
-            : bindingField('clientSecret', t('shell.studio.identityProvider.clientSecret'), 'secret')}
-        </>
-      )}
-      {type === 'saml' && bindingField('metadata', t('shell.studio.identityProvider.metadata'), 'url')}
-      {(type === 'oidc' || type === 'saml') && (
-        <div data-testid="studio-field-/label">
-          <div>{t('shell.studio.identityProvider.label')}</div>
-          <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
-        </div>
-      )}
-      <div data-testid="studio-field-/description">
-        <div>{t('shell.studio.identityProvider.description')}</div>
-        <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
-      </div>
-      {(type === 'oidc' || type === 'saml') && (
-        <div data-testid="studio-field-/claims">
-          <Flex vertical gap="small">
-            <Typography.Text strong>{t('shell.studio.identityProvider.claims')}</Typography.Text>
-            {claimDefaults.map((claim) =>
-              textField(`/claims/${claim.key}`, t(claim.label), claims[claim.key], claim.placeholder, (next) =>
-                changeClaim(claim.key, next),
-              ),
-            )}
-          </Flex>
-        </div>
-      )}
-      <div data-testid="studio-field-/roles">
+  function section(name: string, children: ReactNode, action?: ReactNode) {
+    const prefix = `shell.studio.section.identityProvider.${name}`
+    return (
+      <ResourceFormSection testName={name} heading={{ title: t(prefix), line: t(`${prefix}.line`) }} action={action}>
         <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.identityProvider.roles')}</Typography.Text>
-          {textField(
-            '/roles/claim',
-            t('shell.studio.identityProvider.rolesClaim'),
-            roles.claim,
-            'roles',
-            changeRolesClaim,
+          {children}
+        </Flex>
+      </ResourceFormSection>
+    )
+  }
+
+  const takesSignIn = type === 'oidc' || type === 'saml'
+
+  return (
+    <div data-testid="studio-identity-provider-editor">
+      <ResourceFormSections>
+        {section(
+          'general',
+          <>
+            {textField('/name', 'name', value.name)}
+            <div data-testid="studio-field-/type">
+              <AxisField {...field('type')}>
+                <Select
+                  style={{ minWidth: 240 }}
+                  virtual={false}
+                  value={type}
+                  options={types.map((option) => ({ value: option, label: option }))}
+                  onChange={(next: string) => changeType(next)}
+                />
+              </AxisField>
+            </div>
+            <div data-testid="studio-field-/description">
+              <AxisFieldGroup {...group('description')}>
+                <LabelTexts pointer="/description" value={value.description} onChange={onChange} />
+              </AxisFieldGroup>
+            </div>
+          </>,
+        )}
+        {takesSignIn &&
+          section(
+            'signIn',
+            <>
+              {type === 'oidc' && (
+                <>
+                  {bindingField('issuer')}
+                  {bindingField('clientId')}
+                  <div data-testid="studio-field-/clientCredential">
+                    <AxisField {...field('clientCredential')}>
+                      <Radio.Group
+                        role="radiogroup"
+                        aria-label={field('clientCredential').label}
+                        value={usesKey ? 'clientKey' : 'clientSecret'}
+                        options={[
+                          { value: 'clientSecret', label: field('clientSecret').label },
+                          { value: 'clientKey', label: field('clientKey').label },
+                        ]}
+                        onChange={(event) => changeCredential(event.target.value as 'clientSecret' | 'clientKey')}
+                      />
+                    </AxisField>
+                  </div>
+                  {bindingField(usesKey ? 'clientKey' : 'clientSecret')}
+                </>
+              )}
+              {type === 'saml' && bindingField('metadata')}
+              <div data-testid="studio-field-/label">
+                <AxisFieldGroup {...group('label')}>
+                  <LabelTexts pointer="/label" value={value.label} onChange={onChange} />
+                </AxisFieldGroup>
+              </div>
+            </>,
           )}
-          <div data-testid="studio-field-/roles/values">
+        {takesSignIn &&
+          section(
+            'claims',
+            <div data-testid="studio-field-/claims">
+              <Flex vertical gap="small">
+                {claimDefaults.map((claim) =>
+                  textField(
+                    `/claims/${claim.key}`,
+                    `claims.${claim.key}`,
+                    claims[claim.key],
+                    claim.placeholder,
+                    (next) => changeClaim(claim.key, next),
+                  ),
+                )}
+              </Flex>
+            </div>,
+          )}
+        {section(
+          'roles',
+          <div data-testid="studio-field-/roles">
             <Flex vertical gap="small">
-              <div>{t('shell.studio.identityProvider.roleValues')}</div>
-              {Object.entries(roleValues).map(([claim, role], position) => (
-                <Flex key={position} gap="small" align="center" wrap data-testid={`studio-role-row-${position}`}>
-                  <Input
-                    aria-label={t('shell.studio.identityProvider.claimValue')}
-                    value={claim}
-                    onChange={(event) => changeRoleRow(position, event.target.value, text(role))}
-                  />
-                  <ReferencePicker
-                    name={t('shell.studio.identityProvider.role')}
-                    value={text(role)}
-                    required
-                    options={names?.roles.map((declared) => declared.name) ?? []}
-                    onChange={(next) => changeRoleRow(position, claim, next ?? '')}
-                  />
+              {textField('/roles/claim', 'roles.claim', roles.claim, 'roles', changeRolesClaim)}
+              <div data-testid="studio-field-/roles/values">
+                <AxisFieldGroup {...group('roles.values')}>
+                  <Flex vertical gap="small">
+                    {Object.entries(roleValues).map(([claim, role], position) => (
+                      <Flex
+                        key={position}
+                        gap="small"
+                        align="flex-end"
+                        wrap
+                        data-testid={`studio-role-row-${position}`}
+                      >
+                        <AxisField {...field('roles.values.claimValue')}>
+                          <Input
+                            value={claim}
+                            onChange={(event) => changeRoleRow(position, event.target.value, text(role))}
+                          />
+                        </AxisField>
+                        <AxisField {...field('roles.values.role')}>
+                          <ReferencePicker
+                            name={field('roles.values.role').label}
+                            value={text(role)}
+                            required
+                            options={names?.roles.map((declared) => declared.name) ?? []}
+                            onChange={(next) => changeRoleRow(position, claim, next ?? '')}
+                          />
+                        </AxisField>
+                        {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                        <Button
+                          onClick={() =>
+                            writeRoleValues(
+                              Object.entries(roleValues)
+                                .map(([key, current]): [string, string] => [key, text(current)])
+                                .filter((_, index) => index !== position),
+                            )
+                          }
+                        >
+                          {t('shell.studio.identityProvider.remove')}
+                        </Button>
+                      </Flex>
+                    ))}
+                    <div>
+                      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                      <Button onClick={addRoleRow}>{t('shell.studio.identityProvider.addRole')}</Button>
+                    </div>
+                    {Object.keys(roleValues).length === 0 && (
+                      <Typography.Text type="secondary" data-testid="studio-identity-provider-same-name">
+                        {t('shell.studio.identityProvider.sameNameHint')}
+                      </Typography.Text>
+                    )}
+                  </Flex>
+                </AxisFieldGroup>
+              </div>
+            </Flex>
+          </div>,
+        )}
+        {section(
+          'assurance',
+          <div data-testid="studio-field-/acr">
+            <Flex vertical gap="small">
+              {acr.map((level, index) => (
+                <Flex key={index} gap="small" align="flex-end" data-testid={`studio-field-/acr/${index}`}>
+                  <AxisField {...field('acr')}>
+                    <Input value={text(level)} onChange={(event) => onChange(`/acr/${index}`, event.target.value)} />
+                  </AxisField>
                   {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                   <Button
                     onClick={() =>
-                      writeRoleValues(
-                        Object.entries(roleValues)
-                          .map(([key, current]): [string, string] => [key, text(current)])
-                          .filter((_, index) => index !== position),
-                      )
+                      onChange('/acr', acr.length > 1 ? acr.filter((_, position) => position !== index) : undefined)
                     }
                   >
                     {t('shell.studio.identityProvider.remove')}
                   </Button>
                 </Flex>
               ))}
-              <div>
-                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-                <Button onClick={addRoleRow}>{t('shell.studio.identityProvider.addRole')}</Button>
-              </div>
-              {Object.keys(roleValues).length === 0 && (
-                <Typography.Text type="secondary" data-testid="studio-identity-provider-same-name">
-                  {t('shell.studio.identityProvider.sameNameHint')}
-                </Typography.Text>
-              )}
             </Flex>
-          </div>
-        </Flex>
-      </div>
-      <div data-testid="studio-field-/acr">
-        <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.identityProvider.acr')}</Typography.Text>
-          {acr.map((level, index) => (
-            <Flex key={index} gap="small" align="center" data-testid={`studio-field-/acr/${index}`}>
-              <Input
-                aria-label={t('shell.studio.identityProvider.acr')}
-                value={text(level)}
-                onChange={(event) => onChange(`/acr/${index}`, event.target.value)}
-              />
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
-                onClick={() =>
-                  onChange('/acr', acr.length > 1 ? acr.filter((_, position) => position !== index) : undefined)
-                }
-              >
-                {t('shell.studio.identityProvider.remove')}
-              </Button>
-            </Flex>
-          ))}
-          <div>
-            {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-            <Button onClick={() => onChange('/acr', [...acr, ''])}>{t('shell.studio.identityProvider.addAcr')}</Button>
-          </div>
-        </Flex>
-      </div>
-    </Flex>
+          </div>,
+          <AxisButton role="secondary" onClick={() => onChange('/acr', [...acr, ''])}>
+            {t('shell.studio.identityProvider.addAcr')}
+          </AxisButton>,
+        )}
+      </ResourceFormSections>
+    </div>
   )
 }

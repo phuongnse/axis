@@ -1,4 +1,5 @@
-import { Alert, Flex, Modal, Typography } from 'antd'
+import { Flex, Modal, Typography } from 'antd'
+import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useId, useState } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -6,13 +7,11 @@ import { saveFile } from '../platform/exports'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { downloadTenantExport, readTenantExport, startTenantExport, type TenantExport } from '../platform/tenantExports'
+import { useFollowJob } from '../platform/useFollowJob'
 import { usePlatform } from './context'
 
 /** The local storage key that holds the id of the last export, so a reload shows it again. */
 const storageKey = 'axis.tenantExport'
-
-/** How long the section waits between two checks of a queued or running export. */
-const pollDelay = 2000
 
 type Notice = 'expired' | 'startFailed' | 'downloadFailed'
 
@@ -69,44 +68,29 @@ export function TenantExportSection() {
     return () => controller.abort()
   }, [])
 
-  useEffect(() => {
-    if (!enabled || !following) {
-      return
-    }
-    const controller = new AbortController()
-    let timer: ReturnType<typeof setTimeout> | undefined
-    async function check(id: string) {
-      let next: TenantExport | undefined
-      try {
-        const result = await readTenantExport(id, controller.signal)
-        if (controller.signal.aborted) {
-          return
-        }
-        if (result.kind === 'gone') {
-          remember(null)
-          setExported(undefined)
-          setFollowing(null)
-          return
-        }
-        next = result.export
-        setExported(next)
-      } catch (error: unknown) {
-        if (controller.signal.aborted) {
-          return
-        }
-        console.warn('Reading the export failed', error)
+  useFollowJob(enabled ? following : null, {
+    read: (signal) => readTenantExport(following!, signal),
+    ends: (result) => result.kind === 'gone' || (result.export.state !== 'queued' && result.export.state !== 'running'),
+    interval: 2000,
+    onAnswer: (result) => {
+      if (result.kind === 'ok') {
+        setExported(result.export)
       }
-      // A failed read tries again, like a running export.
-      if (!next || next.state === 'queued' || next.state === 'running') {
-        timer = setTimeout(() => void check(id), pollDelay)
+    },
+    onEnd: (result) => {
+      if (result.kind === 'gone') {
+        remember(null)
+        setExported(undefined)
+        setFollowing(null)
+        return
       }
-    }
-    void check(following)
-    return () => {
-      controller.abort()
-      clearTimeout(timer)
-    }
-  }, [enabled, following])
+      setExported(result.export)
+    },
+    onError: (error) => {
+      console.warn('Reading the export failed', error)
+      return 'retry'
+    },
+  })
 
   if (!enabled) {
     return null
@@ -161,14 +145,12 @@ export function TenantExportSection() {
         <Typography.Title level={3} id={headingId}>
           {t('shell.users.export.title')}
         </Typography.Title>
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        <Alert type="warning" showIcon title={t('shell.users.export.warning')} />
+        <AxisAlert kind="warning" message={t('shell.users.export.warning')} />
         {running && (
           <Typography.Text data-testid="tenant-export-running">{t('shell.users.export.running')}</Typography.Text>
         )}
         {exported?.state === 'failed' && (
-          // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-          <Alert data-testid="tenant-export-failed" type="error" title={t('shell.users.export.failed')} />
+          <AxisAlert data-testid="tenant-export-failed" kind="error" message={t('shell.users.export.failed')} />
         )}
         {exported?.state === 'succeeded' && (
           <Flex vertical gap="small" align="flex-start">
@@ -185,8 +167,9 @@ export function TenantExportSection() {
             </AxisButton>
           </Flex>
         )}
-        {/* oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert. */}
-        {notice && <Alert data-testid="tenant-export-notice" type="error" title={t(`shell.users.export.${notice}`)} />}
+        {notice && (
+          <AxisAlert data-testid="tenant-export-notice" kind="error" message={t(`shell.users.export.${notice}`)} />
+        )}
         {offerStart && (
           <div>
             <AxisButton

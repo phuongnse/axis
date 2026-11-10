@@ -136,6 +136,8 @@ These rules hold for every field on a form.
   hidden from screen readers. An editable input of a required field carries `aria-required`, and a
   read-only value does not. Required means the form state answer's `required`, or else the field's
   `required`.
+- **Warning.** A field's warning message and its border take `warningText`, as an
+  error's take `dangerText`, see [fields](actions-and-controls.md#fields).
 - **Help text.** A field whose entity field has [`help`](resource-files.md#resource-file-shape) shows
   it between the label and the input, in small text in `textMuted`, `spacing-xs` above the input, and
   tied to the input with `aria-describedby`. A file input and a read-only value show it but are not
@@ -244,6 +246,8 @@ The form sends only what changed, and shows the server's answer where it belongs
 - **Errors.** A `400` or `409` problem is mapped by its JSON Pointer keys. A key `/values/<field>` for
   a field of the form shows its messages under that field. Every other key, such as `""`, `/values` or
   `/version`, shows above the form, and so does a shared error for a save that fails in any other way.
+  The page scrolls to an error above the form and focuses it, so a user at the foot of a long form sees
+  it. A screen reader reads it as an alert.
   Every message is looked up in the site texts first, so a failed validation, whose message is a text
   key, shows its text in the user's locale. A fixed message such as "Required." is no text key, so it
   shows unchanged.

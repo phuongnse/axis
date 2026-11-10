@@ -1,4 +1,5 @@
-import { Alert, Button, Card, Flex } from 'antd'
+import { Button, Card, Flex } from 'antd'
+import { AxisAlert } from './AxisAlert'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { boundParameterQuery } from './boundParameters'
@@ -96,8 +97,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
   if (loading) {
     content = t('shell.kpi.loading')
   } else if (failed) {
-    // oxlint-disable-next-line axis/no-antd-alert -- Predates AxisAlert.
-    content = <Alert data-testid="kpi-error" type="error" title={t('shell.kpi.loadFailed')} />
+    content = <AxisAlert data-testid="kpi-error" kind="error" message={t('shell.kpi.loadFailed')} />
   } else {
     content = (
       <Flex vertical gap="small">

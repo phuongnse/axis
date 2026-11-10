@@ -87,6 +87,10 @@ export function hasFieldError(element: HTMLElement): boolean {
   return formItem(element).classList.contains('ant-form-item-has-error')
 }
 
+export function hasFieldWarning(element: HTMLElement): boolean {
+  return formItem(element).classList.contains('ant-form-item-has-warning')
+}
+
 /** Whether the label, or the label that holds `element`, is marked required. */
 export function isRequiredLabel(element: HTMLElement): boolean {
   return element.closest('label')?.classList.contains('ant-form-item-required') ?? false

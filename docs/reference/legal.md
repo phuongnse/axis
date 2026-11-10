@@ -34,6 +34,9 @@ The legal line closes every page with the copyright and the legal links.
 
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
   and so does the shell's footer, see [layout](shell.md#layout).
+- **The sign-up pages** _(planned for M33)_. Every page of [sign-up](sign-up.md#the-page) ends in the line
+  too, in the page's language. Its Privacy, Terms and Licences addresses come from the control plane, see
+  [the documents](sign-up.md#the-documents).
 - **Copyright at the start, links at the end.** The line starts with the copyright in `textMuted`. At its end sit the
   links, in `primaryText` as links: Privacy and Terms when the site or its tenant sets them, then Licences, always. At
   narrow width the links wrap and stay at the end. The links sit in a navigation landmark named Legal.
@@ -82,6 +85,10 @@ A person accepts the tenant's terms in a step of the identity provider, once and
   the box with an error and sends nothing. Continue records when the person accepted. Declining ends the sign-in at
   `/?signIn=declined`, Axis's sign-in card, which says that signing in needs the terms accepted, see
   [the shell's sign-in card](shell.md#the-sign-in-card).
+- **One box, drawn once**. `AcceptTermsField` draws the box, on this step and on the
+  [sign-up page](sign-up.md#the-terms-box). It is a required box that never starts ticked, names each
+  document as a link that opens in a new tab and marks itself with its message when the form is finished
+  unticked.
 - **On only while there are terms.** The realm sync turns the step on, for new users too, while the tenant sets terms
   and off when it has none, so the page never shows without a link. When the tenant's terms version changes, the
   sync asks it again of every user of the realm, and then stores the version in the realm attribute
