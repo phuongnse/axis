@@ -6,6 +6,7 @@ import { AxisButton } from '../src/platform/AxisButton'
 import { FilledText } from '../src/platform/FilledText'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
+import type { SignUpDocuments } from './documents'
 import { SignUpFrame } from './SignUpFrame'
 import type { SignUpLocale } from './texts'
 
@@ -33,9 +34,11 @@ function postToken(url: string, token: string, signal?: AbortSignal) {
 export function VerifyPage({
   locale,
   onLocaleChange,
+  documents,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
+  documents: SignUpDocuments | undefined
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -113,7 +116,13 @@ export function VerifyPage({
         : t('signUp.verify.title')
 
   return (
-    <SignUpFrame locale={locale} onLocaleChange={onLocaleChange} title={title} titleRef={titleRef}>
+    <SignUpFrame
+      locale={locale}
+      onLocaleChange={onLocaleChange}
+      title={title}
+      titleRef={titleRef}
+      documents={documents}
+    >
       {page.state === 'checking' && (
         <Typography.Paragraph style={{ margin: 0 }}>{t('signUp.verify.checking')}</Typography.Paragraph>
       )}

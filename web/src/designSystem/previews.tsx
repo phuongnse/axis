@@ -14,6 +14,7 @@ import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
+import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, ShellPreview } from './ShellPreview'
 import { studioFixtures } from './studioFixtures'
@@ -48,6 +49,9 @@ import {
   processInspectorWidget,
   requestId,
   sectionWidget,
+  signUpApplications,
+  signUpDocuments,
+  signUpRegion,
   siteTexts,
   sitePath,
   tableWidget,
@@ -318,6 +322,18 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       frameHeight: 600,
+    },
+  ],
+  signUp: [
+    {
+      caption: 'Typical',
+      draw: () => <SignUpPreview />,
+      frameHeight: 1200,
+      routes: {
+        '/api/sign-up/applications': () => signUpApplications,
+        '/api/sign-up/documents': () => signUpDocuments,
+        '/api/sign-up/region': () => signUpRegion,
+      },
     },
   ],
 }

@@ -17,13 +17,13 @@ sends nothing outside the region.
 - **No third party.** The page loads no script, font or image from another host. Its
   Content-Security-Policy allows `'self'` only, as the platform's
   [security headers](headers-and-rate-limits.md#security-headers) do.
-- **One frame for every sign-up page** _(planned for M33)_. Each page of the journey, from the form to
+- **One frame for every sign-up page**. Each page of the journey, from the form to
   the progress page, draws `SignUpFrame`: the [card page](shared-widgets.md#which-widget) with the
   shared "Language and theme" menu and the [legal line](legal.md#legal-line) under the card. The card is
   as wide as the `small` dialog, so a long form needs height and not width, and the page draws no frame
   of its own. The legal line's Privacy, Terms and Licences addresses come from
   [the region's documents](#the-documents).
-- **Fields** _(planned for M33)_. Each is an [`AxisField`](actions-and-controls.md#fields) with its help,
+- **Fields**. Each is an [`AxisField`](actions-and-controls.md#fields) with its help,
   in the order of the person's thinking: the person first, then the business's short fields together,
   and the choice that needs most thought last.
   1. The person's full name.
@@ -35,7 +35,7 @@ sends nothing outside the region.
   6. Start from, see [start from](#start-from).
   7. The box that accepts the terms, see [the terms box](#the-terms-box).
   8. The privacy notice under the box.
-- **Required fields** _(planned for M33)_. Full name, work email, business name, subdomain and language
+- **Required fields**. Full name, work email, business name, subdomain and language
   carry the shared required mark and show a message when empty. Start from and the terms box are not
   marked, because each always has a value or a check of its own. The sign-up pages mark their required
   fields, as every platform form does.
@@ -60,7 +60,7 @@ The person chooses what the new tenant starts from, because the platform does no
 application, as [D51](../decisions/d51-creating-applications-and-resources-from-studio.md) starts one blank
 or from a template.
 
-- **The choices** _(planned for M33)_. `StartFromField` offers Blank, chosen first, then the region's
+- **The choices**. `StartFromField` offers Blank, chosen first, then the region's
   built-in applications, each with its description. It is the field that Studio's
   [New application](studio.md#new-application) draws too. When the list does not load, the field's
   warning status says under the choices that Blank is still there.
@@ -68,19 +68,19 @@ or from a template.
   [settings](control-plane.md#settings), and `GET /api/sign-up/applications` serves it as
   `{ applications: [{ id, titles: { en, vi }, descriptions: { en, vi } }] }`, from the settings
   `ControlPlane:SignUp:Applications:<n>:Titles` and `:Descriptions`. The page shows each title in its language.
-- **Blank** _(planned for M33)_. The form sends `application: ""` for Blank. A tenant created without
+- **Blank**. The form sends `application: ""` for Blank. A tenant created without
   an application gets a blank one, see [creating a tenant](tenant-lifecycle.md#creating-a-tenant).
 
 ### The terms box
 
 The box accepts the business's agreements.
 
-- **The box** _(planned for M33)_. `AcceptTermsField` reads "On behalf of my business, I accept the Terms
+- **The box**. `AcceptTermsField` reads "On behalf of my business, I accept the Terms
   of service and the Data processing agreement.", in `vi` "Tôi thay mặt doanh nghiệp đồng ý với Điều
   khoản dịch vụ và Thỏa thuận xử lý dữ liệu.". It names each document as a link, in the page's language,
   opening in a new tab, and it is never ticked at first. See
   [accepting the terms](legal.md#accepting-the-terms).
-- **The privacy notice** _(planned for M33)_. A line under the box, before sending, names the Privacy
+- **The privacy notice**. A line under the box, before sending, names the Privacy
   policy as a link and has no box: the person's name and email are used to run the contract, which needs
   no separate consent. A lawyer confirms this before sign-up opens. If Vietnamese law needs an explicit
   consent, it is a box of its own, never joined to the terms.
@@ -91,7 +91,7 @@ The box accepts the business's agreements.
 `{ version, urls: { en, vi } }`, from the settings `ControlPlane:SignUp:Terms`, `:Dpa`, `:Privacy` and
 `:LicencesUrl`, see the [settings](control-plane.md#settings). Without them the route answers `503`.
 
-- **The page links the documents** _(planned for M33)_. The page links each document in its language,
+- **The page links the documents**. The page links each document in its language,
   and the legal line takes its Privacy, Terms and Licences addresses from the answer.
 - **The versions are sent** _(planned for M33)_. `POST /api/sign-up` sends `termsVersion`, `dpaVersion`
   and `privacyVersion`, the versions shown, and the control plane records them.
@@ -124,13 +124,13 @@ The person chooses the subdomain, which becomes the tenant's id, and the page ch
   use (`taken`), or when it is held after a deletion or by a pending sign-up (`held`). `reason` is null
   when the name is free. The answer never says which tenant has it. Without the region directory the
   route answers `503`.
-- **The status under the input** _(planned for M33)_. The check's answer is the field's
+- **The status under the input**. The check's answer is the field's
   [status](actions-and-controls.md#fields): checking shows the input busy, a free name shows nothing but
   a status region for a screen reader, a refused name shows its message as an error, and a check that
   could not run shows a warning, all under the input.
 - **The tenant domain.** `GET /api/sign-up/region` answers `{ tenantDomain }` from
   `ControlPlane:TenantDomain`, see the [settings](control-plane.md#settings).
-- **Ends in the tenant domain** _(planned for M33)_. The input shows the region's tenant domain after what
+- **Ends in the tenant domain**. The input shows the region's tenant domain after what
   the person types, in `textMuted`, such as `contoso-trading` then `.vn.example.com`, so the person reads
   the whole address as they type. A long subdomain scrolls inside the input. When the route fails, the
   input shows the subdomain alone, and its help still says it starts the address.

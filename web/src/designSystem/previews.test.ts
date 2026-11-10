@@ -46,7 +46,7 @@ describe('design-system previews', () => {
     expect(states.map(({ caption }) => caption)).toEqual(['Editable', 'Read-only', 'Required, help text and error'])
   })
 
-  test('the card groups are the eight agreed groups and list every preview once', () => {
+  test('the card groups are the nine agreed groups and list every preview once', () => {
     expect(cardGroups.map(({ name }) => name)).toEqual([
       'Field inputs',
       'Data widgets',
@@ -56,6 +56,7 @@ describe('design-system previews', () => {
       'Shared states',
       'Shell',
       'Studio',
+      'Sign-up',
     ])
     const listed = cardGroups.flatMap(({ previews: group }) => group)
     expect(new Set(listed).size).toBe(listed.length)
@@ -94,7 +95,7 @@ describe('design-system previews', () => {
     }
   })
 
-  test('the cards have the 26 names of the Design System artifact, in group order', () => {
+  test('the cards have the 27 names of the Design System artifact, in group order', () => {
     expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
       'TextField',
       'IntegerField',
@@ -122,6 +123,7 @@ describe('design-system previews', () => {
       'SignIn',
       'IdentitySignIn',
       'Studio',
+      'SignUp',
     ])
   })
 
