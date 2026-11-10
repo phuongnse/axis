@@ -28,6 +28,9 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     private const string DirectoryDatabase = "axis_directory";
     private const string Proxy = "10.0.0.5";
     private const string CompanyDomain = "contoso.example";
+    private const string TermsVersion = "2026-01";
+    private const string DpaVersion = "2026-02";
+    private const string PrivacyVersion = "2026-03";
 
     private static readonly byte[] _challengeKey = Enumerable.Range(0, 32).Select(index => (byte)index).ToArray();
 
@@ -206,11 +209,12 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = await ErrorsAsync(response);
         Assert.Equal(
-            ["/application", "/businessName", "/email", "/fullName", "/language", "/subdomain"],
+            ["/application", "/businessName", "/dpaVersion", "/email", "/fullName", "/language", "/privacyVersion", "/subdomain", "/termsVersion"],
             errors.Keys);
         Assert.Equal("signUp.required", errors["/email"]);
         Assert.Equal("signUp.language.invalid", errors["/language"]);
         Assert.Equal("signUp.application.unknown", errors["/application"]);
+        Assert.Equal("signUp.terms.required", errors["/termsVersion"]);
 
         var notAnObject = await client.PostAsync("/api/sign-up", new StringContent("[1]", System.Text.Encoding.UTF8, "application/json"), cancellation);
         Assert.Equal(HttpStatusCode.BadRequest, notAnObject.StatusCode);
@@ -219,6 +223,69 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         var plainText = await client.PostAsync("/api/sign-up", new StringContent("{}", System.Text.Encoding.UTF8, "text/plain"), cancellation);
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, plainText.StatusCode);
         await AssertNothingStoredAsync();
+    }
+
+    [Theory]
+    [InlineData("termsVersion", "2025-12")]
+    [InlineData("dpaVersion", "2025-12")]
+    [InlineData("privacyVersion", "2025-12")]
+    [InlineData("termsVersion", "")]
+    [InlineData("dpaVersion", "")]
+    [InlineData("privacyVersion", "")]
+    [InlineData("termsVersion", "2026-01 ")]
+    [InlineData("termsVersion", null)]
+    public async Task A_form_with_a_missing_or_old_document_version_is_refused_under_that_version_and_nothing_is_stored(string field, string? sent)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var form = await SolvedFormAsync(client, NewAddress(), NewSubdomain());
+        if (sent is null)
+        {
+            form.Remove(field);
+        }
+        else
+        {
+            form[field] = sent;
+        }
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", form, cancellation);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var errors = await ErrorsAsync(response);
+        Assert.Equal([$"/{field}"], errors.Keys);
+        Assert.Equal("signUp.terms.required", errors[$"/{field}"]);
+        await AssertNothingStoredAsync();
+    }
+
+    [Fact]
+    public async Task An_accepted_sign_up_stores_the_three_document_versions_it_sent()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var address = NewAddress();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(TermsVersion, await Scalar<string>($"SELECT terms_version FROM control_plane.sign_ups WHERE email = '{address}'"));
+        Assert.Equal(DpaVersion, await Scalar<string>($"SELECT dpa_version FROM control_plane.sign_ups WHERE email = '{address}'"));
+        Assert.Equal(PrivacyVersion, await Scalar<string>($"SELECT privacy_version FROM control_plane.sign_ups WHERE email = '{address}'"));
+    }
+
+    [Fact]
+    public async Task A_sign_up_without_the_document_settings_answers_503_and_stores_nothing()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync(documents: false);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, NewAddress(), NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        await AssertNothingStoredAsync();
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.sign_up_challenges"));
     }
 
     [Fact]
@@ -658,7 +725,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
-    private async Task<WebApplicationFactory<Program>> FactoryAsync()
+    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true)
     {
         var host = await mailpit.SmtpHostAsync();
         var port = await mailpit.SmtpPortAsync();
@@ -681,6 +748,17 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:en", "Approve requests");
             builder.UseSetting("ControlPlane:SignUp:Applications:0:Descriptions:vi", "Duyệt yêu cầu");
             builder.UseSetting("ControlPlane:SignUp:PublicMailboxDomains:0", "gmail.com");
+            if (documents)
+            {
+                foreach (var (name, version) in new[] { ("Terms", TermsVersion), ("Dpa", DpaVersion), ("Privacy", PrivacyVersion) })
+                {
+                    builder.UseSetting($"ControlPlane:SignUp:{name}:Version", version);
+                    builder.UseSetting($"ControlPlane:SignUp:{name}:Urls:en", $"https://example.com/{name.ToLowerInvariant()}/en");
+                    builder.UseSetting($"ControlPlane:SignUp:{name}:Urls:vi", $"https://example.com/{name.ToLowerInvariant()}/vi");
+                }
+
+                builder.UseSetting("ControlPlane:SignUp:LicencesUrl", "https://example.com/licences");
+            }
 
             // The test server has no client address, so the filter gives every request the one proxy the control plane trusts.
             // A test then picks the client address with X-Forwarded-For. A request without the header shares one address.
@@ -772,6 +850,9 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         ["subdomain"] = subdomain,
         ["language"] = language,
         ["application"] = application,
+        ["termsVersion"] = TermsVersion,
+        ["dpaVersion"] = DpaVersion,
+        ["privacyVersion"] = PrivacyVersion,
     };
 
     // Signs up, waits for the confirm email and returns the address, the subdomain and the token of its link.

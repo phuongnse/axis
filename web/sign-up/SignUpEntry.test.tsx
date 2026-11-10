@@ -431,6 +431,9 @@ describe('SignUpEntry', () => {
       subdomain: 'acme',
       language: 'en',
       application: '',
+      termsVersion: documents.terms.version,
+      dpaVersion: documents.dpa.version,
+      privacyVersion: documents.privacy.version,
       altcha: btoa(
         JSON.stringify({
           algorithm: 'SHA-256',
@@ -538,6 +541,85 @@ describe('SignUpEntry', () => {
     const subdomain = screen.getByRole('textbox', { name: 'Subdomain' })
     expect(await within(formItem(subdomain)).findByText('This subdomain is taken. Choose another.')).toBeInTheDocument()
     expect(subdomain).toHaveFocus()
+  })
+
+  it('sends the three document versions that the documents route answered', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    const fetchMock = stubServer(undefined, undefined, {
+      documentsAnswer: () =>
+        answer({
+          ...documents,
+          terms: { ...documents.terms, version: '2026-01' },
+          dpa: { ...documents.dpa, version: '2026-02' },
+          privacy: { ...documents.privacy, version: '2026-03' },
+        }),
+    })
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+    expect(await screen.findByRole('link', { name: 'Terms of service' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await screen.findByRole('heading', { name: 'Check your inbox' })
+    expect(JSON.parse(String(signUpCalls(fetchMock)[0][1]?.body))).toMatchObject({
+      termsVersion: '2026-01',
+      dpaVersion: '2026-02',
+      privacyVersion: '2026-03',
+    })
+  })
+
+  it('unticks the terms box on a refused version, loads the documents again and sends the new version next', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    const renewed = {
+      ...documents,
+      terms: {
+        ...documents.terms,
+        version: '2026-12-01',
+        urls: { ...documents.terms.urls, en: 'https://axis.example.com/terms-2' },
+      },
+    }
+    let refusals = 1
+    let reloaded = false
+    const fetchMock = stubServer(
+      undefined,
+      () =>
+        refusals-- > 0
+          ? answer({ errors: { '/termsVersion': ['signUp.terms.required'] } }, 400)
+          : new Response(null, { status: 202 }),
+      { documentsAnswer: () => answer(reloaded ? renewed : documents) },
+    )
+    const documentFetches = () => fetchMock.mock.calls.filter(([input]) => input === '/api/sign-up/documents').length
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+    expect(await screen.findByRole('link', { name: 'Terms of service' })).toHaveAttribute(
+      'href',
+      'https://axis.example.com/terms',
+    )
+    const before = documentFetches()
+    reloaded = true
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    expect(JSON.parse(String(signUpCalls(fetchMock)[0][1]?.body))).toMatchObject({ termsVersion: '2026-11-01' })
+    const box = screen.getByRole('checkbox')
+    expect(await within(formItem(box)).findByText('Accept the terms to sign up.')).toBeInTheDocument()
+    expect(box).not.toBeChecked()
+    expect(box).toHaveFocus()
+    await waitFor(() => expect(documentFetches()).toBeGreaterThan(before))
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: 'Terms of service' })).toHaveAttribute(
+        'href',
+        'https://axis.example.com/terms-2',
+      ),
+    )
+
+    await user.click(box)
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await screen.findByRole('heading', { name: 'Check your inbox' })
+    expect(JSON.parse(String(signUpCalls(fetchMock)[1][1]?.body))).toMatchObject({ termsVersion: '2026-12-01' })
   })
 
   it('shows a failed sign-up in an error alert above the form', async () => {

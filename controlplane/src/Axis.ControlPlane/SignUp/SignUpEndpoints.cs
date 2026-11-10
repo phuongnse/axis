@@ -40,12 +40,13 @@ internal static class SignUpEndpoints
                 ? Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable)
                 : Results.Ok(SignUpChallenge.Create(Convert.FromBase64String(options.SignUp.ChallengeKey), clock.GetUtcNow())));
 
-        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key and the directory),
-        // the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit and
-        // the subdomain, see docs/reference/sign-up.md#bots-and-abuse. A missing, malformed, wrong, expired or used solution is refused
+        // See docs/reference/sign-up.md#sending-the-form. It checks, in this order, the settings (the challenge key, the documents and the
+        // directory), the body, the proof-of-work solution in altcha, the client address limit, then the form's fields, the email's domain limit and
+        // the subdomain, see docs/reference/sign-up.md#bots-and-abuse. The form's three document versions must each equal the region's
+        // current one, see docs/reference/sign-up.md#the-documents, and the route stores them on the pending sign-up. A missing, malformed, wrong, expired or used solution is refused
         // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
-        // 24 hours and queues the confirm email in the same transaction. The answer has no body yet. Without the key or the directory the
-        // route answers 503.
+        // 24 hours and queues the confirm email in the same transaction. The answer has no body yet. Without the key, the documents or the
+        // directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
@@ -106,6 +107,11 @@ internal static class SignUpEndpoints
     {
         var request = context.Request;
         if (string.IsNullOrWhiteSpace(options.SignUp.ChallengeKey))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        if (!options.SignUp.HasDocuments)
         {
             return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable);
         }
@@ -172,6 +178,10 @@ internal static class SignUpEndpoints
             errors["/application"] = ["signUp.application.unknown"];
         }
 
+        Version(body, "termsVersion", options.SignUp.Terms.Version, errors);
+        Version(body, "dpaVersion", options.SignUp.Dpa.Version, errors);
+        Version(body, "privacyVersion", options.SignUp.Privacy.Version, errors);
+
         if (subdomain is not null)
         {
             var answer = await check.CheckAsync(subdomain, cancellationToken);
@@ -204,8 +214,8 @@ internal static class SignUpEndpoints
 
             await using (var insert = new NpgsqlCommand(
                 """
-                INSERT INTO control_plane.sign_ups (id, full_name, email, business_name, subdomain, language, application, expires_at)
-                VALUES (@id, @fullName, @email, @businessName, @subdomain, @language, @application, now() + interval '24 hours')
+                INSERT INTO control_plane.sign_ups (id, full_name, email, business_name, subdomain, language, application, terms_version, dpa_version, privacy_version, expires_at)
+                VALUES (@id, @fullName, @email, @businessName, @subdomain, @language, @application, @termsVersion, @dpaVersion, @privacyVersion, now() + interval '24 hours')
                 """,
                 connection,
                 transaction))
@@ -217,6 +227,9 @@ internal static class SignUpEndpoints
                 insert.Parameters.AddWithValue("subdomain", subdomain!);
                 insert.Parameters.AddWithValue("language", language!);
                 insert.Parameters.AddWithValue("application", application!);
+                insert.Parameters.AddWithValue("termsVersion", options.SignUp.Terms.Version!);
+                insert.Parameters.AddWithValue("dpaVersion", options.SignUp.Dpa.Version!);
+                insert.Parameters.AddWithValue("privacyVersion", options.SignUp.Privacy.Version!);
                 await insert.ExecuteNonQueryAsync(cancellationToken);
             }
 
@@ -403,5 +416,15 @@ internal static class SignUpEndpoints
         }
 
         return text;
+    }
+
+    // A version of a document that the page showed must equal the region's current one exactly, so a sign-up records the document the person saw.
+    // A missing, old or unknown version is an error under the field's pointer, with the terms box's own text.
+    private static void Version(JsonObject body, string name, string? current, SortedDictionary<string, string[]> errors)
+    {
+        if (current is null || !string.Equals(Required(body, name), current, StringComparison.Ordinal))
+        {
+            errors[$"/{name}"] = ["signUp.terms.required"];
+        }
     }
 }
