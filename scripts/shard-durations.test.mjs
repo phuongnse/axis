@@ -3,7 +3,19 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { cli, drift, driftShare, issuesFrom, junitFiles, marker, maxBody, minimumMove, refresh, title } from './shard-durations.mjs'
+import {
+  cli,
+  drift,
+  driftShare,
+  issuesFrom,
+  junitFiles,
+  marker,
+  maxBody,
+  minimumMove,
+  perPage,
+  refresh,
+  title,
+} from './shard-durations.mjs'
 
 // About 2,700 seconds, as tests/e2e/spec-durations.json held on 2026-11-10.
 const specs = Object.fromEntries([
@@ -214,17 +226,21 @@ describe('refresh', () => {
 })
 
 describe('cli', () => {
-  // A gh that lists the open issues in GH_OPEN and logs each call with its standard input.
+  // A gh that serves each page of open issues from open-<page>.json, and logs each other call with its standard input.
   function withGh(dir, open, run) {
     const gh = path.join(dir, 'gh')
     const log = path.join(dir, 'gh.log')
     writeFileSync(
       gh,
-      `#!/bin/bash\nif [ "$2" = list ]; then cat "${path.join(dir, 'open.json')}"; exit 0; fi\n` +
+      `#!/bin/bash\nif [ "$1" = api ]; then re='[?&]page=([0-9]+)'; [[ "$*" =~ $re ]]; f="${dir}/open-\${BASH_REMATCH[1]}.json"; ` +
+        `if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi; exit 0; fi\n` +
         `{ echo "ARGS $*"; cat; echo; } >> "${log}"\necho "https://github.com/phuongnse/axis/issues/9"\n`,
     )
     chmodSync(gh, 0o755)
-    writeFileSync(path.join(dir, 'open.json'), JSON.stringify(open))
+    const pages = Array.from({ length: Math.max(1, Math.ceil(open.length / perPage)) }, (_, i) =>
+      open.slice(i * perPage, (i + 1) * perPage),
+    )
+    pages.forEach((page, i) => writeFileSync(path.join(dir, `open-${i + 1}.json`), JSON.stringify(page)))
     const saved = process.env.GH
     process.env.GH = gh
     try {
@@ -263,6 +279,27 @@ describe('cli', () => {
         assert.equal(calls.length, 1)
         assert.match(calls[0], /^issue edit 3700 --body-file -\n<!-- nexkit:workflow ci\.yml 41 -->/)
         assert.match(calls[0], /\/actions\/runs\/42\)/)
+      })
+    })
+  })
+
+  test('finds the open durations and Over budget issues past the first page, and opens no second one', () => {
+    withRun((root, results, dir) => {
+      const opened = issuesFrom(
+        [{ path: e2eFile, before: { 'specs/slow.spec.ts': 100 }, after: { 'specs/slow.spec.ts': 1900 } }],
+        [{ kind: 'e2e', line: 'Over budget: specs/slow.spec.ts takes about 950 s, longer than the budget of 900 s.' }],
+        [],
+        41,
+      )
+      const unrelated = Array.from({ length: perPage - 1 }, (_, i) => ({ number: i + 1, body: 'Other.' }))
+      const pullRequest = { number: 1000, body: `Quotes it.\n\n${marker}`, pull_request: {} }
+      const marked = opened.map((issue, index) => ({ number: 3700 + index, body: issue.body }))
+      withGh(dir, [...unrelated, pullRequest, ...marked], (log) => {
+        assert.equal(cli([results, '42'], root, () => {}), 0)
+        const calls = log().split('ARGS ').slice(1)
+        assert.equal(calls.length, 1)
+        assert.match(calls[0], /^issue edit 3700 --body-file -\n<!-- nexkit:workflow ci\.yml 41 -->/)
+        assert.doesNotMatch(log(), /issue create/)
       })
     })
   })

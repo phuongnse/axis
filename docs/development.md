@@ -423,10 +423,9 @@ check's `max` is at least 2 and a second smoke job would take two rounds past th
   in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The count estimates a
   shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
   a collection runs its classes one after another. `--durations` measures the parallelism as all test
-  seconds over the wall time of the suites. The last shard runs
-  every class that the other shards do not, so a class the split does not find still runs. The
-  scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them.
-  A shard cannot be combined with arguments.
+  seconds over the wall time of the suites. The last shard runs every class that the other shards do
+  not, so a class the split does not find still runs. The scenario suites are expected only in the shard
+  that holds `ScenarioRunnerTests`, which writes them. A shard cannot be combined with arguments.
 - **Smoke.** Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`. `NEXKIT_SHARD` works the
   same way beside it, and `AXIS_SMOKE_SHARD` wins when both are set. A shard runs the smoke tests that
   `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
@@ -443,11 +442,12 @@ check's `max` is at least 2 and a second smoke job would take two rounds past th
 - **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its
   `Shard durations` job, with no model, only `contents: read` and `issues: write`, and no commit, runs
   `scripts/shard-durations.mjs` on the run's `test-results-*` artifacts. It rewrites each durations file
-  with its split's `--durations` and reads each `--count`. A file drifts when its entries that moved by
-  at least a few seconds, past one run's noise, add up to more than a set share of its old total, both
-  set in the script. Drifted files go into one `process` issue, opened or updated, and NexKit's round
-  commits them. Each unit that `--count` reports `Over budget:` gets a `process` issue of its own, to split
-  it or make it faster, unless its issue is open. By hand, `--durations` takes a run's JUnit files.
+  with its split's `--durations` and reads each `--count`. A file drifts when its entries that moved past
+  one run's noise add up to more than a set share of its old total, both set in the script. Drifted files
+  go into one `process` issue, opened or updated, which NexKit's round commits. Each `Over budget:` unit
+  gets a `process` issue of its own, to split it or make it faster, unless its issue is open. By hand,
+  `--durations` takes `web*.xml`, `playwright-*.xml`, each integration shard's `Axis.Integration.Tests.xml`
+  with shard 1's `Axis.ControlPlane.Integration.Tests.xml`, and `{dev-script,compose,images,onprem}.xml`.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs

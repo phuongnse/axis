@@ -35,6 +35,9 @@ export const marker = '<!-- shard-durations -->'
 /** The title of the durations issue. */
 export const title = 'The shard durations match the runs on main'
 
+/** The most items GitHub's issues API returns per page. */
+export const perPage = 100
+
 /** The most characters GitHub keeps in an issue's body, less a margin. */
 export const maxBody = 65_000
 
@@ -236,6 +239,19 @@ function run(command, args, input) {
   return result.stdout
 }
 
+/** The open `process` issues, pull requests left out, read page by page until a page comes back short. */
+export function openProcessIssues(gh) {
+  const repo = new URL(repository).pathname.slice(1)
+  const open = []
+  for (let page = 1; ; page++) {
+    const entries = JSON.parse(
+      run(gh, ['api', `repos/${repo}/issues?state=open&labels=process&per_page=${perPage}&page=${page}`]),
+    )
+    open.push(...entries.filter((issue) => !issue.pull_request).map(({ number, body }) => ({ number, body })))
+    if (entries.length < perPage) return open
+  }
+}
+
 /** Runs the command line: refreshes the durations under `root` and opens or updates the issues with gh. */
 export function cli([resultsDir, runId], root = repositoryRoot, log = (line) => console.log(line)) {
   if (!resultsDir || !runId) {
@@ -245,10 +261,7 @@ export function cli([resultsDir, runId], root = repositoryRoot, log = (line) => 
   const { files, overBudget } = refresh(resultsDir, root, log)
   for (const { line } of overBudget) log(line)
   const gh = process.env.GH ?? 'gh'
-  const open = JSON.parse(
-    run(gh, ['issue', 'list', '--state', 'open', '--label', 'process', '--limit', '200', '--json', 'number,body']),
-  )
-  const issues = issuesFrom(files, overBudget, open, runId)
+  const issues = issuesFrom(files, overBudget, openProcessIssues(gh), runId)
   if (issues.length === 0) log('The shard durations did not drift, and nothing passes the budget.')
   for (const issue of issues) {
     if (issue.action === 'edit') {
