@@ -51,10 +51,10 @@ function fieldOf(segments: string[]): FormField | null {
   return formFields.find((field) => segments.length === 1 && segments[0] === field) ?? null
 }
 
-function subdomainStatusOf(status: SubdomainStatus, t: (key: string) => string): AxisFieldStatus | undefined {
+function subdomainStatusOf(status: SubdomainStatus, t: (key: string) => string): AxisFieldStatus {
   switch (status.state) {
     case 'idle':
-      return undefined
+      return { state: 'idle' }
     case 'checking':
       return { state: 'running' }
     case 'free':

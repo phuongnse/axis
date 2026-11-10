@@ -6,7 +6,8 @@ import { useDesignTokens } from './themeMode'
 type FieldInput = ReactElement<{ id?: string; 'aria-describedby'?: string; onChange?: (...args: never[]) => void }>
 
 /** What the screen found about the field beyond its rules, see docs/reference/actions-and-controls.md#fields. */
-export type AxisFieldStatus = { state: 'running' } | { state: 'passed' | 'refused' | 'failed'; message: string }
+export type AxisFieldStatus =
+  { state: 'idle' } | { state: 'running' } | { state: 'passed' | 'refused' | 'failed'; message: string }
 
 type FormFieldProps = {
   label: string
@@ -79,15 +80,30 @@ export function AxisField(props: AxisFieldProps) {
   return isFormField(props) ? <FormField {...props} /> : <OwnField {...props} />
 }
 
-/** The form item's state for a status. A passed status gives none, so the field keeps its own rule errors. */
-function statusItemProps(status: AxisFieldStatus | undefined): Pick<FormItemProps, 'validateStatus' | 'help'> {
-  if (status === undefined || status.state === 'passed') {
+// Ant Design remounts the input when hasFeedback switches on or off, so a field with a status keeps it on and draws
+// only the spinner.
+const statusFeedback: FormItemProps['hasFeedback'] = {
+  icons: () => ({ success: false, error: false, warning: false }),
+}
+
+/** The form item's state for a status. Idle and passed show no message, so the field keeps its rule errors. */
+function statusItemProps(
+  status: AxisFieldStatus | undefined,
+): Pick<FormItemProps, 'validateStatus' | 'help' | 'hasFeedback'> {
+  if (status === undefined) {
     return {}
   }
-  if (status.state === 'running') {
-    return { validateStatus: 'validating' }
+  if (status.state === 'idle' || status.state === 'passed') {
+    return { hasFeedback: statusFeedback }
   }
-  return { validateStatus: status.state === 'refused' ? 'error' : 'warning', help: status.message }
+  if (status.state === 'running') {
+    return { validateStatus: 'validating', hasFeedback: statusFeedback }
+  }
+  return {
+    validateStatus: status.state === 'refused' ? 'error' : 'warning',
+    help: status.message,
+    hasFeedback: statusFeedback,
+  }
 }
 
 /** A field the caller holds the value of: a label tied to the input, then the help and the input. */

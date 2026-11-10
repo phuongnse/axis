@@ -220,6 +220,18 @@ describe('AxisField status', () => {
     const input = screen.getByRole('textbox', { name: 'Name' })
     expect(input).toHaveAttribute('aria-busy', 'true')
     expect(formItem(input)).toHaveClass('ant-form-item-is-validating')
+    expect(formItem(input).querySelector('.ant-form-item-feedback-icon-validating .anticon-loading')).not.toBeNull()
+  })
+
+  it('keeps the same input as its status changes, so typing into it is not interrupted', () => {
+    const { rerender } = renderForm(nameField({ state: 'idle' }))
+    const input = screen.getByRole('textbox', { name: 'Name' })
+
+    rerender(formTree(nameField({ state: 'running' })))
+    rerender(formTree(nameField({ state: 'passed', message: 'Name is free.' })))
+    rerender(formTree(nameField({ state: 'refused', message: 'That name is taken.' })))
+
+    expect(screen.getByRole('textbox', { name: 'Name' })).toBe(input)
   })
 
   it('announces a passed status and shows its text nowhere else, with no error on the field', () => {
