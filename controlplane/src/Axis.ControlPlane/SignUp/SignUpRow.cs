@@ -46,8 +46,8 @@ public sealed class SignUpRow
     public byte[]? SecretHash { get; set; }
 
     /// <summary>
-    /// <c>queued</c> (no cell had room), <c>creating</c> or <c>ready</c> once a verified sign-up is being provisioned, otherwise null. It is
-    /// not part of <see cref="State"/>, as the one-trial-for-each-email index and the trial-used check read <c>verified</c>.
+    /// <c>queued</c> (no cell had room), <c>creating</c>, <c>ready</c> or <c>delayed</c> (the cell's create job ended failed) once a verified
+    /// sign-up is being provisioned, otherwise null. It is not part of <see cref="State"/>, as the one-trial-for-each-email index and the trial-used check read <c>verified</c>.
     /// </summary>
     public string? Provisioning { get; set; }
 

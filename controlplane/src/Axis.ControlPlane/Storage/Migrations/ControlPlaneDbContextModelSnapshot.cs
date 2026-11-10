@@ -228,7 +228,7 @@ namespace Axis.ControlPlane.Storage.Migrations
                         {
                             t.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
 
-                            t.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready')");
+                            t.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready', 'delayed')");
 
                             t.HasCheckConstraint("ck_sign_ups_secret_hash", "secret_hash IS NULL OR octet_length(secret_hash) = 32");
 
