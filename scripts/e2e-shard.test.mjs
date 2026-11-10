@@ -9,10 +9,10 @@ import {
   isSerial,
   junitDurations,
   main,
-  mergeDurations,
   readSpecs,
   split,
 } from './lib/e2e-shard.mjs'
+import { mergeDurations } from './lib/shards.mjs'
 
 const spec = (name, seconds, serial = false) => ({ path: `specs/${name}.spec.ts`, seconds, serial })
 

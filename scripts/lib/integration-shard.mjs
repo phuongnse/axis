@@ -29,7 +29,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { budgetSeconds, maxShards, parseShard, shardCount } from './shards.mjs'
+import { budgetSeconds, maxShards, median, mergeDurations, parseShard, shardCount } from './shards.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const project = path.join(root, 'tests/Axis.Integration.Tests')
@@ -73,13 +73,6 @@ export function readClasses(dir = project) {
     .flatMap((file) => parseSource(readFileSync(file, 'utf8')))
     .filter((testClass) => !isPerformance(testClass.name))
     .sort((a, b) => (a.name < b.name ? -1 : 1))
-}
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b)
-  if (sorted.length === 0) return undefined
-  const middle = Math.floor(sorted.length / 2)
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
 /** The seconds of each class: its measured ones, or an estimate from its number of tests. */
@@ -161,16 +154,6 @@ export function junitDurations(texts) {
     }
   }
   return Object.fromEntries(Object.entries(durations).map(([name, seconds]) => [name, Math.round(seconds)]))
-}
-
-/** The new durations: measured ones replace known ones, and only classes that exist are kept. */
-export function mergeDurations(known, measured, names) {
-  const merged = {}
-  for (const name of [...names].sort()) {
-    const seconds = measured[name] ?? known[name]
-    if (seconds !== undefined) merged[name] = seconds
-  }
-  return merged
 }
 
 /** Runs the command line and returns the text for stdout. Throws on a malformed shard. */
