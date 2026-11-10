@@ -398,13 +398,22 @@ sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart 
   ends as succeeded. The wait for an operator to open a cell does not use up the job's retries.
 - **A failed create job** _(planned for M33)_. The job is run again, up to 3 times. After that the
   operator is alerted, and the person gets an email that the team is on it.
+- **The progress route.** `GET /api/sign-up/{id}` with the header `Sign-Up-Secret` answers
+  `{ step, address }`, where `address` is the tenant's sign-in address. It answers only a verified
+  sign-up whose secret is the one that the confirm answered. For an unknown id, an id that is not a
+  UUID, a pending sign-up, a missing secret, a malformed secret or a wrong secret it answers the same
+  `404` with no body, so it tells a caller nothing about a sign-up. The route compares the SHA-256 of the
+  secret with the stored hash in constant time. The secret is in a header, so it is in no request line.
+  The `step` is:
+  - `verified` until the cell starts creating the tenant, including while no cell has room.
+  - `creating` while the cell works.
+  - `ready` once the trial is ready.
+  - `delayed` when a `provisionTenant` job of the sign-up has ended `failed` because its retries ran
+    out, and the trial is not ready yet.
 - **Progress** _(planned for M33)_. After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
-  as [the verify page](#the-verify-page) says. When the person closes the page, the email still tells
+  as [the verify page](#the-verify-page) says. The page asks the progress route. When the person closes the page, the email still tells
   them.
-  - **The contract.** `GET /api/sign-up/{id}` with the header `Sign-Up-Secret` answers
-    `{ step: "verified" | "creating" | "ready" | "delayed", address }`, and `404` for an unknown id or a
-    wrong secret, so the secret is in no request line.
   - **The steps.** A vertical `StepsBar` shows one step on each line: Confirmed, Setting up and Ready,
     in `vi` Đã xác nhận, Đang chuẩn bị and Sẵn sàng.
   - **While it is set up.** From the moment it opens, the page says "Setting up the trial. You can close
