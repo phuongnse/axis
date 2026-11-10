@@ -12,12 +12,34 @@ internal sealed record CreatedInvoice(Guid Id, bool Created);
 /// Creates billing invoices and reads their amount, see <c>docs/reference/payments.md#invoices</c>. An invoice takes its lines from the plan and
 /// the add-ons that the subscription pins, see <c>docs/reference/plans.md#the-catalogue</c>: the plan is line 1 and each add-on follows, ordered by
 /// code. Each line is stored with no amount and writes one <c>charge</c> ledger entry in the same transaction, so the ledger stays the only
-/// place that holds money. The calls write no audit record: the job or command that calls them does.
+/// place that holds money. Payments settle the subscription's open invoices oldest first, from ledger sums, and an invoice that credit already
+/// covers is paid when it is created. The calls write no audit record: the job or command that calls them does.
 /// </summary>
 internal static class Invoices
 {
     /// <summary>A change invoice is due this many days after it is created.</summary>
     private const int ChangeDueDays = 7;
+
+    // The sums that settling and the amount due share, for the parameter @subscription: what its payments and refunds have paid in all, and for
+    // each invoice that is not void its amount and the running total of the amounts of it and every older invoice, by created_at and then id.
+    private const string RunningTotals =
+        """
+        WITH paid AS (
+            SELECT COALESCE(-SUM(amount_minor), 0)::bigint AS total
+            FROM billing.ledger_entries
+            WHERE subscription_id = @subscription AND kind IN ('payment', 'refund')
+        ),
+        amounts AS (
+            SELECT i.id, i.created_at,
+                (SELECT COALESCE(SUM(l.amount_minor), 0)::bigint FROM billing.ledger_entries l
+                 WHERE l.invoice_id = i.id AND l.kind NOT IN ('payment', 'refund')) AS amount
+            FROM billing.invoices i
+            WHERE i.subscription_id = @subscription AND i.status <> 'void'
+        ),
+        running AS (
+            SELECT id, amount, (SUM(amount) OVER (ORDER BY created_at, id))::bigint AS running FROM amounts
+        )
+        """;
 
     /// <summary>
     /// Creates the invoice of the period that starts at <paramref name="periodStart"/>, due on that day. A period that already has an invoice
@@ -58,6 +80,64 @@ internal static class Invoices
             connection);
         command.Parameters.AddWithValue("invoice", invoiceId);
         return (long)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    /// <summary>
+    /// The part of the invoice that the payments of its subscription do not cover. The payments and refunds of the subscription are pooled and
+    /// applied to its invoices that are not <c>void</c> oldest first, so an overpayment's credit lowers the next invoice. It is between 0 and the
+    /// invoice's amount, and 0 for a <c>void</c> invoice.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">There is no such invoice.</exception>
+    public static async Task<long> AmountDueAsync(NpgsqlConnection connection, Guid invoiceId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        Guid subscriptionId;
+        await using (var select = new NpgsqlCommand("SELECT subscription_id FROM billing.invoices WHERE id = @invoice", connection))
+        {
+            select.Parameters.AddWithValue("invoice", invoiceId);
+            subscriptionId = await select.ExecuteScalarAsync(cancellationToken) is Guid found
+                ? found
+                : throw new InvalidOperationException($"There is no invoice {invoiceId}.");
+        }
+
+        await using var command = new NpgsqlCommand(
+            $"""
+            {RunningTotals}
+            SELECT COALESCE(
+                (SELECT GREATEST(0, LEAST(r.amount, r.running - p.total)) FROM running r CROSS JOIN paid p WHERE r.id = @invoice),
+                0)
+            """,
+            connection);
+        command.Parameters.AddWithValue("subscription", subscriptionId);
+        command.Parameters.AddWithValue("invoice", invoiceId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Marks the open invoices of the subscription <c>paid</c>, oldest first, while the payments of the subscription cover them and every older
+    /// invoice. It locks the subscription's row, so two settlements of one subscription never run together. A <c>paid</c> invoice never reopens.
+    /// </summary>
+    public static async Task SettleAsync(NpgsqlTransaction transaction, Guid subscriptionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        var connection = transaction.Connection!;
+        await using (var @lock = new NpgsqlCommand("SELECT 1 FROM control_plane.subscriptions WHERE id = @subscription FOR UPDATE", connection, transaction))
+        {
+            @lock.Parameters.AddWithValue("subscription", subscriptionId);
+            await @lock.ExecuteScalarAsync(cancellationToken);
+        }
+
+        await using var update = new NpgsqlCommand(
+            $"""
+            {RunningTotals}
+            UPDATE billing.invoices i SET status = 'paid'
+            FROM running r CROSS JOIN paid p
+            WHERE i.id = r.id AND i.status = 'open' AND r.running <= p.total
+            """,
+            connection,
+            transaction);
+        update.Parameters.AddWithValue("subscription", subscriptionId);
+        await update.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<CreatedInvoice> CreateAsync(
@@ -132,6 +212,7 @@ internal static class Invoices
                 cancellationToken);
         }
 
+        await SettleAsync(transaction, subscriptionId, cancellationToken);
         return new CreatedInvoice(invoiceId, true);
     }
 
