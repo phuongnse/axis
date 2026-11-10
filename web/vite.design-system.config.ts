@@ -58,8 +58,9 @@ function escapeScriptEndings(): Plugin {
 }
 
 // Under `vite`, the harness loads the previews from source so that React Fast Refresh swaps an edit in
-// place: the module below replaces the script tag of the built bundle. A harness without that tag fails
-// the page load, so the dev server never serves a stale bundle unnoticed.
+// place: the module below replaces the script tag of the built bundle. Only the harness is checked, since
+// Vite runs this transform on every HTML page it serves. A harness without that tag fails the page load, so
+// the dev server never serves a stale bundle unnoticed.
 function serveBundleFromSource(): Plugin {
   const bundleTag = '<script src="../artifacts/design-system/axis-design-system.js"></script>'
   const sourceModule = `<script type="module">
@@ -72,7 +73,10 @@ function serveBundleFromSource(): Plugin {
     transformIndexHtml: {
       // Before Vite's own HTML step, so that it turns the inline module into a module of the dev server.
       order: 'pre',
-      handler(html) {
+      handler(html, ctx) {
+        if (ctx.path !== '/design-system.html') {
+          return html
+        }
         if (!html.includes(bundleTag)) {
           throw new Error('web/design-system.html has no script tag of the design-system bundle.')
         }
@@ -92,6 +96,8 @@ export default defineConfig(({ command }) =>
     // development mode.
     define: command === 'build' ? { 'process.env.NODE_ENV': JSON.stringify('production') } : {},
     plugins: [dropRouteModuleImport(), inlineStyleSheets(), escapeScriptEndings(), serveBundleFromSource()],
+    // Vite answers 404 for unknown paths instead of serving index.html. Library mode builds ignore appType.
+    appType: 'mpa',
     server: { port: 5174, strictPort: true },
     build: {
       outDir: '../artifacts/design-system',

@@ -1,20 +1,27 @@
 /// <reference types="node" />
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createServer, type ViteDevServer } from 'vite'
+import { createLogger, createServer, type IndexHtmlTransformContext, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const webFolder = resolve(fileURLToPath(import.meta.url), '../../..')
 const timeout = 60_000
+const devToolsPath = '/.well-known/appspecific/com.chrome.devtools.json'
 
 let server: ViteDevServer
 let baseUrl: string
+const errors: string[] = []
 
 beforeAll(async () => {
+  const logger = createLogger('error')
+  logger.error = (message) => {
+    errors.push(message)
+  }
   server = await createServer({
     configFile: resolve(webFolder, 'vite.design-system.config.ts'),
     root: webFolder,
     server: { port: 0 },
+    customLogger: logger,
     logLevel: 'error',
   })
   await server.listen()
@@ -55,4 +62,36 @@ describe('the design-system dev server', () => {
     },
     timeout,
   )
+
+  it(
+    'answers 404 without an error for a path that names no file or module',
+    async () => {
+      errors.length = 0
+      const response = await fetchText(devToolsPath)
+      expect(response.status).toBe(404)
+      expect(errors).toEqual([])
+    },
+    timeout,
+  )
+})
+
+describe('the bundle guard of the design-system dev server', () => {
+  function transformHtml(path: string, html: string): unknown {
+    const plugin = server.config.plugins.find((candidate) => candidate.name === 'serve-bundle-from-source')
+    const transform = plugin?.transformIndexHtml as {
+      handler: (html: string, ctx: IndexHtmlTransformContext) => unknown
+    }
+    return transform.handler(html, { path, filename: resolve(webFolder, path.slice(1)) })
+  }
+
+  it('throws for the harness without the bundle tag', () => {
+    expect(() => transformHtml('/design-system.html', '<html></html>')).toThrow(
+      /has no script tag of the design-system bundle/,
+    )
+  })
+
+  it('passes other HTML pages through unchanged', () => {
+    expect(transformHtml('/index.html', '<html></html>')).toBe('<html></html>')
+    expect(transformHtml(devToolsPath, '<html></html>')).toBe('<html></html>')
+  })
 })
