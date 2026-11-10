@@ -258,7 +258,8 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
 history table `control_plane.__control_plane_migrations`. A failed migration stops the start. One
 database role runs the migrations and the queries, and the migrations leave it only `INSERT` and
-`SELECT` on `billing.ledger_entries`, see [the ledger](payments.md#the-ledger). When
+`SELECT` on `billing.ledger_entries`, see [the ledger](payments.md#the-ledger), and on
+`control_plane.terms_acceptances`, see [terms acceptance](sign-up.md#terms-acceptance). When
 `ControlPlane:DirectoryConnectionString` is set, the start then applies the region directory's
 migrations to the `directory` schema of that database, with the history table
 `directory.__directory_migrations`, and a failure there also stops the start.
