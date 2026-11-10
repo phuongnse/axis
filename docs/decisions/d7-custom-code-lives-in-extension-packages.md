@@ -16,7 +16,7 @@ configuration or as application-specific platform code, as
   is idempotent.
 - **Processes call package operations as they call built-in ones,** and the engine keeps control of
   transactions, retries, history and inspection.
-- **Packages run out of process** and get only what they declare, as
+- **Packages run out of process** _(planned for M21)_ and get only what they declare, as
   [D90](d90-extension-packages-run-out-of-process.md) agrees.
 
 The design is in [D28](d28-extension-packages.md) and
