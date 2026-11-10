@@ -1,4 +1,6 @@
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
+using Axis.ControlPlane.Subscriptions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -7,9 +9,11 @@ namespace Axis.ControlPlane.Storage;
 /// <summary>
 /// Applies the <c>control_plane</c> schema migrations over the <c>ControlPlane:ConnectionString</c> role. It runs as
 /// a hosted service in its starting step, so a database that cannot be reached, or a migration that fails, stops the start.
+/// It then checks that <c>ControlPlane:Plans</c> still lists every plan version that a subscription pins, see
+/// <c>docs/reference/plans.md#the-catalogue</c>, and a missing version stops the start.
 /// When <c>ControlPlane:DirectoryConnectionString</c> is set, it then applies the <c>directory</c> schema migrations to that database.
 /// </summary>
-internal sealed class ControlPlaneMigrationStart(ControlPlaneOptions options) : IHostedLifecycleService
+internal sealed class ControlPlaneMigrationStart(ControlPlaneOptions options, PlanCatalogue catalogue) : IHostedLifecycleService
 {
     public async Task StartingAsync(CancellationToken cancellationToken)
     {
@@ -20,6 +24,12 @@ internal sealed class ControlPlaneMigrationStart(ControlPlaneOptions options) : 
             .Options;
         await using var context = new ControlPlaneDbContext(contextOptions);
         await context.Database.MigrateAsync(cancellationToken);
+
+        await using (var connection = new NpgsqlConnection(connectionString))
+        {
+            await connection.OpenAsync(cancellationToken);
+            catalogue.CheckPinned(await SubscriptionPlans.ReadPinsAsync(connection, cancellationToken));
+        }
 
         if (string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
         {

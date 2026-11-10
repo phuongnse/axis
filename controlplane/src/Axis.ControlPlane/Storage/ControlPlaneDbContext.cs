@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -36,6 +36,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
+
+    public DbSet<TermsAcceptanceRow> TermsAcceptances => Set<TermsAcceptanceRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -79,6 +81,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
                 table.HasCheckConstraint("ck_sign_ups_state", "state IN ('pending', 'verified', 'expired')");
                 table.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
                 table.HasCheckConstraint("ck_sign_ups_token_hash", "token_hash IS NULL OR octet_length(token_hash) = 32");
+                table.HasCheckConstraint("ck_sign_ups_secret_hash", "secret_hash IS NULL OR octet_length(secret_hash) = 32");
+                table.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready')");
             });
             signUp.HasKey(s => s.Id).HasName("pk_sign_ups");
             signUp.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
@@ -94,6 +98,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             signUp.Property(s => s.PrivacyVersion).HasColumnName("privacy_version");
             signUp.Property(s => s.State).HasColumnName("state").HasDefaultValue("pending");
             signUp.Property(s => s.TokenHash).HasColumnName("token_hash").HasColumnType("bytea");
+            signUp.Property(s => s.SecretHash).HasColumnName("secret_hash").HasColumnType("bytea");
+            signUp.Property(s => s.Provisioning).HasColumnName("provisioning").HasColumnType("text");
             signUp.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             signUp.Property(s => s.ExpiresAt).HasColumnName("expires_at");
             signUp.HasIndex(s => s.Subdomain, "ux_sign_ups_pending_subdomain").IsUnique().HasFilter("state = 'pending'");
@@ -120,7 +126,14 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
 
         modelBuilder.Entity<SubscriptionRow>(subscription =>
         {
-            subscription.ToTable("subscriptions", table => table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')"));
+            subscription.ToTable("subscriptions", table =>
+            {
+                table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
+                table.HasCheckConstraint("ck_subscriptions_plan", "(plan_code IS NULL) = (plan_version IS NULL)");
+                table.HasCheckConstraint("ck_subscriptions_purchase", "(currency IS NULL) = (period IS NULL) AND (currency IS NULL OR plan_code IS NOT NULL)");
+                table.HasCheckConstraint("ck_subscriptions_currency", "currency IN ('VND', 'USD')");
+                table.HasCheckConstraint("ck_subscriptions_period", "period IN ('month', 'year')");
+            });
             subscription.HasKey(s => s.Id).HasName("pk_subscriptions");
             subscription.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
             subscription.Property(s => s.TenantId).HasColumnName("tenant_id");
@@ -129,6 +142,10 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             subscription.Property(s => s.TrialEndsAt).HasColumnName("trial_ends_at");
             subscription.Property(s => s.NextAt).HasColumnName("next_at");
             subscription.Property(s => s.StepId).HasColumnName("step_id").ValueGeneratedNever();
+            subscription.Property(s => s.PlanCode).HasColumnName("plan_code");
+            subscription.Property(s => s.PlanVersion).HasColumnName("plan_version");
+            subscription.Property(s => s.Currency).HasColumnName("currency");
+            subscription.Property(s => s.Period).HasColumnName("period");
             subscription.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             subscription.HasOne<SignUpRow>().WithMany().HasForeignKey(s => s.SignUpId).HasConstraintName("fk_subscriptions_sign_up_id").OnDelete(DeleteBehavior.Restrict);
             subscription.HasIndex(s => s.SignUpId, "ix_subscriptions_sign_up_id");
@@ -168,6 +185,22 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             entry.Property(e => e.OccurredAt).HasColumnName("occurred_at").HasDefaultValueSql("now()");
             entry.HasIndex(e => e.IdempotencyKey, "ux_ledger_entries_idempotency_key").IsUnique();
             entry.HasIndex(e => e.SubscriptionId, "ix_ledger_entries_subscription_id");
+        });
+
+        modelBuilder.Entity<TermsAcceptanceRow>(acceptance =>
+        {
+            acceptance.ToTable("terms_acceptances", table => table.HasCheckConstraint("ck_terms_acceptances_document", "document IN ('terms', 'dpa')"));
+            acceptance.HasKey(a => a.Id).HasName("pk_terms_acceptances");
+            acceptance.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            acceptance.Property(a => a.Account).HasColumnName("account");
+            acceptance.Property(a => a.TenantId).HasColumnName("tenant_id");
+            acceptance.Property(a => a.Document).HasColumnName("document");
+            acceptance.Property(a => a.Version).HasColumnName("version");
+            acceptance.Property(a => a.PrivacyVersion).HasColumnName("privacy_version");
+            acceptance.Property(a => a.AcceptedAt).HasColumnName("accepted_at").HasDefaultValueSql("now()");
+            acceptance.Property(a => a.ClientAddress).HasColumnName("client_address").HasColumnType("inet");
+            acceptance.Property(a => a.UserAgent).HasColumnName("user_agent");
+            acceptance.HasIndex(a => a.Account, "ix_terms_acceptances_account");
         });
     }
 }

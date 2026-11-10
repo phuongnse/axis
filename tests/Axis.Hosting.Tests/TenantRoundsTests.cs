@@ -1,9 +1,7 @@
-using Axis.Worker;
-
-namespace Axis.Integration.Tests;
+namespace Axis.Hosting.Tests;
 
 /// <summary>
-/// The active list of the worker hands out tenants by weighted deficit round-robin, see
+/// The active list that the worker and the agent host share hands out tenants by weighted deficit round-robin, see
 /// <c>docs/reference/worker-scheduling.md#fair-share</c>. The test covers a tenant whose claim waits for a call lease.
 /// </summary>
 public sealed class TenantRoundsTests

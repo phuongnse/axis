@@ -19,8 +19,10 @@ commerce.
 - **Runs as jobs.** A job checks each subscription's next date every hour, so a restart or an outage
   delays a step and never skips one. Every change of state writes an audit record.
 - **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
-  `readOnly`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id` and `created_at`. A
-  [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
+  `readOnly`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
+  `plan_version`, `currency` (`VND` or `USD`), `period` (`month` or `year`) and `created_at`. The
+  plan, currency and period are empty until a plan is bought, see
+  [the catalogue](plans.md#the-catalogue). A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
   trial ending 30 days later, and writes the first audit record with the sign-up as actor. A tenant
   has one subscription that is not `deleted`. `next_at` is the date of the next move, and it is empty
   once the subscription is `deleted`. The dates come from the control plane's clock.
@@ -36,8 +38,12 @@ commerce.
   retries it. Every cell call of a move carries the idempotency key `<operation>:<step id>`. The step
   id is new each time a move commits, so a retry of the same move gets the cell's first job, and a
   later move gets a new key.
+- **The operator can extend a trial.** [`trial extend`](control-plane.md#operators) adds days to the
+  trial end and the next date of a `trialing` subscription. The email windows follow the new end,
+  and an email that is already queued is not sent again.
 - **History is the audit records.** Each move writes the action `subscription.<new state>` with the
-  subscription as its subject, and the table keeps no history of its own.
+  subscription as its subject, and an operator's extension writes `subscription.trialExtended`. The
+  table keeps no history of its own.
 - **`deleting` ends when the cell lets the tenant go.** While `deleting`, each hourly run reads
   `GET /api/cell/tenants/{id}`. A `404` means the cell purged the tenant after its grace, and the
   subscription is `deleted`. So does a tenant whose row the [region directory](region-directory.md)

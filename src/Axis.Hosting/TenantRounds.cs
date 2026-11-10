@@ -1,7 +1,7 @@
-namespace Axis.Worker;
+namespace Axis.Hosting;
 
 /// <summary>
-/// The active list of the worker: the tenants that have work due, in round order, each with a deficit. It runs weighted
+/// The active list that the worker and the agent host share: the tenants that have work due, in round order, each with a deficit. It runs weighted
 /// deficit round-robin, see <c>docs/reference/worker-scheduling.md#fair-share</c>. When a tenant's turn starts, its deficit
 /// grows by the quantum times its weight. The tenant is handed out while its deficit is at least 1, and each hand-out takes 1.
 /// Then its turn ends and the next tenant has its turn. A tenant that leaves the list keeps no deficit.
@@ -9,7 +9,7 @@ namespace Axis.Worker;
 /// items runs, because a running item may queue the next one. When a claim finds nothing due while other items of the tenant run,
 /// the tenant is idle: it is not handed out until one of those items ends. A claim that found a call with no lease free ends the
 /// turn the same way: the tenant stays in the list, idle until one of its items ends or the next poll joins it. All members are thread-safe, because the loops
-/// of the worker share one list.
+/// of a host share one list.
 /// </summary>
 public sealed class TenantRounds(int quantum, Func<string, long> weight)
 {

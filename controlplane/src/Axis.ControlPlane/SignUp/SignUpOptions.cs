@@ -4,7 +4,8 @@ namespace Axis.ControlPlane.SignUp;
 /// The <c>ControlPlane:SignUp</c> settings: what the sign-up page offers, see the settings table in
 /// <c>docs/reference/control-plane.md#settings</c>. The applications are optional. The documents are optional as a group,
 /// and once one of their settings is set, all of them are required.
-/// The challenge key is optional.
+/// The challenge key is optional. The disposable domain list is optional as a pair, and once one of its settings is set, both are required.
+/// The trial quotas are optional.
 /// </summary>
 public sealed class SignUpOptions
 {
@@ -35,12 +36,39 @@ public sealed class SignUpOptions
     /// </summary>
     public string? ChallengeKey { get; set; }
 
+    /// <summary>
+    /// The open-source list of disposable mailbox domains that the weekly <c>refreshDisposableDomains</c> job downloads, and the SHA-256 that pins it, see
+    /// <c>docs/reference/sign-up.md#bots-and-abuse</c>. Optional.
+    /// </summary>
+    public SignUpDisposableDomainsOptions DisposableDomains { get; set; } = new();
+
+    /// <summary>
+    /// The quotas that a new trial gets, by quota key, see the settings table in <c>docs/reference/control-plane.md#settings</c>. A key that is absent is
+    /// not set, so the cell's default applies. A <c>null</c> value is no limit. Optional. It is internal so the binder skips it:
+    /// <see cref="ControlPlaneOptions.Load"/> reads it from the configuration, because the binder would merge <c>null</c> and absent.
+    /// </summary>
+    internal IReadOnlyDictionary<string, long?> TrialQuotas { get; set; } = new Dictionary<string, long?>(StringComparer.Ordinal);
+
     internal bool HasDocuments => !string.IsNullOrWhiteSpace(LicencesUrl) || new[] { Terms, Dpa, Privacy }.Any(IsSet);
 
     private static bool IsSet(SignUpDocumentOptions document) =>
         !string.IsNullOrWhiteSpace(document.Version)
         || !string.IsNullOrWhiteSpace(document.Urls.En)
         || !string.IsNullOrWhiteSpace(document.Urls.Vi);
+}
+
+/// <summary>The <c>ControlPlane:SignUp:DisposableDomains</c> settings: the address of the list and the SHA-256 of its content, as hex.</summary>
+public sealed class SignUpDisposableDomainsOptions
+{
+    /// <summary>The address of the list, one domain per line.</summary>
+    public string? Url { get; set; }
+
+    /// <summary>The SHA-256 of the list, as 64 hex characters. The job replaces the table only from a list with this hash.</summary>
+    public string? Sha256 { get; set; }
+
+    internal bool IsSet => !string.IsNullOrWhiteSpace(Url) || !string.IsNullOrWhiteSpace(Sha256);
+
+    internal bool IsComplete => !string.IsNullOrWhiteSpace(Url) && !string.IsNullOrWhiteSpace(Sha256);
 }
 
 /// <summary>One entry of <c>ControlPlane:SignUp:Applications</c>: a built-in application, its title and its description in each language.</summary>
@@ -56,7 +84,7 @@ public sealed class SignUpApplicationOptions
     public SignUpTexts Descriptions { get; set; } = new();
 }
 
-/// <summary>A text of the sign-up page in its two languages.</summary>
+/// <summary>A text in its two languages.</summary>
 public sealed class SignUpTexts
 {
     /// <summary>The English text.</summary>

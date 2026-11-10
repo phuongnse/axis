@@ -114,7 +114,8 @@ every business change.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
-    (`advanceSubscriptions`) every hour. Under a database lock on the kind, it queues
+    (`advanceSubscriptions`) every hour. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
     every 30 seconds and the job runner runs the job as any other. A job that waits for a retry
@@ -167,16 +168,37 @@ every business change.
     code has only an append and a read.
   - **Who writes it.** The handler or the command that makes the change appends the record in the
     same transaction as the change. A job's record has the actor kind `job` and the job id as the
-    actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
+    actor. An operator command's record has the actor kind `operator` and the `--operator` name as
+    the actor. The job runner writes none itself, because claiming and retrying are bookkeeping and not a
     business change.
 
 ## Operators
 
 The platform operator, who runs the cells, runs the control plane too, from the command line.
 
-- **Commands** _(planned for M33)_. `Axis.ControlPlane.Admin` holds the operator's commands: extend
-  a trial, resend an email, and list a region's sign-ups and subscriptions. Each writes an audit
-  record.
+- **Region lists.** `Axis.ControlPlane.Admin`, in `/app/admin` of the image, lists the region's rows.
+  `sign-ups list` prints each sign-up's id, subdomain, state, created and, for a pending sign-up,
+  expires. `subscriptions list` prints each subscription's id, tenant, sign-up, state, trial ends,
+  next and created. Neither prints a name, a business name or an email address. The tool reads the
+  same `ControlPlane:` settings and runs the same start checks as the service. It exits 0 when it
+  works, 1 when the database cannot be read or when a change is refused, and 2 for a usage or
+  settings error, which names the setting and never its value. A lists command writes no audit
+  record, because it changes nothing.
+- **`trial extend <tenant> --days <n> --operator <name>`.** Adds `n` days to the trial end and the
+  next date of the tenant's `trialing` subscription, and prints the subscription's id and its new
+  dates. `n` is a whole number from 1 to 365. A tenant whose subscription is not `trialing`, or that
+  has none, is refused and nothing changes. The audit record has the action
+  `subscription.trialExtended` and the subscription as its subject. See
+  [one clock](subscriptions.md#one-clock) for what the extension does to the emails.
+- **`email resend <job id> --operator <name>`.** Queues the email of a `sendEmail` job again as a
+  new job, through the same helper as any email, so the payload is checked again against today's
+  templates. The job runner then sends it. It prints the new job's id and never the address or the
+  values. A job that is not a `sendEmail` job, or that is still `queued` or `running`, is refused and
+  nothing is queued. The audit record has the action `email.resent` and the resent job as its
+  subject.
+- **`--operator` is required.** A change command names the operator who runs it, and a missing or
+  blank name is a usage error. The audit record of the change has the actor kind `operator` and
+  that name as its actor. Both commands commit the change and its audit record in one transaction.
 - **Billing commands** _(planned for M34)_. `Axis.ControlPlane.Admin` also records a bank transfer
   that arrived without a payment link, issues a refund and adjusts an e-invoice. Each writes an audit
   record.
@@ -194,10 +216,10 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   and the client certificate are required. The DNS settings are optional, and once a provider is
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
-  their settings is set, all of them are required. The sign-up challenge key is optional. The public
-  URL is optional.
+  their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
+  settings is set, both are required. The trial quotas are optional. The public URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
-  index of a cell or an application, and never its value.
+  index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
   `ForwardedHeaders:KnownNetworks` by the rules of [host settings](host-settings.md#forwarded-headers), so the
   [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
@@ -207,8 +229,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
   `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
-- **Plans and providers** _(planned for M34)_. `ControlPlane:` settings also hold the
-  [plans](plans.md) and the payment and e-invoice providers' non-secret values.
+- **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
+- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the payment and e-invoice
+  providers' non-secret values.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |
@@ -242,6 +265,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:en` | The English description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Descriptions:vi` | The Vietnamese description that the sign-up page shows under that application's title | Not empty |
 | `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
+| `ControlPlane:SignUp:DisposableDomains:Url` | The address of the open-source list of disposable mailbox domains, one domain per line. Optional | An absolute `https` URL, when either is set |
+| `ControlPlane:SignUp:DisposableDomains:Sha256` | The SHA-256 of that list, as hex. The job refreshes the table only from a list with this hash | 64 hex characters, when either is set |
+| `ControlPlane:SignUp:TrialQuotas:<quota key>` | The quota that a new trial gets for that [quota key](tenant-quotas.md#quotas), such as `users`, which [provisioning](sign-up.md#provisioning) sends to the cell. Empty, or `null` in a JSON file, for no limit. Optional. A quota key that is not set keeps the cell's default | A quota key, and a whole number of zero or more when not empty |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional. Without the documents `GET /api/sign-up/documents` and `POST /api/sign-up` answer `503`. A [sign-up](sign-up.md#the-documents) must send the current version of each document | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |
@@ -253,15 +279,32 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` and `POST /api/sign-up` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
+| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens |
+| `ControlPlane:Plans:<n>:Version` | The version of the plan. The code and version are unique, and a subscription's pinned version must stay | Plain digits, at least 1, and the code and version not repeated |
+| `ControlPlane:Plans:<n>:Name:en` | The English name of the plan | Not empty |
+| `ControlPlane:Plans:<n>:Name:vi` | The Vietnamese name of the plan | Not empty |
+| `ControlPlane:Plans:<n>:IncludedUsers` | The users that the plan's price includes | Plain digits, at least 1 |
+| `ControlPlane:Plans:<n>:Trial` | Whether the plan sets a trial's quotas. Default off | A trial plan has no price and no add-on |
+| `ControlPlane:Plans:<n>:Quotas:<quota>` | A quota of the plan, by the key of [tenant quotas](tenant-quotas.md#quotas), such as `storage` | Every quota key except `users` is set, no other key, and each is plain digits from 0 |
+| `ControlPlane:Plans:<n>:Prices:<n>:Currency` | The currency of a monthly price | `VND` or `USD`, each once, and both set unless the plan is a trial plan |
+| `ControlPlane:Plans:<n>:Prices:<n>:Month` | The monthly price in the currency's smallest unit. A year costs 10 times it, computed | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Code` | The code of a user pack, such as `users-10` | Lowercase letters and digits, joined by single hyphens, and unique in the plan version |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Users` | The users that the pack adds | Plain digits, at least 1 |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Currency` | The currency of a monthly price of the pack | `VND` or `USD`, each once, and both set |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Month` | The monthly price of the pack in the currency's smallest unit | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
 history table `control_plane.__control_plane_migrations`. A failed migration stops the start. One
 database role runs the migrations and the queries, and the migrations leave it only `INSERT` and
-`SELECT` on `billing.ledger_entries`, see [the ledger](payments.md#the-ledger). When
+`SELECT` on `billing.ledger_entries`, see [the ledger](payments.md#the-ledger), and on
+`control_plane.terms_acceptances`, see [terms acceptance](sign-up.md#terms-acceptance). When
 `ControlPlane:DirectoryConnectionString` is set, the start then applies the region directory's
 migrations to the `directory` schema of that database, with the history table
-`directory.__directory_migrations`, and a failure there also stops the start.
+`directory.__directory_migrations`, and a failure there also stops the start. Right after the
+`control_plane` migrations the start checks that `ControlPlane:Plans` still lists every plan version
+that a subscription pins, see [the catalogue](plans.md#the-catalogue), and a missing version stops
+the start.
 
 ## Image and chart
 
@@ -272,7 +315,8 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   non-root user of the base image in the Production environment, works on a read-only root file
   system, carries the version as the OCI label `org.opencontainers.image.version`, holds the built
   [sign-up page](sign-up.md#the-page) in its web root, and holds no sample, extension package or
-  module.
+  module. It also holds the operator's commands in `/app/admin`, run as
+  `kubectl exec deploy/<release> -- dotnet /app/admin/Axis.ControlPlane.Admin.dll sign-ups list`.
 - **Chart.** `deploy/helm/axis-controlplane` installs one Deployment and one ClusterIP Service. The
   Deployment has startup, liveness and readiness probes on `/health/live` and `/health/ready`.
 - **HTTPS only.** The control plane listens on port 8443 with the certificate of a Kubernetes TLS
@@ -292,7 +336,8 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   `secrets.connectionString.name` or `secrets.certificate.name` is not set.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
   Kubernetes schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the
-  image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS.
+  image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS and runs
+  `sign-ups list` in it.
 
 ## Health and telemetry
 

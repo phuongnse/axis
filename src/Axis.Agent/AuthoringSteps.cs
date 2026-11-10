@@ -42,7 +42,7 @@ public sealed class AuthoringStepContext
 
 /// <summary>How long the agent host holds a claim and how often it looks for work.</summary>
 /// <param name="Lease">How long a claim lasts without a renewal. The host renews it every third of it.</param>
-/// <param name="PollInterval">How long the work loop waits when a round claimed nothing.</param>
+/// <param name="PollInterval">How often the work loop adds the served tenants to its turns.</param>
 public sealed record AuthoringLoopOptions(TimeSpan Lease, TimeSpan PollInterval)
 {
     /// <summary>The lease of the publisher, see <c>docs/reference/authoring-requests.md#durable-requests</c>.</summary>

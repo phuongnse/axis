@@ -125,6 +125,7 @@ RUN dotnet publish src/Axis.Agent/Axis.Agent.csproj -c Release -p:InformationalV
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/admin
 RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane \
     && test -f /out/controlplane/wwwroot/sign-up.html
+RUN dotnet publish controlplane/src/Axis.ControlPlane.Admin/Axis.ControlPlane.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane-admin
 RUN rm -f /out/*/appsettings.Development.json
 
 # Production server. It runs as the non-root user of the base image and can run on a read-only root file
@@ -187,13 +188,15 @@ ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
 # Production control plane, which a region runs on a cluster of its own. It runs as the non-root user of the base
 # image and can run on a read-only root file system. Settings come from environment variables and files in
-# /run/secrets. The image has no curl and holds no extension package or module.
+# /run/secrets. The image also holds the operator's commands in /app/admin. It has no curl and holds no extension
+# package or module.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS axis-controlplane
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
 ENV DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
 WORKDIR /app
 COPY --from=production-build /out/controlplane .
+COPY --from=production-build /out/controlplane-admin ./admin
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.ControlPlane.dll"]

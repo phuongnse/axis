@@ -219,8 +219,10 @@ cost something.
   The list is the `control_plane.disposable_domains` table, whose domains are lower case. The domain of
   the email is compared in lower case, and a subdomain of a listed domain is refused too: with
   `mailinator.com` listed, `x@sub.mailinator.com` is refused and `x@notmailinator.com` is not. A bare
-  top-level domain such as `com` never matches. The control plane refreshes the list each week from an
-  open-source list, pinned by its hash.
+  top-level domain such as `com` never matches. With both `ControlPlane:SignUp:DisposableDomains` settings set, the
+  job `refreshDisposableDomains` downloads the open-source list every 7 days and checks its SHA-256 against the pinned hash. On a match it
+  replaces the table in one transaction. On a mismatch it keeps the table and logs an error. A failed download is retried by the job runner.
+  A line is a domain, which the job lower-cases, and it skips blank lines and lines that start with `#`. Without the settings the table is not refreshed.
 
 ## Verifying the email first
 
@@ -285,8 +287,9 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   `{ state: "pending", email, businessName, address }`, `{ state: "confirmed" }` or
   `{ state: "expired" }`. It changes nothing.
 - **Confirming.** `POST /api/sign-up/confirm` takes `{ token }` and answers `{ id, secret }` for the
-  progress page. When the link was used or expired while the page was open, it answers `409` with
-  `{ state }`, and the page shows that state, not an error. A link whose email another sign-up
+  progress page. The secret is 32 random bytes in base64url, and only its SHA-256 is kept. The confirm
+  also starts [the provisioning](#provisioning). When the link was used or expired while the page was
+  open, it answers `409` with `{ state }`, and the page shows that state, not an error. A link whose email another sign-up
   verified first answers `409` with `{ state: "confirmed" }`, see [one trial for each email](#bots-and-abuse).
 
 ### The emails
@@ -372,22 +375,30 @@ Nếu không phải bạn, hãy bỏ qua email này.
 
 ## Provisioning
 
-_(planned for M33)_
+The confirm queues one `provisionTenant` job in its own transaction, with the payload `{ signUpId }`. The
+job provisions the tenant with the idempotency key `tenant-create:<sign-up id>`. Its progress is the
+sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart from the sign-up's
+`state`, which stays `verified`, as the [one trial for each email](#bots-and-abuse) rule reads it.
 
-The control plane provisions the tenant as one job, with the sign-up's id as the idempotency key.
-
-1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell).
-2. Call `POST /api/cell/tenants` on it with the tenant id, the built-in application, the person's
-   email as the administrator, and the trial's quotas, see
-   [creating a tenant](tenant-lifecycle.md#creating-a-tenant).
+1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell). A tenant that the directory
+   holds already goes to its own cell again, so a run after a crash never creates a second tenant.
+2. Call `POST /api/cell/tenants` on it with the subdomain as the tenant id, the built-in application,
+   the person's email as the administrator, and the trial's quotas, see
+   [creating a tenant](tenant-lifecycle.md#creating-a-tenant). The application is left out when the
+   sign-up chose a blank one. The quotas go in key order, and as `{}` when none are set, so every run
+   sends the same body.
 3. When the cell accepts, write the tenant and its host to the [directory](region-directory.md), and
    its `CNAME` record.
-4. Poll the cell job until it ends. A failed job is run again, up to 3 times. After that the operator
-   is alerted, and the person gets an email that the team is on it.
-5. On success, email the person that the trial is ready, with the tenant's address. The identity
+4. Poll the cell job until it ends.
+5. On success, email the person that the trial is ready, with the tenant's address. The email is queued
+   once, in the transaction that sets `provisioning` to `ready`, so a second run sends none. The identity
    provider sends its own invitation to set a password, as the `invite` step of the cell does.
 
-- **Progress.** After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
+- **No cell left.** The sign-up is `queued` and the job queues itself again, due 5 minutes later, and
+  ends as succeeded. The wait for an operator to open a cell does not use up the job's retries.
+- **A failed create job** _(planned for M33)_. The job is run again, up to 3 times. After that the
+  operator is alerted, and the person gets an email that the team is on it.
+- **Progress** _(planned for M33)_. After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
   as [the verify page](#the-verify-page) says. When the person closes the page, the email still tells
   them.
@@ -415,18 +426,23 @@ The control plane provisions the tenant as one job, with the sign-up's id as the
 
 ## Terms acceptance
 
-_(planned for M33)_
-
 Each acceptance of the terms of service and the data processing agreement is recorded and never
 changed.
 
-- **What is recorded.** For each acceptance, an append-only row: the account, the tenant, the
-  document (`terms` or `dpa`), its version, the time, the client address and the browser's user
-  agent. A row is never changed or deleted while the account exists.
+- **What is recorded.** For each acceptance, an append-only row of `control_plane.terms_acceptances`:
+  the `account`, the `tenant_id`, the `document` (`terms` or `dpa`), its `version`, the
+  `privacy_version`, the `accepted_at` time, the `client_address` and the browser's `user_agent`. The
+  address and the user agent are empty when the request had none, and a user agent is cut to 512
+  characters. [The confirm](#the-verify-page) writes the two rows in its transaction, with the
+  versions that the pending sign-up stored. Triggers reject every update, delete and truncate of the
+  table with `restrict_violation`, even from a superuser, and the control plane's role keeps only
+  `SELECT` and `INSERT` on it.
 - **The privacy policy is told, not accepted.** It has no row of its own. The acceptance row also holds
   the version of the Privacy policy that [the terms box](#the-terms-box) showed.
-- **When.** At sign-up, and again when a new version of either document is published. The
-  [billing portal](billing-portal.md) then asks the owner to accept it before any other action.
+- **At sign-up.** A confirm that succeeds records one acceptance of each document. A confirm that is
+  refused records none.
+- **A new version** _(planned for M33)_. When a new version of either document is published, the
+  [billing portal](billing-portal.md) asks the owner to accept it before any other action.
 - **Versions.** Each document's version and its address in each language are settings of the control
   plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
   current is refused. The texts come from a lawyer before sign-up opens.

@@ -363,6 +363,39 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_first_confirm_answers_a_32_byte_secret_that_only_its_hash_is_stored_for_and_queues_provisioning_and_a_second_confirm_answers_no_secret()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, _, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+
+        var first = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var secret = (await first.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("secret").GetString()!;
+        Assert.Equal(43, secret.Length);
+        var bytes = Base64Url.DecodeFromChars(secret);
+        Assert.Equal(32, bytes.Length);
+        await using (var read = _controlPlane.CreateCommand($"SELECT secret_hash FROM control_plane.sign_ups WHERE id = '{id}'"))
+        {
+            Assert.Equal(SHA256.HashData(bytes), (byte[])(await read.ExecuteScalarAsync(cancellation))!);
+        }
+
+        Assert.DoesNotContain(secret, await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE id = '{id}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+        Assert.True(await Scalar<bool>($"SELECT payload = jsonb_build_object('signUpId', '{id}') FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+        Assert.True(await Scalar<bool>($"SELECT provisioning IS NULL FROM control_plane.sign_ups WHERE id = '{id}'"));
+
+        var second = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.False((await second.Content.ReadFromJsonAsync<JsonElement>(cancellation)).TryGetProperty("secret", out _));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+    }
+
+    [Fact]
     public async Task The_first_confirm_starts_one_trialing_subscription_of_30_days_with_one_audit_record_and_a_second_confirm_adds_none()
     {
         var cancellation = TestContext.Current.CancellationToken;
@@ -391,6 +424,71 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
         Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.subscriptions WHERE tenant_id = '{subdomain}'"));
         Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.audit_records WHERE subject = '{subscriptionId}'"));
+    }
+
+    [Fact]
+    public async Task A_confirm_records_one_acceptance_of_the_terms_and_one_of_the_dpa_with_the_versions_time_address_and_user_agent()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, subdomain, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+
+        var before = DateTime.UtcNow;
+        Assert.Equal(HttpStatusCode.OK, (await ConfirmAsync(client, token, "203.0.113.7", "AxisTest/1.0")).StatusCode);
+        var after = DateTime.UtcNow;
+
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal("dpa,terms", await Scalar<string>($"SELECT string_agg(document, ',' ORDER BY document) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+        Assert.Equal(TermsVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'terms'"));
+        Assert.Equal(DpaVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'dpa'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND privacy_version = '{PrivacyVersion}'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND account = '{id}'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND host(client_address) = '203.0.113.7'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND user_agent = 'AxisTest/1.0'"));
+        foreach (var document in new[] { "terms", "dpa" })
+        {
+            var acceptedAt = await Scalar<DateTime>($"SELECT accepted_at FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = '{document}'");
+            Assert.InRange(acceptedAt, before.AddSeconds(-1), after.AddSeconds(1));
+        }
+
+        Assert.Equal(HttpStatusCode.Conflict, (await ConfirmAsync(client, token, "203.0.113.8", "AxisTest/2.0")).StatusCode);
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}'"));
+    }
+
+    [Fact]
+    public async Task A_confirm_that_finds_nothing_to_confirm_records_no_acceptance()
+    {
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var unknown = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+
+        Assert.Equal(HttpStatusCode.Conflict, (await ConfirmAsync(client, unknown, "203.0.113.7", "AxisTest/1.0")).StatusCode);
+
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.terms_acceptances"));
+    }
+
+    [Fact]
+    public async Task A_confirm_after_newer_versions_are_configured_records_the_versions_that_the_form_sent()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        string subdomain;
+        string token;
+        using (var first = await FactoryAsync())
+        {
+            using var client = first.CreateClient();
+            (_, subdomain, token) = await SignUpAsync(client);
+        }
+
+        using var second = await FactoryAsync(termsVersion: "2026-04", dpaVersion: "2026-05", privacyVersion: "2026-06");
+        using var newClient = second.CreateClient();
+
+        Assert.Equal(HttpStatusCode.OK, (await newClient.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
+
+        Assert.Equal(TermsVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'terms'"));
+        Assert.Equal(DpaVersion, await Scalar<string>($"SELECT version FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND document = 'dpa'"));
+        Assert.Equal(2, await Scalar<long>($"SELECT count(*) FROM control_plane.terms_acceptances WHERE tenant_id = '{subdomain}' AND privacy_version = '{PrivacyVersion}'"));
     }
 
     [Fact]
@@ -899,7 +997,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         }
     }
 
-    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true)
+    private async Task<WebApplicationFactory<Program>> FactoryAsync(bool documents = true, string termsVersion = TermsVersion, string dpaVersion = DpaVersion, string privacyVersion = PrivacyVersion)
     {
         var host = await mailpit.SmtpHostAsync();
         var port = await mailpit.SmtpPortAsync();
@@ -924,7 +1022,7 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
             builder.UseSetting("ControlPlane:SignUp:PublicMailboxDomains:0", "gmail.com");
             if (documents)
             {
-                foreach (var (name, version) in new[] { ("Terms", TermsVersion), ("Dpa", DpaVersion), ("Privacy", PrivacyVersion) })
+                foreach (var (name, version) in new[] { ("Terms", termsVersion), ("Dpa", dpaVersion), ("Privacy", privacyVersion) })
                 {
                     builder.UseSetting($"ControlPlane:SignUp:{name}:Version", version);
                     builder.UseSetting($"ControlPlane:SignUp:{name}:Urls:en", $"https://example.com/{name.ToLowerInvariant()}/en");
@@ -953,6 +1051,15 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/sign-up") { Content = JsonContent.Create(form) };
         request.Headers.Add("X-Forwarded-For", clientAddress);
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
+    }
+
+    // One confirm from the client address that X-Forwarded-For names and with the user agent the test gives.
+    private static async Task<HttpResponseMessage> ConfirmAsync(HttpClient client, string token, string clientAddress, string userAgent)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/sign-up/confirm") { Content = JsonContent.Create(new { token }) };
+        request.Headers.Add("X-Forwarded-For", clientAddress);
+        request.Headers.Add("User-Agent", userAgent);
         return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 

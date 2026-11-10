@@ -33,12 +33,24 @@ public sealed partial class ControlPlaneSettingsTableTests
     }
 
     // String, int and bool properties are settings. A list adds an index and a dictionary adds a key. A list of strings is one setting for each index. Other classes hold more settings.
+    // An internal dictionary of nullable numbers is a setting that ControlPlaneOptions.Load reads from the configuration section itself, because the binder would merge null and missing.
     private static IEnumerable<string> BoundSettings(Type type, string prefix)
     {
-        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
         {
             var name = $"{prefix}:{property.Name}";
             var propertyType = property.PropertyType;
+            var isPublic = property.GetMethod?.IsPublic == true;
+            if (!isPublic)
+            {
+                if (propertyType == typeof(IReadOnlyDictionary<string, long?>))
+                {
+                    yield return $"{name}:<>";
+                }
+
+                continue;
+            }
+
             if (propertyType == typeof(string) || propertyType == typeof(int) || propertyType == typeof(bool))
             {
                 yield return name;

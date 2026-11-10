@@ -15,7 +15,7 @@ src/
   Axis.Server/            ASP.NET Core host: API, BFF, SPA hosting
   Axis.Worker/            background host
   Axis.Agent/             the agent host, which runs authoring requests
-  Axis.Hosting/           code that the hosts share: the health endpoints
+  Axis.Hosting/           code that the hosts share: the health endpoints and the tenant rounds
   Axis.Admin/             console host for tenant provisioning, migrations, activation, backup and
                           restore, and the publisher
   Axis.Administration/    library behind the Axis.Admin commands, such as the tenant setting commands
@@ -52,6 +52,7 @@ tests/
 controlplane/
   src/Axis.ControlPlane/  the control plane service: its settings, its own schema and migrations,
                           its job queue and audit records, health and telemetry
+  src/Axis.ControlPlane.Admin/  the operator's commands of the control plane
   tests/                  its unit tests, and its integration tests on PostgreSQL (Testcontainers)
 modules/                  built-in modules, as configuration, installed with Axis: organization and
                           approvals

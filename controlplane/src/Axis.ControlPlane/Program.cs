@@ -4,6 +4,7 @@ using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
@@ -21,6 +22,9 @@ builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 // Read before any database work, so a missing or wrong setting stops the start.
 var options = ControlPlaneOptions.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(options);
+
+// The plan versions, built from the checked settings. The migration start then checks the versions that subscriptions pin.
+builder.Services.AddSingleton(PlanCatalogue.Create(options.Plans));
 
 // The proxies whose forwarded headers are trusted, by the platform's rules: the client address is then the real one, see
 // docs/reference/control-plane.md#settings. Read before any database work too, so a bad value stops the start.
@@ -75,11 +79,25 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 // The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
 builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
 
+// The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
+if (options.SignUp.DisposableDomains.IsComplete)
+{
+    builder.Services.AddSingleton<IJobHandler, DisposableDomainRefresh>();
+    builder.Services.AddSingleton(new RecurringJob(DisposableDomainRefresh.JobKind, TimeSpan.FromDays(7)));
+
+    // Known lists are about 100 KB, so the cap only stops a wrong address from filling the replica's memory.
+    builder.Services.AddHttpClient(DisposableDomainRefresh.HttpClientName, client => client.MaxResponseContentBufferSize = 10 * 1024 * 1024);
+}
+
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cells.Count > 0)
 {
     builder.Services.AddSingleton<IJobHandler, DirectoryCorrection>();
     builder.Services.AddSingleton(new RecurringJob(DirectoryCorrection.JobKind, TimeSpan.FromMinutes(5)));
+
+    // The provisioning of a confirmed sign-up. It places the tenant in a cell, so it needs the directory and a cell to call.
+    builder.Services.AddSingleton<CellPicker>();
+    builder.Services.AddSingleton<IJobHandler, ProvisionTenantJobHandler>();
 
     // The clock of the subscriptions, queued every hour. It finds each tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();

@@ -1,7 +1,5 @@
 # Plans
 
-_(planned for M34)_
-
 A plan is what a tenant of Axis SaaS pays for: a price for the whole tenant and the quotas it sets.
 This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
 changing a plan. The prices are set from what the [cell load test](performance.md#cell-load-test)
@@ -53,10 +51,23 @@ The numbers above show the shape only. They are not prices.
 - **Versions.** Changing a plan's quotas or prices adds a new version. A subscription pins the
   version it bought and keeps it until its plan changes, so a price rise never reaches a customer
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
-- **The trial's plan** _(planned for M33)_. A plan marked `"trial": true` sets a trial's quotas:
-  those of a mid plan, with at most 10 users. It has no price.
+- **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
+  catalogue. It refuses a number that is not plain digits, such as a decimal price, a missing
+  currency or quota key, a repeated code and version, and a trial plan with a price. The message
+  names the plan code, version and setting, and never holds a value. The quota keys it requires are
+  the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
+  until its plans set it. An empty catalogue is valid.
+- **The pin.** A subscription holds a plan code and version, a currency and a period (`month` or
+  `year`). They are empty until a plan is bought, and a trial works without them. After the
+  migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
+  lists one, naming each missing plan code and version.
+- **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
+- **The trial's quotas** _(planned for M33)_. The trial plan sets a trial's quotas: those of a mid
+  plan, with at most 10 users.
 
 ## From a plan to the quotas
+
+_(planned for M34)_
 
 The control plane turns a subscription's plan and add-ons into the tenant's quotas on the cell.
 
@@ -72,6 +83,8 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
 
 ## Add-ons
 
+_(planned for M34)_
+
 An add-on lets a business buy more users without moving to the next plan.
 
 - **User packs.** An add-on adds a fixed number of users, such as 10, at the add-on's price. A
@@ -82,6 +95,8 @@ An add-on lets a business buy more users without moving to the next plan.
   users than the new number is refused, naming how many users to disable first.
 
 ## Changing a plan
+
+_(planned for M34)_
 
 A larger plan applies at once, with the rest of the period prorated, and a smaller one applies at the
 period's end.
