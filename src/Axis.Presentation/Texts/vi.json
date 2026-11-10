@@ -1918,6 +1918,7 @@
   "shell.studio.matrix.reload": "Tải lại",
   "shell.studio.matrix.invalid": "Không thể lưu chính sách.",
   "shell.studio.matrix.filter": "Bộ lọc bản ghi",
+  "shell.studio.matrix.filter.help": "Chỉ các bản ghi khớp với biểu thức này mới được cấp quyền. Để trống thì cấp quyền cho mọi bản ghi.",
   "shell.studio.matrix.fields": "Các trường",
   "shell.studio.matrix.unacceptedAction": "Không được chấp nhận ở đây:",
   "shell.studio.validate": "Kiểm tra lỗi",

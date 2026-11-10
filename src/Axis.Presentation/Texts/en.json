@@ -1918,6 +1918,7 @@
   "shell.studio.matrix.reload": "Reload",
   "shell.studio.matrix.invalid": "The policy could not be saved.",
   "shell.studio.matrix.filter": "Record filter",
+  "shell.studio.matrix.filter.help": "Only records that match this expression are granted. Leave it empty to grant every record.",
   "shell.studio.matrix.fields": "Fields",
   "shell.studio.matrix.unacceptedAction": "Not accepted here:",
   "shell.studio.validate": "Validate",
