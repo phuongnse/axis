@@ -26,6 +26,7 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
     private readonly CellHandler _cells = new();
     private readonly InMemoryDnsRecords _dns = new();
+    private readonly LogCollector _logs = new();
     private readonly Guid _signUpId = Guid.CreateVersion7();
     private NpgsqlDataSource _dataSource = null!;
     private ILoggerFactory _loggers = null!;
@@ -65,7 +66,7 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
         }
 
         _clients = new CellClients(controlPlane, new HandlerFactory(_cells), new CellClientOptions { PollDelay = TimeSpan.FromMilliseconds(10) }, TimeProvider.System);
-        _loggers = LoggerFactory.Create(builder => builder.AddProvider(new LogCollector()));
+        _loggers = LoggerFactory.Create(builder => builder.AddProvider(_logs));
         _handler = new ProvisionTenantJobHandler(
             _dataSource,
             _dataSource,
@@ -73,7 +74,8 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
             _clients,
             EmailTemplates.LoadEmbedded(),
             controlPlane,
-            TimeProvider.System);
+            TimeProvider.System,
+            _loggers.CreateLogger<ProvisionTenantJobHandler>());
     }
 
     public async ValueTask DisposeAsync()
@@ -195,15 +197,36 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_failed_cell_job_fails_the_run_with_a_text_that_holds_no_cell_answer_and_the_sign_up_is_not_ready_and_sends_no_email()
+    public async Task A_failed_cell_job_makes_the_sign_up_delayed_logs_an_error_and_queues_one_delayed_email_when_the_job_runs_twice()
     {
         _cells.JobState = "failed";
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(RunAsync);
+        await RunAsync();
+        await RunAsync();
 
-        Assert.DoesNotContain("acme", exception.Message, StringComparison.Ordinal);
-        Assert.Equal("creating", await Scalar<string>($"SELECT provisioning FROM control_plane.sign_ups WHERE id = '{_signUpId}'"));
-        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
+        Assert.Equal("delayed", await Scalar<string>($"SELECT provisioning FROM control_plane.sign_ups WHERE id = '{_signUpId}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'provisioningDelayed'"));
+        Assert.Equal("owner@example.com", await Scalar<string>("SELECT payload->>'to' FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'provisioningDelayed'"));
+        Assert.Equal("An Owner", await Scalar<string>("SELECT payload->'values'->>'name' FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'provisioningDelayed'"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'tenantReady'"));
+        Assert.Contains(_logs.Entries, entry => entry.Level == LogLevel.Error
+            && entry.Message.Contains(_signUpId.ToString(), StringComparison.Ordinal)
+            && entry.Message.Contains("vn-1", StringComparison.Ordinal));
+        Assert.DoesNotContain(_logs.Entries, entry => entry.Message.Contains("owner@example.com", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task A_delayed_sign_up_whose_cell_job_then_succeeds_becomes_ready_with_one_ready_email_and_no_second_delayed_email()
+    {
+        _cells.JobState = "failed";
+        await RunAsync();
+        _cells.JobState = "succeeded";
+
+        await RunAsync();
+
+        Assert.Equal("ready", await Scalar<string>($"SELECT provisioning FROM control_plane.sign_ups WHERE id = '{_signUpId}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'provisioningDelayed'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail' AND payload->>'template' = 'tenantReady'"));
     }
 
     private Task RunAsync() => _handler.RunAsync(Job(), TestContext.Current.CancellationToken);
@@ -222,7 +245,8 @@ public sealed class ProvisionTenantJobTests : IAsyncLifetime
             _clients,
             EmailTemplates.LoadEmbedded(),
             controlPlane,
-            TimeProvider.System);
+            TimeProvider.System,
+            _loggers.CreateLogger<ProvisionTenantJobHandler>());
     }
 
     private Task<int> SeedSignUpAsync() => Execute($"""

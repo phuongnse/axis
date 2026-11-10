@@ -460,11 +460,12 @@ internal static class SignUpEndpoints
             return Results.NotFound();
         }
 
-        // Waiting for a cell and a job that has not started both leave the set-up not begun. Delayed is the end of the job's retries.
+        // Waiting for a cell and a job that has not started both leave the set-up not begun. Delayed is a cell job that ended failed, or the end of the job's retries.
         var provisioning = reader.IsDBNull(2) ? null : reader.GetString(2);
         var step = provisioning switch
         {
             "ready" => "ready",
+            "delayed" => "delayed",
             _ when reader.GetBoolean(3) => "delayed",
             "creating" => "creating",
             _ => "verified",

@@ -414,6 +414,10 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
         await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'creating' WHERE id = '{id}'", cancellation);
         await AssertProgressAsync("creating");
 
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'delayed' WHERE id = '{id}'", cancellation);
+        await AssertProgressAsync("delayed");
+        await ControlPlaneDatabase.ExecuteAsync(_controlPlane, $"UPDATE control_plane.sign_ups SET provisioning = 'creating' WHERE id = '{id}'", cancellation);
+
         await ControlPlaneDatabase.ExecuteAsync(
             _controlPlane,
             $"INSERT INTO control_plane.jobs (id, kind, payload, state, next_attempt_at, finished_at) VALUES (gen_random_uuid(), 'provisionTenant', jsonb_build_object('signUpId', '{id}'), 'failed', now(), now())",

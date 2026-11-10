@@ -380,7 +380,7 @@ Nếu không phải bạn, hãy bỏ qua email này.
 
 The confirm queues one `provisionTenant` job in its own transaction, with the payload `{ signUpId }`. The
 job provisions the tenant with the idempotency key `tenant-create:<sign-up id>`. Its progress is the
-sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart from the sign-up's
+sign-up's `provisioning`, which is `queued`, `creating`, `ready` or `delayed`. It is apart from the sign-up's
 `state`, which stays `verified`, as the [one trial for each email](#bots-and-abuse) rule reads it.
 
 1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell). A tenant that the directory
@@ -399,8 +399,11 @@ sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart 
 
 - **No cell left.** The sign-up is `queued` and the job queues itself again, due 5 minutes later, and
   ends as succeeded. The wait for an operator to open a cell does not use up the job's retries.
-- **A failed create job** _(planned for M33)_. The job is run again, up to 3 times. After that the
-  operator is alerted, and the person gets an email that the team is on it.
+- **A failed create job.** The cell's create job runs up to 3 claims, see
+  [jobs](tenant-lifecycle.md#jobs). When it ends `failed`, the sign-up is `delayed` and the job ends as
+  succeeded. It logs an error that names the sign-up, the cell and the cell job, which alerts the
+  operator, and emails the person that the team is on it. The email is queued once, in the transaction
+  that sets `delayed`. A later run keeps the sign-up `delayed` until it is `ready`.
 - **The progress route.** `GET /api/sign-up/{id}` with the header `Sign-Up-Secret` answers
   `{ step, address }`, where `address` is the tenant's sign-in address. It answers only a verified
   sign-up whose secret is the one that the confirm answered. For an unknown id, an id that is not a
@@ -411,8 +414,8 @@ sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart 
   - `verified` until the cell starts creating the tenant, including while no cell has room.
   - `creating` while the cell works.
   - `ready` once the trial is ready.
-  - `delayed` when a `provisionTenant` job of the sign-up has ended `failed` because its retries ran
-    out, and the trial is not ready yet.
+  - `delayed` when the sign-up is `delayed` or a `provisionTenant` job of the sign-up has ended
+    `failed` because its retries ran out, and the trial is not ready yet.
 - **Progress.** After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
   as [the verify page](#the-verify-page) says. The page asks the progress route. When the person closes the page, the email still tells

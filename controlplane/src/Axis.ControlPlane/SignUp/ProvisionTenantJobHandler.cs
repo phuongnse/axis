@@ -16,16 +16,19 @@ namespace Axis.ControlPlane.SignUp;
 /// and not to a cell the <see cref="CellPicker"/> chooses, so a run that follows a crash never creates a second tenant. With no cell left the
 /// sign-up is <c>queued</c> and the job queues itself again in 5 minutes and succeeds, so the wait for an operator does not use up its
 /// retries. The job follows the cell's create job to its end and then queues the <c>tenantReady</c> email in the transaction that sets
-/// <c>ready</c>, so a second run sends none. A failed cell job fails the run with a fixed text, and a sign-up that is not verified is skipped.
+/// <c>ready</c>, so a second run sends none. A failed cell job makes the sign-up <c>delayed</c>, logs an error that names the sign-up, the cell
+/// and the cell's job, and queues the <c>provisioningDelayed</c> email in the transaction that sets <c>delayed</c>, so a second run sends none.
+/// The run then succeeds, as a retry asks the cell for the same failed job. A sign-up that is not verified is skipped.
 /// </summary>
-internal sealed class ProvisionTenantJobHandler(
+internal sealed partial class ProvisionTenantJobHandler(
     [FromKeyedServices("directory")] NpgsqlDataSource directory,
     NpgsqlDataSource controlPlane,
     CellPicker picker,
     CellClients cells,
     EmailTemplates templates,
     ControlPlaneOptions options,
-    TimeProvider clock) : IJobHandler
+    TimeProvider clock,
+    ILogger<ProvisionTenantJobHandler> logger) : IJobHandler
 {
     public const string JobKind = "provisionTenant";
 
@@ -97,6 +100,7 @@ internal sealed class ProvisionTenantJobHandler(
                 subdomain,
                 async (chosen, token) =>
                 {
+                    cellId = chosen;
                     client = cells.Get(chosen);
                     created = await client.PostAsync(CreatePath, operation, body, token);
                 },
@@ -112,39 +116,72 @@ internal sealed class ProvisionTenantJobHandler(
         var ended = await client!.FollowAsync(created!.Id, cancellationToken);
         if (ended.State == CellJob.Failed)
         {
-            // Never the job's error or the body: the text of a failed job is stored with the job.
-            throw new InvalidOperationException("The cell's create job for the sign-up failed.");
+            // Never the job's error, the email or the body: the text of a failed job is stored with the job. The log comes before the
+            // change, so a crash between the two never loses the alert.
+            LogDelayed(signUpId, cellId!, created!.Id);
+            await FinishAsync(
+                signUpId,
+                "delayed",
+                "provisioningDelayed",
+                new Dictionary<string, string> { ["name"] = fullName },
+                language,
+                email,
+                cancellationToken);
+            return;
         }
 
+        await FinishAsync(
+            signUpId,
+            "ready",
+            "tenantReady",
+            new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, subdomain) },
+            language,
+            email,
+            cancellationToken);
+    }
+
+    [LoggerMessage(LogLevel.Error, "The sign-up {SignUpId} is delayed: the cell {CellId} ended its create job {CellJobId} as failed. The cell job holds the error.")]
+    private partial void LogDelayed(Guid signUpId, string cellId, Guid cellJobId);
+
+    // The progress and its email commit together, so a second run finds the progress set and queues no second email.
+    private async Task FinishAsync(
+        Guid signUpId,
+        string progress,
+        string template,
+        IReadOnlyDictionary<string, string> values,
+        string language,
+        string email,
+        CancellationToken cancellationToken)
+    {
         await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await using (var ready = new NpgsqlCommand(
-            "UPDATE control_plane.sign_ups SET provisioning = 'ready' WHERE id = @id AND provisioning IS DISTINCT FROM 'ready'", connection, transaction))
+        await using (var update = new NpgsqlCommand(
+            """
+            UPDATE control_plane.sign_ups SET provisioning = @progress
+            WHERE id = @id AND provisioning IS DISTINCT FROM @progress AND provisioning IS DISTINCT FROM 'ready'
+            """,
+            connection,
+            transaction))
         {
-            ready.Parameters.AddWithValue("id", signUpId);
+            update.Parameters.AddWithValue("progress", progress);
+            update.Parameters.AddWithValue("id", signUpId);
 
-            // Another run already made it ready and queued the email.
-            if (await ready.ExecuteNonQueryAsync(cancellationToken) == 0)
+            // Another run already set it and queued the email, or the sign-up is ready, which delayed never replaces.
+            if (await update.ExecuteNonQueryAsync(cancellationToken) == 0)
             {
                 return;
             }
         }
 
-        await EmailJobs.EnqueueAsync(
-            connection,
-            transaction,
-            templates,
-            "tenantReady",
-            language,
-            email,
-            new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, subdomain) },
-            cancellationToken);
+        await EmailJobs.EnqueueAsync(connection, transaction, templates, template, language, email, values, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
     private async Task SetProvisioningAsync(Guid signUpId, string progress, CancellationToken cancellationToken)
     {
-        await using var command = controlPlane.CreateCommand("UPDATE control_plane.sign_ups SET provisioning = @progress WHERE id = @id");
+        // A delayed sign-up stays delayed, so a second run does not move it back and queue a second delayed email.
+        await using var command = controlPlane.CreateCommand(
+            "UPDATE control_plane.sign_ups SET provisioning = @progress WHERE id = @id AND provisioning IS DISTINCT FROM 'delayed'");
         command.Parameters.AddWithValue("progress", progress);
         command.Parameters.AddWithValue("id", signUpId);
         await command.ExecuteNonQueryAsync(cancellationToken);

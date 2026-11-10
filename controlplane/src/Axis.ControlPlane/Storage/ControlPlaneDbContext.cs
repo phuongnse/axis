@@ -86,7 +86,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
                 table.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
                 table.HasCheckConstraint("ck_sign_ups_token_hash", "token_hash IS NULL OR octet_length(token_hash) = 32");
                 table.HasCheckConstraint("ck_sign_ups_secret_hash", "secret_hash IS NULL OR octet_length(secret_hash) = 32");
-                table.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready')");
+                table.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready', 'delayed')");
             });
             signUp.HasKey(s => s.Id).HasName("pk_sign_ups");
             signUp.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
