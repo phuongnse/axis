@@ -35,7 +35,7 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
   [provisioning API](tenant-lifecycle.md#provisioning-api), and each change writes a platform audit
   record that names the keys of the request. The [create route](tenant-lifecycle.md#creating-a-tenant)
   can also set the first rows.
-- **The operator as actor** _(planned for M31)_. The audit record of a quota change names the operator
+- **The operator as actor** _(planned for M33)_. The audit record of a quota change names the operator
   or the machine caller in its `actor` column.
 - **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's
   rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
@@ -206,7 +206,7 @@ sizes only, never a record value, a file name or a user name.
   the day, the emails sent, the connector and package calls, and the work items run. A sample
   replaces the day's pair of sizes only when its total is larger. Rows are kept for 13 months, and
   the sampling job deletes the tenant's rows older than that.
-- **Users, applications and emails sent** _(planned for M31)_. The daily row's users, applications
+- **Users, applications and emails sent** _(planned for M33)_. The daily row's users, applications
   and emails-sent columns are filled from the counts of their quotas, see [quotas](#quotas) and
   [emails a day](#emails-a-day).
 - **Authoring requests** _(planned for M35)_. The daily row also holds the authoring requests sent

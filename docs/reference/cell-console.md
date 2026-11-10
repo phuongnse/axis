@@ -102,12 +102,12 @@ actions of the Tenant view.
   defaults, its usage and its jobs in the same table as the Jobs view. An unknown id shows the not-found page.
   - **Usage.** The tenant's usage of the last 13 months by day, in the same table as the users page's "Usage"
     section, see [the tenant read](tenant-lifecycle.md#routes).
-  - **Host verification** _(planned for M31)_: the verification state of each host.
-  - **Deletion dates** _(planned for M31)_: the dates of a tenant's deletion.
+  - **Host verification** _(planned for M33)_: the verification state of each host.
+  - **Deletion dates** _(planned for M33)_: the dates of a tenant's deletion.
   - **Actions.** A Suspend, a Resume, an Export, a Delete and a Cancel deletion button, each with a confirmation
     that names the tenant, a Download button once an export has succeeded, and a Set quotas and an Add a host
     button, each with a dialog that names the tenant, see [actions](#actions).
-- **Application** _(planned for M31)_. A row of the Tenants view and the Tenant view show the tenant's
+- **Application**. A row of the Tenants view and the Tenant view show the tenant's
   application, as the [tenant reads](tenant-lifecycle.md#routes) answer it.
 
 ## Actions
@@ -165,8 +165,6 @@ and Add a host apply at once.
   Suspend, Resume, Export, Delete, Cancel deletion and Download buttons are off while it follows a job.
 
 ## What the console never shows
-
-_(planned for M31)_
 
 The console shows what the operator needs to run the cell, and no business data of a tenant.
 

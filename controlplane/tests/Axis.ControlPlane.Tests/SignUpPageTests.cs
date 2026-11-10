@@ -114,7 +114,7 @@ public sealed class SignUpPageTests : IDisposable
         Assert.Equal(Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(challenge))), root.GetProperty("signature").GetString());
         Assert.Equal("SHA-256", root.GetProperty("algorithm").GetString());
         Assert.Equal(100_000, root.GetProperty("maxnumber").GetInt32());
-        Assert.EndsWith($"?expires={served.AddMinutes(10).ToUnixTimeSeconds()}", root.GetProperty("salt").GetString(), StringComparison.Ordinal);
+        Assert.EndsWith($"?expires={served.AddMinutes(10).ToUnixTimeSeconds()}&", root.GetProperty("salt").GetString(), StringComparison.Ordinal);
     }
 
     [Fact]

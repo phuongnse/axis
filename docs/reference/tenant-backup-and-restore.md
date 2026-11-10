@@ -426,7 +426,7 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
   point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command
   exports the gauge over OTLP before it exits, see [telemetry export](host-settings.md#telemetry-export).
   With no endpoint, nothing is exported.
-- **An alert on a stale backup** _(planned for M31)_. An alert fires on a gauge that is too old.
+- **An alert on a stale backup** _(planned for M33)_. An alert fires on a gauge that is too old.
 - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and
   `:SecretAccessKey` name an S3-compatible service, reached with the AWS SDK and path-style addressing,
   see [host settings](host-settings.md#cell-settings). All five are required. The command's other

@@ -500,7 +500,7 @@ The publisher and the server also write records for the operator's work in a cel
 - **Quotas.** The quotas route of the provisioning API, `PUT /api/cell/tenants/{id}/quotas`, writes
   `tenant quotas set` in one transaction with the quota rows, with the quota keys it was given in
   `changed`.
-- **The actor of a quota change** _(planned for M31)_. The record of the quotas route names the operator
+- **The actor of a quota change** _(planned for M33)_. The record of the quotas route names the operator
   or the machine caller as its actor.
 - **Export downloads.** The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, and the
   tenant administrator's route, `GET /api/tenant/exports/{exportId}`, write `tenant export download`

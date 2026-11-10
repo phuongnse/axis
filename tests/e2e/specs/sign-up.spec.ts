@@ -48,6 +48,22 @@ test.describe('the sign-up page', () => {
     await expect(page.getByText('This subdomain is free.', { exact: true })).toBeVisible()
   })
 
+  test('a person signs up without a bot check to touch and reaches Check your inbox', async ({ page }) => {
+    const stamp = Date.now()
+    await page.goto(`${controlPlaneURL}/sign-up`)
+    await page.getByRole('textbox', { name: 'Full name', exact: true }).fill('Ana Nguyen')
+    await page.getByRole('textbox', { name: 'Work email', exact: true }).fill(`no-check-${stamp}@example.com`)
+    await page.getByRole('textbox', { name: 'Business name', exact: true }).fill(`E2E No Check ${stamp}`)
+
+    // The terms box is the only box on the page: the proof of work is solved out of sight.
+    await expect(page.getByRole('checkbox')).toHaveCount(1)
+    await page.getByRole('checkbox').check()
+    await expect(page.getByText('This subdomain is free.', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'Sign up', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Check your inbox', exact: true })).toBeVisible()
+  })
+
   test('a person signs up, opens the link of the confirm email, confirms, and the link then shows already confirmed', async ({
     page,
     context,
