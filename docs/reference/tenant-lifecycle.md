@@ -51,7 +51,7 @@ has one implementation.
   in the same transaction as the job's final state. The record names the operator or the machine
   caller as actor, the tenant, the command name of the matching `Axis.Admin` command and `job:<id>`
   in `changed`, and holds no secret.
-- **Refused calls** _(planned for M31)_. A refused call writes a log event and no audit record.
+- **Refused calls** _(planned for M33)_. A refused call writes a log event and no audit record.
 
 ### Jobs
 
@@ -71,7 +71,7 @@ over the schema role.
 - **Waiting for a lease.** A step may take a lease of the tenant first, as the `export` step does. A
   wait for a lease uses no claim: it adds to the job's `waits` count, and the limit of three is
   `claims` minus `waits`.
-- **Running a failed job again** _(planned for M31)_. A failed job can be run again, and it skips the
+- **Running a failed job again** _(planned for M33)_. A failed job can be run again, and it skips the
   steps already done, as `tenant create` does.
 
 | Kind | Queued by | Steps |
@@ -107,7 +107,7 @@ over the schema role.
 | `GET /api/cell/jobs` | Lists the cell's jobs as `{ "items": [...] }`, newest first by `createdAt`, then by id. Each item is a job as the job read answers it, with its `steps` and `error`. The `actor` and the `input` of a job are never returned. `tenant` keeps one tenant's jobs, and an unknown tenant answers an empty list. `limit` is a whole number from 1 to 200 and is 50 when missing. Any other value answers `400`. There is no paging past `limit`. |
 | `GET /api/cell/jobs/{id}` | Answers a job as the `202` does, with its `steps`, each `{ name, state, error }`, and the `error` of a failed job. An unknown id answers `404`. |
 
-- **A tenant's application** _(planned for M31)_. The create job records the tenant's application,
+- **A tenant's application** _(planned for M33)_. The create job records the tenant's application,
   which the tenant reads answer as `application`.
 
 ## Creating a tenant
@@ -319,11 +319,11 @@ A deletion can be undone during its grace window, and not after.
    1. **`hosts`.** The tenant's hosts from the directory and its realm redirect addresses. This step
       first writes the tombstone, takes the actor from the job input `{ "actor" }`, and refuses a job
       that has none.
-      - **Certificates** _(planned for M31)_. The step also removes the tenant's cert-manager
+      - **Certificates** _(planned for M33)_. The step also removes the tenant's cert-manager
         certificates.
    2. **`database`.** The tenant database, then its schema and runtime roles.
    3. **`realm`.** Its realm in the identity provider.
-   4. **`files`** _(planned for M31)_. Its files in object storage, when a storage binding holds them
+   4. **`files`** _(planned for M33)_. Its files in object storage, when a storage binding holds them
       outside the database.
    5. **`studio`.** Its Studio folder.
    6. **`keys`.** Its data keys, lookup keys and backup key, see
@@ -346,4 +346,4 @@ A deletion can be undone during its grace window, and not after.
 - **Point-in-time recovery.** The managed PostgreSQL's point-in-time recovery holds the tenant
   database and the platform rows, wrapped keys included, for its retention of 7 days. A deletion is
   complete once that window has passed.
-- **The date** _(planned for M31)_. The cell console shows the date when the deletion is complete.
+- **The date** _(planned for M33)_. The cell console shows the date when the deletion is complete.
