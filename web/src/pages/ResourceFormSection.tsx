@@ -1,5 +1,5 @@
 import { Flex, Typography } from 'antd'
-import { useId, useState, type ReactNode } from 'react'
+import { Children, Fragment, isValidElement, useId, useState, type ReactNode } from 'react'
 import { useDesignTokens } from '../platform/themeMode'
 
 /** The column that spaces a resource form's sections apart, see docs/reference/studio-resource-form.md#sections. */
@@ -62,6 +62,45 @@ export function ResourceFormSection({
         {typeof children === 'function' ? <div ref={setSlot} /> : action}
       </Flex>
       {body}
+    </section>
+  )
+}
+
+/**
+ * Proposed: the parts of one panel, for a page that reads as one document, such as an AI request's page: each
+ * `SectionPart` has its heading, and a `borderSubtle` rule sits above every part but the first. Anything between parts,
+ * such as a message or a row of actions, belongs to the part above it. See the review on #3263.
+ */
+export function SectionParts({ children }: { children: ReactNode }) {
+  const { colour, spacing } = useDesignTokens()
+  const items = Children.toArray(children)
+  const first = items.findIndex((child) => isValidElement(child) && child.type === SectionPart)
+  return (
+    <Flex vertical gap={spacing.md}>
+      {items.map((child, index) => (
+        <Fragment key={index}>
+          {index > first && isValidElement(child) && child.type === SectionPart && (
+            <div role="separator" style={{ borderTop: `1px solid ${colour.borderSubtle}` }} />
+          )}
+          {child}
+        </Fragment>
+      ))}
+    </Flex>
+  )
+}
+
+/** Proposed: one part of `SectionParts`: a level-5 heading, then its content. */
+export function SectionPart({ testName, title, children }: { testName: string; title: string; children: ReactNode }) {
+  const { spacing } = useDesignTokens()
+  const headingId = useId()
+  return (
+    <section aria-labelledby={headingId} data-testid={`studio-part-${testName}`}>
+      <Flex vertical gap={spacing.sm}>
+        <Typography.Title id={headingId} level={5} style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
+        {children}
+      </Flex>
     </section>
   )
 }
