@@ -196,9 +196,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The public URL is optional.
+  settings is set, both are required. The trial quotas are optional. The public URL is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
-  index of a cell or an application, and never its value.
+  index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
   `ForwardedHeaders:KnownNetworks` by the rules of [host settings](host-settings.md#forwarded-headers), so the
   [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
@@ -246,6 +246,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:PublicMailboxDomains:<n>` | A public mailbox domain, such as `gmail.com`, whose addresses the [sign-up domain limit](sign-up.md#bots-and-abuse) counts one by one. Optional | A domain name |
 | `ControlPlane:SignUp:DisposableDomains:Url` | The address of the open-source list of disposable mailbox domains, one domain per line. Optional | An absolute `https` URL, when either is set |
 | `ControlPlane:SignUp:DisposableDomains:Sha256` | The SHA-256 of that list, as hex. The job refreshes the table only from a list with this hash | 64 hex characters, when either is set |
+| `ControlPlane:SignUp:TrialQuotas:<quota key>` | The quota that a new trial gets for that [quota key](tenant-quotas.md#quotas), such as `users`, which [provisioning](sign-up.md#provisioning) sends to the cell. Empty, or `null` in a JSON file, for no limit. Optional. A quota key that is not set keeps the cell's default | A quota key, and a whole number of zero or more when not empty |
 | `ControlPlane:SignUp:Terms:Version` | The version of the terms of service that a person accepts, such as `2026-01`. Optional. Without the documents `GET /api/sign-up/documents` and `POST /api/sign-up` answer `503`. A [sign-up](sign-up.md#the-documents) must send the current version of each document | Not empty, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:en` | The English address of the terms of service | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:Terms:Urls:vi` | The Vietnamese address of the terms of service | An absolute `https` URL, when a document is set |

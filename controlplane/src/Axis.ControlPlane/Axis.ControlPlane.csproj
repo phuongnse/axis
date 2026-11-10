@@ -26,13 +26,17 @@
     <ProjectReference Include="..\..\..\src\Axis.Core\Axis.Core.csproj" />
   </ItemGroup>
 
-  <!-- The platform's security headers, JSON content type rule, forwarded headers settings and quota keys, compiled from the platform's own files so they stay exactly the same. -->
+  <!-- The platform's security headers, JSON content type rule and forwarded headers settings, compiled from the platform's own files so they stay exactly the same. -->
   <ItemGroup>
     <Compile Include="..\..\..\src\Axis.Server\Http\SecurityHeaders.cs" Link="Http\%(Filename)%(Extension)" />
     <Compile Include="..\..\..\src\Axis.Server\Http\ResponseCharset.cs" Link="Http\%(Filename)%(Extension)" />
     <Compile Include="..\..\..\src\Axis.Server\Http\JsonRequest.cs" Link="Http\%(Filename)%(Extension)" />
     <Compile Include="..\..\..\src\Axis.Server\Http\ForwardedHeadersSettings.cs" Link="Http\%(Filename)%(Extension)" />
-    <Compile Include="..\..\..\src\Axis.Tenancy\QuotaKeys.cs" Link="Plans\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <!-- The platform's quota keys, compiled from the platform's own file so the list of keys stays one. -->
+  <ItemGroup>
+    <Compile Include="..\..\..\src\Axis.Tenancy\QuotaKeys.cs" Link="Tenancy\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
