@@ -10,20 +10,22 @@ installation that ran them.
 
 ## Decision
 
-- **Three production images,** `axis-server`, `axis-worker` and `axis-admin`, separate from the
-  development images. They hold no sample and no credential, run as a non-root user on a read-only
-  root file system, and read settings only from the environment and secret files. `axis-admin` holds
-  the PostgreSQL client tools for backup and restore.
-- **On premises, a Compose example** runs the server, the worker and a one-shot `migrate`, with
-  PostgreSQL outside it. A smoke test installs it, as the end-to-end proof of the images.
+- **Four production images,** `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`,
+  separate from the development images. They hold no sample and no credential, run as a non-root
+  user on a read-only root file system, and read settings only from the environment and secret
+  files. `axis-admin` holds the PostgreSQL client tools for backup and restore.
+- **On premises, a Compose example** runs the hosts, with PostgreSQL outside it. Migrations run as
+  the one-shot command `admin migrate`. A smoke test installs it, as the end-to-end proof of the
+  images.
 - **In the cloud, a Helm chart** runs the server and the worker with their probes and runs `migrate`
   before an upgrade. It is checked statically, against the Kubernetes schemas.
 - **Both run Axis's identity provider,** as [D99](d99-axis-ships-its-own-identity-provider.md) says.
 - **An upgrade migrates first,** then rolls out the new hosts, as
   [D43](d43-tenant-provisioning-and-migrations-across-tenant-databases.md) orders. Migrations are
   never reversed: a rollback restores the backup and runs the old images.
-- **A release workflow publishes the images,** scanned and signed, as
+- **CI scans the images,** as
   [D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) says.
+- **A release workflow publishes the images** _(planned for M32)_, each signed, as D107 says.
 
 Several replicas are [D49](d49-several-server-replicas-behind-a-tls-proxy.md). The steps and every
 setting are in [installation](../reference/installation.md).
