@@ -219,8 +219,10 @@ cost something.
   The list is the `control_plane.disposable_domains` table, whose domains are lower case. The domain of
   the email is compared in lower case, and a subdomain of a listed domain is refused too: with
   `mailinator.com` listed, `x@sub.mailinator.com` is refused and `x@notmailinator.com` is not. A bare
-  top-level domain such as `com` never matches. The control plane refreshes the list each week from an
-  open-source list, pinned by its hash.
+  top-level domain such as `com` never matches. With both `ControlPlane:SignUp:DisposableDomains` settings set, the
+  job `refreshDisposableDomains` downloads the open-source list every 7 days and checks its SHA-256 against the pinned hash. On a match it
+  replaces the table in one transaction. On a mismatch it keeps the table and logs an error. A failed download is retried by the job runner.
+  A line is a domain, which the job lower-cases, and it skips blank lines and lines that start with `#`. Without the settings the table is not refreshed.
 
 ## Verifying the email first
 

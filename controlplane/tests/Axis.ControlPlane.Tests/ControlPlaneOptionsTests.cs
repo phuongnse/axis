@@ -587,6 +587,53 @@ public sealed class ControlPlaneOptionsTests
         Assert.Equal("https://example.com/licences", signUp.LicencesUrl);
     }
 
+    [Theory]
+    [InlineData("https://lists.example/only-url-4f9c.conf", null, "Sha256", "https://lists.example/only-url-4f9c.conf")]
+    [InlineData(null, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Url", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("http://lists.example/plain-http-4f9c.conf", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Url", "http://lists.example/plain-http-4f9c.conf")]
+    [InlineData("https://lists.example/short-hash.conf", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde", "Sha256", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde")]
+    [InlineData("https://lists.example/bad-hash.conf", "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Sha256", "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    public void A_disposable_domain_list_that_is_half_set_or_wrong_stops_the_start_and_the_message_holds_no_value(string? url, string? sha256, string refused, string value)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:DisposableDomains:Url"] = url,
+            ["ControlPlane:SignUp:DisposableDomains:Sha256"] = sha256,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:SignUp:DisposableDomains:{refused}", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_disposable_domain_list_with_an_https_url_and_a_64_character_hash_loads_and_queues_the_refresh()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:DisposableDomains:Url"] = "https://lists.example/disposable.conf",
+            ["ControlPlane:SignUp:DisposableDomains:Sha256"] = new string('A', 64),
+        });
+
+        using var client = factory.CreateClient();
+
+        var disposable = factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.DisposableDomains;
+        Assert.True(disposable.IsComplete);
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains" && job.Interval == TimeSpan.FromDays(7));
+    }
+
+    [Fact]
+    public void Without_the_disposable_domain_settings_the_refresh_is_not_queued()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains");
+    }
+
     [Fact]
     public void With_no_sign_up_document_the_service_starts()
     {

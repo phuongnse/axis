@@ -75,6 +75,16 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 // The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
 builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
 
+// The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
+if (options.SignUp.DisposableDomains.IsComplete)
+{
+    builder.Services.AddSingleton<IJobHandler, DisposableDomainRefresh>();
+    builder.Services.AddSingleton(new RecurringJob(DisposableDomainRefresh.JobKind, TimeSpan.FromDays(7)));
+
+    // Known lists are about 100 KB, so the cap only stops a wrong address from filling the replica's memory.
+    builder.Services.AddHttpClient(DisposableDomainRefresh.HttpClientName, client => client.MaxResponseContentBufferSize = 10 * 1024 * 1024);
+}
+
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cells.Count > 0)
 {
