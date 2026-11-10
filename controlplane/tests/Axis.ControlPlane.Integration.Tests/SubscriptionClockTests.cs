@@ -193,6 +193,22 @@ public sealed class SubscriptionClockTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_deleting_subscription_whose_directory_row_was_dropped_after_the_purge_becomes_deleted_without_a_cell_call()
+    {
+        var id = await SeedAsync("acme", "deleting", _start.AddMinutes(-5));
+        await Execute("DELETE FROM directory.tenants WHERE id = 'acme'");
+
+        await Run();
+
+        Assert.Equal("deleted", await StateAsync(id));
+        Assert.Null(await NextAtAsync(id));
+        Assert.Empty(_cell.Calls);
+        Assert.Equal(["subscription.deleted"], await ColumnAsync($"SELECT action FROM control_plane.audit_records WHERE subject = '{id}'"));
+        await Run();
+        Assert.Equal(1L, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records"));
+    }
+
+    [Fact]
     public async Task A_tenant_with_no_directory_row_is_left_as_it_is_with_a_warning_and_the_other_subscriptions_still_move()
     {
         var orphan = await SeedAsync("orphan", "trialing", _start.AddDays(-2));

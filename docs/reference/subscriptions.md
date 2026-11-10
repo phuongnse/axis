@@ -39,7 +39,8 @@ commerce.
   subscription as its subject, and the table keeps no history of its own.
 - **`deleting` ends when the cell lets the tenant go.** While `deleting`, each hourly run reads
   `GET /api/cell/tenants/{id}`. A `404` means the cell purged the tenant after its grace, and the
-  subscription is `deleted`. The control plane does not count the grace.
+  subscription is `deleted`. So does a tenant whose row the [region directory](region-directory.md)
+  dropped after the purge. The control plane does not count the grace.
 - **A cancelled deletion.** When the cell reports a status other than `deleting`, an operator
   cancelled the deletion. The control plane resumes the tenant if it is suspended, makes it
   read-only, and sets the subscription back to `readOnly` with a new 30-day wait.

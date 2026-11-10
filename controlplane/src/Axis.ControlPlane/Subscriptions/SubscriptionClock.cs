@@ -12,7 +12,8 @@ namespace Axis.ControlPlane.Subscriptions;
 /// <c>deleting</c> after <see cref="ReadOnlyWait"/> and the cell is asked to delete the tenant, which starts its own grace window. A
 /// <c>deleting</c> one asks the cell about the tenant each <see cref="DeletingCheck"/>: a tenant the cell no longer knows makes it
 /// <c>deleted</c>, and a tenant whose deletion an operator cancelled is resumed, made read-only again, and the subscription goes back to
-/// <c>readOnly</c>. The waits count from the run that made the move, so a late run delays the next step and never shortens it. A move
+/// <c>readOnly</c>. A <c>deleting</c> one whose tenant has no directory row is <c>deleted</c> too, as the directory correction drops the
+/// row once the cell purged the tenant. The waits count from the run that made the move, so a late run delays the next step and never shortens it. A move
 /// commits the new state, the next date, a new <see cref="SubscriptionRow.StepId"/> and one audit record in one transaction, after
 /// the cell's job succeeded. The cell calls of a move carry the step id as their idempotency key, so a retry gets the cell's first job.
 /// A failed cell call, a job that does not end in time or a tenant with no directory row leaves the subscription as it is and logs a
@@ -65,7 +66,15 @@ internal sealed partial class SubscriptionClock(
         var failed = 0;
         foreach (var (id, tenantId, state, stepId) in due)
         {
-            var cell = await FindCellAsync(tenantId, cancellationToken);
+            var cellId = await FindCellIdAsync(tenantId, cancellationToken);
+            if (cellId is null && state == Deleting)
+            {
+                // The directory correction drops the row of a tenant that the cell purged, so no row means the tenant is gone.
+                await CommitAsync(job, id, Deleting, stepId, "deleted", null, cancellationToken);
+                continue;
+            }
+
+            var cell = cellId is null ? null : cells.All.FirstOrDefault(client => string.Equals(client.CellId, cellId, StringComparison.Ordinal));
             if (cell is null)
             {
                 LogNoCell(id);
@@ -146,17 +155,12 @@ internal sealed partial class SubscriptionClock(
         await CommitAsync(job, id, Deleting, stepId, ReadOnly, now + ReadOnlyWait, cancellationToken);
     }
 
-    // The subscription's tenant lives in the cell that the region directory holds. A tenant with no row, or whose cell this region does not list, has none.
-    private async Task<CellClient?> FindCellAsync(string tenantId, CancellationToken cancellationToken)
+    // The subscription's tenant lives in the cell that the region directory holds. A tenant with no row has none.
+    private async Task<string?> FindCellIdAsync(string tenantId, CancellationToken cancellationToken)
     {
         await using var command = directory.CreateCommand("SELECT cell_id FROM directory.tenants WHERE id = @id");
         command.Parameters.AddWithValue("id", tenantId);
-        if (await command.ExecuteScalarAsync(cancellationToken) is not string cellId)
-        {
-            return null;
-        }
-
-        return cells.All.FirstOrDefault(client => string.Equals(client.CellId, cellId, StringComparison.Ordinal));
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
     private static async Task FollowAsync(CellClient cell, CellJob queued, CancellationToken cancellationToken)
