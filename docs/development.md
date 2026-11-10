@@ -392,12 +392,12 @@ change since NexKit's commit can affect.
 
 ### Shards
 
-NexKit's `e2e`, `integration` and `test` checks run in as many shards as their split's `--count` prints,
-as [D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and
-[CI on main](delivery.md#ci-on-main) runs the same counts and shards. A check's `max` in `.nexkit/config.json`
-matches its split's cap, since NexKit fails a count above it. Two rounds at their caps, with build-lint and
-smoke, fit within the jobs GitHub runs at once, and `scripts/nexkit-shards.test.mjs` checks it. The smoke
-tests run as one check, since NexKit's `max` is at least 2.
+NexKit's `e2e`, `integration` and `test` checks run in as many shards as their split's `--count` prints, as
+[D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and [CI on
+main](delivery.md#ci-on-main) runs the same. A check's `max` matches its split's cap, since NexKit fails a count
+above it. Two NexKit rounds at their caps fit within the jobs GitHub runs at once, as `nexkit-shards.test.mjs`
+checks, and beside CI on `main` and its two scans a few jobs may wait. Smoke stays one check, since a sharded
+check's `max` is at least 2 and a second smoke job would take two rounds past the limit.
 
 - **Unit tests.** Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`. `NEXKIT_SHARD` works
   the same way beside it, and `AXIS_TEST_SHARD` wins when both are set. Shard 1 runs the .NET unit tests,
@@ -432,7 +432,7 @@ tests run as one check, since NexKit's `max` is at least 2.
   `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
   `scripts/smoke-durations.json`, and a test without an entry weighs the median. A shard builds the production
   images only when it holds `images` or `onprem`. The image builds are not in those seconds, so such a shard
-  takes longer than its estimate. NexKit's `smoke` check runs with no shard.
+  takes longer than its estimate.
 - **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
   `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
   shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is

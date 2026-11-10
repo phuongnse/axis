@@ -74,8 +74,8 @@ jobs:
                 results: ([.checks[] | .results // [] | .[]] | unique | join("\n"))})}' .nexkit/config.json)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
-  # CI runs one job per check or group of .nexkit/config.json, which the matrix job reads, so a failed
-  # NexKit check and the CI job of the same name run the same command.
+  # CI runs one job per check, per group, or per shard of a sharded check of .nexkit/config.json, which
+  # the matrix job reads, so a failed NexKit check and the CI job of the same name run the same command.
   checks:
     if: github.event_name != 'schedule'
     needs: matrix

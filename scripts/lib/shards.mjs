@@ -8,9 +8,10 @@ export const budgetSeconds = 15 * 60
 
 /**
  * The most shards --count prints for each split. A sharded check's max in .nexkit/config.json matches its entry,
- * since NexKit fails a check whose count passes its max (docs/development.md#shards). Two rounds at these caps,
- * with build-lint and smoke, fit within the jobs GitHub runs at once. Smoke runs as one check, since NexKit's max
- * is at least 2, so its cap only bounds the count that the durations job reads.
+ * since NexKit fails a check whose count passes its max (docs/development.md#shards). Two NexKit rounds at these
+ * caps, with build-lint and smoke, fit within the jobs GitHub runs at once. Smoke runs as one check, since a sharded
+ * check's max is at least 2 and a second smoke job would take two rounds past the limit, so its cap only bounds the
+ * count that the durations job reads.
  */
 export const maxShards = { e2e: 3, integration: 3, smoke: 6, test: 2 }
 
@@ -64,7 +65,7 @@ export function packLightest(units, total, firstShardSeconds = 0) {
   return shards
 }
 
-/** The jobs GitHub's Free plan runs at once for the account (docs/development.md#shards). */
+/** The jobs GitHub's Free plan runs at once for the account. configProblems checks that two NexKit rounds fit (docs/development.md#shards). */
 export const jobLimit = 20
 
 /** The split of each sharded check, by the check's name, and the script the check runs. */

@@ -162,7 +162,8 @@ that holds it.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
   start. On any other branch a newer push stops the older run.
 - **CI's jobs come from [NexKit's checks](#nexkits-checks):** each check, or `group` of checks, in
-  `.nexkit/config.json` is one parallel job that runs the check's commands with its timeout and
+  `.nexkit/config.json` is one parallel job, and a sharded check is one job per shard, named
+  `<name>-k`, as many as its count prints. Each job runs its commands with the check's timeout and
   uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
   slowest job, and adding, removing or resharding a check changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
