@@ -106,3 +106,21 @@ describe('runDocker', () => {
     assert.match(result.stderr, /docker compose -p axis-smoke build server failed after 3 attempts with status 7/)
   })
 })
+
+describe('Dockerfile', () => {
+  test('every production stage installs its packages before it declares AXIS_VERSION, so a new version reuses the package layer', () => {
+    const dockerfile = readFileSync(fileURLToPath(new URL('../Dockerfile', import.meta.url)), 'utf8')
+    const stages = dockerfile
+      .split(/^(?=FROM\s)/im)
+      .map((text) => ({ name: text.match(/^FROM\s+\S+\s+AS\s+(axis-[\w-]+)\s*$/im)?.[1], lines: text.split('\n') }))
+      .filter((stage) => stage.name)
+    const admin = stages.find((stage) => stage.name === 'axis-admin')
+    assert.ok(admin?.lines.some((line) => /^RUN\b.*apt-get/.test(line)), 'axis-admin installs packages with apt-get')
+    for (const { name, lines } of stages) {
+      const declared = lines.findIndex((line) => /^ARG\s+AXIS_VERSION\b/.test(line))
+      if (declared < 0) continue
+      const late = lines.slice(declared + 1).filter((line) => /^RUN\b.*apt-get/.test(line))
+      assert.deepEqual(late, [], `${name} runs apt-get after it declares AXIS_VERSION`)
+    }
+  })
+})
