@@ -80,3 +80,11 @@ export function ClickOnMount({ selector, children }: { selector: string; childre
   }, [selector])
   return <div ref={wrapper}>{children}</div>
 }
+
+/**
+ * Proposed: a frame that scrolls inside itself as a browser window of that size does, so what the shell fixes to the
+ * window, such as the side panel and the action bar at its foot, stays in view. See the review on #3263.
+ */
+export function PreviewWindow({ height, width, children }: { height: number; width?: number; children: ReactNode }) {
+  return <div style={{ height, maxWidth: width, overflowY: 'auto' }}>{children}</div>
+}

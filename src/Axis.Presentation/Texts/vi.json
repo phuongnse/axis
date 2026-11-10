@@ -1879,6 +1879,7 @@
   "shell.studio.publish.note": "Ghi chú",
   "shell.studio.publish.confirm": "Phát hành",
   "shell.studio.publish.release": "Bản phát hành",
+  "shell.studio.publish.goesLive": "Sẽ chạy thật thành bản {number}",
   "shell.studio.publish.label.help": "Tên ngắn cho bản phát hành, ví dụ Cập nhật mùa xuân.",
   "shell.studio.publish.note.help": "Đã thay đổi gì và vì sao, cho người xem danh sách bản phát hành.",
   "shell.studio.publish.replaces": "Mọi thay đổi dưới đây sẽ chạy thật trong một bản phát hành mới, thay cho bản {number}.",

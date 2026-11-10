@@ -17,7 +17,7 @@ import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
-import { ClickOnMount, ShellPreview } from './ShellPreview'
+import { ClickOnMount, PreviewWindow, ShellPreview } from './ShellPreview'
 import { studioFixtures } from './studioFixtures'
 import {
   application,
@@ -297,9 +297,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
         ...state,
         entry: `/studio?app=${application}`,
         draw: () => (
-          <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
-            <ShellPreview />
-          </ClickOnMount>
+          <PreviewWindow height={900}>
+            <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
+              <ShellPreview />
+            </ClickOnMount>
+          </PreviewWindow>
         ),
         frameHeight: 900,
       })),
@@ -308,7 +310,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
         caption: 'Publish',
         fixtures: studioFixtures.askAi,
         entry: `/studio?app=${application}&view=publish`,
-        draw: () => <ShellPreview />,
+        draw: () => (
+          <PreviewWindow height={900}>
+            <ShellPreview />
+          </PreviewWindow>
+        ),
         frameHeight: 900,
       },
       // Proposed: at narrow width the request panel takes the window's width, over the page. The frame scrolls as a
@@ -319,11 +325,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
         entry: `/studio?app=${application}`,
         draw: () => (
           <NarrowWidthOverride.Provider value>
-            <div style={{ maxWidth: 700, height: 760, overflowY: 'auto' }}>
+            <PreviewWindow height={760} width={700}>
               <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
                 <ShellPreview />
               </ClickOnMount>
-            </div>
+            </PreviewWindow>
           </NarrowWidthOverride.Provider>
         ),
         frameHeight: 760,

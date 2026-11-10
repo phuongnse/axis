@@ -38,6 +38,7 @@ import {
 } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
 import { ResourceFormSection, SectionPart, SectionParts } from './ResourceFormSection'
+import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 import { StudioDiagnosticRow } from './StudioProblems'
 import { StudioRequestStatus } from './StudioRequestStatus'
@@ -160,21 +161,24 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
   return (
     <Flex vertical gap="middle">
       <StudioPageHeading title={t('shell.studio.aiRequests')} />
-      <AxisTable<StudioAuthoringRequest>
-        columns={columns}
-        rowKey={(row) => row.id}
-        dataSource={Array.isArray(requests) ? requests : []}
-        loading={requests === undefined}
-        emptyText={t('shell.studio.aiRequests.empty')}
-        pagination={false}
-        toolbar={{}}
-        failure={
-          requests === 'failed' ? <AxisAlert kind="error" message={t('shell.studio.ai.listFailed')} /> : undefined
-        }
-        rowAttributes={(row) =>
-          ({ 'data-testid': 'studio-ai-request-row', 'data-id': row.id }) as HTMLAttributes<HTMLElement>
-        }
-      />
+      {/* The page's content is one panel, and its table fills it. */}
+      <ResourceFormSection testName="ai-requests">
+        <AxisTable<StudioAuthoringRequest>
+          columns={columns}
+          rowKey={(row) => row.id}
+          dataSource={Array.isArray(requests) ? requests : []}
+          loading={requests === undefined}
+          emptyText={t('shell.studio.aiRequests.empty')}
+          pagination={false}
+          toolbar={{}}
+          failure={
+            requests === 'failed' ? <AxisAlert kind="error" message={t('shell.studio.ai.listFailed')} /> : undefined
+          }
+          rowAttributes={(row) =>
+            ({ 'data-testid': 'studio-ai-request-row', 'data-id': row.id }) as HTMLAttributes<HTMLElement>
+          }
+        />
+      </ResourceFormSection>
     </Flex>
   )
 }
@@ -538,11 +542,11 @@ export function StudioAuthoringRequestPage({
                     ))}
                   </ul>
                 )}
-                <StudioTestResults request={request.checks} onSelect={onOpen} />
+                <StudioTestResults request={request.checks} onSelect={onOpen} nested />
                 {/* The review runs only once the checks pass, so a request that failed before it has no notes. */}
                 {request.review !== null && (
                   <>
-                    <Typography.Title level={5}>{t('shell.studio.aiRequest.review')}</Typography.Title>
+                    <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
                     {request.review.length === 0 ? (
                       <Typography.Text style={{ color: colour.textMuted }}>
                         {t('shell.studio.aiRequest.noFindings')}
@@ -574,22 +578,6 @@ export function StudioAuthoringRequestPage({
           ) : (
             accept !== null && <StudioRequestStatus request={accept} releaseNumber={null} />
           )}
-          {ready && mine && !acceptPending && (
-            <AxisActionRow>
-              {conflicts.length > 0 ? (
-                <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
-                  {t('shell.studio.aiRequest.retry')}
-                </AxisButton>
-              ) : (
-                <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
-                  {t('shell.studio.aiRequest.accept')}
-                </AxisButton>
-              )}
-              <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-                {t('shell.studio.aiRequest.drop')}
-              </AxisButton>
-            </AxisActionRow>
-          )}
           {request.steps.length > 0 &&
             section(
               'ai-steps',
@@ -605,6 +593,26 @@ export function StudioAuthoringRequestPage({
             )}
         </SectionParts>
       </ResourceFormSection>
+      {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
+      {ready && mine && !acceptPending && (
+        <ActionBar testId="studio-ai-request-bar">
+          <span>{stateWords(request, mine)}</span>
+          <AxisActionRow align="center">
+            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+              {t('shell.studio.aiRequest.drop')}
+            </AxisButton>
+            {conflicts.length > 0 ? (
+              <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
+                {t('shell.studio.aiRequest.retry')}
+              </AxisButton>
+            ) : (
+              <AxisButton role="finish" disabled={acting} onClick={() => void startAccept()}>
+                {t('shell.studio.aiRequest.accept')}
+              </AxisButton>
+            )}
+          </AxisActionRow>
+        </ActionBar>
+      )}
       <Modal
         forceRender
         open={changeOpen}

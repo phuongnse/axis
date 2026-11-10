@@ -12,18 +12,27 @@ import { useText } from '../platform/texts'
 export function StudioTestResults({
   request,
   onSelect,
+  nested = false,
 }: {
   request: StudioRequest
   onSelect: (resourceId: string, path: string) => void
+  /** Proposed: inside a part of a panel, its title is bold text, not a heading, see the review on #3263. */
+  nested?: boolean
 }) {
   const t = useText()
   const pending = request.status === 'queued' || request.status === 'running'
   const scenarios = request.scenarios ?? []
   return (
     <section data-testid="studio-test-results" data-status={request.status}>
-      <Typography.Title level={5}>
-        {t(request.kind === 'test' ? 'shell.studio.tests.title' : 'shell.studio.tests.contractTitle')}
-      </Typography.Title>
+      {nested ? (
+        <Typography.Text strong>
+          {t(request.kind === 'test' ? 'shell.studio.tests.title' : 'shell.studio.tests.contractTitle')}
+        </Typography.Text>
+      ) : (
+        <Typography.Title level={5}>
+          {t(request.kind === 'test' ? 'shell.studio.tests.title' : 'shell.studio.tests.contractTitle')}
+        </Typography.Title>
+      )}
       {pending ? (
         <Typography.Text type="secondary">{t('shell.studio.tests.pending')}</Typography.Text>
       ) : scenarios.length === 0 ? (

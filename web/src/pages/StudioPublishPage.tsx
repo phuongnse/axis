@@ -17,6 +17,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { authoringRequestAddress } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
 import { ResourceFormSection, SectionPart, SectionParts } from './ResourceFormSection'
+import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
 
 /**
@@ -26,7 +27,8 @@ import { StudioPageHeading } from './StudioPageHeading'
  * it since: a person by name, "you" for the reader, or an AI request by its words as a link to its page. Then come the
  * optional label and note and Publish, which sends the publish and goes back to the page Publish… was opened from,
  * where the status line follows it. With nothing to publish it says so and Publish is off. Below the heading the page
- * is one panel: the changes, then the release's label and note, a rule apart, then Publish and Cancel.
+ * is one panel: the changes, then the release's label and note, a rule apart. Cancel and Publish sit in the `ActionBar`
+ * at the foot of the window, beside the number of the release that goes live.
  */
 export function StudioPublishPage({
   application,
@@ -163,21 +165,24 @@ export function StudioPublishPage({
                 </AxisField>
               </div>
             </SectionPart>
-            <AxisActionRow>
-              <AxisButton
-                role="finish"
-                htmlType="submit"
-                disabled={busy || nothing}
-                data-testid="studio-publish-confirm"
-              >
-                {t('shell.studio.publish.confirm')}
-              </AxisButton>
-              <AxisButton role="secondary" onClick={() => navigate(-1)}>
-                {t('shell.studio.cancel')}
-              </AxisButton>
-            </AxisActionRow>
           </SectionParts>
         </ResourceFormSection>
+        {/* What finishes the page's task, publishing, sits in the bar at the foot of the window. */}
+        <ActionBar testId="studio-publish-bar">
+          <span>
+            {Array.isArray(changes) && changes.length > 0
+              ? t('shell.studio.publish.goesLive').replace('{number}', String((liveNumber ?? 0) + 1))
+              : ''}
+          </span>
+          <AxisActionRow align="center">
+            <AxisButton role="secondary" onClick={() => navigate(-1)}>
+              {t('shell.studio.cancel')}
+            </AxisButton>
+            <AxisButton role="finish" htmlType="submit" disabled={busy || nothing} data-testid="studio-publish-confirm">
+              {t('shell.studio.publish.confirm')}
+            </AxisButton>
+          </AxisActionRow>
+        </ActionBar>
       </Form>
     </Flex>
   )
