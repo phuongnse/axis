@@ -205,6 +205,10 @@ that holds it.
   merges nothing there. The owner merges once both are green, with no admin bypass. The bypass is left
   for a pull request that needs the owner's code-owner review and that the owner opened, since GitHub
   does not let an author approve their own pull request.
+- **One that closes an issue carries the issue's labels and milestone.** NexKit sets them only on the
+  pull requests it opens, so whoever opens a hand-made pull request sets them as they open it, the owner
+  or the local agent session. One that closes no issue, such as a NexKit version bump, gets labels by the
+  owner's choice.
 
 ## Profiles
 
