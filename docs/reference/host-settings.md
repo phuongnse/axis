@@ -468,21 +468,24 @@ minute for one replica. The rules of the limits are in
 ## AI settings
 
 The agent host reads the `Ai` settings: the model bindings and the default and review bindings. Their
-table is in [model bindings](model-bindings.md#bindings). The server reads `Ai:AllowTenantKeys`, see
-[a tenant's own key](model-bindings.md#a-tenants-own-key).
+table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
+`Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key).
 
 With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the worker does under
 [tenancy settings](#tenancy-settings). With it unset, AI authoring is off and the agent host starts
 idle, reading none of the settings below.
 
-- **What it reads.** `Tenancy:Source`, `Tenancy:RefreshInterval`, `ConnectionStrings:Platform`,
-  `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of the tenancy settings. Under
-  `directory` it needs `ConnectionStrings:Platform` and `Platform:SecretKey`, and never reads
-  `ConnectionStrings:PlatformSchema`. Under `configuration` it reads the `Tenants` section.
+- **What it reads.** `Ai:AllowTenantKeys`, `Tenancy:Source`, `Tenancy:RefreshInterval`,
+  `ConnectionStrings:Platform`, `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of
+  the tenancy settings. Under `directory` it needs `ConnectionStrings:Platform` and
+  `Platform:SecretKey`, and never reads `ConnectionStrings:PlatformSchema`. Under `configuration` it
+  reads the `Tenants` section.
 - **The tenant directory.** It reads its `active` tenants over `ConnectionStrings:Platform`. If its first
   read fails, it retries every `Tenancy:RefreshInterval`. Then it reads the directory again every
   interval and keeps the last good read when a refresh fails. It leaves out a read-only tenant, as the
   worker does. Its readiness does not show the directory read.
+- **A tenant's own model key.** It reads the key from the same directory, see
+  [a tenant's own key](model-bindings.md#a-tenants-own-key).
 - **The tenant role.** It opens a tenant database only with the tenant's runtime role, and refuses a
   tenant whose role fails the [runtime role check](storage.md#database-roles). The error names the
   tenant and the role and never a connection string.

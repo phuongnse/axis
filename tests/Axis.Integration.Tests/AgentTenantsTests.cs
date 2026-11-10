@@ -1,12 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using Axis.Agent;
-using Axis.Hosting;
 using Axis.Tenancy;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Npgsql;
 using static Axis.Integration.Tests.Polling;
 
@@ -21,7 +17,7 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
     public async Task A_directory_tenant_is_read_as_the_runtime_role_and_only_its_requests_that_need_work_are_listed()
     {
         var platform = await CellTestPlatform.CreateAsync(database, new Uri("https://127.0.0.1:1/realms/axis"), CancellationToken);
-        await using var app = BuildAgent(
+        await using var app = AgentTestHost.Build(
             aiOn: true,
             new Dictionary<string, string?>
             {
@@ -55,7 +51,7 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
         await DataDatabaseFixture.MigrateTenantAsync(owner, CancellationToken);
         var planning = Guid.NewGuid();
         await InsertRequestAsync(owner, planning, "planning");
-        await using var app = BuildAgent(
+        await using var app = AgentTestHost.Build(
             aiOn: true,
             new Dictionary<string, string?>
             {
@@ -81,7 +77,7 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
     public async Task With_ai_authoring_off_the_agent_host_starts_ready_and_reads_no_tenants()
     {
         var logs = new LogCollector();
-        await using var app = BuildAgent(aiOn: false, new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" }, logs);
+        await using var app = AgentTestHost.Build(aiOn: false, new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" }, logs);
 
         await app.StartAsync(CancellationToken);
         using var client = new HttpClient { BaseAddress = new Uri(app.Urls.Single()) };
@@ -94,26 +90,6 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
         await WaitUntilAsync(
             () => logs.Entries.Any(entry => entry.Contains("AI authoring is off", StringComparison.Ordinal)),
             "The agent host did not say that AI authoring is off.");
-    }
-
-    private static WebApplication BuildAgent(bool aiOn, Dictionary<string, string?> settings, LogCollector logs)
-    {
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
-        settings["Health:Urls"] = "http://127.0.0.1:0";
-        if (aiOn)
-        {
-            settings["Ai:Bindings:main:Kind"] = "anthropic";
-            settings["Ai:Bindings:main:Model"] = "model-1";
-            settings["Ai:DefaultBinding"] = "main";
-        }
-
-        builder.Configuration.AddInMemoryCollection(settings);
-        builder.Logging.ClearProviders();
-        builder.Logging.AddProvider(logs);
-        builder.Services.AddAxisAgent(builder.Configuration, builder.Environment);
-        var app = builder.Build();
-        app.MapHostHealth();
-        return app;
     }
 
     // The rows go in as the superuser of the container, which names the database through the connection string.

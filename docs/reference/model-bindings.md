@@ -44,7 +44,7 @@ The agent host reads these settings:
 | `Ai:Bindings:<name>:MaxOutputTokens` | The largest output of one call, 16,000 by default                                                      |
 | `Ai:DefaultBinding`                  | The binding requests use. With no value, AI authoring is off and Studio shows no request panel         |
 | `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the default binding                                      |
-| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default. The server reads it                        |
+| `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default. The server and the agent host read it      |
 | `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ |
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default _(planned for M35)_                                           |
 | `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default _(planned for M35)_                  |
@@ -52,9 +52,10 @@ The agent host reads these settings:
 - **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
   `MaxOutputTokens` that is not a whole number of at least 1, or a default or review binding that names
   no binding stops the agent host's start and names the setting, never a value. An `Ai:AllowTenantKeys`
-  that is not `true` or `false` stops the server's start in the same way.
+  that is not `true` or `false` stops the server's start in the same way, and the agent host's start
+  with AI authoring on.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
-  tool or stored in a request.
+  tool or stored in a request. A tenant's own key is read for the call only and is never logged.
 - **Axis SaaS** _(planned for M35)_ uses an `anthropic` binding with Claude by default, because it does well at long runs
   of tool calls. That is a setting of the cell, not a rule of the platform. Each SaaS plan includes a
   number of requests, the `authoringRequests` [quota](tenant-quotas.md#quotas), while on premises the
@@ -70,8 +71,15 @@ Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
   [storage](storage.md#secrets-in-the-platform-database).
 - **The users page** holds [its Model key section](platform-pages.md#model-key), where an administrator sets,
   changes and removes the key.
-- **Requests** _(planned for M35)_ use the tenant's key, and it replaces the installation's key for that
-  tenant's requests.
+- **Requests.** The tenant's key replaces the installation's key on that tenant's model calls, and
+  other tenants' calls never use it. The agent host reads and decrypts the stored key over
+  `ConnectionStrings:Platform` for each call, so a key that an administrator sets, changes or removes
+  applies from the next call. A call uses the installation's key with `Ai:AllowTenantKeys` off, under
+  `Tenancy:Source=configuration`, which has no tenant directory, and for a tenant with no key. A stored
+  key that does not decrypt fails the call, and the call does not fall back to the installation's key,
+  so the installation never pays for a tenant that chose to pay for its own use. Give the server and
+  the agent host the same `Ai:AllowTenantKeys`. With it off on the server and on in the agent host,
+  the keys that are already stored stay in use.
 - **Usage** _(planned for M35)_. A tenant with its own key still counts toward `authoringRequests`, but
   its tokens are recorded as its own in [usage](tenant-quotas.md#usage), so that a plan can price them
   apart.

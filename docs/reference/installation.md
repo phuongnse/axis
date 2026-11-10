@@ -83,6 +83,7 @@ from a secret store of the platform, never from a committed file.
 | none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher, `cell restore-check` | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests and the contract scenarios of `publish` and `validate` requests, and `cell restore-check` run the scenarios of a restored application. Empty by default, and a `test` request, or a `publish` or `validate` with contract scenarios, then fails with `AXC0217`, which names the setting. See [the scenario role](#the-scenario-role). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
+| `Ai:AllowTenantKeys` | `Ai__AllowTenantKeys` | server, agent | no | Optional. `true` lets a tenant administrator set the tenant's own model key, and the agent host then sends it in place of the installation's key on that tenant's model calls. Off by default. Give the server and the agent host the same value. The Compose example passes it through from the shell and the Helm chart sets it with `ai.allowTenantKeys`. See [a tenant's own key](model-bindings.md#a-tenants-own-key). |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
 | `Templates:Path` | `Templates__Path` | server, publisher | no | Optional. Unset in production, so Studio lists no application templates. In a cell the publisher reads it for the create job, which fails without it. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
@@ -110,11 +111,10 @@ This section installs Axis on one machine with Docker Compose, from the example 
 PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server with its own database
 on that PostgreSQL server.
 
-The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider, the TLS
-proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second
-server replica sits under the `replicas` profile, see
-[TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password, client
-secret or key.
+The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
+the TLS proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
+under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
+client secret or key.
 
 - **The server, the worker and the agent host** run the production images with a read-only root file system. The
   identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
@@ -342,9 +342,8 @@ Install in this order:
 The hosts serve a tenant after their next refresh, which `Tenancy__RefreshInterval` sets, 30 seconds
 by default.
 
-- **The OIDC authority must be `https`.** The server runs in `Production`, which refuses an identity
-  provider over plain `http`, so `tenant create` refuses a plain `http` `IdentityProvider__Url` there
-  too.
+- **The OIDC authority must be `https`.** The server runs in `Production`, which refuses an identity provider
+  over plain `http`, so `tenant create` refuses a plain `http` `IdentityProvider__Url` there too.
 - **A private certificate authority.** When the proxy's certificate comes from your own authority, add
   its certificate to the trust store of the server, of the admin host and of the publisher, because
   they reach the identity host through the proxy. Do not replace the store: pointing `SSL_CERT_FILE` at
@@ -697,6 +696,7 @@ The values of the chart, with their defaults:
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
 | `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [the scenario role](#the-scenario-role). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
+| `ai.allowTenantKeys` | `false` | Server and agent host. `true` renders `Ai__AllowTenantKeys` on both, so a tenant administrator can set the tenant's own model key and the agent host uses it. See [a tenant's own key](model-bindings.md#a-tenants-own-key). |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |

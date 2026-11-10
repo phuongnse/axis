@@ -55,6 +55,27 @@ public sealed class AgentTenancySettingsTests
     }
 
     [Fact]
+    public void With_ai_authoring_on_a_value_of_allow_tenant_keys_that_is_not_true_or_false_stops_the_start_and_names_the_setting()
+    {
+        var values = AiOn();
+        values["Tenants:a:Hosts:0"] = "a.example.test";
+        values["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=unused";
+        values["Ai:AllowTenantKeys"] = "yes";
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Add(values));
+
+        Assert.Contains("Ai:AllowTenantKeys", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_ai_authoring_off_a_value_of_allow_tenant_keys_that_is_not_true_or_false_does_not_stop_the_start()
+    {
+        var services = Add(new Dictionary<string, string?> { ["Ai:AllowTenantKeys"] = "yes" });
+
+        Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(TenantModelKeySettings));
+    }
+
+    [Fact]
     public async Task With_ai_authoring_off_the_tenancy_settings_and_secrets_are_not_read()
     {
         var services = Add(new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" });

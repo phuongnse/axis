@@ -59,6 +59,10 @@ spec:
             - name: Studio__Tests
               value: "true"
             {{- end }}
+            {{- if .Values.ai.allowTenantKeys }}
+            - name: Ai__AllowTenantKeys
+              value: "true"
+            {{- end }}
             {{- range $i, $proxy := .Values.forwardedHeaders.knownProxies }}
             - name: ForwardedHeaders__KnownProxies__{{ $i }}
               value: {{ $proxy | quote }}

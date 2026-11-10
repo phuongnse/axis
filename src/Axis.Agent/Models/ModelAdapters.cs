@@ -7,6 +7,10 @@ public sealed class ModelAdapters
     public const string HttpClientName = "axis-model";
 
     private readonly Dictionary<string, IModelAdapter> _adapters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly AiSettings _settings;
+    private readonly IHttpClientFactory _httpClients;
+    private readonly TimeProvider _timeProvider;
+    private readonly ILogger _logger;
     private readonly ScriptedModelAdapter? _scripted;
 
     public ModelAdapters(
@@ -21,17 +25,14 @@ public sealed class ModelAdapters
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
+        _settings = settings;
+        _httpClients = httpClients;
+        _timeProvider = timeProvider;
         _scripted = scripted;
-        var logger = loggerFactory.CreateLogger("Axis.Agent.Models");
+        _logger = loggerFactory.CreateLogger("Axis.Agent.Models");
         foreach (var binding in settings.Bindings.Values)
         {
-            var client = httpClients.CreateClient(HttpClientName);
-            _adapters[binding.Name] = binding.Kind switch
-            {
-                ModelBindingKind.Anthropic => new AnthropicModelAdapter(binding, client, timeProvider, logger),
-                ModelBindingKind.OpenAiCompatible => new OpenAiCompatibleModelAdapter(binding, client, timeProvider, logger),
-                _ => throw new ArgumentOutOfRangeException(nameof(settings), binding.Kind, null),
-            };
+            _adapters[binding.Name] = Create(binding);
         }
     }
 
@@ -47,5 +48,44 @@ public sealed class ModelAdapters
         return _adapters.TryGetValue(bindingName, out var adapter)
             ? adapter
             : throw new InvalidOperationException("The binding names no binding under 'Ai:Bindings'.");
+    }
+
+    /// <summary>
+    /// The adapter of the binding with <paramref name="key"/> in place of the binding's own key, for a tenant's own key, see
+    /// <c>docs/reference/model-bindings.md#a-tenants-own-key</c>. With a scripted adapter registered, it returns that adapter.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No binding has this name. The message names the setting and never the name or the key.</exception>
+    internal IModelAdapter WithKey(string bindingName, string key)
+    {
+        if (_scripted is not null)
+        {
+            return _scripted;
+        }
+
+        if (!_settings.Bindings.TryGetValue(bindingName, out var binding))
+        {
+            throw new InvalidOperationException("The binding names no binding under 'Ai:Bindings'.");
+        }
+
+        return Create(new ModelBinding
+        {
+            Name = binding.Name,
+            Kind = binding.Kind,
+            Endpoint = binding.Endpoint,
+            Model = binding.Model,
+            Key = key,
+            MaxOutputTokens = binding.MaxOutputTokens,
+        });
+    }
+
+    private IModelAdapter Create(ModelBinding binding)
+    {
+        var client = _httpClients.CreateClient(HttpClientName);
+        return binding.Kind switch
+        {
+            ModelBindingKind.Anthropic => new AnthropicModelAdapter(binding, client, _timeProvider, _logger),
+            ModelBindingKind.OpenAiCompatible => new OpenAiCompatibleModelAdapter(binding, client, _timeProvider, _logger),
+            _ => throw new ArgumentOutOfRangeException(nameof(binding), binding.Kind, null),
+        };
     }
 }
