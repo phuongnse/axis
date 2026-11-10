@@ -1,10 +1,12 @@
 name: Docs audit
 
-# Reads a quarter of the docs against the code and opens a NexKit issue for each finding (D145).
-# NexKit starts it on main every few merges, by merge.after_workflows, and it also runs on demand. NexKit takes
-# its issues because autopilot.trusted_workflows lists this file. The audit job runs Claude Code with read-only tools, no GitHub
-# token in its checkout and no permission to write; the file job runs no model and only opens
-# issues from the findings, so a page that tries to steer the model cannot write to the repository.
+# Reads a quarter of the docs against the code and opens a NexKit issue for each finding (D145), and
+# points each broken link of an open issue at its new home. NexKit starts it on main every few merges, by
+# merge.after_workflows, and it also runs on demand. NexKit takes its issues because
+# autopilot.trusted_workflows lists this file. The links job runs no model and may only read issues. The
+# audit job runs Claude Code with read-only tools, no GitHub token in its checkout and no permission to
+# write. The file job runs no model, opens issues from the findings and replaces only each checked link,
+# so a page or an issue that tries to steer the model cannot write to the repository.
 on:
   workflow_dispatch:
 
@@ -16,12 +18,46 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  links:
+    name: List the broken links of open issues
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      links: ${{ steps.list.outputs.links }}
+    steps:
+      # The whole history, so the listing can say where a renamed or deleted file went.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: List the broken links
+        id: list
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/check-issue-links.mjs > links.json
+          {
+            echo 'links<<DOCS_AUDIT_END'
+            cat links.json
+            echo 'DOCS_AUDIT_END'
+          } >> "$GITHUB_OUTPUT"
+
   audit:
     name: Read the docs against the code
+    needs: links
+    # The pages are read even when listing the links failed; the homes step then has no link to answer.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     outputs:
       findings: ${{ steps.read.outputs.findings }}
+      homes: ${{ steps.homes.outputs.homes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,6 +85,21 @@ jobs:
             cat artifacts/docs-audit/findings.json
             echo 'DOCS_AUDIT_END'
           } >> "$GITHUB_OUTPUT"
+      - name: Choose the new home of each broken link
+        id: homes
+        # A failure leaves every link as it is and still files the findings.
+        continue-on-error: true
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_FALLBACK_OAUTH_TOKEN }}
+          LINKS: ${{ needs.links.outputs.links }}
+        run: |
+          printf '%s' "$LINKS" > artifacts/docs-audit/links.json
+          node scripts/docs-audit.mjs homes artifacts/docs-audit/links.json > artifacts/docs-audit/homes.json
+          {
+            echo 'homes<<DOCS_AUDIT_END'
+            cat artifacts/docs-audit/homes.json
+            echo 'DOCS_AUDIT_END'
+          } >> "$GITHUB_OUTPUT"
       - name: Upload the pages and findings
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -58,8 +109,9 @@ jobs:
           retention-days: 30
 
   file:
-    name: Open the issues
-    needs: audit
+    name: Open the issues and fix their links
+    needs: [links, audit]
+    if: ${{ !cancelled() && needs.audit.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -77,3 +129,13 @@ jobs:
         run: |
           printf '%s' "$FINDINGS" > findings.json
           node scripts/docs-audit.mjs file findings.json "$GITHUB_RUN_ID"
+      - name: Point each broken link at its checked home
+        if: ${{ needs.links.result == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINKS: ${{ needs.links.outputs.links }}
+          HOMES: ${{ needs.audit.outputs.homes }}
+        run: |
+          printf '%s' "$LINKS" > links.json
+          printf '%s' "$HOMES" > homes.json
+          node scripts/check-issue-links.mjs relink links.json homes.json

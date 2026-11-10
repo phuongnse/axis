@@ -35,7 +35,9 @@ Three actors take part in the work, the owner, the local agent session and NexKi
   the skills and AGENTS.md against the code every few merges and opens a NexKit issue for each group
   of findings that no open issue covers, code and test fixes first and at most ten a run, as
   [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees and the
-  skill says. It changes no file itself.
+  skill says. It also points each broken link of an open issue at its new home, once a job that runs
+  no model has checked that home on `main`, and changes nothing else in the issue. It changes no file
+  itself.
 - **NexKit's agents** plan, implement, fix and review inside the NexKit pipeline. They read
   [AGENTS.md](../AGENTS.md), and they neither read nor write Claude Design.
 
