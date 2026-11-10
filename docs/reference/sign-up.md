@@ -417,18 +417,23 @@ The control plane provisions the tenant as one job, with the sign-up's id as the
 
 ## Terms acceptance
 
-_(planned for M33)_
-
 Each acceptance of the terms of service and the data processing agreement is recorded and never
 changed.
 
-- **What is recorded.** For each acceptance, an append-only row: the account, the tenant, the
-  document (`terms` or `dpa`), its version, the time, the client address and the browser's user
-  agent. A row is never changed or deleted while the account exists.
+- **What is recorded.** For each acceptance, an append-only row of `control_plane.terms_acceptances`:
+  the `account`, the `tenant_id`, the `document` (`terms` or `dpa`), its `version`, the
+  `privacy_version`, the `accepted_at` time, the `client_address` and the browser's `user_agent`. The
+  address and the user agent are empty when the request had none, and a user agent is cut to 512
+  characters. [The confirm](#the-verify-page) writes the two rows in its transaction, with the
+  versions that the pending sign-up stored. Triggers reject every update, delete and truncate of the
+  table with `restrict_violation`, even from a superuser, and the control plane's role keeps only
+  `SELECT` and `INSERT` on it.
 - **The privacy policy is told, not accepted.** It has no row of its own. The acceptance row also holds
   the version of the Privacy policy that [the terms box](#the-terms-box) showed.
-- **When.** At sign-up, and again when a new version of either document is published. The
-  [billing portal](billing-portal.md) then asks the owner to accept it before any other action.
+- **At sign-up.** A confirm that succeeds records one acceptance of each document. A confirm that is
+  refused records none.
+- **A new version** _(planned for M33)_. When a new version of either document is published, the
+  [billing portal](billing-portal.md) asks the owner to accept it before any other action.
 - **Versions.** Each document's version and its address in each language are settings of the control
   plane, and [the documents' route](#the-documents) serves them. A sign-up that sends a version that is no longer
   current is refused. The texts come from a lawyer before sign-up opens.

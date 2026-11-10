@@ -56,7 +56,8 @@ internal static class SignUpEndpoints
         endpoints.MapPost("/api/sign-up/verification", VerifyAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. One conditional update marks a pending, unexpired sign-up verified, so a link
-        // works once and two parallel confirms cannot both succeed. The same transaction starts the tenant's trialing subscription,
+        // works once and two parallel confirms cannot both succeed. The same transaction records the acceptance of the terms and of the
+        // data processing agreement, see docs/reference/sign-up.md#terms-acceptance, and starts the tenant's trialing subscription,
         // see docs/reference/subscriptions.md#one-clock. A used or expired link answers 409 with its state. So does a link whose address
         // another sign-up verified first: the unique index of the verified email refuses it, nothing changes and it answers confirmed.
         endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
@@ -323,9 +324,9 @@ internal static class SignUpEndpoints
         };
     }
 
-    private static async Task<IResult> ConfirmAsync(HttpRequest request, NpgsqlDataSource controlPlane, TimeProvider clock, CancellationToken cancellationToken)
+    private static async Task<IResult> ConfirmAsync(HttpContext context, NpgsqlDataSource controlPlane, TimeProvider clock, CancellationToken cancellationToken)
     {
-        var (body, refused) = await ReadBodyAsync(request, cancellationToken);
+        var (body, refused) = await ReadBodyAsync(context.Request, cancellationToken);
         if (body is null)
         {
             return refused!;
@@ -338,10 +339,13 @@ internal static class SignUpEndpoints
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             Guid id;
             string subdomain;
+            string termsVersion;
+            string dpaVersion;
+            string privacyVersion;
             try
             {
                 await using (var confirm = new NpgsqlCommand(
-                    "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain",
+                    "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain, terms_version, dpa_version, privacy_version",
                     connection,
                     transaction))
                 {
@@ -351,11 +355,15 @@ internal static class SignUpEndpoints
                     {
                         id = reader.GetGuid(0);
                         subdomain = reader.GetString(1);
+                        termsVersion = reader.GetString(2);
+                        dpaVersion = reader.GetString(3);
+                        privacyVersion = reader.GetString(4);
                     }
                     else
                     {
                         id = Guid.Empty;
                         subdomain = "";
+                        termsVersion = dpaVersion = privacyVersion = "";
                     }
                 }
             }
@@ -368,6 +376,24 @@ internal static class SignUpEndpoints
 
             if (id != Guid.Empty)
             {
+                // The sign-up stands for the account until billing portal accounts exist, as in the audit record below. The versions are
+                // those that the pending sign-up stored, the ones the person saw, even when the region has published newer ones since.
+                var userAgent = context.Request.Headers.UserAgent.ToString();
+                var clientAddress = context.Connection.RemoteIpAddress;
+                foreach (var (document, version) in new[] { (TermsAcceptances.Terms, termsVersion), (TermsAcceptances.Dpa, dpaVersion) })
+                {
+                    await TermsAcceptances.AppendAsync(
+                        transaction,
+                        id.ToString(),
+                        subdomain,
+                        document,
+                        version,
+                        privacyVersion,
+                        clientAddress,
+                        userAgent.Length > 0 ? userAgent : null,
+                        cancellationToken);
+                }
+
                 var subscriptionId = Guid.CreateVersion7();
                 var trialEndsAt = clock.GetUtcNow() + SubscriptionClock.TrialLength;
                 await using (var insert = new NpgsqlCommand(

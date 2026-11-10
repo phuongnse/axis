@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -36,6 +36,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
+
+    public DbSet<TermsAcceptanceRow> TermsAcceptances => Set<TermsAcceptanceRow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -168,6 +170,22 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             entry.Property(e => e.OccurredAt).HasColumnName("occurred_at").HasDefaultValueSql("now()");
             entry.HasIndex(e => e.IdempotencyKey, "ux_ledger_entries_idempotency_key").IsUnique();
             entry.HasIndex(e => e.SubscriptionId, "ix_ledger_entries_subscription_id");
+        });
+
+        modelBuilder.Entity<TermsAcceptanceRow>(acceptance =>
+        {
+            acceptance.ToTable("terms_acceptances", table => table.HasCheckConstraint("ck_terms_acceptances_document", "document IN ('terms', 'dpa')"));
+            acceptance.HasKey(a => a.Id).HasName("pk_terms_acceptances");
+            acceptance.Property(a => a.Id).HasColumnName("id").ValueGeneratedNever();
+            acceptance.Property(a => a.Account).HasColumnName("account");
+            acceptance.Property(a => a.TenantId).HasColumnName("tenant_id");
+            acceptance.Property(a => a.Document).HasColumnName("document");
+            acceptance.Property(a => a.Version).HasColumnName("version");
+            acceptance.Property(a => a.PrivacyVersion).HasColumnName("privacy_version");
+            acceptance.Property(a => a.AcceptedAt).HasColumnName("accepted_at").HasDefaultValueSql("now()");
+            acceptance.Property(a => a.ClientAddress).HasColumnName("client_address").HasColumnType("inet");
+            acceptance.Property(a => a.UserAgent).HasColumnName("user_agent");
+            acceptance.HasIndex(a => a.Account, "ix_terms_acceptances_account");
         });
     }
 }
