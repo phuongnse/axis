@@ -2,6 +2,7 @@ using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.RegionDirectory;
 using Npgsql;
 
 namespace Axis.ControlPlane.Subscriptions;
@@ -69,7 +70,7 @@ internal sealed partial class SubscriptionClock(
         var failed = 0;
         foreach (var (id, tenantId, state, stepId) in due)
         {
-            var cellId = await FindCellIdAsync(tenantId, cancellationToken);
+            var cellId = await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken);
             if (cellId is null && state == Deleting)
             {
                 // The directory correction drops the row of a tenant that the cell purged, so no row means the tenant is gone.
@@ -77,7 +78,7 @@ internal sealed partial class SubscriptionClock(
                 continue;
             }
 
-            var cell = cellId is null ? null : cells.All.FirstOrDefault(client => string.Equals(client.CellId, cellId, StringComparison.Ordinal));
+            var cell = TenantCells.Client(cells, cellId);
             if (cell is null)
             {
                 LogNoCell(id);
@@ -157,14 +158,6 @@ internal sealed partial class SubscriptionClock(
         }
 
         await CommitAsync(job, id, Deleting, stepId, ReadOnly, now + ReadOnlyWait, cancellationToken);
-    }
-
-    // The subscription's tenant lives in the cell that the region directory holds. A tenant with no row has none.
-    private async Task<string?> FindCellIdAsync(string tenantId, CancellationToken cancellationToken)
-    {
-        await using var command = directory.CreateCommand("SELECT cell_id FROM directory.tenants WHERE id = @id");
-        command.Parameters.AddWithValue("id", tenantId);
-        return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
     private static async Task FollowAsync(CellClient cell, CellJob queued, CancellationToken cancellationToken)

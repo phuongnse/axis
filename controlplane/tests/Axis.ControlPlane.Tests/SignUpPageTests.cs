@@ -48,6 +48,19 @@ public sealed class SignUpPageTests : IDisposable
     }
 
     [Fact]
+    public async Task The_progress_page_is_served_at_sign_up_progress_with_the_platforms_content_security_policy()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/sign-up/progress", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Page, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        AssertPlatformPolicy(response);
+    }
+
+    [Fact]
     public async Task The_applications_are_served_with_their_titles_and_the_platforms_content_security_policy()
     {
         using var factory = Factory();

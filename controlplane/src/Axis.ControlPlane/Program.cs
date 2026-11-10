@@ -102,6 +102,11 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     // The clock of the subscriptions, queued every hour. It finds each tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
     builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
+
+    // The write of a subscription's quotas to its cell, and its sync over every subscription, queued every 24 hours. Both find the tenant's cell in the directory and call it.
+    builder.Services.AddSingleton<IJobHandler, SubscriptionQuotas>();
+    builder.Services.AddSingleton<IJobHandler, QuotaSync>();
+    builder.Services.AddSingleton(new RecurringJob(QuotaSync.JobKind, TimeSpan.FromDays(1)));
 }
 
 // The schedule that queues the recurring jobs above. It is idle when there are none.
@@ -134,9 +139,10 @@ app.UseStaticFiles();
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
 
-// The sign-up page and its verify page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
+// The sign-up page, its verify page and its progress page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");
 app.MapFallbackToFile("/sign-up/verify", "sign-up.html");
+app.MapFallbackToFile("/sign-up/progress", "sign-up.html");
 
 app.Run();
 

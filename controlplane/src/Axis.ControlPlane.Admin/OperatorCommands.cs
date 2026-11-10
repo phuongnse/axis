@@ -1,12 +1,14 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Emails;
+using Axis.ControlPlane.Subscriptions;
 using Npgsql;
 
 namespace Axis.ControlPlane.Admin;
 
 /// <summary>
-/// <c>trial extend</c> and <c>email resend</c>: the commands of the platform operator that change the control plane, see
+/// <c>trial extend</c>, <c>email resend</c> and <c>quota override</c>: the commands of the platform operator that change the control plane, see
 /// <c>docs/reference/control-plane.md#operators</c>. Each commits its change and one audit record of the actor kind <c>operator</c>, with the
 /// <c>--operator</c> name as actor, in one transaction. A refusal changes nothing, writes no audit record and is exit code 1. Nothing printed
 /// holds an email address, a name or the values of an email.
@@ -16,6 +18,8 @@ internal static class OperatorCommands
     private const string TrialExtendedAction = "subscription.trialExtended";
 
     private const string EmailResentAction = "email.resent";
+
+    private const string QuotaOverriddenAction = "quota.overridden";
 
     public static async Task<int> TrialExtendAsync(
         ControlPlaneOptions options,
@@ -150,6 +154,80 @@ internal static class OperatorCommands
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
         {
             return Failed(error, "the email");
+        }
+    }
+
+    public static async Task<int> QuotaOverrideAsync(
+        ControlPlaneOptions options,
+        string tenant,
+        string quota,
+        long value,
+        DateTimeOffset until,
+        string reason,
+        string operatorName,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var connection = new NpgsqlConnection(options.ConnectionString);
+            await connection.OpenAsync(cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            // A subscription that is deleting or deleted gets no quota writes, so an override for it would change nothing.
+            Guid id;
+            await using (var command = new NpgsqlCommand(
+                "SELECT id FROM control_plane.subscriptions WHERE tenant_id = @tenant AND state NOT IN ('deleting', 'deleted') AND plan_code IS NOT NULL",
+                connection,
+                transaction))
+            {
+                command.Parameters.AddWithValue("tenant", tenant);
+                if (await command.ExecuteScalarAsync(cancellationToken) is not Guid found)
+                {
+                    error.WriteLine($"The tenant {tenant} has no subscription with a plan.");
+                    return 1;
+                }
+
+                id = found;
+            }
+
+            if (until <= DateTimeOffset.UtcNow)
+            {
+                error.WriteLine("The end date must be in the future.");
+                return 1;
+            }
+
+            await using (var upsert = new NpgsqlCommand(
+                """
+                INSERT INTO control_plane.quota_overrides (subscription_id, quota, value, reason, until, operator)
+                VALUES (@id, @quota, @value, @reason, @until, @operator)
+                ON CONFLICT (subscription_id, quota) DO UPDATE
+                SET value = EXCLUDED.value, reason = EXCLUDED.reason, until = EXCLUDED.until, operator = EXCLUDED.operator, created_at = now()
+                """,
+                connection,
+                transaction))
+            {
+                upsert.Parameters.AddWithValue("id", id);
+                upsert.Parameters.AddWithValue("quota", quota);
+                upsert.Parameters.AddWithValue("value", value);
+                upsert.Parameters.AddWithValue("reason", reason);
+                upsert.Parameters.AddWithValue("until", until);
+                upsert.Parameters.AddWithValue("operator", operatorName);
+                await upsert.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await AuditRecords.AppendAsync(transaction, AuditActorKind.Operator, operatorName, QuotaOverriddenAction, id.ToString(), cancellationToken);
+            var jobId = await SubscriptionQuotas.EnqueueAsync(connection, transaction, id, cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            // Never the reason: it is free text that can name a person.
+            output.WriteLine($"{id}  {quota} {value.ToString(CultureInfo.InvariantCulture)} until {RegionLists.Time(until)}  job {jobId}");
+            return 0;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            return Failed(error, "the quota");
         }
     }
 

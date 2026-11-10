@@ -72,6 +72,19 @@ const en = {
   'signUp.verify.expired.title': 'This link has expired',
   'signUp.verify.expired.body': 'A link works once, for 24 hours. Sign up again to get a new one.',
   'signUp.verify.signUpAgain': 'Sign up again',
+  'signUp.progress.title': 'Setting up the trial',
+  'signUp.progress.step.confirmed': 'Confirmed',
+  'signUp.progress.step.settingUp': 'Setting up',
+  'signUp.progress.step.ready': 'Ready',
+  'signUp.progress.settingUp':
+    'Setting up the trial. You can close this page: an email tells you when you can sign in.',
+  'signUp.progress.ready.title': 'The trial is ready',
+  'signUp.progress.ready':
+    'The trial is ready at {address}. Open the invitation email to set your password, then sign in.',
+  'signUp.progress.delayed':
+    'The trial needs more time to set up. Our team is on it, and you do not need to do anything.',
+  'signUp.progress.unknown.title': 'The progress cannot be shown',
+  'signUp.progress.unknown': 'An email tells you when you can sign in.',
 }
 
 const vi: Record<keyof typeof en, string> = {
@@ -148,6 +161,18 @@ const vi: Record<keyof typeof en, string> = {
   'signUp.verify.expired.title': 'Liên kết đã hết hạn',
   'signUp.verify.expired.body': 'Liên kết chỉ dùng được một lần, trong 24 giờ. Hãy đăng ký lại để nhận liên kết mới.',
   'signUp.verify.signUpAgain': 'Đăng ký lại',
+  'signUp.progress.title': 'Đang chuẩn bị bản dùng thử',
+  'signUp.progress.step.confirmed': 'Đã xác nhận',
+  'signUp.progress.step.settingUp': 'Đang chuẩn bị',
+  'signUp.progress.step.ready': 'Sẵn sàng',
+  'signUp.progress.settingUp':
+    'Đang chuẩn bị bản dùng thử. Có thể đóng trang này: bạn sẽ nhận email khi có thể đăng nhập.',
+  'signUp.progress.ready.title': 'Bản dùng thử đã sẵn sàng',
+  'signUp.progress.ready': 'Bản dùng thử đã sẵn sàng tại {address}. Mở email mời để đặt mật khẩu, rồi đăng nhập.',
+  'signUp.progress.delayed':
+    'Bản dùng thử cần thêm thời gian để chuẩn bị. Đội ngũ của chúng tôi đang xử lý, bạn không cần làm gì.',
+  'signUp.progress.unknown.title': 'Không hiện được tiến độ',
+  'signUp.progress.unknown': 'Bạn sẽ nhận email khi có thể đăng nhập.',
 }
 
 /** The languages of the sign-up page. */
