@@ -505,17 +505,26 @@ function change(
   }
 }
 
-// A process long enough that its diff folds the unchanged lines.
-const approvalProcess = (extra: object[]) => ({
+// A process long enough that its diff folds the unchanged lines. The email request changes a line, removes one and
+// adds a step, so its diff shows all three.
+const approvalProcess = (emails: boolean) => ({
   kind: 'process',
   name: 'PurchaseApproval',
   entity: 'PurchaseRequest',
   start: 'submitted',
   steps: [
-    { name: 'submit', kind: 'task', assignee: '=requester', form: 'RequestForm' },
+    emails
+      ? { name: 'submit', kind: 'task', assignee: '=requester', form: 'RequestForm' }
+      : { name: 'submit', kind: 'task', assignee: '=requester', form: 'RequestForm', notify: false },
     { name: 'review', kind: 'task', assignee: 'role:Manager', form: 'ReviewForm', due: 'P2D' },
-    { name: 'approve', kind: 'decision', assignee: 'role:Approver', outcomes: ['approved', 'rejected'] },
-    ...extra,
+    {
+      name: 'approve',
+      kind: 'decision',
+      assignee: 'role:Approver',
+      outcomes: ['approved', 'rejected'],
+      next: emails ? 'notifyRequester' : 'end',
+    },
+    ...(emails ? [{ name: 'notifyRequester', kind: 'email', to: '=requester.email', template: 'decisionMade' }] : []),
   ],
   end: ['approved', 'rejected'],
 })
@@ -561,8 +570,8 @@ const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[
       'processes/purchase-approval.json',
       'process',
       'PurchaseApproval',
-      approvalProcess([]),
-      approvalProcess([{ name: 'notifyRequester', kind: 'email', to: '=requester.email', template: 'decisionMade' }]),
+      approvalProcess(false),
+      approvalProcess(true),
       'After the approval step, the process emails the requester whether the request was approved or rejected.',
     ),
     change(
