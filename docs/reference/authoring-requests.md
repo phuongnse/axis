@@ -47,8 +47,9 @@ loses no work.
 - **Tables.** `axis.authoring_requests` holds one row per request: its id, application, author,
   request text, binding, state, draft, plan, round, token use, the auto-accept flag and its times.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
-  summary, outcome, tokens and times. A step's full model messages are kept for 30 days for the author
-  and the audit, then deleted. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
+  summary, outcome, tokens and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
+- **Model messages** _(planned for M35)_. A step's full model messages are kept for 30 days for the
+  author and the audit, then deleted.
 - **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
