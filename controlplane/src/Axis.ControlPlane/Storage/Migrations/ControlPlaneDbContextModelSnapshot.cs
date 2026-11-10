@@ -402,6 +402,80 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.QuotaOverrideRow", b =>
+                {
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("Quota")
+                        .HasColumnType("text")
+                        .HasColumnName("quota");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Operator")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("operator");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("Until")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("until");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.HasKey("SubscriptionId", "Quota")
+                        .HasName("pk_quota_overrides");
+
+                    b.ToTable("quota_overrides", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_quota_overrides_reason", "btrim(reason) <> ''");
+
+                            t.HasCheckConstraint("ck_quota_overrides_value", "value >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionAddOnRow", b =>
+                {
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("AddOnCode")
+                        .HasColumnType("text")
+                        .HasColumnName("add_on_code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("SubscriptionId", "AddOnCode")
+                        .HasName("pk_subscription_add_ons");
+
+                    b.ToTable("subscription_add_ons", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_subscription_add_ons_quantity", "quantity >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionEmailRow", b =>
                 {
                     b.Property<Guid>("SubscriptionId")
@@ -502,6 +576,26 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                             t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
                         });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.QuotaOverrideRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_quota_overrides_subscription_id");
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionAddOnRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_add_ons_subscription_id");
                 });
 
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionEmailRow", b =>

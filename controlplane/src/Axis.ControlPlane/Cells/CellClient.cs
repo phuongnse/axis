@@ -16,7 +16,8 @@ namespace Axis.ControlPlane.Cells;
 /// response body, a token, the client secret or a request body, and none of them is logged. A <c>409</c> titled
 /// <see cref="FullTitle"/> sets <see cref="CellCallException.CellFull"/>, and any other <c>409</c> is an ordinary failure.
 /// <see cref="ListTenantsAsync"/> reads the cell's tenant list, <see cref="GetTenantStatusAsync"/> one tenant's status and
-/// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures.
+/// <see cref="ListAdministratorsAsync"/> its administrators, with the same token and the same failures. <see cref="PutQuotasAsync"/> sets a
+/// tenant's quotas with a <c>PUT</c> that carries no idempotency key: it sets every key it names, so a repeat gives the same rows.
 /// </summary>
 internal sealed class CellClient : IDisposable
 {
@@ -80,6 +81,20 @@ internal sealed class CellClient : IDisposable
         return CallAsync(
             HttpMethod.Delete, path, operation.IdempotencyKey, null,
             (response, call, token) => ReadJobAsync(response, HttpMethod.Delete, call, token), cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the quotas of one tenant, <c>PUT /api/cell/tenants/{id}/quotas</c>, to the values of <paramref name="set"/> by their keys. The cell
+    /// answers <c>200</c> once the rows are written and runs no job. Repeating the call writes the same rows.
+    /// </summary>
+    public async Task PutQuotasAsync(string tenantId, IReadOnlyDictionary<string, long> set, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(set);
+
+        var content = JsonSerializer.SerializeToUtf8Bytes(new { set }, JsonSerializerOptions.Web);
+        await CallAsync(
+            HttpMethod.Put, $"/api/cell/tenants/{Uri.EscapeDataString(tenantId)}/quotas", null, content, ReadQuotasWrittenAsync, cancellationToken);
     }
 
     /// <summary>Reads a job with its steps and its error.</summary>
@@ -241,6 +256,17 @@ internal sealed class CellClient : IDisposable
         }
 
         throw new CellCallException($"The call {call} to the cell '{CellId}' answered with a body that is not a job.", status);
+    }
+
+    private Task<bool> ReadQuotasWrittenAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)
+    {
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            var status = (int)response.StatusCode;
+            throw new CellCallException($"The call {call} to the cell '{CellId}' answered with the status {status.ToString(CultureInfo.InvariantCulture)}.", status);
+        }
+
+        return Task.FromResult(true);
     }
 
     private async Task<IReadOnlyList<CellTenant>> ReadTenantsAsync(HttpResponseMessage response, string call, CancellationToken cancellationToken)

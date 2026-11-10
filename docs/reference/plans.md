@@ -67,19 +67,32 @@ The numbers above show the shape only. They are not prices.
 
 ## From a plan to the quotas
 
-_(planned for M34)_
-
 The control plane turns a subscription's plan and add-ons into the tenant's quotas on the cell.
 
-- **The control plane writes them.** When a subscription starts, changes its plan, adds or drops an
-  add-on, or becomes `active` again, the control plane writes the tenant's quota rows through
-  `PUT /api/cell/tenants/{id}/quotas`, see [quotas](tenant-quotas.md#quotas).
-- **Users.** `users` is `includedUsers` plus the users of every add-on.
-- **One source.** The plan is the only source of a SaaS tenant's quotas. An operator who sets a quota
-  by hand writes an override in the control plane, with a reason and an end date, and the control
-  plane writes it to the cell. A quota set on the cell directly is put back at the next sync.
-- **Sync.** Each night the control plane writes every subscription's quotas again, so a lost call is
-  corrected within a day.
+- **The `writeQuotas` job.** One `PUT /api/cell/tenants/{id}/quotas` for a subscription sets every
+  quota of its pinned plan version, with `users` and any override on top, see
+  [quotas](tenant-quotas.md#quotas). The call names every quota, so repeating it writes the same
+  rows, and it carries no idempotency key. A `deleting` or `deleted` subscription, and one that pins
+  no plan, gets no call. A job that cannot reach the cell, or whose tenant has no directory row, fails
+  and the job queue retries it.
+- **The events** _(planned for M34)_. When a subscription starts, changes its plan, adds or drops an
+  add-on, or becomes `active` again, the code that makes the move queues `writeQuotas` in the same
+  transaction, through the one helper that every move uses.
+- **Users.** `users` is `includedUsers` plus the users of every add-on pack the subscription holds. The
+  packs are the rows of `control_plane.subscription_add_ons`: `subscription_id`, `add_on_code`,
+  `quantity` and `created_at`, one row for each code. A code that the pinned plan version does not list
+  fails the job, so that the tenant never loses users quietly.
+- **Overrides.** An operator who sets a quota by hand writes an override with
+  [`quota override`](control-plane.md#operators), which holds a reason and an end date. The rows of
+  `control_plane.quota_overrides` are `subscription_id`, `quota`, `value`, `reason`, `until`,
+  `operator` and `created_at`, one row for each subscription and quota, so a new override replaces the
+  old one. The job writes the override instead of the plan's value until its end date, and an override
+  that has ended drops out of the next write. A subscription that pins no plan takes no override.
+- **One source.** The plan is the only source of a SaaS tenant's quotas, and the override is the only
+  other. A quota set on the cell directly is put back at the next sync.
+- **Sync.** Each night the recurring `syncQuotas` job queues one `writeQuotas` job for every
+  subscription that pins a plan and is not `deleting` or `deleted`, so a lost call is corrected within
+  a day.
 
 ## Add-ons
 

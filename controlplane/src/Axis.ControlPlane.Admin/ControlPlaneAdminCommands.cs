@@ -1,4 +1,5 @@
 using System.Globalization;
+using Axis.Tenancy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Hosting.Internal;
@@ -7,7 +8,7 @@ namespace Axis.ControlPlane.Admin;
 
 /// <summary>
 /// The commands of the platform operator for one control plane region, see <c>docs/reference/control-plane.md#operators</c>:
-/// <c>sign-ups list</c>, <c>subscriptions list</c>, <c>trial extend</c> and <c>email resend</c>. They read the same <c>ControlPlane:</c> settings as the service and run the same start checks.
+/// <c>sign-ups list</c>, <c>subscriptions list</c>, <c>trial extend</c>, <c>email resend</c> and <c>quota override</c>. They read the same <c>ControlPlane:</c> settings as the service and run the same start checks.
 /// The exit code is 0 when the command succeeded, 1 when a step failed, such as a database that cannot be read, or when a change was refused, and 2 when nothing ran
 /// because of a usage or settings error. Nothing is written to <c>output</c> in the cases 1 and 2.
 /// </summary>
@@ -19,6 +20,7 @@ internal static class ControlPlaneAdminCommands
           subscriptions list
           trial extend <tenant> --days <n> --operator <name>
           email resend <job id> --operator <name>
+          quota override <tenant> <quota> <value> --until <yyyy-MM-dd> --reason <text> --operator <name>
         """;
 
     private const int MaxDays = 365;
@@ -52,6 +54,18 @@ internal static class ControlPlaneAdminCommands
             var operatorName = email["--operator"];
             command = (options, output, error, cancellationToken) => OperatorCommands.EmailResendAsync(options, jobId, operatorName, output, error, cancellationToken);
         }
+        else if (args is ["quota", "override", var quotaTenant, var quota, var quotaValue, .. var overrideOptions]
+            && QuotaKeys.All.Contains(quota, StringComparer.Ordinal)
+            && long.TryParse(quotaValue, NumberStyles.None, CultureInfo.InvariantCulture, out var value)
+            && ParseOptions(overrideOptions, "--until", "--reason") is { } quotaOverride
+            && DateTimeOffset.TryParseExact(
+                quotaOverride["--until"], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var until))
+        {
+            var operatorName = quotaOverride["--operator"];
+            var reason = quotaOverride["--reason"].Trim();
+            command = (options, output, error, cancellationToken) =>
+                OperatorCommands.QuotaOverrideAsync(options, quotaTenant, quota, value, until, reason, operatorName, output, error, cancellationToken);
+        }
         else
         {
             error.WriteLine(UsageText);
@@ -81,7 +95,7 @@ internal static class ControlPlaneAdminCommands
     }
 
     // Reads the options after the positional words as `--name value` pairs, in any order. It returns null for an option that is unknown, repeated or without a value,
-    // and for a missing or blank --operator, or a missing option of `required`. The operator name comes back trimmed.
+    // and for a missing or blank --operator, or a missing or blank option of `required`. The operator name comes back trimmed.
     private static Dictionary<string, string>? ParseOptions(string[] words, params string[] required)
     {
         var allowed = new HashSet<string>(["--operator", .. required], StringComparer.Ordinal);
@@ -99,7 +113,7 @@ internal static class ControlPlaneAdminCommands
             }
         }
 
-        if (!allowed.All(values.ContainsKey) || string.IsNullOrWhiteSpace(values["--operator"]))
+        if (!allowed.All(values.ContainsKey) || allowed.Any(name => string.IsNullOrWhiteSpace(values[name])))
         {
             return null;
         }
