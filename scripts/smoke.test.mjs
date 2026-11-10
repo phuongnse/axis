@@ -1,18 +1,23 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { productionTargets, stageText } from './lib/images.mjs'
 
 // Runs scripts/smoke.sh in a temporary copy of the files it needs, with each smoke test replaced by a
-// test that passes, or fails when it is named in FAILING, and git replaced by a stub that lists the
-// changed paths in FAKE_CHANGED.
+// test that passes, or fails when it is named in FAILING, git replaced by a stub that lists the
+// changed paths in FAKE_CHANGED, and docker replaced by a stub that logs its arguments and writes the file of
+// `docker save -o`. `saved` names files to put in the cache folder before the run, with the placeholder HASH for
+// the hash of the admin-tools stage.
 const root = fileURLToPath(new URL('..', import.meta.url))
 const suites = { 'dev-script': 'dev', compose: 'compose', images: 'images', onprem: 'onprem' }
+const hash = createHash('sha256').update(stageText(root, 'admin-tools')).digest('hex').slice(0, 12)
 
-function runSmoke({ changed, failing = [] } = {}) {
+function runSmoke({ changed, failing = [], saved = [], dockerFails = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-smoke-'))
   try {
     for (const file of [
@@ -22,6 +27,10 @@ function runSmoke({ changed, failing = [] } = {}) {
       '.nexkit/config.json',
       'scripts/lib/install-modules.sh',
       'scripts/test-report.mjs',
+      'Dockerfile',
+      'scripts/lib/images.mjs',
+      'scripts/lib/docker-build.mjs',
+      'scripts/lib/smoke-images.mjs',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
@@ -41,7 +50,32 @@ function runSmoke({ changed, failing = [] } = {}) {
       mode: 0o755,
     })
 
-    const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CHANGED: changed ?? '' }
+    writeFileSync(
+      join(bin, 'docker'),
+      [
+        '#!/bin/sh',
+        'echo "$*" >> "$DOCKER_LOG"',
+        'if [ "$1" = "$DOCKER_FAIL" ]; then exit 1; fi',
+        'if [ "$1" = save ] && [ "$2" = -o ]; then echo saved > "$3"; fi',
+        'exit 0',
+      ].join('\n'),
+      { mode: 0o755 },
+    )
+    const cache = join(dir, 'cache')
+    mkdirSync(cache)
+    for (const file of saved) writeFileSync(join(cache, file.replace('HASH', hash)), 'old')
+    const dockerLog = join(dir, 'docker.log')
+    writeFileSync(dockerLog, '')
+
+    const env = {
+      ...process.env,
+      PATH: `${bin}:${process.env.PATH}`,
+      FAKE_CHANGED: changed ?? '',
+      DOCKER_LOG: dockerLog,
+      DOCKER_FAIL: dockerFails,
+      AXIS_DOCKER_CACHE_DIR: cache,
+      AXIS_RETRY_DELAY_SECONDS: '0',
+    }
     // NODE_TEST_CONTEXT would make each suite's node --test skip its file.
     for (const name of [
       'NODE_TEST_CONTEXT',
@@ -59,11 +93,16 @@ function runSmoke({ changed, failing = [] } = {}) {
     const result = spawnSync('bash', ['scripts/smoke.sh'], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
     const written = Object.keys(suites).filter((suite) => existsSync(join(dir, 'artifacts/test-results', `${suite}.xml`)))
     const modules = existsSync(join(dir, 'artifacts/modules/department-budgets/1.2.0/module.json'))
-    return { ...result, written, modules }
+    const docker = readFileSync(dockerLog, 'utf8').split('\n').filter(Boolean)
+    return { ...result, written, modules, docker, cache: readdirSync(cache).sort() }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 }
+
+const builds = (run) => run.docker.filter((line) => line.startsWith('build --target'))
+const targetOf = (line) => line.split(' ')[2]
+const production = productionTargets(root)
 
 describe('scripts/smoke.sh', () => {
   test('runs every smoke test and installs the sample modules that the on-premises test reads', () => {
@@ -73,6 +112,49 @@ describe('scripts/smoke.sh', () => {
     assert.deepEqual(run.written, Object.keys(suites))
     assert.ok(run.modules)
     for (const suite of Object.keys(suites)) assert.match(run.stdout, new RegExp(`^\\| ${suite} \\| 1 \\| 0 \\| 0 \\| `, 'm'))
+  })
+
+  test('builds each production image once and the PostgreSQL tools layer once, then removes the images', () => {
+    const run = runSmoke()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(builds(run).map(targetOf).sort(), [...production, 'admin-tools'].sort(), run.docker.join('\n'))
+    for (const line of builds(run).filter((line) => production.includes(targetOf(line)))) {
+      assert.match(line, /--build-arg AXIS_VERSION=0\.0\.0-smoke\.\d+ .*-t axis-[\w-]+:0\.0\.0-smoke\.\d+ \.$/, line)
+    }
+    const version = builds(run)[1].match(/AXIS_VERSION=(\S+)/)[1]
+    for (const target of production) assert.ok(run.docker.includes(`rmi -f ${target}:${version}`), run.docker.join('\n'))
+    assert.deepEqual(run.cache, [`admin-tools-${hash}.tar`])
+    assert.ok(run.docker.some((line) => line.startsWith(`save -o `) && line.includes(`axis-admin-tools:${hash} mcr.microsoft.com/dotnet/runtime:10.0`)))
+  })
+
+  test('loads the saved PostgreSQL tools layer of the current stage and builds axis-admin from it', () => {
+    const run = runSmoke({ saved: ['admin-tools-HASH.tar'] })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.ok(run.docker.some((line) => line.startsWith('load -i ') && line.endsWith(`admin-tools-${hash}.tar`)))
+    assert.deepEqual(builds(run).map(targetOf).sort(), [...production].sort(), run.docker.join('\n'))
+    assert.ok(!run.docker.some((line) => line.startsWith('pull ')), 'the base image comes from the saved file')
+    const admin = builds(run).find((line) => targetOf(line) === 'axis-admin')
+    assert.ok(admin.includes(`--cache-from axis-admin-tools:${hash}`), admin)
+    for (const line of builds(run).filter((line) => targetOf(line) !== 'axis-admin')) assert.doesNotMatch(line, /--cache-from/)
+  })
+
+  test('builds and saves the PostgreSQL tools layer when the saved file is of an older stage, and deletes that file', () => {
+    const run = runSmoke({ saved: ['admin-tools-000000000000.tar'] })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.ok(!run.docker.some((line) => line.startsWith('load ')))
+    assert.deepEqual(builds(run).map(targetOf).sort(), [...production, 'admin-tools'].sort(), run.docker.join('\n'))
+    assert.deepEqual(run.cache, [`admin-tools-${hash}.tar`])
+  })
+
+  test('fails the images and on-premises tests at once when the production images do not build', () => {
+    const run = runSmoke({ dockerFails: 'build' })
+
+    assert.equal(run.status, 1, run.stdout + run.stderr)
+    assert.equal(builds(run).length, 3, 'one build, tried three times')
+    assert.match(run.stderr, /docker build --target admin-tools failed after 3 attempts/)
   })
 
   test('runs the other smoke tests after one fails, and fails', () => {
@@ -88,6 +170,7 @@ describe('scripts/smoke.sh', () => {
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.deepEqual(run.written, [])
+    assert.deepEqual(run.docker, [], 'a docs change builds nothing')
     for (const suite of Object.keys(suites)) {
       assert.ok(run.stdout.includes(`${suite} (skipped: not affected by this change)`), suite)
     }

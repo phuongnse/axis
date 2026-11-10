@@ -1,7 +1,7 @@
-// Smoke test for the production images: builds axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, checks what they
-// hold, and runs them read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a
-// certificate from an authority made for the run, and the connection strings set SSL Mode=VerifyFull, which the
-// production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
+// Smoke test for the production images axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, which
+// scripts/smoke.sh builds: checks what they hold, and runs them read-only with their settings in /run/secrets files.
+// The test PostgreSQL serves TLS with a certificate from an authority made for the run, and the connection strings
+// set SSL Mode=VerifyFull, which the production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -9,13 +9,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildImage } from './lib/docker-build.mjs'
+import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
 const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane']
-const suffix = `images-test-${process.pid}`
 const network = `axis-images-${process.pid}`
 const postgres = `axis-images-postgres-${process.pid}`
 const secretKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
@@ -25,7 +24,7 @@ let folder
 let trustDir
 const containers = []
 
-const image = (target) => `${target}:${suffix}`
+const image = (target) => `${target}:${version}`
 
 const docker = (args, options = {}) => spawnSync('docker', args, { cwd: root, encoding: 'utf8', ...options })
 
@@ -49,9 +48,8 @@ const writeSecrets = (name, settings) => {
 
 before(
   async () => {
-    version = `0.0.0-test.${process.pid}`
+    version = smokeImages(targets)
     folder = mkdtempSync(join(tmpdir(), 'axis-images-'))
-    for (const target of targets) await buildImage({ target, version, tag: image(target) })
 
     const certificates = issuePostgresCertificate({
       folder,
@@ -110,7 +108,6 @@ after(() => {
   for (const container of [...containers, postgres]) docker(['rm', '-f', container], { stdio: 'ignore' })
   docker(['network', 'rm', network], { stdio: 'ignore' })
   if (folder) rmSync(folder, { recursive: true, force: true })
-  for (const target of targets) docker(['rmi', '-f', image(target)], { stdio: 'ignore' })
 })
 
 test('no image holds samples, development settings or source control metadata', { timeout }, () => {

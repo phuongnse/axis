@@ -163,15 +163,19 @@ COPY --from=production-build /out/agent .
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Agent.dll"]
 
-# Production admin tool, with the PostgreSQL 18 client tools from the PostgreSQL apt repository.
-# The stage installs its packages before it declares AXIS_VERSION, so a build with another version reuses that layer,
-# see docs/development.md#production-images-and-axisadmin.
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS axis-admin
+# The PostgreSQL 18 client tools from the PostgreSQL apt repository, for the production admin tool. The stage takes no
+# build argument, so its layer is the same for every Axis version and scripts/smoke.sh can save it and reuse it,
+# see docs/development.md#smoke-tests. The image scan builds without that saved layer.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS admin-tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-common \
     && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
     && apt-get install -y --no-install-recommends postgresql-client-18 \
     && rm -rf /var/lib/apt/lists/*
+
+# Production admin tool, built on the admin-tools stage so a build with another version reuses the package layer,
+# see docs/development.md#production-images-and-axisadmin.
+FROM admin-tools AS axis-admin
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
 ENV DOTNET_ENVIRONMENT=Production PATH=/usr/lib/postgresql/18/bin:$PATH

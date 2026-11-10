@@ -35,7 +35,7 @@ import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
-import { buildImage } from './lib/docker-build.mjs'
+import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -450,7 +450,7 @@ describe('the Studio folder', () => {
 
 describe('the on-premises installation', () => {
   const project = `axis-onprem-${process.pid}`
-  const version = `0.0.0-onprem.${process.pid}`
+  let version
   let folder
   let env
   let serverPort
@@ -676,8 +676,8 @@ describe('the on-premises installation', () => {
       const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
       assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
 
-      // Step 1, the images. The four targets are tagged with the version that compose.yaml requires.
-      for (const target of targets) await buildImage({ target, version, tag: `${target}:${version}` })
+      // Step 1, the images. scripts/smoke.sh built the four targets with the version that compose.yaml requires.
+      version = smokeImages(targets)
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
       const secrets = join(folder, 'secrets')
@@ -874,7 +874,6 @@ describe('the on-premises installation', () => {
   after(() => {
     compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,replicas' } })
     if (folder) rmSync(folder, { recursive: true, force: true })
-    for (const target of targets) docker(['rmi', '-f', `${target}:${version}`], { stdio: 'ignore' })
   })
 
   test('the guide installs two tenants and serves them', { timeout }, async () => {

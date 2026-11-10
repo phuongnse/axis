@@ -24,8 +24,20 @@ export const runDocker = async (args, { env = process.env, attempts = 3, label =
   assert.fail(`${label} failed after ${attempts} attempts with status ${status}`)
 }
 
-export const buildImage = ({ target, version, tag, attempts = 3 }) =>
-  runDocker(['build', '--target', target, '--build-arg', `AXIS_VERSION=${version}`, '-t', tag, '.'], {
-    attempts,
-    label: `docker build --target ${target}`,
-  })
+// `cacheFrom` names an image that Docker takes cached layers from, and `buildArgs` are more `NAME=value` build
+// arguments. Each is left out of the command when unset, and so is the version of a stage that takes none.
+export const buildImage = ({ target, version, tag, attempts = 3, cacheFrom, buildArgs = [] }) =>
+  runDocker(
+    [
+      'build',
+      '--target',
+      target,
+      ...(version ? ['--build-arg', `AXIS_VERSION=${version}`] : []),
+      ...buildArgs.flatMap((arg) => ['--build-arg', arg]),
+      ...(cacheFrom ? ['--cache-from', cacheFrom] : []),
+      '-t',
+      tag,
+      '.',
+    ],
+    { attempts, label: `docker build --target ${target}` },
+  )

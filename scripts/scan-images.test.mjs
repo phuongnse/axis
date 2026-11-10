@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { after, before, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { findImages } from './lib/images.mjs'
+import { findImages, productionTargets, stageText } from './lib/images.mjs'
 
 // Runs scripts/scan-images.sh with stub `docker` and `trivy` commands. The stub Trivy prints recorded
 // reports for real advisories, so the tests need no Docker, no network and no change when an
@@ -109,6 +109,21 @@ describe('scripts/scan-images.sh', () => {
       )
     }
     assert.ok(docker.includes(`pull ${keycloak}`), docker.join('\n'))
+  })
+
+  test('builds from scratch, with no saved PostgreSQL tools layer and no cache source', () => {
+    const cache = path.join(stubs, `cache-${Date.now()}`)
+    mkdirSync(cache)
+    writeFileSync(path.join(cache, 'admin-tools-x.tar'), 'saved')
+
+    const result = scan({ AXIS_DOCKER_CACHE_DIR: cache })
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    const docker = logLines(dockerLog)
+    assert.ok(docker.some((line) => line.startsWith('build --target axis-admin ')), docker.join('\n'))
+    assert.deepEqual(
+      docker.filter((line) => line.startsWith('load') || line.includes('--cache-from')),
+      [],
+    )
   })
 
   test('fails on a high finding and prints the image, the package and the vulnerability id', () => {
@@ -226,6 +241,37 @@ describe('findImages', () => {
   test('throws an error that names KeycloakFixture.cs when it has no Image constant', () => {
     writeFileSync(path.join(folder, 'tests/Axis.Integration.Tests/KeycloakFixture.cs'), 'class KeycloakFixture {}\n')
     assert.throws(() => findImages(folder), /KeycloakFixture\.cs has no Image constant/)
+    rmSync(folder, { recursive: true, force: true })
+  })
+})
+
+describe('productionTargets and stageText', () => {
+  let folder
+
+  beforeEach(() => {
+    folder = mkdtempSync(path.join(tmpdir(), 'stage-text-'))
+    writeFileSync(
+      path.join(folder, 'Dockerfile'),
+      [
+        'FROM mcr.microsoft.com/dotnet/runtime:10.0 AS tools',
+        '# A comment inside the stage.',
+        'RUN apt-get update',
+        '',
+        '# The comment of the next stage.',
+        'FROM tools AS axis-admin',
+        'ARG AXIS_VERSION',
+      ].join('\n'),
+    )
+  })
+
+  test('lists the axis-* stages, whatever their base', () => {
+    assert.deepEqual(productionTargets(folder), ['axis-admin'])
+    rmSync(folder, { recursive: true, force: true })
+  })
+
+  test('returns one stage without its comments and blank lines, or throws when it is missing', () => {
+    assert.equal(stageText(folder, 'tools'), 'FROM mcr.microsoft.com/dotnet/runtime:10.0 AS tools\nRUN apt-get update')
+    assert.throws(() => stageText(folder, 'missing'), /has no missing stage/)
     rmSync(folder, { recursive: true, force: true })
   })
 })
