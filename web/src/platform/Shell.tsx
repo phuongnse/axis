@@ -67,10 +67,11 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * and the sidebar's navigation stays under it with a scroll of its own. A site with two or more navigation entries
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
- * Proposed: a page without a sidebar has a footer across the bottom, with the copyright at the start and the legal
- * links at the end. A page with a sidebar has none, at narrow width too, so the sidebar and a side panel reach the
- * bottom of the window, and the account menu holds the legal line. A page can open a side panel in a right column
- * with `ShellAside`; at narrow width the panel takes the window's width, over the page.
+ * A footer runs under the page, with the copyright at the start and the legal links at the end. Without a sidebar it
+ * runs across the bottom. Beside one it runs under the content column only, so the sidebar reaches the bottom of the window.
+ * Proposed: a page can open a side panel in a right column with `ShellAside`, which reaches the bottom of the window
+ * beside the content column and its footer; at narrow width the panel takes the window's width, over the page, and a
+ * page with a sidebar keeps its footer in the content column. See the review on #3263.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
@@ -196,7 +197,7 @@ export function Shell({
               <>
                 {bell}
                 {hasAccount ? account : <AppSwitcher locale={locale} />}
-                {!hasAccount && <UserMenu legal={legal} />}
+                {!hasAccount && <UserMenu />}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   ref={toggle}
@@ -214,7 +215,7 @@ export function Shell({
                 {bell}
                 {!hasAccount && <AppSwitcher locale={locale} />}
                 {preferences}
-                {hasAccount ? account : <UserMenu legal={legal} />}
+                {hasAccount ? account : <UserMenu />}
               </Flex>
             )}
           </Layout.Header>
@@ -266,6 +267,7 @@ export function Shell({
                   <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>
               </Layout.Content>
+              {hasSidebar && <ShellFooter legal={legal} />}
             </Layout>
             {asideClaims > 0 && (
               // Proposed: the right column, as tall as the page, with its side panel under the header to the window's
@@ -304,7 +306,6 @@ export function Shell({
               </div>
             )}
           </Layout>
-          {/* Proposed: a page with a sidebar has no footer, at narrow width too; the legal line is in the account menu. */}
           {!hasSidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>
