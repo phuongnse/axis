@@ -287,8 +287,9 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   `{ state: "pending", email, businessName, address }`, `{ state: "confirmed" }` or
   `{ state: "expired" }`. It changes nothing.
 - **Confirming.** `POST /api/sign-up/confirm` takes `{ token }` and answers `{ id, secret }` for the
-  progress page. When the link was used or expired while the page was open, it answers `409` with
-  `{ state }`, and the page shows that state, not an error. A link whose email another sign-up
+  progress page. The secret is 32 random bytes in base64url, and only its SHA-256 is kept. The confirm
+  also starts [the provisioning](#provisioning). When the link was used or expired while the page was
+  open, it answers `409` with `{ state }`, and the page shows that state, not an error. A link whose email another sign-up
   verified first answers `409` with `{ state: "confirmed" }`, see [one trial for each email](#bots-and-abuse).
 
 ### The emails
@@ -374,22 +375,30 @@ Nếu không phải bạn, hãy bỏ qua email này.
 
 ## Provisioning
 
-_(planned for M33)_
+The confirm queues one `provisionTenant` job in its own transaction, with the payload `{ signUpId }`. The
+job provisions the tenant with the idempotency key `tenant-create:<sign-up id>`. Its progress is the
+sign-up's `provisioning`, which is `queued`, `creating` or `ready`. It is apart from the sign-up's
+`state`, which stays `verified`, as the [one trial for each email](#bots-and-abuse) rule reads it.
 
-The control plane provisions the tenant as one job, with the sign-up's id as the idempotency key.
-
-1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell).
-2. Call `POST /api/cell/tenants` on it with the tenant id, the built-in application, the person's
-   email as the administrator, and the trial's quotas, see
-   [creating a tenant](tenant-lifecycle.md#creating-a-tenant).
+1. Pick a cell, see [picking a cell](region-directory.md#picking-a-cell). A tenant that the directory
+   holds already goes to its own cell again, so a run after a crash never creates a second tenant.
+2. Call `POST /api/cell/tenants` on it with the subdomain as the tenant id, the built-in application,
+   the person's email as the administrator, and the trial's quotas, see
+   [creating a tenant](tenant-lifecycle.md#creating-a-tenant). The application is left out when the
+   sign-up chose a blank one. The quotas go in key order, and as `{}` when none are set, so every run
+   sends the same body.
 3. When the cell accepts, write the tenant and its host to the [directory](region-directory.md), and
    its `CNAME` record.
-4. Poll the cell job until it ends. A failed job is run again, up to 3 times. After that the operator
-   is alerted, and the person gets an email that the team is on it.
-5. On success, email the person that the trial is ready, with the tenant's address. The identity
+4. Poll the cell job until it ends.
+5. On success, email the person that the trial is ready, with the tenant's address. The email is queued
+   once, in the transaction that sets `provisioning` to `ready`, so a second run sends none. The identity
    provider sends its own invitation to set a password, as the `invite` step of the cell does.
 
-- **Progress.** After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
+- **No cell left.** The sign-up is `queued` and the job queues itself again, due 5 minutes later, and
+  ends as succeeded. The wait for an operator to open a cell does not use up the job's retries.
+- **A failed create job** _(planned for M33)_. The job is run again, up to 3 times. After that the
+  operator is alerted, and the person gets an email that the team is on it.
+- **Progress** _(planned for M33)_. After Confirm, the page `/sign-up/progress#<id>.<secret>` follows the trial being set
   up. It needs no account, only the id and the secret that the confirm answered, which travel after `#`
   as [the verify page](#the-verify-page) says. When the person closes the page, the email still tells
   them.

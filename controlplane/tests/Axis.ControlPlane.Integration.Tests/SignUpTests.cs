@@ -363,6 +363,39 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_first_confirm_answers_a_32_byte_secret_that_only_its_hash_is_stored_for_and_queues_provisioning_and_a_second_confirm_answers_no_secret()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (address, _, token) = await SignUpAsync(client);
+        var id = await Scalar<Guid>($"SELECT id FROM control_plane.sign_ups WHERE email = '{address}'");
+
+        var first = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var secret = (await first.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("secret").GetString()!;
+        Assert.Equal(43, secret.Length);
+        var bytes = Base64Url.DecodeFromChars(secret);
+        Assert.Equal(32, bytes.Length);
+        await using (var read = _controlPlane.CreateCommand($"SELECT secret_hash FROM control_plane.sign_ups WHERE id = '{id}'"))
+        {
+            Assert.Equal(SHA256.HashData(bytes), (byte[])(await read.ExecuteScalarAsync(cancellation))!);
+        }
+
+        Assert.DoesNotContain(secret, await Scalar<string>($"SELECT row_to_json(s)::text FROM control_plane.sign_ups s WHERE id = '{id}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+        Assert.True(await Scalar<bool>($"SELECT payload = jsonb_build_object('signUpId', '{id}') FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+        Assert.True(await Scalar<bool>($"SELECT provisioning IS NULL FROM control_plane.sign_ups WHERE id = '{id}'"));
+
+        var second = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation);
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.False((await second.Content.ReadFromJsonAsync<JsonElement>(cancellation)).TryGetProperty("secret", out _));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'provisionTenant'"));
+    }
+
+    [Fact]
     public async Task The_first_confirm_starts_one_trialing_subscription_of_30_days_with_one_audit_record_and_a_second_confirm_adds_none()
     {
         var cancellation = TestContext.Current.CancellationToken;

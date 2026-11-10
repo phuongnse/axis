@@ -177,6 +177,14 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("privacy_version");
 
+                    b.Property<string>("Provisioning")
+                        .HasColumnType("text")
+                        .HasColumnName("provisioning");
+
+                    b.Property<byte[]>("SecretHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("secret_hash");
+
                     b.Property<string>("State")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -219,6 +227,10 @@ namespace Axis.ControlPlane.Storage.Migrations
                     b.ToTable("sign_ups", "control_plane", t =>
                         {
                             t.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
+
+                            t.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready')");
+
+                            t.HasCheckConstraint("ck_sign_ups_secret_hash", "secret_hash IS NULL OR octet_length(secret_hash) = 32");
 
                             t.HasCheckConstraint("ck_sign_ups_state", "state IN ('pending', 'verified', 'expired')");
 
