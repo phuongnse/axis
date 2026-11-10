@@ -157,3 +157,21 @@ are `shell.users.usage.*`.
   use on a line of its own when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.
+
+### Model key
+
+Where `Ai:AllowTenantKeys` is on, the users page has a "Model key" section below Usage, where an administrator sets,
+changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
+The section is a component of its own. It loads `GET /api/tenant/model-key` and renders nothing unless the route answers
+`200`. That keeps it hidden from a user who is not an administrator, where `Ai:AllowTenantKeys` is off, and for a tenant
+with no directory row or a preview tenant. A `403` or `404` is not logged, and any other failure is logged. Its texts are
+`shell.users.modelKey.*`.
+
+- **State.** The section says "No key is set." or shows a set key as `••••` followed by its last four characters. A key
+  of four characters or fewer shows `••••` alone. The page never holds the whole key after it is saved.
+- **Set and change.** The "Set key…" button, which reads "Change key…" once a key is set, opens a dialog with a password
+  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and it stays disabled
+  while the field is blank. Closing the dialog clears the field. A failed save shows "The key was not saved."
+- **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
+  "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
+- **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.

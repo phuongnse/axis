@@ -25,8 +25,8 @@ like the author and the operator roles.
 The users page lists every user of the tenant and holds the commands an administrator runs on them: invite, resend an
 invitation, disable, enable, reset an account's authenticator, give a role and remove a role. Each command asks for
 confirmation first and writes an [audit record](#audit). What the page shows, and what it says for each answer, is in
-[users page](platform-pages.md#users-page). An administrator also sets the tenant's own model key through
-[its routes](#the-tenants-model-key).
+[users page](platform-pages.md#users-page). An administrator also sets the tenant's own model key from the page's
+[Model key section](platform-pages.md#model-key), which calls [these routes](#the-tenants-model-key).
 
 ### The list
 

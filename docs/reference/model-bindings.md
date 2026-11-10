@@ -68,8 +68,8 @@ Where `Ai:AllowTenantKeys` is on, a tenant may pay for its own model use.
   [model key routes](user-administration.md#the-tenants-model-key). It is kept as the tenant secret
   `model_key`, encrypted as other tenant secrets are, see
   [storage](storage.md#secrets-in-the-platform-database).
-- **The users page** _(planned for M35)_ holds the form where an administrator gives the key, for the
-  default binding's provider.
+- **The users page** holds [its Model key section](platform-pages.md#model-key), where an administrator sets,
+  changes and removes the key.
 - **Requests** _(planned for M35)_ use the tenant's key, and it replaces the installation's key for that
   tenant's requests.
 - **Usage** _(planned for M35)_. A tenant with its own key still counts toward `authoringRequests`, but
