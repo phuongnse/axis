@@ -1735,3 +1735,65 @@ export async function sendAuthoringRequest(
   }
   return (await response.json()) as StudioAuthoringRequest
 }
+
+/** One step of an authoring request, as the read route answers it, see docs/reference/authoring-requests.md#routes. */
+export interface StudioAuthoringRequestStep {
+  kind: string
+  summary: string
+  outcome: string | null
+  tokens: number
+  startedAt: string
+  finishedAt: string | null
+}
+
+/** One authoring request with its steps in order, as the read route answers it. */
+export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
+  steps: StudioAuthoringRequestStep[]
+}
+
+/** The address of an application's authoring requests. */
+function authoringRequestsPath(application: string, id?: string, action?: string): string {
+  return [`/api/studio/apps/${encodeURIComponent(application)}/authoring-requests`, id, action]
+    .filter((part) => part !== undefined)
+    .join('/')
+}
+
+/** Reads one request with its steps, or `null` when the application has no such request. */
+export async function fetchAuthoringRequest(
+  application: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioAuthoringRequestDetail | null> {
+  const path = authoringRequestsPath(application, id)
+  const response = await studioFetch(path, { signal })
+  if (response.status === 404) {
+    return null
+  }
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioAuthoringRequestDetail
+}
+
+/**
+ * Proposed: approves the plan, changes it with the author's comment, or drops the request, and answers the request as
+ * it now is.
+ */
+export async function actOnAuthoringRequest(
+  application: string,
+  id: string,
+  action: 'approve' | 'change-plan' | 'drop',
+  comment?: string,
+): Promise<StudioAuthoringRequest> {
+  const path = authoringRequestsPath(application, id, action)
+  const response = await studioFetch(path, {
+    method: 'POST',
+    ...(comment === undefined
+      ? {}
+      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }) }),
+  })
+  if (!response.ok) {
+    throw new Error(`'${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioAuthoringRequest
+}

@@ -5,6 +5,7 @@ import { SignInCard } from '../pages/HomePage'
 import { ChartWidget } from '../platform/ChartWidget'
 import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
+import type { FixtureRoute } from './fixtureFetch'
 import { NarrowWidthOverride } from '../platform/useNarrowWidth'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
@@ -85,7 +86,7 @@ export interface PreviewState {
   draw: () => ReactNode
   routes?: Record<string, () => unknown>
   /** Answers on paths the preview's other states answer too, so the state shows alone. */
-  fixtures?: Record<string, () => unknown>
+  fixtures?: Record<string, FixtureRoute>
   /** The address the state starts at. */
   entry?: InitialEntry
   /** The height of the frame the state draws in, with its menus and dialogs inside it. */
@@ -377,7 +378,7 @@ export function stateRoutes(all: Record<string, readonly PreviewState[]>): Recor
 }
 
 /** The answers of the state that the preview shows. */
-let chosen: Record<string, () => unknown> = {}
+let chosen: Record<string, FixtureRoute> = {}
 
 /** Makes `state` the one whose `fixtures` answer, before it is drawn. */
 export function chooseFixtures(state: PreviewState): void {
@@ -388,15 +389,15 @@ export function chooseFixtures(state: PreviewState): void {
  * The fixture paths that states answer for themselves, each answered by the chosen state. A path the chosen state lacks
  * is logged as a missing fixture and answered with a 404, as a path with no route is.
  */
-export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
+export function chosenRoutes(all: Record<string, readonly PreviewState[]>): Record<string, FixtureRoute> {
   const paths = Object.values(all).flatMap((states) => states.flatMap((state) => Object.keys(state.fixtures ?? {})))
   return Object.fromEntries(
     paths.map((path) => [
       path,
-      () => {
+      (init?: RequestInit) => {
         const answer = chosen[path]
         if (answer) {
-          return answer()
+          return answer(init)
         }
         console.error('No design-system fixture for', path)
         return new Response(null, { status: 404 })

@@ -11,6 +11,7 @@ import type {
   StudioResource,
   StudioResourceItem,
 } from '../platform/studio'
+import type { FixtureRoute } from './fixtureFetch'
 import { application, currentUser, locale } from './fixtures'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
@@ -333,13 +334,81 @@ const aiRequests: StudioAuthoringRequest[] = [
   authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
 ]
 
+// Proposed: the plan of a request that waits for its author, in plain words: what will change, the modules and layers
+// it uses, and the scenarios it adds, see docs/reference/ai-authoring-in-studio.md#the-plan.
+const supplierPlan = [
+  'Add a Supplier entity with a name, a tax code and an email address.',
+  'Add a required Supplier field to the purchase request, chosen from the active suppliers.',
+  'Show the supplier on the request form, on the request detail and as a column of the request list.',
+  'Use no module: nothing built in keeps suppliers.',
+  'Add two scenarios: a request saves with its supplier, and a request without one is refused.',
+].join('\n')
+
+const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan }
+
+// What the preview's own sends and actions changed, so the list and each request's page follow them.
+const sentRequests: { request: StudioAuthoringRequest; at: number }[] = []
+const actedOn = new Map<string, { state: StudioAuthoringRequest['state']; at: number }>()
+
+/**
+ * A sent request, or one whose plan was changed, writes its plan for four seconds, then waits for its author with a plan
+ * made of its words.
+ */
+function asNow(request: StudioAuthoringRequest): StudioAuthoringRequest {
+  const sent = sentRequests.find((item) => item.request.id === request.id)
+  const acted = actedOn.get(request.id)
+  const since = acted?.at ?? sent?.at
+  const writing = acted?.state ?? (sent !== undefined ? 'planning' : request.state)
+  const planned = writing === 'planning' && since !== undefined && Date.now() - since > 4000
+  const state = planned ? 'awaitingApproval' : writing
+  const plan =
+    plans[request.id] ??
+    (planned
+      ? [
+          `Change the application as asked: "${request.text}"`,
+          'Use no module: nothing built in does this.',
+          'Add one scenario that checks the change.',
+        ].join('\n')
+      : null)
+  return { ...request, state, plan: state === 'planning' ? null : plan }
+}
+
 /** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
-function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, () => unknown> {
-  return {
+function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, FixtureRoute> {
+  const all = () => [...sentRequests.map((item) => item.request), ...list.items]
+  const one = (id: string) => (): unknown => {
+    const request = all().find((item) => item.id === id)
+    return request === undefined ? new Response(null, { status: 404 }) : { ...asNow(request), steps: [] }
+  }
+  const act = (id: string, state: StudioAuthoringRequest['state']) => (): unknown => {
+    actedOn.set(id, { state, at: Date.now() })
+    return asNow(all().find((item) => item.id === id)!)
+  }
+  const routes: Record<string, FixtureRoute> = {
     ...workspaceRoutes(typicalFolder),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
-    [`${folderPath}/authoring-requests`]: () => list,
+    [`${folderPath}/authoring-requests`]: (init) => {
+      if (init?.method !== 'POST') {
+        return { items: all().map(asNow), left: list.left } satisfies StudioAuthoringRequestList
+      }
+      const body = JSON.parse(String(init.body)) as { text: string; autoAccept?: boolean }
+      const request = {
+        ...authoringRequest(100 + sentRequests.length, 'planning', body.text, new Date().toISOString(), true),
+        autoAccept: body.autoAccept === true,
+      }
+      sentRequests.unshift({ request, at: Date.now() })
+      return request
+    },
   }
+  // The preview's own sends take the ids of requests 100 to 103.
+  const sendable = [0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true).id)
+  const requestRoutes = [...list.items.map((item) => item.id), ...sendable].flatMap((id) => [
+    [`${folderPath}/authoring-requests/${id}`, one(id)],
+    [`${folderPath}/authoring-requests/${id}/approve`, act(id, 'working')],
+    [`${folderPath}/authoring-requests/${id}/change-plan`, act(id, 'planning')],
+    [`${folderPath}/authoring-requests/${id}/drop`, act(id, 'dropped')],
+  ])
+  return { ...routes, ...(Object.fromEntries(requestRoutes) as Record<string, FixtureRoute>) }
 }
 
 /** The applications Studio lists in each state, with the routes of the open application where the state opens one. */
@@ -354,4 +423,4 @@ export const studioFixtures = {
   askAi: askAiRoutes({ items: aiRequests, left: 12 }, true),
   askAiFirst: askAiRoutes({ items: [], left: null }, false),
   askAiNoneLeft: askAiRoutes({ items: aiRequests.slice(0, 3), left: 0 }, false),
-} satisfies Record<string, Record<string, () => unknown>>
+} satisfies Record<string, Record<string, FixtureRoute>>

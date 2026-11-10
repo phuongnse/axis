@@ -48,6 +48,7 @@ import { StudioPageHeading } from './StudioPageHeading'
 import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
+import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
 import { StudioProblems } from './StudioProblems'
 import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -265,6 +266,8 @@ function StudioWorkspace() {
   const [askAi, setAskAi] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [requestBusy, setRequestBusy] = useState(false)
+  // Proposed: counts the changes to the AI requests, so the request panel shows what waits now.
+  const [requestsRevision, setRequestsRevision] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -539,7 +542,7 @@ function StudioWorkspace() {
   }
 
   const overviewApp = apps.find((item) => item.name === application)
-  const entries = studioNavigation(application, resources, allModuleGroups, t)
+  const entries = studioNavigation(application, resources, allModuleGroups, t, askAi)
   const activeKey = studioActiveEntry(
     params,
     resources,
@@ -587,6 +590,7 @@ function StudioWorkspace() {
                   application={application!}
                   userId={userId}
                   openRequest={requestsView ? params.get('request') : null}
+                  revision={requestsRevision}
                   onClose={() => setSidePanel(null)}
                 />
               ) : (
@@ -624,6 +628,17 @@ function StudioWorkspace() {
                 />
               ) : releasesView ? (
                 <StudioPageHeading title={t('shell.studio.releases')} />
+              ) : requestsView && askAi ? (
+                params.get('request') !== null ? (
+                  <StudioAuthoringRequestPage
+                    application={application!}
+                    requestId={params.get('request')!}
+                    userId={userId}
+                    onChanged={() => setRequestsRevision((value) => value + 1)}
+                  />
+                ) : (
+                  <StudioAuthoringRequests application={application!} userId={userId} />
+                )
               ) : historyView ? (
                 revisionId !== null ? (
                   <StudioRevisionPage application={application!} revisionId={revisionId} resources={resources} />

@@ -11,6 +11,8 @@ export function studioNavigation(
   resources: readonly StudioResourceItem[],
   moduleGroups: readonly ModuleResourceGroup[],
   t: (key: string) => string,
+  /** Proposed: whether the person may ask AI, which adds AI requests after History. */
+  aiRequests = false,
 ): (ShellNavigationEntry | ShellNavigationGroup)[] {
   const path = (extra: Record<string, string> = {}) => `/studio?${new URLSearchParams({ app: application, ...extra })}`
   const manifest = resources.find((item) => item.kind === 'application')
@@ -35,6 +37,9 @@ export function studioNavigation(
     { key: 'overview', path: path(), icon: 'dashboard', label: t('shell.studio.nav.overview') },
     { key: 'releases', path: path({ view: 'releases' }), icon: 'tag', label: t('shell.studio.releases') },
     { key: 'history', path: path({ view: 'history' }), icon: 'clock', label: t('shell.studio.history') },
+    ...(aiRequests
+      ? [{ key: 'requests', path: path({ view: 'requests' }), icon: 'inbox', label: t('shell.studio.requests') }]
+      : []),
   ]
   if (manifest !== undefined) {
     entries.push({
@@ -89,7 +94,7 @@ export function studioActiveEntry(
   if (view === 'release') {
     return 'releases'
   }
-  if (view === 'releases' || view === 'history' || view === 'policies') {
+  if (view === 'releases' || view === 'history' || view === 'policies' || view === 'requests') {
     return view
   }
   return 'overview'

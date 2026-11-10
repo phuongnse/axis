@@ -1,10 +1,9 @@
 import { Flex, Form, Input, Typography } from 'antd'
 import { useContext, useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField, AxisField } from '../platform/AxisField'
-import { EmptyState } from '../platform/EmptyState'
 import { QuotaRefusedError } from '../platform/quota'
 import { requiredMark } from '../platform/requiredMark'
 import {
@@ -13,12 +12,12 @@ import {
   sendAuthoringRequest,
   type StudioAuthoringRequest,
   type StudioAuthoringRequestList,
-  type StudioAuthoringRequestState,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { selectedItemTint } from '../platform/antTheme'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { PlatformContext } from './context'
+import { authoringRequestAddress, useRequestStateWords, waitingForAuthor } from './authoringRequests'
 import { StudioSidePanel } from './StudioSidePanel'
 
 /** The id of the request panel, which the band's Ask AI button controls. */
@@ -27,36 +26,34 @@ export const askAiPanelId = 'studio-ask-ai-panel'
 /** The longest request text the send route takes, see docs/reference/authoring-requests.md#routes. */
 const maxText = 4000
 
-/** The states that wait for the author of the request. */
-const waitingForAuthor: StudioAuthoringRequestState[] = ['awaitingApproval', 'ready']
-
-/** The address of one request's page. */
-function authoringRequestAddress(application: string, id: string): string {
-  return `/studio?${new URLSearchParams({ app: application, view: 'requests', request: id })}`
-}
-
 /**
  * Proposed: the request panel of the open application, in the shared `StudioSidePanel`. On top an author writes a
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept,
- * and the requests left this month when the tenant has a quota. Under it the application's requests, newest first:
- * each one's text is a link to the request's page, and under it one sentence of its state and who sent it when. The
- * request whose page is open is on the selected tint. The panel goes with the page and never holds a request, see
+ * and the requests left this month when the tenant has a quota. A sent request opens its page, where its plan shows
+ * when AI has written it, and the panel stays open and empty for the next one. Under the form only the author's
+ * requests that wait for them show, under "Waiting for you": each one's text is a link to its page, and under it its
+ * state and when it was sent. The request whose page is open is on the selected tint. Last, "All AI requests" leads to
+ * the page that lists every request. The panel goes with the page and never holds a request, see
  * docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioAskAi({
   application,
   userId,
   openRequest,
+  revision,
   onClose,
 }: {
   application: string
-  /** The signed-in author, whose own requests the list words for them. */
+  /** The signed-in author, whose requests that wait for them the panel shows. */
   userId: string | null
-  /** The id of the request whose page is open, which the list marks. */
+  /** The id of the request whose page is open, which the panel marks. */
   openRequest: string | null
+  /** Counts the changes to the application's requests, each of which loads them again. */
+  revision: number
   onClose: () => void
 }) {
   const t = useText()
+  const navigate = useNavigate()
   const { colour, spacing } = useDesignTokens()
   const [form] = Form.useForm<{ text: string; autoAccept: boolean }>()
   const [list, setList] = useState<StudioAuthoringRequestList | 'failed'>()
@@ -64,6 +61,7 @@ export function StudioAskAi({
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
+  // The list loads again when another request's page opens or a request changes, as that changes what waits.
   useEffect(() => {
     const controller = new AbortController()
     fetchAuthoringRequests(application, controller.signal).then(setList, () => {
@@ -71,6 +69,11 @@ export function StudioAskAi({
         setList('failed')
       }
     })
+    return () => controller.abort()
+  }, [application, openRequest, revision])
+
+  useEffect(() => {
+    const controller = new AbortController()
     fetchStudioSettings(application, controller.signal).then(
       (settings) => setAllowsAutoAccept(settings.autoAccept),
       () => {},
@@ -79,17 +82,17 @@ export function StudioAskAi({
   }, [application])
 
   const left = list !== undefined && list !== 'failed' ? list.left : null
+  const waiting =
+    list !== undefined && list !== 'failed'
+      ? list.items.filter((request) => request.author === userId && waitingForAuthor.includes(request.state))
+      : []
   const send = async (values: { text: string; autoAccept: boolean }) => {
     setSending(true)
     setSendError(null)
     try {
       const sent = await sendAuthoringRequest(application, values.text.trim(), values.autoAccept === true)
-      setList((current) =>
-        current === undefined || current === 'failed'
-          ? current
-          : { items: [sent, ...current.items], left: current.left === null ? null : current.left - 1 },
-      )
       form.resetFields()
+      navigate(authoringRequestAddress(application, sent.id))
     } catch (error) {
       setSendError(error instanceof QuotaRefusedError ? error.message : t('shell.studio.ai.sendFailed'))
     } finally {
@@ -105,114 +108,99 @@ export function StudioAskAi({
       onClose={onClose}
       testId="studio-ask-ai"
       top={
-        <>
-          <Form
-            form={form}
-            layout="vertical"
-            requiredMark={requiredMark}
-            initialValues={{ text: '', autoAccept: false }}
-            onFinish={send}
+        <Form
+          form={form}
+          layout="vertical"
+          requiredMark={requiredMark}
+          initialValues={{ text: '', autoAccept: false }}
+          onFinish={send}
+        >
+          <AxisField
+            name="text"
+            label={t('shell.studio.ai.text')}
+            help={t('shell.studio.ai.text.help')}
+            requiredMessage={t('shell.studio.ai.textRequired')}
           >
-            <AxisField
-              name="text"
-              label={t('shell.studio.ai.text')}
-              help={t('shell.studio.ai.text.help')}
-              requiredMessage={t('shell.studio.ai.textRequired')}
-            >
-              <Input.TextArea
-                aria-label={t('shell.studio.ai.text')}
-                autoSize={{ minRows: 4, maxRows: 10 }}
-                maxLength={maxText}
-              />
-            </AxisField>
-            {allowsAutoAccept && (
-              <AxisCheckboxField
-                name="autoAccept"
-                label={t('shell.studio.ai.autoAccept')}
-                help={t('shell.studio.ai.autoAccept.help')}
-              />
+            <Input.TextArea
+              aria-label={t('shell.studio.ai.text')}
+              autoSize={{ minRows: 4, maxRows: 10 }}
+              maxLength={maxText}
+            />
+          </AxisField>
+          {allowsAutoAccept && (
+            <AxisCheckboxField
+              name="autoAccept"
+              label={t('shell.studio.ai.autoAccept')}
+              help={t('shell.studio.ai.autoAccept.help')}
+            />
+          )}
+          {sendError !== null && <AxisAlert kind="error" message={sendError} style={{ marginBottom: spacing.sm }} />}
+          <AxisActionRow align="center">
+            <AxisButton role="finish" htmlType="submit" disabled={sending || left === 0}>
+              {t('shell.studio.ai.send')}
+            </AxisButton>
+            {left !== null && (
+              <Typography.Text style={{ color: left === 0 ? colour.warningText : colour.textMuted }}>
+                {left === 0
+                  ? t('shell.studio.ai.noneLeft')
+                  : left === 1
+                    ? t('shell.studio.ai.oneLeft')
+                    : t('shell.studio.ai.left').replace('{count}', String(left))}
+              </Typography.Text>
             )}
-            {sendError !== null && <AxisAlert kind="error" message={sendError} style={{ marginBottom: spacing.sm }} />}
-            <AxisActionRow align="center">
-              <AxisButton role="finish" htmlType="submit" disabled={sending || left === 0}>
-                {t('shell.studio.ai.send')}
-              </AxisButton>
-              {left !== null && (
-                <Typography.Text style={{ color: left === 0 ? colour.warningText : colour.textMuted }}>
-                  {left === 0
-                    ? t('shell.studio.ai.noneLeft')
-                    : left === 1
-                      ? t('shell.studio.ai.oneLeft')
-                      : t('shell.studio.ai.left').replace('{count}', String(left))}
-                </Typography.Text>
-              )}
-            </AxisActionRow>
-          </Form>
-          <Typography.Text strong style={{ display: 'block', marginTop: spacing.md }}>
-            {t('shell.studio.ai.requests')}
-          </Typography.Text>
-        </>
+          </AxisActionRow>
+        </Form>
       }
     >
-      {list === 'failed' ? (
-        <AxisAlert kind="warning" message={t('shell.studio.ai.listFailed')} />
-      ) : list === undefined ? null : list.items.length === 0 ? (
-        <EmptyState text={t('shell.studio.ai.noRequests')} />
-      ) : (
-        <Flex
-          component="ul"
-          vertical
-          gap={4}
-          style={{ listStyle: 'none', margin: 0, padding: 0 }}
-          data-testid="studio-ai-requests"
-        >
-          {list.items.map((request) => (
-            <RequestRow
-              key={request.id}
-              application={application}
-              request={request}
-              mine={request.author === userId}
-              open={request.id === openRequest}
-            />
-          ))}
-        </Flex>
-      )}
+      <Flex vertical gap={spacing.sm} style={{ marginTop: spacing.sm }}>
+        {list === 'failed' && <AxisAlert kind="warning" message={t('shell.studio.ai.listFailed')} />}
+        {waiting.length > 0 && (
+          <Flex vertical gap={4}>
+            <Typography.Text strong>{t('shell.studio.ai.waiting')}</Typography.Text>
+            <Flex
+              component="ul"
+              vertical
+              gap={4}
+              style={{ listStyle: 'none', margin: 0, padding: 0 }}
+              data-testid="studio-ai-waiting"
+            >
+              {waiting.map((request) => (
+                <WaitingRow
+                  key={request.id}
+                  application={application}
+                  request={request}
+                  open={request.id === openRequest}
+                />
+              ))}
+            </Flex>
+          </Flex>
+        )}
+        <Link to={authoringRequestAddress(application)} data-testid="studio-ai-all-requests">
+          {t('shell.studio.ai.allRequests')}
+        </Link>
+      </Flex>
     </StudioSidePanel>
   )
 }
 
-/** One request of the list: its text as a link to its page, then one sentence of its state and who sent it when. */
-function RequestRow({
+/** One request that waits for its author: its text as a link to its page, then its state and when it was sent. */
+function WaitingRow({
   application,
   request,
-  mine,
   open,
 }: {
   application: string
   request: StudioAuthoringRequest
-  mine: boolean
   open: boolean
 }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
+  const stateWords = useRequestStateWords()
   const locale = useContext(PlatformContext)?.current.locale
   const sentAt = new Date(request.sentAt)
   const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(sentAt)
   const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(sentAt)
-  const waiting = waitingForAuthor.includes(request.state)
-  const stateColour =
-    request.state === 'failed'
-      ? colour.dangerText
-      : request.state === 'accepted' || request.state === 'dropped'
-        ? colour.textMuted
-        : colour.text
-  const stateKey =
-    waiting && !mine ? `shell.studio.ai.state.${request.state}.other` : `shell.studio.ai.state.${request.state}`
-  const sent = t(mine ? 'shell.studio.ai.sentByYou' : 'shell.studio.ai.sentBy')
-    .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
-    .replace('{date}', date)
-    .replace('{time}', time)
 
   return (
     <li
@@ -230,8 +218,8 @@ function RequestRow({
         {request.text}
       </Link>
       <Typography.Text style={{ color: colour.textMuted }}>
-        <span style={{ color: stateColour, fontWeight: waiting && mine ? 600 : undefined }}>{t(stateKey)}</span>
-        {sent}
+        <span style={{ color: colour.text, fontWeight: 600 }}>{stateWords(request, true)}</span>
+        {t('shell.studio.ai.sentByYou').replace('{date}', date).replace('{time}', time)}
       </Typography.Text>
     </li>
   )
