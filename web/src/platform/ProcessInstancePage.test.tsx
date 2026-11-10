@@ -167,6 +167,17 @@ function detailWith(commands: string[], failed?: 'package' | 'connector') {
 const parentId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e01'
 const childId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e02'
 
+const dueAt = '2026-10-11T02:05:00Z'
+
+// The page shows a date-time in the browser's time zone, in English, to the minute.
+function shownTime(iso: string): string {
+  const at = new Date(iso)
+  const two = (n: number) => String(n).padStart(2, '0')
+  const hours = at.getHours()
+  const period = hours < 12 ? 'AM' : 'PM'
+  return `${two(at.getMonth() + 1)}/${two(at.getDate())}/${at.getFullYear()} ${hours % 12 || 12}:${two(at.getMinutes())} ${period}`
+}
+
 /** A detail without a subject, waiting at the timer `wait`, with a parent and one child. */
 function detailWithRelatives() {
   const detail = JSON.parse(detailText) as Record<string, unknown>
@@ -187,7 +198,7 @@ function detailWithRelatives() {
         startedAt: '2026-10-10T02:05:00Z',
         finishedAt: '2026-10-10T02:05:00Z',
         decision: null,
-        output: { state: 'waiting', dueAt: '2026-10-11T02:05:00Z' },
+        output: { state: 'waiting', dueAt },
         error: null,
         traceId: null,
       },
@@ -295,8 +306,7 @@ describe('ProcessInstancePage', () => {
     const page = await screen.findByTestId('inspector-instance')
     expect(within(page).getByText('No subject')).toBeInTheDocument()
     const due = within(page).getByText('Due').closest('.ant-descriptions-item')
-    expect(due).toHaveTextContent(/2026/)
-    expect(due).toHaveTextContent(/0?2:05/)
+    expect(due).toHaveTextContent(shownTime(dueAt))
     const childLink = await screen.findByTestId(`inspector-subprocess-${childId}`)
     expect(childLink).toHaveAttribute('href', `/e2e/children/${childId}`)
     expect(within(childLink.closest('tr')!).getByText('ChildJob')).toBeInTheDocument()
