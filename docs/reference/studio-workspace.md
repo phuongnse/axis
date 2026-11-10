@@ -78,9 +78,9 @@ The actions are New resource…, Validate, Preview and Run tests as text buttons
 Publish… as the band's one solid button, see [buttons](actions-and-controls.md#buttons). New resource…
 comes first, so it is never next to Publish….
 
-- **One row for every author** _(planned for M31)_. The actions are one `AxisActionRow`, the same gap apart, and
+- **One row for every author.** The actions are one `AxisActionRow`, the same gap apart, and
   the row is the same with or without Publish…, for an author who may not publish.
-- **Too little room** _(planned for M31)_. The band's actions never push the page wider than the window. The row
+- **Too little room** _(planned for M33)_. The band's actions never push the page wider than the window. The row
   does not wrap, and the band measures whether it fits. When it does not, Validate, Preview and Run tests
   fold into one "…" icon menu, in that order, and New resource… and Publish… stay. They unfold when the
   room comes back.
@@ -115,7 +115,7 @@ Studio shows words, never an internal code, see [text](actions-and-controls.md#t
   provider by its `label`, a page or a site by its `title`. A text resource is named by its language.
   A resource that only authors see, and so has no label, is named by the name its author gave.
   `GET .../resources` gives each resource's `titles` by locale, and a text resource's `locale`.
-- **A label's language** _(planned for M31)_. A label shows in the author's language, else in `en`, see
+- **A label's language** _(planned for M33)_. A label shows in the author's language, else in `en`, see
   [label texts](studio.md#label-texts).
 - **A kind** has a name for its list, such as Entities, and one for a single resource, such as Entity,
   in the author's language.
@@ -174,7 +174,7 @@ The Overview's changes and a release's changes share one list.
   package that differs, after the files, modules first and each group by name. A row has its label, its
   type, Module or Package, and its change, such as "Upgraded from 1.1.0 to 1.2.0" or "Removed, was 1.0.0".
   With no difference, one line says so.
-- **Modules and packages on the Overview** _(planned for M31)_. The Overview's list shows them the same way.
+- **Modules and packages on the Overview** _(planned for M33)_. The Overview's list shows them the same way.
 - **Order:** by kind in the sidebar's order, then by name, see
   [list order](actions-and-controls.md#list-order).
 
