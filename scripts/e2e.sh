@@ -8,7 +8,9 @@
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The axis realm sends its emails, such as a password reset link, to Mailpit. This script starts Mailpit on a Docker
-# network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end.
+# network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end. Mailpit also
+# publishes its SMTP and API ports on 127.0.0.1: the control plane sends its emails to the SMTP port, and Playwright
+# reads them through the API at AXIS_E2E_MAILPIT_URL.
 # This script also starts MinIO, an S3-compatible store, with the bucket axis-exports and a KMS key, because the export
 # job stores its ZIP encrypted in a bucket that exists. It gives Playwright the five settings of Cell:ExportStorage as
 # AXIS_E2E_EXPORT_STORAGE_URL, _BUCKET, _REGION, _ACCESS_KEY and _SECRET_KEY, and removes the container at the end. Only
@@ -47,7 +49,8 @@
 # the stub, so an approved purchase request creates its purchase order there.
 # The control plane runs from the build output on $AXIS_E2E_CONTROL_PLANE_PORT (default 5290) in Testing, with its
 # own database axis_controlplane and the region directory's database axis_directory. Specs find it at
-# $AXIS_E2E_CONTROL_PLANE_URL. The run fails if it never answers.
+# $AXIS_E2E_CONTROL_PLANE_URL. It sends its emails to Mailpit, and the links in them start with that address. The run
+# fails if it never answers.
 # PostgreSQL loads samples/postgres/init-roles.sql on its first start, which creates the database
 # roles axis_schema and axis_runtime. The server runs startup activation as axis_schema and serves
 # requests as axis_runtime. The worker runs only as axis_runtime and gets no schema connection string.
@@ -203,7 +206,11 @@ if affected playwright; then
   keycloak_port="${AXIS_E2E_KEYCLOAK_PORT:-8180}"
   # The realm names Mailpit by its alias, so both containers join a network of their own.
   docker network create "$network" >/dev/null
-  docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit "$mailpit_image" >/dev/null
+  docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit \
+    -p 127.0.0.1::1025 -p 127.0.0.1::8025 "$mailpit_image" >/dev/null
+  mailpit_smtp_port="$(docker port "$mailpit_container" 1025/tcp | head -n1 | sed 's/.*://')"
+  mailpit_api_port="$(docker port "$mailpit_container" 8025/tcp | head -n1 | sed 's/.*://')"
+  export AXIS_E2E_MAILPIT_URL="http://127.0.0.1:$mailpit_api_port"
   # MinIO accepts the server-side encryption of the export upload only when it has a KMS key.
   minio_kms_key="$(openssl rand -base64 32)"
   docker run -d --name "$minio_container" -e MINIO_ROOT_USER="$minio_user" -e MINIO_ROOT_PASSWORD="$minio_password" \
@@ -304,13 +311,14 @@ if affected playwright; then
   control_plane_log="$root/artifacts/logs/e2e-controlplane.log"
   : >"$control_plane_log"
   export AXIS_E2E_CONTROL_PLANE_URL="http://127.0.0.1:${AXIS_E2E_CONTROL_PLANE_PORT:-5290}"
-  # /health/ready would also probe the mail relay, which has no host port in this run, so this waits for /health/live.
+  # The control plane is up when /health/live answers.
   ASPNETCORE_URLS="$AXIS_E2E_CONTROL_PLANE_URL" ASPNETCORE_ENVIRONMENT=Testing \
     ControlPlane__Region=vn ControlPlane__TenantDomain=vn.example.com \
     ControlPlane__ConnectionString="Host=127.0.0.1;Port=$port;Database=axis_controlplane;Username=axis_controlplane;Password=axis" \
     ControlPlane__DirectoryConnectionString="Host=127.0.0.1;Port=$port;Database=axis_directory;Username=axis_directory;Password=axis" \
     ControlPlane__Dns__Provider=InMemory ControlPlane__MailFrom=no-reply@vn.example.com \
-    ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port=1025 ControlPlane__Mail__UseTls=false \
+    ControlPlane__Mail__Host=127.0.0.1 ControlPlane__Mail__Port="$mailpit_smtp_port" ControlPlane__Mail__UseTls=false \
+    ControlPlane__PublicUrl="$AXIS_E2E_CONTROL_PLANE_URL" \
     dotnet controlplane/src/Axis.ControlPlane/bin/Release/net10.0/Axis.ControlPlane.dll \
     --contentRoot "$root/controlplane/src/Axis.ControlPlane" >>"$control_plane_log" 2>&1 &
   control_plane_pid=$!

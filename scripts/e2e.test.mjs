@@ -17,7 +17,7 @@ const stubs = {
   docker: `#!/usr/bin/env bash
 ${log('docker')}case "$1" in
   run) echo stub-container ;;
-  port) echo 127.0.0.1:5432 ;;
+  port) case "$3" in 1025/tcp) echo 127.0.0.1:41025 ;; 8025/tcp) echo 127.0.0.1:48025 ;; *) echo 127.0.0.1:5432 ;; esac ;;
   inspect) echo true ;;
 esac
 exit 0
@@ -28,6 +28,7 @@ ${log('curl')}exit 0
   // The worker and the publisher report every tenant ready, then run until the script stops them.
   dotnet: `#!/usr/bin/env bash
 ${log('dotnet')}case "$*" in
+  *Axis.ControlPlane.dll*) echo "control-plane-env ControlPlane__Mail__Port=$ControlPlane__Mail__Port ControlPlane__PublicUrl=$ControlPlane__PublicUrl" >> "$STUB_LOG" ;;
   *Axis.Worker.dll*) echo 'Tenant default is ready for work'; echo 'Tenant journey is ready for work' ;;
   *Axis.Admin.dll*) echo 'default ready'; echo 'journey ready' ;;
 esac
@@ -37,6 +38,7 @@ exec sleep 60
   // ready, as the real run does, then writes one passing test to its JUnit file.
   npm: `#!/usr/bin/env bash
 ${log('npm')}if [ "$1 $2" = "run build:keycloak-theme" ]; then exit 0; fi
+if [ "$1" = "test" ]; then echo "playwright-env AXIS_E2E_MAILPIT_URL=$AXIS_E2E_MAILPIT_URL" >> "$STUB_LOG"; fi
 for _ in $(seq 1 100); do
   if grep -q 'journey is ready' "$AXIS_E2E_WORKER_LOG" 2>/dev/null &&
     grep -q 'journey ready' "$PWD/artifacts/logs/e2e-publisher.log" 2>/dev/null; then break; fi
@@ -209,6 +211,21 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     const mailpitName = /--name (\S+)/.exec(run.calls[mailpit])?.[1]
     assert.ok(run.calls.includes(`docker rm -f ${mailpitName}`), run.calls.join('\n'))
     assert.ok(run.calls.includes(`docker network rm ${network}`), run.calls.join('\n'))
+  })
+
+  test('Mailpit publishes its SMTP and API ports on 127.0.0.1, the control plane sends its mail there, and Playwright gets the API address', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const mailpit = run.calls.find((call) => call.startsWith('docker run ') && call.includes('axllent/mailpit'))
+    assert.ok(mailpit, run.calls.join('\n'))
+    assert.match(mailpit, / -p 127\.0\.0\.1::1025 /)
+    assert.match(mailpit, / -p 127\.0\.0\.1::8025 /)
+    assert.ok(
+      run.calls.includes('control-plane-env ControlPlane__Mail__Port=41025 ControlPlane__PublicUrl=http://127.0.0.1:5290'),
+      run.calls.join('\n'),
+    )
+    assert.ok(run.calls.includes('playwright-env AXIS_E2E_MAILPIT_URL=http://127.0.0.1:48025'), run.calls.join('\n'))
   })
 
   test('MinIO starts with a default bucket and a KMS key before the build and Playwright, and is removed at the end', () => {
