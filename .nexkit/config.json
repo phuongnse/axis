@@ -205,6 +205,15 @@
       "key_files": [
         "tests/e2e/package-lock.json"
       ]
+    },
+    {
+      "name": "docker",
+      "paths": [
+        "~/.cache/axis-docker"
+      ],
+      "key_files": [
+        "Dockerfile"
+      ]
     }
   ],
   "stages": {
