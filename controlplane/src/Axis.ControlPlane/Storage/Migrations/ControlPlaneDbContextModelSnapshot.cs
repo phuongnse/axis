@@ -99,6 +99,27 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpChallengeRow", b =>
+                {
+                    b.Property<byte[]>("Challenge")
+                        .HasColumnType("bytea")
+                        .HasColumnName("challenge");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.HasKey("Challenge")
+                        .HasName("pk_sign_up_challenges");
+
+                    b.HasIndex(new[] { "ExpiresAt" }, "ix_sign_up_challenges_expires_at");
+
+                    b.ToTable("sign_up_challenges", "control_plane", t =>
+                        {
+                            t.HasCheckConstraint("ck_sign_up_challenges_challenge", "octet_length(challenge) = 32");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.SignUp.SignUpRow", b =>
                 {
                     b.Property<Guid>("Id")

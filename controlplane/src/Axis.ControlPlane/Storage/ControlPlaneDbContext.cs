@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -28,6 +28,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SignUpRow> SignUps => Set<SignUpRow>();
 
     public DbSet<DisposableDomainRow> DisposableDomains => Set<DisposableDomainRow>();
+
+    public DbSet<SignUpChallengeRow> SignUpChallenges => Set<SignUpChallengeRow>();
 
     public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
 
@@ -100,6 +102,15 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             domain.ToTable("disposable_domains", table => table.HasCheckConstraint("ck_disposable_domains_domain", "domain = lower(domain)"));
             domain.HasKey(d => d.Domain).HasName("pk_disposable_domains");
             domain.Property(d => d.Domain).HasColumnName("domain").ValueGeneratedNever();
+        });
+
+        modelBuilder.Entity<SignUpChallengeRow>(challenge =>
+        {
+            challenge.ToTable("sign_up_challenges", table => table.HasCheckConstraint("ck_sign_up_challenges_challenge", "octet_length(challenge) = 32"));
+            challenge.HasKey(c => c.Challenge).HasName("pk_sign_up_challenges");
+            challenge.Property(c => c.Challenge).HasColumnName("challenge").HasColumnType("bytea").ValueGeneratedNever();
+            challenge.Property(c => c.ExpiresAt).HasColumnName("expires_at");
+            challenge.HasIndex(c => c.ExpiresAt, "ix_sign_up_challenges_expires_at");
         });
 
         modelBuilder.Entity<SubscriptionRow>(subscription =>

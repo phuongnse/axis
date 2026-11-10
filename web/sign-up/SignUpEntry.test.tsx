@@ -501,6 +501,31 @@ describe('SignUpEntry', () => {
     expect(altchaOf(signUpCalls(fetchMock)[1])).toMatchObject({ challenge: 'challenge-2', signature: 'signature-2' })
   })
 
+  it('shows a refused solution in the error alert and solves a new challenge for the next click', async () => {
+    vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+    let refusals = 1
+    const fetchMock = stubServer(undefined, () =>
+      refusals-- > 0
+        ? answer({ errors: { '/altcha': ['signUp.altcha.refused'] } }, 400)
+        : new Response(null, { status: 202 }),
+    )
+    const user = userEvent.setup()
+    render(<SignUpEntry />)
+    await fillForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('The sign-up could not be checked. Try again.')
+    expect(alert.parentElement).toHaveFocus()
+    await waitFor(() => expect(challengeFetches(fetchMock)).toHaveLength(2))
+
+    await user.click(screen.getByRole('button', { name: 'Sign up' }))
+
+    await screen.findByRole('heading', { name: 'Check your inbox' })
+    expect(altchaOf(signUpCalls(fetchMock)[1])).toMatchObject({ challenge: 'challenge-2', signature: 'signature-2' })
+  })
+
   it('sends the form without altcha when the control plane has no challenge', async () => {
     vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
     const fetchMock = stubServer()
