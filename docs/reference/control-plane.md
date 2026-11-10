@@ -208,8 +208,9 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
   `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
-- **Plans and providers** _(planned for M34)_. `ControlPlane:` settings also hold the
-  [plans](plans.md) and the payment and e-invoice providers' non-secret values.
+- **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
+- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the payment and e-invoice
+  providers' non-secret values.
 
 | Setting | Meaning | Start check |
 | --- | --- | --- |
@@ -256,6 +257,19 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:SignUp:Privacy:Urls:vi` | The Vietnamese address of the privacy policy | An absolute `https` URL, when a document is set |
 | `ControlPlane:SignUp:ChallengeKey` | The HMAC-SHA256 key, as base64, that signs the [sign-up page's proof-of-work challenges](sign-up.md#bots-and-abuse). Optional. Without it `GET /api/sign-up/challenge` and `POST /api/sign-up` answer `503`, so nobody can sign up. Comes from the secret `ControlPlane__SignUp__ChallengeKey`, never from a setting file | Base64 of at least 32 bytes, when set. The message never holds the value |
 | `ControlPlane:SignUp:LicencesUrl` | The address of the licences page that the legal line links. Optional | An absolute `https` URL, when a document is set |
+| `ControlPlane:Plans:<n>:Code` | The plan code, such as `team`. The whole `ControlPlane:Plans` list is optional | Lowercase letters and digits, joined by single hyphens |
+| `ControlPlane:Plans:<n>:Version` | The version of the plan. The code and version are unique, and a subscription's pinned version must stay | Plain digits, at least 1, and the code and version not repeated |
+| `ControlPlane:Plans:<n>:Name:en` | The English name of the plan | Not empty |
+| `ControlPlane:Plans:<n>:Name:vi` | The Vietnamese name of the plan | Not empty |
+| `ControlPlane:Plans:<n>:IncludedUsers` | The users that the plan's price includes | Plain digits, at least 1 |
+| `ControlPlane:Plans:<n>:Trial` | Whether the plan sets a trial's quotas. Default off | A trial plan has no price and no add-on |
+| `ControlPlane:Plans:<n>:Quotas:<quota>` | A quota of the plan, by the key of [tenant quotas](tenant-quotas.md#quotas), such as `storage` | Every quota key except `users` is set, no other key, and each is plain digits from 0 |
+| `ControlPlane:Plans:<n>:Prices:<n>:Currency` | The currency of a monthly price | `VND` or `USD`, each once, and both set unless the plan is a trial plan |
+| `ControlPlane:Plans:<n>:Prices:<n>:Month` | The monthly price in the currency's smallest unit. A year costs 10 times it, computed | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Code` | The code of a user pack, such as `users-10` | Lowercase letters and digits, joined by single hyphens, and unique in the plan version |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Users` | The users that the pack adds | Plain digits, at least 1 |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Currency` | The currency of a monthly price of the pack | `VND` or `USD`, each once, and both set |
+| `ControlPlane:Plans:<n>:AddOns:<n>:Prices:<n>:Month` | The monthly price of the pack in the currency's smallest unit | Plain digits, at least 1 and at most a tenth of the largest 64-bit integer |
 | `ControlPlane:CellCertificateAuthorityPath` | The PEM file of the region's internal certificate authority. Without it the system trust store decides | The file exists, when set |
 
 At start the service applies its migrations to the `control_plane` and `billing` schemas, with the
@@ -265,7 +279,10 @@ database role runs the migrations and the queries, and the migrations leave it o
 `control_plane.terms_acceptances`, see [terms acceptance](sign-up.md#terms-acceptance). When
 `ControlPlane:DirectoryConnectionString` is set, the start then applies the region directory's
 migrations to the `directory` schema of that database, with the history table
-`directory.__directory_migrations`, and a failure there also stops the start.
+`directory.__directory_migrations`, and a failure there also stops the start. Right after the
+`control_plane` migrations the start checks that `ControlPlane:Plans` still lists every plan version
+that a subscription pins, see [the catalogue](plans.md#the-catalogue), and a missing version stops
+the start.
 
 ## Image and chart
 

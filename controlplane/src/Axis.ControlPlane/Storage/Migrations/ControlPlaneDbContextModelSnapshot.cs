@@ -424,9 +424,25 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnName("created_at")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<string>("Currency")
+                        .HasColumnType("text")
+                        .HasColumnName("currency");
+
                     b.Property<DateTimeOffset?>("NextAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("next_at");
+
+                    b.Property<string>("Period")
+                        .HasColumnType("text")
+                        .HasColumnName("period");
+
+                    b.Property<string>("PlanCode")
+                        .HasColumnType("text")
+                        .HasColumnName("plan_code");
+
+                    b.Property<int?>("PlanVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("plan_version");
 
                     b.Property<Guid>("SignUpId")
                         .HasColumnType("uuid")
@@ -464,6 +480,14 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                     b.ToTable("subscriptions", "control_plane", t =>
                         {
+                            t.HasCheckConstraint("ck_subscriptions_currency", "currency IN ('VND', 'USD')");
+
+                            t.HasCheckConstraint("ck_subscriptions_period", "period IN ('month', 'year')");
+
+                            t.HasCheckConstraint("ck_subscriptions_plan", "(plan_code IS NULL) = (plan_version IS NULL)");
+
+                            t.HasCheckConstraint("ck_subscriptions_purchase", "(currency IS NULL) = (period IS NULL) AND (currency IS NULL OR plan_code IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
                         });
                 });
