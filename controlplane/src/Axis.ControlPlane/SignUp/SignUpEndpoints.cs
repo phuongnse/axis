@@ -46,8 +46,9 @@ internal static class SignUpEndpoints
         // equal the region's current one, see docs/reference/sign-up.md#the-documents, and the route stores them on the pending sign-up.
         // A missing, malformed, wrong, expired or used solution is refused
         // under /altcha, and an accepted one is stored so it works once. The route stores a pending sign-up that holds its subdomain for
-        // 24 hours and queues the confirm email in the same transaction. The answer has no body yet. Without the key, the documents or the
-        // directory the route answers 503.
+        // 24 hours and queues the confirm email in the same transaction. An address that already verified a sign-up gets the trial-used
+        // email instead: nothing is stored and no subdomain is held, and the answer is the same. The answer has no body yet. Without the
+        // key, the documents or the directory the route answers 503.
         endpoints.MapPost("/api/sign-up", SignUpAsync);
 
         // See docs/reference/sign-up.md#the-verify-page. It reports the state of a link and changes nothing. An unknown, malformed or
@@ -56,7 +57,8 @@ internal static class SignUpEndpoints
 
         // See docs/reference/sign-up.md#the-verify-page. One conditional update marks a pending, unexpired sign-up verified, so a link
         // works once and two parallel confirms cannot both succeed. The same transaction starts the tenant's trialing subscription,
-        // see docs/reference/subscriptions.md#one-clock. A used or expired link answers 409 with its state.
+        // see docs/reference/subscriptions.md#one-clock. A used or expired link answers 409 with its state. So does a link whose address
+        // another sign-up verified first: the unique index of the verified email refuses it, nothing changes and it answers confirmed.
         endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
 
         // The region's built-in applications from the settings, each with its id, its title and its description in both languages.
@@ -101,6 +103,7 @@ internal static class SignUpEndpoints
         HttpContext context,
         IServiceProvider services,
         ControlPlaneOptions options,
+        EmailTemplates templates,
         SignUpLimits limits,
         NpgsqlDataSource controlPlane,
         TimeProvider clock,
@@ -203,9 +206,18 @@ internal static class SignUpEndpoints
         }
 
         var id = Guid.CreateVersion7();
+        var normalisedEmail = SignUpEmail.Normalise(email!);
         try
         {
             await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
+
+            // An address that already verified a sign-up gets the trial-used email, as the answer is alike for every address.
+            if (await VerifiedSubdomainAsync(connection, normalisedEmail, cancellationToken) is { } tenantId)
+            {
+                await QueueTrialUsedAsync(services, connection, options, templates, tenantId, fullName!, email!, language!, cancellationToken);
+                return Results.StatusCode(StatusCodes.Status202Accepted);
+            }
+
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
             // The hold check ignores an expired sign-up, so one that the expiry job has not reached yet must not block a free name.
@@ -220,8 +232,8 @@ internal static class SignUpEndpoints
 
             await using (var insert = new NpgsqlCommand(
                 """
-                INSERT INTO control_plane.sign_ups (id, full_name, email, business_name, subdomain, language, application, terms_version, dpa_version, privacy_version, expires_at)
-                VALUES (@id, @fullName, @email, @businessName, @subdomain, @language, @application, @termsVersion, @dpaVersion, @privacyVersion, now() + interval '24 hours')
+                INSERT INTO control_plane.sign_ups (id, full_name, email, normalised_email, business_name, subdomain, language, application, terms_version, dpa_version, privacy_version, expires_at)
+                VALUES (@id, @fullName, @email, @normalisedEmail, @businessName, @subdomain, @language, @application, @termsVersion, @dpaVersion, @privacyVersion, now() + interval '24 hours')
                 """,
                 connection,
                 transaction))
@@ -229,6 +241,7 @@ internal static class SignUpEndpoints
                 insert.Parameters.AddWithValue("id", id);
                 insert.Parameters.AddWithValue("fullName", fullName!);
                 insert.Parameters.AddWithValue("email", email!);
+                insert.Parameters.AddWithValue("normalisedEmail", normalisedEmail);
                 insert.Parameters.AddWithValue("businessName", businessName!);
                 insert.Parameters.AddWithValue("subdomain", subdomain!);
                 insert.Parameters.AddWithValue("language", language!);
@@ -250,6 +263,38 @@ internal static class SignUpEndpoints
         }
 
         return Results.StatusCode(StatusCodes.Status202Accepted);
+    }
+
+    // The subdomain of the verified sign-up of a normalised email, or null when the address has none.
+    private static async Task<string?> VerifiedSubdomainAsync(NpgsqlConnection connection, string normalisedEmail, CancellationToken cancellationToken)
+    {
+        await using var read = new NpgsqlCommand("SELECT subdomain FROM control_plane.sign_ups WHERE normalised_email = @email AND state = 'verified'", connection);
+        read.Parameters.AddWithValue("email", normalisedEmail);
+        return await read.ExecuteScalarAsync(cancellationToken) as string;
+    }
+
+    // Queues the trial-used email to the address of the form: the sign-in address while the region directory holds the tenant of the
+    // earlier sign-up, else the billing portal link. See docs/reference/sign-up.md#the-emails.
+    private static async Task QueueTrialUsedAsync(
+        IServiceProvider services,
+        NpgsqlConnection connection,
+        ControlPlaneOptions options,
+        EmailTemplates templates,
+        string tenantId,
+        string fullName,
+        string email,
+        string language,
+        CancellationToken cancellationToken)
+    {
+        var directory = services.GetRequiredKeyedService<NpgsqlDataSource>("directory");
+        await using var exists = directory.CreateCommand("SELECT EXISTS (SELECT 1 FROM directory.tenants WHERE id = @id)");
+        exists.Parameters.AddWithValue("id", tenantId);
+        var running = (bool)(await exists.ExecuteScalarAsync(cancellationToken))!;
+
+        var (template, values) = running
+            ? ("signUpTrialUsedSignIn", new Dictionary<string, string> { ["name"] = fullName, ["tenantAddress"] = SignUpAddress.Of(options, tenantId) })
+            : ("signUpTrialUsedBillingPortal", new Dictionary<string, string> { ["name"] = fullName, ["billingPortalUrl"] = SignUpAddress.BillingPortalOf(options, tenantId) });
+        await EmailJobs.EnqueueAsync(connection, null, templates, template, language, email, values, cancellationToken);
     }
 
     // Stores a solution as used. The conditional insert is atomic, so of two parallel sign-ups with one solution, on any replica, only one inserts.
@@ -293,23 +338,32 @@ internal static class SignUpEndpoints
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
             Guid id;
             string subdomain;
-            await using (var confirm = new NpgsqlCommand(
-                "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain",
-                connection,
-                transaction))
+            try
             {
-                confirm.Parameters.AddWithValue("hash", hash);
-                await using var reader = await confirm.ExecuteReaderAsync(cancellationToken);
-                if (await reader.ReadAsync(cancellationToken))
+                await using (var confirm = new NpgsqlCommand(
+                    "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain",
+                    connection,
+                    transaction))
                 {
-                    id = reader.GetGuid(0);
-                    subdomain = reader.GetString(1);
+                    confirm.Parameters.AddWithValue("hash", hash);
+                    await using var reader = await confirm.ExecuteReaderAsync(cancellationToken);
+                    if (await reader.ReadAsync(cancellationToken))
+                    {
+                        id = reader.GetGuid(0);
+                        subdomain = reader.GetString(1);
+                    }
+                    else
+                    {
+                        id = Guid.Empty;
+                        subdomain = "";
+                    }
                 }
-                else
-                {
-                    id = Guid.Empty;
-                    subdomain = "";
-                }
+            }
+            catch (PostgresException exception) when (exception is { SqlState: PostgresErrorCodes.UniqueViolation, ConstraintName: "ux_sign_ups_verified_email" })
+            {
+                // Another sign-up of the address was verified first, so there is no second trial. The transaction rolls back when it is
+                // disposed and this sign-up stays pending until it expires.
+                return Results.Json(new { state = "confirmed" }, statusCode: StatusCodes.Status409Conflict);
             }
 
             if (id != Guid.Empty)

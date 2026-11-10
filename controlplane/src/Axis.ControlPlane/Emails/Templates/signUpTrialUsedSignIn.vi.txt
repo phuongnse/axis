@@ -1,0 +1,12 @@
+Subject: Email này đã dùng thử Axis
+
+Chào {{name}},
+
+Có người, có thể là bạn, vừa đăng ký Axis bằng email này. Email này đã dùng thử, nên không có thêm lượt dùng thử nào.
+
+Đăng nhập tại:
+{{tenantAddress}}
+
+Nếu không phải bạn, hãy bỏ qua email này.
+
+Đội ngũ Axis

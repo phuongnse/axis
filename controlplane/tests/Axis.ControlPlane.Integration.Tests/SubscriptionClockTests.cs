@@ -438,9 +438,10 @@ public sealed class SubscriptionClockTests(MailpitFixture mailpit) : IAsyncLifet
     {
         var signUp = Guid.CreateVersion7();
         var id = Guid.CreateVersion7();
+        var email = owner ?? $"{tenant}@example.com";
         await Execute($"""
-            INSERT INTO control_plane.sign_ups (id, full_name, email, business_name, subdomain, language, application, state, expires_at)
-            VALUES ('{signUp}', 'An', '{owner ?? $"{tenant}@example.com"}', 'Acme', '{tenant}', 'en', '', 'verified', now())
+            INSERT INTO control_plane.sign_ups (id, full_name, email, normalised_email, business_name, subdomain, language, application, state, expires_at)
+            VALUES ('{signUp}', 'An', '{email}', '{email.ToLowerInvariant()}', 'Acme', '{tenant}', 'en', '', 'verified', now())
             """);
         await using var insert = _dataSource.CreateCommand(
             """

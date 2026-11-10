@@ -462,6 +462,147 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_repeat_sign_up_of_a_verified_address_answers_202_stores_nothing_and_gets_the_trial_used_email_instead_of_the_confirm_email()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, repeat) = NewOwnerAddresses();
+        var subdomain = NewSubdomain();
+        await VerifyAsync(client, owner, subdomain);
+        var held = NewSubdomain();
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, held, language: "vi"), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal(string.Empty, await response.Content.ReadAsStringAsync(cancellation));
+        var message = await WaitForMessageAsync(repeat);
+        Assert.Equal("Email này đã dùng thử Axis", message.Subject);
+        Assert.Contains("Chào An Nguyen,", message.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("/sign-up/verify", message.Text, StringComparison.Ordinal);
+        Assert.Single(await mailpit.MessagesToAsync(repeat, cancellation));
+        Assert.Equal(1, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE normalised_email = '{owner}'"));
+        Assert.Equal(0, await Scalar<long>($"SELECT count(*) FROM control_plane.sign_ups WHERE subdomain = '{held}'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendSignUpConfirm'"));
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
+
+        // The subdomain of the repeat is not held, so another sign-up can take it.
+        Assert.True((await CheckAsync(client, held)).GetProperty("free").GetBoolean());
+    }
+
+    [Fact]
+    public async Task The_trial_used_email_is_sent_in_english_when_the_form_chose_english()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, repeat) = NewOwnerAddresses();
+        await VerifyAsync(client, owner, NewSubdomain());
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        Assert.Equal("This email already had an Axis trial", (await WaitForMessageAsync(repeat)).Subject);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task An_earlier_sign_up_of_the_address_that_was_never_verified_does_not_count_and_the_new_one_gets_the_confirm_email(bool expired)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, repeat) = NewOwnerAddresses();
+        var first = NewSubdomain();
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, owner, first), cancellation)).StatusCode);
+        if (expired)
+        {
+            await ControlPlaneDatabase.ExecuteAsync(
+                _controlPlane,
+                $"UPDATE control_plane.sign_ups SET state = 'expired', expires_at = now() - interval '1 minute' WHERE email = '{owner}'",
+                cancellation);
+        }
+
+        var second = NewSubdomain();
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, second), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var message = await WaitForMessageAsync(repeat);
+        Assert.Equal("Confirm your Axis sign-up", message.Subject);
+        Assert.Contains($"https://{second}.vn.example.com", message.Text, StringComparison.Ordinal);
+        Assert.Matches("/sign-up/verify#[A-Za-z0-9_-]{43}", message.Text);
+        Assert.Equal("pending", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE subdomain = '{second}'"));
+        Assert.Equal(owner, await Scalar<string>($"SELECT normalised_email FROM control_plane.sign_ups WHERE subdomain = '{second}'"));
+        Assert.Equal(0, await Scalar<long>("SELECT count(*) FROM control_plane.jobs WHERE kind = 'sendEmail'"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task The_trial_used_email_holds_the_sign_in_address_while_the_directory_holds_the_tenant_and_the_billing_portal_link_otherwise(bool inDirectory)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, repeat) = NewOwnerAddresses();
+        var subdomain = NewSubdomain();
+        await VerifyAsync(client, owner, subdomain);
+        if (inDirectory)
+        {
+            await using var directory = NpgsqlDataSource.Create(DirectoryConnectionString);
+            await ControlPlaneDatabase.ExecuteAsync(
+                directory,
+                $"""
+                INSERT INTO directory.regions (code, tenant_domain, api_url) VALUES ('vn', 'vn.example.com', 'https://api.vn.example.com') ON CONFLICT DO NOTHING;
+                INSERT INTO directory.cells (id, region_code, internal_url, cap, tenant_count) VALUES ('vn-1', 'vn', 'https://vn-1.test', 100, 1) ON CONFLICT DO NOTHING;
+                INSERT INTO directory.tenants (id, region_code, cell_id) VALUES ('{subdomain}', 'vn', 'vn-1');
+                """,
+                cancellation);
+        }
+
+        var response = await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, repeat, NewSubdomain()), cancellation);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var text = (await WaitForMessageAsync(repeat)).Text;
+        if (inDirectory)
+        {
+            Assert.Contains("Sign in at", text, StringComparison.Ordinal);
+            Assert.Contains($"https://{subdomain}.vn.example.com", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("/tenants/", text, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains($"https://account.vn.example.com/tenants/{subdomain}", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("Sign in at", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task With_two_pending_sign_ups_of_one_address_the_first_confirm_succeeds_and_the_second_answers_409_confirmed_without_a_second_trial()
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        using var factory = await FactoryAsync();
+        using var client = factory.CreateClient();
+        var (owner, _) = NewOwnerAddresses();
+        var (first, second) = (NewSubdomain(), NewSubdomain());
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, owner, first), cancellation)).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, owner, second), cancellation)).StatusCode);
+        var messages = await WaitForMessagesAsync(owner, 2);
+        string TokenOf(string subdomain) => TokenPattern().Match(messages.Single(message => message.Text.Contains($"https://{subdomain}.", StringComparison.Ordinal)).Text).Groups[1].Value;
+
+        var accepted = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token = TokenOf(first) }, cancellation);
+        var refused = await client.PostAsJsonAsync("/api/sign-up/confirm", new { token = TokenOf(second) }, cancellation);
+
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal("confirmed", (await refused.Content.ReadFromJsonAsync<JsonElement>(cancellation)).GetProperty("state").GetString());
+        Assert.Equal(1, await Scalar<long>("SELECT count(*) FROM control_plane.subscriptions"));
+        Assert.Equal("verified", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE subdomain = '{first}'"));
+        Assert.Equal("pending", await Scalar<string>($"SELECT state FROM control_plane.sign_ups WHERE subdomain = '{second}'"));
+    }
+
+    [Fact]
     public async Task A_sign_up_with_a_freshly_solved_challenge_answers_202_and_stores_the_solution_as_used_until_it_expires()
     {
         var cancellation = TestContext.Current.CancellationToken;
@@ -873,6 +1014,13 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
 
     private static string NewAddress() => $"{Guid.NewGuid():N}@example.org";
 
+    // A new address in lower case and the same address written with capitals and a +tag.
+    private static (string Owner, string Repeat) NewOwnerAddresses()
+    {
+        var part = Guid.NewGuid().ToString("N");
+        return ($"owner-{part}@example.org", $"Owner-{part}+Test@Example.org");
+    }
+
     private static string NewSubdomain() => $"s{Guid.NewGuid():N}"[..20];
 
     private static Dictionary<string, object?> Form(string email, string subdomain, string language = "en", string application = "") => new()
@@ -920,22 +1068,33 @@ public sealed partial class SignUpTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     // The hosted job runner sends the email, so the test waits up to a deadline.
-    private async Task<MailpitMessage> WaitForMessageAsync(string address)
+    private async Task<MailpitMessage> WaitForMessageAsync(string address) => (await WaitForMessagesAsync(address, 1))[0];
+
+    private async Task<IReadOnlyList<MailpitMessage>> WaitForMessagesAsync(string address, int count)
     {
         var cancellation = TestContext.Current.CancellationToken;
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
             var messages = await mailpit.MessagesToAsync(address, cancellation);
-            if (messages.Count > 0)
+            if (messages.Count >= count)
             {
-                return messages[0];
+                return messages;
             }
 
             await Task.Delay(TimeSpan.FromMilliseconds(250), cancellation);
         }
 
-        throw new TimeoutException("The confirm email did not arrive in 30 seconds.");
+        throw new TimeoutException("The email did not arrive in 30 seconds.");
+    }
+
+    // Signs up with the address, waits for the confirm email and confirms the link, so the address has a verified sign-up.
+    private async Task VerifyAsync(HttpClient client, string address, string subdomain)
+    {
+        var cancellation = TestContext.Current.CancellationToken;
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync("/api/sign-up", await SolvedFormAsync(client, address, subdomain), cancellation)).StatusCode);
+        var token = TokenPattern().Match((await WaitForMessageAsync(address)).Text).Groups[1].Value;
+        Assert.Equal(HttpStatusCode.OK, (await client.PostAsJsonAsync("/api/sign-up/confirm", new { token }, cancellation)).StatusCode);
     }
 
     private Task<T> Scalar<T>(string sql) => ControlPlaneDatabase.ScalarAsync<T>(_controlPlane, sql, TestContext.Current.CancellationToken);

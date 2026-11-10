@@ -168,8 +168,6 @@ The person chooses the subdomain, which becomes the tenant's id, and the page ch
 
 ## Bots and abuse
 
-_(planned for M33)_
-
 Sign-up is open to anyone, so a proof of work, rate limits and email checks make each abusive try
 cost something.
 
@@ -202,17 +200,20 @@ cost something.
   - **The client address** is read by the rules of the
     [forwarded headers](control-plane.md#settings), and each refusal counts in the
     [metric](headers-and-rate-limits.md#a-refused-request) `axis.rate_limits.refused` with the partition `sign_up`.
-- **Three emails a day for an address.** Each email address, compared as below, gets at most 3 sign-up
+- **Three emails a day for an address.** _(planned for M33)_ Each email address, compared as below, gets at most 3 sign-up
   emails of either kind in 24 hours, resends included, so the form cannot fill someone else's inbox. A
   sign-up past that answers `202` and sends nothing, so the limit tells nothing either.
-- **One trial for each email.** A verified email gets one trial. The address is compared in lower
-  case and without a `+tag`.
-- **The page never tells whether an email already had a trial.** An email that already had a trial is
-  answered as a new one, `202`, and the page goes on to check the inbox, so no one can learn from the
-  page whether a business uses Axis. The control plane stores no pending sign-up for it and holds no
+- **One trial for each email.** Each sign-up stores its email in lower case and without a `+tag`, so
+  `Owner+Test@Example.com` is `owner@example.com`. A unique index lets only one sign-up of that address be
+  verified. A second pending sign-up of it that is confirmed after the first answers `409` with
+  `{ state: "confirmed" }` and starts no second trial. A sign-up that was never verified does not
+  count.
+- **The page never tells whether an email already had a trial.** An email that already verified a sign-up
+  is answered as a new one, `202`, and the page goes on to check the inbox, so no one can learn from the
+  page whether a business uses Axis. The control plane stores no sign-up for it and holds no
   subdomain. It sends that address the [trial-used email](#the-emails) instead of the confirm email,
-  with a link to sign in to its Axis while a tenant of it runs, or to the
-  [billing portal](billing-portal.md) when its trial has ended. A subdomain that is taken is still
+  with a link to sign in to its Axis while the region directory holds its tenant, or to the
+  [billing portal](billing-portal.md) otherwise. A subdomain that is taken is still
   told, as it is public in DNS.
 - **Disposable domains.** An email of a domain on a list of disposable mailbox providers is refused.
   The list is the `control_plane.disposable_domains` table, whose domains are lower case. The domain of
@@ -285,13 +286,15 @@ The link of the confirm email opens `/sign-up/verify#<token>`, titled "Confirm y
   `{ state: "expired" }`. It changes nothing.
 - **Confirming.** `POST /api/sign-up/confirm` takes `{ token }` and answers `{ id, secret }` for the
   progress page. When the link was used or expired while the page was open, it answers `409` with
-  `{ state }`, and the page shows that state, not an error.
+  `{ state }`, and the page shows that state, not an error. A link whose email another sign-up
+  verified first answers `409` with `{ state: "confirmed" }`, see [one trial for each email](#bots-and-abuse).
 
 ### The emails
 
-Both are plain text, as every control plane email is, in the sign-up's language and sent from the control
-plane's mail domain. They are the templates `signUpConfirm.<language>.txt` and
-`signUpTrialUsed.<language>.txt`, see [control plane](control-plane.md#its-own-work).
+Each is plain text, as every control plane email is, in the sign-up's language and sent from the control
+plane's mail domain. They are the templates `signUpConfirm.<language>.txt`,
+`signUpTrialUsedSignIn.<language>.txt` and `signUpTrialUsedBillingPortal.<language>.txt`, see
+[control plane](control-plane.md#its-own-work).
 They follow [UI writing](ui-writing.md#principles): each names the address the person signs in at, or the
 trial, never "your Axis".
 
@@ -326,9 +329,10 @@ Liên kết chỉ dùng được một lần, trong 24 giờ. Nếu bạn không
 Đội ngũ Axis
 ```
 
-The trial-used email goes to an address that already had a trial, instead of the confirm email. It keeps
-one of its two middle paragraphs: the sign-in one while a tenant of the address runs, else the
-[billing portal](billing-portal.md) one, whose link is `{{billingPortalLink}}`.
+The trial-used email goes to an address that already had a trial, instead of the confirm email. It is two
+templates with the same text but one middle paragraph: `signUpTrialUsedSignIn` holds the sign-in one, with
+`{{tenantAddress}}`, while the region directory holds the tenant, and `signUpTrialUsedBillingPortal` holds
+the [billing portal](billing-portal.md) one otherwise, whose link is `{{billingPortalUrl}}`.
 
 ```
 Subject: This email already had an Axis trial
@@ -341,7 +345,7 @@ Sign in at:
 {{tenantAddress}}
 
 To go on after the trial, choose a plan in the billing portal:
-{{billingPortalLink}}
+{{billingPortalUrl}}
 
 If this was not you, ignore this email.
 
@@ -359,7 +363,7 @@ Có người, có thể là bạn, vừa đăng ký Axis bằng email này. Emai
 {{tenantAddress}}
 
 Để tiếp tục sau khi hết dùng thử, hãy chọn gói dịch vụ tại trang thanh toán:
-{{billingPortalLink}}
+{{billingPortalUrl}}
 
 Nếu không phải bạn, hãy bỏ qua email này.
 

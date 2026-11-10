@@ -169,6 +169,11 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("language");
 
+                    b.Property<string>("NormalisedEmail")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("normalised_email");
+
                     b.Property<string>("PrivacyVersion")
                         .IsRequired()
                         .HasColumnType("text")
@@ -208,6 +213,10 @@ namespace Axis.ControlPlane.Storage.Migrations
                     b.HasIndex(new[] { "TokenHash" }, "ux_sign_ups_token_hash")
                         .IsUnique()
                         .HasFilter("token_hash IS NOT NULL");
+
+                    b.HasIndex(new[] { "NormalisedEmail" }, "ux_sign_ups_verified_email")
+                        .IsUnique()
+                        .HasFilter("state = 'verified'");
 
                     b.ToTable("sign_ups", "control_plane", t =>
                         {
