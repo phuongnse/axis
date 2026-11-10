@@ -96,8 +96,9 @@ app.UseStaticFiles();
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
 
-// The sign-up page, built by web/vite.sign-up.config.ts into the web root.
+// The sign-up page and its verify page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");
+app.MapFallbackToFile("/sign-up/verify", "sign-up.html");
 
 app.Run();
 

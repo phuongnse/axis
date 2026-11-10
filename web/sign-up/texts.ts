@@ -44,6 +44,18 @@ const en = {
   'signUp.inbox.sent': 'We sent the confirmation email to {email}.',
   'signUp.inbox.notThere': 'If it is not there, look in the spam folder or wait a minute.',
   'signUp.inbox.changeEmail': 'Change email',
+  'signUp.verify.title': 'Confirm your sign-up',
+  'signUp.verify.checking': 'Checking the link.',
+  'signUp.verify.sentence': 'Confirm to start the trial for {business} at {address}. You sign in with {email}.',
+  'signUp.verify.confirm': 'Confirm',
+  'signUp.verify.checkFailed': 'The link could not be checked. Try again.',
+  'signUp.verify.tryAgain': 'Try again',
+  'signUp.verify.confirmFailed': 'The sign-up could not be confirmed. Try again.',
+  'signUp.verify.confirmed.title': 'Already confirmed',
+  'signUp.verify.confirmed.body': 'This sign-up is confirmed. An email tells you when you can sign in.',
+  'signUp.verify.expired.title': 'This link has expired',
+  'signUp.verify.expired.body': 'A link works once, for 24 hours. Sign up again to get a new one.',
+  'signUp.verify.signUpAgain': 'Sign up again',
 }
 
 const vi: Record<keyof typeof en, string> = {
@@ -92,6 +104,18 @@ const vi: Record<keyof typeof en, string> = {
   'signUp.inbox.sent': 'Chúng tôi đã gửi email xác nhận đến {email}.',
   'signUp.inbox.notThere': 'Nếu chưa thấy, bạn kiểm tra thư rác hoặc chờ một phút.',
   'signUp.inbox.changeEmail': 'Đổi email',
+  'signUp.verify.title': 'Xác nhận đăng ký',
+  'signUp.verify.checking': 'Đang kiểm tra liên kết.',
+  'signUp.verify.sentence': 'Xác nhận để bắt đầu dùng thử cho {business} tại {address}. Bạn sẽ đăng nhập bằng {email}.',
+  'signUp.verify.confirm': 'Xác nhận',
+  'signUp.verify.checkFailed': 'Không kiểm tra được liên kết. Thử lại.',
+  'signUp.verify.tryAgain': 'Thử lại',
+  'signUp.verify.confirmFailed': 'Không xác nhận được đăng ký. Thử lại.',
+  'signUp.verify.confirmed.title': 'Đã xác nhận',
+  'signUp.verify.confirmed.body': 'Đã xác nhận đăng ký này. Bạn sẽ nhận email khi có thể đăng nhập.',
+  'signUp.verify.expired.title': 'Liên kết đã hết hạn',
+  'signUp.verify.expired.body': 'Liên kết chỉ dùng được một lần, trong 24 giờ. Hãy đăng ký lại để nhận liên kết mới.',
+  'signUp.verify.signUpAgain': 'Đăng ký lại',
 }
 
 /** The languages of the sign-up page. */

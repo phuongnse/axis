@@ -1,16 +1,14 @@
-import { Card, Checkbox, ConfigProvider, Flex, Form, Input, Select, Typography } from 'antd'
+import { Checkbox, Flex, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
-import { antLocaleFor } from '../src/platform/antLocale'
 import { apiFetch } from '../src/platform/api'
 import { AxisAlert } from '../src/platform/AxisAlert'
 import { AxisButton } from '../src/platform/AxisButton'
 import { AxisField, type AxisFieldStatus } from '../src/platform/AxisField'
-import { OrganizationHeading } from '../src/platform/OrganizationHeading'
-import { PreferencesMenu } from '../src/platform/PreferencesMenu'
 import { placeProblemErrors } from '../src/platform/problemErrors'
 import { requiredMark } from '../src/platform/requiredMark'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
+import { SignUpFrame } from './SignUpFrame'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
 
@@ -80,7 +78,7 @@ export function SignUpPage({
   onLocaleChange: (locale: SignUpLocale) => void
 }) {
   const t = useText()
-  const { colour, spacing, radius } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
@@ -239,157 +237,125 @@ export function SignUpPage({
   }
 
   return (
-    <ConfigProvider locale={antLocaleFor(locale)}>
-      <Flex
-        vertical
-        align="center"
-        gap={spacing.md}
-        style={{
-          position: 'relative',
-          paddingBlock: spacing.lg,
-          background: colour.canvas,
-          minHeight: '100vh',
-          boxSizing: 'border-box',
-        }}
-      >
-        <div style={{ position: 'absolute', top: spacing.lg, right: spacing.lg }}>
-          <PreferencesMenu
-            locales={signUpLocales}
-            locale={locale}
-            onLocaleChange={(next) => onLocaleChange(next as SignUpLocale)}
-          />
+    <SignUpFrame
+      locale={locale}
+      onLocaleChange={onLocaleChange}
+      title={sent ? t('signUp.inbox.title') : t('signUp.title')}
+      titleRef={titleRef}
+    >
+      {formErrors.length > 0 && (
+        <div ref={formErrorRef} tabIndex={-1}>
+          <AxisAlert kind="error" message={formErrors.join(' ')} />
         </div>
-        <OrganizationHeading />
-        <Card
-          style={{
-            width: '100%',
-            maxWidth: 480,
-            background: colour.surface,
-            borderColor: colour.borderSubtle,
-            borderRadius: radius.base,
-          }}
-          styles={{ body: { padding: spacing.xl } }}
+      )}
+      {sent && (
+        <Flex vertical gap={spacing.md} align="flex-start">
+          <Typography.Paragraph style={{ margin: 0 }}>
+            {t('signUp.inbox.sent').replace('{email}', sent.email)}
+          </Typography.Paragraph>
+          <Typography.Paragraph style={{ margin: 0 }}>{t('signUp.inbox.notThere')}</Typography.Paragraph>
+          <AxisButton role="plain" onClick={changeEmail}>
+            {t('signUp.inbox.changeEmail')}
+          </AxisButton>
+        </Flex>
+      )}
+      <div hidden={sent !== null}>
+        <Form
+          form={form}
+          name="sign-up"
+          layout="vertical"
+          requiredMark={requiredMark}
+          noValidate
+          initialValues={{ language: locale }}
+          scrollToFirstError={{ focus: true }}
+          onFinish={send}
         >
-          <Flex vertical gap={spacing.md}>
-            <Typography.Title ref={titleRef} level={4} tabIndex={-1} style={{ margin: 0 }}>
-              {sent ? t('signUp.inbox.title') : t('signUp.title')}
-            </Typography.Title>
-            {formErrors.length > 0 && (
-              <div ref={formErrorRef} tabIndex={-1}>
-                <AxisAlert kind="error" message={formErrors.join(' ')} />
-              </div>
-            )}
-            {sent && (
-              <Flex vertical gap={spacing.md} align="flex-start">
-                <Typography.Paragraph style={{ margin: 0 }}>
-                  {t('signUp.inbox.sent').replace('{email}', sent.email)}
-                </Typography.Paragraph>
-                <Typography.Paragraph style={{ margin: 0 }}>{t('signUp.inbox.notThere')}</Typography.Paragraph>
-                <AxisButton role="plain" onClick={changeEmail}>
-                  {t('signUp.inbox.changeEmail')}
-                </AxisButton>
-              </Flex>
-            )}
-            <div hidden={sent !== null}>
-              <Form
-                form={form}
-                name="sign-up"
-                layout="vertical"
-                requiredMark={requiredMark}
-                noValidate
-                initialValues={{ language: locale }}
-                scrollToFirstError={{ focus: true }}
-                onFinish={send}
-              >
-                <AxisField
-                  label={t('signUp.fullName')}
-                  help={t('signUp.fullName.help')}
-                  name="fullName"
-                  requiredMessage={t('signUp.fullName.required')}
-                >
-                  <Input autoComplete="name" />
-                </AxisField>
-                <AxisField
-                  label={t('signUp.email')}
-                  help={t('signUp.email.help')}
-                  name="email"
-                  requiredMessage={t('signUp.email.required')}
-                  rules={[{ type: 'email', message: t('signUp.email.invalid') }]}
-                >
-                  <Input type="email" autoComplete="email" />
-                </AxisField>
-                <AxisField
-                  label={t('signUp.businessName')}
-                  help={t('signUp.businessName.help')}
-                  name="businessName"
-                  requiredMessage={t('signUp.businessName.required')}
-                >
-                  <Input
-                    autoComplete="organization"
-                    onChange={(event) => {
-                      if (!subdomainEdited.current) {
-                        form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
-                      }
-                    }}
-                  />
-                </AxisField>
-                <AxisField
-                  label={t('signUp.subdomain')}
-                  help={t('signUp.subdomain.help')}
-                  name="subdomain"
-                  requiredMessage={t('signUp.subdomain.required')}
-                  status={subdomainStatus}
-                >
-                  <Input
-                    autoComplete="off"
-                    spellCheck={false}
-                    onChange={() => {
-                      subdomainEdited.current = true
-                    }}
-                  />
-                </AxisField>
-                <AxisField label={t('signUp.application')} help={t('signUp.application.help')} name="application">
-                  <Select
-                    options={applications.map((application) => ({
-                      value: application.id,
-                      label: application.titles[locale],
-                    }))}
-                  />
-                </AxisField>
-                <AxisField
-                  label={t('signUp.language')}
-                  help={t('signUp.language.help')}
-                  name="language"
-                  requiredMessage={t('signUp.language.required')}
-                >
-                  <Select
-                    options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
-                    onChange={() => {
-                      languageEdited.current = true
-                    }}
-                  />
-                </AxisField>
-                <Form.Item
-                  name="terms"
-                  valuePropName="checked"
-                  style={{ marginBottom: 0 }}
-                  rules={[
-                    {
-                      validator: (_rule, checked: boolean) =>
-                        checked ? Promise.resolve() : Promise.reject(new Error(t('signUp.terms.required'))),
-                    },
-                  ]}
-                >
-                  <Checkbox>{t('signUp.terms')}</Checkbox>
-                </Form.Item>
-                <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
-                  {t('signUp.submit')}
-                </AxisButton>
-              </Form>
-            </div>
-          </Flex>
-        </Card>
-      </Flex>
-    </ConfigProvider>
+          <AxisField
+            label={t('signUp.fullName')}
+            help={t('signUp.fullName.help')}
+            name="fullName"
+            requiredMessage={t('signUp.fullName.required')}
+          >
+            <Input autoComplete="name" />
+          </AxisField>
+          <AxisField
+            label={t('signUp.email')}
+            help={t('signUp.email.help')}
+            name="email"
+            requiredMessage={t('signUp.email.required')}
+            rules={[{ type: 'email', message: t('signUp.email.invalid') }]}
+          >
+            <Input type="email" autoComplete="email" />
+          </AxisField>
+          <AxisField
+            label={t('signUp.businessName')}
+            help={t('signUp.businessName.help')}
+            name="businessName"
+            requiredMessage={t('signUp.businessName.required')}
+          >
+            <Input
+              autoComplete="organization"
+              onChange={(event) => {
+                if (!subdomainEdited.current) {
+                  form.setFieldValue('subdomain', suggestSubdomain(event.target.value))
+                }
+              }}
+            />
+          </AxisField>
+          <AxisField
+            label={t('signUp.subdomain')}
+            help={t('signUp.subdomain.help')}
+            name="subdomain"
+            requiredMessage={t('signUp.subdomain.required')}
+            status={subdomainStatus}
+          >
+            <Input
+              autoComplete="off"
+              spellCheck={false}
+              onChange={() => {
+                subdomainEdited.current = true
+              }}
+            />
+          </AxisField>
+          <AxisField label={t('signUp.application')} help={t('signUp.application.help')} name="application">
+            <Select
+              options={applications.map((application) => ({
+                value: application.id,
+                label: application.titles[locale],
+              }))}
+            />
+          </AxisField>
+          <AxisField
+            label={t('signUp.language')}
+            help={t('signUp.language.help')}
+            name="language"
+            requiredMessage={t('signUp.language.required')}
+          >
+            <Select
+              options={signUpLocales.map((tag) => ({ value: tag, label: t(`shell.locale.${tag}`) }))}
+              onChange={() => {
+                languageEdited.current = true
+              }}
+            />
+          </AxisField>
+          <Form.Item
+            name="terms"
+            valuePropName="checked"
+            style={{ marginBottom: 0 }}
+            rules={[
+              {
+                validator: (_rule, checked: boolean) =>
+                  checked ? Promise.resolve() : Promise.reject(new Error(t('signUp.terms.required'))),
+              },
+            ]}
+          >
+            <Checkbox>{t('signUp.terms')}</Checkbox>
+          </Form.Item>
+          <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
+            {t('signUp.submit')}
+          </AxisButton>
+        </Form>
+      </div>
+    </SignUpFrame>
   )
 }
