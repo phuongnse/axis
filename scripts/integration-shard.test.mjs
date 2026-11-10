@@ -6,8 +6,10 @@ import { describe, test } from 'node:test'
 import {
   controlPlane,
   count,
+  estimate,
   filterArgs,
   junitDurations,
+  junitParallelism,
   main,
   parseSource,
   readClasses,
@@ -52,6 +54,26 @@ describe('count', () => {
       total: 6,
       overBudget: [`Over budget: ${controlPlane} takes about 25 s, longer than the budget of 20 s.`],
     })
+  })
+
+  test('divides the seconds by the parallelism, so four 10 s classes fit one shard at parallelism 2', () => {
+    assert.equal(count(four, 0, 25, 6, 2).total, 1)
+  })
+
+  test('estimates two 100 s classes at parallelism 2 as 100 s in separate collections and 200 s in one', () => {
+    const separate = [testClass('ATests', 100), testClass('BTests', 100)]
+    const shared = [testClass('ATests', 100, 'Scratch'), testClass('BTests', 100, 'Scratch')]
+    // A shard of separate classes takes 100 s, which fits the 150 s budget. The shared collection takes 200 s
+    // whatever the shards, since its classes run one after another.
+    assert.deepEqual(count(separate, 0, 150, 6, 2), { total: 1, overBudget: [] })
+    assert.equal(count(shared, 0, 150, 6, 2).total, 6)
+  })
+})
+
+describe('estimate', () => {
+  test('is the seconds over the parallelism, or the heaviest collection when that is longer', () => {
+    assert.equal(estimate(200, 100, 2), 100)
+    assert.equal(estimate(200, 200, 2), 200)
   })
 })
 
@@ -192,6 +214,21 @@ describe('durations', () => {
   test('keeps known classes that were not measured and drops classes that no longer exist', () => {
     assert.deepEqual(mergeDurations({ A: 1, B: 2, Gone: 3 }, { A: 10 }, ['A', 'B']), { A: 10, B: 2 })
   })
+
+  test('measures the parallelism as the tests’ seconds over the wall time of the integration suites', () => {
+    // The control plane's tests count toward the seconds, and its suite does not count toward the wall time.
+    const controlPlaneXml =
+      '<testsuite name="/p/Axis.ControlPlane.Integration.Tests.dll" tests="1" time="50">' +
+      '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="x" time="50" /></testsuite>'
+    const integrationXml =
+      '<testsuite name="/p/Axis.Integration.Tests.dll" tests="2" time="100">' +
+      '<testcase classname="N.ATests" name="a" time="60" /><testcase classname="N.BTests" name="b" time="40" /></testsuite>'
+    assert.equal(junitParallelism([controlPlaneXml, integrationXml]), 1.5)
+  })
+
+  test('has no parallelism without an integration suite', () => {
+    assert.equal(junitParallelism(['<testcase classname="N.ATests" name="a" time="1" />']), undefined)
+  })
 })
 
 describe('main', () => {
@@ -237,13 +274,25 @@ describe('main', () => {
     }
   })
 
-  test('--count prints the count alone and warns about each class over the budget', () => {
+  test('--count prints the cap, and warns about each class over the budget', () => {
     const dir = project()
     try {
       writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 1000, "N.BTests": 5 }\n')
       const warnings = []
-      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '6')
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '3')
       assert.deepEqual(warnings, ['Over budget: N.ATests takes about 1000 s, longer than the budget of 900 s.'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count divides the seconds by the measured parallelism', () => {
+    const dir = project()
+    try {
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 500, "N.BTests": 500, "parallelism": 2 }\n')
+      assert.equal(main(['--count'], dir), '1')
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 500, "N.BTests": 500 }\n')
+      assert.equal(main(['--count'], dir), '2')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -293,6 +342,26 @@ describe('main', () => {
       main(['--durations', junit], dir)
       assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
         'Axis.ControlPlane.Integration.Tests': 8,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--durations writes the parallelism beside the class seconds', () => {
+    const dir = project()
+    try {
+      const junit = path.join(dir, 'Axis.Integration.Tests.xml')
+      writeFileSync(
+        junit,
+        '<testsuite name="/p/Axis.Integration.Tests.dll" time="10">' +
+          '<testcase classname="N.ATests" name="t" time="1" /><testcase classname="N.BTests" name="t" time="7.6" /></testsuite>',
+      )
+      main(['--durations', junit], dir)
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
+        'N.ATests': 1,
+        'N.BTests': 8,
+        parallelism: 0.86,
       })
     } finally {
       rmSync(dir, { recursive: true, force: true })

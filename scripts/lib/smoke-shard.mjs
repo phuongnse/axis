@@ -46,7 +46,7 @@ export function split(list, total) {
 }
 
 /** The fewest shards that fit the budget, and an `Over budget:` line for each suite that alone does not. */
-export function count(list, budget = budgetSeconds, max = maxShards) {
+export function count(list, budget = budgetSeconds, max = maxShards.smoke) {
   const all = units(list)
   const longest = (total) => Math.max(...packLightest(all, total).map((shard) => shard.seconds))
   const overBudget = list

@@ -410,8 +410,10 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
   by how many tests they hold: each spec weighs its seconds in `tests/e2e/spec-durations.json`, and a
   new spec weighs the median. A serial spec, such as a Studio journey, runs on one worker from start
-  to end, so the split gives a long one a shard with little else. When the shards drift apart by
-  minutes, refresh the durations from the JUnit files of a full run on `main`:
+  to end, so the split gives a long one a shard with little else. The count adds the shard setup, the
+  seconds a shard pays besides its specs, under `shard setup` in the same file. `--durations` measures it
+  as each file's wall time minus its specs' estimate, averaged. When the shards drift apart by minutes,
+  refresh the durations from the JUnit files of a full run on `main`:
   `node scripts/lib/e2e-shard.mjs --durations artifacts/test-results/playwright-*.xml`.
 - **Integration.** Set `AXIS_INTEGRATION_SHARD`, such as `AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh`.
   `NEXKIT_SHARD` works the same way beside it, and `AXIS_INTEGRATION_SHARD` wins when both are set.
@@ -420,7 +422,10 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
   or, without an entry, its number of tests times the median seconds per test. Shard 1 also runs
   `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
-  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The last shard runs
+  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The count estimates a
+  shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
+  a collection runs its classes one after another. `--durations` measures the parallelism as all test
+  seconds over the wall time of the suites. The last shard runs
   every class that the other shards do not, so a class the split does not find still runs. The
   scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them.
   A shard cannot be combined with arguments. When the shards drift apart by minutes, refresh the
@@ -438,10 +443,11 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
 - **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
   `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
   shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is
-  never below 2. The counts never exceed the most shards allowed. The budget and that most live in
-  `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
-  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still prints, because no number of shards makes such a spec,
-  class or file fit.
+  never below 2. Each count stops at the cap of its split, which lives in `scripts/lib/shards.mjs`: 3 for E2E
+  and integration, and 6 for smoke and unit tests. A sharded check's `max` must match its cap. The budget
+  also lives there. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
+  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
+  prints, because no number of shards makes such a spec, class or file fit.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
