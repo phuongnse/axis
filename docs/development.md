@@ -192,12 +192,23 @@ in [Testing](testing.md).
 | ------------ | ----------------------------------------------------------------------------- |
 | `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                           |
 | `compose`    | Runs the Compose stack                                                        |
-| `images`     | Builds and runs the production images, from `scripts/images.test.mjs`         |
+| `images`     | Runs the production images, from `scripts/images.test.mjs`                    |
 | `onprem`     | Installs `deploy/compose/` from the production images for two tenants          |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
 agent host. The test removes the Compose project at the end.
+
+`scripts/smoke.sh` builds the production images once, before `images` and `onprem`, which both use them,
+and removes them when it exits. A change that skips both tests builds nothing. The PostgreSQL tools layer of
+`axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
+image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
+comments, and loads the file in a later run, so the run does not download the packages again. NexKit's `docker`
+cache entry restores the folder, and CI on `main` saves it. The layer is built again when the stage changes,
+when the `Dockerfile` changes, or when GitHub drops the cache after 7 days without use. The saved layer can be
+weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
+The [image scan](#workflows-outside-nexkits-checks) never uses the saved layer: it builds from scratch and sees
+each new package release.
 
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
@@ -474,13 +485,14 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 ## Production images and Axis.Admin
 
 The production images and the admin tool are the same in development as in an install. The
-`Dockerfile` has four production targets, `axis-server`, `axis-worker`, `axis-admin` and
+`Dockerfile` has five production targets, `axis-server`, `axis-worker`, `axis-agent`, `axis-admin` and
 `axis-controlplane`, which hold no samples, development settings or source control metadata. Build one
 with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. The default target is
-the development server. The `images` and `onprem` smoke tests build each image up to three times, with
-waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times. Each production stage installs
-its system packages before it declares `AXIS_VERSION`. Docker caches that layer, so a build with a new
-version and the two smoke tests download the packages once.
+the development server. `scripts/smoke.sh` builds each image once, up to three attempts with
+waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times. The `axis-admin`
+stage builds on the `admin-tools` stage, which installs the system packages and declares no `AXIS_VERSION`. Docker
+caches that layer, so a build with a new version does not download the packages again, and the
+[smoke tests](#smoke-tests) save it for later runs.
 
 `Axis.Admin` is the console tool that the platform operator runs. It creates, suspends, resumes,
 lists, backs up and restores tenants, and it migrates and activates them. Run it with

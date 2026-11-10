@@ -190,8 +190,8 @@ that holds it.
 - **The performance tests run on `main` only,** in the performance workflow, and neither in NexKit's
   checks nor in CI's integration jobs, because they depend on the runner's load, as
   [D97](decisions/d97-reliable-test-runs.md) says.
-- **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm and the Playwright
-  browsers. The entries are in NexKit's [`cache`][nexkit-caches] setting, and each workflow that runs
+- **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm, the Playwright
+  browsers and the PostgreSQL tools layer of the [smoke tests](development.md#smoke-tests). The entries are in NexKit's [`cache`][nexkit-caches] setting, and each workflow that runs
   setup restores them with NexKit's cache action, which reads the same entries and saves them on
   `main`. A change to what setup downloads changes the entries in a hand-made pull request.
 
