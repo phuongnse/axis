@@ -5,6 +5,7 @@ import { SignInCard } from '../pages/HomePage'
 import { ChartWidget } from '../platform/ChartWidget'
 import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
+import { NarrowWidthOverride } from '../platform/useNarrowWidth'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import { SignInPromptDialog } from '../platform/SignInPrompt'
@@ -301,6 +302,22 @@ export const previews: Record<string, readonly PreviewState[]> = {
         ),
         frameHeight: 900,
       })),
+      // Proposed: at narrow width the request panel takes the window's width, over the page.
+      {
+        caption: 'Ask AI, narrow width',
+        fixtures: studioFixtures.askAi,
+        entry: `/studio?app=${application}`,
+        draw: () => (
+          <NarrowWidthOverride.Provider value>
+            <div style={{ maxWidth: 390 }}>
+              <ClickOnMount selector='[data-testid="studio-ask-ai-open"]'>
+                <ShellPreview />
+              </ClickOnMount>
+            </div>
+          </NarrowWidthOverride.Provider>
+        ),
+        frameHeight: 760,
+      },
     ),
   signIn: [
     {

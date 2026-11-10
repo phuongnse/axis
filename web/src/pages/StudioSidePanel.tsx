@@ -8,7 +8,7 @@ import { useDesignTokens } from '../platform/themeMode'
 /**
  * Proposed: one side panel frame for Studio, which the Problems panel and the request panel share. It is drawn in the
  * shell's right column through `ShellAside`, `sidePanel` wide, from under the header to the bottom of the window, so
- * no footer pushes it and it stays while the page scrolls. Its title row is as high as the band, so their lines meet.
+ * no footer pushes it and it stays while the page scrolls. At narrow width it takes the window's width, over the page. Its title row is as high as the band, so their lines meet.
  * The title, the close button and `top`, such as a form, stay, and only `children`, its list, scrolls, with no scroll
  * passed on to the page at its end. It is not modal, and Studio shows one side panel at a time: opening one closes
  * the other. See docs/reference/actions-and-controls.md#opening-things and the scrolling rules of the review on #3263.

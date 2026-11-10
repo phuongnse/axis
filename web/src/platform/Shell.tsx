@@ -68,8 +68,9 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * has a sidebar of labels that collapses to a strip of icons. A page can claim the sidebar with `ShellSidebar` and
  * draw its own navigation there, even on a one-page site, and then the page gets the tighter workspace padding.
  * Proposed: a page without a sidebar has a footer across the bottom, with the copyright at the start and the legal
- * links at the end. A page with a sidebar has none, so the sidebar and a side panel reach the bottom of the window, and
- * the account menu holds the legal line. A page can open a side panel in a right column with `ShellAside`.
+ * links at the end. A page with a sidebar has none, at narrow width too, so the sidebar and a side panel reach the
+ * bottom of the window, and the account menu holds the legal line. A page can open a side panel in a right column
+ * with `ShellAside`; at narrow width the panel takes the window's width, over the page.
  * Ant Design components and dayjs follow the locale. At narrow width, below
  * 992 px, the navigation and the language and theme menu sit in a panel that a Menu button opens and closes, and
  * there is no sidebar. The app switcher stays in the header. A shell given `account` shows it in place of the app switcher
@@ -121,6 +122,8 @@ export function Shell({
   )
   const hasSidebar = claimed || navigation.length > 1
   const sidebar = hasSidebar && !narrow
+  // As the sidebar's nav, a design-system frame's height stands for the window's.
+  const asideHeight = `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`
   const home = navigation[0]?.path ?? '/'
   const entries = navigation.map((item) => ({ ...item, label: t(item.labelKey) }))
   // The page's own navigation, or the site's.
@@ -193,7 +196,7 @@ export function Shell({
               <>
                 {bell}
                 {hasAccount ? account : <AppSwitcher locale={locale} />}
-                {!hasAccount && <UserMenu />}
+                {!hasAccount && <UserMenu legal={legal} />}
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
                   ref={toggle}
@@ -264,22 +267,35 @@ export function Shell({
               </Layout.Content>
             </Layout>
             {asideClaims > 0 && (
-              // Proposed: the right column, as tall as the page, with its side panel under the header to the window's bottom.
+              // Proposed: the right column, as tall as the page, with its side panel under the header to the window's
+              // bottom. At narrow width the panel takes the window's width instead, from under the header to the
+              // window's bottom, over the page: it comes first and its negative margin gives its room back.
               <div
-                style={{
-                  flex: 'none',
-                  width: sizeTokens.sidePanel,
-                  background: colour.surface,
-                  borderInlineStart: `1px solid ${colour.borderSubtle}`,
-                }}
+                style={
+                  narrow
+                    ? {
+                        order: -1,
+                        position: 'sticky',
+                        top: headerHeight,
+                        zIndex: 9,
+                        height: asideHeight,
+                        marginBottom: `calc(-1 * ${asideHeight})`,
+                        background: colour.surface,
+                      }
+                    : {
+                        flex: 'none',
+                        width: sizeTokens.sidePanel,
+                        background: colour.surface,
+                        borderInlineStart: `1px solid ${colour.borderSubtle}`,
+                      }
+                }
               >
                 <div
                   ref={setAsideTarget}
                   style={{
-                    position: 'sticky',
-                    top: headerHeight,
-                    // As the sidebar's nav, a design-system frame's height stands for the window's.
-                    height: `calc(var(--shell-min-height, 100vh) - ${headerHeight}px)`,
+                    position: narrow ? undefined : 'sticky',
+                    top: narrow ? undefined : headerHeight,
+                    height: narrow ? '100%' : asideHeight,
                     display: 'flex',
                     flexDirection: 'column',
                   }}
@@ -287,8 +303,8 @@ export function Shell({
               </div>
             )}
           </Layout>
-          {/* Proposed: a page with a sidebar has no footer; the legal line is in the account menu. */}
-          {!sidebar && <ShellFooter legal={legal} />}
+          {/* Proposed: a page with a sidebar has no footer, at narrow width too; the legal line is in the account menu. */}
+          {!hasSidebar && <ShellFooter legal={legal} />}
         </Layout>
       </ConfigProvider>
     </div>
