@@ -303,6 +303,14 @@ export const previews: Record<string, readonly PreviewState[]> = {
         ),
         frameHeight: 900,
       })),
+      // Proposed: the publish page, which Publish… opens, see the review on #3263.
+      {
+        caption: 'Publish',
+        fixtures: studioFixtures.askAi,
+        entry: `/studio?app=${application}&view=publish`,
+        draw: () => <ShellPreview />,
+        frameHeight: 900,
+      },
       // Proposed: at narrow width the request panel takes the window's width, over the page. The frame scrolls as a
       // 700 by 760 window does.
       {

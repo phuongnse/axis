@@ -1,6 +1,7 @@
-import { Flex, Input, Modal } from 'antd'
+import { Flex } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { type ReactNode, type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { QuotaRefusedError } from '../platform/quota'
 import {
@@ -22,7 +23,6 @@ import {
 } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
 import { useFollowJob } from '../platform/useFollowJob'
 import { askAiPanelId } from './StudioAskAi'
 import { StudioBand } from './StudioBand'
@@ -34,6 +34,8 @@ import { StudioTestResults } from './StudioTestResults'
 export interface StudioPublishingHandle {
   runTests(scenarios?: string[]): void
   activate(releaseId: string): void
+  /** Proposed: sends a publish with its label and note, each left out when empty, from the publish page. */
+  publish(label: string, note: string): void
 }
 
 async function findReleaseNumber(
@@ -101,7 +103,7 @@ async function findPreviewLinks(
  * Studio checks the request every second until it is `succeeded` or `failed`, with no time limit, and shows its
  * status meanwhile. When it ends, its diagnostics go to the Problems panel. A succeeded publish or activate
  * shows its release number, found in the release history by the request's `releaseId`. Publish and Activate… show
- * only when `canPublish`. They and Validate are off while a request runs and while the reconnect message shows. The
+ * only when `canPublish`. Proposed: Publish… opens the publish page, which sends the publish through the handle. They and Validate are off while a request runs and while the reconnect message shows. The
  * history loads when the application is picked, and again after a request ends, after the reconnect, and when
  * `folderRevision` changes, which the page does after a save or a delete. The band says "Changes not live" when the
  * folder differs from the active release. When the server
@@ -151,16 +153,13 @@ export function StudioPublishing({
   children?: ReactNode | ((history: StudioReleases | 'failed' | undefined) => ReactNode)
 }) {
   const t = useText()
-  const { size } = useDesignTokens()
+  const navigate = useNavigate()
   const { generation, reconnecting, lost } = useStudioConnection()
   const [request, setRequest] = useState<StudioRequest | null>(null)
   const [releaseNumber, setReleaseNumber] = useState<number | null>(null)
   const [previewLinks, setPreviewLinks] = useState<string[]>([])
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [label, setLabel] = useState('')
-  const [note, setNote] = useState('')
   const [history, setHistory] = useState<StudioReleases | 'failed'>()
   const [historyRevision, setHistoryRevision] = useState(0)
 
@@ -239,11 +238,8 @@ export function StudioPublishing({
     }
   }
 
-  async function publish() {
-    setDialogOpen(false)
+  async function publish(label: string, note: string) {
     await send(() => publishStudioApp(application, { label: label.trim(), note: note.trim() }))
-    setLabel('')
-    setNote('')
   }
 
   function activateRelease(releaseId: string) {
@@ -259,6 +255,7 @@ export function StudioPublishing({
   useImperativeHandle(ref, () => ({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
     activate: activateRelease,
+    publish: (label, note) => void publish(label, note),
   }))
 
   return (
@@ -306,7 +303,12 @@ export function StudioPublishing({
             </AxisButton>
           )}
           {canPublish && (
-            <AxisButton role="finish" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
+            <AxisButton
+              role="finish"
+              data-testid="studio-publish"
+              disabled={busy}
+              onClick={() => navigate(`/studio?${new URLSearchParams({ app: application, view: 'publish' })}`)}
+            >
               {t('shell.studio.publish')}
             </AxisButton>
           )}
@@ -341,33 +343,6 @@ export function StudioPublishing({
         </Flex>
         {sidePanel}
       </Flex>
-      <Modal
-        open={dialogOpen}
-        width={size.dialog.medium}
-        title={t('shell.studio.publish.title')}
-        okText={t('shell.studio.publish.confirm')}
-        cancelText={t('shell.studio.cancel')}
-        onOk={publish}
-        onCancel={() => setDialogOpen(false)}
-      >
-        <Flex vertical gap="small">
-          <Input
-            aria-label={t('shell.studio.publish.label')}
-            placeholder={t('shell.studio.publish.label')}
-            maxLength={100}
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Input.TextArea
-            aria-label={t('shell.studio.publish.note')}
-            placeholder={t('shell.studio.publish.note')}
-            maxLength={2000}
-            autoSize={{ minRows: 3, maxRows: 8 }}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-          />
-        </Flex>
-      </Modal>
     </Flex>
   )
 }

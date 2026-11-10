@@ -771,7 +771,8 @@ export const currentUser: CurrentUser = {
   displayName: 'Alex Morgan',
   roles: ['Author', 'Operator', 'Administrator'],
   studio: true,
-  studioPublisher: false,
+  // Proposed: Alex publishes, so Studio's band shows Publish…, see the review on #3263.
+  studioPublisher: true,
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,

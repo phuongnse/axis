@@ -91,6 +91,10 @@ export function studioActiveEntry(
     return `kind:${kind}`
   }
   const view = params.get('view')
+  // Proposed: the publish page belongs to no sidebar entry, see the review on #3263.
+  if (view === 'publish') {
+    return ''
+  }
   if (view === 'release') {
     return 'releases'
   }

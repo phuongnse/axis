@@ -1843,3 +1843,26 @@ export async function actOnAuthoringRequest(
   }
   return (await response.json()) as StudioAuthoringRequest
 }
+
+/** Proposed: who changed a file since the live release: a person, or an AI request that was accepted. */
+export type StudioChangeAuthor =
+  { kind: 'person'; id: string; name: string | null } | { kind: 'request'; request: string; text: string }
+
+/** Proposed: a file that differs from the live release, with its JSON on both sides and who changed it since. */
+export interface StudioLiveChange extends StudioRevisionChange {
+  by: StudioChangeAuthor[]
+}
+
+/**
+ * Proposed: the diff of the folder from the live release, `GET .../releases/live/diff`, each file with its JSON before
+ * and after and the people and AI requests whose revisions changed it since that release, in the order of their first
+ * change. `null` when no release is live, as the release history's `changes` is.
+ */
+export async function fetchLiveDiff(application: string, signal?: AbortSignal): Promise<StudioLiveChange[] | null> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/live/diff`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return ((await response.json()) as { resources: StudioLiveChange[] | null }).resources
+}

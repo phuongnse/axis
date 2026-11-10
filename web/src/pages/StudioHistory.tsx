@@ -1,7 +1,7 @@
 import { RightOutlined, UndoOutlined } from '@ant-design/icons'
 import { Flex, Spin, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { lazy, Suspense, useContext, useEffect, useState, type HTMLAttributes } from 'react'
+import { lazy, Suspense, useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { QuotaRefusedError } from '../platform/quota'
@@ -286,18 +286,25 @@ export function StudioRevisionPage({
 /**
  * Each resource a revision or a draft added, changed or removed, as one block as GitHub shows a file: a header with a
  * button that folds the block, its name, kind and change, and the lines added and removed, then, when given, its summary
- * in words, and its diff in `JsonDiff`, unified, with the JSON indented. Proposed: the GitHub-like diff and a draft's
+ * in words and who changed it, and its diff in `JsonDiff`, unified, with the JSON indented. Every file starts open, or
+ * folded when `folded`. Proposed: the GitHub-like diff and a draft's
  * summaries, see the review on #3263.
  */
 export function StudioChanges({
   changes,
   resources,
   summaries,
+  authors,
+  folded = false,
 }: {
   changes: StudioRevisionChange[]
   resources: StudioResourceItem[]
   /** The summary in words of each file, by its file. */
   summaries?: ReadonlyMap<string, string>
+  /** Proposed: who changed each file, by its file, shown under its header. */
+  authors?: ReadonlyMap<string, ReactNode>
+  /** Proposed: every file starts folded, for a long list such as the publish page's. */
+  folded?: boolean
 }) {
   const t = useText()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -323,6 +330,8 @@ export function StudioChanges({
             change={t(`shell.studio.overview.change.${row.change}`)}
             file={resource?.file}
             summary={resource === undefined ? undefined : summaries?.get(resource.file)}
+            author={resource === undefined ? undefined : authors?.get(resource.file)}
+            folded={folded}
             before={resource?.before ?? null}
             after={resource?.after ?? null}
           />
@@ -339,6 +348,8 @@ function ChangedFile({
   change,
   file,
   summary,
+  author,
+  folded,
   before,
   after,
 }: {
@@ -347,12 +358,14 @@ function ChangedFile({
   change: string
   file: string | undefined
   summary: string | undefined
+  author: ReactNode
+  folded: boolean
   before: string | null
   after: string | null
 }) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(!folded)
   const [counts, setCounts] = useState<DiffCounts>()
   return (
     <section
@@ -366,7 +379,8 @@ function ChangedFile({
         align="center"
         style={{
           padding: `${spacing.xs / 2}px ${spacing.sm}px ${spacing.xs / 2}px ${spacing.xs / 2}px`,
-          borderBottom: open || summary !== undefined ? `1px solid ${colour.borderSubtle}` : undefined,
+          borderBottom:
+            open || summary !== undefined || author !== undefined ? `1px solid ${colour.borderSubtle}` : undefined,
         }}
       >
         <AxisButton
@@ -396,10 +410,11 @@ function ChangedFile({
           </span>
         )}
       </Flex>
-      {summary !== undefined && (
-        <Typography.Paragraph style={{ margin: 0, padding: `${spacing.xs}px ${spacing.sm}px` }}>
-          {summary}
-        </Typography.Paragraph>
+      {(summary !== undefined || author !== undefined) && (
+        <Flex vertical style={{ padding: `${spacing.xs}px ${spacing.sm}px` }}>
+          {summary !== undefined && <Typography.Text>{summary}</Typography.Text>}
+          {author !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{author}</Typography.Text>}
+        </Flex>
       )}
       <div hidden={!open}>
         <Suspense fallback={<Spin />}>

@@ -49,6 +49,7 @@ import { StudioReleasePage } from './StudioReleasePage'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioAskAi } from './StudioAskAi'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
+import { StudioPublishPage } from './StudioPublishPage'
 import { StudioProblems } from './StudioProblems'
 import { StudioResourceMenu } from './StudioResourceMenu'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
@@ -248,6 +249,8 @@ function StudioWorkspace() {
   const releasePage = releaseView && releaseNumber !== null
   const historyView = params.get('view') === 'history'
   const requestsView = params.get('view') === 'requests'
+  // Proposed: the publish page, which Publish… opens, see the review on #3263.
+  const publishView = params.get('view') === 'publish'
   const revisionId = params.get('revision')
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
@@ -628,6 +631,15 @@ function StudioWorkspace() {
                 />
               ) : releasesView ? (
                 <StudioPageHeading title={t('shell.studio.releases')} />
+              ) : publishView && canPublish ? (
+                <StudioPublishPage
+                  application={application!}
+                  resources={resources}
+                  userId={userId}
+                  liveNumber={history && history !== 'failed' ? (history.active?.number ?? null) : null}
+                  busy={requestBusy || reconnecting}
+                  onPublish={(label, note) => publishing.current?.publish(label, note)}
+                />
               ) : requestsView && askAi ? (
                 params.get('request') !== null ? (
                   <StudioAuthoringRequestPage

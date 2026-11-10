@@ -4,6 +4,7 @@ import type {
   StudioAuthoringRequestDetail,
   StudioAuthoringRequestList,
   StudioAuthoringRequestStep,
+  StudioLiveChange,
   StudioRequest,
   StudioRevisionChange,
   StudioBindings,
@@ -175,8 +176,140 @@ const releases = {
       relaxed: [],
     },
   ],
-  changes: [{ path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null }],
+  changes: [
+    { path: 'entities/Request.json', change: 'changed', kind: null, name: null, titles: null, locale: null },
+    { path: 'pages/request-list.json', change: 'changed', kind: null, name: null, titles: null, locale: null },
+    { path: 'entities/Supplier.json', change: 'added', kind: null, name: null, titles: null, locale: null },
+  ],
 } satisfies StudioReleases
+
+// The preview's publish, which runs for two seconds and then succeeds.
+const publishRequestId = 'b0b00000-0000-4000-8000-000000000001'
+let publishedAt = 0
+const publishedReleaseId = '7c1d0000-0000-4000-8000-000000000003'
+const published = () => publishedAt > 0 && Date.now() - publishedAt > 2000
+
+/** The release history, with release 3 live once the preview's publish has succeeded. */
+function releasesNow(): StudioReleases {
+  if (!published()) {
+    return releases
+  }
+  return {
+    ...releases,
+    active: { releaseId: publishedReleaseId, number: 3, contentHash: 'c3' },
+    items: [
+      {
+        ...releases.items[0],
+        releaseId: publishedReleaseId,
+        number: 3,
+        contentHash: 'c3',
+        activatedAt: new Date(publishedAt).toISOString(),
+        actorName: 'Alex Morgan',
+        actor: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+        label: null,
+        note: null,
+      },
+      ...releases.items,
+    ],
+    changes: [],
+  }
+}
+function publishRequest() {
+  return {
+    id: publishRequestId,
+    application,
+    kind: 'publish',
+    target: 'tenant',
+    status: published() ? 'succeeded' : 'running',
+    label: null,
+    note: null,
+    releaseId: published() ? publishedReleaseId : null,
+    diagnostics: [],
+    scenarios: null,
+  } satisfies StudioRequest
+}
+
+// Proposed: the diff from the live release, with who changed each file since, see the review on #3263. Alex changed
+// the request list, Linh Tran the request entity and added Supplier, and an accepted AI request changed both of the first.
+const renameRequest = {
+  kind: 'request',
+  request: 'a1e00000-0000-4000-8000-000000000003',
+  text: 'Rename the Category field to Spending category.',
+} as const
+const purchaseRequestBefore = {
+  kind: 'entity',
+  name: 'Request',
+  fields: [
+    { name: 'title', type: 'text', required: true },
+    { name: 'category', type: 'choice', label: 'Category', choices: ['Office', 'Travel', 'IT'] },
+    { name: 'amount', type: 'money', currency: 'VND', required: true },
+    { name: 'neededBy', type: 'date' },
+    { name: 'notes', type: 'text', multiline: true },
+  ],
+}
+const liveDiff: StudioLiveChange[] = [
+  {
+    file: 'entities/Request.json',
+    change: 'changed',
+    id: null,
+    kind: 'entity',
+    name: 'Request',
+    before: JSON.stringify(purchaseRequestBefore),
+    after: JSON.stringify({
+      ...purchaseRequestBefore,
+      fields: purchaseRequestBefore.fields
+        .map((field) =>
+          field.name === 'category'
+            ? {
+                ...field,
+                name: 'spendingCategory',
+                label: 'Spending category',
+                choices: ['Office', 'Travel', 'IT', 'Training'],
+              }
+            : field,
+        )
+        .filter((field) => field.name !== 'notes'),
+    }),
+    by: [{ kind: 'person', id: '8a2b0c1d-4e5f-4a6b-9c7d-0e1f2a3b4c5d', name: 'Linh Tran' }, renameRequest],
+  },
+  {
+    file: 'pages/request-list.json',
+    change: 'changed',
+    id: null,
+    kind: 'page',
+    name: 'RequestList',
+    before: JSON.stringify({
+      kind: 'page',
+      name: 'RequestList',
+      columns: ['title', 'category', 'amount'],
+      pageSize: 20,
+    }),
+    after: JSON.stringify({
+      kind: 'page',
+      name: 'RequestList',
+      columns: ['title', 'spendingCategory', 'amount', 'neededBy'],
+      pageSize: 50,
+    }),
+    by: [renameRequest, { kind: 'person', id: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f', name: 'Alex Morgan' }],
+  },
+  {
+    file: 'entities/Supplier.json',
+    change: 'added',
+    id: null,
+    kind: 'entity',
+    name: 'Supplier',
+    before: null,
+    after: JSON.stringify({
+      kind: 'entity',
+      name: 'Supplier',
+      fields: [
+        { name: 'name', type: 'text', required: true },
+        { name: 'taxCode', type: 'text' },
+      ],
+    }),
+    by: [{ kind: 'person', id: '8a2b0c1d-4e5f-4a6b-9c7d-0e1f2a3b4c5d', name: 'Linh Tran' }],
+  },
+]
 
 const catalog = {
   modules: [
@@ -214,7 +347,13 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     '/api/studio/bindings': () => bindings,
     [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
-    [`${folderPath}/releases`]: () => releases,
+    [`${folderPath}/releases`]: () => releasesNow(),
+    [`${folderPath}/releases/live/diff`]: () => ({ resources: published() ? [] : liveDiff }),
+    [`${folderPath}/publish`]: () => {
+      publishedAt = Date.now()
+      return publishRequest()
+    },
+    [`${folderPath}/requests/${publishRequestId}`]: () => publishRequest(),
     [`${folderPath}/settings`]: () => settings,
   }
 }
