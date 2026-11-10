@@ -260,7 +260,10 @@ export function Shell({
             )}
             <Layout>
               {!hasAccount && <ReadOnlyBanner />}
-              <Layout.Content style={{ padding: claimed ? spacing.md : spacing.lg }}>
+              {/* Proposed: the content is a column, so a page's panel can reach the window's foot, see the review on #3263. */}
+              <Layout.Content
+                style={{ padding: claimed ? spacing.md : spacing.lg, display: 'flex', flexDirection: 'column' }}
+              >
                 <ShellSidebarContext.Provider value={sidebarContext}>
                   <ShellAsideContext.Provider value={asideContext}>{children}</ShellAsideContext.Provider>
                 </ShellSidebarContext.Provider>

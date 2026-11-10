@@ -159,10 +159,10 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
   ]
 
   return (
-    <Flex vertical gap="middle">
+    <Flex vertical gap="middle" style={{ flex: 1 }}>
       <StudioPageHeading title={t('shell.studio.aiRequests')} />
       {/* The page's content is one panel, and its table fills it. */}
-      <ResourceFormSection testName="ai-requests">
+      <ResourceFormSection testName="ai-requests" fill>
         <AxisTable<StudioAuthoringRequest>
           columns={columns}
           rowKey={(row) => row.id}
@@ -424,7 +424,7 @@ export function StudioAuthoringRequestPage({
   const problems = request.checks?.diagnostics ?? []
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-ai-request">
+    <Flex vertical gap="middle" data-testid="studio-ai-request" style={{ flex: 1 }}>
       <StudioPageHeading
         title={t('shell.studio.aiRequest.title')}
         line={line}
@@ -436,7 +436,7 @@ export function StudioAuthoringRequestPage({
           ) : undefined
         }
       />
-      <ResourceFormSection testName="ai-request">
+      <ResourceFormSection testName="ai-request" fill>
         <SectionParts>
           {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
           {section(

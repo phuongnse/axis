@@ -22,6 +22,7 @@ export function ResourceFormSection({
   testName,
   heading,
   action,
+  fill = false,
   children,
 }: {
   /** In `data-testid="studio-section-<testName>"`. */
@@ -30,6 +31,11 @@ export function ResourceFormSection({
   heading?: { title: string; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode
+  /**
+   * Proposed: the page's one panel reaches at least the window's foot, as the sidebar and a side panel do, while each
+   * column up to the shell's content grows to fill; see the review on #3263.
+   */
+  fill?: boolean
   /** A function child gets a slot on the right of the heading, for a list that draws its own Add… into it. */
   children: ReactNode | ((actionSlot: HTMLElement | null) => ReactNode)
 }) {
@@ -41,6 +47,7 @@ export function ResourceFormSection({
     border: `1px solid ${colour.borderSubtle}`,
     borderRadius: radius.base,
     padding: spacing.md,
+    ...(fill ? { flex: '1 0 auto' } : {}),
   }
   const body = typeof children === 'function' ? children(slot) : children
   if (heading === undefined) {

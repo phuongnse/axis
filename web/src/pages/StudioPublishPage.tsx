@@ -97,7 +97,7 @@ export function StudioPublishPage({
   const nothing = Array.isArray(changes) && changes.length === 0
 
   return (
-    <Flex vertical gap="middle" data-testid="studio-publish-page">
+    <Flex vertical gap="middle" data-testid="studio-publish-page" style={{ flex: 1 }}>
       <StudioPageHeading
         title={t('shell.studio.publish.title')}
         line={
@@ -107,6 +107,7 @@ export function StudioPublishPage({
         }
       />
       <Form
+        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
         form={form}
         layout="vertical"
         initialValues={{ label: '', note: '' }}
@@ -117,7 +118,7 @@ export function StudioPublishPage({
           window.scrollTo({ top: 0 })
         }}
       >
-        <ResourceFormSection testName="publish">
+        <ResourceFormSection testName="publish" fill>
           <SectionParts>
             {changes !== null && (
               <SectionPart

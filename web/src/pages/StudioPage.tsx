@@ -565,7 +565,7 @@ function StudioWorkspace() {
           onCreated={onApplicationCreated}
         />
       </ShellSidebar>
-      <Flex vertical gap="middle">
+      <Flex vertical gap="middle" style={{ flex: 1 }}>
         {loaded && 'resources' in loaded && (
           <StudioPublishing
             key={application}
