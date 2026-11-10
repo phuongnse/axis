@@ -161,7 +161,6 @@ export function StudioAskAi({
             <Flex
               component="ul"
               vertical
-              gap={4}
               style={{ listStyle: 'none', margin: 0, padding: 0 }}
               data-testid="studio-ai-waiting"
             >
@@ -197,7 +196,7 @@ export function StudioAskAi({
 
 /**
  * One request that waits for its author, drawn as a menu's item is, see docs/reference/actions-and-controls.md#menus:
- * the whole row is a link to its page, `spacing-xs` in from the panel's edges with `radius-base` corners, its words in
+ * the whole row is a link to its page, across the panel's width with square corners and no gap, its words in
  * the text colour, on the hover tint under the pointer, and in `primaryText` on the selected tint while its page is
  * open. Under them its state and when it was sent. Proposed: one look for a selected item, see the review on #3263.
  */
@@ -211,7 +210,7 @@ function WaitingRow({
   open: boolean
 }) {
   const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
   const [hovered, setHovered] = useState(false)
   const stateWords = useRequestStateWords()
@@ -219,10 +218,8 @@ function WaitingRow({
   const sentAt = new Date(request.sentAt)
   const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(sentAt)
   const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(sentAt)
-  const inset = spacing.md - spacing.xs
-
   return (
-    <li style={{ marginInline: -inset }}>
+    <li style={{ marginInline: -spacing.md }}>
       <Link
         to={authoringRequestAddress(application, request.id)}
         aria-current={open ? 'page' : undefined}
@@ -230,8 +227,7 @@ function WaitingRow({
         onMouseLeave={() => setHovered(false)}
         style={{
           display: 'block',
-          padding: `${spacing.xs / 2}px ${inset}px`,
-          borderRadius: radius.base,
+          padding: `${spacing.xs / 2}px ${spacing.md}px`,
           color: open ? colour.primaryText : colour.text,
           background: open ? selectedItemTint(mode) : hovered ? hoverItemTint(mode) : undefined,
         }}

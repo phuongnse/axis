@@ -91,12 +91,12 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       TreeSelect: fieldBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
-      // Proposed: a menu's item, in a dropdown or the sidebar, has `radius-base` corners, see the review on #3263.
+      // Proposed: a menu's item spans its menu's width with square corners, see the review on #3263.
       Dropdown: {
         colorError: colour.dangerText,
         colorPrimary: colour.primaryText,
         paddingXXS: spacing.xs,
-        borderRadiusSM: radius.base,
+        borderRadiusSM: 0,
       },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
@@ -109,8 +109,9 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
       },
       Menu: {
-        itemBorderRadius: radius.base,
-        itemMarginInline: spacing.xs,
+        itemBorderRadius: 0,
+        itemMarginInline: 0,
+        itemMarginBlock: 0,
         itemSelectedColor: colour.primaryText,
         horizontalItemSelectedColor: colour.primaryText,
         collapsedWidth: 64,
@@ -198,6 +199,10 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     `.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`,
     `.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`,
     `.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`,
+    // Proposed: a dropdown menu keeps its space above and below its items, and its items span its width, see the
+    // review on #3263.
+    '.ant-dropdown .ant-dropdown-menu { padding-inline: 0; }',
+    '.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-list { margin-inline: 0; }',
   ].join('\n')
 }
 
