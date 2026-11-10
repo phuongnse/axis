@@ -56,12 +56,14 @@ loses no work.
   claim is fenced by `claimed_by`, which is new for each claim, so a host that lost its claim, or
   whose request was dropped, changes nothing and stops working on that request.
 - **Resuming.** Each finished step is committed with the request's next state before the next
-  starts, and a commit that keeps the claim also extends the lease. After a restart the next host resumes at the last finished step. It closes the step
+  starts. The commit frees the request, and a later turn claims it again. After a restart the next host resumes at the last finished step. It closes the step
   that never finished with the outcome `interrupted`, which keeps its tokens, and runs that step
   again as a new step. A step's tokens are written to its row and to the request as soon as its
   call ends. A model call that was in flight is made again, and its tokens count again.
-- **Fair use** _(planned for M35)_. The agent host takes the requests of the tenants of a cell in turn, as the worker
-  shares its time, so one tenant's long request does not hold back another's.
+- **Fair use.** The agent host takes the tenants that have claimable requests in turn, as the worker shares its time,
+  see [fair share](worker-scheduling.md#fair-share). Each turn claims one request of the tenant and runs one step of it. Every
+  tenant has the same share, one step per turn, so one tenant's long request does not hold back another's. A tenant joins
+  the turns at each poll and leaves when its claim finds nothing.
 
 ## Routes
 
