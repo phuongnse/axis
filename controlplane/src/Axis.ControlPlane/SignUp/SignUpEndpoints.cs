@@ -58,7 +58,8 @@ internal static class SignUpEndpoints
         // See docs/reference/sign-up.md#the-verify-page. One conditional update marks a pending, unexpired sign-up verified, so a link
         // works once and two parallel confirms cannot both succeed. The same transaction records the acceptance of the terms and of the
         // data processing agreement, see docs/reference/sign-up.md#terms-acceptance, and starts the tenant's trialing subscription,
-        // see docs/reference/subscriptions.md#one-clock. A used or expired link answers 409 with its state. So does a link whose address
+        // see docs/reference/subscriptions.md#one-clock, and queues the tenant's provisioning, see docs/reference/sign-up.md#provisioning. It
+        // answers the progress secret, 32 random bytes in base64url, and stores only its SHA-256. The secret is never logged. A used or expired link answers 409 with its state. So does a link whose address
         // another sign-up verified first: the unique index of the verified email refuses it, nothing changes and it answers confirmed.
         endpoints.MapPost("/api/sign-up/confirm", ConfirmAsync);
 
@@ -337,6 +338,7 @@ internal static class SignUpEndpoints
         {
             await using var connection = await controlPlane.OpenConnectionAsync(cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            var secret = RandomNumberGenerator.GetBytes(TokenBytes);
             Guid id;
             string subdomain;
             string termsVersion;
@@ -345,11 +347,12 @@ internal static class SignUpEndpoints
             try
             {
                 await using (var confirm = new NpgsqlCommand(
-                    "UPDATE control_plane.sign_ups SET state = 'verified' WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain, terms_version, dpa_version, privacy_version",
+                    "UPDATE control_plane.sign_ups SET state = 'verified', secret_hash = @secretHash WHERE token_hash = @hash AND state = 'pending' AND expires_at > now() RETURNING id, subdomain, terms_version, dpa_version, privacy_version",
                     connection,
                     transaction))
                 {
                     confirm.Parameters.AddWithValue("hash", hash);
+                    confirm.Parameters.AddWithValue("secretHash", SHA256.HashData(secret));
                     await using var reader = await confirm.ExecuteReaderAsync(cancellationToken);
                     if (await reader.ReadAsync(cancellationToken))
                     {
@@ -414,8 +417,11 @@ internal static class SignUpEndpoints
 
                 // The sign-up is the person who confirmed: billing portal accounts do not exist yet.
                 await AuditRecords.AppendAsync(transaction, AuditActorKind.Account, id.ToString(), "subscription.trialing", subscriptionId.ToString(), cancellationToken);
+
+                // The payload is only the id: the job reads the rest from the sign-up, as a payload is stored in the database.
+                await JobQueue.EnqueueAsync(connection, transaction, ProvisionTenantJobHandler.JobKind, new JsonObject { ["signUpId"] = id.ToString() }, null, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return Results.Ok(new { id });
+                return Results.Ok(new { id, secret = Base64Url.EncodeToString(secret) });
             }
         }
 

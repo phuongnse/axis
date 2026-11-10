@@ -91,6 +91,10 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     builder.Services.AddSingleton<IJobHandler, DirectoryCorrection>();
     builder.Services.AddSingleton(new RecurringJob(DirectoryCorrection.JobKind, TimeSpan.FromMinutes(5)));
 
+    // The provisioning of a confirmed sign-up. It places the tenant in a cell, so it needs the directory and a cell to call.
+    builder.Services.AddSingleton<CellPicker>();
+    builder.Services.AddSingleton<IJobHandler, ProvisionTenantJobHandler>();
+
     // The clock of the subscriptions, queued every hour. It finds each tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
     builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));

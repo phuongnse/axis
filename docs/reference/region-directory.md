@@ -24,8 +24,6 @@ The directory holds ids, hosts and cells, and no personal data.
 
 ## Picking a cell
 
-_(planned for M33)_
-
 The directory sends a new tenant to the least full cell of its region that has room.
 
 - **Room.** A new tenant goes to a cell of its region that takes new tenants and is under 80% of its
@@ -35,8 +33,9 @@ The directory sends a new tenant to the least full cell of its region that has r
 - **Written on acceptance.** When the cell accepts the create, the tenant row is written and the
   cell's count goes up by one, in one transaction. The same transaction writes the host row
   `<tenant id>.<tenant domain>` under the cell.
-- **No cell left.** The sign-up waits as `queued`, the operator is alerted to open a cell, and the
-  person is told by email when their tenant is ready.
+- **No cell left.** The sign-up waits as `queued` and the picker logs an error that tells the operator
+  to open a cell. The sign-up's job tries again 5 minutes later, and the person is told by email when a
+  later run succeeds and their tenant is ready.
 - **Counts stay true.** Every 5 minutes the directory reads each cell's tenant list through the
   provisioning API and corrects its counts and its rows, so a tenant created or deleted from a cell
   console is found. The control plane queues one durable job every 5 minutes. The job reads every

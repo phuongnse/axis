@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -81,6 +81,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
                 table.HasCheckConstraint("ck_sign_ups_state", "state IN ('pending', 'verified', 'expired')");
                 table.HasCheckConstraint("ck_sign_ups_language", "language IN ('en', 'vi')");
                 table.HasCheckConstraint("ck_sign_ups_token_hash", "token_hash IS NULL OR octet_length(token_hash) = 32");
+                table.HasCheckConstraint("ck_sign_ups_secret_hash", "secret_hash IS NULL OR octet_length(secret_hash) = 32");
+                table.HasCheckConstraint("ck_sign_ups_provisioning", "provisioning IS NULL OR provisioning IN ('queued', 'creating', 'ready')");
             });
             signUp.HasKey(s => s.Id).HasName("pk_sign_ups");
             signUp.Property(s => s.Id).HasColumnName("id").ValueGeneratedNever();
@@ -96,6 +98,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             signUp.Property(s => s.PrivacyVersion).HasColumnName("privacy_version");
             signUp.Property(s => s.State).HasColumnName("state").HasDefaultValue("pending");
             signUp.Property(s => s.TokenHash).HasColumnName("token_hash").HasColumnType("bytea");
+            signUp.Property(s => s.SecretHash).HasColumnName("secret_hash").HasColumnType("bytea");
+            signUp.Property(s => s.Provisioning).HasColumnName("provisioning").HasColumnType("text");
             signUp.Property(s => s.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             signUp.Property(s => s.ExpiresAt).HasColumnName("expires_at");
             signUp.HasIndex(s => s.Subdomain, "ux_sign_ups_pending_subdomain").IsUnique().HasFilter("state = 'pending'");
