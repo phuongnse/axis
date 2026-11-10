@@ -334,7 +334,10 @@
     "checklist": [
       "The change keeps every rule of docs/writing-docs.md and leaves no doc statement false: read the page and check the diff, code included, against each of its rules",
       "The change keeps docs/testing.md#rules-for-tests: read that section and check the tests and checks the change adds, changes or removes against each of its rules",
-      "The change adds no exception to a check and loosens none, as docs/delivery.md#how-pull-requests-merge states",
+      {
+        "text": "The change adds no exception to a check and loosens none, as docs/delivery.md#how-pull-requests-merge states",
+        "person": true
+      },
       "The change keeps docs/reference/shared-widgets.md#the-rule: for each thing it draws, loads or checks, search for the widget, helper or route that already does that job and check that the change uses or extends it, adds no second way to it, and gives a new shared widget its row in that page",
       "A change that adds or changes a screen text keeps docs/reference/ui-writing.md and its glossary: read the page and check each text against each of its rules"
     ]

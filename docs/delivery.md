@@ -128,13 +128,15 @@ that holds it.
   rise of a baseline count, and no rule removed, narrowed or skipped in a check script under
   `scripts/` or its test. The review checklist refuses such a change, and NexKit then mentions the
   owner, as [D137](decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md)
-  agrees.
+  agrees. The item is marked `person` in the checklist, so no fix round undoes the change: the owner's
+  approval of the reviewed commit accepts it, and NexKit then merges it.
 - **Every plan and review answers Axis's checklist.** NexKit's [`review.checklist`][nexkit-checklist]
   setting holds it. Each item names one doc section that holds rules a review can check in the diff,
   summarizes it in a sentence and asks the review to check the diff against each of its rules. The
   rules stay in their section, so a new rule adds no item. A rule that a script or a test can check is
   checked there, not by the review. An item not met requests changes like a blocking finding, so a pull
-  request that leaves a doc false or loosens a check does not merge.
+  request that leaves a doc false does not merge. An item the owner decides, marked `person`, starts no
+  fix round, and its pull request waits for the owner's approval.
 - **NexKit acts as the owner's [GitHub App][nexkit-app],** which its `github_app` setting names. The owner keeps one
   App for every repository that uses NexKit and installs it on this one, and its id and private key
   are repository secrets. Its pushes and merges count like a person's: they start workflows, and
