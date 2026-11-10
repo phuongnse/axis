@@ -83,6 +83,9 @@ public sealed class TenantRow
     /// <summary>The secret of the tenant realm's users client, stored encrypted. <c>null</c> when the tenant has none, such as a preview tenant.</summary>
     public byte[]? RealmUsersClientSecret { get; set; }
 
+    /// <summary>The secret of the tenant realm's agent client, stored encrypted. <c>null</c> when the tenant has none, such as a preview tenant or a tenant made before the agent client.</summary>
+    public byte[]? RealmAgentClientSecret { get; set; }
+
     /// <summary>The sender address of the tenant's emails. It is set exactly when <see cref="SmtpHost"/> is.</summary>
     public string? EmailFrom { get; set; }
 

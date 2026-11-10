@@ -639,7 +639,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     public async Task Start_brings_the_realm_of_a_tenant_with_realm_details_in_step_with_the_sites_of_the_folder()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
-        var secrets = new TenantRealmSecrets("platform-1", "activation-1", "users-1");
+        var secrets = new TenantRealmSecrets("platform-1", "activation-1", "users-1", "agent-1");
         var baseAddress = await keycloak.BaseAddressAsync();
         var realm = $"t{Guid.NewGuid():N}"[..16];
         using var http = new HttpClient();
@@ -680,7 +680,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         try
         {
             await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-                .EnsureAsync(realm, "Acme", new TenantRealmSecrets("platform-1", "activation-1", "users-1"), new Dictionary<string, string>(), CancellationToken);
+                .EnsureAsync(realm, "Acme", new TenantRealmSecrets("platform-1", "activation-1", "users-1", "agent-1"), new Dictionary<string, string>(), CancellationToken);
 
             await using var factory = CreateFactory(a, b, folder.Path, logs, RealmSettings(baseAddress, realm, WrongSecret));
 

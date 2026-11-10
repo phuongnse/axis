@@ -279,8 +279,8 @@ The command runs these steps in order, and each writes its own line.
 The `realm` step gives a tenant that gets a new realm its realm, its clients and, when the archive
 holds `realm.json`, its people.
 
-1. It creates the realm named after the new tenant id, with the clients `axis`, `axis-activation` and
-   `axis-users`, and saves the generated client secrets, encrypted, as `tenant create` does.
+1. It creates the realm named after the new tenant id, with the clients `axis`, `axis-activation`,
+   `axis-users` and `axis-agent`, and saves the generated client secrets, encrypted, as `tenant create` does.
 2. It brings the realm in step with the tenant's active releases: a `site-` client for each site, and a
    brokered provider for each `oidc` identity provider. The archive holds no secret value, so a provider
    whose bindings have no value yet is left out, with a `<id> warning ...` line on standard error that

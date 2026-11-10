@@ -29,6 +29,9 @@ public static class TenantSecretFields
     /// <summary>The field of the secret of the tenant realm's client that the users page uses to change users.</summary>
     public const string RealmUsersClientSecret = "realm_users_client_secret";
 
+    /// <summary>The field of the secret of the tenant realm's client that the agent host exchanges an author's token with.</summary>
+    public const string RealmAgentClientSecret = "realm_agent_client_secret";
+
     /// <summary>
     /// The field of a tenant's backup key in a cell. Unlike every other field, the value is wrapped by the cell's backup key
     /// (<c>Cell:BackupKeyFile</c>), not the installation key.

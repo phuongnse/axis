@@ -6,13 +6,14 @@ using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// <c>tenant create</c> on a real Keycloak: it creates the tenant's realm with its three clients, stores the generated
+/// <c>tenant create</c> on a real Keycloak: it creates the tenant's realm with its four clients, stores the generated
 /// client secrets encrypted and points the tenant's <c>Oidc</c> block at the realm. The realm uses the Axis login and email
 /// themes, its account console client is off and <c>manage-account</c> is not among its default roles. A second run sets
 /// all of it again. A preview tenant gets no realm.
@@ -41,7 +42,7 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
     }
 
     [Fact]
-    public async Task Create_makes_the_realm_with_three_clients_and_stores_the_secrets_encrypted_and_points_the_oidc_block_at_it()
+    public async Task Create_makes_the_realm_with_four_clients_and_stores_the_secrets_encrypted_and_points_the_oidc_block_at_it()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = NewTenantId(scenario);
@@ -54,11 +55,17 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
         using var realm = await SendAsync(http, admin, HttpMethod.Get, $"admin/realms/{id}");
         Assert.Equal(HttpStatusCode.OK, realm.StatusCode);
-        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users" })
+        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users", "axis-agent" })
         {
             using var clients = await SendAsync(http, admin, HttpMethod.Get, $"admin/realms/{id}/clients?clientId={clientId}");
             var body = await clients.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
             Assert.Equal(1, body.GetArrayLength());
+            if (clientId == "axis-agent")
+            {
+                using var optional = await SendAsync(http, admin, HttpMethod.Get, $"admin/realms/{id}/clients/{body[0].GetProperty("id").GetString()}/optional-client-scopes");
+                var scopes = await optional.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+                Assert.Equal([RealmSync.AuthoringScope], scopes.EnumerateArray().Select(scope => scope.GetProperty("name").GetString()));
+            }
         }
 
         var row = await scenario.RowAsync(id);
@@ -67,6 +74,8 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.NotEmpty(row.OidcClientSecret);
         Assert.NotEmpty(row.RealmActivationClientSecret!);
         Assert.NotEmpty(row.RealmUsersClientSecret!);
+        Assert.NotEmpty(row.RealmAgentClientSecret!);
+        Assert.NotEmpty(AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RealmAgentClientSecret, row.RealmAgentClientSecret!).Reveal());
         var activation = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal();
         var users = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal();
         Assert.NotEmpty(await TokenAsync(http, id, "axis-activation", activation));

@@ -8,13 +8,13 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <see cref="TenantRealm"/> creates a tenant's realm in a real Keycloak with its display name, sessions of at most
-/// 8 hours and three clients. The activation client has rights over providers and clients but not users, and the users
+/// 8 hours and four clients. The activation client has rights over providers and clients but not users, and the users
 /// client has rights over users only. A second run brings the realm in step and leaves one of each client. A server error from the identity provider
 /// makes it read the realm again and repeat, up to three attempts, and any other failed status fails at once.
 /// </summary>
 public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
-    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
+    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
 
     private readonly HttpClient _http = new();
     private readonly List<string> _realms = [];
@@ -48,7 +48,7 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
         var rememberMe = body.GetProperty("ssoSessionMaxLifespanRememberMe").GetInt32();
         Assert.InRange(rememberMe, 1, TenantRealm.SessionMaxLifespanSeconds);
 
-        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users" })
+        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users", "axis-agent" })
         {
             Assert.Equal(1, await CountClientsAsync(token, realm, clientId));
         }
@@ -101,13 +101,13 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
     {
         var realm = NewRealm();
         await EnsureAsync(realm, "Acme Corporation", _secrets);
-        var renewed = new TenantRealmSecrets("platform-secret-2", "activation-secret-2", "users-secret-2");
+        var renewed = new TenantRealmSecrets("platform-secret-2", "activation-secret-2", "users-secret-2", "agent-secret-2");
         await EnsureAsync(realm, "Acme Holdings", renewed);
 
         var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
         var body = await GetJsonAsync(token, $"admin/realms/{realm}");
         Assert.Equal("Acme Holdings", body.GetProperty("displayName").GetString());
-        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users" })
+        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users", "axis-agent" })
         {
             Assert.Equal(1, await CountClientsAsync(token, realm, clientId));
         }
@@ -130,7 +130,7 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
         using var clients = await SendAsync(token, HttpMethod.Get, $"admin/realms/{realm}/clients");
         Assert.Equal(HttpStatusCode.OK, clients.StatusCode);
         var master = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
-        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users" })
+        foreach (var clientId in new[] { "axis", "axis-activation", "axis-users", "axis-agent" })
         {
             Assert.Equal(1, await CountClientsAsync(master, realm, clientId));
         }

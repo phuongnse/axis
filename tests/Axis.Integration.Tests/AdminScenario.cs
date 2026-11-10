@@ -430,6 +430,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                     secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RealmUsersClientSecret, tenant.RealmUsersClientSecret).Reveal());
                 }
 
+                if (tenant.RealmAgentClientSecret is { Length: > 0 })
+                {
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RealmAgentClientSecret, tenant.RealmAgentClientSecret).Reveal());
+                }
+
                 foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })
                 {
                     if (encrypted is { Length: > 0 })
