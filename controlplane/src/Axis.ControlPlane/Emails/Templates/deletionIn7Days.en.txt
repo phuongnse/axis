@@ -1,0 +1,13 @@
+Subject: The Axis workspace is deleted in 7 days
+
+Hello {{name}},
+
+The workspace at {{tenantAddress}} is read-only, and on {{nextStepAt}}, in 7 days, its deletion starts. The workspace and all its data are then lost. This cannot be undone.
+
+To stop it, pay in the billing portal:
+
+{{billingPortalUrl}}
+
+Export the data first: an administrator can do it from the application until then.
+
+The Axis team

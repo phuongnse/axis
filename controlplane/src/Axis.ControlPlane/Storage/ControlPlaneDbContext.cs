@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>subscriptions</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c>, the <c>subscriptions</c>, the <c>subscription_emails</c> and the append-only <c>billing.ledger_entries</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -28,6 +28,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<SignUpRow> SignUps => Set<SignUpRow>();
 
     public DbSet<SubscriptionRow> Subscriptions => Set<SubscriptionRow>();
+
+    public DbSet<SubscriptionEmailRow> SubscriptionEmails => Set<SubscriptionEmailRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
 
@@ -107,6 +109,16 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             subscription.HasIndex(s => s.SignUpId, "ix_subscriptions_sign_up_id");
             subscription.HasIndex(s => s.TenantId, "ux_subscriptions_tenant_id").IsUnique().HasFilter("state <> 'deleted'");
             subscription.HasIndex(s => s.NextAt, "ix_subscriptions_next_at").HasFilter("state <> 'deleted'");
+        });
+
+        modelBuilder.Entity<SubscriptionEmailRow>(email =>
+        {
+            email.ToTable("subscription_emails");
+            email.HasKey(e => new { e.SubscriptionId, e.Kind }).HasName("pk_subscription_emails");
+            email.Property(e => e.SubscriptionId).HasColumnName("subscription_id");
+            email.Property(e => e.Kind).HasColumnName("kind");
+            email.Property(e => e.QueuedAt).HasColumnName("queued_at").HasDefaultValueSql("now()");
+            email.HasOne<SubscriptionRow>().WithMany().HasForeignKey(e => e.SubscriptionId).HasConstraintName("fk_subscription_emails_subscription_id").OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<LedgerEntryRow>(entry =>

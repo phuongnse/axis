@@ -271,6 +271,33 @@ public sealed class CellClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task An_administrators_read_returns_each_email_name_and_language_and_a_tenant_the_cell_does_not_know_is_null()
+    {
+        var cell = Build().Get("vn-1");
+        var token = TestContext.Current.CancellationToken;
+        _server.Administrators = [("an@example.org", "An", "vi"), ("binh@example.org", null, null)];
+
+        var administrators = await cell.ListAdministratorsAsync("acme", token);
+
+        Assert.Equal([new CellAdministrator("an@example.org", "An", "vi"), new CellAdministrator("binh@example.org", null, null)], administrators);
+
+        _server.Administrators = null;
+        Assert.Null(await cell.ListAdministratorsAsync("acme", token));
+    }
+
+    [Fact]
+    public async Task An_administrators_read_answered_with_an_error_throws_with_the_status_and_no_body()
+    {
+        _server.AdministratorsStatus = 500;
+        var cell = Build().Get("vn-1");
+
+        var exception = await Assert.ThrowsAsync<CellCallException>(() => cell.ListAdministratorsAsync("acme", TestContext.Current.CancellationToken));
+
+        Assert.Equal(500, exception.Status);
+        Assert.Contains("vn-1", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task After_a_401_the_client_gets_one_new_token_and_sends_the_call_again()
     {
         var clients = Build();

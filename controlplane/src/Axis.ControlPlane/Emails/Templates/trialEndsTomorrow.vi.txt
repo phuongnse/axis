@@ -1,0 +1,11 @@
+Subject: Bản dùng thử Axis còn 1 ngày
+
+Chào {{name}},
+
+Bản dùng thử của không gian làm việc tại {{tenantAddress}} kết thúc sau 1 ngày, lúc {{nextStepAt}}. Sau đó không gian làm việc chuyển sang chế độ chỉ xem.
+
+Để tránh việc này, hãy thanh toán trên trang thanh toán trước thời điểm đó:
+
+{{billingPortalUrl}}
+
+Đội ngũ Axis

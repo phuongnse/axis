@@ -1,5 +1,6 @@
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Jobs;
 using Npgsql;
 
@@ -18,12 +19,14 @@ namespace Axis.ControlPlane.Subscriptions;
 /// the cell's job succeeded. The cell calls of a move carry the step id as their idempotency key, so a retry gets the cell's first job.
 /// A failed cell call, a job that does not end in time or a tenant with no directory row leaves the subscription as it is and logs a
 /// warning that names the subscription and the cell, never the tenant. The run goes on with the other subscriptions and throws at
-/// the end, so the job queue retries it.
+/// the end, so the job queue retries it. After its moves the run queues the timeline emails, see <c>SubscriptionClock.Emails.cs</c>.
 /// </summary>
 internal sealed partial class SubscriptionClock(
     NpgsqlDataSource controlPlane,
     [FromKeyedServices("directory")] NpgsqlDataSource directory,
     CellClients cells,
+    EmailTemplates templates,
+    ControlPlaneOptions options,
     TimeProvider clock,
     ILogger<SubscriptionClock> logger) : IJobHandler
 {
@@ -93,9 +96,10 @@ internal sealed partial class SubscriptionClock(
             }
         }
 
-        if (failed > 0)
+        var emailsFailed = await QueueEmailsAsync(now, cancellationToken);
+        if (failed > 0 || emailsFailed > 0)
         {
-            throw new InvalidOperationException($"{failed} of {due.Count} due subscriptions could not be moved.");
+            throw new InvalidOperationException($"{failed} of {due.Count} due subscriptions could not be moved, and {emailsFailed} could not get their emails.");
         }
     }
 

@@ -273,6 +273,28 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionEmailRow", b =>
+                {
+                    b.Property<Guid>("SubscriptionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subscription_id");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTimeOffset>("QueuedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("queued_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("SubscriptionId", "Kind")
+                        .HasName("pk_subscription_emails");
+
+                    b.ToTable("subscription_emails", "control_plane");
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -327,6 +349,16 @@ namespace Axis.ControlPlane.Storage.Migrations
                         {
                             t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
                         });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionEmailRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Subscriptions.SubscriptionRow", null)
+                        .WithMany()
+                        .HasForeignKey("SubscriptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_subscription_emails_subscription_id");
                 });
 
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.SubscriptionRow", b =>
