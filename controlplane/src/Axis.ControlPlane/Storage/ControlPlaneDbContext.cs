@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -40,6 +40,10 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<QuotaOverrideRow> QuotaOverrides => Set<QuotaOverrideRow>();
 
     public DbSet<LedgerEntryRow> LedgerEntries => Set<LedgerEntryRow>();
+
+    public DbSet<InvoiceRow> Invoices => Set<InvoiceRow>();
+
+    public DbSet<InvoiceLineRow> InvoiceLines => Set<InvoiceLineRow>();
 
     public DbSet<TermsAcceptanceRow> TermsAcceptances => Set<TermsAcceptanceRow>();
 
@@ -218,6 +222,51 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             entry.Property(e => e.OccurredAt).HasColumnName("occurred_at").HasDefaultValueSql("now()");
             entry.HasIndex(e => e.IdempotencyKey, "ux_ledger_entries_idempotency_key").IsUnique();
             entry.HasIndex(e => e.SubscriptionId, "ix_ledger_entries_subscription_id");
+            entry.HasIndex(e => e.InvoiceId, "ix_ledger_entries_invoice_id");
+        });
+
+        modelBuilder.Entity<InvoiceRow>(invoice =>
+        {
+            invoice.ToTable("invoices", BillingSchema, table =>
+            {
+                table.HasCheckConstraint("ck_invoices_kind", "kind IN ('period', 'change')");
+                table.HasCheckConstraint("ck_invoices_status", "status IN ('open', 'paid', 'void')");
+                table.HasCheckConstraint("ck_invoices_currency", "currency IN ('VND', 'USD')");
+                table.HasCheckConstraint("ck_invoices_period", "period IN ('month', 'year')");
+                table.HasCheckConstraint("ck_invoices_period_start", "(kind = 'period') = (period_start IS NOT NULL)");
+            });
+            invoice.HasKey(i => i.Id).HasName("pk_invoices");
+            invoice.Property(i => i.Id).HasColumnName("id").ValueGeneratedNever();
+            invoice.Property(i => i.SubscriptionId).HasColumnName("subscription_id");
+            invoice.Property(i => i.Kind).HasColumnName("kind");
+            invoice.Property(i => i.Status).HasColumnName("status").HasDefaultValue("open");
+            invoice.Property(i => i.Currency).HasColumnName("currency");
+            invoice.Property(i => i.PlanCode).HasColumnName("plan_code");
+            invoice.Property(i => i.PlanVersion).HasColumnName("plan_version");
+            invoice.Property(i => i.Period).HasColumnName("period");
+            invoice.Property(i => i.PeriodStart).HasColumnName("period_start");
+            invoice.Property(i => i.DueAt).HasColumnName("due_at");
+            invoice.Property(i => i.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            invoice.HasOne<SubscriptionRow>().WithMany().HasForeignKey(i => i.SubscriptionId).HasConstraintName("fk_invoices_subscription_id").OnDelete(DeleteBehavior.Restrict);
+            invoice.HasIndex(i => i.SubscriptionId, "ix_invoices_subscription_id");
+            invoice.HasIndex(i => new { i.SubscriptionId, i.PeriodStart }, "ux_invoices_period").IsUnique().HasFilter("kind = 'period'");
+        });
+
+        modelBuilder.Entity<InvoiceLineRow>(line =>
+        {
+            line.ToTable("invoice_lines", BillingSchema, table =>
+            {
+                table.HasCheckConstraint("ck_invoice_lines_kind", "kind IN ('plan', 'addOn')");
+                table.HasCheckConstraint("ck_invoice_lines_quantity", "quantity >= 1");
+                table.HasCheckConstraint("ck_invoice_lines_line_number", "line_number >= 1");
+            });
+            line.HasKey(l => new { l.InvoiceId, l.LineNumber }).HasName("pk_invoice_lines");
+            line.Property(l => l.InvoiceId).HasColumnName("invoice_id");
+            line.Property(l => l.LineNumber).HasColumnName("line_number");
+            line.Property(l => l.Kind).HasColumnName("kind");
+            line.Property(l => l.Code).HasColumnName("code");
+            line.Property(l => l.Quantity).HasColumnName("quantity");
+            line.HasOne<InvoiceRow>().WithMany().HasForeignKey(l => l.InvoiceId).HasConstraintName("fk_invoice_lines_invoice_id").OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TermsAcceptanceRow>(acceptance =>

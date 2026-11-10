@@ -7,18 +7,33 @@ company, the providers' contracts and the accountant are in place.
 
 ## Invoices
 
-_(planned for M34)_
-
 A billing invoice is Axis's own record of what a subscription owes for a period or a change.
 
-- **A billing invoice for each period.** The [control plane](control-plane.md) creates the invoice
-  of a period 7 days before it starts, with its lines: the plan, each add-on, and any prorated charge
-  or credit. Its due date is the period's first day. A plan change or an add-on makes an invoice at
-  once, due in 7 days.
+- **Stored with its lines.** `billing.invoices` holds the `id`, the `subscription_id`, the `kind`
+  (`period` or `change`), the `status` (`open`, `paid` or `void`), the `currency`, the pinned
+  `plan_code`, `plan_version` and `period`, the `period_start` of a period invoice, the `due_at` and
+  `created_at`. `billing.invoice_lines` holds its lines: the plan is line 1 and each add-on the
+  subscription holds follows, ordered by code. A line has a `kind` (`plan` or `addOn`), a `code` and a
+  `quantity`, and no amount. Both kinds take their lines from the plan and add-ons the subscription
+  pins, see [the catalogue](plans.md#the-catalogue), and an add-on that the pinned plan does not list
+  fails and writes nothing.
+- **Charged in the ledger.** Creating an invoice writes one `charge` entry for each line, in the same
+  transaction, see [the ledger](#the-ledger). Each entry carries the invoice's id and the key
+  `invoice:<invoice id>:<line number>`. The invoice's amount is the sum of the entries with its id,
+  without its `payment` and `refund` entries, so it does not fall once the invoice is paid. A yearly
+  period costs 10 times the monthly price, as the catalogue computes.
+- **One for each period.** A subscription has one invoice for each period start. Creating the
+  invoice of a period that has one returns it and adds no line or ledger entry, so a retried job or a
+  race never charges twice.
+- **Due dates.** A period invoice is due on the period's first day. A change invoice is due 7 days
+  after it is created.
+- **Made ahead** _(planned for M34)_. The [control plane](control-plane.md) creates the invoice of a
+  period 7 days before it starts, with its lines: the plan, each add-on, and any prorated charge or
+  credit. A plan change or an add-on makes an invoice at once, with any prorated charge or credit.
 - **Not the e-invoice.** This is Axis's own record of what is owed. The legal invoice of a payment in
   Vietnam is the [e-invoice](e-invoices.md), issued once it is paid.
-- **One currency.** A subscription's currency is set by its first payment: `VND` when it pays in
-  Vietnam, `USD` when it pays abroad. It does not change.
+- **One currency** _(planned for M34)_. A subscription's currency is set by its first payment: `VND`
+  when it pays in Vietnam, `USD` when it pays abroad. It does not change.
 
 ## Paying in Vietnam
 
@@ -103,7 +118,8 @@ The ledger is the only source of money: every amount is an entry in it, and noth
   nothing and reports so, even if the amount differs, so a retried webhook or job never counts money
   twice.
 - **Balances are sums.** What a subscription owes is the sum of its entries for each currency, as a
-  whole number, so the ledger is the only source of money, and the invoices and the portal read it.
+  whole number, so the ledger is the only source of money. The portal reads it, and an invoice's amount is the
+  sum of its entries without payments and refunds, see [invoices](#invoices).
 - **Refunds** _(planned for M34)_. The operator issues a refund with `Axis.ControlPlane.Admin`. A
   refund through Paddle goes through its API. A refund in Vietnam is a bank transfer the operator
   makes, then records.
