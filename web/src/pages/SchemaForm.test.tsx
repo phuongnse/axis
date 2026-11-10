@@ -778,6 +778,12 @@ describe('SchemaForm controls that know what they hold', () => {
     const dialog = await findDialog('Edit module')
 
     const approver = within(dialog).getByRole('combobox', { name: 'Budget approver' })
+    expect(within(dialog).getByLabelText('Budget approver')).toHaveAccessibleDescription(
+      english['shell.studio.module.roleSlot.help'],
+    )
+    expect(within(dialog).getByLabelText('Mail server')).toHaveAccessibleDescription(
+      english['shell.studio.module.connectorSlot.help'],
+    )
     expect(within(dialog).getByTestId('studio-slot-approver')).toHaveTextContent('Budget approver')
     expect(within(dialog).getByText('Clerk')).toBeVisible()
     await userEvent.click(approver)

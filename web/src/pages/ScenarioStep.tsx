@@ -282,25 +282,31 @@ export function ScenarioStep({
             .filter((field) => Object.hasOwn(values, field.name))
             .map((field) => (
               <div key={field.name} data-testid={`studio-field-${at(`values/${pointerSegment(field.name)}`)}`}>
-                <div>{field.name}</div>
-                <FieldCell
-                  field={toSeedField(field)}
-                  value={values[field.name]}
-                  problem={undefined}
-                  onChange={(next) => onChange(at(`values/${pointerSegment(field.name)}`), next)}
-                />
+                <AxisField
+                  label={field.name}
+                  help={t('shell.studio.scenario.value.help').replace('{type}', field.type)}
+                >
+                  <FieldCell
+                    field={toSeedField(field)}
+                    value={values[field.name]}
+                    problem={undefined}
+                    onChange={(next) => onChange(at(`values/${pointerSegment(field.name)}`), next)}
+                  />
+                </AxisField>
               </div>
             ))}
           {Object.keys(values)
             .filter((key) => !known.has(key))
             .map((key) => (
               <div key={key} data-testid={`studio-field-${at(`values/${pointerSegment(key)}`)}`}>
-                <div>{key}</div>
-                <Input
-                  aria-label={key}
-                  value={literalText(values[key])}
-                  onChange={(event) => onChange(at(`values/${pointerSegment(key)}`), parseLiteral(event.target.value))}
-                />
+                <AxisField label={key} help={t('shell.studio.scenario.unnamedValue.help')}>
+                  <Input
+                    value={literalText(values[key])}
+                    onChange={(event) =>
+                      onChange(at(`values/${pointerSegment(key)}`), parseLiteral(event.target.value))
+                    }
+                  />
+                </AxisField>
               </div>
             ))}
           {missing.length > 0 && (

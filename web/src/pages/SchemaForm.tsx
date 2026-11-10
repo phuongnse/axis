@@ -675,6 +675,7 @@ function catalogInput({
       const slots = control === 'roles' ? installed.roles : installed.connectors
       return (
         <ModuleSlots
+          control={control}
           slots={slots}
           noSlots={control === 'roles' && installed.roles.length === 0 && installed.connectors.length === 0}
           names={referenceOptions(names!, control === 'roles' ? 'role' : 'connector', rootValue, pointer)}

@@ -1,5 +1,6 @@
 import { Flex, Select } from 'antd'
 import type { ReactNode } from 'react'
+import { AxisField } from '../platform/AxisField'
 import { escapePointerSegment } from '../platform/jsonPatch'
 import type { StudioCatalogSlot } from '../platform/studio'
 import { slotTitle, timeZoneText, type RangeOperator } from '../platform/studioCatalog'
@@ -135,10 +136,12 @@ export function VersionRangeInput({
 }
 
 /**
- * One select for each slot of the chosen module: the slot's label above a select of the application's names. A module
- * with no slots at all says so, on its roles field only, so the line shows once.
+ * One select for each slot of the chosen module: the slot's title above a select of the application's roles or
+ * connectors, which the `control` names. A module with no slots at all says so, on its roles field only, so the line
+ * shows once.
  */
 export function ModuleSlots({
+  control,
   slots,
   noSlots,
   names,
@@ -147,6 +150,7 @@ export function ModuleSlots({
   locale,
   onChange,
 }: {
+  control: 'roles' | 'connectors'
   slots: StudioCatalogSlot[]
   /** Whether to say that the module has no roles or connectors. */
   noSlots: boolean
@@ -158,9 +162,10 @@ export function ModuleSlots({
   onChange: (pointer: string, next: unknown) => void
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const map =
     typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
+  const help = t(control === 'roles' ? 'shell.studio.module.roleSlot.help' : 'shell.studio.module.connectorSlot.help')
   return (
     <Flex vertical gap="small">
       {noSlots && <span style={{ color: colour.textMuted }}>{t('shell.studio.module.noSlots')}</span>}
@@ -169,16 +174,17 @@ export function ModuleSlots({
         const mapped = map[slot.name]
         return (
           <div key={slot.name} data-testid={`studio-slot-${slot.name}`}>
-            <div style={{ color: colour.textMuted, marginBottom: spacing.xs }}>{title}</div>
-            <ReferencePicker
-              name={title}
-              value={typeof mapped === 'string' ? mapped : undefined}
-              required={false}
-              options={names}
-              onChange={(next) =>
-                onChange(`${pointer}/${escapePointerSegment(slot.name)}`, next === '' ? undefined : next)
-              }
-            />
+            <AxisField label={title} help={help}>
+              <ReferencePicker
+                name={title}
+                value={typeof mapped === 'string' ? mapped : undefined}
+                required={false}
+                options={names}
+                onChange={(next) =>
+                  onChange(`${pointer}/${escapePointerSegment(slot.name)}`, next === '' ? undefined : next)
+                }
+              />
+            </AxisField>
           </div>
         )
       })}
