@@ -3,9 +3,9 @@ import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { configProblems, maxShards, shardedChecks } from './lib/shards.mjs'
+import { configProblems, jobLimit, maxShards, shardedChecks } from './lib/shards.mjs'
 
-// NexKit and CI run the E2E, integration and unit tests in as many shards as each split's --count prints, up to the
+// NexKit and CI run the E2E, integration, smoke and unit tests in as many shards as each split's --count prints, up to the
 // check's max, which matches the split's cap. See docs/development.md#shards.
 const root = fileURLToPath(new URL('..', import.meta.url))
 const config = JSON.parse(readFileSync(new URL('../.nexkit/config.json', import.meta.url), 'utf8'))
@@ -21,7 +21,7 @@ const valid = {
     { name: 'build', run: 'scripts/build.sh', group: 'build-lint' },
     { name: 'lint', run: 'scripts/lint.sh', group: 'build-lint' },
     sharded('test'),
-    { name: 'smoke', run: 'scripts/smoke.sh' },
+    sharded('smoke'),
     sharded('integration'),
     sharded('e2e'),
   ],
@@ -51,9 +51,9 @@ describe('configProblems', () => {
 
   test('reports a fixed shard left over', () => {
     const config = {
-      checks: [...valid.checks.filter((check) => check.name !== 'smoke'), { name: 'e2e-1', run: 'AXIS_E2E_SHARD=1/3 scripts/e2e.sh' }],
+      checks: [...valid.checks, { name: 'smoke-1', run: 'AXIS_SMOKE_SHARD=1/2 scripts/smoke.sh' }],
     }
-    assert.deepEqual(configProblems(config), ['e2e-1 is a fixed shard; its check has shards.'])
+    assert.deepEqual(configProblems(config), ['smoke-1 is a fixed shard; its check has shards.'])
   })
 
   test('reports a max that is not the split’s cap, since NexKit fails a count above the max', () => {
@@ -75,11 +75,12 @@ describe('configProblems', () => {
   })
 
   test('reports caps that leave no room for two rounds within the job limit', () => {
-    const config = {
-      checks: [...valid.checks, { name: 'extra-1', run: 'true' }, { name: 'extra-2', run: 'true' }],
-    }
-    assert.deepEqual(configProblems(config), [
-      'A round at its caps runs 12 jobs, so two rounds pass the 20 jobs GitHub runs at once.',
+    // build-lint and the caps make a round; enough extra jobs make it one more than half the limit.
+    const round = 1 + Object.values(maxShards).reduce((sum, cap) => sum + cap, 0)
+    const extra = Array.from({ length: jobLimit / 2 + 1 - round }, (_, i) => ({ name: `extra-${i + 1}`, run: 'true' }))
+    assert.deepEqual(configProblems({ checks: [...valid.checks, ...extra.slice(1)] }), [])
+    assert.deepEqual(configProblems({ checks: [...valid.checks, ...extra] }), [
+      `A round at its caps runs ${jobLimit / 2 + 1} jobs, so two rounds pass the ${jobLimit} jobs GitHub runs at once.`,
     ])
   })
 })

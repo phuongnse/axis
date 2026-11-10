@@ -16,7 +16,7 @@ import {
   split,
   weigh,
 } from './lib/integration-shard.mjs'
-import { mergeDurations } from './lib/shards.mjs'
+import { budgetSeconds, maxShards, mergeDurations } from './lib/shards.mjs'
 
 const testClass = (name, seconds, collection) => ({ name: `N.${name}`, seconds, collection, tests: 1 })
 
@@ -286,10 +286,11 @@ describe('main', () => {
   test('--count prints the cap, and warns about each class over the budget', () => {
     const dir = project()
     try {
-      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 1000, "N.BTests": 5 }\n')
+      const big = budgetSeconds + 100
+      writeFileSync(path.join(dir, 'class-durations.json'), `{ "N.ATests": ${big}, "N.BTests": 5 }\n`)
       const warnings = []
-      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '3')
-      assert.deepEqual(warnings, ['Over budget: N.ATests takes about 1000 s, longer than the budget of 900 s.'])
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), String(maxShards.integration))
+      assert.deepEqual(warnings, [`Over budget: N.ATests takes about ${big} s, longer than the budget of ${budgetSeconds} s.`])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

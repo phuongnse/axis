@@ -175,7 +175,7 @@ that holds it.
 ### NexKit's checks
 
 - **The checks run in parallel jobs,** with `parallel_checks` on: the build and lint share one job,
-  the group `build-lint`, the smoke tests get one, and the unit, integration and E2E tests get one per
+  the group `build-lint`, and the unit, integration, smoke and E2E tests get one per
   shard, as many as their split counts up to its cap, as [the shards section](development.md#shards)
   says. A check round then takes about as long as its slowest job, instead of all of them in a row. A
   check gets a job of its own when sharing one made that job the slowest, and a suite splits into
