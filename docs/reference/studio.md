@@ -486,8 +486,8 @@ edits the same draft on a canvas.
 - **The page.** The Form tab shows three [sections](studio-resource-form.md#sections): General, with the
   page's name, its [title](studio-resource-form.md#labels) and its [description](#editor); the
   [parameters](#page-parameters); and Widgets, with the [widget tree](#widget-tree). Each page field and
-  each widget name picker, and each field of the `table`, `form`, `detail`, `taskInbox` and `processInspector`
-  panels and of their actions, has a label and help, named by its path in the page.
+  each widget name picker, and each field of every widget panel and of their actions, has a label and help,
+  named by its path in the page. The page editor draws no label of its own.
 - **Widget panels.** Each widget type has a panel that shows the widget's properties: `table`, `form`,
   `taskInbox`, `processInspector`, `kpi`, `chart`, `detail`, `columns`, `tabs` and `section`. A widget
   of a type with no panel shows its type and points to the JSON view.
@@ -525,6 +525,8 @@ Add comparison adds a comparison with its own measure picker and label, and Add 
 [navigate action](#navigate-actions), each with Remove. A `chart` panel has a data source picker, a
 kind picker over `bar`, `line` and `pie`, a category picker, a title, and a list of measures, each with
 a picker and a label, with Add measure and Remove measure, which is off when one measure is left.
+Every field and group of both panels shows its label and help. A chart's title and a section's title
+share one text, Title, with one help.
 
 - **Data sources.** A KPI's data source picker lists only data sources with a total row, and a chart's
   only those with exactly one group field, which are the only choices the compiler accepts.
@@ -534,7 +536,7 @@ a picker and a label, with Add measure and Remove measure, which is off when one
   or `max` the type of its field. Picking another data source keeps the names already set, and a name
   that the new data source does not project shows as unknown, which the compiler reports after the
   save. While the names have not loaded, the column pickers are plain boxes.
-- **Parameters.** Both panels have a Parameters list, with a picker for each parameter of the data
+- **Parameters.** Both panels have a Page parameters list, with a picker for each parameter of the data
   source that lists the page parameters of the same type. Clearing a picker removes its key, a key the
   list does not show stays as it is, and clearing the last one leaves an empty `parameters` object. A
   binding to a missing or wrong-type page parameter shows as unknown. The compiler checks the target,
@@ -591,7 +593,8 @@ body as nested lists, and a row opens its widget's panel at its own pointer, suc
 
 ### Container panels
 
-Each container type has a panel under its fixed type, and a key the panels do not show, on a column, a
+Each container type has a panel under its fixed type. The type shows in a read-only box labelled Widget
+type, and every field of the panel shows its label and help. A key the panels do not show, on a column, a
 tab or a section, stays in the saved file. A container whose parts are malformed, such as `columns`
 that is not a list, points to the JSON view.
 
