@@ -48,7 +48,7 @@ echo '<testsuites><testsuite name="s" tests="1"><testcase name="t" time="0"/></t
 `,
 }
 
-function runE2e(shard, args = []) {
+function runE2e(shard, args = [], extraEnv = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-e2e-'))
   try {
     for (const file of [
@@ -57,6 +57,7 @@ function runE2e(shard, args = []) {
       'scripts/lib/affected.mjs',
       '.nexkit/config.json',
       'scripts/lib/e2e-shard.mjs',
+      'scripts/lib/shards.mjs',
       'scripts/test-report.mjs',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
@@ -104,10 +105,12 @@ function runE2e(shard, args = []) {
       'CI',
       'AXIS_TEST_RESULTS_DIR',
       'AXIS_E2E_SHARD',
+      'NEXKIT_SHARD',
     ]) {
       delete env[name]
     }
     if (shard !== undefined) env.AXIS_E2E_SHARD = shard
+    Object.assign(env, extraEnv)
 
     const result = spawnSync('bash', ['scripts/e2e.sh', ...args], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
@@ -150,6 +153,22 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(run.results('playwright-1'))
     for (const suite of smokeSuites) assert.ok(!run.results(suite), suite)
     assert.match(run.stdout, /^\| playwright-1 \| 1 \| 0 \| 0 \| /m)
+  })
+
+  test('NEXKIT_SHARD runs the same shard as AXIS_E2E_SHARD', () => {
+    const run = runE2e(undefined, [], { NEXKIT_SHARD: '2/3' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.equal(playwrightCall(run), playwrightCall(runE2e('2/3')))
+    assert.ok(run.results('playwright-2'))
+  })
+
+  test('AXIS_E2E_SHARD wins over NEXKIT_SHARD when both are set', () => {
+    const run = runE2e('1/3', [], { NEXKIT_SHARD: '2/3' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.match(playwrightCall(run), / -- specs\/journey\.spec\.ts$/)
+    assert.ok(run.results('playwright-1'))
   })
 
   test("a shard with arguments leaves the split to Playwright's --shard over the matching tests", () => {
@@ -281,6 +300,14 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
       assert.ok(!run.calls.some((call) => call.startsWith('docker ')), run.calls.join('\n'))
     })
   }
+
+  test('a malformed NEXKIT_SHARD stops the script and names NEXKIT_SHARD', () => {
+    const run = runE2e(undefined, [], { NEXKIT_SHARD: '4/3' })
+
+    assert.equal(run.status, 2)
+    assert.match(run.stderr, /NEXKIT_SHARD must be a shard such as 1\/3, not '4\/3'/)
+    assert.ok(!run.calls.some((call) => call.startsWith('docker ')), run.calls.join('\n'))
+  })
 })
 
 describe('docs/development.md lists the E2E logs that scripts/e2e.sh writes', () => {

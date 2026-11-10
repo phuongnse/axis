@@ -2,6 +2,7 @@
 //
 // Usage: node scripts/lib/integration-shard.mjs K/N
 //        node scripts/lib/integration-shard.mjs --classes K/N
+//        node scripts/lib/integration-shard.mjs --count
 //        node scripts/lib/integration-shard.mjs --durations JUNIT...
 //
 // The first prints the dotnet test filter arguments of shard K of N, one per line, and fails when the
@@ -11,7 +12,10 @@
 // runs the performance tests. Every shard computes the same split, so each class runs in exactly
 // one shard.
 // The second prints the full names of the classes given to shard K, one per line.
-// The third rewrites tests/Axis.Integration.Tests/class-durations.json from xUnit JUnit files, such
+// The third prints the fewest shards whose longest estimated shard fits the budget in
+// scripts/lib/shards.mjs, at most its cap. A class, a collection or the control plane suite that alone
+// takes longer than the budget gets an `Over budget:` line on stderr, and the count still prints.
+// The fourth rewrites tests/Axis.Integration.Tests/class-durations.json from xUnit JUnit files, such
 // as the artifacts/test-results/Axis.Integration.Tests.xml of each shard of a full run, and the
 // Axis.ControlPlane.Integration.Tests.xml of shard 1. A class missing from them keeps its entry, and an
 // entry whose class no longer exists is dropped.
@@ -25,6 +29,7 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { budgetSeconds, maxShards, parseShard, shardCount } from './shards.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const project = path.join(root, 'tests/Axis.Integration.Tests')
@@ -84,28 +89,51 @@ export function weigh(classes, durations) {
   return classes.map((c) => ({ ...c, seconds: durations[c.name] ?? c.tests * perTest }))
 }
 
-/** Splits weighed classes over `total` shards and returns the class names of each. Shard 1 starts at `firstShardSeconds`. */
-export function split(classes, total, firstShardSeconds = 0) {
-  const units = new Map()
+/** Groups weighed classes into units, heaviest first: the classes of one collection form one unit. */
+function units(classes) {
+  const grouped = new Map()
   for (const testClass of classes) {
     const key = testClass.collection ? `collection:${testClass.collection}` : testClass.name
-    const unit = units.get(key) ?? { names: [], seconds: 0 }
+    const unit = grouped.get(key) ?? { names: [], seconds: 0, collection: testClass.collection }
     unit.names.push(testClass.name)
     unit.seconds += testClass.seconds
-    units.set(key, unit)
+    grouped.set(key, unit)
   }
-  const heaviestFirst = [...units.values()].sort(
-    (a, b) => b.seconds - a.seconds || (a.names[0] < b.names[0] ? -1 : 1),
-  )
+  return [...grouped.values()].sort((a, b) => b.seconds - a.seconds || (a.names[0] < b.names[0] ? -1 : 1))
+}
+
+/** Packs units over `total` shards, the lightest first. Shard 1 starts at `firstShardSeconds`. */
+function pack(sorted, total, firstShardSeconds) {
   const shards = Array.from({ length: total }, () => ({ names: [], seconds: 0 }))
   shards[0].seconds = firstShardSeconds
-  for (const unit of heaviestFirst) {
+  for (const unit of sorted) {
     let lightest = shards[0]
     for (const shard of shards) if (shard.seconds < lightest.seconds) lightest = shard
     lightest.names.push(...unit.names)
     lightest.seconds += unit.seconds
   }
-  return shards.map((shard) => shard.names.sort())
+  return shards
+}
+
+/** Splits weighed classes over `total` shards and returns the class names of each. Shard 1 starts at `firstShardSeconds`. */
+export function split(classes, total, firstShardSeconds = 0) {
+  return pack(units(classes), total, firstShardSeconds).map((shard) => shard.names.sort())
+}
+
+/** The fewest shards that fit the budget, and an `Over budget:` line for each unit that alone does not. */
+export function count(classes, firstShardSeconds, budget = budgetSeconds, max = maxShards) {
+  const all = units(classes)
+  const longest = (total) => Math.max(...pack(all, total, firstShardSeconds).map((shard) => shard.seconds))
+  const line = (name, seconds) =>
+    `Over budget: ${name} takes about ${Math.round(seconds)} s, longer than the budget of ${budget} s.`
+  const overBudget = []
+  if (firstShardSeconds > budget) overBudget.push(line(controlPlane, firstShardSeconds))
+  for (const unit of all) {
+    if (unit.seconds <= budget) continue
+    const members = [...unit.names].sort().join(', ')
+    overBudget.push(line(unit.collection ? `collection ${unit.collection} (${members})` : members, unit.seconds))
+  }
+  return { total: shardCount(longest, budget, max), overBudget }
 }
 
 /** The dotnet test filter arguments of shard `index` (1-based) of `shards`. */
@@ -145,14 +173,8 @@ export function mergeDurations(known, measured, names) {
   return merged
 }
 
-function parseShard(text) {
-  const match = /^([1-9][0-9]*)\/([1-9][0-9]*)$/.exec(text ?? '')
-  if (!match || Number(match[1]) > Number(match[2])) throw new Error(`A shard such as 1/3, not '${text}'.`)
-  return { index: Number(match[1]), total: Number(match[2]) }
-}
-
 /** Runs the command line and returns the text for stdout. Throws on a malformed shard. */
-export function main(args, dir = project) {
+export function main(args, dir = project, warn = (line) => console.error(line)) {
   const file = path.join(dir, 'class-durations.json')
   const durations = JSON.parse(readFileSync(file, 'utf8'))
   const classes = readClasses(dir)
@@ -161,6 +183,11 @@ export function main(args, dir = project) {
     const merged = mergeDurations(durations, measured, [...classes.map((c) => c.name), controlPlane])
     writeFileSync(file, `${JSON.stringify(merged, null, 2)}\n`)
     return `${Object.keys(measured).length} classes measured, ${Object.keys(merged).length} kept in ${file}.`
+  }
+  if (args[0] === '--count') {
+    const { total, overBudget } = count(weigh(classes, durations), durations[controlPlane] ?? 0)
+    for (const line of overBudget) warn(line)
+    return String(total)
   }
   const listing = args[0] === '--classes'
   const { index, total } = parseShard(listing ? args[1] : args[0])

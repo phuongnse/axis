@@ -380,7 +380,8 @@ NexKit's checks split the E2E and integration tests into shards, one check each,
 checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
 The smoke tests run in a job of their own, so the shards hold only their own tests.
 
-- **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. Its Playwright results go
+- **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. `NEXKIT_SHARD` works the
+  same way beside it, and `AXIS_E2E_SHARD` wins when both are set. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
   by how many tests they hold: each spec weighs its seconds in `tests/e2e/spec-durations.json`, and a
   new spec weighs the median. A serial spec, such as a Studio journey, runs on one worker from start
@@ -388,6 +389,7 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   minutes, refresh the durations from the JUnit files of a full run on `main`:
   `node scripts/lib/e2e-shard.mjs --durations artifacts/test-results/playwright-*.xml`.
 - **Integration.** Set `AXIS_INTEGRATION_SHARD`, such as `AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh`.
+  `NEXKIT_SHARD` works the same way beside it, and `AXIS_INTEGRATION_SHARD` wins when both are set.
   A shard runs whole test classes of `Axis.Integration.Tests`, which `scripts/lib/integration-shard.mjs`
   gives it: classes that share an xUnit collection stay together, and the heaviest go first to the
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
@@ -400,6 +402,11 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
   and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
   `node scripts/lib/integration-shard.mjs --durations <those files>`.
+- **Shard count.** `node scripts/lib/e2e-shard.mjs --count` and `node scripts/lib/integration-shard.mjs --count`
+  print the fewest shards whose longest estimated shard fits the time budget. They never print more than
+  the most shards allowed. Both values live in `scripts/lib/shards.mjs`. A spec, test class, collection
+  or the control plane suite that alone takes longer than the budget gets an `Over budget:` line on
+  stderr. The count still prints, because no number of shards makes such a spec or class fit.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs

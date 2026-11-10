@@ -90,7 +90,8 @@
 # is relative to the repository root. With arguments only the matching specs run, after the setup project.
 # A change is checked in minutes, and the full run stays the check.
 # AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI and NexKit's checks can split the suite
-# over several machines. Without arguments a shard runs the specs that scripts/lib/e2e-shard.mjs gives it,
+# over several machines. NEXKIT_SHARD takes the same shard when AXIS_E2E_SHARD is unset, and AXIS_E2E_SHARD wins
+# when both are set. Without arguments a shard runs the specs that scripts/lib/e2e-shard.mjs gives it,
 # split by the durations in tests/e2e/spec-durations.json. With arguments Playwright's --shard splits the
 # matching tests. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a file.
 # Without it the whole suite runs.
@@ -107,24 +108,30 @@ for argument in "$@"; do
   esac
 done
 
-# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright.
+# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright. NEXKIT_SHARD does the same when AXIS_E2E_SHARD is unset.
 playwright_suite=playwright
-if [ -n "${AXIS_E2E_SHARD:-}" ]; then
-  if ! [[ "$AXIS_E2E_SHARD" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
-    echo "AXIS_E2E_SHARD must be a shard such as 1/3, not '$AXIS_E2E_SHARD'." >&2
+shard_variable=AXIS_E2E_SHARD
+shard="${AXIS_E2E_SHARD:-}"
+if [ -z "$shard" ] && [ -n "${NEXKIT_SHARD:-}" ]; then
+  shard_variable=NEXKIT_SHARD
+  shard="$NEXKIT_SHARD"
+fi
+if [ -n "$shard" ]; then
+  if ! [[ "$shard" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
+    echo "$shard_variable must be a shard such as 1/3, not '$shard'." >&2
     exit 2
   fi
   playwright_suite="playwright-${BASH_REMATCH[1]}"
   if [ "${#playwright_args[@]}" -eq 0 ]; then
     # Every shard computes the same split, so a failed split stops the run rather than leave specs out.
-    shard_specs="$(node scripts/lib/e2e-shard.mjs "$AXIS_E2E_SHARD")"
+    shard_specs="$(node scripts/lib/e2e-shard.mjs "$shard")"
     if [ -z "$shard_specs" ]; then
-      echo "Shard $AXIS_E2E_SHARD has no spec. Use fewer shards." >&2
+      echo "Shard $shard has no spec. Use fewer shards." >&2
       exit 2
     fi
     mapfile -t playwright_args <<<"$shard_specs"
   else
-    playwright_args=("--shard=$AXIS_E2E_SHARD" "${playwright_args[@]}")
+    playwright_args=("--shard=$shard" "${playwright_args[@]}")
   fi
 fi
 
