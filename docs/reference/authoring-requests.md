@@ -101,18 +101,18 @@ request, which belongs to [accepting](#accepting).
 A request follows the same loop as a change to the platform: a plan the author approves, the change,
 the checks, an independent review and fix rounds.
 
-| State              | What happens                                                                                                                            | Next                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
-| `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
-| `working`          | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
-| `checking`         | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
-| `reviewing`        | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
-| `fixing`           | The agent works on the failures and findings                                                                                            | `checking`                            |
-| `ready`            | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
-| `accepted`         | The draft is in the working folder as a revision                                                                                        | none                                  |
-| `dropped`          | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                  |
-| `failed`           | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                    | `dropped`                             |
+| State                           | What happens                                                                                                                            | Next                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `planning` _(planned for M35)_  | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
+| `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
+| `working` _(planned for M35)_   | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
+| `checking` _(planned for M35)_  | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
+| `reviewing` _(planned for M35)_ | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
+| `fixing` _(planned for M35)_    | The agent works on the failures and findings                                                                                            | `checking`                            |
+| `ready`                         | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
+| `accepted`                      | The draft is in the working folder as a revision                                                                                        | none                                  |
+| `dropped`                       | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                  |
+| `failed`                        | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                    | `dropped`                             |
 
 - **Built-in modules first.** When a request matches a built-in module, the plan declares the module
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
