@@ -231,7 +231,7 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   const dialog = await waitForDialog(page)
   await dialog.getByLabel(fieldLabel('Reason')).fill('The order exists in the purchasing system')
   await dialog.getByLabel(fieldLabel('Succeeded')).check()
-  await dialog.getByLabel('orderNumber (text)', { exact: true }).fill(orderNumber)
+  await dialog.getByLabel(fieldLabel('orderNumber (text)')).fill(orderNumber)
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(dialog).toHaveCount(0)
 
