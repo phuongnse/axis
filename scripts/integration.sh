@@ -21,7 +21,8 @@
 # is unset, and AXIS_INTEGRATION_SHARD wins when both are set. scripts/lib/integration-shard.mjs gives each shard its
 # test classes by their durations in tests/Axis.Integration.Tests/class-durations.json. A shard expects
 # the scenario suites only when it holds the class that writes them: ScenarioRunnerTests. Shard 1 also
-# runs the control plane suite. The shard cannot be combined with arguments.
+# runs the control plane suite, and runs only that suite when the split gives it no class, since that
+# suite alone outweighs a shard's share. The shard cannot be combined with arguments.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -30,6 +31,7 @@ source scripts/lib/test-results.sh
 filter=(--filter-not-class '*PerformanceTests')
 shard_classes=
 control_plane=true
+integration_suite=true
 shard_variable=AXIS_INTEGRATION_SHARD
 shard="${AXIS_INTEGRATION_SHARD:-}"
 if [ -z "$shard" ] && [ -n "${NEXKIT_SHARD:-}" ]; then
@@ -47,8 +49,12 @@ if [ -n "$shard" ]; then
     exit 2
   fi
   shard_classes="$(node scripts/lib/integration-shard.mjs --classes "$shard")"
-  shard_filter="$(node scripts/lib/integration-shard.mjs "$shard")"
-  mapfile -t filter <<<"$shard_filter"
+  if [ -z "$shard_classes" ] && [ "$shard_index" = 1 ]; then
+    integration_suite=false
+  else
+    shard_filter="$(node scripts/lib/integration-shard.mjs "$shard")"
+    mapfile -t filter <<<"$shard_filter"
+  fi
   [ "$shard_index" = 1 ] || control_plane=false
 fi
 
@@ -87,8 +93,10 @@ if affected integration; then
       >"$control_plane_log" 2>&1 &
     control_plane_pid=$!
   fi
-  run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
-    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "${filter[@]}"
+  if [ "$integration_suite" = true ]; then
+    run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
+      --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "${filter[@]}"
+  fi
   if [ "$control_plane" = true ]; then
     wait "$control_plane_pid" || status=1
     cat "$control_plane_log"
@@ -96,7 +104,7 @@ if affected integration; then
   fi
 else
   for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
-  skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
+  [ "$integration_suite" = false ] || skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
   [ "$control_plane" = false ] || skip_suite Axis.ControlPlane.Integration.Tests controlplane/tests/Axis.ControlPlane.Integration.Tests
 fi
 
