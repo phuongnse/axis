@@ -1,6 +1,6 @@
 import { DeleteOutlined } from '@ant-design/icons'
 import { Flex, Modal } from 'antd'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisTable, type AxisColumn, type ColumnKind } from '../platform/AxisTable'
@@ -57,7 +57,8 @@ function hasValue(value: unknown): boolean {
  * a dialog that edits a copy of the item, so nothing changes until Done, which writes the copy with one change. Remove
  * writes `undefined` at the item's index. The caller draws the dialog's fields, so the component knows no JSON Schema.
  * Done stays on. A click on it with a required field empty shows the field's message, focuses the first such field and
- * keeps the dialog open, see docs/reference/actions-and-controls.md#fields.
+ * keeps the dialog open, see docs/reference/actions-and-controls.md#fields. The focus moves when the message is drawn,
+ * not after Done's render, so it does not depend on the order in which the dialog draws its content.
  * With `addIn`, Add… is drawn into that element and the table has no toolbar row.
  */
 export function ObjectListTable({
@@ -107,18 +108,18 @@ export function ObjectListTable({
   const t = useText()
   const { colour, size } = useDesignTokens()
   const [editing, setEditing] = useState<Editing | null>(null)
-  const [focusRequest, setFocusRequest] = useState(0)
-  const body = useRef<HTMLDivElement>(null)
+  // Set by Done while a required field is empty, until the first message is drawn and takes the focus to its field.
+  const focusPending = useRef(false)
   const named = (text: string) => text.replace('{name}', itemName)
   const emptyRequired = (copy: Item) => required.filter((name) => !hasValue(copy[name]))
   const missing = editing?.checked ? emptyRequired(editing.copy) : []
 
-  useEffect(() => {
-    body.current
-      ?.querySelector('[data-item-problem]')
-      ?.parentElement?.querySelector<HTMLElement>('input, textarea')
-      ?.focus()
-  }, [focusRequest])
+  // Ref callbacks run in tree order, so the first message drawn takes the focus and clears the request.
+  const focusFieldOf = (message: HTMLElement | null) => {
+    if (message === null || !focusPending.current) return
+    focusPending.current = false
+    message.parentElement?.querySelector<HTMLElement>('input, textarea')?.focus()
+  }
 
   const rows: Row[] = items.map((item, index) => ({ key: String(index), index, item }))
   const cellOf = (column: ObjectListColumn, item: Item) => (column.render ? column.render(item) : item[column.key])
@@ -130,15 +131,22 @@ export function ObjectListTable({
     (column, at) => at === 0 || rows.length === 0 || rows.some((row) => present(column, row.item)),
   )
 
-  const openAdd = () => setEditing({ index: null, copy: newItem(), checked: false })
-  const openEdit = (index: number) => setEditing({ index, copy: structuredClone(items[index]), checked: false })
+  const openAdd = () => {
+    focusPending.current = false
+    setEditing({ index: null, copy: newItem(), checked: false })
+  }
+  const openEdit = (index: number) => {
+    focusPending.current = false
+    setEditing({ index, copy: structuredClone(items[index]), checked: false })
+  }
   const done = () => {
     if (editing === null) return
     if (emptyRequired(editing.copy).length > 0) {
+      focusPending.current = true
       setEditing({ ...editing, checked: true })
-      setFocusRequest((request) => request + 1)
       return
     }
+    focusPending.current = false
     if (editing.index === null) {
       onChange(pointer, [...items, editing.copy])
     } else {
@@ -148,6 +156,7 @@ export function ObjectListTable({
     onDone?.()
   }
   const cancel = () => {
+    focusPending.current = false
     setEditing(null)
     onCancel?.()
   }
@@ -220,7 +229,7 @@ export function ObjectListTable({
         onCancel={cancel}
         destroyOnHidden
       >
-        <div ref={body}>
+        <div>
           {editing &&
             fields(
               editing.copy,
@@ -229,7 +238,7 @@ export function ObjectListTable({
               editing.index ?? items.length,
               (name) =>
                 missing.includes(name) ? (
-                  <div data-item-problem style={{ color: colour.dangerText }}>
+                  <div data-item-problem ref={focusFieldOf} style={{ color: colour.dangerText }}>
                     {t('shell.studio.list.required')}
                   </div>
                 ) : null,
