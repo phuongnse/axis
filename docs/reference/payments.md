@@ -143,8 +143,9 @@ and applied in order.
     ledger entry for the amount in the event's currency, `VND` when it names none, and marks the
     event `applied`. A recorded payment writes the audit record `payment.recorded`, with the actor
     kind `webhook` and the inbox row as the actor. When payments cover the invoice, the settlement
-    of [invoices](#invoices) makes it `paid`. Any other error stops the run, so the job queue
-    retries it and a later event never overtakes an earlier one.
+    of [invoices](#invoices) makes it `paid`, and a payment that settles its invoice can make the
+    subscription `active`, see [states](subscriptions.md#states). Any other error stops the run, so
+    the job queue retries it and a later event never overtakes an earlier one.
   - **Out of place.** An event is out of place when its `orderCode` is unknown (`unknownOrder`), its
     invoice is `void` (`voidInvoice`), PayOS did not report the transfer as paid, which is a `code`
     other than `00` or an amount that is not above zero (`notPaid`), or its currency is not the

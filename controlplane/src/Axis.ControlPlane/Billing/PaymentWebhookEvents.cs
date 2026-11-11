@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Axis.ControlPlane.Audit;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Subscriptions;
 using Axis.ControlPlane.Telemetry;
 using Npgsql;
 
@@ -10,7 +11,7 @@ namespace Axis.ControlPlane.Billing;
 /// Runs the recurring <c>applyPaymentWebhooks</c> job: it applies the events that wait in <c>billing.webhook_inbox</c>, see <c>docs/reference/payments.md#webhooks</c>. It takes
 /// all of them in one order, the provider's time of the transfer, then the arrival, so the events of one invoice stay in order. Each event commits in its own transaction:
 /// the row is locked, <see cref="Payments.RecordAsync"/> writes a <c>payment</c> ledger entry with the key <c>payos:</c> and the bank reference, the <c>payment.recorded</c> audit
-/// record follows, and the row is marked <c>applied</c>. An event that does not fit its invoice is marked <c>outOfPlace</c> with its reason, writes nothing to the ledger, logs an
+/// record follows, the payment can make the subscription <c>active</c> (see <see cref="SubscriptionPayments"/>), and the row is marked <c>applied</c>. An event that does not fit its invoice is marked <c>outOfPlace</c> with its reason, writes nothing to the ledger, logs an
 /// error and adds one to <see cref="ControlPlaneMetrics.PaymentsOutOfPlace"/>. The reasons are <c>unknownOrder</c>, <c>voidInvoice</c>, <c>notPaid</c> and <c>currency</c>. Any other
 /// error stops the run, so the job queue retries it and a later event never overtakes an earlier one. The log never holds the body, an amount or an account. The payload is not used.
 /// </summary>
@@ -96,6 +97,7 @@ internal sealed partial class PaymentWebhookEvents(NpgsqlDataSource controlPlane
                     if (await Payments.RecordAsync(transaction, invoiceId!.Value, amount, currency, reference, $"payos:{reference}", cancellationToken))
                     {
                         await AuditRecords.AppendAsync(transaction, AuditActorKind.Webhook, inboxId.ToString(), "payment.recorded", invoiceId.Value.ToString(), cancellationToken);
+                        await SubscriptionPayments.ApplyAsync(transaction, invoiceId.Value, AuditActorKind.Webhook, inboxId.ToString(), clock.GetUtcNow(), cancellationToken);
                     }
                 }
                 catch (InvalidOperationException)
