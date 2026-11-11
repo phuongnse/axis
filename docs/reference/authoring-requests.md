@@ -204,8 +204,6 @@ A request keeps the whole story of the change, and its milestones write audit re
 
 ## What reaches the model
 
-_(planned for M35)_
-
 The model sees the application's configuration and the results of its checks, never the tenant's
 data.
 
@@ -213,3 +211,6 @@ data.
   diagnostics, scenario results and the reference text of the tools.
 - **Never sent:** records, files, record history, process instances, secrets, binding values, keys,
   tokens and the names of people. A scenario's data is made up for the scenario.
+- **Checked.** `AgentPlanningModelInputTests` runs a planning step whose scripted model reads every
+  resource of an application. The tenant holds a record, a `secret` binding and a `url` binding, and
+  the author's names hold markers. The test fails when a message sent to the adapter holds one of them.
