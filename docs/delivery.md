@@ -107,6 +107,11 @@ that holds it.
   tunes it, as [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees.
 - **A second Claude subscription takes over at the usage limit,** as the fallback agent in
   `agents`, so NexKit pauses only when both are at their limit.
+- **A run that stops on a transient error runs again after NexKit's waits,** its
+  [`retry`][nexkit-retry] setting, which Axis leaves at NexKit's default, so an outage of an outside
+  service delays a round and asks for the owner only when it outlasts the waits, as
+  [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
+  agrees.
 - **A parent issue closes when its last part does,** with `close_parent_issues` on.
 
 ### How pull requests merge
@@ -479,3 +484,4 @@ issues, pull requests and sub-issues.
 [nexkit-person-review]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#reviewing-your-own-pull-requests
 [nexkit-branches]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md#stages
 [nexkit-labels]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
+[nexkit-retry]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#transient-errors
