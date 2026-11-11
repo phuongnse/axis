@@ -15,7 +15,9 @@ namespace Axis.Server.Mcp;
 /// calling person through <see cref="StudioDrafts"/> and answer what the authoring API's matching route answers, or an error text
 /// that is a problem title of the authoring API or a fixed one, never text from the request or a path. A draft that is not the
 /// person's, or does not exist, answers the draft routes' title and changes nothing. Each successful write call appends one
-/// <c>mcp.toolCalled</c> audit record that holds ids only, see <c>docs/reference/storage.md#audit-actions</c>.
+/// <c>mcp.toolCalled</c> audit record that holds ids only, see <c>docs/reference/storage.md#audit-actions</c>. <c>run_scenarios</c>
+/// changes no draft. It stores a <c>test</c> request of the draft's files, or reads one back, and records no audit record, as a
+/// <c>test</c> records none, see <c>docs/reference/authoring.md#test</c>.
 /// </summary>
 internal static class McpWriteTools
 {
@@ -303,6 +305,86 @@ internal static class McpWriteTools
             _ => (null, StudioRevisionEndpoints.NoDraft),
         };
     }
+
+    /// <summary>
+    /// The answer of <c>run_scenarios</c>: the request's id and status, its diagnostics and its scenario results, each an
+    /// empty list until the publisher has run the request.
+    /// </summary>
+    internal sealed record McpScenarioRun(string Request, string Status, JsonElement Diagnostics, JsonElement Scenarios);
+
+    /// <summary>
+    /// Without <paramref name="request"/>, stores a <c>test</c> publish request whose snapshot is the files of the person's draft, with
+    /// the draft in <c>draft_id</c> and the scenario <paramref name="names"/> (a JSON list, none or empty for every scenario), and answers
+    /// it queued. With <paramref name="request"/>, answers that request, only when it is a <c>test</c> of this draft by this person. The
+    /// working folder plays no part. See <c>docs/reference/authoring.md#test</c>.
+    /// </summary>
+    public static async Task<(object? Output, string? Error)> RunScenariosAsync(
+        McpToolContext context, string application, string draft, string? names, string? request, CancellationToken ct)
+    {
+        var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
+        if (folder is null)
+        {
+            return (null, McpReadTools.Title(refusal));
+        }
+
+        // A draft id that passed the check is a "D" GUID.
+        if (request is not null)
+        {
+            var (drafts, draftError) = await McpReadTools.FindDraftAsync(context, folder, draft, ct);
+            return drafts is null ? (null, draftError) : await ReadRunAsync(context, folder, Guid.Parse(draft), request, ct);
+        }
+
+        var (files, error) = await McpReadTools.DraftFilesAsync(context, folder, draft, ct);
+        if (files is null)
+        {
+            return (null, error);
+        }
+
+        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        {
+            return (null, StudioPublishEndpoints.NoManifestId);
+        }
+
+        var scenarioNames = names is null || JsonNode.Parse(names)!.AsArray().Count == 0 ? null : names;
+        var id = Guid.CreateVersion7();
+        var connection = await context.Database.GetConnectionAsync(ct);
+        await StudioPublishEndpoints.InsertRequestAsync(
+            connection,
+            id,
+            "test",
+            applicationId,
+            "tenant",
+            StudioPublishEndpoints.SnapshotJson(StudioFolder.Snapshot(files)),
+            releaseId: null,
+            label: null,
+            note: null,
+            context.Caller.Id,
+            scenarioNames,
+            Guid.Parse(draft),
+            ct);
+        return (new McpScenarioRun(id.ToString("D"), "queued", EmptyList(), EmptyList()), null);
+    }
+
+    // Only a test of this draft by the calling person is answered. Anything else counts as unknown.
+    private static async Task<(object? Output, string? Error)> ReadRunAsync(
+        McpToolContext context, string folder, Guid draft, string request, CancellationToken ct)
+    {
+        if (!Guid.TryParseExact(request, "D", out var requestId)
+            || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId }
+            || await StudioPublishEndpoints.FindRequestAsync(
+                await context.Database.GetConnectionAsync(ct), applicationId, requestId, ct) is not { Kind: "test" } stored
+            || stored.RequestedBy != context.Caller.Id
+            || stored.DraftId != draft)
+        {
+            return (null, StudioPublishEndpoints.NoRequest);
+        }
+
+        using var diagnostics = JsonDocument.Parse(stored.Diagnostics ?? "[]");
+        using var scenarios = JsonDocument.Parse(stored.ScenarioResults ?? "[]");
+        return (new McpScenarioRun(request, stored.Status, diagnostics.RootElement.Clone(), scenarios.RootElement.Clone()), null);
+    }
+
+    private static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
 
     // The compile diagnostics of the draft as its branch now holds it.
     private static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(
