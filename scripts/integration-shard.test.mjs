@@ -411,7 +411,16 @@ describe('main', () => {
     }
   })
 
-  test('splits the real test project into three shards that each hold classes', () => {
-    for (const shard of ['1/3', '2/3', '3/3']) assert.notEqual(main(['--classes', shard]), '')
+  test('splits the real test project into the shards --count prints, each class in one, every shard but the first with classes', () => {
+    const total = Number(main(['--count'], undefined, () => {}))
+    const shards = Array.from({ length: total }, (_, i) => main(['--classes', `${i + 1}/${total}`]).split('\n').filter(Boolean))
+    // Shard 1 may hold no class: it runs the control plane suite, which can outweigh a shard's share alone.
+    for (const [i, names] of shards.entries()) if (i > 0) assert.notEqual(names.length, 0, `shard ${i + 1}/${total}`)
+    const all = shards.flat()
+    assert.equal(new Set(all).size, all.length)
+    assert.deepEqual(
+      [...all].sort(),
+      readClasses().map((c) => c.name),
+    )
   })
 })

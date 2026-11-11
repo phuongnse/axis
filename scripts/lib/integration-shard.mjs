@@ -25,7 +25,8 @@
 // or a [Theory]. Classes that share an xUnit [Collection] stay in one shard, as one unit. Each class
 // weighs its seconds in class-durations.json. A class without an entry weighs its number of tests
 // times the median seconds per test of the classes that have one, or its number of tests when none
-// has. Shard 1 starts with the seconds of the control plane suite, which it runs beside its classes.
+// has. Shard 1 starts with the seconds of the control plane suite, which it runs beside its classes. When that
+// suite alone outweighs a shard's share, shard 1 gets no class and scripts/integration.sh runs only that suite.
 // The units go one at a time, the heaviest first, to the shard that is then the lightest. A shard's
 // estimate is its seconds over the parallelism, or its heaviest unit when that is longer, because the
 // classes of one collection run one after another.

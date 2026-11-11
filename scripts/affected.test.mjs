@@ -508,6 +508,22 @@ exit 0
     }
   });
 
+  test("integration.sh runs only the control plane suite in a shard 1 that the split gives no class", () => {
+    // With 40 shards, the control plane suite's seconds alone outweigh a shard's share, so shard 1 gets no class.
+    assert.equal(
+      execFileSync("node", ["scripts/lib/integration-shard.mjs", "--classes", "1/40"], { cwd: root, encoding: "utf8" }).trim(),
+      "",
+    );
+    const result = run("scripts/integration.sh", "src/Axis.Engine/Foo.cs", {
+      AXIS_INTEGRATION_SHARD: "1/40",
+    });
+
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    const calls = dotnetCalls();
+    assert.ok(calls.some((call) => call.includes("test --project controlplane/tests/Axis.ControlPlane.Integration.Tests")), calls.join("\n"));
+    assert.ok(!calls.some((call) => call.includes("tests/Axis.Integration.Tests")), calls.join("\n"));
+  });
+
   test("integration.sh reads NEXKIT_SHARD as its shard, the same as AXIS_INTEGRATION_SHARD", () => {
     const shardCall = (variable) => {
       run("scripts/integration.sh", "src/Axis.Engine/Foo.cs", {

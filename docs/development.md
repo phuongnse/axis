@@ -420,8 +420,8 @@ jobs may wait.
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
   or, without an entry, its number of tests times the median seconds per test. Shard 1 also runs
   `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
-  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The count estimates a
-  shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
+  in the same file. Shard 1 starts with those seconds, so it gets fewer classes, or none and then runs only that
+  suite. The count estimates a shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
   a collection runs its classes one after another. `--durations` measures the parallelism as the test seconds of
   `Axis.Integration.Tests` over those suites' wall time, and the control plane and scenario suites count on
   neither side. The last shard runs every class that the other shards do not, so a class the split does not
