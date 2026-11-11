@@ -192,8 +192,9 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
 ## Usage
 
 The worker of a cell measures each tenant's usage: its storage every hour and its counts as it runs
-work. A worker with no `Cell:Id` measures nothing and writes no usage row. Usage holds counts and
-sizes only, never a record value, a file name or a user name.
+work. A worker with no `Cell:Id` measures nothing and writes no usage row. The agent host writes the
+tokens of its model calls. Usage holds counts and sizes only, never a record value, a file name or a
+user name.
 
 - **Sampling.** A worker job samples each tenant's storage every hour and keeps the newest sample in
   `platform.tenant_usage_latest`, which the storage check reads. The same pass counts the tenant's
@@ -216,9 +217,18 @@ sizes only, never a record value, a file name or a user name.
 - **Users, applications and emails sent** _(planned for M33)_. The daily row's users, applications
   and emails-sent columns are filled from the counts of their quotas, see [quotas](#quotas) and
   [emails a day](#emails-a-day).
-- **Authoring requests** _(planned for M35)_. The daily row also holds the authoring requests sent
-  and the tokens of each model, with a tenant's own key counted apart, see
-  [authoring requests](authoring-requests.md#audit).
+- **Tokens.** `platform.tenant_token_usage` holds the tokens of the agent host's model calls: one
+  row per tenant, UTC day, binding, model and `own_key`, which is true for tokens that the tenant's
+  own key paid, see [a tenant's own key](model-bindings.md#a-tenants-own-key), so own-key tokens
+  never share a row with the installation's. A row holds input tokens and output tokens. After each
+  model call, review included, the agent host adds the call's tokens to its row, and a tenant's
+  calls on one day for one binding and model share one row. A write that fails is logged as a
+  warning that names the tenant, and the call and its step go on. The host writes whenever it reads
+  the tenant directory, with or without `Cell:Id`, and writes nothing under
+  `Tenancy:Source=configuration`. Each write deletes the tenant's token rows older than 13 months.
+  The usage route and the cell console do not show these rows yet.
+- **Authoring requests sent** _(planned for M35)_. The daily row also holds the authoring requests
+  sent, see [authoring requests](authoring-requests.md#audit).
 - **Counts.** Each work item the worker runs adds one to the day's work-item count, and a connector
   call or a package call adds one to the day's call count too. A retry that the handler reschedules
   counts, because every attempt is real work. The count is added in a short transaction on the
@@ -227,7 +237,8 @@ sizes only, never a record value, a file name or a user name.
   write is logged and never fails the work item. An item whose claim another worker took counts
   nowhere in this worker.
 - **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
-  rows of both usage tables, see [storage](storage.md#database-roles).
+  rows of the three usage tables, see [storage](storage.md#database-roles). The worker writes the two
+  tables of the sizes and counts, and the agent host writes the tokens.
 - **Readers.** The [cell console](cell-console.md#views) shows the usage through the
   [provisioning API's tenant reads](tenant-lifecycle.md#routes), which answer `usage`. The single tenant
   read also answers the day rows of the last 13 months. A tenant's administrator reads it through
