@@ -72,6 +72,20 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
 - **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks
   what the code does now. A guard against a kind of mistake is a lint rule or a check of the current
   rule, such as "every chart import goes through `ChartDrawing`", never a list of removed names.
+- **Over the shard budget.** A spec, test class, collection or file that alone takes longer than the
+  [shard budget](development.md#shards) is fixed in this order. A test is slow for a reason, and a split
+  can drop what it proves, such as a journey's whole flow.
+  1. **Faster, with the same proof.** Time spent on what the test does not check goes first. Setup through
+     the UI that the test does not assert moves to the API or a fixture, and a wait for time becomes a wait
+     for a state.
+  2. **Shared state removed at its cause.** Classes that share an xUnit collection only because one of them
+     clears what the others use get their own resources, rather than being cut into collections of
+     arbitrary size.
+  3. **A split only along a seam.** The parts share no state, and together they still prove everything that
+     the test's section of the docs says the whole proved. That section then says which part proves what. A
+     test whose section or decision asks for one whole flow keeps it.
+  4. **Otherwise the owner decides.** When none of these fits, the owner decides, and the test keeps what it
+     proves rather than being narrowed.
 
 ## Shared test services
 

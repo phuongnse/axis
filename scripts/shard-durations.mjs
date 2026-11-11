@@ -104,6 +104,7 @@ const runLink = (runId) => `[${runId}](${repository}/actions/runs/${runId})`
 const measuredBy = (runIds) =>
   runIds.length === 1 ? `CI run ${runLink(runIds[0])}` : `CI runs ${runIds.map(runLink).join(', ')}`
 const shards = `[the shards section](${repository}/blob/main/docs/development.md#shards)`
+const overBudgetRule = `[the rule for a test over the shard budget](${repository}/blob/main/docs/testing.md#rules-for-tests)`
 
 /** The entries of `after` that differ from `before`, and the names `after` drops. */
 function changes(before, after) {
@@ -167,8 +168,9 @@ function overBudgetIssue({ kind, line }, runId, runIds) {
       '',
       '## Acceptance criteria',
       '',
-      `- [ ] \`${name}\` is split, or made faster, so that \`node scripts/lib/${kind}-shard.mjs --count\` prints no ` +
+      `- [ ] \`${name}\` is made faster, or split, so that \`node scripts/lib/${kind}-shard.mjs --count\` prints no ` +
         '`Over budget:` line for it or for any part of it.',
+      `- [ ] The change follows ${overBudgetRule}, taking its steps in order.`,
       '- [ ] Every test it held still runs, in the check that ran it, and passes.',
       '- [ ] `scripts/test.sh` and `scripts/lint.sh` pass.',
       '',
