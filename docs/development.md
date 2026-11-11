@@ -33,10 +33,10 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 ### Setup
 
 `scripts/setup.sh` restores the .NET packages, installs the npm packages and the Playwright browser,
-and installs pinned Helm, kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step
-and each tool download gets up to 4 tries, with waits of 15, 30 and 60 seconds between them, so a
-short refusal such as a `403` is retried. On CI the Playwright system packages install in a step of
-their own.
+and installs pinned Helm, kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`, which
+NexKit's `tools` cache entry restores. Each step and each tool download gets up to 4 tries, with waits
+of 15, 30 and 60 seconds between them, so a short refusal such as a `403` is retried. On CI the
+Playwright system packages install in a step of their own.
 
 ### Build
 

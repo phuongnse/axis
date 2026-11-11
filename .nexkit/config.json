@@ -145,6 +145,15 @@
       ]
     },
     {
+      "name": "tools",
+      "paths": [
+        "~/.cache/axis-tools"
+      ],
+      "key_files": [
+        "scripts/lib/tools.sh"
+      ]
+    },
+    {
       "name": "docker",
       "paths": [
         "~/.cache/axis-docker"
