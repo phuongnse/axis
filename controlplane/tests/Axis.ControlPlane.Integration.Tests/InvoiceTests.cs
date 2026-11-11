@@ -1,6 +1,8 @@
 using Axis.ControlPlane.Billing;
+using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -8,7 +10,8 @@ namespace Axis.ControlPlane.Integration.Tests;
 
 /// <summary>
 /// Billing invoices against a real PostgreSQL, see <c>docs/reference/payments.md#invoices</c>: the lines of a pinned plan and its add-ons, the
-/// <c>charge</c> entry of each line, the amount that the ledger holds, one invoice for each period and the due dates.
+/// <c>charge</c> entry of each line, the amount that the ledger holds, one invoice for each period and the due dates. It also covers the
+/// <c>createPeriodInvoices</c> job, which creates each period's invoice 7 days ahead.
 /// </summary>
 public sealed class InvoiceTests : IAsyncLifetime
 {
@@ -20,6 +23,7 @@ public sealed class InvoiceTests : IAsyncLifetime
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder("postgres:18-alpine").Build();
     private readonly PlanCatalogue _catalogue = BillingSeed.Catalogue();
+    private readonly MovedClock _clock = new(_now);
     private NpgsqlDataSource _dataSource = null!;
 
     public async ValueTask InitializeAsync()
@@ -147,6 +151,115 @@ public sealed class InvoiceTests : IAsyncLifetime
         Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
     }
 
+    [Fact]
+    public async Task The_job_creates_the_invoice_of_each_period_seven_days_before_it_starts()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var subscription = await SeedAsync("ahead", "month");
+        await Execute($"INSERT INTO control_plane.subscription_add_ons (subscription_id, add_on_code, quantity) VALUES ('{subscription}', 'users-10', 2)");
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-01-01T00:00:00Z' WHERE id = '{subscription}'");
+
+        _clock.Now = new DateTimeOffset(2026, 12, 25, 0, 0, 0, TimeSpan.Zero) - TimeSpan.FromSeconds(1);
+        await RunJobAsync(token);
+        Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+
+        _clock.Now = new DateTimeOffset(2026, 12, 25, 0, 0, 0, TimeSpan.Zero);
+        await RunJobAsync(token);
+        Assert.Equal(1, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+        Assert.Equal(
+            "2027-01-01 00:00:00 2027-01-01 00:00:00",
+            await ScalarAsync<string>("SELECT string_agg(to_char(period_start AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') || ' ' || to_char(due_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '|') FROM billing.invoices"));
+        Assert.Equal(
+            "1 plan team 1|2 addOn users-10 2",
+            await ScalarAsync<string>("SELECT string_agg(line_number || ' ' || kind || ' ' || code || ' ' || quantity, '|' ORDER BY line_number) FROM billing.invoice_lines"));
+
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-02-01T00:00:00Z' WHERE id = '{subscription}'");
+        _clock.Now = new DateTimeOffset(2027, 1, 25, 0, 0, 0, TimeSpan.Zero);
+        await RunJobAsync(token);
+
+        Assert.Equal(2, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+        Assert.Equal(
+            "2027-01-01 2027-02-01",
+            await ScalarAsync<string>("SELECT string_agg(to_char(due_at AT TIME ZONE 'UTC', 'YYYY-MM-DD'), ' ' ORDER BY due_at) FROM billing.invoices"));
+        Assert.Equal(
+            "1 plan team 1|2 addOn users-10 2",
+            await ScalarAsync<string>("SELECT string_agg(l.line_number || ' ' || l.kind || ' ' || l.code || ' ' || l.quantity, '|' ORDER BY l.line_number) FROM billing.invoice_lines l JOIN billing.invoices i ON i.id = l.invoice_id WHERE i.period_start = '2027-02-01T00:00:00Z'"));
+    }
+
+    [Fact]
+    public async Task A_rerun_of_the_job_in_the_same_window_adds_no_invoice_ledger_entry_or_audit_record()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var subscription = await SeedAsync("rerun", "month");
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-01-01T00:00:00Z' WHERE id = '{subscription}'");
+        _clock.Now = new DateTimeOffset(2026, 12, 26, 0, 0, 0, TimeSpan.Zero);
+
+        await RunJobAsync(token);
+        var invoices = await ScalarAsync<long>("SELECT count(*) FROM billing.invoices");
+        var entries = await ScalarAsync<long>("SELECT count(*) FROM billing.ledger_entries");
+        var records = await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records WHERE action = 'invoice.created'");
+        await RunJobAsync(token);
+
+        Assert.Equal(1, invoices);
+        Assert.Equal(1, records);
+        Assert.Equal(invoices, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+        Assert.Equal(entries, await ScalarAsync<long>("SELECT count(*) FROM billing.ledger_entries"));
+        Assert.Equal(records, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records WHERE action = 'invoice.created'"));
+        Assert.Equal(
+            "job",
+            await ScalarAsync<string>("SELECT actor_kind FROM control_plane.audit_records WHERE action = 'invoice.created'"));
+    }
+
+    [Fact]
+    public async Task The_job_creates_no_invoice_for_a_subscription_that_pins_no_plan()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var subscription = await SeedAsync("noplan", null);
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-01-01T00:00:00Z' WHERE id = '{subscription}'");
+        _clock.Now = new DateTimeOffset(2026, 12, 26, 0, 0, 0, TimeSpan.Zero);
+
+        await RunJobAsync(token);
+
+        Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+    }
+
+    [Theory]
+    [InlineData("readOnly")]
+    [InlineData("deleting")]
+    [InlineData("deleted")]
+    public async Task The_job_creates_no_invoice_for_a_subscription_that_is_not_in_use(string state)
+    {
+        var token = TestContext.Current.CancellationToken;
+        var subscription = await SeedAsync($"state-{state.ToLowerInvariant()}", "month");
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-01-01T00:00:00Z', state = '{state}' WHERE id = '{subscription}'");
+        _clock.Now = new DateTimeOffset(2026, 12, 26, 0, 0, 0, TimeSpan.Zero);
+
+        await RunJobAsync(token);
+
+        Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM billing.invoices"));
+    }
+
+    [Fact]
+    public async Task A_subscription_the_job_cannot_invoice_fails_the_run_and_the_others_still_get_their_invoice()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var bad = await SeedAsync("badaddon", "month");
+        await Execute($"INSERT INTO control_plane.subscription_add_ons (subscription_id, add_on_code, quantity) VALUES ('{bad}', 'storage-1', 1)");
+        var good = await SeedAsync("goodaddon", "month");
+        await Execute($"UPDATE control_plane.subscriptions SET period_ends_at = '2027-01-01T00:00:00Z' WHERE id IN ('{bad}', '{good}')");
+        _clock.Now = new DateTimeOffset(2026, 12, 26, 0, 0, 0, TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RunJobAsync(token));
+
+        Assert.Equal(1, await ScalarAsync<long>($"SELECT count(*) FROM billing.invoices WHERE subscription_id = '{good}'"));
+        Assert.Equal(0, await ScalarAsync<long>($"SELECT count(*) FROM billing.invoices WHERE subscription_id = '{bad}'"));
+    }
+
+    // Runs the job once, at the moved clock.
+    private Task RunJobAsync(CancellationToken token) =>
+        new PeriodInvoicing(_dataSource, _catalogue, _clock, NullLogger<PeriodInvoicing>.Instance)
+            .RunAsync(new ClaimedJob(Guid.CreateVersion7(), PeriodInvoicing.JobKind, [], 1), token);
+
     // Creates the invoice of the period in its own transaction.
     private async Task<CreatedInvoice> CreatePeriodAsync(Guid subscription)
     {
@@ -163,4 +276,11 @@ public sealed class InvoiceTests : IAsyncLifetime
     private Task<int> Execute(string sql) => ControlPlaneDatabase.ExecuteAsync(_dataSource, sql, TestContext.Current.CancellationToken);
 
     private Task<T> ScalarAsync<T>(string sql) => ControlPlaneDatabase.ScalarAsync<T>(_dataSource, sql, TestContext.Current.CancellationToken);
+
+    private sealed class MovedClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
 }
