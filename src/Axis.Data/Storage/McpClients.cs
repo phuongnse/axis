@@ -3,7 +3,7 @@ using Npgsql;
 namespace Axis.Data.Storage;
 
 /// <summary>
-/// Reads and writes <c>axis.mcp_clients</c> of the tenant database, see <c>docs/reference/mcp-server.md#sign-in</c>. The
+/// Reads and writes <c>axis.mcp_clients</c> of the tenant database, see <c>docs/reference/mcp-server.md#sign-in</c>. The last use is also read by <c>docs/reference/user-administration.md#outside-mcp-clients</c>. The
 /// database clock is the only clock used.
 /// </summary>
 public static class McpClients
@@ -12,6 +12,11 @@ public static class McpClients
         """
         SELECT "revoked_at", ("last_used_at" IS NULL OR "last_used_at" < now() - interval '1 minute')
         FROM "axis"."mcp_clients" WHERE "client_id" = @client
+        """;
+
+    private const string ListLastUsesSql =
+        """
+        SELECT "client_id", "last_used_at" FROM "axis"."mcp_clients" WHERE "client_id" = ANY(@clients)
         """;
 
     private const string RecordUseSql =
@@ -41,6 +46,27 @@ public static class McpClients
         return new McpClientUse(
             await reader.IsDBNullAsync(0, cancellationToken) ? null : await reader.GetFieldValueAsync<DateTimeOffset>(0, cancellationToken),
             reader.GetBoolean(1));
+    }
+
+    /// <summary>
+    /// Reads the last use of each of the clients. A client with no row, or a row with no last use, has a <c>null</c> use.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, DateTimeOffset?>> ListLastUsesAsync(
+        NpgsqlConnection connection, IReadOnlyCollection<string> clientIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(clientIds);
+
+        var uses = new Dictionary<string, DateTimeOffset?>(StringComparer.Ordinal);
+        await using var command = new NpgsqlCommand(ListLastUsesSql, connection);
+        command.Parameters.AddWithValue("clients", clientIds.ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            uses[reader.GetString(0)] = await reader.IsDBNullAsync(1, cancellationToken) ? null : await reader.GetFieldValueAsync<DateTimeOffset>(1, cancellationToken);
+        }
+
+        return uses;
     }
 
     /// <summary>
