@@ -190,6 +190,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Checks")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("checks");
+
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("finished_at");

@@ -57,7 +57,7 @@ loses no work.
 - **Tables.** `axis.authoring_requests` holds one row per request: its id, application, author,
   request text, binding, state, draft, plan, round, token use, the auto-accept flag and its times.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
-  summary, outcome, tokens and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
+  summary, outcome, tokens, checks and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
 - **Model messages.** A step's full model messages, resource contents included, are kept in its row
   in `messages`.
 - **Deleting model messages** _(planned for M35)_. A step's model messages are deleted after 30 days,
@@ -111,7 +111,8 @@ request, which belongs to [accepting](#accepting).
   plan takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
 - **Answer.** A request has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
   `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
-  each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt` and `finishedAt`.
+  each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
+  the results of a `check` step and null on any other step.
 
 ## States
 
@@ -123,7 +124,7 @@ the checks, an independent review and fix rounds.
 | `planning`                      | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
 | `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
 | `working`                       | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
-| `checking` _(planned for M35)_  | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
+| `checking`                      | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
 | `reviewing` _(planned for M35)_ | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
 | `fixing` _(planned for M35)_    | The agent works on the failures and findings                                                                                            | `checking`                            |
 | `ready`                         | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
@@ -145,6 +146,16 @@ the checks, an independent review and fix rounds.
   `validate_draft` and `diff_draft`, and only for the request's application and its draft. A call without a
   draft gets the request's draft. Any other call gets a tool error from the agent host and never reaches the
   MCP server. When the model ends its turn, the request moves to `checking`.
+- **Checking runs every scenario.** The step makes no model call. It calls `validate_draft` on the request's
+  draft. When no diagnostic is an `error`, it calls `run_scenarios` with no names, so the run covers the
+  application's scenarios and every module scenario, contract scenarios included, and asks for the run's
+  status until it ends. A warning is kept and does not fail the compile. The step stores `{ compile, scenarios }`
+  in `checks` on its `check` step: the compile outcome with its diagnostics, and the scenario run with its
+  request id, its diagnostics and its items, as `run_scenarios` returns them. When the compile fails, the
+  scenarios are `notRun` and no run starts. When both passed, the request moves to `reviewing` with the
+  outcome `passed`. Otherwise it moves to `fixing` with the outcome `failed`. A step whose run does not end in
+  time, whose tool call is a tool error, whose request has no draft, or whose application the author can no longer
+  list stops the request as `failed` with the outcome `unfinished`. A step that runs again starts a new run.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
@@ -161,6 +172,9 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
   by then, or whose answer stops at the output limit, stops the request as `failed` with the outcome
   `unfinished`, and so does a request whose application the author can no longer list or whose draft cannot
   be made.
+- **Checking time.** At most 450 polls of the scenario run, 2 seconds apart, which is about 15 minutes. A
+  run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
+  never starts does not hold the agent host for ever. The publisher stops a test run after 10 minutes.
 - **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
   round stops as `failed`.
 - **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model

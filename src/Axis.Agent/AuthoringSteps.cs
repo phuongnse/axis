@@ -18,9 +18,10 @@ public interface IAuthoringStep
 
 /// <summary>
 /// What a finished step writes: the request's next state, the step row's outcome and input summary, the request's new <c>plan</c> and
-/// the step's model messages as JSON. A <see langword="null"/> plan leaves the request's plan as it is.
+/// the step's model messages as JSON and the results of a check step as JSON. A <see langword="null"/> plan leaves the request's plan as it is.
 /// </summary>
-public sealed record AuthoringStepResult(string NextState, string? Outcome = null, string? InputSummary = null, string? Plan = null, string? Messages = null);
+public sealed record AuthoringStepResult(
+    string NextState, string? Outcome = null, string? InputSummary = null, string? Plan = null, string? Messages = null, string? Checks = null);
 
 /// <summary>
 /// What a step knows about the request it works on, how it reports the tokens a model call used, how it gets the author's access token,
@@ -73,6 +74,15 @@ public sealed class AuthoringStepContext
     /// A server that refuses the author ends the request like a realm that refuses the token.
     /// </summary>
     public AuthorMcpClient Mcp { get; }
+}
+
+/// <summary>How a check step waits for its scenario run, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+/// <param name="PollInterval">How long the step waits before it asks for the run's status.</param>
+/// <param name="MaxPolls">How many times the step asks. A run that has not ended by then stops the request as <c>failed</c>.</param>
+public sealed record CheckingOptions(TimeSpan PollInterval, int MaxPolls)
+{
+    /// <summary>Every 2 seconds, 450 times: about 15 minutes, past the publisher's own limit of 10 minutes for a test run.</summary>
+    public static CheckingOptions Default { get; } = new(TimeSpan.FromSeconds(2), 450);
 }
 
 /// <summary>How long the agent host holds a claim and how often it looks for work.</summary>
