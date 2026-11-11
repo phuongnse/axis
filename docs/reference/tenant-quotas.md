@@ -14,17 +14,17 @@ asks.
 
 Each quota has a key, a cell-wide default and a kind, which says how it is counted.
 
-| Quota | What it counts | Default | Kind |
-| --- | --- | --- | --- |
-| `storage` | The tenant database's size plus the bytes of its stored files, in bytes | 10 GiB | Sampled |
-| `users` | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50 | Exact |
-| `applications` | The applications of the tenant: folders in its Studio folder and applications with a release | 10 | Exact |
-| `emailsPerDay` | Emails sent for the tenant since 00:00 UTC | 1,000 | Exact |
-| `concurrentImports` | Imports and exports that run at once | 2 | Lease |
-| `concurrentConnectorCalls` | Connector and package calls in flight at once | 10 | Lease |
-| `concurrentQueries` | Data source queries and record list reads that run at once | 10 | Lease |
-| `workerWeight` | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md) | 1 | Weight |
-| `authoringRequests` | AI authoring requests sent in a calendar month in UTC, see [budgets](authoring-requests.md#budgets) | None | Exact |
+| Quota                      | What it counts                                                                                        | Default | Kind    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- | ------- | ------- |
+| `storage`                  | The tenant database's size plus the bytes of its stored files, in bytes                               | 10 GiB  | Sampled |
+| `users`                    | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50      | Exact   |
+| `applications`             | The applications of the tenant: folders in its Studio folder and applications with a release          | 10      | Exact   |
+| `emailsPerDay`             | Emails sent for the tenant since 00:00 UTC                                                            | 1,000   | Exact   |
+| `concurrentImports`        | Imports and exports that run at once                                                                  | 2       | Lease   |
+| `concurrentConnectorCalls` | Connector and package calls in flight at once                                                         | 10      | Lease   |
+| `concurrentQueries`        | Data source queries and record list reads that run at once                                            | 10      | Lease   |
+| `workerWeight`             | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md)                       | 1       | Weight  |
+| `authoringRequests`        | AI authoring requests sent in a calendar month in UTC, see [budgets](authoring-requests.md#budgets)   | None    | Exact   |
 
 - **Where they live.** `platform.tenant_quotas` holds one row for each quota that a tenant overrides:
   `tenant_id`, `quota`, `value` and `updated_at`. A quota with no row takes the cell's default,
@@ -87,6 +87,10 @@ nothing:
   tenant with no sample yet is not refused, and neither is a write when the platform database cannot
   be read: the server logs a warning and the write goes on, because a quota is a billing limit and not
   a security boundary.
+- **Platform rows only.** The routes of a tenant administrator that write only platform rows, such as its
+  [model key](user-administration.md#the-tenants-model-key) and its
+  [outside clients](user-administration.md#outside-mcp-clients), are never refused over the `storage` quota,
+  because they write no tenant data.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks
@@ -124,13 +128,13 @@ in the platform database, so it holds for the whole cell.
 
 What waits, and how:
 
-| Work | Lease | When none is free |
-| --- | --- | --- |
-| The dry run or the commit of an import, in the worker | `concurrentImports`, held until the work has committed | It does not run. Its work item is due again in 1 second and the import keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. |
-| The `export` job of the publisher, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) | `concurrentImports`, held until the ZIP is stored | The job stays `running` and the publisher tries again about a second later. The wait uses none of the job's three claims, so a busy tenant never fails an export. |
-| A connector or package call, in the worker | `concurrentConnectorCalls`, held until the run of the item ends | The worker does not claim it. The work item stays due, the worker runs other tenants' work, and it retries the claim at the tenant's next turn, after one of its items ends or at the next poll. |
-| A data source query or a record list read | `concurrentQueries` | It waits up to 5 seconds, then answers `503`, see below. |
-| A record export or a data source export | `concurrentImports`, released when the file is complete, before it is sent | It waits up to 5 seconds, then answers `503`, see below. |
+| Work                                                                                                | Lease                                                                      | When none is free                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The dry run or the commit of an import, in the worker                                               | `concurrentImports`, held until the work has committed                     | It does not run. Its work item is due again in 1 second and the import keeps its state, `pending` or `checked`, so any worker can run it once a lease is free.                                   |
+| The `export` job of the publisher, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) | `concurrentImports`, held until the ZIP is stored                          | The job stays `running` and the publisher tries again about a second later. The wait uses none of the job's three claims, so a busy tenant never fails an export.                                |
+| A connector or package call, in the worker                                                          | `concurrentConnectorCalls`, held until the run of the item ends            | The worker does not claim it. The work item stays due, the worker runs other tenants' work, and it retries the claim at the tenant's next turn, after one of its items ends or at the next poll. |
+| A data source query or a record list read                                                           | `concurrentQueries`                                                        | It waits up to 5 seconds, then answers `503`, see below.                                                                                                                                         |
+| A record export or a data source export                                                             | `concurrentImports`, released when the file is complete, before it is sent | It waits up to 5 seconds, then answers `503`, see below.                                                                                                                                         |
 
 - **The busy answer.** A read or an export that waited 5 seconds answers `503` problem details titled
   "This tenant is busy. Try again in a moment.", with `Retry-After: 1`. The query timeout counts from

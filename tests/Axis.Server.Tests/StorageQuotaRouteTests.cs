@@ -85,6 +85,9 @@ public sealed class StorageQuotaRouteTests
         "DELETE /api/tenant/model-key",
         "PUT /api/tenant/model-key",
 
+        // The tenant's outside clients setting is a platform row and no tenant data, so the storage quota does not count it.
+        "PUT /api/tenant/outside-clients",
+
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 
