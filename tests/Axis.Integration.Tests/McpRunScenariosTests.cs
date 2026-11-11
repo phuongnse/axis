@@ -15,7 +15,6 @@ namespace Axis.Integration.Tests;
 /// publisher runs it as any <c>test</c>, see docs/reference/mcp-server.md#tools. A call with the request then answers the results.
 /// The server is tenant <c>a</c> on a real PostgreSQL database, and the folder holds the purchase-requests sample.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class McpRunScenariosTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string Host = "localhost";

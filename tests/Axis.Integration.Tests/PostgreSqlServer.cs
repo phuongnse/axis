@@ -36,8 +36,17 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
     /// </summary>
     public const string ScenarioRole = "axis_scenario";
 
-    /// <summary>The development password of the three roles.</summary>
+    /// <summary>
+    /// The scenario role of the tests of the "Test scenario runs" collection, which count and drop the databases of this
+    /// role. It has <c>CREATEDB</c> and owns only the databases those tests create.
+    /// </summary>
+    public const string CountedScenarioRole = "axis_scenario_counted";
+
+    /// <summary>The development password of the four roles.</summary>
     public const string RolePassword = "axis";
+
+    private static readonly string _countedScenarioDatabasesFrom =
+        $"pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = '{CountedScenarioRole}'";
 
     // The start takes no test's cancellation token, so cancelling one test does not fail the others.
     private static readonly Lazy<Task<PostgreSqlContainer>> _container = new(StartContainerAsync);
@@ -103,18 +112,46 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
         return value is DBNull ? null : value;
     }
 
-    /// <summary>The connection string of <see cref="ScenarioRole"/> to the maintenance database, as <c>Scenarios:ServerConnectionString</c> takes it.</summary>
-    public static async Task<string> ScenarioConnectionStringAsync() =>
+    /// <summary>The connection string of <paramref name="role"/> to the maintenance database, as <c>Scenarios:ServerConnectionString</c> takes it.</summary>
+    public static async Task<string> ScenarioConnectionStringAsync(string role = ScenarioRole) =>
         new NpgsqlConnectionStringBuilder(await AdminConnectionStringAsync())
         {
             Database = "postgres",
-            Username = ScenarioRole,
+            Username = role,
             Password = RolePassword,
         }.ConnectionString;
 
     /// <summary>Drops the database and ends every session still connected to it.</summary>
     public static async Task DropDatabaseAsync(string name, CancellationToken cancellationToken = default) =>
         await ExecuteAsync(await AdminConnectionStringAsync(), $"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", cancellationToken);
+
+    /// <summary>The number of databases that <see cref="CountedScenarioRole"/> owns.</summary>
+    public static async Task<long> CountedScenarioDatabasesAsync(CancellationToken cancellationToken = default) =>
+        (long)(await AdminScalarAsync(
+            await AdminConnectionStringAsync(),
+            $"SELECT count(*) FROM {_countedScenarioDatabasesFrom}",
+            cancellationToken))!;
+
+    /// <summary>Drops every database that <see cref="CountedScenarioRole"/> owns, so a test starts with none of them.</summary>
+    public static async Task DropCountedScenarioDatabasesAsync(CancellationToken cancellationToken = default)
+    {
+        var names = new List<string>();
+        await using (var connection = new NpgsqlConnection(await AdminConnectionStringAsync()))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var list = new NpgsqlCommand($"SELECT d.datname FROM {_countedScenarioDatabasesFrom}", connection);
+            await using var reader = await list.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                names.Add(reader.GetString(0));
+            }
+        }
+
+        foreach (var name in names)
+        {
+            await DropDatabaseAsync(name, cancellationToken);
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -152,7 +189,7 @@ public sealed partial class PostgreSqlServer : IAsyncDisposable
             await container.StartAsync();
             await ExecuteAsync(
                 container.GetConnectionString(),
-                $"CREATE ROLE {SchemaRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {RuntimeRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {ScenarioRole} LOGIN PASSWORD '{RolePassword}' CREATEDB",
+                $"CREATE ROLE {SchemaRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {RuntimeRole} LOGIN PASSWORD '{RolePassword}'; CREATE ROLE {ScenarioRole} LOGIN PASSWORD '{RolePassword}' CREATEDB; CREATE ROLE {CountedScenarioRole} LOGIN PASSWORD '{RolePassword}' CREATEDB",
                 CancellationToken.None);
             return container;
         }

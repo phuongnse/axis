@@ -320,7 +320,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
         ["IdentityProvider:AdminClientSecret"] = KeycloakFixture.AdminClientSecret,
     };
 
-    // The scenario databases of these tests must not belong to the axis_scenario role: the tests of the "Test scenario runs" collection
+    // The scenario databases of these tests must not belong to the axis_scenario_counted role: the tests of the "Test scenario runs" collection
     // count and drop the databases of that role while they run.
     private async Task<Dictionary<string, string?>> ScenarioCellSettingsAsync(string bucket, TemporaryFolder studio) =>
         new(CellSettings(bucket, studio))

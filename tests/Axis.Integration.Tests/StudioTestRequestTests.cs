@@ -9,7 +9,6 @@ namespace Axis.Integration.Tests;
 /// The test route of the authoring API stores a <c>test</c> publish request with a snapshot of the folder and the
 /// scenario names. Until a publisher runs it, it stays queued.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class StudioTestRequestTests : IAsyncLifetime
 {
     private const string TestUrl = "/api/studio/apps/PurchaseRequests/test";

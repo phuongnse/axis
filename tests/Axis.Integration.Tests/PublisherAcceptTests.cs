@@ -32,26 +32,7 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // A database that an earlier test left behind must not fail this test, so each test starts from none.
-    public async ValueTask InitializeAsync()
-    {
-        await using var connection = new NpgsqlConnection(await PostgreSqlServer.AdminConnectionStringAsync());
-        await connection.OpenAsync(CancellationToken);
-        var names = new List<string>();
-        await using (var list = new NpgsqlCommand("SELECT d.datname FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'", connection))
-        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
-        {
-            while (await reader.ReadAsync(CancellationToken))
-            {
-                names.Add(reader.GetString(0));
-            }
-        }
-
-        foreach (var name in names)
-        {
-            await using var drop = new NpgsqlCommand($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", connection);
-            await drop.ExecuteNonQueryAsync(CancellationToken);
-        }
-    }
+    public async ValueTask InitializeAsync() => await PostgreSqlServer.DropCountedScenarioDatabasesAsync(CancellationToken);
 
     [Fact]
     public async Task An_accept_writes_the_drafts_files_and_adds_one_revision_naming_the_request()
@@ -381,7 +362,7 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
             ["Studio:RevisionsPath"] = revisionsPath,
             ["ConnectionStrings:Platform"] = scenario.Platform,
             ["Modules:Path"] = modules,
-            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync() : null,
+            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync(PostgreSqlServer.CountedScenarioRole) : null,
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);

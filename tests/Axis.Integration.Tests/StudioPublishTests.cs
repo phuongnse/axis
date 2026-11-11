@@ -16,7 +16,6 @@ namespace Axis.Integration.Tests;
 /// The validate and publish routes of the authoring API store a snapshot of the folder as a publish request in the
 /// database of the host's tenant, and the publisher runs it. The server and the publisher run together here.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class StudioPublishTests : IAsyncLifetime
 {
     internal const string HostA = "a.example.test";

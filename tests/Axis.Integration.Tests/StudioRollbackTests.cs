@@ -11,7 +11,6 @@ namespace Axis.Integration.Tests;
 /// The activate route of the authoring API stores an <c>activate</c> request for a release of the history, and the publisher
 /// activates that release again. The server and the publisher run together here.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class StudioRollbackTests : IAsyncLifetime
 {
     private const string ApplicationUrl = "/api/studio/apps/PurchaseRequests";
