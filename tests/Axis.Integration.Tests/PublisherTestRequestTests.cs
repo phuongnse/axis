@@ -49,26 +49,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // A database that an earlier test left behind must not fail this test, so each test starts from none.
-    public async ValueTask InitializeAsync()
-    {
-        await using var connection = new NpgsqlConnection(await PostgreSqlServer.AdminConnectionStringAsync());
-        await connection.OpenAsync(CancellationToken);
-        var names = new List<string>();
-        await using (var list = new NpgsqlCommand("SELECT d.datname FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'", connection))
-        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
-        {
-            while (await reader.ReadAsync(CancellationToken))
-            {
-                names.Add(reader.GetString(0));
-            }
-        }
-
-        foreach (var name in names)
-        {
-            await using var drop = new NpgsqlCommand($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", connection);
-            await drop.ExecuteNonQueryAsync(CancellationToken);
-        }
-    }
+    public async ValueTask InitializeAsync() => await PostgreSqlServer.DropCountedScenarioDatabasesAsync(CancellationToken);
 
     [Fact]
     public async Task A_test_request_of_the_purchase_request_sample_passes_every_scenario_and_leaves_no_database()
@@ -103,7 +84,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Equal(names, results.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(["version ok", "test ok"], StepLines(result, tenant));
         Assert.All(names, name => Assert.Contains($"{tenant} scenario {name} passed", result.Output));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
 
         // A test has no release id and writes no audit record.
         Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
@@ -144,7 +125,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
             Assert.StartsWith(ScenarioFolder(item["name"]!.GetValue<string>()), item["file"]!.GetValue<string>(), StringComparison.Ordinal);
         });
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -172,7 +153,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         // A scenario failure is in the results only, not in the diagnostics.
         var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic!["severity"]!.GetValue<string>() == "error");
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -223,7 +204,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Empty(await ResultsAsync(scenario, tenant, request));
         Assert.DoesNotContain(result.Output, line => line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal));
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} test failed: AXC0217 ", StringComparison.Ordinal));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -242,7 +223,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Equal("The scenario 'NoSuchScenario' is not in the application.", error["message"]!.GetValue<string>());
         Assert.Empty(await ResultsAsync(scenario, tenant, request));
         Assert.DoesNotContain(result.Output, line => line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -258,7 +239,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Contains(await DiagnosticsAsync(scenario, tenant, request), diagnostic => diagnostic["severity"]!.GetValue<string>() == "error");
         Assert.Empty(await ResultsAsync(scenario, tenant, request));
         Assert.DoesNotContain(result.Output, line => line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -316,7 +297,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Null(cut["path"]);
         Assert.Contains("time limit", cut["message"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} test failed: AXC0219 ", StringComparison.Ordinal));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -328,14 +309,14 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "directory",
-            ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync(),
+            ["Scenarios:ServerConnectionString"] = await PostgreSqlServer.ScenarioConnectionStringAsync(PostgreSqlServer.CountedScenarioRole),
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
         try
         {
             var deadline = DateTime.UtcNow + _limit;
-            while (!run.IsCompleted && await ScenarioDatabasesAsync() == 0 && DateTime.UtcNow < deadline)
+            while (!run.IsCompleted && await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken) == 0 && DateTime.UtcNow < deadline)
             {
                 await Task.Delay(20, CancellationToken);
             }
@@ -353,7 +334,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         Assert.Equal("AXC0220", error["code"]!.GetValue<string>());
         Assert.Equal("failed", (await ResultsAsync(scenario, tenant, request))[^1]!["outcome"]!.GetValue<string>());
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} test failed: AXC0220 ", StringComparison.Ordinal));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     internal static async Task<string> CreateTenantAsync(AdminScenario scenario)
@@ -375,7 +356,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "directory",
-            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync() : null,
+            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync(PostgreSqlServer.CountedScenarioRole) : null,
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings, publisherTestLimit: testLimit);
@@ -486,13 +467,6 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         [.. result.Output
             .Where(line => line.StartsWith($"{tenant} ", StringComparison.Ordinal) && !line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal) && !line.StartsWith($"{tenant} claim ", StringComparison.Ordinal))
             .Select(line => line[(tenant.Length + 1)..])];
-
-    // The databases that the scenario role owns. A test run creates them as that role, and the other runner tests create theirs as the superuser.
-    private static async Task<long> ScenarioDatabasesAsync() =>
-        (long)(await PostgreSqlServer.AdminScalarAsync(
-            await PostgreSqlServer.AdminConnectionStringAsync(),
-            "SELECT count(*) FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'",
-            CancellationToken))!;
 
     private static Task<object?> ScalarAsync(AdminScenario scenario, string id, string sql) =>
         PostgreSqlServer.AdminScalarAsync(new NpgsqlConnectionStringBuilder(scenario.Platform) { Database = $"axis_{id}" }.ConnectionString, sql, CancellationToken);

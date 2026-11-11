@@ -31,26 +31,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // A database that an earlier test left behind must not fail this test, so each test starts from none.
-    public async ValueTask InitializeAsync()
-    {
-        await using var connection = new NpgsqlConnection(await PostgreSqlServer.AdminConnectionStringAsync());
-        await connection.OpenAsync(CancellationToken);
-        var names = new List<string>();
-        await using (var list = new NpgsqlCommand("SELECT d.datname FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'", connection))
-        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
-        {
-            while (await reader.ReadAsync(CancellationToken))
-            {
-                names.Add(reader.GetString(0));
-            }
-        }
-
-        foreach (var name in names)
-        {
-            await using var drop = new NpgsqlCommand($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", connection);
-            await drop.ExecuteNonQueryAsync(CancellationToken);
-        }
-    }
+    public async ValueTask InitializeAsync() => await PostgreSqlServer.DropCountedScenarioDatabasesAsync(CancellationToken);
 
     [Fact]
     public async Task A_publish_whose_contract_scenario_fails_fails_with_AXC0342_and_stores_nothing()
@@ -78,7 +59,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         var item = Assert.Single(await ResultsAsync(scenario, tenant, request))!;
         Assert.Equal("failed", item["outcome"]!.GetValue<string>());
         Assert.Equal(2, item["step"]!.GetValue<int>());
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -100,7 +81,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Equal("requests/SubmitRequest", item["name"]!.GetValue<string>());
         Assert.Equal(ScenarioFile, item["file"]!.GetValue<string>());
         Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -118,7 +99,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Equal("AXC0342", error["code"]!.GetValue<string>());
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0342 ", StringComparison.Ordinal));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -137,7 +118,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} contracts failed: AXC0217 ", StringComparison.Ordinal));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -178,7 +159,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Equal("passed", ran["outcome"]!.GetValue<string>());
         Assert.Contains(result.Output, line => line.StartsWith($"{tenant} scenario requests/SubmitRequest skipped:", StringComparison.Ordinal));
         Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -222,7 +203,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
             items.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
         Assert.All(items, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
         Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -251,7 +232,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
             items.Select(item => item!["name"]!.GetValue<string>()).Order(StringComparer.Ordinal).ToArray());
         Assert.All(items, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
         Assert.Equal(["version ok", "contracts ok", "compile ok"], StepLines(result, tenant).Take(3).ToArray());
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]
@@ -282,7 +263,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
         Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
-        Assert.Equal(0L, await ScenarioDatabasesAsync());
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     private static async Task<string> CreateTenantAsync(AdminScenario scenario)
@@ -299,7 +280,7 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         {
             ["Tenancy:Source"] = "directory",
             ["Modules:Path"] = modules,
-            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync() : null,
+            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync(PostgreSqlServer.CountedScenarioRole) : null,
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
@@ -380,13 +361,6 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         [.. result.Output
             .Where(line => line.StartsWith($"{tenant} ", StringComparison.Ordinal) && !line.StartsWith($"{tenant} scenario ", StringComparison.Ordinal) && !line.StartsWith($"{tenant} claim ", StringComparison.Ordinal))
             .Select(line => line[(tenant.Length + 1)..])];
-
-    // The databases that the scenario role owns. The contracts step creates them as that role.
-    private static async Task<long> ScenarioDatabasesAsync() =>
-        (long)(await PostgreSqlServer.AdminScalarAsync(
-            await PostgreSqlServer.AdminConnectionStringAsync(),
-            "SELECT count(*) FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'",
-            CancellationToken))!;
 
     private static Task<object?> ScalarAsync(AdminScenario scenario, string id, string sql) =>
         PostgreSqlServer.AdminScalarAsync(new NpgsqlConnectionStringBuilder(scenario.Platform) { Database = $"axis_{id}" }.ConnectionString, sql, CancellationToken);

@@ -87,7 +87,8 @@ The integration tests share their containers, so a run starts each service at mo
   database a fixture creates has a name unique in the run. A fixture never starts its own container.
   Tenant isolation tests still use one tenant database per tenant. Tests that read
   `pg_stat_activity` filter on `current_database()`, so they neither see nor end other classes'
-  sessions.
+  sessions. Tests that count or drop scenario databases use the scenario role `axis_scenario_counted`,
+  act only on its databases, and share one collection, so they never drop each other's.
 - **Models.** No test calls a paid model. Tests that need a model's answer use the scripted adapter,
   see [model bindings](reference/model-bindings.md#bindings).
 - **Scenarios.** `scripts/integration.sh` runs the scenarios of every application under
