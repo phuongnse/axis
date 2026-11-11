@@ -126,6 +126,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ["check_expression"] = $$"""{"application":"StepApp","draft":"{{draft}}","id":"{{FixtureId("rules", "needs-review.json")}}","path":"/expression","expression":"total >= 500"}""",
                 ["validate_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
                 ["diff_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
+                ["run_scenarios"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
             },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),
             [TaskApiFixture.RequestTitle(record), secret, url, KeycloakFixture.ClientSecret],

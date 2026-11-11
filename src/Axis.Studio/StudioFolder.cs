@@ -160,8 +160,14 @@ internal static class StudioFolder
     /// that is not a valid resource is kept, so the publisher reports it. The same files as <see cref="List"/> are
     /// reachable: no link, no hidden file and nothing that leaves the folder.
     /// </summary>
-    public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder) =>
-        [.. Files(folder).Select(file => new StudioSnapshotFile(
+    public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder) => Snapshot(Files(folder));
+
+    /// <summary>
+    /// The snapshot of <paramref name="files"/>, sorted by file ordinally, with the version a folder's snapshot gives each file.
+    /// A draft's files take the same way to a snapshot as the working folder's.
+    /// </summary>
+    public static IReadOnlyList<StudioSnapshotFile> Snapshot(IReadOnlyList<(string File, byte[] Bytes)> files) =>
+        [.. files.OrderBy(file => file.File, StringComparer.Ordinal).Select(file => new StudioSnapshotFile(
             file.File,
             Convert.ToHexStringLower(SHA256.HashData(file.Bytes)),
             Encoding.UTF8.GetString(file.Bytes)))];

@@ -716,11 +716,11 @@ first and then the application's own scenarios. An item is
 What each kind does:
 
 - **A snapshot.** `validate`, `publish`, `preview` and `test` store the folder as it is when the
-  request is made: every `*.json` file that Studio can reach, with its `version`, as for
-  [Versions](#versions). A file that is not a valid resource is kept, so the request fails with the
-  diagnostic that the diagnostics route shows. The snapshot is read under the write lock, so it never
-  holds a write half done, and a later edit in Studio does not change a queued request: the release is
-  exactly what the author sent.
+  request is made (a `test` of `run_scenarios`, the draft, see [Test](#test)): every `*.json` file
+  that Studio can reach, with its `version`, as for [Versions](#versions). A file that is not a valid
+  resource is kept, so the request fails with the diagnostic that the diagnostics route shows. The
+  snapshot is read under the write lock, so it never holds a write half done, and a later edit in
+  Studio does not change a queued request: the release is exactly what the author sent.
 - **A folder with errors.** A `publish` of a folder with compile errors is still accepted with `202`,
   and the request then ends `failed` with those diagnostics. So there is one path for diagnostics, and
   the snapshot shows what the author sent.
@@ -781,9 +781,10 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   body, no list or an empty list, every scenario runs, a pinned module's after the application's own,
   as `<module id>/<name>`. An unknown name is accepted with `202`, and the request then ends `failed`
   with `AXC0218`, as for a folder with errors.
-- **Where it runs.** The server stores the request with a snapshot, taken as for `validate`. The
+- **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
+  the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
-  [the publisher](administration.md#publisher), and touches the tenant database only to store the
+  [the publisher](administration.md#publisher), and touches the tenant database only for the
   request's status and outcomes. Without the setting, the request ends `failed` with `AXC0217`, which
   names it, and a snapshot that does not compile ends it `failed` with the compile diagnostics. In
   these cases, and for an unknown name, no scenario runs.
@@ -801,8 +802,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   separate from the one of `validate`, `publish` and `activate`, so a `test` does not wait behind a
   `publish`.
 - **Audit.** A `test` writes no audit record.
-- **A request that runs again.** A request that is claimed again after a lost lease runs every
-  scenario again.
+- **A request that runs again.** A request claimed again after a lost lease runs every scenario again.
 
 ### Lifecycle
 

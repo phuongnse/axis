@@ -8,5 +8,5 @@ Use this when `main` has changed code the prototype touches. The rule is in
 2. Resolve each conflict on `main`'s API, data shape, texts and logic, and put
    the prototype's look back on them. Never change `main`'s logic to suit the
    prototype.
-3. Check it: `tsc -b --noEmit`, `oxlint --deny-warnings --report-unused-disable-directives` and `prettier --check` in
-   `web/`, and `scripts/design-system.sh`. Then push the branch.
+3. Check it: `npm run lint --prefix web` and `scripts/design-system.sh`. Then
+   push the branch.
