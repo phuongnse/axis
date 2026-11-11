@@ -60,6 +60,12 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
   one, and using the old one again is refused with `invalid_grant`. Refresh tokens end with the realm
   session, at most 8 hours. These rules, and the PKCE policy, hold for every client of the tenant's
   realm.
+- **Revoked consent.** The server reads the client's row in `axis.mcp_clients` (see
+  [storage](storage.md)) on every call. When the token's `iat` is not later than the row's
+  `revoked_at`, it answers `401` with the same `WWW-Authenticate` header as for any refused token, so a
+  revoke takes effect on the next call. A token issued after the revoke works, so a client whose
+  consent is given again can connect. Each call also records the client's last use in that row, at
+  most once a minute. The revoke action belongs to **Connected apps** below.
 - **Who acts.** The token's subject is the person. The route needs the [author role](authoring.md#settings)
   and answers `403` without it.
 - **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for

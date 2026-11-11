@@ -25,7 +25,7 @@ namespace Axis.Integration.Tests;
 /// under <c>none</c> registration answers <c>403</c> and every outside client is off, under <c>allowList</c> only the listed clients are on, under <c>all</c> registration is open,
 /// and the clients of Axis stay on under every value.
 /// </summary>
-public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsyncLifetime
+public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string ClientId = "mcp-public-test";
     private const string RedirectUri = "http://localhost/callback";
@@ -39,7 +39,6 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
     private const string TokenExchangeGrant = RealmAgentTokens.TokenExchangeGrant;
     private const string AccessTokenType = RealmAgentTokens.AccessTokenType;
     private const string RefreshTokenType = RealmAgentTokens.RefreshTokenType;
-    private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
     // The mapper stands in for the roles that tenant realms do not yet put into MCP tokens.
     private static readonly Dictionary<string, object> _rolesMapper = new()
@@ -714,16 +713,17 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
     private async Task<McpInitialize> InitializeMcpAsync(string realm, string? accessToken)
     {
         var applications = Directory.CreateTempSubdirectory("axis-mcp-realm-").FullName;
+        var platform = await database.CreateDatabaseAsync("mcp_realm", CancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
         try
         {
             await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment("Testing");
-                builder.UseTestPlatform(UnreachableDatabase);
-                builder.WithoutPlatformMigration();
+                builder.UseTestPlatform(platform);
                 builder.UseSetting("Tenants:a:Hosts:0", Host);
-                builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
-                builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);
+                builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
+                builder.UseSetting("Tenants:a:SchemaConnectionString", database.ConnectionString);
                 builder.UseSetting("Tenants:a:Oidc:Authority", new Uri(_baseAddress, $"realms/{realm}").ToString());
                 builder.UseSetting("Tenants:a:Oidc:ClientId", TenantRealm.PlatformClientId);
                 builder.UseSetting("Tenants:a:Oidc:ClientSecret", _secrets.Platform);
