@@ -42,6 +42,15 @@ describe('.nexkit/config.json', () => {
       assert.ok(number >= 1 && number <= check.shards.max, `${check.name} printed ${number}`)
     }
   })
+
+  // CI uploads each job's results as test-results-<job>, and NexKit's evidence names them, a sharded check's by one
+  // name ending in *, so the list holds whatever its count (docs/delivery.md#nexkits-checks).
+  test('names in evidence.artifacts the results of every check, a sharded one by a pattern for all its shards', () => {
+    for (const check of config.checks.filter((c) => c.results)) {
+      const name = check.shards ? `test-results-${check.name}-*` : `test-results-${check.name}`
+      assert.ok(config.evidence.artifacts.includes(name), `${name} is not in evidence.artifacts`)
+    }
+  })
 })
 
 describe('configProblems', () => {

@@ -258,29 +258,20 @@
       },
       "on-hold": {
         "hold": true
+      },
+      "hand-made": {
+        "hold": true
       }
     },
     "dependabot": "high"
   },
   "evidence": {
     "artifacts": [
-      "test-results-e2e-1",
-      "test-results-e2e-2",
-      "test-results-e2e-3",
-      "test-results-e2e-4",
-      "test-results-e2e-5",
-      "test-results-integration-1",
-      "test-results-integration-2",
-      "test-results-integration-3",
-      "test-results-integration-4",
-      "test-results-integration-5",
+      "test-results-e2e-*",
+      "test-results-integration-*",
       "test-results-performance",
-      "test-results-smoke-1",
-      "test-results-smoke-2",
-      "test-results-smoke-3",
-      "test-results-test-1",
-      "test-results-test-2",
-      "test-results-test-3"
+      "test-results-smoke-*",
+      "test-results-test-*"
     ]
   },
   "notify": [

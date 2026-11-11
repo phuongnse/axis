@@ -71,10 +71,11 @@ that holds it.
   shared mechanism and keeps its behaviour. Both go before the milestones' features, because every
   later issue is built with what they change, and a feature built first would add one more copy to
   move.
-- **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
-  makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
-  issue to stop work on it without closing it. A [design issue](#design-changes) is held until its
-  review ends.
+- **A held issue waits for the owner.** An issue with the `on-hold` or the `hand-made` label, which the
+  `labels` setting makes holds, gets no plan, no round and no merge until the label is removed. The
+  owner holds an issue with `on-hold` to stop work on it without closing it, and a
+  [design issue](#design-changes) is held so until its review ends. `hand-made` holds an issue that a
+  [hand-made pull request](#hand-made-pull-requests) closes.
 - **Autopilot takes only trusted issues.** An issue is trusted when a person with write access opens
   it, or when NexKit's App opens it: for a failure of CI on `main`, a flaky test, a Dependabot advisory
   or a part of a split. The issues of the docs audit and of CI's
@@ -185,8 +186,9 @@ that holds it.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
 - **NexKit reads CI's evidence.** Its [`evidence`][nexkit-evidence] setting names the test result
-  artifacts of the CI and performance workflows, which hold the Playwright traces and
-  `error-context.md` files, so a fix sees why `main` failed.
+  artifacts of the CI and performance workflows, a sharded check's by one name ending in `*` for all
+  its shards. They hold the Playwright traces and `error-context.md` files, so a fix sees why `main`
+  failed.
 - **A check skips the suites that a change cannot affect,** so a round after a small change is short.
   A suite runs unless no file changed since the check last passed can affect it, and any doubt runs
   it. In the automatic review that brings a branch up to date, NexKit goes further: the smoke,
@@ -217,6 +219,9 @@ that holds it.
   merges nothing there. The owner merges once both are green, with no admin bypass. The bypass is left
   for a pull request that needs the owner's code-owner review and that the owner opened, since GitHub
   does not let an author approve their own pull request.
+- **The issue it closes has the `hand-made` label,** a hold as [how issues run](#how-issues-run) says,
+  so autopilot plans nothing that a person makes. An issue opened for hand-made work gets it at once,
+  and the local agent session adds it when a plan finds a hand-made change. It stays after the merge.
 - **One that closes an issue carries the issue's labels and milestone.** NexKit sets them only on the
   pull requests it opens, so whoever opens a hand-made pull request sets them as they open it, the owner
   or the local agent session. One that closes no issue, such as a NexKit version bump, gets labels by the
@@ -276,8 +281,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   notes never holds a follow-up. A change in a path NexKit may not change is an issue like any other:
   its plan lists the change under *Needs a hand-made change*, and the local agent session makes it as a
   [hand-made pull request](#hand-made-pull-requests) when the owner asks. A hand-made pull request that other work waits
-  for closes an issue of its own with the `on-hold` label, which [how issues run](#how-issues-run)
-  makes a hold, and the follow-ups are *blocked by* that issue.
+  for closes an issue of its own, with the `hand-made` label, and the follow-ups are *blocked by* that
+  issue.
 
 ## The life of a milestone
 

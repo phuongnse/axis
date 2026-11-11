@@ -82,7 +82,10 @@ marks between issues, in NexKit's `request` skill.
    says when each one starts. A `bug` issue goes first, as the same section
    says. A follow-up is an issue from the start, blocked by the work it waits
    for: [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
-   gives the rule.
+   gives the rule. An issue for a hand-made pull request gets the `hand-made`
+   label, not `on-hold`, as
+   [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
+   says.
 
 ## Breaking down a milestone
 
