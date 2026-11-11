@@ -230,20 +230,24 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The trial quotas are optional. The public URL is optional. The PayOS provider is optional.
+  settings is set, both are required. The trial quotas are optional. The public URL is optional. The PayOS provider is optional, and with `PayOs` the base URL and the client id, API
+  key and checksum key are required.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
   `ForwardedHeaders:KnownNetworks` by the rules of [host settings](host-settings.md#forwarded-headers), so the
   [sign-up limits](sign-up.md#bots-and-abuse) see the client address. Without them it sees the proxy's address
   for every client.
-- **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key and
-  the sign-up challenge key may also come from the key-per-file secrets
+- **Secrets as files.** The connection strings, the mail password, the cells' secrets, the DNS key,
+  the sign-up challenge key and the PayOS keys may also come from the key-per-file secrets
   `/run/secrets/ControlPlane__ConnectionString`, `/run/secrets/ControlPlane__DirectoryConnectionString`,
   `/run/secrets/ControlPlane__Mail__Password`, `/run/secrets/ControlPlane__CellSecrets__<cell id>`,
-  `/run/secrets/ControlPlane__Dns__Key` and `/run/secrets/ControlPlane__SignUp__ChallengeKey`.
+  `/run/secrets/ControlPlane__Dns__Key`, `/run/secrets/ControlPlane__SignUp__ChallengeKey`,
+  `/run/secrets/ControlPlane__PayOs__ClientId`, `/run/secrets/ControlPlane__PayOs__ApiKey` and
+  `/run/secrets/ControlPlane__PayOs__ChecksumKey`. The PayOS keys come only from these files, and no log
+  line or error message holds one.
 - **Plans.** `ControlPlane:` settings also hold the [plans](plans.md#the-catalogue).
-- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the payment and e-invoice
+- **Providers** _(planned for M34)_. `ControlPlane:` settings also hold the Paddle and e-invoice
   providers' non-secret values.
 
 | Setting | Meaning | Start check |
@@ -272,7 +276,11 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
-| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake`. Optional. With none the service registers no adapter and no payment link job | `Fake` is refused outside Development and Testing. Any other value is refused |
+| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake` or `PayOs`. Optional. With none the service registers no adapter and no payment link job | `Fake` is refused outside Development and Testing. Any other value is refused |
+| `ControlPlane:PayOs:BaseUrl` | The address of the PayOS API, such as `https://api-merchant.payos.vn` | An absolute `https` URL, with `PayOs` |
+| `ControlPlane:PayOs:ClientId` | The PayOS client id, from the secret `ControlPlane__PayOs__ClientId` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
+| `ControlPlane:PayOs:ApiKey` | The PayOS API key, from the secret `ControlPlane__PayOs__ApiKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
+| `ControlPlane:PayOs:ChecksumKey` | The PayOS checksum key that signs the requests and the answers, from the secret `ControlPlane__PayOs__ChecksumKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
@@ -343,11 +351,17 @@ The control plane ships as its own image and Helm chart, beside the platform's.
   password, as `/run/secrets/ControlPlane__Mail__Password`, and is left out when the relay needs no
   sign-in. `secrets.challengeKey` does the same for the sign-up challenge key, as
   `/run/secrets/ControlPlane__SignUp__ChallengeKey`, and is left out when no Secret is named.
+  `controlPlane.payOs.provider` and `controlPlane.payOs.baseUrl` set `ControlPlane:PayOs:Provider`,
+  which is empty or `PayOs`, and `ControlPlane:PayOs:BaseUrl`, which defaults to
+  `https://api-merchant.payos.vn`. `secrets.payOs` names one Kubernetes Secret with the keys
+  `ControlPlane__PayOs__ClientId`, `ControlPlane__PayOs__ApiKey` and `ControlPlane__PayOs__ChecksumKey`,
+  which the chart mounts as the files of the same names, and is left out when the provider is empty.
   `image`, `replicas`, `resources` and `service` are the usual. The chart holds no secret
   value and creates no Secret, and its schema rejects a `value` in a secret reference.
 - **Render failures.** Rendering fails and names the value when `controlPlane.region`,
   `controlPlane.tenantDomain`, `controlPlane.mailFrom`, `controlPlane.mail.host`,
-  `secrets.connectionString.name` or `secrets.certificate.name` is not set.
+  `secrets.connectionString.name` or `secrets.certificate.name` is not set. It also fails and names
+  `secrets.payOs.name` when `controlPlane.payOs.provider` is `PayOs` and no Secret is named.
 - **Checks.** `scripts/lint.sh` lints the chart and checks its rendered manifests against the
   Kubernetes schemas, `scripts/helm-controlplane.test.mjs` tests the render, the image scan covers the
   image, and the `images` smoke suite starts it read-only against PostgreSQL over TLS and runs

@@ -48,6 +48,12 @@ spec:
             - name: ControlPlane__Mail__UserName
               value: {{ . | quote }}
             {{- end }}
+            {{- if eq .Values.controlPlane.payOs.provider "PayOs" }}
+            - name: ControlPlane__PayOs__Provider
+              value: "PayOs"
+            - name: ControlPlane__PayOs__BaseUrl
+              value: {{ .Values.controlPlane.payOs.baseUrl | quote }}
+            {{- end }}
             # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
             - name: Kestrel__Endpoints__Https__Url
               value: https://+:8443
@@ -120,6 +126,17 @@ spec:
                   items:
                     - key: {{ $.Values.secrets.challengeKey.key | default "ControlPlane__SignUp__ChallengeKey" | quote }}
                       path: ControlPlane__SignUp__ChallengeKey
+              {{- end }}
+              {{- if eq .Values.controlPlane.payOs.provider "PayOs" }}
+              - secret:
+                  name: {{ required "secrets.payOs.name is required when controlPlane.payOs.provider is PayOs: the Kubernetes Secret with ControlPlane__PayOs__ClientId, ControlPlane__PayOs__ApiKey and ControlPlane__PayOs__ChecksumKey" .Values.secrets.payOs.name | quote }}
+                  items:
+                    - key: ControlPlane__PayOs__ClientId
+                      path: ControlPlane__PayOs__ClientId
+                    - key: ControlPlane__PayOs__ApiKey
+                      path: ControlPlane__PayOs__ApiKey
+                    - key: ControlPlane__PayOs__ChecksumKey
+                      path: ControlPlane__PayOs__ChecksumKey
               {{- end }}
         - name: tmp
           emptyDir: {}

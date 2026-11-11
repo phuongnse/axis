@@ -327,6 +327,15 @@ public sealed class ControlPlaneOptionsTests
         ["ControlPlane:Dns:Key"] = DnsKey,
     };
 
+    private static Dictionary<string, string?> PayOsSettings() => new()
+    {
+        ["ControlPlane:PayOs:Provider"] = "PayOs",
+        ["ControlPlane:PayOs:BaseUrl"] = "https://api-merchant.payos.test",
+        ["ControlPlane:PayOs:ClientId"] = "client-id-48151623420",
+        ["ControlPlane:PayOs:ApiKey"] = "api-key-91827364550",
+        ["ControlPlane:PayOs:ChecksumKey"] = "checksum-key-27182818280",
+    };
+
     [Theory]
     [InlineData("ControlPlane:Dns:Server")]
     [InlineData("ControlPlane:Dns:Zone")]
@@ -445,6 +454,7 @@ public sealed class ControlPlaneOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
         Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Fake or PayOs", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("Other", exception.Message, StringComparison.Ordinal);
     }
 
@@ -457,6 +467,56 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.IsType<FakePayOs>(factory.Services.GetRequiredService<IPayOs>());
         Assert.Same(factory.Services.GetRequiredService<FakePayOs>(), factory.Services.GetRequiredService<IPayOs>());
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
+        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
+    }
+
+    [Theory]
+    [InlineData("BaseUrl")]
+    [InlineData("ClientId")]
+    [InlineData("ApiKey")]
+    [InlineData("ChecksumKey")]
+    public void The_PayOS_provider_without_one_of_its_settings_stops_the_start_and_the_message_names_only_that_setting(string name)
+    {
+        var settings = PayOsSettings();
+        settings[$"ControlPlane:PayOs:{name}"] = string.Empty;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:PayOs:{name}", exception.Message, StringComparison.Ordinal);
+        foreach (var (setting, value) in PayOsSettings().Where(pair => pair.Key != "ControlPlane:PayOs:Provider"))
+        {
+            Assert.DoesNotContain(value!, exception.Message, StringComparison.Ordinal);
+            if (!setting.EndsWith($":{name}", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain(setting, exception.Message, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public void A_PayOS_base_URL_that_is_not_https_stops_the_start()
+    {
+        var settings = PayOsSettings();
+        settings["ControlPlane:PayOs:BaseUrl"] = "http://api-merchant.payos.test";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:BaseUrl", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-merchant.payos.test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_PayOS_provider_with_all_its_settings_registers_the_real_adapter_and_the_payment_link_job()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: PayOsSettings());
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<PayOsClient>(factory.Services.GetRequiredService<IPayOs>());
+        Assert.Null(factory.Services.GetService<FakePayOs>());
         Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
         Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
     }

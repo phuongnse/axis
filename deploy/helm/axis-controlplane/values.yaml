@@ -38,6 +38,13 @@ controlPlane:
     useTls: true
     # ControlPlane:Mail:UserName. Optional. When set, secrets.mailPassword is required.
     userName: ""
+  # ControlPlane:PayOs, the PayOS adapter that creates the payment links of the VND invoices. Optional.
+  payOs:
+    # ControlPlane:PayOs:Provider. Empty registers no PayOS adapter and no payment link job. "PayOs" calls the real PayOS,
+    # and then secrets.payOs is required. The chart runs in Production, so it does not offer "Fake".
+    provider: ""
+    # ControlPlane:PayOs:BaseUrl, the https address of the PayOS API. Used only with the provider "PayOs".
+    baseUrl: https://api-merchant.payos.vn
 
 secrets:
   # ControlPlane:ConnectionString, the connection string of the control plane database. It must set
@@ -61,3 +68,8 @@ secrets:
   challengeKey:
     name: ""
     key: ControlPlane__SignUp__ChallengeKey
+  # The PayOS keys, a Kubernetes Secret with the keys ControlPlane__PayOs__ClientId, ControlPlane__PayOs__ApiKey and
+  # ControlPlane__PayOs__ChecksumKey. The chart mounts each as the file of the same name in /run/secrets. The keys are fixed,
+  # so the reference holds only the name. Required when controlPlane.payOs.provider is "PayOs", and left out otherwise.
+  payOs:
+    name: ""
