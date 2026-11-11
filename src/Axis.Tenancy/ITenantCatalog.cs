@@ -45,6 +45,7 @@ public interface ITenantCatalog
 /// <param name="Quotas">The tenant's own quota rows keyed by quota, where a <c>null</c> value means no limit, or <c>null</c> when the source has none. A quota with no row takes the cell's default. Only the <c>directory</c> source has them.</param>
 /// <param name="Legal">The tenant's privacy and terms links, or <c>null</c> when it sets none. Both sources have it, and a preview tenant has its main tenant's.</param>
 /// <param name="ReadOnly">Whether the tenant is read-only: its hosts are served, and each request learns it. Only the <c>directory</c> source has read-only tenants.</param>
+/// <param name="RealmAgent">What the server needs to exchange an author's token for the agent host, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -61,7 +62,8 @@ public sealed record TenantEntry(
     IReadOnlyDictionary<string, string>? HostSites = null,
     IReadOnlyDictionary<string, long?>? Quotas = null,
     TenantLegal? Legal = null,
-    bool ReadOnly = false);
+    bool ReadOnly = false,
+    TenantRealmAgent? RealmAgent = null);
 
 /// <summary>A tenant's privacy and terms links, and the links its sites set for themselves.</summary>
 /// <param name="PrivacyUrl">The tenant's privacy address, or <c>null</c> for none.</param>
@@ -124,6 +126,16 @@ public sealed record TenantRealmAccess(Uri BaseAddress, string Name, SecretValue
 /// <param name="Realm">The realm's name.</param>
 /// <param name="ClientSecret">The secret of the <c>axis-users</c> client.</param>
 public sealed record TenantRealmUsers(Uri BaseAddress, string Realm, SecretValue ClientSecret);
+
+/// <summary>
+/// What the server needs to exchange an author's token for the agent host: the address of the identity provider, the
+/// realm's name and the secret of its <c>axis-agent</c> client. The secret is a <see cref="SecretValue"/>, so the text form
+/// never shows it.
+/// </summary>
+/// <param name="BaseAddress">The identity provider's address, always ending with a slash, so a path joins onto it.</param>
+/// <param name="Realm">The realm's name.</param>
+/// <param name="ClientSecret">The secret of the <c>axis-agent</c> client.</param>
+public sealed record TenantRealmAgent(Uri BaseAddress, string Realm, SecretValue ClientSecret);
 
 /// <summary>How one tenant signs people in. A value the source leaves blank is <c>null</c>.</summary>
 /// <param name="Profile">The sign-in profile as the source wrote it, or <c>null</c> when unset, which counts as <c>standard</c>. See <see cref="TenantSignInProfiles"/>.</param>
