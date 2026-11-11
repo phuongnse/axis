@@ -269,6 +269,26 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("given_roles", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.McpClientRow", b =>
+                {
+                    b.Property<string>("ClientId")
+                        .HasColumnType("text")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_used_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("ClientId")
+                        .HasName("pk_mcp_clients");
+
+                    b.ToTable("mcp_clients", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.PendingComputedFieldRow", b =>
                 {
                     b.Property<Guid>("EntityId")

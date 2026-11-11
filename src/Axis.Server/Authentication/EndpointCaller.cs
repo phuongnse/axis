@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Axis.Core.Tenancy;
+using Axis.Data.Storage;
 using Axis.Server.CellApi;
+using Axis.Server.Tenancy;
 using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -337,6 +339,21 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                     return;
                 }
 
+                // An MCP token is refused when its client's consent was revoked at or after the token was issued, see docs/reference/mcp-server.md#sign-in.
+                var clientId = mcp ? principal.FindFirst("azp")?.Value : null;
+                McpClientUse? use = null;
+                if (!string.IsNullOrWhiteSpace(clientId))
+                {
+                    var connection = await context.HttpContext.RequestServices.GetRequiredService<TenantDatabase>()
+                        .GetConnectionAsync(context.HttpContext.RequestAborted);
+                    use = await McpClients.ReadAsync(connection, clientId, context.HttpContext.RequestAborted);
+                    if (use.RevokedAt is { } revokedAt && token.IssuedAt <= revokedAt.UtcDateTime)
+                    {
+                        Refuse(context, "The client's consent was revoked after the token was issued.");
+                        return;
+                    }
+                }
+
                 // Service-account tokens often have no name, and a bare id is hard to read in a history.
                 var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
                 if (string.IsNullOrWhiteSpace(displayName))
@@ -350,7 +367,13 @@ internal sealed partial class BearerCallerOptions(TenantSignInSettings settings,
                     callerId,
                     string.IsNullOrWhiteSpace(displayName) ? callerId : displayName,
                     roles,
-                    mcp ? principal.FindFirst("azp")?.Value : null);
+                    clientId);
+                if (use is { UseIsStale: true })
+                {
+                    var connection = await context.HttpContext.RequestServices.GetRequiredService<TenantDatabase>()
+                        .GetConnectionAsync(context.HttpContext.RequestAborted);
+                    await McpClients.RecordUseAsync(connection, clientId!, context.HttpContext.RequestAborted);
+                }
             },
         };
 
