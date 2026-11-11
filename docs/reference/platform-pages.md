@@ -53,6 +53,10 @@ their roles. Who may open it, the rules of each command, its routes and its audi
 [user administration](user-administration.md#the-users-page). The page shows names, never translated
 labels, and never shows a field marked `sensitive` or record data. Its texts are `shell.users.*`.
 
+The page has two tabs, and People is open by default. People holds [the list](#the-list) and the
+[Export data and usage](#export-data-and-usage) and [Model key](#model-key) sections. The [Connected apps](#connected-apps)
+tab shows only to an administrator of a tenant that has the setting.
+
 ### The list
 
 The page lists the tenant's users from `GET /api/users`, 20 to a page, and fetches each page from the
@@ -125,7 +129,7 @@ one for the platform, where the administrator gives and removes them. Their text
 
 ### Export data and usage
 
-In a tenant of a cell, the users page has two more sections for an administrator:
+In a tenant of a cell, the People tab has two more sections for an administrator:
 
 - **Export data.** Described below.
 - **Usage.** The tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
@@ -160,7 +164,7 @@ are `shell.users.usage.*`.
 
 ### Model key
 
-Where `Ai:AllowTenantKeys` is on, the users page has a "Model key" section below Usage, where an administrator sets,
+Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Usage, where an administrator sets,
 changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
 The section is a component of its own. It loads `GET /api/tenant/model-key` and renders nothing unless the route answers
 `200`. That keeps it hidden from a user who is not an administrator, where `Ai:AllowTenantKeys` is off, and for a tenant
@@ -175,3 +179,22 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
 - **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
+
+### Connected apps
+
+The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, see
+[outside MCP clients](user-administration.md#outside-mcp-clients) and
+[client registration](mcp-server.md#client-registration). The tab reads `GET /api/tenant/outside-clients` and shows only
+when the route answers `200`. That keeps it hidden from a user who is not an administrator, for a preview tenant and for a
+tenant with no directory row. A `403` or `404` is not logged, and any other failure is logged. Its texts are
+`shell.users.connectedApps.*`.
+
+- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode.
+- **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
+  the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
+- **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads
+  `GET /api/tenant/outside-clients` again, so the tab shows what the server stored, with the IDs trimmed and without
+  repeats. It then says "The setting was saved."
+- **A failed save.** The tab says "The setting was not saved." and keeps the edited values on screen. A `502` says "The
+  setting was stored, but the identity provider did not apply it. Save again to apply it.", because the server keeps the
+  stored change when the identity provider fails.

@@ -69,9 +69,13 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+const outsideClientsPath = '/api/tenant/outside-clients'
+
 function stubServer(answer: (input: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
-    input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : answer(input, init),
+    input === '/api/tenant/usage' || input === outsideClientsPath
+      ? new Response(null, { status: 404 })
+      : answer(input, init),
   )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -161,6 +165,44 @@ describe('UsersPage', () => {
     const other = screen.getByText('Bob Active').closest('tr')!
     expect(within(other).getByText('google')).toBeVisible()
     expect(within(other).getByText('Active')).toBeVisible()
+  })
+
+  it('shows the Connected apps tab next to People when the outside clients route answers 200', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === outsideClientsPath) {
+          return json({ outsideClients: 'allowList', allowedClients: ['claude'] })
+        }
+        return input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : json(users)
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('tab', { name: 'People', selected: true })).toBeVisible()
+    expect(screen.getByText('Ann Invited')).toBeVisible()
+    await userEvent.click(screen.getByRole('tab', { name: 'Connected apps' }))
+    expect(await screen.findByTestId('connected-apps')).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByText('claude')).toBeVisible()
+  })
+
+  it('shows no Connected apps tab when the outside clients route answers 403', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === outsideClientsPath
+          ? new Response(null, { status: 403 })
+          : input === '/api/tenant/usage'
+            ? new Response(null, { status: 404 })
+            : json(users),
+      ),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'People' })).toBeVisible()
+    expect(screen.queryByRole('tab', { name: 'Connected apps' })).toBeNull()
   })
 
   it('searches from page 1 and pages from the server', async () => {
