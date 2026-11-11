@@ -862,6 +862,51 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantTokenUsageRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<string>("Binding")
+                        .HasColumnType("text")
+                        .HasColumnName("binding");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<bool>("OwnKey")
+                        .HasColumnType("boolean")
+                        .HasColumnName("own_key");
+
+                    b.Property<long>("InputTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("input_tokens");
+
+                    b.Property<long>("OutputTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("output_tokens");
+
+                    b.HasKey("TenantId", "Day", "Binding", "Model", "OwnKey")
+                        .HasName("pk_tenant_token_usage");
+
+                    b.ToTable("tenant_token_usage", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_token_usage_input_tokens", "input_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_token_usage_output_tokens", "output_tokens >= 0");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -1095,6 +1140,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_site_legal_links_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantTokenUsageRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_token_usage_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>

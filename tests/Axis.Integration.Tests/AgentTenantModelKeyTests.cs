@@ -89,7 +89,7 @@ public sealed class AgentTenantModelKeyTests(PostgreSqlFixture database) : IClas
             services => services.AddHttpClient(ModelAdapters.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => handler));
     }
 
-    private static async Task StoreKeyAsync(string platform, string tenantId, string key)
+    internal static async Task StoreKeyAsync(string platform, string tenantId, string key)
     {
         var cipher = TenantSecretCipher.Load(
             new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestPlatform.SecretKey }).Build());

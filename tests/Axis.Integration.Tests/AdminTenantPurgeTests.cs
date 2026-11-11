@@ -256,6 +256,7 @@ public sealed class AdminTenantPurgeTests(KeycloakFixture keycloak, PostgreSqlFi
             $"INSERT INTO platform.tenant_quotas (tenant_id, quota, value) VALUES ('{id}', 'users', 5)",
             $"INSERT INTO platform.tenant_leases (lease_id, tenant_id, quota, holder, expires_at) VALUES (gen_random_uuid(), '{id}', 'work-items', 'host-1', now() + interval '1 hour')",
             $"INSERT INTO platform.tenant_usage (tenant_id, day) VALUES ('{id}', current_date)",
+            $"INSERT INTO platform.tenant_token_usage (tenant_id, day, binding, model, own_key, input_tokens, output_tokens) VALUES ('{id}', current_date, 'main', 'model-1', false, 3, 4)",
             $"INSERT INTO platform.tenant_usage_latest (tenant_id, database_bytes, file_bytes, sampled_at) VALUES ('{id}', 1, 2, now())",
             $"INSERT INTO platform.tenant_daily_counters (tenant_id, day, counter, value) VALUES ('{id}', current_date, 'emails', 3)",
             $"INSERT INTO platform.tenant_backups (tenant_id, last_success_at) VALUES ('{id}', now())",
