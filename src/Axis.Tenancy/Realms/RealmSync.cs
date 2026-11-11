@@ -275,28 +275,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
         var allowed = new HashSet<string>(allowedClients, StringComparer.Ordinal);
         var clientsPath = $"{realmPath}/clients";
-        var outside = new List<(string Uuid, bool Enabled, string ClientId)>();
-        for (var first = 0; ; first += OutsideClientPageSize)
-        {
-            using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?first={first}&max={OutsideClientPageSize}", null, cancellationToken);
-            EnsureSuccess(listed, "list the clients");
-            var page = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
-            foreach (var client in page)
-            {
-                var clientId = client.GetProperty("clientId").GetString()!;
-                if (client.TryGetProperty("publicClient", out var isPublic) && isPublic.ValueKind == JsonValueKind.True && !_keycloakClientIds.Contains(clientId))
-                {
-                    outside.Add((client.GetProperty("id").GetString()!, client.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True, clientId));
-                }
-            }
+        var outside = await ReadOutsideClientsAsync(token, clientsPath, cancellationToken);
 
-            if (page.Count < OutsideClientPageSize)
-            {
-                break;
-            }
-        }
-
-        foreach (var (uuid, enabled, clientId) in outside)
+        foreach (var (uuid, clientId, _, enabled) in outside)
         {
             var allow = outsideClients == TenantOutsideClients.All || (outsideClients == TenantOutsideClients.AllowList && allowed.Contains(clientId));
             if (allow == enabled)
@@ -312,6 +293,46 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             representation["enabled"] = JsonSerializer.SerializeToElement(allow);
             using var updated = await SendAsync(token, HttpMethod.Put, clientPath, representation, cancellationToken);
             EnsureSuccess(updated, $"{(allow ? "turn on" : "turn off")} the client '{clientId}'");
+        }
+    }
+
+    /// <summary>
+    /// Lists the outside MCP clients of the realm: the public clients that are not one of Keycloak's own, see
+    /// <c>docs/reference/mcp-server.md#client-registration</c>. A confidential client, so every client of Axis, never appears.
+    /// It signs in as <c>axis-activation</c>. An error names the step and the status code, never a response body or a secret.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<IReadOnlyList<RealmOutsideClient>> ListOutsideClientsAsync(string realm, string activationSecret, CancellationToken cancellationToken)
+    {
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        return await ReadOutsideClientsAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}/clients", cancellationToken);
+    }
+
+    private async Task<List<RealmOutsideClient>> ReadOutsideClientsAsync(string token, string clientsPath, CancellationToken cancellationToken)
+    {
+        var outside = new List<RealmOutsideClient>();
+        for (var first = 0; ; first += OutsideClientPageSize)
+        {
+            using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?first={first}&max={OutsideClientPageSize}", null, cancellationToken);
+            EnsureSuccess(listed, "list the clients");
+            var page = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+            foreach (var client in page)
+            {
+                var clientId = client.GetProperty("clientId").GetString()!;
+                if (client.TryGetProperty("publicClient", out var isPublic) && isPublic.ValueKind == JsonValueKind.True && !_keycloakClientIds.Contains(clientId))
+                {
+                    outside.Add(new RealmOutsideClient(
+                        client.GetProperty("id").GetString()!,
+                        clientId,
+                        client.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String && name.GetString() is { Length: > 0 } text ? text : null,
+                        client.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True));
+                }
+            }
+
+            if (page.Count < OutsideClientPageSize)
+            {
+                return outside;
+            }
         }
     }
 
@@ -1612,3 +1633,6 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
     private sealed class ConflictException(string message) : InvalidOperationException(message);
 }
+
+/// <summary>An outside MCP client of a realm. <c>Name</c> is the client's name in the realm, or <c>null</c> when it has none.</summary>
+public sealed record RealmOutsideClient(string Id, string ClientId, string? Name, bool Enabled);

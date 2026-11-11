@@ -96,7 +96,8 @@ erDiagram
   `azp` claim of the client's tokens), `last_used_at` (`timestamptz`, nullable) and `revoked_at`
   (`timestamptz`, nullable, the time the client's consent was revoked). The MCP server reads the
   client's row on every `/mcp` call and writes `last_used_at` at most once a minute, from the
-  database clock. See [sign-in](mcp-server.md#sign-in).
+  database clock. See [sign-in](mcp-server.md#sign-in). The connected apps route also reads `last_used_at`, see
+  [outside MCP clients](user-administration.md#outside-mcp-clients).
 - **Given roles.** A row of `axis.given_roles` holds `id` (`uuid`, the primary key), `user_id`,
   `application_id` (null for a platform role) and `role` (for a platform role, its kind, such as
   `operator`), with a unique index on those three that counts nulls as equal. A session reads its

@@ -14,7 +14,7 @@ namespace Axis.Tenancy.Realms;
 /// alias of the first federated identity. It counts the enabled users. It reads the contact details of one user: the enabled flag, email, display name and locale. It also finds one user, disables or enables a user, ends a user's realm
 /// sessions or one realm session by its id, lists a user's authenticators and removes them. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
-/// adds a required action to every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
+/// adds a required action to every user. It reads the consents of every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -209,6 +209,61 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                 return;
             }
         }
+    }
+
+    /// <summary>
+    /// Reads every consent that a person of the realm gave to a client, see <c>docs/reference/user-administration.md#outside-mcp-clients</c>.
+    /// It walks every user, a service account excepted, and reads that user's consents. An entry counts only when the realm gives a creation
+    /// time for it, because the realm also lists a client that holds only an offline token, which is not a consent.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<IReadOnlyList<RealmConsent>> ListConsentsAsync(CancellationToken cancellationToken)
+    {
+        const int pageSize = 100;
+        var token = await TokenAsync(cancellationToken);
+        var usersPath = $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users";
+        var consents = new List<RealmConsent>();
+        for (var first = 0; ; first += pageSize)
+        {
+            using var listed = await GetAsync(token, $"{usersPath}?briefRepresentation=true&search=*&first={first}&max={pageSize}", cancellationToken);
+            EnsureSuccess(listed, "list the users");
+            var users = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+            var pageConsents = await Task.WhenAll(users.Select(user => ConsentsOfAsync(token, usersPath, user, cancellationToken)));
+            consents.AddRange(pageConsents.SelectMany(found => found));
+            if (users.Count < pageSize)
+            {
+                return consents;
+            }
+        }
+    }
+
+    private async Task<List<RealmConsent>> ConsentsOfAsync(string token, string usersPath, JsonElement user, CancellationToken cancellationToken)
+    {
+        var userId = user.GetProperty("id").GetString()!;
+        using var response = await GetAsync(token, $"{usersPath}/{Uri.EscapeDataString(userId)}/consents", cancellationToken);
+
+        // The user was deleted since the page was read, so there is nothing to read.
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return [];
+        }
+
+        EnsureSuccess(response, "read the consents of a user");
+        var entries = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var displayName = DisplayNameOf(user);
+        var email = Text(user, "email");
+        return
+        [
+            .. entries.EnumerateArray()
+                .Where(entry => Text(entry, "clientId") is not null
+                    && entry.TryGetProperty("createdDate", out var created) && created.ValueKind == JsonValueKind.Number && created.TryGetInt64(out _))
+                .Select(entry => new RealmConsent(
+                    Text(entry, "clientId")!,
+                    userId,
+                    displayName,
+                    email,
+                    DateTimeOffset.FromUnixTimeMilliseconds(entry.GetProperty("createdDate").GetInt64()))),
+        ];
     }
 
     /// <summary>Ends every session of the user in the realm.</summary>
@@ -452,6 +507,9 @@ public sealed record RealmUser(
     public string DisplayName =>
         string.Join(' ', new[] { FirstName, LastName }.Where(name => name is not null)) is { Length: > 0 } name ? name : Username;
 }
+
+/// <summary>One consent of a realm user to a client: the client id, the person and when the person consented. <c>Email</c> is <c>null</c> when the user has none.</summary>
+public sealed record RealmConsent(string ClientId, string UserId, string DisplayName, string? Email, DateTimeOffset ConsentedAt);
 
 /// <summary>The contact details of one realm user. <c>Locale</c> is the language the user chose, or <c>null</c> when none.</summary>
 public sealed record RealmUserContact(bool Enabled, string? Email, string DisplayName, string? Locale);
