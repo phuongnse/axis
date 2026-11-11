@@ -351,15 +351,17 @@ page, All tickets and the lead's dashboard. Its texts are in `en` and `vi`.
 The main Playwright journey proves that Studio alone builds a whole application. Its steps are in
 [testing](testing.md).
 
-- It starts from a blank application in Studio and builds the whole application, the two-step form,
-  the dashboard, the ticket detail page, the time zone, the automations and their texts included.
+- It starts from a blank application in Studio and builds the whole application except its test
+  scenarios, the two-step form, the dashboard, the ticket detail page, the time zone, the automations and
+  their texts included.
 - It may not use a file edit, the JSON view or an `axis-admin` command.
-- At the end it compares the folder it built with the committed sample, `samples/apps/service-desk`.
-  The comparison ignores only what [the folder comparison](testing.md#the-folder-comparison) lists, and
-  any other difference fails the journey.
-- It then runs the scenarios from Studio and publishes. The requester, the service desk lead and the
-  agent take one ticket through the process on the site, and the requester opens the ticket from the
-  bell after the agent resolves it.
+- At the end it compares the folder it built with the committed sample, `samples/apps/service-desk`,
+  except its scenarios. The comparison ignores only what [the folder comparison](testing.md#the-folder-comparison)
+  lists, and any other difference fails the journey.
+- It then publishes. The requester, the service desk lead and the agent take one ticket through the
+  process on the site, and the requester opens the ticket from the bell after the agent resolves it.
+- A second Playwright spec writes the twelve test scenarios in Studio over a copy of the sample that has
+  no scenarios. It compares the written folder with the sample, and then runs the scenarios from Studio.
 
 Another Playwright journey uses the sample at phone width.
 
@@ -427,8 +429,8 @@ The asset register, the asset form, the asset detail page and the dashboard, in 
 
 ### Built through Studio
 
-As for the service desk, the main Playwright journey builds the application with Studio only,
-compares it with the committed folder, runs its scenarios from Studio and publishes it. It uses the
+Studio alone builds the application in the main Playwright journey, which compares it with the committed
+folder, runs its scenarios from Studio and publishes it. It uses the
 JSON view for one scenario only, because the scenario editor cannot add a child-collection value. On
 the site, the asset manager registers an asset with an attachment and imports assets, and the
 auditor exports the register.
