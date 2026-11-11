@@ -23,9 +23,10 @@ limit, so the one more try starts late.
   Chromium needs, and the packages Playwright would add are fonts that no test reads.
 - **Every outside download has a time limit,** so a service that does not answer fails its step in
   minutes, not at NexKit's limit for setup.
-- **NexKit runs a command that stopped on a transient error again after growing waits,** about two
-  hours in all, before it asks for a person. Other issues run meanwhile. The waits are a NexKit
-  setting, which the owner tunes in `.nexkit/config.json` alone, as
+- **NexKit runs a command that stopped on a transient error again after growing waits,** long
+  enough in all to outlast a usual outage of an outside service, before it asks for a person. Other
+  issues run meanwhile. The waits are a NexKit setting, which the owner tunes in `.nexkit/config.json`
+  alone, as
   [D145](d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) agrees for every NexKit
   setting.
 
@@ -37,8 +38,8 @@ limit, so the one more try starts late.
   cache. GitHub drops a cache that nobody used for 7 days, so after a quiet week the first runs
   download again.
 - The caches take more of the repository's cache storage, and the container images most of it.
-- A transient stop holds its issue for up to two hours, where a person could have run it again
-  sooner by hand.
+- A transient stop holds its issue for as long as the waits last, where a person could have run it
+  again sooner by hand.
 
 ## Alternatives
 
