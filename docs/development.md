@@ -216,7 +216,7 @@ Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`, to run 
 
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
-`.nexkit/`, or a Markdown file. CI and NexKit each run the smoke tests as a job of their own.
+`.nexkit/`, or a Markdown file. CI and NexKit run the smoke tests in [shards](#shards), one job per shard.
 
 ### Performance and load tests
 
