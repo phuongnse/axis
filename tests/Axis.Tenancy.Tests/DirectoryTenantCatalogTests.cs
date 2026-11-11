@@ -186,6 +186,53 @@ public sealed class DirectoryTenantCatalogTests
     }
 
     [Fact]
+    public void A_row_with_an_agent_secret_gets_realm_agent_whose_secret_decrypts_to_the_stored_value()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+
+        var agent = DirectoryTenantCatalog.RealmAgent(row, cipher);
+
+        Assert.NotNull(agent);
+        Assert.Equal(new Uri("https://idp.example.test/"), agent.BaseAddress);
+        Assert.Equal("acme", agent.Realm);
+        Assert.Equal(AgentSecret, agent.ClientSecret.Reveal());
+        Assert.DoesNotContain(AgentSecret, agent.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_preview_row_gets_no_realm_agent()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.PreviewOf = "main";
+
+        Assert.Null(DirectoryTenantCatalog.RealmAgent(row, cipher));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_row_without_an_agent_secret_gets_no_realm_agent(bool empty)
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.RealmAgentClientSecret = empty ? [] : null;
+
+        Assert.Null(DirectoryTenantCatalog.RealmAgent(row, cipher));
+    }
+
+    [Fact]
+    public void A_row_that_signs_in_with_an_outside_identity_provider_gets_no_realm_agent()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.OidcAuthority = "https://login.example.test/realms/other";
+
+        Assert.Null(DirectoryTenantCatalog.RealmAgent(row, cipher));
+    }
+
+    [Fact]
     public void Bindings_decrypt_a_secret_only_when_it_is_revealed_and_match_names_ignoring_letter_case()
     {
         var cipher = CipherFor();
@@ -276,6 +323,7 @@ public sealed class DirectoryTenantCatalogTests
     private const string PlatformSecret = "pl4tform-cl13nt-s3cret";
 
     private const string UsersSecret = "us3rs-cl13nt-s3cret";
+    private const string AgentSecret = "ag3nt-cl13nt-s3cret";
 
     private static TenantRow Row(TenantSecretCipher cipher) =>
         new()
@@ -285,6 +333,7 @@ public sealed class DirectoryTenantCatalogTests
             OidcAuthority = "https://idp.example.test/realms/acme",
             RealmActivationClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmActivationClientSecret, ActivationSecret),
             RealmUsersClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmUsersClientSecret, UsersSecret),
+            RealmAgentClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmAgentClientSecret, AgentSecret),
             OidcClientSecret = cipher.Encrypt("acme", TenantSecretFields.OidcClientSecret, PlatformSecret),
         };
 

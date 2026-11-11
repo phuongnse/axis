@@ -292,9 +292,9 @@ the environment variable `Tenants__<id>__PreviewOf`. A blank value counts as uns
   tenant's.
 - **Sign-in.** A preview tenant has no `Oidc` block. It copies its main tenant's `Authority`,
   `ClientId`, `ClientSecret`, `Profile`, `ClientKey`, `ClientKeyId` and `Claims`. It does not copy
-  `EndpointAudience`, `ServiceAudience` or `UsersClientSecret`, so the preview accepts no
-  machine-caller or service account token and lists no realm users. A preview tenant with its own
-  `Oidc` block stops the start.
+  `EndpointAudience`, `ServiceAudience`, `UsersClientSecret` or `AgentClientSecret`, so the preview
+  accepts no machine-caller or service account token, lists no realm users and has no agent client.
+  A preview tenant with its own `Oidc` block stops the start.
 - **Bindings.** The bindings are empty unless the tenant sets some. A preview never takes its main
   tenant's bindings, so it never calls a real system by accident. See
   [deployment bindings](integration-resources.md#deployment-bindings).
@@ -342,9 +342,18 @@ activation and `Axis.Admin` activation use it, see
   authority stops the start, and the message never shows the secret. Under `directory` the server
   decrypts the stored `realm_users_client_secret`, and the realm name is the tenant id. A tenant with
   no users client has no users page, see [the users page](user-administration.md#the-users-page).
+- **Agent client.** The entry also carries what the server needs to exchange an author's token for
+  the agent host: the secret of the `axis-agent` client, with the same address and realm name. Under
+  `configuration`, `Tenants:{id}:Oidc:AgentClientSecret` gives it, as the environment variable
+  `Tenants__<id>__Oidc__AgentClientSecret`, and a blank value means the tenant has no agent client.
+  It follows the authority rule of the users client: a secret with an authority that does not end in
+  `/realms/<name>` stops the start, and the message never shows the secret. Under `directory` the
+  server decrypts the stored `realm_agent_client_secret`, and the realm name is the tenant id. A row
+  without the secret, and a tenant that signs in with an outside identity provider, has no agent
+  client.
 - **Preview tenants.** A preview tenant has no realm details of its own, and a `Realm` block on one
-  stops the start. It has no users client either, so it does not copy `UsersClientSecret` from its
-  main tenant.
+  stops the start. It has no users client or agent client either, so it does not copy
+  `UsersClientSecret` or `AgentClientSecret` from its main tenant.
 
 ## Data settings
 

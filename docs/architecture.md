@@ -241,7 +241,7 @@ Startup fails with an `InvalidOperationException` that names every problem when:
 - a tenant has no connection string, or one that is only whitespace;
 - a tenant's site hosts break the rules of [tenancy settings](reference/host-settings.md#tenancy-settings);
 - a tenant's legal links break the rules of [legal settings](reference/legal.md#legal-settings);
-- a tenant's `Realm` block or `Oidc:UsersClientSecret` breaks the rules of
+- a tenant's `Realm` block, `Oidc:UsersClientSecret` or `Oidc:AgentClientSecret` breaks the rules of
   [tenant realm](reference/host-settings.md#tenant-realm);
 - a tenant's `Email` block is invalid, see [mail settings](reference/notifications.md#mail-settings);
 - the same host is listed under two tenants, compared ignoring letter case;

@@ -402,7 +402,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             hostSites,
             Quotas(quotaRows),
             legal,
-            row.Status == "readOnly");
+            row.Status == "readOnly",
+            RealmAgent(row, cipher));
     }
 
     // The privacy and terms links of a tenant row with the rows of its sites, or null when the tenant sets none. Legal
@@ -528,6 +529,29 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             baseAddress,
             id,
             SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, stored).Reveal()));
+    }
+
+    /// <summary>
+    /// What the server needs to exchange an author's token for the agent host of a tenant row, or <c>null</c> when the row
+    /// has none: a preview tenant, a row without an agent client secret, or a row whose <c>Oidc</c> authority does not end
+    /// in <c>realms/</c> and the tenant id. The realm name is the tenant id. The secret stays encrypted until it is revealed.
+    /// </summary>
+    public static TenantRealmAgent? RealmAgent(TenantRow row, TenantSecretCipher cipher)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(cipher);
+
+        var id = row.Id;
+        var stored = row.RealmAgentClientSecret;
+        if (row.PreviewOf is not null || stored is not { Length: > 0 } || TenantRealmAddress.BaseOf(row.OidcAuthority, id) is not { } baseAddress)
+        {
+            return null;
+        }
+
+        return new TenantRealmAgent(
+            baseAddress,
+            id,
+            SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmAgentClientSecret, stored).Reveal()));
     }
 
     /// <summary>The deployment bindings of a tenant keyed by name, ignoring letter case. A secret stays encrypted until it is revealed.</summary>
