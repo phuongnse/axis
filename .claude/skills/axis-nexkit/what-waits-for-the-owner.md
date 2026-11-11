@@ -6,6 +6,7 @@ waits for them or needs them.
 1. Use the clone from
    [Where the values live](SKILL.md#where-the-values-live). Follow NexKit's
    `status` skill there, at the pinned ref, and take its `needs_person` items.
+   Run its command as `python3 "$KIT/bin/nexkit"`, in place of the bare `nexkit`.
 2. Check each part of the owner in
    [who does what](../../../docs/delivery.md#who-does-what) that
    `needs_person` does not cover:

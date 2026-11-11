@@ -123,6 +123,8 @@ Upgrading is rare. Follow [upgrading-nexkit.md](upgrading-nexkit.md).
 
 ## Hand merges and hand-made changes
 
-When the owner asks you to look at a stopped issue, read `nexkit status` and
-NexKit's troubleshooting doc at the pinned ref. For a hand merge or a
+When the owner asks you to look at a stopped issue, run
+`python3 "$KIT/bin/nexkit" status` from the clone in
+[Where the values live](#where-the-values-live) and read NexKit's
+troubleshooting doc at the pinned ref. For a hand merge or a
 hand-made change, follow [hand-made-changes.md](hand-made-changes.md).

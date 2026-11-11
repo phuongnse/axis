@@ -1,0 +1,6 @@
+{
+  "extraKnownMarketplaces": {
+    "nexkit": { "source": { "source": "github", "repo": "phuongnse/nexkit" } }
+  },
+  "enabledPlugins": { "nexkit@nexkit": true }
+}
