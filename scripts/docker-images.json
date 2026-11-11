@@ -1,0 +1,14 @@
+[
+  "axllent/mailpit:v1.32.0",
+  "bitnamilegacy/minio:2025.7.23",
+  "caddy:2.10.2-alpine",
+  "edoburu/pgbouncer:v1.24.1-p1",
+  "internetsystemsconsortium/bind9:9.20",
+  "mcr.microsoft.com/dotnet/aspnet:10.0",
+  "mcr.microsoft.com/dotnet/runtime:10.0",
+  "mcr.microsoft.com/dotnet/sdk:10.0",
+  "node:24-slim",
+  "postgres:18-alpine",
+  "quay.io/keycloak/keycloak:26.8.1",
+  "testcontainers/ryuk:0.14.0"
+]

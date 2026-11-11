@@ -82,6 +82,8 @@
 # with the console host console.localhost, and signs the development operator in to the cell console through that realm.
 # The cell quota journey serves a cell on the offset 4 and signs in an operator account of its own. Both start their cell
 # through tests/e2e/cell.ts.
+# Before the first container starts, scripts/lib/docker-images.mjs loads the container images that setup saved in
+# ~/.cache/axis-docker, so the run pulls none that the cache holds, see docs/development.md#end-to-end-tests.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit is in the
 # `unaffected_by` lists of .nexkit/config.json, which scripts/lib/affected.mjs reads. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
@@ -202,6 +204,7 @@ cleanup() {
 trap cleanup EXIT
 
 if affected playwright; then
+  node scripts/lib/docker-images.mjs load
   docker run -d --name "$container" -e POSTGRES_USER=axis -e POSTGRES_DB=axis \
     -e POSTGRES_PASSWORD="$password" -p 127.0.0.1::5432 \
     -v "$PWD/samples/postgres/init-roles.sql:/docker-entrypoint-initdb.d/init-roles.sql:ro" "$image" >/dev/null

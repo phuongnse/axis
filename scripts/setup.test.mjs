@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { listedImages } from './lib/docker-images.mjs'
 
 // Runs scripts/setup.sh with dotnet, npm and npx replaced by stubs. The stubs fail the first
 // STUB_FAIL_TIMES calls of each command line. The home cache is filled in, so no tool downloads.
@@ -22,6 +23,14 @@ counter="$STUB_COUNTS/$(printf '%s' "$line" | tr -c 'A-Za-z0-9' '_')"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
 if [ "$count" -le "$STUB_FAIL_TIMES" ]; then exit "$STUB_FAIL_STATUS"; fi
+exit 0
+`
+
+// Stands in for docker and logs to DOCKER_LOG, so STUB_LOG keeps the lines of the tools only. Its images are all
+// missing when DOCKER_EMPTY is set.
+const dockerStub = `#!/usr/bin/env bash
+echo "$*" >> "$DOCKER_LOG"
+if [ "$1 $2" = "image inspect" ] && [ -n "$DOCKER_EMPTY" ]; then exit 1; fi
 exit 0
 `
 
@@ -85,7 +94,7 @@ function cacheTools(home, { schemas = true, missing = [] } = {}) {
   }
 }
 
-function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
+function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-setup-'))
   try {
     const bin = join(dir, 'bin')
@@ -96,6 +105,16 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
     mkdirSync(counts)
     for (const name of ['dotnet', 'npm', 'npx']) {
       writeFileSync(join(bin, name), stub, { mode: 0o755 })
+    }
+
+    writeFileSync(join(bin, 'docker'), dockerStub, { mode: 0o755 })
+    const dockerLog = join(dir, 'docker-log')
+    // The folder that holds the images setup saves: complete when savedImages is set, empty otherwise.
+    const images = join(dir, 'images')
+    mkdirSync(images)
+    if (savedImages) {
+      writeFileSync(join(images, 'images.tar'), 'archive')
+      writeFileSync(join(images, 'images.json'), JSON.stringify(listedImages(root)))
     }
 
     cacheTools(home)
@@ -109,6 +128,9 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
         HOME: home,
         CI: ci ? 'true' : '',
         AXIS_RETRY_DELAY_SECONDS: '0',
+        AXIS_DOCKER_CACHE_DIR: images,
+        DOCKER_LOG: dockerLog,
+        DOCKER_EMPTY: savedImages ? '' : '1',
         STUB_LOG: log,
         STUB_COUNTS: counts,
         STUB_FAIL_TIMES: String(failTimes),
@@ -116,7 +138,8 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
       },
     })
     const ran = existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : []
-    return { ...result, ran }
+    const docker = existsSync(dockerLog) ? readFileSync(dockerLog, 'utf8').trimEnd().split('\n') : []
+    return { ...result, ran, docker }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -160,6 +183,29 @@ describe('scripts/setup.sh retries its network steps', () => {
     const result = runSetup({ ci: true })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(result.ran, ciCommands)
+  })
+})
+
+describe('scripts/setup.sh keeps the container images of the checks', () => {
+  test('on CI with every listed image saved it makes no Docker call', () => {
+    const result = runSetup({ ci: true, savedImages: true })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.docker, [])
+  })
+
+  test('on CI it pulls the listed images that neither Docker nor the saved archive holds', () => {
+    const result = runSetup({ ci: true })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(
+      result.docker.filter((line) => line.startsWith('pull ')),
+      listedImages(root).map((image) => `pull ${image}`),
+    )
+  })
+
+  test('off CI it makes no Docker call', () => {
+    const result = runSetup({ savedImages: false })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.docker, [])
   })
 })
 

@@ -66,3 +66,42 @@ export function findKeycloakReferences(root, files) {
   }
   return references
 }
+
+// Every container image that the integration, E2E and smoke checks pull and that files name, as { file, line, image }:
+// the FROM lines of the Dockerfile (an earlier stage is not an image), the `image:` values of the Compose files (a
+// value built from a variable is not a pin), `Image = "…"` and `Builder("…")` in the .NET tests, the image variables
+// of scripts/e2e.sh and scripts/integration.sh, and the Testcontainers cleanup helper that scripts/integration.sh pins.
+// scripts/docker-images.json must list each one, see docs/development.md#setup.
+const referencePatterns = [
+  { files: /^Dockerfile$/, pattern: /^FROM\s+(?:--\S+\s+)?(\S+)/i },
+  { files: /^(deploy\/compose\/)?compose\.yaml$/, pattern: /^\s*image:\s*["']?([^\s"']+)/ },
+  { files: /^(controlplane\/)?tests\/.*\.cs$/, pattern: /\bImage = "([^"]+)"/ },
+  { files: /^(controlplane\/)?tests\/.*\.cs$/, pattern: /\w+Builder\("([a-z0-9][\w./-]*:[\w.-]+)"\)/ },
+  { files: /^scripts\/(e2e|integration)\.sh$/, pattern: /^\s*(?:export\s+)?\w*image="([^"]+)"/ },
+  { files: /^scripts\/integration\.sh$/, pattern: /\bTESTCONTAINERS_RYUK_CONTAINER_IMAGE=(\S+)/ },
+]
+
+export function findImageReferences(root, files) {
+  const references = []
+  for (const file of files) {
+    const patterns = referencePatterns.filter((entry) => entry.files.test(file)).map((entry) => entry.pattern)
+    if (patterns.length === 0) continue
+    let text
+    try {
+      text = readFileSync(path.join(root, file), 'utf8')
+    } catch {
+      continue
+    }
+    const stages = new Set()
+    text.split('\n').forEach((content, index) => {
+      for (const pattern of patterns) {
+        const image = content.match(pattern)?.[1]
+        if (!image || image.includes('${') || image === 'scratch' || stages.has(image)) continue
+        references.push({ file, line: index + 1, image })
+      }
+      const stage = file === 'Dockerfile' ? content.match(/^FROM\s+.*\s+AS\s+(\S+)\s*$/i)?.[1] : undefined
+      if (stage) stages.add(stage)
+    })
+  }
+  return references
+}

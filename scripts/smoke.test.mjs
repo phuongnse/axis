@@ -17,7 +17,7 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const suites = { 'dev-script': 'dev', compose: 'compose', images: 'images', onprem: 'onprem' }
 const hash = createHash('sha256').update(stageText(root, 'admin-tools')).digest('hex').slice(0, 12)
 
-function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: extra = {} } = {}) {
+function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: extra = {}, images = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-smoke-'))
   try {
     for (const file of [
@@ -31,6 +31,8 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
       'scripts/lib/images.mjs',
       'scripts/lib/docker-build.mjs',
       'scripts/lib/smoke-images.mjs',
+      'scripts/lib/docker-images.mjs',
+      'scripts/docker-images.json',
       'scripts/lib/smoke-shard.mjs',
       'scripts/lib/shards.mjs',
     ]) {
@@ -62,6 +64,8 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
         '#!/bin/sh',
         'echo "$*" >> "$DOCKER_LOG"',
         'if [ "$1" = "$DOCKER_FAIL" ]; then exit 1; fi',
+        'if [ "$1" = load ]; then touch "$DOCKER_LOG.loaded"; fi',
+        'if [ "$1 $2" = "image inspect" ] && [ -n "$DOCKER_IMAGES_MISSING" ] && [ ! -e "$DOCKER_LOG.loaded" ]; then exit 1; fi',
         'if [ "$1" = save ] && [ "$2" = -o ]; then echo saved > "$3"; fi',
         'exit 0',
       ].join('\n'),
@@ -70,6 +74,11 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
     const cache = join(dir, 'cache')
     mkdirSync(cache)
     for (const file of saved) writeFileSync(join(cache, file.replace('HASH', hash)), 'old')
+    // The archive that setup saved, which Docker lacks until `docker load` runs: `docker image inspect` fails before it.
+    if (images) {
+      writeFileSync(join(cache, 'images.tar'), 'archive')
+      writeFileSync(join(cache, 'images.json'), '["postgres:18-alpine"]')
+    }
     const dockerLog = join(dir, 'docker.log')
     writeFileSync(dockerLog, '')
 
@@ -79,6 +88,7 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
       FAKE_CHANGED: changed ?? '',
       DOCKER_LOG: dockerLog,
       DOCKER_FAIL: dockerFails,
+      DOCKER_IMAGES_MISSING: images ? '1' : '',
       AXIS_DOCKER_CACHE_DIR: cache,
       AXIS_RETRY_DELAY_SECONDS: '0',
     }
@@ -121,6 +131,23 @@ describe('scripts/smoke.sh', () => {
     assert.deepEqual(run.written, Object.keys(suites))
     assert.ok(run.modules)
     for (const suite of Object.keys(suites)) assert.match(run.stdout, new RegExp(`^\\| ${suite} \\| 1 \\| 0 \\| 0 \\| `, 'm'))
+  })
+
+  test('loads the saved container images once, before the first suite, and pulls no image', () => {
+    const run = runSmoke({ images: true })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const loads = run.docker.filter((line) => line.startsWith('load -i ') && line.endsWith('images.tar'))
+    assert.equal(loads.length, 1, run.docker.join('\n'))
+    assert.ok(run.docker.indexOf(loads[0]) < run.docker.findIndex((line) => line.startsWith('build --target')), run.docker.join('\n'))
+    assert.ok(!run.docker.some((line) => line.startsWith('pull ')), run.docker.join('\n'))
+  })
+
+  test('loads no container image for a docs change', () => {
+    const run = runSmoke({ images: true, changed: 'docs/x.md' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.docker, [])
   })
 
   test('builds each production image once and the PostgreSQL tools layer once, then removes the images', () => {

@@ -220,6 +220,7 @@ Read by people who change how Axis stores data.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
 | [AGENTS.md](../AGENTS.md)                 | The working rules and the commands, for people and agents                                                          | You start any change                           |
 | [Development](development.md)             | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users         | You run Axis or its tests locally              |
+| [Running a host](running-a-host.md)       | Running the worker or the server alone, and activating another application folder                                  | You run one host outside `scripts/dev.sh`      |
 | [Production images](production-images.md) | The production images and the admin tool, built the same in development as in an install                           | You build or change a production image         |
 | [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub | You write or change a test                     |
 | [Delivery](delivery.md)                   | How work flows through NexKit                                                                                      | You file an issue, plan or open a pull request |
