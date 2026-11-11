@@ -20,13 +20,18 @@ Three actors take part in the work, the owner, the local agent session and NexKi
   owner merges hand-made pull requests, see [hand-made pull requests](#hand-made-pull-requests), and
   vouches with [`/nexkit trust`][nexkit-trust] for an issue that autopilot leaves alone, after reading
   it. NexKit mentions the owner when a run needs a person, through its `notify` setting.
+  The owner gets NexKit's command-line tool at the pinned release through NexKit's Claude Code plugin,
+  which `.claude/settings.json` offers when the owner trusts the folder, or with `pipx install` of
+  `nexkit_repository` at the tag that `nexkit_ref` names, as [NexKit's install steps][nexkit-install]
+  say. The plugin's skills are for a person's session, and NexKit's agents do not load them.
 - **The local agent session** works for the owner when the owner asks. It writes issues and their
   order, checks whether a milestone is ready and breaks it down, proposes changes to the NexKit
   settings as hand-made pull requests, runs design reviews and publishes the Design System artifact in
   Claude from the repository, as [design changes](#design-changes) describes. When the owner asks, it
   also lists what waits for the owner, merges by hand the conflicts in paths NexKit may not change, and
   makes the hand-made changes that a plan lists under *Needs a hand-made change*, opening their pull
-  requests. It asks the owner before it pushes, and it never approves or merges. Its runbooks are the
+  requests. It runs the command-line tool from its clone of NexKit at the pinned release. It asks the
+  owner before it pushes, and it never approves or merges. Its runbooks are the
   [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
   [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not review plans or merged
   pull requests, because NexKit's review stage does.
@@ -450,6 +455,7 @@ issues, pull requests and sub-issues.
   owner deletes them. A branch with an open pull request, or any other closed one that was not merged,
   stays.
 
+[nexkit-install]: https://github.com/phuongnse/nexkit/blob/main/README.md
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-troubleshooting]: https://github.com/phuongnse/nexkit/blob/main/docs/troubleshooting.md
