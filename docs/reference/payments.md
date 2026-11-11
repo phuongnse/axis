@@ -56,10 +56,10 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
 
 In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 
-- **Provider** _(planned for M34)_. PayOS, with VietQR bank transfers. Until the real adapter is built,
-  `ControlPlane:PayOs:Provider=Fake` picks a fake PayOS in Development and Testing, and any other
-  environment refuses it, see [settings](control-plane.md#settings). With no provider the control plane
-  registers no PayOS adapter and no payment link job.
+- **Provider** _(planned for M34)_. PayOS, with VietQR bank transfers.
+- **Fake provider.** `ControlPlane:PayOs:Provider=Fake` picks a fake PayOS in Development and Testing,
+  and any other environment refuses it, see [settings](control-plane.md#settings). With no provider the
+  control plane registers no PayOS adapter and no payment link job.
 - **A payment link for each invoice.** The recurring job `createPaymentLinks` runs every 5 minutes when
   a PayOS provider is set. It gives each `open` invoice in `VND` one payment link, and a paid, `void` or
   `USD` invoice gets none.
