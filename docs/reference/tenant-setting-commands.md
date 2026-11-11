@@ -517,3 +517,7 @@ The publisher and the server also write records for the operator's work in a cel
   change, with the administrator as actor and `outsideClients` and `allowedClients` in `changed`, never a client id. Each
   accepted `PUT` writes one, also when the values are unchanged. See
   [outside MCP clients](user-administration.md#outside-mcp-clients).
+- **Connected app revokes.** `POST /api/tenant/connected-apps/{clientId}/revoke` writes `tenant connected-app revoke` after
+  the consents are deleted, with the administrator as actor and `consent` in `changed`, never a client id. A revoke that
+  fails at the identity provider writes none, and the repeat that finishes it writes one. See
+  [outside MCP clients](user-administration.md#outside-mcp-clients).

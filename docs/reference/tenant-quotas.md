@@ -91,6 +91,9 @@ nothing:
   [model key](user-administration.md#the-tenants-model-key) and its
   [outside clients](user-administration.md#outside-mcp-clients), are never refused over the `storage` quota,
   because they write no tenant data.
+- **Consent revokes.** A tenant administrator's [revoke of an outside client's consent](user-administration.md#outside-mcp-clients)
+  is never refused over the `storage` quota. Revoking is a security action, and a billing limit must never stop it. It
+  writes one small row and one audit record.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks

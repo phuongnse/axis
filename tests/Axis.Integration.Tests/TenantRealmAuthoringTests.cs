@@ -28,6 +28,7 @@ namespace Axis.Integration.Tests;
 public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string ClientId = "mcp-public-test";
+    private const string AdministratorRole = "tenant-administrator";
     private const string RedirectUri = "http://localhost/callback";
     private const string LoopbackRedirectUri = "http://127.0.0.1/callback";
     private const string DraftHelper = "Draft helper";
@@ -123,6 +124,59 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         var response = await InitializeMcpAsync(realm, tokens.Tokens.GetProperty("access_token").GetString());
         Assert.True(response.Status == HttpStatusCode.OK, response.Body);
         Assert.False(string.IsNullOrEmpty(response.SessionId));
+    }
+
+    [Fact]
+    public async Task A_revoke_removes_the_consent_writes_both_records_and_refuses_the_clients_earlier_tokens()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var (status, registered) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Created, registered.GetRawText());
+        var registeredId = registered.GetProperty("client_id").GetString()!;
+        var client = (await GetJsonAsync($"admin/realms/{realm}/clients?clientId={Uri.EscapeDataString(registeredId)}")).EnumerateArray().Single();
+        using (var mapped = await SendAsync(
+            HttpMethod.Post, $"admin/realms/{realm}/clients/{client.GetProperty("id").GetString()}/protocol-mappers/models", _rolesMapper))
+        {
+            Assert.Equal(HttpStatusCode.Created, mapped.StatusCode);
+        }
+
+        var tokens = (await SignInAsync(realm, secret, registeredId, LoopbackRedirectUri)).Tokens;
+        var access = tokens.GetProperty("access_token").GetString()!;
+        var refresh = tokens.GetProperty("refresh_token").GetString()!;
+        var userId = Subject(access);
+        await using var server = await StartMcpAsync(realm, administrator: true);
+        var before = await server.InitializeAsync(access);
+        Assert.True(before.Status == HttpStatusCode.OK, before.Body);
+
+        var revoked = await server.PostAsAdministratorAsync($"/api/tenant/connected-apps/{Uri.EscapeDataString(registeredId)}/revoke");
+
+        Assert.Equal(HttpStatusCode.NoContent, revoked);
+        var after = await server.InitializeAsync(access);
+        Assert.Equal(HttpStatusCode.Unauthorized, after.Status);
+        var refreshed = await RefreshAsync(realm, refresh, registeredId);
+        Assert.Equal(HttpStatusCode.BadRequest, refreshed.Status);
+        Assert.False(refreshed.Body.TryGetProperty("access_token", out _));
+        var consents = await GetJsonAsync($"admin/realms/{realm}/users/{userId}/consents");
+        Assert.DoesNotContain(consents.EnumerateArray(), consent => consent.GetProperty("clientId").GetString() == registeredId);
+        var tenantRecord = (string)(await PostgreSqlServer.AdminScalarAsync(
+            database.ConnectionString,
+            $"SELECT details::text FROM axis.audit_records WHERE action = 'mcp.consentRevoked' AND details->>'clientId' = '{registeredId}'",
+            CancellationToken))!;
+        using (var details = JsonDocument.Parse(tenantRecord))
+        {
+            Assert.Equal([userId], details.RootElement.GetProperty("userIds").EnumerateArray().Select(id => id.GetString()).ToArray());
+        }
+
+        Assert.Equal(
+            "admin consent",
+            await PostgreSqlServer.AdminScalarAsync(
+                server.Platform,
+                "SELECT actor || ' ' || array_to_string(changed, ',') FROM platform.audit_records WHERE command = 'tenant connected-app revoke'",
+                CancellationToken));
+        Assert.Equal(
+            1L,
+            await PostgreSqlServer.AdminScalarAsync(
+                server.Platform, "SELECT count(*) FROM platform.audit_records WHERE command = 'tenant connected-app revoke'", CancellationToken));
     }
 
     [Fact]
@@ -712,50 +766,89 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
 
     private async Task<McpInitialize> InitializeMcpAsync(string realm, string? accessToken)
     {
+        await using var server = await StartMcpAsync(realm, administrator: false);
+        return await server.InitializeAsync(accessToken);
+    }
+
+    /// <summary>
+    /// Starts the Axis server on the tenant <c>a</c> at <see cref="Host"/> over the realm, with the shared tenant database and a new platform
+    /// database. With <paramref name="administrator"/> it also has the realm details and the users client, and a test sign-in of the tenant administrator
+    /// <c>admin</c>, so the connected apps routes work.
+    /// </summary>
+    private async Task<McpServer> StartMcpAsync(string realm, bool administrator)
+    {
         var applications = Directory.CreateTempSubdirectory("axis-mcp-realm-").FullName;
         var platform = await database.CreateDatabaseAsync("mcp_realm", CancellationToken);
         await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
-        try
+        var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
-            await using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.UseEnvironment("Testing");
+            builder.UseTestPlatform(platform);
+            builder.UseSetting("Tenants:a:Hosts:0", Host);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
+            builder.UseSetting("Tenants:a:SchemaConnectionString", database.ConnectionString);
+            builder.UseSetting("Tenants:a:Oidc:Authority", new Uri(_baseAddress, $"realms/{realm}").ToString());
+            builder.UseSetting("Tenants:a:Oidc:ClientId", TenantRealm.PlatformClientId);
+            builder.UseSetting("Tenants:a:Oidc:ClientSecret", _secrets.Platform);
+            builder.UseSetting("Studio:AuthorRole", "author");
+            builder.UseSetting("Studio:ApplicationsPath", applications);
+            if (administrator)
             {
-                builder.UseEnvironment("Testing");
-                builder.UseTestPlatform(platform);
-                builder.UseSetting("Tenants:a:Hosts:0", Host);
-                builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
-                builder.UseSetting("Tenants:a:SchemaConnectionString", database.ConnectionString);
-                builder.UseSetting("Tenants:a:Oidc:Authority", new Uri(_baseAddress, $"realms/{realm}").ToString());
-                builder.UseSetting("Tenants:a:Oidc:ClientId", TenantRealm.PlatformClientId);
-                builder.UseSetting("Tenants:a:Oidc:ClientSecret", _secrets.Platform);
-                builder.UseSetting("Studio:AuthorRole", "author");
-                builder.UseSetting("Studio:ApplicationsPath", applications);
-            });
-            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions
-            {
-                BaseAddress = new Uri("https://localhost"),
-                AllowAutoRedirect = false,
-                HandleCookies = false,
-            });
+                builder.UseSetting("Tenants:a:Realm:Name", realm);
+                builder.UseSetting("Tenants:a:Realm:ActivationClientSecret", _secrets.Activation);
+                builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", _secrets.Users);
+                builder.UseSetting("Users:AdministratorRole", AdministratorRole);
+                builder.UseTestAuthentication(new TestIdentity("admin", "Admin", AdministratorRole));
+            }
+        });
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false,
+            HandleCookies = false,
+        });
+        return new McpServer(factory, client, applications, platform);
+    }
 
+    private sealed class McpServer(WebApplicationFactory<Program> factory, HttpClient client, string applications, string platform) : IAsyncDisposable
+    {
+        /// <summary>The connection string of the platform database that the server uses.</summary>
+        public string Platform { get; } = platform;
+
+        public async Task<McpInitialize> InitializeAsync(string? accessToken)
+        {
             using var response = await McpTestCalls.PostAsync(client, Host, accessToken, McpTestCalls.Initialize("2025-11-25"), null, null, null, CancellationToken);
             return new McpInitialize(
                 response.StatusCode,
                 await response.Content.ReadAsStringAsync(CancellationToken),
                 response.Headers.TryGetValues("Mcp-Session-Id", out var sessions) ? Assert.Single(sessions) : null);
         }
-        finally
+
+        /// <summary>Sends a request as the tenant administrator <c>admin</c> with the header that every write needs.</summary>
+        public async Task<HttpStatusCode> PostAsAdministratorAsync(string path)
         {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+            request.Headers.Add(TestAuthentication.Header, "admin");
+            request.Headers.Add("X-Axis-Csrf", "1");
+            using var response = await client.SendAsync(request, CancellationToken);
+            return response.StatusCode;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            client.Dispose();
+            await factory.DisposeAsync();
             Directory.Delete(applications, recursive: true);
         }
     }
 
     private sealed record McpInitialize(HttpStatusCode Status, string Body, string? SessionId);
 
-    private Task<(HttpStatusCode Status, JsonElement Body)> RefreshAsync(string realm, string refreshToken) =>
+    private Task<(HttpStatusCode Status, JsonElement Body)> RefreshAsync(string realm, string refreshToken, string clientId = ClientId) =>
         TokenAsync(realm, new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
-            ["client_id"] = ClientId,
+            ["client_id"] = clientId,
             ["refresh_token"] = refreshToken,
         });
 

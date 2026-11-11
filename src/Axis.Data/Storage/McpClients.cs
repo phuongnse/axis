@@ -3,7 +3,7 @@ using Npgsql;
 namespace Axis.Data.Storage;
 
 /// <summary>
-/// Reads and writes <c>axis.mcp_clients</c> of the tenant database, see <c>docs/reference/mcp-server.md#sign-in</c>. The last use is also read by <c>docs/reference/user-administration.md#outside-mcp-clients</c>. The
+/// Reads and writes <c>axis.mcp_clients</c> of the tenant database, see <c>docs/reference/mcp-server.md#sign-in</c>. The last use is also read by <c>docs/reference/user-administration.md#outside-mcp-clients</c>, which also sets the revoke time. The
 /// database clock is the only clock used.
 /// </summary>
 public static class McpClients
@@ -24,6 +24,12 @@ public static class McpClients
         INSERT INTO "axis"."mcp_clients" ("client_id", "last_used_at") VALUES (@client, now())
         ON CONFLICT ("client_id") DO UPDATE SET "last_used_at" = now()
         WHERE "mcp_clients"."last_used_at" IS NULL OR "mcp_clients"."last_used_at" < now() - interval '1 minute'
+        """;
+
+    private const string RevokeSql =
+        """
+        INSERT INTO "axis"."mcp_clients" ("client_id", "revoked_at") VALUES (@client, now())
+        ON CONFLICT ("client_id") DO UPDATE SET "revoked_at" = now()
         """;
 
     /// <summary>
@@ -79,6 +85,20 @@ public static class McpClients
         ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
 
         await using var command = new NpgsqlCommand(RecordUseSql, connection);
+        command.Parameters.AddWithValue("client", clientId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Sets the revoke time of the client to now in <paramref name="transaction"/>, and adds the row when there is none. A repeat moves the
+    /// time to now.
+    /// </summary>
+    public static async Task RevokeAsync(NpgsqlTransaction transaction, string clientId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientId);
+
+        await using var command = new NpgsqlCommand(RevokeSql, transaction.Connection, transaction);
         command.Parameters.AddWithValue("client", clientId);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

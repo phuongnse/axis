@@ -96,8 +96,8 @@ erDiagram
   `azp` claim of the client's tokens), `last_used_at` (`timestamptz`, nullable) and `revoked_at`
   (`timestamptz`, nullable, the time the client's consent was revoked). The MCP server reads the
   client's row on every `/mcp` call and writes `last_used_at` at most once a minute, from the
-  database clock. See [sign-in](mcp-server.md#sign-in). The connected apps route also reads `last_used_at`, see
-  [outside MCP clients](user-administration.md#outside-mcp-clients).
+  database clock. See [sign-in](mcp-server.md#sign-in). The connected apps route also reads `last_used_at`, and the
+  revoke route writes `revoked_at`, see [outside MCP clients](user-administration.md#outside-mcp-clients).
 - **Given roles.** A row of `axis.given_roles` holds `id` (`uuid`, the primary key), `user_id`,
   `application_id` (null for a platform role) and `role` (for a platform role, its kind, such as
   `operator`), with a unique index on those three that counts nulls as equal. A session reads its
@@ -787,6 +787,10 @@ Besides the record and process actions, these actions write audit records. A `pu
   are `{ "tool", "clientId", "draftId", "resourceId" }`, with a null `resourceId` for `create_draft`. For `write_layer` it is the id of the module resource the
   call edited, also when the edit leaves no layer. They
   hold no content, name or path. The record commits after the draft's write, and a refused call writes none.
+- **MCP consent actions.** A [revoke of an outside MCP client's consent](user-administration.md#outside-mcp-clients) writes
+  `mcp.consentRevoked`, with the administrator as `actor`. The `application_id`, `entity_id`, `record_id` and
+  `process_instance_id` are null. The `details` are `{ "clientId", "userIds" }`, the people whose consent was listed
+  before the revoke. The record commits with `revoked_at` of the client, before the consents are deleted.
 
 ### Sequence counters
 

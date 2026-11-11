@@ -1,6 +1,8 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Administration;
 using Axis.Core.Tenancy;
+using Axis.Data.Audit;
 using Axis.Data.Storage;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
@@ -30,16 +32,25 @@ namespace Axis.Server.CellApi;
 /// <c>GET /api/tenant/connected-apps</c> answers each outside client that holds a consent, with the people who consented and the
 /// client's last use. A failure at the identity provider is a <c>502</c> with a fixed title.
 /// </para>
+/// <para>
+/// <c>POST /api/tenant/connected-apps/{clientId}/revoke</c> needs an outside client of the realm (<c>404</c>). It sets the client's revoke
+/// time and writes the tenant audit record in one transaction, then deletes each person's consent at the identity provider, and then
+/// writes the platform audit record, which names <c>consent</c> and never holds the client id. A failure at the identity provider is a
+/// <c>502</c> with a fixed title, the stored revoke stays and the same <c>POST</c> again finishes it.
+/// </para>
 /// </summary>
 internal static partial class TenantOutsideClientsEndpoints
 {
     internal const string SetCommand = "tenant outside-clients set";
+
+    internal const string RevokeCommand = "tenant connected-app revoke";
 
     public static void MapTenantOutsideClientsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/tenant/outside-clients", ReadAsync);
         endpoints.MapPut("/api/tenant/outside-clients", SetAsync);
         endpoints.MapGet("/api/tenant/connected-apps", ListConnectedAppsAsync);
+        endpoints.MapPost("/api/tenant/connected-apps/{clientId}/revoke", RevokeConnectedAppAsync);
     }
 
     private static async Task<IResult> ReadAsync(
@@ -192,6 +203,90 @@ internal static partial class TenantOutsideClientsEndpoints
                     .Select(consent => new TenantConnectedAppPerson(consent.UserId, consent.DisplayName, consent.Email, consent.ConsentedAt))]))]));
     }
 
+    private static async Task<IResult> RevokeConnectedAppAsync(
+        string clientId,
+        HttpContext httpContext,
+        CellPlatformWriter writer,
+        CancellationToken cancellationToken)
+    {
+        var (opening, refusal) = await OpenAsync(httpContext);
+        if (opening is not { } open)
+        {
+            return refusal!;
+        }
+
+        if (open.Users is null)
+        {
+            return NoSetting();
+        }
+
+        var services = httpContext.RequestServices;
+        var logger = services.GetRequiredService<ILogger<UserLog>>();
+        using var client = services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(TenantOutsideClientsEndpoints));
+        var users = new RealmUsers(client, open.Users);
+        string[] userIds;
+        try
+        {
+            var outsideClients = await new RealmSync(client, open.Realm.BaseAddress)
+                .ListOutsideClientsAsync(open.Realm.Name, open.Realm.ActivationClientSecret.Reveal(), cancellationToken);
+            if (!outsideClients.Any(outsideClient => string.Equals(outsideClient.ClientId, clientId, StringComparison.Ordinal)))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no outside client with this id.");
+            }
+
+            userIds =
+            [
+                .. (await users.ListConsentsAsync(cancellationToken))
+                    .Where(consent => string.Equals(consent.ClientId, clientId, StringComparison.Ordinal))
+                    .Select(consent => consent.UserId)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(StringComparer.Ordinal),
+            ];
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogListConsentsFailed(logger, open.TenantId, exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not revoke the consent.");
+        }
+
+        // The revoke and its record commit before the consents go, so a failed delete never leaves a revoke without a record.
+        var connection = await services.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            await McpClients.RevokeAsync(transaction, clientId, cancellationToken);
+            await AuditRecords.AppendAsync(
+                transaction,
+                new AuditEntry(
+                    open.CallerId,
+                    AuditActions.McpConsentRevoked,
+                    null,
+                    null,
+                    null,
+                    null,
+                    new JsonObject { ["clientId"] = clientId, ["userIds"] = new JsonArray([.. userIds.Select(id => (JsonNode)id)]) }),
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        // The stored revoke stays when a delete fails, and the same POST again finishes the job.
+        try
+        {
+            foreach (var userId in userIds)
+            {
+                await users.RevokeConsentAsync(userId, clientId, cancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogRevokeFailed(logger, open.TenantId, exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not revoke the consent.");
+        }
+
+        await using var platform = writer.Open();
+        await PlatformAuditRecords.WriteAsync(platform, RevokeCommand, open.TenantId, ["consent"], open.CallerId, cancellationToken);
+        return Results.NoContent();
+    }
+
     private static IResult NoSetting() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no outside clients setting.");
 
@@ -225,6 +320,12 @@ internal static partial class TenantOutsideClientsEndpoints
 
     [LoggerMessage(LogLevel.Warning, "The realm of tenant {TenantId} could not list the connected apps. {Reason}")]
     private static partial void LogListConnectedAppsFailed(ILogger logger, string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "The realm of tenant {TenantId} could not list the consents to revoke. {Reason}")]
+    private static partial void LogListConsentsFailed(ILogger logger, string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "The realm of tenant {TenantId} could not delete a consent to revoke. {Reason}")]
+    private static partial void LogRevokeFailed(ILogger logger, string tenantId, string reason);
 
     private sealed record Opening(string TenantId, string CallerId, TenantRealmAccess Realm, TenantRealmUsers? Users);
 }

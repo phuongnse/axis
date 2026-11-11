@@ -84,4 +84,6 @@ public static class AuditActions
     public const string AuthoringRequestDropped = "authoringRequest.dropped";
 
     public const string McpToolCalled = "mcp.toolCalled";
+
+    public const string McpConsentRevoked = "mcp.consentRevoked";
 }

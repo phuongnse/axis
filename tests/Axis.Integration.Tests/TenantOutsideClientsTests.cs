@@ -267,6 +267,69 @@ public sealed class TenantOutsideClientsTests(PostgreSqlFixture database, Keyclo
     }
 
     [Fact]
+    public async Task A_member_a_caller_with_no_session_axis_agent_and_an_unknown_client_are_refused_and_nothing_is_written()
+    {
+        var tenant = await PrepareAsync();
+        var (id, tenantDatabase) = await AddRealmTenantAsync(tenant, ActivationSecret);
+        try
+        {
+            var userId = await AddPersonWithConsentsAsync(id, Listed);
+            await using var factory = Start();
+            using var admin = Client(factory, id).SignedInAs("admin");
+            using var member = Client(factory, id).SignedInAs("member");
+            using var anonymous = Client(factory, id);
+            var path = $"{ConnectedApps}/{Listed}/revoke";
+
+            using var anonymousRevoke = await SendAsync(anonymous, HttpMethod.Post, path: path);
+            using var memberRevoke = await SendAsync(member, HttpMethod.Post, path: path);
+            using var agentRevoke = await SendAsync(admin, HttpMethod.Post, path: $"{ConnectedApps}/axis-agent/revoke");
+            using var unknownRevoke = await SendAsync(admin, HttpMethod.Post, path: $"{ConnectedApps}/no-such-client/revoke");
+
+            Assert.Equal(HttpStatusCode.Unauthorized, anonymousRevoke.StatusCode);
+            Assert.Equal(HttpStatusCode.Forbidden, memberRevoke.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, agentRevoke.StatusCode);
+            Assert.Equal(HttpStatusCode.NotFound, unknownRevoke.StatusCode);
+            Assert.Equal(0, await CountAsync("platform.audit_records"));
+            Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(tenantDatabase, "SELECT count(*) FROM axis.audit_records", CancellationToken));
+            Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(tenantDatabase, "SELECT count(*) FROM axis.mcp_clients", CancellationToken));
+            Assert.True(await ConsentTimeAsync(id, userId, Listed) > 0);
+        }
+        finally
+        {
+            await DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
+    public async Task A_revoke_of_a_client_nobody_consented_to_still_stores_the_revoke_and_writes_a_record_with_no_people()
+    {
+        var tenant = await PrepareAsync();
+        var (id, tenantDatabase) = await AddRealmTenantAsync(tenant, ActivationSecret);
+        try
+        {
+            var userId = await AddPersonWithConsentsAsync(id, Other);
+            await using var factory = Start();
+            using var client = Client(factory, id).SignedInAs("admin");
+
+            using var response = await SendAsync(client, HttpMethod.Post, path: $"{ConnectedApps}/{Listed}/revoke");
+
+            Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+            Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(
+                tenantDatabase, "SELECT count(*) FROM axis.mcp_clients WHERE client_id = 'listed' AND revoked_at IS NOT NULL", CancellationToken));
+            Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(
+                tenantDatabase,
+                """SELECT count(*) FROM axis.audit_records WHERE action = 'mcp.consentRevoked' AND details = '{"clientId": "listed", "userIds": []}'::jsonb""",
+                CancellationToken));
+            Assert.Equal([("tenant connected-app revoke", id, "admin", "consent")], await RecordsAsync());
+            Assert.True(await ConsentTimeAsync(id, userId, Other) > 0);
+        }
+        finally
+        {
+            await DeleteRealmAsync(id);
+        }
+    }
+
+    [Fact]
     public async Task A_realm_that_refuses_the_activation_secret_answers_502_to_the_connected_apps_route_with_a_fixed_title()
     {
         var tenant = await PrepareAsync();
