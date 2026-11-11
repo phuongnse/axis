@@ -42,4 +42,7 @@ public sealed class AuthoringRequest
     public string? ClaimedBy { get; init; }
 
     public DateTimeOffset? ClaimedUntil { get; init; }
+
+    /// <summary>The agent host's refresh token for the author, encrypted with the tenant data key, or null when none is stored.</summary>
+    public byte[]? RefreshToken { get; init; }
 }

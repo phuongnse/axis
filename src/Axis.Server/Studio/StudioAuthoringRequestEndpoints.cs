@@ -25,7 +25,8 @@ namespace Axis.Server.Studio;
 /// reads one with its steps. The session and role checks and the application come first, and then an <c>id</c> that is not a UUID of this
 /// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c> and <c>.../drop</c> run those checks, then answer 403
 /// to anyone but the request's author, for <c>change-plan</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
-/// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request.
+/// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
+/// token, and no answer carries it.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
 {
@@ -320,7 +321,7 @@ internal static class StudioAuthoringRequestEndpoints
                 break;
             default:
                 await ExecuteAsync(
-                    "UPDATE axis.authoring_requests SET state = 'dropped', finished_at = now(), claimed_by = NULL, claimed_until = NULL WHERE id = @id",
+                    "UPDATE axis.authoring_requests SET state = 'dropped', finished_at = now(), claimed_by = NULL, claimed_until = NULL, refresh_token = NULL WHERE id = @id",
                     connection, transaction, requestId, cancellationToken);
                 await AppendAuditAsync(transaction, user.Id, AuditActions.AuthoringRequestDropped, applicationId, requestId, cancellationToken);
                 break;
