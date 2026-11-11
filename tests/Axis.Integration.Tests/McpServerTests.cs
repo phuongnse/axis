@@ -15,10 +15,11 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The MCP server at <c>/mcp</c> on a tenant host, against the development realm's Keycloak. Tenant <c>a</c> is served at
 /// <c>localhost</c>, tenant <c>b</c> at <c>b.localhost</c> and the preview tenant of <c>a</c> at <c>preview.localhost</c>.
-/// A token counts only when it was issued for the <c>/mcp</c> URL of the host that gets it. The database is unreachable, so a
+/// A token counts only when it was issued for the <c>/mcp</c> URL of the host that gets it. Tenant <c>a</c> is on a real PostgreSQL
+/// database, because every accepted token reads the client's row. The database of tenant <c>b</c> and of the preview tenant is unreachable, so a
 /// request that reaches it fails the test.
 /// </summary>
-public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
+public sealed class McpServerTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
     private const string Host = "localhost";
@@ -289,17 +290,18 @@ public sealed class McpServerTests(KeycloakFixture keycloak) : IAsyncLifetime
             StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", sample), Path.Combine(_applications, sample));
         }
 
+        var platform = await database.CreateDatabaseAsync("mcp_server", CancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureLogging(logging => logging.AddProvider(_logs));
-            builder.UseTestPlatform(UnreachableDatabase);
-            builder.WithoutPlatformMigration();
+            builder.UseTestPlatform(platform);
             foreach (var (tenant, host) in new[] { ("a", Host), ("b", OtherHost) })
             {
                 builder.UseSetting($"Tenants:{tenant}:Hosts:0", host);
-                builder.UseSetting($"Tenants:{tenant}:ConnectionString", UnreachableDatabase);
-                builder.UseSetting($"Tenants:{tenant}:SchemaConnectionString", UnreachableDatabase);
+                builder.UseSetting($"Tenants:{tenant}:ConnectionString", tenant == "a" ? PostgreSqlServer.RuntimeConnectionString(database.ConnectionString) : UnreachableDatabase);
+                builder.UseSetting($"Tenants:{tenant}:SchemaConnectionString", tenant == "a" ? database.ConnectionString : UnreachableDatabase);
                 builder.UseSetting($"Tenants:{tenant}:Oidc:Authority", _authority.ToString());
                 builder.UseSetting($"Tenants:{tenant}:Oidc:ClientId", KeycloakFixture.ClientId);
                 builder.UseSetting($"Tenants:{tenant}:Oidc:ClientSecret", KeycloakFixture.ClientSecret);

@@ -5,7 +5,7 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
 /// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
-/// profiles, the computed fields whose expression failed for a record, the signed-in sessions, the uploaded
+/// profiles, the computed fields whose expression failed for a record, the signed-in sessions, the MCP clients, the uploaded
 /// files with their bytes, and the uploads of record imports. The caller supplies the connection to the tenant
 /// database.
 /// </summary>
@@ -36,6 +36,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<PendingComputedFieldRow> PendingComputedFields => Set<PendingComputedFieldRow>();
 
     public DbSet<SessionRow> Sessions => Set<SessionRow>();
+
+    public DbSet<McpClientRow> McpClients => Set<McpClientRow>();
 
     public DbSet<GivenRoleRow> GivenRoles => Set<GivenRoleRow>();
 
@@ -171,6 +173,15 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             session.Property(s => s.IdpSessionId).HasColumnName("idp_session_id");
             session.Property(s => s.RefreshToken).HasColumnName("refresh_token");
             session.Property(s => s.ApplicationRoles).HasColumnName("application_roles").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
+        });
+
+        modelBuilder.Entity<McpClientRow>(client =>
+        {
+            client.ToTable("mcp_clients");
+            client.HasKey(c => c.ClientId).HasName("pk_mcp_clients");
+            client.Property(c => c.ClientId).HasColumnName("client_id").ValueGeneratedNever();
+            client.Property(c => c.LastUsedAt).HasColumnName("last_used_at");
+            client.Property(c => c.RevokedAt).HasColumnName("revoked_at");
         });
 
         modelBuilder.Entity<GivenRoleRow>(given =>

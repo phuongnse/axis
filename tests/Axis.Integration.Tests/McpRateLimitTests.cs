@@ -15,12 +15,11 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The calls to <c>/mcp</c> count in the MCP partition by tenant and client id, against the development realm's Keycloak.
-/// The limit is low and the allowance never refills during a test. Tenant <c>a</c> is served at <c>localhost</c>. The
-/// database is unreachable, so a request that reaches it fails the test.
+/// The limit is low and the allowance never refills during a test. Tenant <c>a</c> is served at <c>localhost</c> and
+/// is on a real PostgreSQL database, because every accepted token reads the client's row.
 /// </summary>
-public sealed class McpRateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
+public sealed class McpRateLimitTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
-    private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
     private const string Host = "localhost";
     private const string Version = "2025-11-25";
     private const int McpLimit = 3;
@@ -95,14 +94,15 @@ public sealed class McpRateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
     {
         _authority = await keycloak.StartAsync();
         _applications = Directory.CreateTempSubdirectory("axis-mcp-limit-").FullName;
+        var platform = await database.CreateDatabaseAsync("mcp_rate_limit", CancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
-            builder.UseTestPlatform(UnreachableDatabase);
-            builder.WithoutPlatformMigration();
+            builder.UseTestPlatform(platform);
             builder.UseSetting("Tenants:a:Hosts:0", Host);
-            builder.UseSetting("Tenants:a:ConnectionString", UnreachableDatabase);
-            builder.UseSetting("Tenants:a:SchemaConnectionString", UnreachableDatabase);
+            builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(database.ConnectionString));
+            builder.UseSetting("Tenants:a:SchemaConnectionString", database.ConnectionString);
             builder.UseSetting("Tenants:a:Oidc:Authority", _authority.ToString());
             builder.UseSetting("Tenants:a:Oidc:ClientId", KeycloakFixture.ClientId);
             builder.UseSetting("Tenants:a:Oidc:ClientSecret", KeycloakFixture.ClientSecret);
