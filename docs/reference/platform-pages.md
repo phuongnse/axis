@@ -182,8 +182,8 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
 
 ### Connected apps
 
-The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, see
-[outside MCP clients](user-administration.md#outside-mcp-clients) and
+The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, sees the
+apps that people consented to and revokes one, see [outside MCP clients](user-administration.md#outside-mcp-clients) and
 [client registration](mcp-server.md#client-registration). The tab reads `GET /api/tenant/outside-clients` and shows only
 when the route answers `200`. That keeps it hidden from a user who is not an administrator, for a preview tenant and for a
 tenant with no directory row. A `403` or `404` is not logged, and any other failure is logged. Its texts are
@@ -198,3 +198,17 @@ tenant with no directory row. A `403` or `404` is not logged, and any other fail
 - **A failed save.** The tab says "The setting was not saved." and keeps the edited values on screen. A `502` says "The
   setting was stored, but the identity provider did not apply it. Save again to apply it.", because the server keeps the
   stored change when the identity provider fails.
+- **Apps with consent.** Below the switch, a table headed "Apps with consent" lists each outside MCP client that people
+  consented to, from `GET /api/tenant/connected-apps`: its "Name", its "Client ID", the "People who consented" and
+  "Last used". Each person shows the display name and, when there is one, the email. A client with no name and a client
+  that was never used show the em dash. With no such client, the table says "No app has consent yet. People give
+  consent when they connect an MCP client." A list that does not load says "The apps with consent could not be
+  loaded." in place of the rows, and the switch above still works.
+- **Revoke.** Each row has a "Revoke…" button that opens a confirmation titled "Revoke the consent?". It names the
+  client by its name, or by its client ID when it has no name: "Every person's consent to {client} is removed, and its
+  tokens stop working at once. People must consent again to use it." Only the confirmation's "Revoke" button sends
+  `POST /api/tenant/connected-apps/{clientId}/revoke`. On `204` the tab reads `GET /api/tenant/connected-apps` again, so
+  the client drops out.
+- **A failed revoke.** The row stays as it was and the tab says "The consent was not revoked." A `502` says "The
+  identity provider did not finish the revoke. Revoke again to finish it.", because the server keeps the stored revoke
+  when the identity provider fails and revoking again finishes it.

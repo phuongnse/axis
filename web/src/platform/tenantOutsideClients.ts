@@ -33,3 +33,46 @@ export async function setTenantOutsideClients(value: TenantOutsideClients): Prom
   }
   return response.status === 502 ? 'notApplied' : 'failed'
 }
+
+/** A person who consented to an outside MCP client, as `GET /api/tenant/connected-apps` serves them. */
+export interface TenantConnectedAppPerson {
+  userId: string
+  displayName: string
+  email: string | null
+  consentedAt: string
+}
+
+/** An outside MCP client that at least one person consented to, as `GET /api/tenant/connected-apps` serves it. */
+export interface TenantConnectedApp {
+  clientId: string
+  name: string | null
+  lastUsedAt: string | null
+  people: TenantConnectedAppPerson[]
+}
+
+/** Reads the clients with consent. Any status but `200` gives `null`, and a status other than `404` or `403` is logged. */
+export async function fetchConnectedApps(signal?: AbortSignal): Promise<TenantConnectedApp[] | null> {
+  const response = await apiFetch('/api/tenant/connected-apps', { signal }, { promptSignInOnUnauthorized: false })
+  if (!response.ok) {
+    if (response.status !== 404 && response.status !== 403) {
+      console.warn(`Reading the connected apps failed with status ${response.status}.`)
+    }
+    return null
+  }
+  return ((await response.json()) as { items: TenantConnectedApp[] }).items
+}
+
+/**
+ * Removes every person's consent to the client. `ok` when the server answers `204`, and `notFinished` on `502`, where
+ * the server stored the revoke but the identity provider did not finish removing the consents, so revoking again
+ * finishes it. Any other answer is `failed`.
+ */
+export async function revokeConnectedApp(clientId: string): Promise<'ok' | 'notFinished' | 'failed'> {
+  const response = await apiFetch(`/api/tenant/connected-apps/${encodeURIComponent(clientId)}/revoke`, {
+    method: 'POST',
+  })
+  if (response.status === 204) {
+    return 'ok'
+  }
+  return response.status === 502 ? 'notFinished' : 'failed'
+}

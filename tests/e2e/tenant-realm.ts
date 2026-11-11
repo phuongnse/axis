@@ -102,11 +102,19 @@ export async function addRealmAccount(
 
 /**
  * Adds a public client to `realm` that signs a person in through the code flow and requires consent, so its sign-in opens
- * the consent screen. The realm's default optional scopes already include `axis:authoring`.
+ * the consent screen. The realm's default optional scopes already include `axis:authoring`. With `role`, the client's
+ * access tokens carry the claim `roles` with that value, a fixed claim that stands in for the roles that tenant realms
+ * do not yet put into MCP tokens, so a person who signs in through it can pass the author check of `/mcp`.
  */
 export async function addConsentClient(
   realm: string,
-  { clientId, name, baseUrl, redirectUri }: { clientId: string; name: string; baseUrl: string; redirectUri: string },
+  {
+    clientId,
+    name,
+    baseUrl,
+    redirectUri,
+    role,
+  }: { clientId: string; name: string; baseUrl: string; redirectUri: string; role?: string },
 ): Promise<void> {
   await admin(`Creating the client ${clientId} in ${realm}`, 'POST', `/${realm}/clients`, {
     clientId,
@@ -118,6 +126,25 @@ export async function addConsentClient(
     rootUrl: baseUrl,
     baseUrl,
     redirectUris: [redirectUri],
+    ...(role === undefined
+      ? {}
+      : {
+          protocolMappers: [
+            {
+              name: 'roles',
+              protocol: 'openid-connect',
+              protocolMapper: 'oidc-hardcoded-claim-mapper',
+              config: {
+                'claim.name': 'roles',
+                'claim.value': role,
+                'jsonType.label': 'String',
+                'access.token.claim': 'true',
+                'id.token.claim': 'false',
+                'userinfo.token.claim': 'false',
+              },
+            },
+          ],
+        }),
   })
 }
 

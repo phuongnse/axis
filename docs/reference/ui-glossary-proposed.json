@@ -136,6 +136,13 @@
       "vi": "Ứng dụng đã kết nối",
       "status": "proposed",
       "note": "The users page tab where an administrator chooses which outside MCP clients may connect."
+    },
+    {
+      "concept": "Action: Revoke (consent)",
+      "en": "Revoke",
+      "vi": "Thu hồi",
+      "status": "proposed",
+      "note": "Removes every person's consent to an MCP client."
     }
   ]
 }
