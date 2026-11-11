@@ -116,7 +116,7 @@ internal static class StudioPublishEndpoints
 
         if (StudioFolder.ReadManifest(folder) is not { Id: not null })
         {
-            return NoManifestId();
+            return NoManifestIdProblem();
         }
 
         var request = httpContext.Request;
@@ -159,7 +159,7 @@ internal static class StudioPublishEndpoints
 
         if (StudioFolder.ReadManifest(folder) is not { Id: not null })
         {
-            return NoManifestId();
+            return NoManifestIdProblem();
         }
 
         var request = httpContext.Request;
@@ -243,8 +243,14 @@ internal static class StudioPublishEndpoints
     private static IResult BadBody() =>
         StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid publish request.");
 
-    private static IResult NoManifestId() =>
-        StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The application manifest has no valid id.");
+    /// <summary>The title of the 409 for a manifest without a valid id.</summary>
+    internal const string NoManifestId = "The application manifest has no valid id.";
+
+    /// <summary>The title of the 404 for a request the application does not have.</summary>
+    internal const string NoRequest = "The application has no publish request with this id.";
+
+    private static IResult NoManifestIdProblem() =>
+        StudioEndpoints.Problem(StatusCodes.Status409Conflict, NoManifestId);
 
     // The folder is read under the write lock, so the snapshot is what the author saw after their last finished write.
     private static async Task<IResult> StoreAsync(
@@ -261,7 +267,7 @@ internal static class StudioPublishEndpoints
     {
         if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
-            return NoManifestId();
+            return NoManifestIdProblem();
         }
 
         var user = (await CurrentUsers.FindAsync(httpContext))!;
@@ -276,15 +282,17 @@ internal static class StudioPublishEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable);
         }
 
-        var snapshot = new JsonArray([.. files.Select(file => (JsonNode)new JsonObject
+        return await InsertAsync(kind, application, manifest.Name, applicationId, SnapshotJson(files), releaseId: null, label, note, user, database, cancellationToken, target, scenarioNames);
+    }
+
+    /// <summary>The JSON a request stores as its snapshot: each file's path, version and text.</summary>
+    internal static string SnapshotJson(IReadOnlyList<StudioSnapshotFile> files) =>
+        new JsonArray([.. files.Select(file => (JsonNode)new JsonObject
         {
             ["file"] = file.File,
             ["version"] = file.Version,
             ["content"] = file.Content,
-        })]);
-
-        return await InsertAsync(kind, application, manifest.Name, applicationId, snapshot.ToJsonString(), releaseId: null, label, note, user, database, cancellationToken, target, scenarioNames);
-    }
+        })]).ToJsonString();
 
     // Stores the request as queued and answers 202 with it and its Location.
     private static async Task<IResult> InsertAsync(
@@ -304,11 +312,39 @@ internal static class StudioPublishEndpoints
     {
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
+        var requestedAt = await InsertRequestAsync(
+            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, cancellationToken);
+
+        // The name is the one in the user's profile, else the session's, as GET answers it.
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
+        var response = new StudioPublishRequestResponse(
+            id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, names.GetValueOrDefault(user.Id) ?? user.DisplayName, requestedAt,
+            null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone(),
+            kind == "test" ? JsonDocument.Parse("[]").RootElement.Clone() : null);
+        return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
+    }
+
+    /// <summary>Stores the request as queued and answers when it was requested. The one insert of a publish request.</summary>
+    internal static async Task<DateTimeOffset> InsertRequestAsync(
+        NpgsqlConnection connection,
+        Guid id,
+        string kind,
+        Guid applicationId,
+        string target,
+        string? snapshot,
+        Guid? releaseId,
+        string? label,
+        string? note,
+        string requestedBy,
+        string? scenarioNames,
+        Guid? draftId,
+        CancellationToken cancellationToken)
+    {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names)
-            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios)
+                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names, draft_id)
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios, @draft)
             RETURNING requested_at
             """,
             connection);
@@ -320,20 +356,45 @@ internal static class StudioPublishEndpoints
         command.Parameters.Add(new NpgsqlParameter("release", NpgsqlDbType.Uuid) { Value = (object?)releaseId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("label", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("note", NpgsqlDbType.Text) { Value = (object?)note ?? DBNull.Value });
-        command.Parameters.AddWithValue("user", user.Id);
+        command.Parameters.AddWithValue("user", requestedBy);
         command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioNames ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("draft", NpgsqlDbType.Uuid) { Value = (object?)draftId ?? DBNull.Value });
         await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
         await inserted.ReadAsync(cancellationToken);
-        var requestedAt = inserted.GetFieldValue<DateTimeOffset>(0);
-        await inserted.DisposeAsync();
+        return inserted.GetFieldValue<DateTimeOffset>(0);
+    }
 
-        // The name is the one in the user's profile, else the session's, as GET answers it.
-        var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
-        var response = new StudioPublishRequestResponse(
-            id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, names.GetValueOrDefault(user.Id) ?? user.DisplayName, requestedAt,
-            null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone(),
-            kind == "test" ? JsonDocument.Parse("[]").RootElement.Clone() : null);
-        return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
+    /// <summary>The request of the application with this id, or null. The one read of a publish request.</summary>
+    internal static async Task<StoredPublishRequest?> FindRequestAsync(
+        NpgsqlConnection connection, Guid applicationId, Guid requestId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name, draft_id
+            FROM axis.publish_requests
+            WHERE id = @id AND application_id = @application
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", requestId);
+        command.Parameters.AddWithValue("application", applicationId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new StoredPublishRequest(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetString(4),
+                reader.GetFieldValue<DateTimeOffset>(5),
+                reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
+                reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
+                reader.IsDBNull(8) ? null : reader.GetGuid(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetString(12),
+                reader.IsDBNull(13) ? null : reader.GetGuid(13))
+            : null;
     }
 
     private static async Task<IResult> GetRequestAsync(
@@ -349,60 +410,63 @@ internal static class StudioPublishEndpoints
         if (!Guid.TryParseExact(id, "D", out var requestId)
             || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
-            return NoRequest();
+            return NoRequestProblem();
         }
 
         var cancellationToken = httpContext.RequestAborted;
         var connection = await database.GetConnectionAsync(cancellationToken);
-        await using var command = new NpgsqlCommand(
-            """
-            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name
-            FROM axis.publish_requests
-            WHERE id = @id AND application_id = @application
-            """,
-            connection);
-        command.Parameters.AddWithValue("id", requestId);
-        command.Parameters.AddWithValue("application", applicationId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        if (await FindRequestAsync(connection, applicationId, requestId, cancellationToken) is not { } stored)
         {
-            return NoRequest();
+            return NoRequestProblem();
         }
 
-        using var diagnostics = JsonDocument.Parse(reader.IsDBNull(9) ? "[]" : reader.GetString(9));
-        var kind = reader.GetString(0);
-        var storedScenarios = reader.IsDBNull(11) ? null : reader.GetString(11);
-        using var scenarios = kind == "test"
-            ? JsonDocument.Parse(storedScenarios ?? "[]")
-            : storedScenarios is null ? null : JsonDocument.Parse(storedScenarios);
-        var requestedBy = reader.GetString(4);
-        var storedName = reader.IsDBNull(12) ? null : reader.GetString(12);
+        using var diagnostics = JsonDocument.Parse(stored.Diagnostics ?? "[]");
+        using var scenarios = stored.Kind == "test"
+            ? JsonDocument.Parse(stored.ScenarioResults ?? "[]")
+            : stored.ScenarioResults is null ? null : JsonDocument.Parse(stored.ScenarioResults);
         var response = new StudioPublishRequestResponse(
             requestId.ToString("D"),
             manifest.Name ?? application,
-            kind,
-            reader.GetString(10),
-            reader.GetString(1),
-            reader.IsDBNull(2) ? null : reader.GetString(2),
-            reader.IsDBNull(3) ? null : reader.GetString(3),
-            requestedBy,
-            storedName,
-            reader.GetFieldValue<DateTimeOffset>(5),
-            reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
-            reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
-            reader.IsDBNull(8) ? null : reader.GetGuid(8).ToString("D"),
+            stored.Kind,
+            stored.Target,
+            stored.Status,
+            stored.Label,
+            stored.Note,
+            stored.RequestedBy,
+            stored.RequestedByName,
+            stored.RequestedAt,
+            stored.StartedAt,
+            stored.FinishedAt,
+            stored.ReleaseId?.ToString("D"),
             diagnostics.RootElement.Clone(),
             scenarios?.RootElement.Clone());
 
-        // Npgsql allows one open reader per connection, so the profile is read after the request.
-        await reader.DisposeAsync();
-        var names = await UserProfiles.FindDisplayNamesAsync(connection, [requestedBy], cancellationToken);
-        return Results.Ok(response with { RequestedByName = names.GetValueOrDefault(requestedBy) ?? storedName });
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [stored.RequestedBy], cancellationToken);
+        return Results.Ok(response with { RequestedByName = names.GetValueOrDefault(stored.RequestedBy) ?? stored.RequestedByName });
     }
 
-    private static IResult NoRequest() =>
-        StudioEndpoints.NotFound("The application has no publish request with this id.");
+    private static IResult NoRequestProblem() => StudioEndpoints.NotFound(NoRequest);
 }
+
+/// <summary>
+/// A row of <c>axis.publish_requests</c> as <see cref="StudioPublishEndpoints.FindRequestAsync"/> reads it, without its snapshot.
+/// <c>Diagnostics</c> and <c>ScenarioResults</c> are the stored JSON text, null when none were stored.
+/// </summary>
+internal sealed record StoredPublishRequest(
+    string Kind,
+    string Status,
+    string? Label,
+    string? Note,
+    string RequestedBy,
+    DateTimeOffset RequestedAt,
+    DateTimeOffset? StartedAt,
+    DateTimeOffset? FinishedAt,
+    Guid? ReleaseId,
+    string? Diagnostics,
+    string Target,
+    string? ScenarioResults,
+    string? RequestedByName,
+    Guid? DraftId);
 
 /// <summary>
 /// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
