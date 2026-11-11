@@ -26,3 +26,6 @@ when the author approves, changes the plan or drops it. The agent host writes th
   never finished has the `outcome` `interrupted` once a later host closes it, see
   [resuming](authoring-requests.md#durable-requests). A step that found the author's token ended
   has the `outcome` `tokenEnded`, see [acting for the author](authoring-requests.md#acting-for-the-author).
+  A planning step that wrote no plan has the `outcome` `noPlan`, see
+  [planning calls](authoring-requests.md#budgets). `messages` holds the step's model messages as a JSON
+  array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.

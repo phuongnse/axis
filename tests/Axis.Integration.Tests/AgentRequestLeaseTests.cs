@@ -3,6 +3,7 @@ using Axis.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using static Axis.Integration.Tests.Polling;
 
@@ -237,12 +238,14 @@ public sealed class AgentRequestLeaseTests(PostgreSqlFixture database) : IClassF
         builder.Logging.ClearProviders();
         builder.Logging.AddProvider(logs);
         builder.Services.AddSingleton(_options);
+        builder.Services.AddAxisAgent(builder.Configuration, builder.Environment);
+        // The test steps take the place of the built-in one.
+        builder.Services.RemoveAll<IAuthoringStep>();
         foreach (var step in steps)
         {
             builder.Services.AddSingleton<IAuthoringStep>(step);
         }
 
-        builder.Services.AddAxisAgent(builder.Configuration, builder.Environment);
         var app = builder.Build();
         app.MapHostHealth();
         return app;

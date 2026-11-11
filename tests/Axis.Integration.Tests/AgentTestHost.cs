@@ -4,6 +4,7 @@ using Axis.Hosting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.Integration.Tests;
@@ -31,10 +32,14 @@ internal static class AgentTestHost
             [$"Tenants:{tenant}:DataKeys:1"] = dataKey,
         };
 
-    /// <summary>Registers <paramref name="steps"/> and the lease and poll interval of <paramref name="options"/>, for the <c>services</c> argument of <see cref="Build"/>.</summary>
+    /// <summary>
+    /// Registers <paramref name="steps"/> in place of the built-in planning step, and the lease and poll interval of <paramref name="options"/>, for
+    /// the <c>services</c> argument of <see cref="Build"/>.
+    /// </summary>
     public static Action<IServiceCollection> Steps(AuthoringLoopOptions options, params IAuthoringStep[] steps) =>
         services =>
         {
+            services.RemoveAll<IAuthoringStep>();
             services.AddSingleton(options);
             foreach (var step in steps)
             {

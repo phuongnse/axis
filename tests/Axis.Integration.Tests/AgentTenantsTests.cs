@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Agent;
 using Axis.Tenancy;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Npgsql;
 using static Axis.Integration.Tests.Polling;
 
@@ -26,7 +27,8 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
                 ["Platform:SecretKey"] = TestPlatform.SecretKey,
                 ["Tenancy:RefreshInterval"] = "00:00:00.2",
             },
-            new LogCollector());
+            new LogCollector(),
+            WithoutSteps);
         await app.StartAsync(CancellationToken);
         var catalog = app.Services.GetRequiredService<BackgroundTenantCatalog>();
         await WaitUntilAsync(() => catalog.Find("a") is not null, "The agent host did not read tenant a.");
@@ -60,7 +62,8 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
                 ["Tenants:owner:Hosts:0"] = "owner.example.test",
                 ["Tenants:owner:ConnectionString"] = owner,
             },
-            new LogCollector());
+            new LogCollector(),
+            WithoutSteps);
         await app.StartAsync(CancellationToken);
         var store = app.Services.GetRequiredService<AuthoringRequestStore>();
 
@@ -91,6 +94,9 @@ public sealed class AgentTenantsTests(PostgreSqlFixture database) : IClassFixtur
             () => logs.Entries.Any(entry => entry.Contains("AI authoring is off", StringComparison.Ordinal)),
             "The agent host did not say that AI authoring is off.");
     }
+
+    // The built-in planning step would claim the planning rows these tests list, so they run with no step.
+    private static void WithoutSteps(IServiceCollection services) => services.RemoveAll<IAuthoringStep>();
 
     // The rows go in as the superuser of the container, which names the database through the connection string.
     private static async Task InsertRequestAsync(string connectionString, Guid id, string state) =>

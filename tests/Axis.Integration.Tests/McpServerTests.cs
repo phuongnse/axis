@@ -122,9 +122,11 @@ public sealed class McpServerTests(KeycloakFixture keycloak, PostgreSqlFixture d
         using var called = JsonDocument.Parse(await call.Content.ReadAsStringAsync(CancellationToken));
         var result = called.RootElement.GetProperty("result");
         Assert.False(result.GetProperty("isError").GetBoolean());
-        var names = result.GetProperty("structuredContent").GetProperty("items").EnumerateArray()
-            .Select(item => item.GetProperty("name").GetString()).Order(StringComparer.Ordinal).ToList();
-        Assert.Equal(["LeaveRequests", "PurchaseRequests"], names);
+        var items = result.GetProperty("structuredContent").GetProperty("items").EnumerateArray()
+            .Select(item => (Name: item.GetProperty("name").GetString(), Id: item.GetProperty("id").GetString())).Order().ToList();
+        Assert.Equal(
+            [("LeaveRequests", "6613186d-8c6f-4e98-b911-6acc1104a5a2"), ("PurchaseRequests", "219102bc-864f-42ed-874a-c19eaee0d1ba")],
+            items);
     }
 
     [Fact]
