@@ -30,6 +30,7 @@ flowchart LR
         SPA[SPA]
         Server[Axis.Server]
         Worker[Axis.Worker]
+        Agent[Axis.Agent]
         Admin[Axis.Admin]
         Publisher[axis-admin publisher]
         SysDb[(Platform database)]
@@ -53,6 +54,8 @@ flowchart LR
     Worker --> TenantDb
     Worker -->|connectors| External
     Worker -->|email| Smtp
+    Agent --> SysDb
+    Agent --> TenantDb
     ControlPlane -->|provisioning API on Cell:InternalUrl| Server
 ```
 
@@ -78,6 +81,10 @@ flowchart LR
   loads package code itself only in Development. See
   [package runners](reference/extension-packages.md#package-runners) and
   [D90](decisions/d90-extension-packages-run-out-of-process.md).
+- **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
+  With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads
+  them from the platform database. It works on the request tables in each tenant database with the
+  tenant's runtime role. With AI authoring off, it starts idle.
 - **Axis.Admin** is the console host that the platform operator runs. It creates tenants, migrates
   tenant databases, activates releases, and backs up and restores tenants. It is the only host that
   writes the [tenant directory](#tenant-directory), holds an admin connection to the database server,
