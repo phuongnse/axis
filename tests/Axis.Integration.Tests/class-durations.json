@@ -399,5 +399,5 @@
   "Axis.Integration.Tests.WorkerTenantDirectoryTests": 49,
   "Axis.Integration.Tests.WorkerTenantUsageTests": 29,
   "Axis.Integration.Tests.WriteTimeoutTests": 3,
-  "parallelism": 3.48
+  "parallelism": 2.68
 }

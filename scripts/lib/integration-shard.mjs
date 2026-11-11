@@ -19,7 +19,7 @@
 // as the artifacts/test-results/Axis.Integration.Tests.xml of each shard of a full run, and the
 // Axis.ControlPlane.Integration.Tests.xml of shard 1. A class missing from them keeps its entry, and an
 // entry whose class no longer exists is dropped. It also measures the parallelism under `parallelism`:
-// the seconds of all tests over the wall time of the Axis.Integration.Tests suites.
+// the seconds of the Axis.Integration.Tests suites' tests over the wall time of those suites.
 //
 // A class is a type whose name ends in Tests, in a .cs file of the test project that holds a [Fact]
 // or a [Theory]. Classes that share an xUnit [Collection] stay in one shard, as one unit. Each class
@@ -43,7 +43,7 @@ export const isPerformance = (name) => name.endsWith('PerformanceTests')
 /** The key in class-durations.json of the control plane suite, which shard 1 runs beside its classes (see scripts/integration.sh). */
 export const controlPlane = 'Axis.ControlPlane.Integration.Tests'
 
-/** The key in class-durations.json of the classes' parallelism: their seconds over the wall time of their suites. */
+/** The key in class-durations.json of the parallelism: the seconds of the Axis.Integration.Tests tests over their suites' wall time. */
 export const parallelismKey = 'parallelism'
 
 /** The test classes of one C# source: [{ name, collection, tests }], with name its full name. */
@@ -158,20 +158,22 @@ export function junitDurations(texts) {
   return Object.fromEntries(Object.entries(durations).map(([name, seconds]) => [name, Math.round(seconds)]))
 }
 
+const integrationSuite = /(^|[\/\\])Axis\.Integration\.Tests\.dll$/
+
 /**
- * The parallelism of xUnit JUnit texts: the seconds of all tests over the wall time of the Axis.Integration.Tests
- * suites, or undefined when there is no such suite.
+ * The parallelism of xUnit JUnit texts: the seconds of the tests of the Axis.Integration.Tests suites over their
+ * wall time, or undefined when there is no such suite. The control plane and scenario suites count on neither side.
  */
 export function junitParallelism(texts) {
   let testSeconds = 0
   let wallSeconds = 0
   for (const text of texts) {
-    for (const [, attributes] of text.matchAll(/<testcase\s([^>]*?)\/?>/g)) {
-      testSeconds += Number(attribute(attributes, 'time') ?? 0)
-    }
-    for (const [, attributes] of text.matchAll(/<testsuite\s([^>]*)>/g)) {
-      if (attribute(attributes, 'name')?.includes(controlPlane)) continue
+    for (const [, attributes, body] of text.matchAll(/<testsuite\s([^>]*?)>([\s\S]*?)<\/testsuite>/g)) {
+      if (!integrationSuite.test(attribute(attributes, 'name') ?? '')) continue
       wallSeconds += Number(attribute(attributes, 'time') ?? 0)
+      for (const [, testcase] of body.matchAll(/<testcase\s([^>]*?)\/?>/g)) {
+        testSeconds += Number(attribute(testcase, 'time') ?? 0)
+      }
     }
   }
   if (wallSeconds === 0) return undefined
