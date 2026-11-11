@@ -201,7 +201,7 @@ An administrator reads and replaces the tenant's switch for outside MCP clients,
 outside clients that people consented to, and revokes everyone's consent to one outside client. The routes answer to an administrator with a browser session only, as the
 command routes do.
 The Connected apps tab of the [users page](platform-pages.md#connected-apps) reads and replaces both values through the
-switch routes.
+switch routes, and lists and revokes the consents through the connected apps routes.
 
 | Route                             | Body                                                                   | Answer                                                                            |
 | --------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |

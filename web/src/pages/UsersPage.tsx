@@ -62,8 +62,8 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
  * resend gives the person a new id. The page has two tabs. People holds the list and, below it, the Export data and
  * Usage sections for an administrator in a cell tenant and the Model key section where the installation allows tenant
- * keys. Connected apps holds the outside MCP clients switch, and shows only when `GET /api/tenant/outside-clients`
- * answers `200`. See docs/reference/platform-pages.md#connected-apps.
+ * keys. Connected apps holds the outside MCP clients switch and the apps with consent, and shows only when
+ * `GET /api/tenant/outside-clients` answers `200`. See docs/reference/platform-pages.md#connected-apps.
  */
 export function UsersPage() {
   const t = useText()

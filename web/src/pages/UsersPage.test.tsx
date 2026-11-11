@@ -174,6 +174,9 @@ describe('UsersPage', () => {
         if (input === outsideClientsPath) {
           return json({ outsideClients: 'allowList', allowedClients: ['claude'] })
         }
+        if (input === '/api/tenant/connected-apps') {
+          return json({ items: [] })
+        }
         return input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : json(users)
       }),
     )

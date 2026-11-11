@@ -127,8 +127,8 @@ clients may connect at all.
   [outside MCP clients](user-administration.md#outside-mcp-clients), and each change writes a platform audit record.
 - **Connected apps.** A tenant administrator changes both settings in the Connected apps tab of the
   [users page](platform-pages.md#connected-apps).
-- **Consents** _(planned for M35)_. The Connected apps tab also lists each client with consent, the people who
-  consented and the last use, and revokes a client's consent there.
+- **Consents.** The Connected apps tab also lists each client with consent, the people who consented and the last
+  use, and revokes a client's consent there, see [connected apps](platform-pages.md#connected-apps).
 
 ## Tools
 
