@@ -1,3 +1,4 @@
+using Axis.Admin;
 using Axis.Agent;
 using Axis.Hosting;
 using Microsoft.AspNetCore.Builder;
@@ -10,6 +11,37 @@ namespace Axis.Integration.Tests;
 /// <summary>An agent host built as <c>Axis.Agent</c> registers it, with its log lines collected.</summary>
 internal static class AgentTestHost
 {
+    /// <summary>The settings under which the agent host serves one tenant of the <c>Tenants</c> section, with a realm whose agent client has <paramref name="agentSecret"/>.</summary>
+    public static Dictionary<string, string?> TenantSettings(
+        string tenant,
+        string host,
+        string runtimeConnectionString,
+        Uri authority,
+        string platformSecret,
+        string agentSecret,
+        string dataKey) =>
+        new()
+        {
+            [$"Tenants:{tenant}:Hosts:0"] = host,
+            [$"Tenants:{tenant}:ConnectionString"] = runtimeConnectionString,
+            [$"Tenants:{tenant}:Oidc:Authority"] = authority.ToString(),
+            [$"Tenants:{tenant}:Oidc:ClientId"] = TenantRealm.PlatformClientId,
+            [$"Tenants:{tenant}:Oidc:ClientSecret"] = platformSecret,
+            [$"Tenants:{tenant}:Oidc:AgentClientSecret"] = agentSecret,
+            [$"Tenants:{tenant}:DataKeys:1"] = dataKey,
+        };
+
+    /// <summary>Registers <paramref name="steps"/> and the lease and poll interval of <paramref name="options"/>, for the <c>services</c> argument of <see cref="Build"/>.</summary>
+    public static Action<IServiceCollection> Steps(AuthoringLoopOptions options, params IAuthoringStep[] steps) =>
+        services =>
+        {
+            services.AddSingleton(options);
+            foreach (var step in steps)
+            {
+                services.AddSingleton(step);
+            }
+        };
+
     /// <summary>
     /// Builds the host without starting it. With <paramref name="aiOn"/>, it adds a binding <c>main</c> of kind <c>anthropic</c> and makes it the default,
     /// unless <paramref name="settings"/> sets them. <paramref name="services"/> runs after <c>AddAxisAgent</c>.

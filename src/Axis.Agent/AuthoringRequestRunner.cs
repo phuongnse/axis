@@ -1,17 +1,20 @@
 using System.Collections.Concurrent;
+using Axis.Tenancy;
 
 namespace Axis.Agent;
 
 /// <summary>
 /// Claims authoring requests with a lease and runs the step of their state, see <c>docs/reference/authoring-requests.md#durable-requests</c>.
 /// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A step that needs the author's token and finds it ended
-/// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. A host that stops, or a step that throws,
+/// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
     AuthoringSteps steps,
     AuthoringRequestTokenRefresher refresher,
+    ITenantCatalog catalog,
+    IHttpClientFactory httpClients,
     AuthoringLoopOptions options,
     TimeProvider time,
     ILogger<AuthoringRequestRunner> logger)
@@ -119,11 +122,14 @@ internal sealed partial class AuthoringRequestRunner(
         var renewal = RenewAsync(tenantId, request.Id, claimedBy, linked);
         try
         {
+            Func<CancellationToken, Task<string>> accessToken = token => refresher.AccessTokenAsync(tenantId, request.Id, claimedBy, token);
+            var mcp = new AuthorMcpClient(httpClients.CreateClient(AuthorMcpClient.HttpClientName), catalog.Find(tenantId)?.Hosts is [var host, ..] ? host : null, accessToken);
             var context = new AuthoringStepContext(
                 tenantId,
                 request,
                 (tokens, token) => store.AddTokensAsync(tenantId, request.Id, stepId, claimedBy, tokens, token),
-                token => refresher.AccessTokenAsync(tenantId, request.Id, claimedBy, token));
+                accessToken,
+                mcp);
             return await step.RunAsync(context, linked.Token);
         }
         finally

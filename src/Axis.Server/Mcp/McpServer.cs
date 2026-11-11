@@ -28,10 +28,10 @@ namespace Axis.Server.Mcp;
 /// </summary>
 internal static partial class McpServer
 {
-    /// <summary>The one protocol version the server speaks.</summary>
-    public const string ProtocolVersion = "2025-11-25";
+    /// <summary>The one protocol version the server speaks, which its client in the agent host asks for too.</summary>
+    public const string ProtocolVersion = McpProtocol.Version;
 
-    public const string Path = "/mcp";
+    public const string Path = McpProtocol.Path;
 
     public const string MetadataPath = "/.well-known/oauth-protected-resource/mcp";
 

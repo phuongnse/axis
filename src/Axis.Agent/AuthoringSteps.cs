@@ -20,8 +20,8 @@ public interface IAuthoringStep
 public sealed record AuthoringStepResult(string NextState, string? Outcome = null, string? InputSummary = null);
 
 /// <summary>
-/// What a step knows about the request it works on, how it reports the tokens a model call used and how it gets the author's access token,
-/// see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+/// What a step knows about the request it works on, how it reports the tokens a model call used, how it gets the author's access token,
+/// see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and its client of the tenant's MCP server.
 /// </summary>
 public sealed class AuthoringStepContext
 {
@@ -32,12 +32,14 @@ public sealed class AuthoringStepContext
         string tenantId,
         AuthoringRequestToWork request,
         Func<long, CancellationToken, Task> addTokens,
-        Func<CancellationToken, Task<string>> accessToken)
+        Func<CancellationToken, Task<string>> accessToken,
+        AuthorMcpClient mcp)
     {
         TenantId = tenantId;
         Request = request;
         _addTokens = addTokens;
         _accessToken = accessToken;
+        Mcp = mcp;
     }
 
     public string TenantId { get; }
@@ -55,6 +57,12 @@ public sealed class AuthoringStepContext
     /// <exception cref="AuthoringTokenEndedException">The realm refused the token, or the request keeps none, or it no longer decrypts. The runner then stops the request as <c>failed</c>.</exception>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
     public Task<string> AccessTokenAsync(CancellationToken cancellationToken) => _accessToken(cancellationToken);
+
+    /// <summary>
+    /// The client of the tenant's MCP server, which acts as the author with the same access token, see <c>docs/reference/authoring-requests.md#the-agent-host</c>.
+    /// A server that refuses the author ends the request like a realm that refuses the token.
+    /// </summary>
+    public AuthorMcpClient Mcp { get; }
 }
 
 /// <summary>How long the agent host holds a claim and how often it looks for work.</summary>

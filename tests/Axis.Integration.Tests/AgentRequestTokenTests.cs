@@ -7,13 +7,10 @@ using Axis.Admin;
 using Axis.Agent;
 using Axis.Data.Records;
 using Axis.Data.Storage;
-using Axis.Hosting;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
@@ -135,36 +132,12 @@ public sealed class AgentRequestTokenTests(KeycloakFixture keycloak, PostgreSqlF
         return (connectionString, requestId);
     }
 
-    private WebApplication BuildAgent(string connectionString, LogCollector logs, params TestStep[] steps)
-    {
-        var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-        {
-            ["Health:Urls"] = "http://127.0.0.1:0",
-            ["Ai:Bindings:main:Kind"] = "anthropic",
-            ["Ai:Bindings:main:Model"] = "model-1",
-            ["Ai:DefaultBinding"] = "main",
-            [$"Tenants:{Tenant}:Hosts:0"] = $"{Tenant}.example.test",
-            [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
-            [$"Tenants:{Tenant}:Oidc:Authority"] = Authority.ToString(),
-            [$"Tenants:{Tenant}:Oidc:ClientId"] = TenantRealm.PlatformClientId,
-            [$"Tenants:{Tenant}:Oidc:ClientSecret"] = PlatformSecret,
-            [$"Tenants:{Tenant}:Oidc:AgentClientSecret"] = AgentSecret,
-            [$"Tenants:{Tenant}:DataKeys:1"] = _dataKey,
-        });
-        builder.Logging.ClearProviders();
-        builder.Logging.AddProvider(logs);
-        builder.Services.AddSingleton(_options);
-        foreach (var step in steps)
-        {
-            builder.Services.AddSingleton<IAuthoringStep>(step);
-        }
-
-        builder.Services.AddAxisAgent(builder.Configuration, builder.Environment);
-        var app = builder.Build();
-        app.MapHostHealth();
-        return app;
-    }
+    private WebApplication BuildAgent(string connectionString, LogCollector logs, params TestStep[] steps) =>
+        AgentTestHost.Build(
+            aiOn: true,
+            AgentTestHost.TenantSettings(Tenant, $"{Tenant}.example.test", PostgreSqlServer.RuntimeConnectionString(connectionString), Authority, PlatformSecret, AgentSecret, _dataKey),
+            logs,
+            AgentTestHost.Steps(_options, steps));
 
     private static async Task<string> ScalarAsync(string connectionString, string sql) =>
         Convert.ToString(await PostgreSqlServer.AdminScalarAsync(connectionString, sql, CancellationToken), System.Globalization.CultureInfo.InvariantCulture) ?? "";
@@ -189,22 +162,5 @@ public sealed class AgentRequestTokenTests(KeycloakFixture keycloak, PostgreSqlF
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("access_token").GetString()!;
-    }
-
-    private sealed class TestStep(string state, string kind, string nextState, Func<AuthoringStepContext, CancellationToken, Task>? body = null) : IAuthoringStep
-    {
-        public string State { get; } = state;
-
-        public string Kind { get; } = kind;
-
-        public async Task<AuthoringStepResult> RunAsync(AuthoringStepContext context, CancellationToken cancellationToken)
-        {
-            if (body is not null)
-            {
-                await body(context, cancellationToken);
-            }
-
-            return new AuthoringStepResult(nextState, "done");
-        }
     }
 }
