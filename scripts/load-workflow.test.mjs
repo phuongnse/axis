@@ -3,25 +3,12 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { blockAfter, indentOf, isContent } from './lib/workflow-lines.mjs'
 
 // The load test of D82 runs in exactly one workflow, only once a week and on demand, and keeps its results whatever
-// the run's result. See docs/reference/performance.md#load-test. The workflows are read line by line, since the
-// scripts' tests have no YAML dependency.
+// the run's result. See docs/reference/performance.md#load-test. The workflows are read line by line with
+// scripts/lib/workflow-lines.mjs.
 const root = fileURLToPath(new URL('..', import.meta.url))
-
-const indentOf = (line) => line.length - line.trimStart().length
-
-const isContent = (line) => line.trim() !== '' && !line.trimStart().startsWith('#')
-
-// The lines of the block that starts after `start` and ends before the next content line at `indent` or less.
-const blockAfter = (lines, start, indent) => {
-  const block = []
-  for (const line of lines.slice(start + 1)) {
-    if (isContent(line) && indentOf(line) <= indent) break
-    block.push(line)
-  }
-  return block
-}
 
 const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, '$2')
 
