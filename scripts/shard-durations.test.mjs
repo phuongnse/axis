@@ -108,6 +108,7 @@ describe('issuesFrom', () => {
     assert.equal(issue.body.split('\n')[0], '<!-- nexkit:workflow ci.yml 42 -->')
     assert.ok(issue.body.includes(`> ${overBudget.line}`))
     assert.match(issue.body, /node scripts\/lib\/e2e-shard\.mjs --count` prints no `Over budget:` line for it/)
+    assert.match(issue.body, /^- \[ \] .*\]\(https:\/\/github\.com\/phuongnse\/axis\/blob\/main\/docs\/testing\.md#rules-for-tests\)/m)
     assert.doesNotMatch(issue.body, /holds the durations below/)
   })
 
