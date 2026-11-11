@@ -1,4 +1,5 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
@@ -78,6 +79,10 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 
 // The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
 builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
+
+// The period invoices, queued every hour. It needs only the control plane's database.
+builder.Services.AddSingleton<IJobHandler, PeriodInvoicing>();
+builder.Services.AddSingleton(new RecurringJob(PeriodInvoicing.JobKind, TimeSpan.FromHours(1)));
 
 // The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
 if (options.SignUp.DisposableDomains.IsComplete)

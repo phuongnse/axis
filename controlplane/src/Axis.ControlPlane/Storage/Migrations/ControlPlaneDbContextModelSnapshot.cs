@@ -639,6 +639,10 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("period");
 
+                    b.Property<DateTimeOffset?>("PeriodEndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("period_ends_at");
+
                     b.Property<string>("PlanCode")
                         .HasColumnType("text")
                         .HasColumnName("plan_code");

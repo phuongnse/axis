@@ -116,7 +116,7 @@ every business change.
   - **Recurring jobs.** Every replica runs a schedule that queues the jobs of a kind at an interval,
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
-    (`advanceSubscriptions`) every hour. When the directory and a cell are set, it also queues the
+    (`advanceSubscriptions`) and the [period invoices](payments.md#invoices) (`createPeriodInvoices`) each every hour. When the directory and a cell are set, it also queues the
     [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the

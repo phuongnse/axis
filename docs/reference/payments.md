@@ -27,9 +27,14 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
   race never charges twice.
 - **Due dates.** A period invoice is due on the period's first day. A change invoice is due 7 days
   after it is created.
-- **Made ahead** _(planned for M34)_. The [control plane](control-plane.md) creates the invoice of a
-  period 7 days before it starts, with its lines: the plan, each add-on, and any prorated charge or
-  credit. A plan change or an add-on makes an invoice at once, with any prorated charge or credit.
+- **Made ahead.** The hourly job `createPeriodInvoices` of the [control plane](control-plane.md)
+  creates the invoice of the period that starts at the subscription's `period_ends_at`, 7 days
+  before it starts, with a line for the plan and a line for each add-on. A subscription that pins no
+  plan, or is `readOnly`, `cancelled`, `deleting` or `deleted`, gets none. A run after the period has
+  started still creates it. Each new invoice writes the audit record `invoice.created`, with the job
+  as actor and the invoice as subject.
+- **Prorated lines** _(planned for M34)_. Any prorated charge or credit, and the invoice that a plan
+  change or an add-on makes at once.
 - **Not the e-invoice.** This is Axis's own record of what is owed. The legal invoice of a payment in
   Vietnam is the [e-invoice](e-invoices.md), issued once it is paid.
 - **Paid.** Recording a payment against an invoice appends one `payment` entry to the
