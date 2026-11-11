@@ -68,10 +68,9 @@ In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
   - **Keys only from Secrets.** The client id, the API key and the checksum key come only from the Secret
     files of [the control plane](control-plane.md#settings). No log line or error message holds one.
   - **Return and cancel addresses.** PayOS requires both, and the adapter sets both to
-    `ControlPlane:PublicUrl`, until the [billing portal](billing-portal.md) has a page for the payer.
+    `ControlPlane:PublicUrl`, because the job does not know the tenant.
   - **Reading a status.** The adapter reads a payment link's status by its `orderCode`, with the same
-    headers and the same check of the answer's signature. Nothing calls it yet. The planned nightly
-    [reconciliation](#reconciliation) will.
+    headers and the same check of the answer's signature.
 - **Fake provider.** `ControlPlane:PayOs:Provider=Fake` picks a fake PayOS in Development and Testing,
   and any other environment refuses it. With no provider the control plane registers no PayOS adapter
   and no payment link job.
@@ -139,6 +138,7 @@ _(planned for M34)_
 Webhooks can be lost, so each night the control plane asks each provider for the day's transactions
 and compares them with its ledger.
 
+- For PayOS the control plane reads each payment link's status by its `orderCode`.
 - A payment that the provider has and Axis lacks is recorded, as if its webhook had come.
 - A payment that Axis has and the provider lacks alerts the operator, and nothing is changed.
 - An amount that differs alerts the operator.
