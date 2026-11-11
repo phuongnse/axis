@@ -13,7 +13,7 @@ import {
   readSpecs,
   split,
 } from './lib/e2e-shard.mjs'
-import { mergeDurations } from './lib/shards.mjs'
+import { budgetSeconds, maxShards, mergeDurations } from './lib/shards.mjs'
 
 const spec = (name, seconds, serial = false) => ({ path: `specs/${name}.spec.ts`, seconds, serial })
 
@@ -133,15 +133,16 @@ describe('readSpecs and main', () => {
   })
 
   test('--count prints the cap, and warns about each spec over the budget', () => {
+    const big = budgetSeconds + 100
     const dir = fixture(
-      { 'specs/big.spec.ts': 1000, 'specs/a.spec.ts': 10 },
+      { 'specs/big.spec.ts': big, 'specs/a.spec.ts': 10 },
       { 'big.spec.ts': "test.describe.configure({ mode: 'serial' })", 'a.spec.ts': '' },
     )
     const warnings = []
     try {
-      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '3')
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), String(maxShards.e2e))
       assert.deepEqual(warnings, [
-        'Over budget: specs/big.spec.ts takes about 1000 s, longer than the budget of 900 s.',
+        `Over budget: specs/big.spec.ts takes about ${big} s, longer than the budget of ${budgetSeconds} s.`,
       ])
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -149,14 +150,15 @@ describe('readSpecs and main', () => {
   })
 
   test('--count adds the measured shard setup to each shard', () => {
-    // Two 800 s specs take 800 s in one shard on two workers, which fits the 900 s budget.
-    // A 200 s setup makes that 1000 s, so each spec needs a shard of its own.
-    const dir = fixture({ 'specs/a.spec.ts': 800, 'specs/b.spec.ts': 800 }, { 'a.spec.ts': '', 'b.spec.ts': '' })
+    // Two specs of 100 s under the budget take that long in one shard on two workers, which fits the budget.
+    // A 200 s setup takes the shard past it, so each spec needs a shard of its own.
+    const seconds = budgetSeconds - 100
+    const dir = fixture({ 'specs/a.spec.ts': seconds, 'specs/b.spec.ts': seconds }, { 'a.spec.ts': '', 'b.spec.ts': '' })
     try {
       assert.equal(main(['--count'], dir), '1')
       writeFileSync(
         path.join(dir, 'spec-durations.json'),
-        JSON.stringify({ 'specs/a.spec.ts': 800, 'specs/b.spec.ts': 800, 'shard setup': 200 }),
+        JSON.stringify({ 'specs/a.spec.ts': seconds, 'specs/b.spec.ts': seconds, 'shard setup': 200 }),
       )
       assert.equal(main(['--count'], dir), '2')
     } finally {

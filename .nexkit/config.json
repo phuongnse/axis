@@ -43,7 +43,7 @@
       ],
       "shards": {
         "count": "node scripts/lib/test-shard.mjs --count",
-        "max": 2
+        "max": 3
       }
     },
     {
@@ -59,7 +59,11 @@
         ".github/**",
         ".nexkit/**",
         "**/*.md"
-      ]
+      ],
+      "shards": {
+        "count": "node scripts/lib/smoke-shard.mjs --count",
+        "max": 3
+      }
     },
     {
       "name": "integration",
@@ -84,7 +88,7 @@
       ],
       "shards": {
         "count": "node scripts/lib/integration-shard.mjs --count",
-        "max": 3
+        "max": 5
       }
     },
     {
@@ -105,7 +109,7 @@
       ],
       "shards": {
         "count": "node scripts/lib/e2e-shard.mjs --count",
-        "max": 3
+        "max": 5
       }
     }
   ],
@@ -263,13 +267,20 @@
       "test-results-e2e-1",
       "test-results-e2e-2",
       "test-results-e2e-3",
+      "test-results-e2e-4",
+      "test-results-e2e-5",
       "test-results-integration-1",
       "test-results-integration-2",
       "test-results-integration-3",
+      "test-results-integration-4",
+      "test-results-integration-5",
       "test-results-performance",
-      "test-results-smoke",
+      "test-results-smoke-1",
+      "test-results-smoke-2",
+      "test-results-smoke-3",
       "test-results-test-1",
-      "test-results-test-2"
+      "test-results-test-2",
+      "test-results-test-3"
     ]
   },
   "notify": [

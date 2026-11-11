@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { budgetSeconds, maxShards } from './lib/shards.mjs'
 import { count, junitDurations, main, readSuites, split, suites } from './lib/smoke-shard.mjs'
 
 const real = { 'dev-script': 360, compose: 150, images: 150, onprem: 180 }
@@ -61,8 +62,8 @@ describe('split', () => {
 })
 
 describe('count', () => {
-  test('prints 1 for the real numbers, since the four suites total 840 s within the 900 s budget', () => {
-    assert.deepEqual(count(list(real)), { total: 1, overBudget: [] })
+  test('prints 1 when the four suites, 840 s in all, fit the budget', () => {
+    assert.deepEqual(count(list(real), 900), { total: 1, overBudget: [] })
   })
 
   test('prints the fewest shards whose longest shard fits a smaller budget', () => {
@@ -71,7 +72,7 @@ describe('count', () => {
   })
 
   test('prints the cap, and an Over budget line for the suite that alone takes longer', () => {
-    assert.deepEqual(count(list(real), 300), {
+    assert.deepEqual(count(list(real), 300, 6), {
       total: 6,
       overBudget: ['Over budget: dev-script takes about 360 s, longer than the budget of 300 s.'],
     })
@@ -119,17 +120,18 @@ describe('junitDurations', () => {
 
 describe('main', () => {
   test('--count prints only the number, and warns about a suite over the budget', () => {
-    withDurations({ ...real, 'dev-script': 1000 }, (file) => {
+    const big = budgetSeconds + 100
+    withDurations({ ...real, 'dev-script': big }, (file) => {
       const warnings = []
       assert.equal(
         main(['--count'], file, (line) => warnings.push(line)),
-        '6',
+        String(maxShards.smoke),
       )
-      assert.deepEqual(warnings, ['Over budget: dev-script takes about 1000 s, longer than the budget of 900 s.'])
+      assert.deepEqual(warnings, [`Over budget: dev-script takes about ${big} s, longer than the budget of ${budgetSeconds} s.`])
     })
   })
 
-  test('--count prints 1 for the real numbers, and no warning', () => {
+  test('--count prints 1 for the real numbers, whose 840 s fit the budget, and no warning', () => {
     withDurations(real, (file) => {
       const warnings = []
       assert.equal(

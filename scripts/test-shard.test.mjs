@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { count, estimate, junitDurations, main, readFiles, shardFiles, split } from './lib/test-shard.mjs'
-import { maxShards, mergeDurations } from './lib/shards.mjs'
+import { budgetSeconds, maxShards, mergeDurations } from './lib/shards.mjs'
 
 const file = (name, seconds) => ({ path: name, seconds })
 const names = (files) => files.map((f) => f.path).sort()
@@ -130,14 +130,15 @@ describe('readFiles and main', () => {
   })
 
   test('--count prints the count alone and warns about each file over the budget', () => {
-    const dir = fixture({ 'big.test.ts': 1000, 'small.test.ts': 10 }, ['big.test.ts', 'small.test.ts'])
+    const big = budgetSeconds + 100
+    const dir = fixture({ 'big.test.ts': big, 'small.test.ts': 10 }, ['big.test.ts', 'small.test.ts'])
     const warnings = []
     try {
       assert.equal(
         main(['--count'], dir, (line) => warnings.push(line)),
         String(maxShards.test),
       )
-      assert.deepEqual(warnings, ['Over budget: big.test.ts takes about 1000 s, longer than the budget of 900 s.'])
+      assert.deepEqual(warnings, [`Over budget: big.test.ts takes about ${big} s, longer than the budget of ${budgetSeconds} s.`])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

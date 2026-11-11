@@ -216,7 +216,7 @@ Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`, to run 
 
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
-`.nexkit/`, or a Markdown file. CI and NexKit each run the smoke tests as a job of their own.
+`.nexkit/`, or a Markdown file. CI and NexKit run the smoke tests in [shards](#shards), one job per shard.
 
 ### Performance and load tests
 
@@ -392,12 +392,12 @@ change since NexKit's commit can affect.
 
 ### Shards
 
-NexKit's `e2e`, `integration` and `test` checks run in as many shards as their split's `--count` prints, as
-[D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and [CI on
+NexKit's `e2e`, `integration`, `smoke` and `test` checks run in as many shards as their split's `--count` prints,
+as [D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and [CI on
 main](delivery.md#ci-on-main) runs the same. A check's `max` matches its split's cap, since NexKit fails a count
-above it. Two NexKit rounds at their caps fit within the jobs GitHub runs at once, as `nexkit-shards.test.mjs`
-checks, and beside CI on `main` and its two scans a few jobs may wait. Smoke stays one check, since a sharded
-check's `max` is at least 2 and a second smoke job would take two rounds past the limit.
+above it. Two NexKit rounds at their caps fit within the jobs that GitHub's Pro plan runs at once, as
+`nexkit-shards.test.mjs` checks, and when a third round or CI on `main` and its two scans run beside them, a few
+jobs may wait.
 
 - **Unit tests.** Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`. `NEXKIT_SHARD` works
   the same way beside it, and `AXIS_TEST_SHARD` wins when both are set. Shard 1 runs the .NET unit tests,

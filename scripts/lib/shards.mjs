@@ -9,11 +9,9 @@ export const budgetSeconds = 15 * 60
 /**
  * The most shards --count prints for each split. A sharded check's max in .nexkit/config.json matches its entry,
  * since NexKit fails a check whose count passes its max (docs/development.md#shards). Two NexKit rounds at these
- * caps, with build-lint and smoke, fit within the jobs GitHub runs at once. Smoke runs as one check, since a sharded
- * check's max is at least 2 and a second smoke job would take two rounds past the limit, so its cap only bounds the
- * count that the durations job reads.
+ * caps, with build-lint, fit within the jobs GitHub runs at once.
  */
-export const maxShards = { e2e: 3, integration: 3, smoke: 6, test: 2 }
+export const maxShards = { e2e: 5, integration: 5, smoke: 3, test: 3 }
 
 /** The median of the values, or undefined when there are none. */
 export function median(values) {
@@ -65,13 +63,14 @@ export function packLightest(units, total, firstShardSeconds = 0) {
   return shards
 }
 
-/** The jobs GitHub's Free plan runs at once for the account. configProblems checks that two NexKit rounds fit (docs/development.md#shards). */
-export const jobLimit = 20
+/** The jobs GitHub's Pro plan runs at once for the account. configProblems checks that two NexKit rounds fit (docs/development.md#shards). */
+export const jobLimit = 40
 
 /** The split of each sharded check, by the check's name, and the script the check runs. */
 export const shardedChecks = {
   e2e: { split: 'e2e', run: 'scripts/e2e.sh' },
   integration: { split: 'integration', run: 'scripts/integration.sh' },
+  smoke: { split: 'smoke', run: 'scripts/smoke.sh' },
   test: { split: 'test', run: 'scripts/test.sh' },
 }
 
@@ -98,7 +97,7 @@ export function configProblems(config) {
     }
   }
   for (const check of checks) {
-    if (/^(e2e|integration|test)-\d+$/.test(check.name)) problems.push(`${check.name} is a fixed shard; its check has shards.`)
+    if (/^(e2e|integration|smoke|test)-\d+$/.test(check.name)) problems.push(`${check.name} is a fixed shard; its check has shards.`)
   }
   const jobs = new Set(checks.filter((check) => !check.shards).map((check) => check.group ?? check.name)).size
   const round = jobs + checks.reduce((sum, check) => sum + (check.shards?.max ?? 0), 0)
