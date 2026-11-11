@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Expressions.Diagnostics;
@@ -115,6 +116,51 @@ public sealed class DocumentationTests
         Assert.True(!drawn.Except(foreignKeys).Any(), $"Drawn in docs/reference/storage.md but not a foreign key: {string.Join(", ", drawn.Except(foreignKeys))}.");
         var missing = foreignKeys.Where(key => drawnTables.Contains(key.Principal) && drawnTables.Contains(key.Dependent)).Except(drawn).ToList();
         Assert.True(missing.Count == 0, $"Foreign keys between drawn tables missing from the diagram in docs/reference/storage.md: {string.Join(", ", missing)}.");
+    }
+
+    [Fact]
+    public void List_keys_table_matches_the_keyed_lists_of_ListKeys()
+    {
+        var documented = new List<string>();
+        var tables = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Kind\s*\|\s*List\s*\|\s*Key\s*\|"))
+                {
+                    continue;
+                }
+
+                tables++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    var cells = lines[j].Split('|');
+                    var kind = cells.Length > 3 ? Regex.Match(cells[1], @"`([A-Za-z]+)`") : Match.Empty;
+                    if (!kind.Success)
+                    {
+                        continue;
+                    }
+
+                    var key = Regex.Match(cells[3], @"`([A-Za-z]+)`").Groups[1].Value;
+                    foreach (Match list in Regex.Matches(cells[2], @"`([A-Za-z.]+)`"))
+                    {
+                        var property = list.Groups[1].Value;
+                        documented.Add($"{kind.Groups[1].Value}.{property[(property.LastIndexOf('.') + 1)..]} by {key}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(tables == 1, $"Expected exactly one table with header '| Kind | List | Key |' under docs/, found {tables}.");
+        var declared = ListKeys.Entries
+            .Where(entry => entry.Value.Mode == ListKeyMode.Keyed)
+            .Select(entry => $"{entry.Key.Kind}.{entry.Key.Property} by {entry.Value.Key}")
+            .ToList();
+
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the list keys table in docs/reference/customization-layers.md: {string.Join(", ", declared.Except(documented))}.");
+        Assert.True(!documented.Except(declared).Any(), $"Not a keyed list of ListKeys: {string.Join(", ", documented.Except(declared))}. Each backticked word in the List cell must name a keyed list property of its kind.");
+        Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 
     [Fact]

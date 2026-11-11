@@ -169,8 +169,8 @@ serves both, and Studio gives each new element a name.
 | `seed` | `records` | `id` |
 | `contract` | `lifecycle.states`, `lifecycle.transitions` | `name` |
 
-`Axis.Configuration` holds this table in code, and a unit test checks it against the resource
-schemas.
+`Axis.Configuration` holds this table in code. A unit test checks the code table against the
+resource schemas, and another unit test checks this docs table against the code table.
 
 - **A key is unique** in its list, ignoring letter case, and a missing required `name` is `AXC0004`.
   A repeated name has a code of its own in these lists:
