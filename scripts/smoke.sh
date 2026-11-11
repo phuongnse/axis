@@ -17,8 +17,8 @@
 # layer of axis-admin comes from the admin-tools stage, which scripts/lib/smoke-images.mjs saves in
 # ~/.cache/axis-docker and loads in a later run while the stage is unchanged, see docs/development.md#smoke-tests.
 # Each is skipped when NexKit gives a commit to compare with and every path changed since it is in the
-# `unaffected_by` list of .nexkit/config.json, which scripts/lib/affected.mjs reads. CI runs this script as a job of its own, beside the integration
-# tests and the Playwright shards.
+# `unaffected_by` list of .nexkit/config.json, which scripts/lib/affected.mjs reads. CI and NexKit run this script in
+# shards, one job per shard, see docs/development.md#shards.
 # AXIS_SMOKE_SHARD=k/N, or NEXKIT_SHARD=k/N when it is unset, runs only the suites that scripts/lib/smoke-shard.mjs gives
 # shard k of N, by the seconds in scripts/smoke-durations.json. A shard builds the production images only when it holds
 # images or onprem. Without a shard every suite runs. See docs/development.md#shards.
