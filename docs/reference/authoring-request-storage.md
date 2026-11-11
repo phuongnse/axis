@@ -27,5 +27,7 @@ when the author approves, changes the plan or drops it. The agent host writes th
   [resuming](authoring-requests.md#durable-requests). A step that found the author's token ended
   has the `outcome` `tokenEnded`, see [acting for the author](authoring-requests.md#acting-for-the-author).
   A planning step that wrote no plan has the `outcome` `noPlan`, see
-  [planning calls](authoring-requests.md#budgets). `messages` holds the step's model messages as a JSON
+  [planning calls](authoring-requests.md#budgets). A working step that did not finish the change has the
+  `outcome` `unfinished`, see [working calls](authoring-requests.md#budgets), and the working step sets
+  `draft_id` once it makes the request's draft. `messages` holds the step's model messages as a JSON
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
