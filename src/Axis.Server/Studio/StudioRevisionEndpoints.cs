@@ -29,6 +29,8 @@ internal static class StudioRevisionEndpoints
 
     internal const string NoDraft = "The application has no draft with this id.";
 
+    internal const string ForeignCursor = "The cursor is not one this draft gave.";
+
     public static void MapStudioRevisionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/studio/apps/{application}/revisions", ListAsync);
@@ -58,7 +60,7 @@ internal static class StudioRevisionEndpoints
         {
             null => Results.Ok(outcome.Value),
             StudioWriteRefusal.Unavailable => StudioEndpoints.Problem(StatusCodes.Status503ServiceUnavailable, StudioEndpoints.WriteLockUnavailable),
-            StudioWriteRefusal.DoesNotApply => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The cursor is not one this draft gave."),
+            StudioWriteRefusal.DoesNotApply => StudioEndpoints.Problem(StatusCodes.Status400BadRequest, ForeignCursor),
             _ => StudioEndpoints.NotFound(NoDraft),
         };
     }

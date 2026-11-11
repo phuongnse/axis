@@ -20,7 +20,7 @@ namespace Axis.Server.Mcp;
 /// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
 /// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The tools are
 /// <c>list_applications</c>, <c>read_reference</c> of <see cref="McpReference"/>, the read tools of <see cref="McpReadTools"/> and the
-/// tools of <see cref="McpWriteTools"/> that change a draft and check an expression. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// tools of <see cref="McpWriteTools"/> that change a draft, check an expression, validate a draft and diff a draft. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
 /// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
@@ -52,6 +52,8 @@ internal static partial class McpServer
     private const string DeleteResourceTool = "delete_resource";
     private const string WriteLayerTool = "write_layer";
     private const string CheckExpressionTool = "check_expression";
+    private const string ValidateDraftTool = "validate_draft";
+    private const string DiffDraftTool = "diff_draft";
     private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
 
@@ -69,6 +71,8 @@ internal static partial class McpServer
     private static readonly ToolProperty _contentInput = new("content", "The full content of the resource, a JSON object with its id and kind.", true, "object");
     private static readonly ToolProperty _pathInput = new("path", "The JSON Pointer of the string in the resource that holds the expression, such as /condition.", true);
     private static readonly ToolProperty _expressionInput = new("expression", "The expression text to check at the path.", true);
+    private static readonly ToolProperty _cursorInput = new(
+        "cursor", "The cursor that the previous page of the diff answered. Leave it out to read the first page.", false);
     private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
     private static readonly ToolProperty _layerContentInput = new(
         "content", "The edited module resource whole, a JSON object, as read_module_resource answers its content.", true, "object");
@@ -123,6 +127,16 @@ internal static partial class McpServer
             CheckExpressionTool,
             "Checks an expression at a path of one resource of your draft, in the draft's context, and answers its type and diagnostics. Writes nothing.",
             [_applicationInput, _writeDraftInput, _idInput, _pathInput, _expressionInput]),
+        new(
+            ValidateDraftTool,
+            "Answers the compile diagnostics of your draft, the module contract checks included, as the diagnostics route answers them for the working folder. "
+            + "Writes nothing.",
+            [_applicationInput, _writeDraftInput]),
+        new(
+            DiffDraftTool,
+            "Answers one page of at most 1 MiB of the changes of your draft since the commit it started from, resource by resource. "
+            + "Each page's cursor reads the next page, and the last page's cursor is null. Writes nothing.",
+            [_applicationInput, _writeDraftInput, _cursorInput]),
     ];
 
     /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
@@ -370,6 +384,14 @@ internal static partial class McpServer
                 arguments[_idInput.Name],
                 arguments[_pathInput.Name],
                 arguments[_expressionInput.Name],
+                ct),
+            ValidateDraftTool => await McpWriteTools.ValidateDraftAsync(
+                context, arguments[_applicationInput.Name], arguments[_writeDraftInput.Name], ct),
+            DiffDraftTool => await McpWriteTools.DiffDraftAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments.TryGetValue(_cursorInput.Name, out var cursor) ? cursor : null,
                 ct),
             _ => throw new InvalidOperationException("The tool has no implementation."),
         };

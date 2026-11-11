@@ -10,7 +10,8 @@ namespace Axis.Server.Mcp;
 
 /// <summary>
 /// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c>, <c>delete_resource</c> and <c>write_layer</c>, and
-/// <c>check_expression</c>, which writes nothing, see <c>docs/reference/mcp-server.md#tools</c>. They change only the draft of the
+/// <c>check_expression</c>, <c>validate_draft</c> and <c>diff_draft</c>, which write nothing and record no audit record, see
+/// <c>docs/reference/mcp-server.md#tools</c>. They change only the draft of the
 /// calling person through <see cref="StudioDrafts"/> and answer what the authoring API's matching route answers, or an error text
 /// that is a problem title of the authoring API or a fixed one, never text from the request or a path. A draft that is not the
 /// person's, or does not exist, answers the draft routes' title and changes nothing. Each successful write call appends one
@@ -255,6 +256,52 @@ internal static class McpWriteTools
         var (answer, problem) = StudioExpressionEndpoints.Check(
             StudioFolder.Resources(files), McpReadTools.Contents(files), resource, path, pointer, expression, context.Packages, context.Modules);
         return problem is null ? (answer, null) : (null, problem);
+    }
+
+    /// <summary>
+    /// Answers the compile diagnostics of the draft, the module contract checks included, as the diagnostics route answers them for
+    /// the working folder, see <c>docs/reference/authoring.md#diagnostics</c>. Writes nothing and records no audit record.
+    /// </summary>
+    public static async Task<(object? Output, string? Error)> ValidateDraftAsync(
+        McpToolContext context, string application, string draft, CancellationToken ct)
+    {
+        var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
+        if (folder is null)
+        {
+            return (null, McpReadTools.Title(refusal));
+        }
+
+        var (diagnostics, error) = await DiagnosticsAsync(context, folder, draft, ct);
+        return diagnostics is null ? (null, error) : (new StudioDiagnosticsResponse(diagnostics), null);
+    }
+
+    /// <summary>
+    /// Answers one page of the draft's diff through <see cref="StudioDrafts.DiffAsync"/>, with the titles of the draft diff route, see
+    /// <c>docs/reference/authoring-revisions.md#draft-diff</c>. Writes nothing and records no audit record.
+    /// </summary>
+    public static async Task<(object? Output, string? Error)> DiffDraftAsync(
+        McpToolContext context, string application, string draft, string? cursor, CancellationToken ct)
+    {
+        var (folder, refusal) = StudioEndpoints.FindFolder(context.Options, application);
+        if (folder is null)
+        {
+            return (null, McpReadTools.Title(refusal));
+        }
+
+        var (drafts, error) = McpReadTools.Drafts(context, folder);
+        if (drafts is null)
+        {
+            return (null, error);
+        }
+
+        var outcome = await drafts.DiffAsync(draft, cursor, ct);
+        return outcome.Refusal switch
+        {
+            null => (outcome.Value, null),
+            StudioWriteRefusal.Unavailable => (null, StudioEndpoints.WriteLockUnavailable),
+            StudioWriteRefusal.DoesNotApply => (null, StudioRevisionEndpoints.ForeignCursor),
+            _ => (null, StudioRevisionEndpoints.NoDraft),
+        };
     }
 
     // The compile diagnostics of the draft as its branch now holds it.
