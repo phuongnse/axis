@@ -36,7 +36,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
             Plan("Add a cost centre field to the purchase request entity.", 150, 40),
         ]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
-        await using var host = BuildAgent(script, server);
+        await using var host = BuildAgent(_realm, script, server);
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
         await host.StopAsync(CancellationToken);
@@ -60,7 +60,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         var script = new ScriptedModelAdapter([Plan("The first plan."), Plan("The second plan.")]);
-        await using var host = BuildAgent(script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not write the first plan.");
         using var changed = await StudioPublishTests.SendAsync(
@@ -98,7 +98,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
             Plan("A plan."),
         ]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
-        await using var host = BuildAgent(script, server);
+        await using var host = BuildAgent(_realm, script, server);
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not move the request to awaitingApproval.");
         await host.StopAsync(CancellationToken);
@@ -120,7 +120,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         var id = await SendAsync(client);
         var script = new ScriptedModelAdapter(
             Enumerable.Range(0, 30).Select(number => ToolUse($"call-{number}", "read_names", """{"application":"PurchaseRequests"}""", 1, 1)));
-        await using var host = BuildAgent(script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "failed", "The host did not stop the request as failed.");
         await host.StopAsync(CancellationToken);
@@ -139,7 +139,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
         var script = new ScriptedModelAdapter([new ModelAnswer([new ModelText(text)], reason, new ModelTokens(7, 3))]);
-        await using var host = BuildAgent(script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "failed", "The host did not stop the request as failed.");
         await host.StopAsync(CancellationToken);
@@ -156,7 +156,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         var id = await SendAsync(client);
         await ScalarAsync($"UPDATE axis.authoring_requests SET application_id = '{Guid.NewGuid()}' WHERE id = '{id}' RETURNING 1");
         var script = new ScriptedModelAdapter([Plan("A plan.")]);
-        await using var host = BuildAgent(script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "failed", "The host did not stop the request as failed.");
         await host.StopAsync(CancellationToken);
@@ -169,19 +169,19 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
 
     public async ValueTask DisposeAsync() => await _realm.DisposeAsync();
 
-    private static ModelAnswer ToolUse(string callId, string tool, string input, int inputTokens, int outputTokens) =>
+    internal static ModelAnswer ToolUse(string callId, string tool, string input, int inputTokens, int outputTokens) =>
         new([new ModelToolCall(callId, tool, Json(input))], ModelStopReason.ToolUse, new ModelTokens(inputTokens, outputTokens));
 
-    private static ModelAnswer Plan(string text, int inputTokens = 0, int outputTokens = 0) =>
+    internal static ModelAnswer Plan(string text, int inputTokens = 0, int outputTokens = 0) =>
         new([new ModelText(text)], ModelStopReason.EndTurn, new ModelTokens(inputTokens, outputTokens));
 
-    private static JsonElement Json(string json)
+    internal static JsonElement Json(string json)
     {
         using var document = JsonDocument.Parse(json);
         return document.RootElement.Clone();
     }
 
-    private static async Task<Guid> SendAsync(HttpClient client)
+    internal static async Task<Guid> SendAsync(HttpClient client)
     {
         using var accepted = await StudioPublishTests.SendAsync(client, HttpMethod.Post, Url, Host, Text);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
@@ -190,10 +190,10 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
     }
 
     // The client reaches the server of the factory through a handler that records the tools it calls.
-    private WebApplication BuildAgent(ScriptedModelAdapter script, RecordingHandler server) =>
+    internal static WebApplication BuildAgent(AuthoringRealm realm, ScriptedModelAdapter script, RecordingHandler server) =>
         AgentTestHost.Build(
             aiOn: true,
-            _realm.AgentSettings(),
+            realm.AgentSettings(),
             new LogCollector(),
             services =>
             {
@@ -215,7 +215,7 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
             + (kind is null ? "" : $" AND kind = '{kind}'"));
 
     // Passes every call to the server and records the name of each tools/call.
-    private sealed class RecordingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
+    internal sealed class RecordingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
     {
         private readonly ConcurrentQueue<string> _toolCalls = new();
 

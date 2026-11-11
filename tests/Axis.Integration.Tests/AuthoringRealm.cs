@@ -20,9 +20,15 @@ namespace Axis.Integration.Tests;
 /// The setup of the tests that follow an authoring request through a real Keycloak, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
 /// <see cref="TenantRealm"/> makes the realm, the sync adds the MCP audience, and the author's realm user <c>pat</c> holds the realm role <c>author</c>, which the
 /// clients <c>axis</c> and <c>axis-agent</c> put into the <c>roles</c> claim. The server runs on a schema database as tenant <see cref="Tenant"/>, and the agent
-/// host of a test uses <see cref="AgentSettings"/> to serve the same tenant. Call <see cref="InitializeAsync"/> before use.
+/// host of a test uses <see cref="AgentSettings"/> to serve the same tenant. Call <see cref="InitializeAsync"/> before use. A test may name the author's
+/// first and last name, and add server settings with <c>configure</c>, which gets the host builder and the path of the studio folder.
 /// </summary>
-internal sealed class AuthoringRealm(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncDisposable
+internal sealed class AuthoringRealm(
+    KeycloakFixture keycloak,
+    PostgreSqlFixture database,
+    string firstName = "Pat",
+    string lastName = "Example",
+    Action<IWebHostBuilder, string>? configure = null) : IAsyncDisposable
 {
     public const string Tenant = "a";
     public const string Host = "localhost";
@@ -96,6 +102,7 @@ internal sealed class AuthoringRealm(KeycloakFixture keycloak, PostgreSqlFixture
             builder.UseSetting($"Tenants:{Tenant}:DataKeys:1", DataKey);
             builder.UseSetting("Studio:Folders:0", _folder.Path);
             builder.UseSetting("Studio:AuthorRole", AuthorRole);
+            configure?.Invoke(builder, _folder.Path);
         });
     }
 
@@ -224,8 +231,8 @@ internal sealed class AuthoringRealm(KeycloakFixture keycloak, PostgreSqlFixture
             enabled = true,
             emailVerified = true,
             email = "pat@example.test",
-            firstName = "Pat",
-            lastName = "Example",
+            firstName,
+            lastName,
             credentials = new object[]
             {
                 new { type = "password", value = _password, temporary = false },
