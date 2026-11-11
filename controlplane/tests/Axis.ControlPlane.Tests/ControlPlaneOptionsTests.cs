@@ -1,3 +1,4 @@
+using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
@@ -417,6 +418,58 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.IsType<InMemoryDnsRecords>(factory.Services.GetRequiredService<IDnsRecords>());
         Assert.Same(factory.Services.GetRequiredService<InMemoryDnsRecords>(), factory.Services.GetRequiredService<IDnsRecords>());
+    }
+
+    [Fact]
+    public void Outside_Development_and_Testing_the_fake_PayOS_provider_stops_the_start()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:PayOs:Provider"] = "Fake",
+            ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
+            ["ControlPlane:Mail:UseTls"] = "true",
+        };
+        using var factory = ControlPlaneFactory.Create(environment: "Production", settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_unknown_PayOS_provider_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Other" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Other", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void In_Testing_the_fake_PayOS_provider_loads_and_registers_the_adapter_and_the_payment_link_job()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Fake" });
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<FakePayOs>(factory.Services.GetRequiredService<IPayOs>());
+        Assert.Same(factory.Services.GetRequiredService<FakePayOs>(), factory.Services.GetRequiredService<IPayOs>());
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
+        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
+    }
+
+    [Fact]
+    public void Without_a_PayOS_provider_no_adapter_and_no_payment_link_job_are_registered()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Null(factory.Services.GetService<IPayOs>());
+        Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks");
     }
 
     [Fact]

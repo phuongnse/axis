@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c>, the <c>billing.payment_links</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -44,6 +44,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<InvoiceRow> Invoices => Set<InvoiceRow>();
 
     public DbSet<InvoiceLineRow> InvoiceLines => Set<InvoiceLineRow>();
+
+    public DbSet<PaymentLinkRow> PaymentLinks => Set<PaymentLinkRow>();
 
     public DbSet<TermsAcceptanceRow> TermsAcceptances => Set<TermsAcceptanceRow>();
 
@@ -268,6 +270,34 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             line.Property(l => l.Code).HasColumnName("code");
             line.Property(l => l.Quantity).HasColumnName("quantity");
             line.HasOne<InvoiceRow>().WithMany().HasForeignKey(l => l.InvoiceId).HasConstraintName("fk_invoice_lines_invoice_id").OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.HasSequence<long>("payment_order_codes", BillingSchema).StartsAt(1).HasMax(PaymentLinkRow.MaxOrderCode);
+
+        modelBuilder.Entity<PaymentLinkRow>(link =>
+        {
+            link.ToTable("payment_links", BillingSchema, table =>
+            {
+                table.HasCheckConstraint("ck_payment_links_order_code", $"order_code BETWEEN 1 AND {PaymentLinkRow.MaxOrderCode}");
+                table.HasCheckConstraint(
+                    "ck_payment_links_created",
+                    "(created_at IS NULL AND payment_link_id IS NULL AND checkout_url IS NULL AND qr_code IS NULL AND bin IS NULL AND account_number IS NULL AND account_name IS NULL AND description IS NULL)"
+                    + " OR (created_at IS NOT NULL AND payment_link_id IS NOT NULL AND checkout_url IS NOT NULL AND qr_code IS NOT NULL AND bin IS NOT NULL AND account_number IS NOT NULL AND account_name IS NOT NULL AND description IS NOT NULL)");
+            });
+            link.HasKey(l => l.InvoiceId).HasName("pk_payment_links");
+            link.Property(l => l.InvoiceId).HasColumnName("invoice_id").ValueGeneratedNever();
+            link.Property(l => l.OrderCode).HasColumnName("order_code").HasColumnType("bigint").HasDefaultValueSql("nextval('billing.payment_order_codes')");
+            link.Property(l => l.PaymentLinkId).HasColumnName("payment_link_id");
+            link.Property(l => l.CheckoutUrl).HasColumnName("checkout_url");
+            link.Property(l => l.QrCode).HasColumnName("qr_code");
+            link.Property(l => l.Bin).HasColumnName("bin");
+            link.Property(l => l.AccountNumber).HasColumnName("account_number");
+            link.Property(l => l.AccountName).HasColumnName("account_name");
+            link.Property(l => l.Description).HasColumnName("description");
+            link.Property(l => l.ReservedAt).HasColumnName("reserved_at").HasDefaultValueSql("now()");
+            link.Property(l => l.CreatedAt).HasColumnName("created_at");
+            link.HasOne<InvoiceRow>().WithOne().HasForeignKey<PaymentLinkRow>(l => l.InvoiceId).HasConstraintName("fk_payment_links_invoice_id").OnDelete(DeleteBehavior.Restrict);
+            link.HasIndex(l => l.OrderCode, "ux_payment_links_order_code").IsUnique();
         });
 
         modelBuilder.Entity<TermsAcceptanceRow>(acceptance =>

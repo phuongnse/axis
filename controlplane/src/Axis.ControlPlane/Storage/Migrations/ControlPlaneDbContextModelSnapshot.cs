@@ -24,6 +24,9 @@ namespace Axis.ControlPlane.Storage.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("payment_order_codes", "billing")
+                .HasMax(9007199254740991L);
+
             modelBuilder.Entity("Axis.ControlPlane.Billing.InvoiceLineRow", b =>
                 {
                     b.Property<Guid>("InvoiceId")
@@ -199,6 +202,70 @@ namespace Axis.ControlPlane.Storage.Migrations
                             t.HasCheckConstraint("ck_ledger_entries_currency", "currency ~ '^[A-Z]{3}$'");
 
                             t.HasCheckConstraint("ck_ledger_entries_kind", "kind IN ('charge', 'credit', 'payment', 'refund', 'proration')");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Billing.PaymentLinkRow", b =>
+                {
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invoice_id");
+
+                    b.Property<string>("AccountName")
+                        .HasColumnType("text")
+                        .HasColumnName("account_name");
+
+                    b.Property<string>("AccountNumber")
+                        .HasColumnType("text")
+                        .HasColumnName("account_number");
+
+                    b.Property<string>("Bin")
+                        .HasColumnType("text")
+                        .HasColumnName("bin");
+
+                    b.Property<string>("CheckoutUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("checkout_url");
+
+                    b.Property<DateTimeOffset?>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
+                    b.Property<long>("OrderCode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_code")
+                        .HasDefaultValueSql("nextval('billing.payment_order_codes')");
+
+                    b.Property<string>("PaymentLinkId")
+                        .HasColumnType("text")
+                        .HasColumnName("payment_link_id");
+
+                    b.Property<string>("QrCode")
+                        .HasColumnType("text")
+                        .HasColumnName("qr_code");
+
+                    b.Property<DateTimeOffset>("ReservedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reserved_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("InvoiceId")
+                        .HasName("pk_payment_links");
+
+                    b.HasIndex(new[] { "OrderCode" }, "ux_payment_links_order_code")
+                        .IsUnique();
+
+                    b.ToTable("payment_links", "billing", t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_links_created", "(created_at IS NULL AND payment_link_id IS NULL AND checkout_url IS NULL AND qr_code IS NULL AND bin IS NULL AND account_number IS NULL AND account_name IS NULL AND description IS NULL) OR (created_at IS NOT NULL AND payment_link_id IS NOT NULL AND checkout_url IS NOT NULL AND qr_code IS NOT NULL AND bin IS NOT NULL AND account_number IS NOT NULL AND account_name IS NOT NULL AND description IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_payment_links_order_code", "order_code BETWEEN 1 AND 9007199254740991");
                         });
                 });
 
@@ -717,6 +784,16 @@ namespace Axis.ControlPlane.Storage.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_invoices_subscription_id");
+                });
+
+            modelBuilder.Entity("Axis.ControlPlane.Billing.PaymentLinkRow", b =>
+                {
+                    b.HasOne("Axis.ControlPlane.Billing.InvoiceRow", null)
+                        .WithOne()
+                        .HasForeignKey("Axis.ControlPlane.Billing.PaymentLinkRow", "InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_payment_links_invoice_id");
                 });
 
             modelBuilder.Entity("Axis.ControlPlane.Subscriptions.QuotaOverrideRow", b =>
