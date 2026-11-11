@@ -19,16 +19,25 @@ public interface IAuthoringStep
 /// <summary>What a finished step writes: the request's next state, and the step row's outcome and input summary.</summary>
 public sealed record AuthoringStepResult(string NextState, string? Outcome = null, string? InputSummary = null);
 
-/// <summary>What a step knows about the request it works on, and how it reports the tokens a model call used.</summary>
+/// <summary>
+/// What a step knows about the request it works on, how it reports the tokens a model call used and how it gets the author's access token,
+/// see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+/// </summary>
 public sealed class AuthoringStepContext
 {
     private readonly Func<long, CancellationToken, Task> _addTokens;
+    private readonly Func<CancellationToken, Task<string>> _accessToken;
 
-    internal AuthoringStepContext(string tenantId, AuthoringRequestToWork request, Func<long, CancellationToken, Task> addTokens)
+    internal AuthoringStepContext(
+        string tenantId,
+        AuthoringRequestToWork request,
+        Func<long, CancellationToken, Task> addTokens,
+        Func<CancellationToken, Task<string>> accessToken)
     {
         TenantId = tenantId;
         Request = request;
         _addTokens = addTokens;
+        _accessToken = accessToken;
     }
 
     public string TenantId { get; }
@@ -38,6 +47,14 @@ public sealed class AuthoringStepContext
     /// <summary>Adds the tokens to the step's row and to the request now, so they count even when the step is interrupted later.</summary>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
     public Task AddTokensAsync(long tokens, CancellationToken cancellationToken) => _addTokens(tokens, cancellationToken);
+
+    /// <summary>
+    /// Refreshes the request's token at the tenant's realm and answers a current access token of the agent host for the author. The
+    /// realm's new refresh token replaces the stored one.
+    /// </summary>
+    /// <exception cref="AuthoringTokenEndedException">The realm refused the token, or the request keeps none, or it no longer decrypts. The runner then stops the request as <c>failed</c>.</exception>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
+    public Task<string> AccessTokenAsync(CancellationToken cancellationToken) => _accessToken(cancellationToken);
 }
 
 /// <summary>How long the agent host holds a claim and how often it looks for work.</summary>
@@ -54,6 +71,15 @@ public sealed class AuthoringClaimLostException : Exception
 {
     public AuthoringClaimLostException()
         : base("The agent host no longer holds the claim on the authoring request.")
+    {
+    }
+}
+
+/// <summary>The author's token for the agent host has ended, so the request cannot act for the author any more.</summary>
+public sealed class AuthoringTokenEndedException : Exception
+{
+    public AuthoringTokenEndedException()
+        : base("The author's token for the agent host has ended.")
     {
     }
 }

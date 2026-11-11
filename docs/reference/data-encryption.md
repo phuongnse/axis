@@ -218,7 +218,7 @@ Each tenant has its own numbered data keys and lookup keys, so a key can rotate 
   process step fails with the same error and stores nothing in clear. A seed with a sensitive value fails the whole
   seed run and stores no row.
 - **Refresh.** Each host reads a tenant's keys when it first needs them, and again when a value names a number it does
-  not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a write
+  not hold. The server, the worker and the agent host do this through one key service. It gives the newest key of a kind for a write
   and a key by number for a read, and it never logs a key.
 
 ### Rotating the keys

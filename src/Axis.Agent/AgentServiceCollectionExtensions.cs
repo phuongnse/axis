@@ -1,6 +1,8 @@
 using Axis.Agent.Models;
+using Axis.Data.Records;
 using Axis.Hosting;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -13,9 +15,10 @@ public static class AgentServiceCollectionExtensions
     /// background service of the agent host. The host reads <c>Ai:Bindings:&lt;name&gt;</c> with its <c>Kind</c>, <c>Endpoint</c>,
     /// <c>Model</c>, <c>KeyFile</c> and <c>MaxOutputTokens</c>, which defaults to 16000, and <c>Ai:DefaultBinding</c> and
     /// <c>Ai:ReviewBinding</c>. With no <c>Ai:DefaultBinding</c> it starts idle, because AI authoring is off: it reads no tenant setting
-    /// and no secret. With one, it reads <c>Ai:AllowTenantKeys</c> and its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
+    /// and no secret. With one, it reads <c>Ai:AllowTenantKeys</c>, its tenants and their data keys as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
-    /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
+    /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
+    /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
     /// registered. <see cref="TenantModelAdapters"/> gives those steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
@@ -39,12 +42,12 @@ public static class AgentServiceCollectionExtensions
         var settings = AiSettings.Load(configuration);
 
         var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
-        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys)? tenants =
+        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, ITenantKeySource KeySource)? tenants =
             settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
 
         services.AddSingleton(health);
         services.AddSingleton(settings);
-        if (tenants is var (catalog, modelKeys))
+        if (tenants is var (catalog, modelKeys, keySource))
         {
             services.AddTenancy(catalog);
             services.AddSingleton(catalog);
@@ -54,11 +57,18 @@ public static class AgentServiceCollectionExtensions
                 services.AddSingleton(modelKeys);
             }
 
+            // The data keys decrypt the stored refresh tokens of the requests.
+            services.AddTenantKeys(keySource);
+            services.AddSingleton<SensitiveValues>();
             services.AddSingleton<TenantModelAdapters>();
             services.AddSingleton<AuthoringRequestStore>();
             services.TryAddSingleton(AuthoringLoopOptions.Default);
             services.AddSingleton<AuthoringSteps>();
+            services.AddSingleton<AuthoringRequestTokenRefresher>();
             services.AddSingleton<AuthoringRequestRunner>();
+            // A realm call follows no redirect and never logs a body.
+            services.AddHttpClient(AuthoringRequestTokenRefresher.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         }
 
         services.TryAddSingleton(TimeProvider.System);
@@ -74,13 +84,14 @@ public static class AgentServiceCollectionExtensions
     }
 
     // The agent host reads its tenants as the worker does. Under directory it reads them when it runs, retries until a read works,
-    // and reads the directory again every refresh interval. It ignores a Tenants section and holds no key source. Under directory it also
+    // and reads the directory again every refresh interval. It ignores a Tenants section. Its key source reads the data keys from the
+    // Tenants section, or under directory from the tenant directory as the server does. Under directory it also
     // reads a tenant's own model key from the same database, see docs/reference/model-bindings.md#a-tenants-own-key.
-    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
+    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, ITenantKeySource KeySource) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
     {
         if (TenancySettings.Source(configuration) != TenancySource.Directory)
         {
-            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null);
+            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null, new ConfigurationTenantKeySource(configuration));
         }
 
         var platformConnectionString = configuration.GetConnectionString("Platform");
@@ -99,7 +110,7 @@ public static class AgentServiceCollectionExtensions
             cipher,
             refreshInterval,
             configuration.GetSection(TenantOptions.SectionName).Exists());
-        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher));
+        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher), new DirectoryTenantKeySource(platformConnectionString, cipher));
     }
 
     /// <summary>Makes every binding return the scripted answers in order, for tests and the journey.</summary>

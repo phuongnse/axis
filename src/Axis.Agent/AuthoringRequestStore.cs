@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Tenancy;
 using Npgsql;
@@ -189,8 +190,43 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     }
 
     /// <summary>
+    /// Reads the request's stored refresh token, still encrypted, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+    /// It answers <c>null</c> when the request keeps none.
+    /// </summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim.</exception>
+    public async Task<byte[]?> ReadTokenAsync(string tenantId, Guid requestId, string claimedBy, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(tenantId, cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT refresh_token FROM axis.authoring_requests WHERE id = @id AND claimed_by = @me",
+            connection);
+        command.Parameters.AddWithValue("id", requestId);
+        command.Parameters.AddWithValue("me", claimedBy);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            throw new AuthoringClaimLostException();
+        }
+
+        return await reader.IsDBNullAsync(0, cancellationToken) ? null : reader.GetFieldValue<byte[]>(0);
+    }
+
+    /// <summary>Encrypts the refresh token and stores it on the request in place of the old one, see <see cref="AuthoringRequestTokens.StoreAsync"/>.</summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request has ended.</exception>
+    public async Task StoreTokenAsync(
+        string tenantId, Guid requestId, string claimedBy, SensitiveValues values, string refreshToken, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(tenantId, cancellationToken);
+        if (!await AuthoringRequestTokens.StoreAsync(connection, null, values, tenantId, requestId, refreshToken, claimedBy, cancellationToken))
+        {
+            throw new AuthoringClaimLostException();
+        }
+    }
+
+    /// <summary>
     /// Commits a finished step with the request's next state in one transaction. The commit frees the request, so a later claim runs the
-    /// next step. It answers <c>false</c> and writes nothing when the host no longer holds the claim.
+    /// next step. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token. It
+    /// answers <c>false</c> and writes nothing when the host no longer holds the claim.
     /// </summary>
     public async Task<bool> FinishStepAsync(
         string tenantId,
@@ -209,6 +245,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             UPDATE axis.authoring_requests
             SET state = @next,
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
+                refresh_token = CASE WHEN @next IN ('accepted', 'dropped', 'failed') THEN NULL ELSE refresh_token END,
                 claimed_by = NULL,
                 claimed_until = NULL
             WHERE id = @id AND claimed_by = @me
