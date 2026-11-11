@@ -22,8 +22,8 @@ no shortcut of its own.
 - **Its own state.** It reads its tenants as the worker does, see [AI settings](host-settings.md#ai-settings),
   and reads the request tables below in each tenant database with the tenant's runtime role. It refuses a
   tenant whose role can change the schema. It writes claims, steps and tokens there with the same role.
-- **Models** _(planned for M35)_. It calls a model through an adapter, by the binding the request uses, see
-  [model bindings](model-bindings.md).
+- **Models.** It calls a model through an adapter, by the binding the request uses, see
+  [model bindings](model-bindings.md). A request that stores no binding uses `Ai:DefaultBinding`.
 
 ## Acting for the author
 
@@ -58,8 +58,10 @@ loses no work.
   request text, binding, state, draft, plan, round, token use, the auto-accept flag and its times.
   `axis.authoring_request_steps` holds one row per step of the loop, in order: its kind, input
   summary, outcome, tokens and times. The columns are in [authoring request storage](authoring-request-storage.md#authoring-requests).
-- **Model messages** _(planned for M35)_. A step's full model messages are kept for 30 days for the
-  author and the audit, then deleted.
+- **Model messages.** A step's full model messages, resource contents included, are kept in its row
+  in `messages`.
+- **Deleting model messages** _(planned for M35)_. A step's model messages are deleted after 30 days,
+  and are kept until then for the author and the audit.
 - **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
@@ -118,7 +120,7 @@ the checks, an independent review and fix rounds.
 
 | State                           | What happens                                                                                                                            | Next                                  |
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `planning` _(planned for M35)_  | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
+| `planning`                      | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
 | `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
 | `working` _(planned for M35)_   | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
 | `checking` _(planned for M35)_  | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
@@ -132,6 +134,13 @@ the checks, an independent review and fix rounds.
 - **Built-in modules first.** When a request matches a built-in module, the plan declares the module
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
   application keeps the module's upgrades and its contract. It adds scenarios for what it adds.
+- **Planning reads only.** The model is offered `read_reference`, `list_resources`, `read_resource`,
+  `read_module_resource` and `read_names`, and only for the request's application. Any other call gets a
+  tool error from the agent host and never reaches the MCP server. The plan is the text of the model's
+  last answer, which ends its turn: an answer that stops at the output limit, or has no text, is no plan.
+  The plan goes into the request's `plan` and the request moves to `awaitingApproval`.
+- **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
+  and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
   application allows auto-accept.
 
@@ -139,6 +148,9 @@ the checks, an independent review and fix rounds.
 
 Each request has limits on its rounds, tokens and time, so the cost of one request is bounded.
 
+- **Planning calls.** At most 25 model calls in one planning step. A step that has no plan by then stops
+  the request as `failed` with the outcome `noPlan`, and so does a request whose application the author
+  can no longer list.
 - **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
   round stops as `failed`.
 - **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model

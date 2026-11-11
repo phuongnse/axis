@@ -19,8 +19,8 @@ public static class AgentServiceCollectionExtensions
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
     /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
-    /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
-    /// registered. <see cref="TenantModelAdapters"/> gives those steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims only a state that has a step.
+    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
@@ -63,6 +63,7 @@ public static class AgentServiceCollectionExtensions
             services.AddSingleton<TenantModelAdapters>();
             services.AddSingleton<AuthoringRequestStore>();
             services.TryAddSingleton(AuthoringLoopOptions.Default);
+            services.AddSingleton<IAuthoringStep, PlanningStep>();
             services.AddSingleton<AuthoringSteps>();
             services.AddSingleton<AuthoringRequestTokenRefresher>();
             services.AddSingleton<AuthoringRequestRunner>();

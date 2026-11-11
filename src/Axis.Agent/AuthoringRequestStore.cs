@@ -7,8 +7,19 @@ using NpgsqlTypes;
 
 namespace Axis.Agent;
 
-/// <summary>A request whose state needs work, as the agent host lists it.</summary>
-public sealed record AuthoringRequestToWork(Guid Id, string State, DateTimeOffset SentAt);
+/// <summary>
+/// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, and the
+/// comments of every change of plan, oldest first.
+/// </summary>
+public sealed record AuthoringRequestToWork(
+    Guid Id,
+    string State,
+    DateTimeOffset SentAt,
+    Guid ApplicationId,
+    string Text,
+    string? Plan,
+    string? Binding,
+    IReadOnlyList<string> PlanChanges);
 
 /// <summary>
 /// The agent host's reads and writes of <c>axis.authoring_requests</c> and <c>axis.authoring_request_steps</c> in a tenant database, see
@@ -34,10 +45,12 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         await using var connection = await OpenAsync(tenantId, cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, state, sent_at
-            FROM axis.authoring_requests
-            WHERE state = ANY(@states)
-            ORDER BY sent_at, id
+            SELECT a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
+                   ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
+                         WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal)
+            FROM axis.authoring_requests a
+            WHERE a.state = ANY(@states)
+            ORDER BY a.sent_at, a.id
             """,
             connection);
         command.Parameters.AddWithValue("states", StatesNeedingWork.ToArray());
@@ -73,7 +86,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             UPDATE axis.authoring_requests a
             SET claimed_by = @me, claimed_until = clock_timestamp() + @lease
             FROM next WHERE a.id = next.id
-            RETURNING a.id, a.state, a.sent_at
+            RETURNING a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
+              ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
+                    WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal)
             """,
             connection);
         command.Parameters.AddWithValue("states", states.ToArray());
@@ -236,6 +251,8 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string nextState,
         string? outcome,
         string? inputSummary,
+        string? plan,
+        string? messages,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
@@ -244,6 +261,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             """
             UPDATE axis.authoring_requests
             SET state = @next,
+                plan = coalesce(@plan, plan),
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
                 refresh_token = CASE WHEN @next IN ('accepted', 'dropped', 'failed') THEN NULL ELSE refresh_token END,
                 claimed_by = NULL,
@@ -254,6 +272,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             transaction))
         {
             command.Parameters.AddWithValue("next", nextState);
+            command.Parameters.Add(new NpgsqlParameter("plan", NpgsqlDbType.Text) { Value = (object?)plan ?? DBNull.Value });
             command.Parameters.AddWithValue("id", requestId);
             command.Parameters.AddWithValue("me", claimedBy);
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
@@ -264,12 +283,13 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         }
 
         await using (var command = new NpgsqlCommand(
-            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, finished_at = now() WHERE id = @step AND request_id = @id",
+            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, messages = @messages, finished_at = now() WHERE id = @step AND request_id = @id",
             connection,
             transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("outcome", NpgsqlDbType.Text) { Value = (object?)outcome ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("summary", NpgsqlDbType.Text) { Value = (object?)inputSummary ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("messages", NpgsqlDbType.Jsonb) { Value = (object?)messages ?? DBNull.Value });
             command.Parameters.AddWithValue("step", stepId);
             command.Parameters.AddWithValue("id", requestId);
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -283,7 +303,15 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     public void Forget(string tenantId) => _checked.TryRemove(tenantId, out _);
 
     private static AuthoringRequestToWork ReadRequest(NpgsqlDataReader reader) =>
-        new(reader.GetGuid(0), reader.GetString(1), reader.GetFieldValue<DateTimeOffset>(2));
+        new(
+            reader.GetGuid(0),
+            reader.GetString(1),
+            reader.GetFieldValue<DateTimeOffset>(2),
+            reader.GetGuid(3),
+            reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.GetFieldValue<string?[]>(7).OfType<string>().ToList());
 
     // Locks the request's row when the host still holds the claim, so a drop or a claim by another host waits for the transaction.
     private static async Task<bool> LockClaimAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string claimedBy, CancellationToken cancellationToken)

@@ -16,8 +16,11 @@ public interface IAuthoringStep
     Task<AuthoringStepResult> RunAsync(AuthoringStepContext context, CancellationToken cancellationToken);
 }
 
-/// <summary>What a finished step writes: the request's next state, and the step row's outcome and input summary.</summary>
-public sealed record AuthoringStepResult(string NextState, string? Outcome = null, string? InputSummary = null);
+/// <summary>
+/// What a finished step writes: the request's next state, the step row's outcome and input summary, the request's new <c>plan</c> and
+/// the step's model messages as JSON. A <see langword="null"/> plan leaves the request's plan as it is.
+/// </summary>
+public sealed record AuthoringStepResult(string NextState, string? Outcome = null, string? InputSummary = null, string? Plan = null, string? Messages = null);
 
 /// <summary>
 /// What a step knows about the request it works on, how it reports the tokens a model call used, how it gets the author's access token,
