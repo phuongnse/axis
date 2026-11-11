@@ -167,8 +167,9 @@ that holds it.
   uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
   slowest job, and adding, removing or resharding a check changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
-  no model refreshes the durations from the run's results. It opens or updates one `process` issue
-  when they drift, and opens one for each test that alone passes the shard budget, as
+  no model refreshes the durations from the results of that run and the latest runs dispatched on `main`
+  before it, each entry the median of its measures. It opens or updates one `process` issue when they
+  drift, and opens one for each test that alone passes the shard budget, as
   [the shards section](development.md#shards) says.
 
 ### NexKit's checks

@@ -1,23 +1,27 @@
-// Refreshes the shard durations from the JUnit files of a CI run on main. It opens or updates one `process`
-// issue when they drift, and opens one `process` issue for each spec, class, file or suite that alone passes
-// the budget.
+// Refreshes the shard durations from the JUnit files of the latest CI runs on main. It opens or updates one
+// `process` issue when they drift, and opens one `process` issue for each spec, class, file or suite that alone
+// passes the budget.
 //
 // Usage: node scripts/shard-durations.mjs <results dir> <run id>
 //
 // The results folder holds the run's test-results-* artifacts, one sub-folder each, as
-// actions/download-artifact writes them. Each split's own --durations command rewrites its durations file
-// from the JUnit files found there, and its --count command then gives its `Over budget:` lines. A file
-// drifts when its entries that moved by at least `minimumMove` seconds add up to more than `driftShare` of
-// its old total. The script commits nothing: the issue holds the new files, and NexKit's round commits them.
-// CI's durations job runs it with only `contents: read` and `issues: write`, and no model, see
-// docs/development.md#shards. GH names the gh command, so the tests can replace it.
+// actions/download-artifact writes them. The script downloads the same artifacts of the latest successful CI
+// runs dispatched on main before it, so that `runsMeasured` runs count in all and no run of a pull request whose
+// branch is also called main does. For each split, its own --durations command measures each run from the durations file as it was, and each entry becomes the median of its measures, so one
+// slow or fast run moves no entry. Its --count command then gives its `Over budget:` lines. A file drifts when
+// its entries that moved by at least `minimumMove` seconds add up to more than `driftShare` of its old total. The
+// script commits nothing: the issue holds the new files, and NexKit's round commits them. CI's durations job runs
+// it with only `contents: read`, `actions: read` and `issues: write`, and no model, see docs/development.md#shards.
+// GH names the gh command, so the tests can replace it.
 import { spawnSync } from 'node:child_process'
-import { readFileSync, readdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { main as e2e } from './lib/e2e-shard.mjs'
 import { main as integration } from './lib/integration-shard.mjs'
 import { main as smoke } from './lib/smoke-shard.mjs'
+import { median } from './lib/shards.mjs'
 import { main as test } from './lib/test-shard.mjs'
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -25,6 +29,12 @@ const repository = 'https://github.com/phuongnse/axis'
 
 /** The share of a file's old total that its moved entries must pass for the file to drift. */
 export const driftShare = 0.05
+
+/** The CI runs on main whose median makes the durations: the run itself and the latest successful ones before it. */
+export const runsMeasured = 5
+
+/** The most successful CI runs dispatched on main that the script looks through for earlier results, since one may have none. */
+export const runsSearched = 20
 
 /** The fewest seconds an entry must move to count, so run-to-run noise on short tests is left out. */
 export const minimumMove = 10
@@ -91,6 +101,8 @@ const overBudgetMarker = (kind, name) => `<!-- shard-over-budget ${kind} ${name.
 const percent = (share) => `${Math.round(share * 1000) / 10}%`
 const json = (value) => ['```json', JSON.stringify(value, null, 2), '```']
 const runLink = (runId) => `[${runId}](${repository}/actions/runs/${runId})`
+const measuredBy = (runIds) =>
+  runIds.length === 1 ? `CI run ${runLink(runIds[0])}` : `CI runs ${runIds.map(runLink).join(', ')}`
 const shards = `[the shards section](${repository}/blob/main/docs/development.md#shards)`
 
 /** The entries of `after` that differ from `before`, and the names `after` drops. */
@@ -100,7 +112,7 @@ function changes(before, after) {
   return { changed, removed }
 }
 
-function durationsBody(firstLine, drifted, runId, full) {
+function durationsBody(firstLine, drifted, runIds, full) {
   const sections = drifted.flatMap((file) => {
     const heading = `### \`${file.path}\`, ${percent(file.share)} moved`
     if (full) return ['', heading, '', ...json(file.after)]
@@ -117,8 +129,8 @@ function durationsBody(firstLine, drifted, runId, full) {
   })
   return [
     firstLine,
-    `CI run ${runLink(runId)} on \`main\` measured the shards, as ${shards} says. The durations files below no ` +
-      'longer match that run, so the splits weigh the shards wrong.',
+    `${measuredBy(runIds)} on \`main\` measured the shards, as ${shards} says, and each entry below is the median ` +
+      'of its measures. The durations files no longer match those runs, so the splits weigh the shards wrong.',
     '',
     'Concepts: none from concepts.md; this is how Axis is built.',
     '',
@@ -138,7 +150,7 @@ function durationsBody(firstLine, drifted, runId, full) {
   ].join('\n')
 }
 
-function overBudgetIssue({ kind, line }, runId) {
+function overBudgetIssue({ kind, line }, runId, runIds) {
   const name = overBudgetName(line)
   return {
     action: 'create',
@@ -146,7 +158,7 @@ function overBudgetIssue({ kind, line }, runId) {
     labels: ['process'],
     body: [
       `<!-- nexkit:workflow ci.yml ${runId} -->`,
-      `CI run ${runLink(runId)} on \`main\` measured the shards, as ${shards} says, and \`${name}\` alone takes ` +
+      `${measuredBy(runIds)} on \`main\` measured the shards, as ${shards} says, and \`${name}\` alone takes ` +
         'longer than one shard may. No number of shards makes it fit, so its shard is the slowest.',
       '',
       `> ${line}`,
@@ -167,14 +179,15 @@ function overBudgetIssue({ kind, line }, runId) {
 
 /**
  * The issues to open or update. `files` is [{ path, before, after }], `overBudget` [{ kind, line }] with the
- * split's kind and its `Over budget:` line, and `openIssues` [{ number, body }]. Returns a list of
+ * split's kind and its `Over budget:` line, `openIssues` [{ number, body }], `runId` the run that opens an issue
+ * and `runIds` the runs measured, that one first. Returns a list of
  * { action: 'create', title, labels, body } and { action: 'edit', number, body }.
  *
  * The drifted files make one issue, or update the open one. An edit keeps the open issue's first line, whose
  * marker names the run that opened it, since NexKit trusts the issue only for that run. Each `Over budget:`
  * line makes an issue of its own, unless one for the same name is open.
  */
-export function issuesFrom(files, overBudget, openIssues, runId) {
+export function issuesFrom(files, overBudget, openIssues, runId, runIds = [runId]) {
   const bodies = openIssues.map((issue) => issue.body ?? '')
   const issues = []
   const drifted = files
@@ -183,8 +196,8 @@ export function issuesFrom(files, overBudget, openIssues, runId) {
   if (drifted.length) {
     const open = openIssues.find((issue) => (issue.body ?? '').includes(marker))
     const firstLine = open ? open.body.split('\n')[0] : `<!-- nexkit:workflow ci.yml ${runId} -->`
-    let body = durationsBody(firstLine, drifted, runId, true)
-    if (body.length > maxBody) body = durationsBody(firstLine, drifted, runId, false)
+    let body = durationsBody(firstLine, drifted, runIds, true)
+    if (body.length > maxBody) body = durationsBody(firstLine, drifted, runIds, false)
     issues.push(open ? { action: 'edit', number: open.number, body } : { action: 'create', title, labels: ['process'], body })
   }
   const seen = new Set()
@@ -192,7 +205,7 @@ export function issuesFrom(files, overBudget, openIssues, runId) {
     const key = overBudgetMarker(entry.kind, overBudgetName(entry.line))
     if (seen.has(key) || bodies.some((body) => body.includes(key))) continue
     seen.add(key)
-    issues.push(overBudgetIssue(entry, runId))
+    issues.push(overBudgetIssue(entry, runId, runIds))
   }
   return issues
 }
@@ -210,18 +223,41 @@ export function junitFiles(dir) {
 }
 
 /**
- * Rewrites each split's durations file under `root` from the JUnit files under `resultsDir`, and collects
- * the `Over budget:` lines of every split. Returns { files, overBudget }.
+ * Each entry's median over the measures of one durations file, rounded as the measures are: whole seconds, or two
+ * decimals for a ratio such as the parallelism. The entries are those of the first measure, the latest run's.
  */
-export function refresh(resultsDir, root = repositoryRoot, log = (line) => console.log(line)) {
-  const junit = junitFiles(resultsDir)
-  const readJson = (file) => JSON.parse(readFileSync(path.join(root, file), 'utf8'))
+export function medianDurations(measures) {
+  return Object.fromEntries(
+    Object.keys(measures[0]).map((name) => {
+      const values = measures.map((measure) => measure[name]).filter((seconds) => seconds !== undefined)
+      const middle = median(values)
+      return [name, values.every(Number.isInteger) ? Math.round(middle) : Math.round(middle * 100) / 100]
+    }),
+  )
+}
+
+/**
+ * Rewrites each split's durations file under `root` from the JUnit files under `resultsDirs`, one folder per run,
+ * the latest first, and collects the `Over budget:` lines of every split. A split that the latest run has no
+ * results for keeps its file. Each run is measured from the file as it was, and each entry becomes the median of
+ * its measures. Returns { files, overBudget }.
+ */
+export function refresh(resultsDirs, root = repositoryRoot, log = (line) => console.log(line)) {
+  const runs = [resultsDirs].flat().map(junitFiles)
   const files = []
   for (const split of splits) {
-    if (junit[split.kind].length === 0) continue
-    const before = readJson(split.file)
-    log(split.main(['--durations', ...junit[split.kind]], path.join(root, split.at)))
-    files.push({ path: split.file, before, after: readJson(split.file) })
+    if (runs[0][split.kind].length === 0) continue
+    const file = path.join(root, split.file)
+    const text = readFileSync(file, 'utf8')
+    const measures = []
+    for (const junit of runs.map((found) => found[split.kind]).filter((list) => list.length > 0)) {
+      writeFileSync(file, text)
+      log(split.main(['--durations', ...junit], path.join(root, split.at)))
+      measures.push(JSON.parse(readFileSync(file, 'utf8')))
+    }
+    const after = medianDurations(measures)
+    writeFileSync(file, `${JSON.stringify(after, null, 2)}\n`)
+    files.push({ path: split.file, before: JSON.parse(text), after })
   }
   const overBudget = []
   for (const split of splits) {
@@ -252,16 +288,49 @@ export function openProcessIssues(gh) {
   }
 }
 
+/**
+ * Downloads into folders under `dir` the test-results-* artifacts of the latest successful CI runs dispatched on main
+ * other than `runId`, at most `count` of them, and returns those folders, the latest first. Only dispatched runs
+ * count, so a run of a pull request whose branch is also called main does not. A run that has no such artifacts,
+ * such as one whose artifacts expired, is skipped.
+ */
+export function earlierResults(gh, runId, dir, count, log = (line) => console.log(line)) {
+  const repo = new URL(repository).pathname.slice(1)
+  const list = ['run', 'list', '--repo', repo, '--workflow', 'ci.yml', '--branch', 'main', '--event', 'workflow_dispatch', '--status', 'success']
+  const ids = run(gh, [...list, '--limit', String(runsSearched), '--json', 'databaseId', '--jq', '.[].databaseId'])
+    .split('\n')
+    .map((id) => id.trim())
+    .filter((id) => id && id !== String(runId))
+  const folders = []
+  for (const id of ids) {
+    if (folders.length >= count) break
+    const folder = path.join(dir, id)
+    const download = ['run', 'download', id, '--repo', repo, '--pattern', 'test-results-*', '--dir', folder]
+    const result = spawnSync(gh, download, { encoding: 'utf8' })
+    if (result.status === 0) folders.push(folder)
+    else log(`Run ${id} has no test results to download, so it is left out.`)
+  }
+  return folders
+}
+
 /** Runs the command line: refreshes the durations under `root` and opens or updates the issues with gh. */
 export function cli([resultsDir, runId], root = repositoryRoot, log = (line) => console.log(line)) {
   if (!resultsDir || !runId) {
     console.error('Usage: node scripts/shard-durations.mjs <results dir> <run id>')
     return 2
   }
-  const { files, overBudget } = refresh(resultsDir, root, log)
-  for (const { line } of overBudget) log(line)
   const gh = process.env.GH ?? 'gh'
-  const issues = issuesFrom(files, overBudget, openProcessIssues(gh), runId)
+  const scratch = mkdtempSync(path.join(tmpdir(), 'shard-durations-'))
+  let issues
+  try {
+    const earlier = earlierResults(gh, runId, scratch, runsMeasured - 1, log)
+    const { files, overBudget } = refresh([resultsDir, ...earlier], root, log)
+    for (const { line } of overBudget) log(line)
+    const runIds = [String(runId), ...earlier.map((folder) => path.basename(folder))]
+    issues = issuesFrom(files, overBudget, openProcessIssues(gh), runId, runIds)
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
   if (issues.length === 0) log('The shard durations did not drift, and nothing passes the budget.')
   for (const issue of issues) {
     if (issue.action === 'edit') {

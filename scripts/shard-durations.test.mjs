@@ -7,13 +7,16 @@ import {
   cli,
   drift,
   driftShare,
+  earlierResults,
   issuesFrom,
   junitFiles,
   marker,
   maxBody,
+  medianDurations,
   minimumMove,
   perPage,
   refresh,
+  runsMeasured,
   title,
 } from './shard-durations.mjs'
 
@@ -42,6 +45,22 @@ describe('drift', () => {
   })
 })
 
+describe('medianDurations', () => {
+  test('gives each entry the median of its measures, so one slow run moves nothing', () => {
+    const measures = [{ a: 100, b: 10 }, { a: 400, b: 12 }, { a: 102, b: 11 }]
+    assert.deepEqual(medianDurations(measures), { a: 102, b: 11 })
+  })
+
+  test('keeps the entries of the latest measure, and takes the median of the measures that have each', () => {
+    const measures = [{ a: 100, added: 30 }, { a: 110, gone: 50 }]
+    assert.deepEqual(medianDurations(measures), { a: 105, added: 30 })
+  })
+
+  test('rounds whole seconds to whole seconds and a ratio to two decimals', () => {
+    assert.deepEqual(medianDurations([{ a: 10, parallelism: 2.61 }, { a: 13, parallelism: 2.7 }]), { a: 12, parallelism: 2.66 })
+  })
+})
+
 describe('issuesFrom', () => {
   test('opens no issue when the files moved by less than the share and nothing passes the budget', () => {
     const after = { ...specs, 'specs/service-desk-journey.spec.ts': 396 + 80 }
@@ -60,7 +79,7 @@ describe('issuesFrom', () => {
     const lines = issue.body.split('\n')
     assert.equal(lines[0], '<!-- nexkit:workflow ci.yml 42 -->')
     assert.equal(lines.at(-1), marker)
-    assert.match(issue.body, /\/actions\/runs\/42\)/)
+    assert.match(issue.body, /^CI run \[42\]\(.*\/actions\/runs\/42\) on `main` measured the shards/m)
     assert.match(issue.body, /- \[ \] `tests\/e2e\/spec-durations.json` holds the durations below\./)
     assert.match(issue.body, /- \[ \] `scripts\/test.sh` and `scripts\/lint.sh` pass\./)
     assert.ok(issue.body.includes(JSON.stringify(after, null, 2)))
@@ -167,6 +186,17 @@ describe('junitFiles', () => {
   })
 })
 
+// The Playwright results of a run under `folder`, in which the slow spec takes `slow` seconds.
+function writeE2eRun(folder, slow) {
+  const junit = path.join(folder, 'test-results-e2e-1/artifacts/test-results/playwright-1.xml')
+  mkdirSync(path.dirname(junit), { recursive: true })
+  writeFileSync(
+    junit,
+    `<testsuites><testsuite name="slow.spec.ts" hostname="chromium" time="${slow}"></testsuite>` +
+      '<testsuite name="fast.spec.ts" hostname="chromium" time="20"></testsuite></testsuites>',
+  )
+}
+
 // A repository with one file per split and a run's results: the slow spec moved from 100 to 2,000 seconds,
 // which passes the budget, and the integration class got its first measure.
 function withRun(run) {
@@ -223,10 +253,26 @@ describe('refresh', () => {
       assert.equal(smoke['dev-script'], 10)
     })
   })
+
+  test('measures each run from the file as it was and keeps the median, so one slow run moves nothing', () => {
+    withRun((root, results, dir) => {
+      const earlier = ['earlier-1', 'earlier-2'].map((name, index) => {
+        writeE2eRun(path.join(dir, name), 100 + 4 * index)
+        return path.join(dir, name)
+      })
+      const { files } = refresh([results, ...earlier], root, () => {})
+      const e2e = files.find((file) => file.path === e2eFile)
+      assert.deepEqual(e2e.before, { 'specs/fast.spec.ts': 20, 'specs/slow.spec.ts': 100 })
+      assert.deepEqual(e2e.after, { 'specs/fast.spec.ts': 20, 'specs/slow.spec.ts': 104 })
+      assert.deepEqual(JSON.parse(readFileSync(path.join(root, e2eFile), 'utf8')), e2e.after)
+    })
+  })
 })
 
 describe('cli', () => {
-  // A gh that serves each page of open issues from open-<page>.json, and logs each other call with its standard input.
+  // A gh that serves each page of open issues from open-<page>.json, the successful dispatched runs from runs.txt and
+  // no runs for a list of other events, and each run's artifacts from runs/<id>, failing for a run without that
+  // folder. It logs each other call with its standard input.
   function withGh(dir, open, run) {
     const gh = path.join(dir, 'gh')
     const log = path.join(dir, 'gh.log')
@@ -234,6 +280,10 @@ describe('cli', () => {
       gh,
       `#!/bin/bash\nif [ "$1" = api ]; then re='[?&]page=([0-9]+)'; [[ "$*" =~ $re ]]; f="${dir}/open-\${BASH_REMATCH[1]}.json"; ` +
         `if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi; exit 0; fi\n` +
+        `if [ "$1 $2" = 'run list' ]; then [[ " $* " == *' --event workflow_dispatch '* ]] && cat "${dir}/runs.txt" 2>/dev/null; ` +
+        `exit 0; fi\n` +
+        `if [ "$1 $2" = 'run download' ]; then [ -d "${dir}/runs/$3" ] || exit 1; mkdir -p "\${@: -1}"; ` +
+        `cp -r "${dir}/runs/$3/." "\${@: -1}"; exit 0; fi\n` +
         `{ echo "ARGS $*"; cat; echo; } >> "${log}"\necho "https://github.com/phuongnse/axis/issues/9"\n`,
     )
     chmodSync(gh, 0o755)
@@ -251,13 +301,36 @@ describe('cli', () => {
     }
   }
 
+  test('downloads the results of the latest successful dispatched runs but this one, and leaves out a run without any', () => {
+    withRun((root, results, dir) =>
+      withGh(dir, [], () => {
+        writeFileSync(path.join(dir, 'runs.txt'), '42\n41\n40\n39\n38\n37\n')
+        for (const id of ['41', '39', '38', '37']) writeE2eRun(path.join(dir, 'runs', id), 100)
+        const scratch = mkdtempSync(path.join(dir, 'earlier-'))
+        const lines = []
+        const folders = earlierResults(process.env.GH, '42', scratch, 3, (line) => lines.push(line))
+        assert.deepEqual(
+          folders.map((folder) => path.basename(folder)),
+          ['41', '39', '38'],
+        )
+        assert.equal(junitFiles(folders[0]).e2e.length, 1)
+        assert.deepEqual(lines, ['Run 40 has no test results to download, so it is left out.'])
+      }),
+    )
+  })
+
   test('opens the durations issue and the Over budget issue with the process label', () => {
     withRun((root, results, dir) =>
       withGh(dir, [], (log) => {
+        const earlier = ['41', '40', '39', '38', '37', '36']
+        writeFileSync(path.join(dir, 'runs.txt'), `${earlier.join('\n')}\n`)
+        for (const id of earlier) writeE2eRun(path.join(dir, 'runs', id), 2000)
         assert.equal(cli([results, '42'], root, () => {}), 0)
         const calls = log().split('ARGS ').slice(1)
         assert.equal(calls.length, 2)
         assert.match(calls[0], /^issue create --title The shard durations match the runs on main --body-file - --label process\n<!-- nexkit:workflow ci\.yml 42 -->/)
+        const measured = ['42', ...earlier.slice(0, runsMeasured - 1)].map((id) => `\\[${id}\\]\\([^)]*\\/runs\\/${id}\\)`)
+        assert.match(calls[0], new RegExp(`^CI runs ${measured.join(', ')} on \`main\` measured the shards`, 'm'))
         assert.match(calls[0], /"specs\/slow\.spec\.ts": 2000/)
         assert.match(calls[1], /^issue create --title specs\/slow\.spec\.ts fits within the shard budget --body-file - --label process\n/)
       }),
@@ -304,7 +377,7 @@ describe('cli', () => {
     })
   })
 
-  test('calls gh only to list the open issues when nothing drifted or passes the budget', () => {
+  test('calls gh only to read the runs and the open issues when nothing drifted or passes the budget', () => {
     withRun((root, results, dir) => {
       rmSync(results, { recursive: true, force: true })
       mkdirSync(results)
