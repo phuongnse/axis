@@ -22,7 +22,7 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
 {
     private const string Alias = "oidc-companyissuer";
 
-    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
+    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
 
     private readonly HttpClient _http = new();
     private readonly List<string> _realms = [];
@@ -209,6 +209,9 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
             roles.GetProperty("config").EnumerateObject().ToDictionary(entry => entry.Name, entry => entry.Value.GetString()!));
         Assert.Single(mappers, mapper => mapper.GetProperty("name").GetString() == "identity provider");
         Assert.Single(mappers, mapper => mapper.GetProperty("name").GetString() == "identity provider acr");
+        // The platform client names the agent client in its audience so a Studio sign-in can be exchanged, and a site client, such as a citizen's, does not.
+        Assert.Contains(platform.GetProperty("protocolMappers").EnumerateArray(), mapper => mapper.GetProperty("name").GetString() == RealmAgentClient.AudienceMapperName);
+        Assert.DoesNotContain(mappers, mapper => mapper.GetProperty("name").GetString() == RealmAgentClient.AudienceMapperName);
     }
 
     [Fact]

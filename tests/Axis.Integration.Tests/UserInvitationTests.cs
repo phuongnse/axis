@@ -254,7 +254,7 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         };
         await mailpit.SmtpHostAsync();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret), smtpServer, CancellationToken);
+            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret, "agent-secret-1"), smtpServer, CancellationToken);
         await ConfigureClientAsync();
         _patId = await CreatePatAsync();
 

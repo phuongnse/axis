@@ -21,7 +21,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     private const string Password = "a-long-enough-password";
     private const string InvalidCredentials = "Invalid email, username or password.";
 
-    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
+    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
 
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
     private readonly List<string> _realms = [];

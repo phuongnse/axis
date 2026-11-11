@@ -110,6 +110,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ModelKey).HasColumnName("model_key").HasColumnType("bytea");
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
+            tenant.Property(t => t.RealmAgentClientSecret).HasColumnName("realm_agent_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
             tenant.Property(t => t.DeleteAfter).HasColumnName("delete_after");
             tenant.Property(t => t.PrivacyUrl).HasColumnName("privacy_url");
