@@ -33,10 +33,16 @@ The agent host acts with exactly the grants of the author who sent the request.
   token's subject is the author and its audience is the MCP server. The send refuses with `403` a
   token that does not carry the author role, the check that the MCP server makes on the same token.
 - **Kept with the request.** The refresh token is stored in the request row, encrypted with the
-  tenant's data key, and a drop erases it.
-- **Ends with the session.** _(planned for M35)_ The refresh token is deleted when the request ends.
-  It ends with the author's realm session, at most 8 hours. A request that outlives it stops as
-  `failed`, and the author sends it again.
+  tenant's data key. A drop, an accept or a failure erases it: the commit of a step that moves the
+  request to `accepted`, `dropped` or `failed` sets it to null, and a step that moves it to any
+  other state keeps it.
+- **Ends with the session.** When a step needs the author's access token, the agent host refreshes
+  the stored token at the tenant's realm as `axis-agent` and keeps the new refresh token that the
+  realm returns. The token ends with the author's realm session, at most 8 hours. A token that the
+  realm refuses with `invalid_grant`, a request that keeps none and a token that no longer decrypts
+  stop the request as `failed`, with the step outcome `tokenEnded`, and the author sends it again. A
+  realm that does not answer, or answers another error, changes nothing: the lease lapses and a
+  later turn runs the step again.
 - **No shortcut.** The agent host holds no role of its own on any tenant. A token exchange for a
   person who has lost the author role is refused.
 

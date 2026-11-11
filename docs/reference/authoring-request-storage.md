@@ -17,11 +17,12 @@ when the author approves, changes the plan or drops it. The agent host writes th
   `finished_at` and `claimed_until` (`timestamptz`, null), and `refresh_token` (`bytea`, null). The
   `refresh_token` holds the agent host's refresh token, encrypted with the tenant data key in the
   [sensitive value format](data-encryption.md#sensitive-field-values) and bound to the tenant and the
-  request. No route answers it, and a drop sets it to null. Indexes on
+  request. No route answers it, and a drop, an accept or a failure sets it to null. Indexes on
   `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
   (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `started_at` (`timestamptz`) and
   `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A step that
   never finished has the `outcome` `interrupted` once a later host closes it, see
-  [resuming](authoring-requests.md#durable-requests).
+  [resuming](authoring-requests.md#durable-requests). A step that found the author's token ended
+  has the `outcome` `tokenEnded`, see [acting for the author](authoring-requests.md#acting-for-the-author).

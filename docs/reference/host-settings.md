@@ -342,8 +342,8 @@ activation and `Axis.Admin` activation use it, see
   authority stops the start, and the message never shows the secret. Under `directory` the server
   decrypts the stored `realm_users_client_secret`, and the realm name is the tenant id. A tenant with
   no users client has no users page, see [the users page](user-administration.md#the-users-page).
-- **Agent client.** The entry also carries what the server needs to exchange an author's token for
-  the agent host: the secret of the `axis-agent` client, with the same address and realm name. Under
+- **Agent client.** The entry also carries what the server and the agent host need to exchange an author's token for
+  the agent host and to refresh it: the secret of the `axis-agent` client, with the same address and realm name. Under
   `configuration`, `Tenants:{id}:Oidc:AgentClientSecret` gives it, as the environment variable
   `Tenants__<id>__Oidc__AgentClientSecret`, and a blank value means the tenant has no agent client.
   It follows the authority rule of the users client: a secret with an authority that does not end in
@@ -488,7 +488,9 @@ idle, reading none of the settings below.
   `ConnectionStrings:Platform`, `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of
   the tenancy settings. Under `directory` it needs `ConnectionStrings:Platform` and
   `Platform:SecretKey`, and never reads `ConnectionStrings:PlatformSchema`. Under `configuration` it
-  reads the `Tenants` section.
+  reads the `Tenants` section. For each tenant it reads the data keys that decrypt a request's stored
+  token and the [agent client](#tenant-realm) secret that refreshes it, from the `Tenants`
+  section or, under `directory`, from the tenant directory as the server does.
 - **The tenant directory.** It reads its `active` tenants over `ConnectionStrings:Platform`. If its first
   read fails, it retries every `Tenancy:RefreshInterval`. Then it reads the directory again every
   interval and keeps the last good read when a refresh fails. It leaves out a read-only tenant, as the
