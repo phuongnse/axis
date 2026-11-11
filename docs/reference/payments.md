@@ -56,10 +56,24 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
 
 In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 
-- **Provider** _(planned for M34)_. PayOS, with VietQR bank transfers.
+- **Provider.** `ControlPlane:PayOs:Provider=PayOs` picks the real PayOS, with VietQR bank transfers,
+  at `ControlPlane:PayOs:BaseUrl`, see [settings](control-plane.md#settings).
+  - **Signed requests.** Each request carries the `x-client-id` and `x-api-key` headers. A request that
+    creates a payment link also carries an HMAC-SHA256 signature, made with the checksum key, of its
+    amount, `cancelUrl`, description, `orderCode` and `returnUrl`.
+  - **Signed answers.** The adapter reads PayOS's answer only when its `signature` is the HMAC-SHA256 of
+    the answer's `data` made with the checksum key. An answer with no signature or a wrong one counts as
+    a failed call, and so does an error answer. The error names the HTTP status and PayOS's `code`,
+    never its free text, because PayOS may echo the request.
+  - **Keys only from Secrets.** The client id, the API key and the checksum key come only from the Secret
+    files of [the control plane](control-plane.md#settings). No log line or error message holds one.
+  - **Return and cancel addresses.** PayOS requires both, and the adapter sets both to
+    `ControlPlane:PublicUrl`, because the job does not know the tenant.
+  - **Reading a status.** The adapter reads a payment link's status by its `orderCode`, with the same
+    headers and the same check of the answer's signature.
 - **Fake provider.** `ControlPlane:PayOs:Provider=Fake` picks a fake PayOS in Development and Testing,
-  and any other environment refuses it, see [settings](control-plane.md#settings). With no provider the
-  control plane registers no PayOS adapter and no payment link job.
+  and any other environment refuses it. With no provider the control plane registers no PayOS adapter
+  and no payment link job.
 - **A payment link for each invoice.** The recurring job `createPaymentLinks` runs every 5 minutes when
   a PayOS provider is set. It gives each `open` invoice in `VND` one payment link, and a paid, `void` or
   `USD` invoice gets none.
@@ -124,6 +138,7 @@ _(planned for M34)_
 Webhooks can be lost, so each night the control plane asks each provider for the day's transactions
 and compares them with its ledger.
 
+- For PayOS the control plane reads each payment link's status by its `orderCode`.
 - A payment that the provider has and Axis lacks is recorded, as if its webhook had come.
 - A payment that Axis has and the provider lacks alerts the operator, and nothing is changed.
 - An amount that differs alerts the operator.

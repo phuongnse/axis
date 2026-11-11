@@ -85,10 +85,22 @@ builder.Services.AddSingleton<IJobHandler, PeriodInvoicing>();
 builder.Services.AddSingleton(new RecurringJob(PeriodInvoicing.JobKind, TimeSpan.FromHours(1)));
 
 // The payment links of the open VND invoices, queued every 5 minutes, only when a PayOS provider is named. It needs the control plane's database and the adapter.
-if (string.Equals(options.PayOs.Provider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
+// The settings guarantee the keys and the base URL of the real one.
+var payOsProvider = options.PayOs.Provider;
+if (string.Equals(payOsProvider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
 {
     builder.Services.AddSingleton<FakePayOs>();
     builder.Services.AddSingleton<IPayOs>(services => services.GetRequiredService<FakePayOs>());
+}
+else if (string.Equals(payOsProvider, PayOsProviders.PayOs, StringComparison.OrdinalIgnoreCase))
+{
+    // The job handler is a singleton, so it keeps one client for the life of the process. Its connections are recycled, so a changed PayOS address is followed.
+    builder.Services.AddHttpClient<IPayOs, PayOsClient>(client => client.Timeout = TimeSpan.FromSeconds(30))
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
+}
+
+if (!string.IsNullOrWhiteSpace(payOsProvider))
+{
     builder.Services.AddSingleton<IJobHandler, PaymentLinks>();
     builder.Services.AddSingleton(new RecurringJob(PaymentLinks.JobKind, TimeSpan.FromMinutes(5)));
 }
