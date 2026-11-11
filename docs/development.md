@@ -11,32 +11,33 @@ The scripts build, check and run Axis, and NexKit and CI run the same ones as th
 from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` to
 `scripts/smoke.sh`; the others say which workflow runs them, or that they run on demand only.
 
-| Script                          | What it does                                                                                        | Needs           |
-| ------------------------------- | --------------------------------------------------------------------------------------------------- | --------------- |
-| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser and the pinned Helm tools                    | Network         |
+| Script                          | What it does                                                                                                                                                      | Needs           |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser and the pinned Helm tools                                                                                  | Network         |
 | `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` |                 |
-| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint |                 |
-| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                  |                 |
-| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                        | Docker          |
-| `scripts/e2e.sh`                | Playwright against the full stack                                                                   | Docker          |
-| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install         | Docker          |
-| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                        | Docker          |
-| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
-| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
-| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes | Network         |
-| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them | Network         |
-| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue  | Network         |
-| `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
-| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
-| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |
+| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                 |
+| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                |                 |
+| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                                                                                      | Docker          |
+| `scripts/e2e.sh`                | Playwright against the full stack                                                                                                                                 | Docker          |
+| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install                                                                       | Docker          |
+| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                                                                                      | Docker          |
+| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                                                                                  | Network         |
+| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                                                                                       | Docker, network |
+| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes                                                               | Network         |
+| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them                                                               | Network         |
+| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue                                                           | Network         |
+| `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker          |
+| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network |
+| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker          |
 
 ### Setup
 
-`scripts/setup.sh` restores the .NET packages, installs the npm packages and the Playwright browser,
-and installs pinned Helm, kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`, which
-NexKit's `tools` cache entry restores. Each step and each tool download gets up to 4 tries, with waits
-of 15, 30 and 60 seconds between them, so a short refusal such as a `403` is retried. On CI the
-Playwright system packages install in a step of their own.
+`scripts/setup.sh` restores the .NET and npm packages and the Playwright browser, and installs pinned Helm,
+kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step and download gets up to 4 tries,
+with waits of 15, 30 and 60 seconds, so a short `403` is retried. A try of a restore or install step stops
+after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A download gives up after 30
+seconds without a connection or 5 minutes. A service that does not answer fails its try in time for the
+next. See [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md).
 
 ### Build
 
@@ -67,13 +68,13 @@ The bundle budget keeps the SPA's first load small. The main bundle is the entry
 `index.html` and the scripts it preloads, gzipped. It may grow by 50 KB over the baseline that
 `web/bundle-budget.json` holds. These parts load in chunks of their own, apart from the main bundle:
 
-| Chunk                           | What it holds                                                          |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| `assets/ChartDrawing-*.js`      | The chart library, loaded lazily                                       |
-| `assets/StudioPageDesign-*.js`  | The page designer's canvas and palette, loaded when the Design tab opens |
-| `assets/StudioFormDesign-*.js`  | The form designer's Design tab, loaded when it first opens             |
-| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens        |
-| `assets/DragAndDrop-*.js`       | The drag and drop library `@dnd-kit`, which the three designers share  |
+| Chunk                             | What it holds                                                            |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `assets/ChartDrawing-*.js`        | The chart library, loaded lazily                                         |
+| `assets/StudioPageDesign-*.js`    | The page designer's canvas and palette, loaded when the Design tab opens |
+| `assets/StudioFormDesign-*.js`    | The form designer's Design tab, loaded when it first opens               |
+| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens            |
+| `assets/DragAndDrop-*.js`         | The drag and drop library `@dnd-kit`, which the three designers share    |
 
 [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs) runs after the SPA build. It prints the
 sizes and fails when the main bundle is over budget, when the chart, page design, process design or
@@ -189,12 +190,12 @@ in [Testing](testing.md).
 `scripts/smoke.sh` runs four smoke tests. It first installs the built-in and sample modules in
 `artifacts/modules`, for the `onprem` test.
 
-| Test         | What it does                                                                  |
-| ------------ | ----------------------------------------------------------------------------- |
-| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                           |
-| `compose`    | Runs the Compose stack                                                        |
-| `images`     | Runs the production images, from `scripts/images.test.mjs`                    |
-| `onprem`     | Installs `deploy/compose/` from the production images for two tenants          |
+| Test         | What it does                                                          |
+| ------------ | --------------------------------------------------------------------- |
+| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                   |
+| `compose`    | Runs the Compose stack                                                |
+| `images`     | Runs the production images, from `scripts/images.test.mjs`            |
+| `onprem`     | Installs `deploy/compose/` from the production images for two tenants |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
@@ -339,7 +340,7 @@ that adds a source changes this section too.
   and unknown findings and pass. People keep those time frames in the routine update.
 - **A fix that does not exist yet.** When no fixed version exists, record the finding in
   `scripts/scan-accepted.json`: `{ "advisory": "GHSA-...", "package": "<name>", "found": "YYYY-MM-DD",
-  "reason": "<why it waits>" }`. `found` is the day the scan first found it. The scan then passes
+"reason": "<why it waits>" }`. `found` is the day the scan first found it. The scan then passes
   the finding until `found` plus its time frame, and prints `accepted until <date>`.
 - **Past the deadline.** After that date the scan fails again and prints
   `past its time frame since <date>` on the finding's line. Update or remove the package, and delete
@@ -459,14 +460,14 @@ jobs may wait.
 Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run writes its logs to
 `artifacts/logs/`:
 
-| Log                         | Output of                    |
-| --------------------------- | ---------------------------- |
-| `e2e-server.log`            | The E2E server               |
-| `e2e-worker.log`            | The E2E worker               |
-| `e2e-journey-server.log`    | The E2E journey server       |
-| `e2e-publisher.log`         | The E2E publisher            |
-| `e2e-purchasing.log`        | The purchasing system stub   |
-| `e2e-controlplane.log`      | The E2E control plane        |
+| Log                      | Output of                  |
+| ------------------------ | -------------------------- |
+| `e2e-server.log`         | The E2E server             |
+| `e2e-worker.log`         | The E2E worker             |
+| `e2e-journey-server.log` | The E2E journey server     |
+| `e2e-publisher.log`      | The E2E publisher          |
+| `e2e-purchasing.log`     | The purchasing system stub |
+| `e2e-controlplane.log`   | The E2E control plane      |
 
 `scripts/test-report.mjs` then prints a summary per suite and the failed tests with their
 `file:line`. On GitHub Actions the summary goes to the job summary, and each failed test becomes an
@@ -480,9 +481,8 @@ A failure names the scenario and the step. To run them by hand, run
 
 ### Flaky tests
 
-Playwright does not retry a failed test, on CI or locally, so a flaky test fails its job, and the
-trace of a failed test is kept. On `main`, NexKit runs a failed job once more, and a run that passes
-only on that second attempt is recorded on a `bug` issue.
+Playwright does not retry a failed test, on CI or locally, so a flaky test fails its job, and its trace is kept. On
+`main`, NexKit runs a failed job once more, and a run that passes only on that retry is recorded on a `bug` issue.
 
 A test that fails at times is fixed by its cause, for every test with that cause, as
 [D97](decisions/d97-reliable-test-runs.md) says. The plan of its `bug` issue names the cause's
@@ -491,7 +491,7 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 
 | Cause                                      | Guard                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| An outside download or service             | `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| An outside download or service             | NexKit's caches hold the NuGet and npm packages, the Playwright browser, the tools and the smoke tests' Docker image files, so a run downloads only what they miss. `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again. Each try of setup's steps has a time limit, see [setup](#setup), as [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) says                                                                                                                                                                                                                 |
 | A click during an animation or a redraw    | Playwright asks for reduced motion, and the SPA then shows dialogs and overlays without animation. `waitForDialog`, `confirmDialog` and the drag helper wait until the element is ready, and the drag helper and the binding choice in the journeys wait until the page canvas has drawn the dropped draft (`waitForCanvas`). `openFormTab` and `addMapping` wait until no expression editor of the open resource is loading or checking (`aria-busy`), because a check's answer adds a line under its editor and moves what is below. A spec that slows animations on purpose, to prove a wait, asks for motion again with `test.use({ reducedMotion: 'no-preference' })` |
 | The real clock                             | A test fixes the time with `axis.now` and runs schedules in UTC                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | State left by another test                 | A test counts from its own baseline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -504,17 +504,17 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 Docker Compose runs the whole stack from source, with nothing but Docker installed. Run
 `docker compose up --build`. It starts:
 
-| Service                   | Address                  | Port setting             |
-| ------------------------- | ------------------------ | ------------------------ |
-| The server, with the four samples | http://localhost:5206 | `AXIS_SERVER_PORT`  |
-| PostgreSQL                | `localhost:5432`         | `AXIS_POSTGRES_PORT`     |
-| Keycloak, with the [development realms](#development-realm-and-users) | http://localhost:8080 | `AXIS_KEYCLOAK_PORT` |
-| The purchasing system stub | http://localhost:5207   | `AXIS_PURCHASING_PORT`   |
-| Mailpit, SMTP             | `localhost:1025`         | `AXIS_MAILPIT_SMTP_PORT` |
-| Mailpit, web page         | http://localhost:8025    | `AXIS_MAILPIT_WEB_PORT`  |
-| The worker                | none                     |                          |
-| The agent host            | none                     |                          |
-| The publisher             | none                     |                          |
+| Service                                                               | Address               | Port setting             |
+| --------------------------------------------------------------------- | --------------------- | ------------------------ |
+| The server, with the four samples                                     | http://localhost:5206 | `AXIS_SERVER_PORT`       |
+| PostgreSQL                                                            | `localhost:5432`      | `AXIS_POSTGRES_PORT`     |
+| Keycloak, with the [development realms](#development-realm-and-users) | http://localhost:8080 | `AXIS_KEYCLOAK_PORT`     |
+| The purchasing system stub                                            | http://localhost:5207 | `AXIS_PURCHASING_PORT`   |
+| Mailpit, SMTP                                                         | `localhost:1025`      | `AXIS_MAILPIT_SMTP_PORT` |
+| Mailpit, web page                                                     | http://localhost:8025 | `AXIS_MAILPIT_WEB_PORT`  |
+| The worker                                                            | none                  |                          |
+| The agent host                                                        | none                  |                          |
+| The publisher                                                         | none                  |                          |
 
 All six ports are published on `127.0.0.1` only. The Keycloak admin console login is `admin` /
 `admin`.
@@ -568,13 +568,13 @@ Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the same.
 
 PostgreSQL loads `samples/postgres/init-roles.sql` on its first start. It creates:
 
-| Role or database        | What it is for                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `axis_schema`           | Owns the tenant database. The server uses it for `SchemaConnectionString` and `ConnectionStrings:PlatformSchema` |
-| `axis_runtime`          | Every other connection string of the server, and the worker's only one. The worker gets no `SchemaConnectionString` |
-| `axis_preview`          | The database of the preview tenant `default-preview`                                                  |
-| `axis_preview_schema`, `axis_preview_runtime` | The same two parts for `default-preview`                                        |
-| `axis_scenario`         | A role with `CREATEDB` that owns no database. The publisher gets it as `Scenarios__ServerConnectionString`, so Studio can run test scenarios |
+| Role or database                              | What it is for                                                                                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `axis_schema`                                 | Owns the tenant database. The server uses it for `SchemaConnectionString` and `ConnectionStrings:PlatformSchema`                             |
+| `axis_runtime`                                | Every other connection string of the server, and the worker's only one. The worker gets no `SchemaConnectionString`                          |
+| `axis_preview`                                | The database of the preview tenant `default-preview`                                                                                         |
+| `axis_preview_schema`, `axis_preview_runtime` | The same two parts for `default-preview`                                                                                                     |
+| `axis_scenario`                               | A role with `CREATEDB` that owns no database. The publisher gets it as `Scenarios__ServerConnectionString`, so Studio can run test scenarios |
 
 Every role has the development password `axis`. `axis` stays the bootstrap superuser, for setup and
 health checks only. Studio runs scenarios only when the server turns on `Studio:Tests`: E2E sets
@@ -636,14 +636,14 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
 
 The realm's clients:
 
-| Client           | Secret                               | What uses it                                                                                                                                                                                                                                                                                                                                     |
-| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `axis`           | `axis-development-secret`            | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                 |
-| `axis-activation` | `axis-activation-development-secret` | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
-| `axis-users`     | `axis-users-development-secret`      | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them |
-| `axis-mcp-test`  | `axis-mcp-test-development-secret`   | An integration test host only, for the [MCP server](reference/mcp-server.md). Its password grant gives the realm's users tokens with the audience `https://localhost/mcp`, so `McpServerTests` signs in as `author` and `requester` through it |
-| `axis-mcp-other-test` | `axis-mcp-other-test-development-secret` | An integration test host only, a second client with the same audience as `axis-mcp-test`, so `McpRateLimitTests` signs in as a second client of one tenant |
-| `axis-fapi`      | Development keys in `samples/keycloak` | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                |
+| Client                | Secret                                   | What uses it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `axis`                | `axis-development-secret`                | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                                                                                                                                                                             |
+| `axis-activation`     | `axis-activation-development-secret`     | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
+| `axis-users`          | `axis-users-development-secret`          | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them                                                                                           |
+| `axis-mcp-test`       | `axis-mcp-test-development-secret`       | An integration test host only, for the [MCP server](reference/mcp-server.md). Its password grant gives the realm's users tokens with the audience `https://localhost/mcp`, so `McpServerTests` signs in as `author` and `requester` through it                                                                                                                                                                                                                                                               |
+| `axis-mcp-other-test` | `axis-mcp-other-test-development-secret` | An integration test host only, a second client with the same audience as `axis-mcp-test`, so `McpRateLimitTests` signs in as a second client of one tenant                                                                                                                                                                                                                                                                                                                                                   |
+| `axis-fapi`           | Development keys in `samples/keycloak`   | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                                                                                                                                                                           |
 
 The confidential clients `purchasing-system`, a [machine caller](reference/security.md#machine-callers),
 and `reporting-system`, a [service account](reference/security.md#service-accounts), get tokens through
@@ -685,25 +685,25 @@ The realm `axis-operators`, from `samples/keycloak/axis-operators-realm.json`, i
 
 Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant these bindings:
 
-| Binding                                | Value                                                         | Read by                                       |
-| -------------------------------------- | ------------------------------------------------------------- | --------------------------------------------- |
-| `CompanyIssuer`                        | The `company` realm's issuer URL                              | The purchase request sample's `company` provider |
-| `CompanyClientId`                      | `axis-broker`                                                 | The same                                      |
-| `CompanyClientSecret`                  | `axis-broker-development-secret`                              | The same                                      |
-| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route        | The purchase request sample's approval webhook |
-| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                             | The same                                      |
+| Binding                                | Value                                                  | Read by                                          |
+| -------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider |
+| `CompanyClientId`                      | `axis-broker`                                          | The same                                         |
+| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                         |
+| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook   |
+| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                         |
 
 ### The samples and their users
 
 Each sample uses development users of the `axis` realm, in a site of its own, and declares one
 `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one.
 
-| Sample                                                      | Site                | Users and roles                                                                                                                                                                                         |
-| ----------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Purchase requests, `samples/apps/purchase-requests`         | `/purchasing`       | Declares `organization`, seeds the same employees and departments as leave requests, lets `operator` administer the organization and `department-manager` read it. A request goes to the head of its department. `operator` opens the Approvals inspector page |
-| Leave requests, `samples/apps/leave-requests`               | `/leave`            | Reuses `employee` and `department-manager`. Declares `organization`, seeds an employee for each of its users and three departments headed by `finance-reviewer`, `manager` and `manager-2`, and sends a leave request to the head of its department |
-| Service desk, `samples/apps/service-desk`                   | `/service-desk`     | Adds `agent` and two `service-desk-lead` users and gives an employee `requester`. `approver` stays in the realm for the service desk E2E, which assigns tickets to it                                     |
-| Asset management, `samples/apps/asset-management`           | `/asset-management` | Adds `asset-manager` and `auditor`, and uses `employee` as the holder of assets                                                                                                                          |
+| Sample                                              | Site                | Users and roles                                                                                                                                                                                                                                                |
+| --------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Purchase requests, `samples/apps/purchase-requests` | `/purchasing`       | Declares `organization`, seeds the same employees and departments as leave requests, lets `operator` administer the organization and `department-manager` read it. A request goes to the head of its department. `operator` opens the Approvals inspector page |
+| Leave requests, `samples/apps/leave-requests`       | `/leave`            | Reuses `employee` and `department-manager`. Declares `organization`, seeds an employee for each of its users and three departments headed by `finance-reviewer`, `manager` and `manager-2`, and sends a leave request to the head of its department            |
+| Service desk, `samples/apps/service-desk`           | `/service-desk`     | Adds `agent` and two `service-desk-lead` users and gives an employee `requester`. `approver` stays in the realm for the service desk E2E, which assigns tickets to it                                                                                          |
+| Asset management, `samples/apps/asset-management`   | `/asset-management` | Adds `asset-manager` and `auditor`, and uses `employee` as the holder of assets                                                                                                                                                                                |
 
 - **Sign-in per site.** The purchase request sample also declares the `oidc` provider `company` in
   `identity-providers/company.json`, which brokers to the `company` realm through the
@@ -781,10 +781,10 @@ Docker, .NET and Node, and works on a fresh clone.
    starts the worker once the server has migrated the tenant databases. The SPA proxies `/api` and
    `/health` to the server.
 10. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
-   The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
-   tenant settings as environment variables of that process only, because `Axis.Admin` reads no
-   `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
-   [publisher](reference/administration.md#publisher).
+    The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
+    tenant settings as environment variables of that process only, because `Axis.Admin` reads no
+    `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
+    [publisher](reference/administration.md#publisher).
 
 Each output line starts with `[server]`, `[worker]`, `[web]`, `[publisher]` or `[agent]`, and the script's own
 messages start with `[dev]`.

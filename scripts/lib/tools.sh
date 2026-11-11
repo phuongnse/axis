@@ -2,6 +2,7 @@
 # scripts/setup.sh calls install_tools. scripts/lint.sh and scripts/test.sh use the paths. The image
 # scanner's pin is in scripts/lib/trivy.sh, which the owner guards. The tools go into versioned
 # folders under the home cache, so a version change downloads again and the lint step needs no network.
+# Each download has a connect and a total time limit, and retry alone tries it again, as D147 says.
 
 source scripts/lib/retry.sh
 source scripts/lib/trivy.sh
@@ -46,8 +47,8 @@ install_tools() {
   if [ ! -x "$helm" ]; then
     local archive="helm-$HELM_VERSION-$os-$arch.tar.gz" sum
     mkdir "$work/helm"
-    retry 4 curl -fsSL --retry 3 -o "$work/$archive" "https://get.helm.sh/$archive"
-    sum="$(retry 4 curl -fsSL --retry 3 "https://get.helm.sh/$archive.sha256sum" | cut -d' ' -f1)"
+    retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/$archive" "https://get.helm.sh/$archive"
+    sum="$(retry 4 curl -fsSL --connect-timeout 30 --max-time 300 "https://get.helm.sh/$archive.sha256sum" | cut -d' ' -f1)"
     verify_sha256 "$work/$archive" "$sum"
     tar -xzf "$work/$archive" -C "$work/helm" --strip-components=1 "$os-$arch/helm"
     mv "$work/helm" "$tools_dir/helm-$HELM_VERSION"
@@ -56,9 +57,9 @@ install_tools() {
   if [ ! -x "$kubeconform" ]; then
     local archive="kubeconform-$os-$arch.tar.gz" sum
     mkdir "$work/kubeconform"
-    retry 4 curl -fsSL --retry 3 -o "$work/$archive" \
+    retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/$archive" \
       "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/$archive"
-    sum="$(retry 4 curl -fsSL --retry 3 "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/CHECKSUMS" |
+    sum="$(retry 4 curl -fsSL --connect-timeout 30 --max-time 300 "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/CHECKSUMS" |
       awk -v name="$archive" '$2 == name { print $1 }')"
     verify_sha256 "$work/$archive" "$sum"
     tar -xzf "$work/$archive" -C "$work/kubeconform" kubeconform
@@ -69,7 +70,7 @@ install_tools() {
   mkdir -p "$kubernetes_schemas"
   for file in "${KUBERNETES_SCHEMA_FILES[@]}"; do
     if [ ! -f "$kubernetes_schemas/$file.json" ]; then
-      retry 4 curl -fsSL --retry 3 -o "$work/$file.json" \
+      retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/$file.json" \
         "https://raw.githubusercontent.com/yannh/kubernetes-json-schema/$KUBERNETES_SCHEMAS_COMMIT/v$KUBERNETES_VERSION-standalone-strict/$file.json"
       mv "$work/$file.json" "$kubernetes_schemas/$file.json"
     fi
@@ -79,7 +80,7 @@ install_tools() {
   mkdir -p "$crd_schemas"
   for crd in "${CRD_SCHEMA_FILES[@]}"; do
     if [ ! -f "$crd_schemas/$crd.json" ]; then
-      retry 4 curl -fsSL --retry 3 -o "$work/crd.json" \
+      retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/crd.json" \
         "https://raw.githubusercontent.com/datreeio/CRDs-catalog/$CRDS_CATALOG_COMMIT/$crd.json"
       mkdir -p "$crd_schemas/$(dirname "$crd")"
       mv "$work/crd.json" "$crd_schemas/$crd.json"
