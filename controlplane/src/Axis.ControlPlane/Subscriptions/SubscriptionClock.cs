@@ -178,14 +178,20 @@ internal sealed partial class SubscriptionClock(
     // once, as the new end is later than now and the old end in the condition no longer matches.
     private async Task AdvancePeriodAsync(Guid id, DateTimeOffset periodEndsAt, string? period, CancellationToken cancellationToken)
     {
-        var end = periodEndsAt.UtcDateTime;
-        var next = new DateTimeOffset(period == "year" ? end.AddYears(1) : end.AddMonths(1), TimeSpan.Zero);
+        var next = PeriodEnd(periodEndsAt, period);
         await using var advance = controlPlane.CreateCommand(
             "UPDATE control_plane.subscriptions SET period_ends_at = @next, next_at = @next WHERE id = @id AND state = 'active' AND period_ends_at = @old");
         advance.Parameters.AddWithValue("next", next);
         advance.Parameters.AddWithValue("id", id);
         advance.Parameters.AddWithValue("old", periodEndsAt);
         await advance.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>The end of the paid period that starts at <paramref name="start"/>: one year for the period <c>year</c> and one month otherwise, on the UTC date.</summary>
+    internal static DateTimeOffset PeriodEnd(DateTimeOffset start, string? period)
+    {
+        var date = start.UtcDateTime;
+        return new DateTimeOffset(period == "year" ? date.AddYears(1) : date.AddMonths(1), TimeSpan.Zero);
     }
 
     private async Task CheckDeletionAsync(
@@ -224,7 +230,7 @@ internal sealed partial class SubscriptionClock(
         await CommitAsync(job, id, Deleting, stepId, ReadOnly, now + ReadOnlyWait, cancellationToken);
     }
 
-    private static async Task FollowAsync(CellClient cell, CellJob queued, CancellationToken cancellationToken)
+    internal static async Task FollowAsync(CellClient cell, CellJob queued, CancellationToken cancellationToken)
     {
         var ended = await cell.FollowAsync(queued.Id, cancellationToken);
         if (ended.State != CellJob.Succeeded)

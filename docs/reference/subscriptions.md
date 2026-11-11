@@ -81,12 +81,19 @@ A subscription is in one of these states, and each state says how the tenant wor
   `cancelled` ends in `readOnly` at the period's end. The end of each `active` period moves
   `period_ends_at` forward one period.
 - **A banner to pay** _(planned for M34)_. A `pastDue` tenant sees a banner that asks the owner to pay.
-- **Paying starts the paid period** _(planned for M34)_. Every move on a payment comes with paid
-  plans, and starting the first paid period sets `period_ends_at`. A payment in `pastDue` also moves
-  the period forward.
-- **Paying ends any wait** _(planned for M34)_. A payment in `pastDue` or `readOnly` makes the
-  subscription `active` again at once: the control plane resumes the tenant and writes the plan's
-  quotas.
+- **Paying starts the paid period.** A trial paid early keeps its tenant and its records, and its
+  first paid period starts at the trial's end, so the payment sets `period_ends_at` one period
+  later. A trial that ended unpaid and is then paid starts its period at the payment.
+- **A payment in `pastDue` also moves the period forward** _(planned for M34)_. A late payer's next
+  period then starts from the payment.
+- **Paying ends any wait.** A payment that settles its invoice and leaves no open invoice past its
+  due date makes a `trialing`, `pastDue` or `readOnly` subscription `active` at once, in the
+  payment's own transaction. The move writes the audit record `subscription.active`, with the
+  webhook as its actor, and queues `writeQuotas`, so the tenant gets the plan's quotas. From
+  `pastDue` or `readOnly` it also queues `resumeTenant`, which calls the cell's resume with the key
+  `resume:<step id>`. The job queue retries a failed call with the same key. The job does nothing
+  once a later move has changed the step id. A part payment changes no state: the subscription moves
+  when a later payment completes the invoice.
 - **Cancelling** _(planned for M34)_. The owner cancels in the [billing portal](billing-portal.md).
   The tenant keeps working to the end of the paid period, then follows the same path as an unpaid
   one.

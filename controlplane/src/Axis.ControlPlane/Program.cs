@@ -133,8 +133,9 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cel
     builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
     builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
 
-    // The write of a subscription's quotas to its cell, and its sync over every subscription, queued every 24 hours. Both find the tenant's cell in the directory and call it.
+    // The write of a subscription's quotas to its cell, the resume of a tenant that a payment made active, and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
     builder.Services.AddSingleton<IJobHandler, SubscriptionQuotas>();
+    builder.Services.AddSingleton<IJobHandler, SubscriptionResume>();
     builder.Services.AddSingleton<IJobHandler, QuotaSync>();
     builder.Services.AddSingleton(new RecurringJob(QuotaSync.JobKind, TimeSpan.FromDays(1)));
 }

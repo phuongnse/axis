@@ -132,7 +132,7 @@ public sealed class PaymentWebhookTests(MailpitFixture mailpit) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Two_payments_that_reach_the_amount_mark_the_invoice_paid_and_the_first_alone_does_not()
+    public async Task Two_payments_that_reach_the_amount_mark_the_invoice_paid_and_make_the_trialing_subscription_active_and_the_first_alone_does_neither()
     {
         var token = TestContext.Current.CancellationToken;
         using var factory = await FactoryAsync();
@@ -144,12 +144,16 @@ public sealed class PaymentWebhookTests(MailpitFixture mailpit) : IAsyncLifetime
         await RunJobAsync(token);
 
         Assert.Equal("open", await ScalarAsync<string>($"SELECT status FROM billing.invoices WHERE id = '{invoice}'"));
+        Assert.Equal("trialing", await ScalarAsync<string>("SELECT state FROM control_plane.subscriptions WHERE tenant_id = 'pay'"));
+        Assert.Equal(0, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records WHERE action = 'subscription.active'"));
 
         await client.PostAsync("/api/payments/payos/webhook", Json(Event(orderCode, PlanVnd - 2_000_000, "FT4002", "2026-11-10 16:00:00")), token);
         await RunJobAsync(token);
 
         Assert.Equal("paid", await ScalarAsync<string>($"SELECT status FROM billing.invoices WHERE id = '{invoice}'"));
         Assert.Equal(2, await ScalarAsync<long>("SELECT count(*) FROM billing.ledger_entries WHERE kind = 'payment'"));
+        Assert.Equal("active", await ScalarAsync<string>("SELECT state FROM control_plane.subscriptions WHERE tenant_id = 'pay'"));
+        Assert.Equal(1, await ScalarAsync<long>("SELECT count(*) FROM control_plane.audit_records WHERE action = 'subscription.active'"));
     }
 
     [Fact]

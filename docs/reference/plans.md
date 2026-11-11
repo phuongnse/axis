@@ -75,9 +75,11 @@ The control plane turns a subscription's plan and add-ons into the tenant's quot
   rows, and it carries no idempotency key. A `deleting` or `deleted` subscription, and one that pins
   no plan, gets no call. A job that cannot reach the cell, or whose tenant has no directory row, fails
   and the job queue retries it.
-- **The events** _(planned for M34)_. When a subscription starts, changes its plan, adds or drops an
-  add-on, or becomes `active` again, the code that makes the move queues `writeQuotas` in the same
-  transaction, through the one helper that every move uses.
+- **A payment.** A payment that makes a subscription `active` queues `writeQuotas` in the same
+  transaction, see [states](subscriptions.md#states).
+- **The other events** _(planned for M34)_. When a subscription starts, changes its plan or adds or
+  drops an add-on, the code that makes the move queues `writeQuotas` in the same transaction,
+  through the one helper that every move uses.
 - **Users.** `users` is `includedUsers` plus the users of every add-on pack the subscription holds. The
   packs are the rows of `control_plane.subscription_add_ons`: `subscription_id`, `add_on_code`,
   `quantity` and `created_at`, one row for each code. A code that the pinned plan version does not list
