@@ -210,7 +210,8 @@ A request keeps the whole story of the change, and its milestones write audit re
   [audit actions](storage.md#audit-actions).
 - **Accepting's record** _(planned for M35)_. Accepting a draft writes an audit record too, with the
   same fields.
-- **Usage** _(planned for M35)_. The tokens of each request and model join the tenant's [usage](tenant-quotas.md#usage).
+- **Usage.** Every model call, review included, adds its tokens to the tenant's
+  [usage](tenant-quotas.md#usage) by binding and model, with a tenant's own key counted apart.
 
 ## What reaches the model
 

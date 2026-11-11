@@ -5,6 +5,7 @@ using Axis.Tenancy;
 using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Npgsql;
 
 namespace Axis.Agent;
 
@@ -20,7 +21,7 @@ public static class AgentServiceCollectionExtensions
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
     /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims only a state that has a step.
-    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
@@ -42,12 +43,12 @@ public static class AgentServiceCollectionExtensions
         var settings = AiSettings.Load(configuration);
 
         var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
-        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, ITenantKeySource KeySource)? tenants =
+        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource)? tenants =
             settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
 
         services.AddSingleton(health);
         services.AddSingleton(settings);
-        if (tenants is var (catalog, modelKeys, keySource))
+        if (tenants is var (catalog, modelKeys, usage, keySource))
         {
             services.AddTenancy(catalog);
             services.AddSingleton(catalog);
@@ -55,6 +56,11 @@ public static class AgentServiceCollectionExtensions
             if (modelKeys is not null)
             {
                 services.AddSingleton(modelKeys);
+            }
+
+            if (usage is not null)
+            {
+                services.AddSingleton(usage);
             }
 
             // The data keys decrypt the stored refresh tokens of the requests.
@@ -92,12 +98,13 @@ public static class AgentServiceCollectionExtensions
     // The agent host reads its tenants as the worker does. Under directory it reads them when it runs, retries until a read works,
     // and reads the directory again every refresh interval. It ignores a Tenants section. Its key source reads the data keys from the
     // Tenants section, or under directory from the tenant directory as the server does. Under directory it also
-    // reads a tenant's own model key from the same database, see docs/reference/model-bindings.md#a-tenants-own-key.
-    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, ITenantKeySource KeySource) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
+    // reads a tenant's own model key from the same database, see docs/reference/model-bindings.md#a-tenants-own-key, and writes the tokens of
+    // its model calls to the tenant's usage there, see docs/reference/tenant-quotas.md#usage.
+    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
     {
         if (TenancySettings.Source(configuration) != TenancySource.Directory)
         {
-            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null, new ConfigurationTenantKeySource(configuration));
+            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null, null, new ConfigurationTenantKeySource(configuration));
         }
 
         var platformConnectionString = configuration.GetConnectionString("Platform");
@@ -116,7 +123,7 @@ public static class AgentServiceCollectionExtensions
             cipher,
             refreshInterval,
             configuration.GetSection(TenantOptions.SectionName).Exists());
-        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher), new DirectoryTenantKeySource(platformConnectionString, cipher));
+        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher), new TenantUsageStore(NpgsqlDataSource.Create(platformConnectionString)), new DirectoryTenantKeySource(platformConnectionString, cipher));
     }
 
     /// <summary>Makes every binding return the scripted answers in order, for tests and the journey.</summary>

@@ -3,9 +3,11 @@ using Npgsql;
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
-/// Writes the usage of a cell's tenants to <c>platform.tenant_usage_latest</c> and <c>platform.tenant_usage</c> over
+/// Writes the usage of a cell's tenants to <c>platform.tenant_usage_latest</c> and <c>platform.tenant_usage</c>, and the tokens of the
+/// agent host's model calls to <c>platform.tenant_token_usage</c>, over
 /// the platform database, and reads a tenant's latest storage sample and its day rows. It writes counts and sizes only, among them the counts of failed work. The platform
-/// role that the data source connects as has the write grant of <see cref="PlatformRoleGrants"/> on these two tables.
+/// role that the data source connects as has the write grant of <see cref="PlatformRoleGrants"/> on these three tables, see
+/// <c>docs/reference/tenant-quotas.md#usage</c>.
 /// </summary>
 public sealed class TenantUsageStore(NpgsqlDataSource platform)
 {
@@ -128,6 +130,52 @@ public sealed class TenantUsageStore(NpgsqlDataSource platform)
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Adds the tokens of one model call to the tenant's row of the UTC day of <paramref name="now"/> for the binding, the model and
+    /// <paramref name="ownKey"/>, which is true when the tenant's own key paid. The row is created when it does not exist yet. The tenant's token
+    /// rows older than <see cref="RetentionMonths"/> months are deleted in the same transaction.
+    /// </summary>
+    public async Task AddTokensAsync(string tenantId, string binding, string model, bool ownKey, long inputTokens, long outputTokens, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(binding);
+        ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        await using var connection = await platform.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using (var command = new NpgsqlCommand(
+            """
+            INSERT INTO platform.tenant_token_usage AS t (tenant_id, day, binding, model, own_key, input_tokens, output_tokens)
+            VALUES (@tenant, @day, @binding, @model, @ownKey, @input, @output)
+            ON CONFLICT (tenant_id, day, binding, model, own_key) DO UPDATE
+            SET input_tokens = t.input_tokens + EXCLUDED.input_tokens, output_tokens = t.output_tokens + EXCLUDED.output_tokens
+            """,
+            connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("tenant", tenantId);
+            command.Parameters.AddWithValue("day", today);
+            command.Parameters.AddWithValue("binding", binding);
+            command.Parameters.AddWithValue("model", model);
+            command.Parameters.AddWithValue("ownKey", ownKey);
+            command.Parameters.AddWithValue("input", inputTokens);
+            command.Parameters.AddWithValue("output", outputTokens);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (var retention = new NpgsqlCommand(
+            "DELETE FROM platform.tenant_token_usage WHERE tenant_id = @tenant AND day < @cutoff",
+            connection,
+            transaction))
+        {
+            retention.Parameters.AddWithValue("tenant", tenantId);
+            retention.Parameters.AddWithValue("cutoff", today.AddMonths(-RetentionMonths));
+            await retention.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ namespace Axis.Tenancy.Platform;
 /// Limits the platform reader role, the user of <c>ConnectionStrings:Platform</c>, to reading the
 /// <c>platform</c> schema: <c>USAGE</c> on the schema and <c>SELECT</c> on its tables, and <c>INSERT</c> on
 /// <c>data_protection_keys</c>, where the server stores its keys, and <c>INSERT</c>, <c>UPDATE</c> and <c>DELETE</c> on
-/// <c>tenant_usage</c> and <c>tenant_usage_latest</c>, where a cell's worker keeps usage, on <c>tenant_leases</c>, where
+/// <c>tenant_usage</c>, <c>tenant_usage_latest</c> and <c>tenant_token_usage</c>, where a cell's worker and the agent host keep usage, on <c>tenant_leases</c>, where
 /// the hosts of a cell share their running work, on <c>operator_sessions</c>, where the cell console keeps the sessions of its operators, <c>INSERT</c> on <c>jobs</c>, where the provisioning API queues its
 /// jobs, <c>INSERT</c> on <c>tenant_host_requests</c>, where it stores the requests for hosts of a tenant's own, and <c>INSERT</c> and <c>UPDATE</c> on <c>tenant_daily_counters</c>,
 /// where it counts the emails of the day, and nothing else. The one exception to reading is
@@ -58,7 +58,7 @@ public static class PlatformRoleGrants
             REVOKE ALL ON ALL SEQUENCES IN SCHEMA platform FROM {role};
             GRANT SELECT ON ALL TABLES IN SCHEMA platform TO {role};
             GRANT INSERT ON platform.data_protection_keys TO {role};
-            GRANT INSERT, UPDATE, DELETE ON platform.tenant_usage, platform.tenant_usage_latest TO {role};
+            GRANT INSERT, UPDATE, DELETE ON platform.tenant_usage, platform.tenant_usage_latest, platform.tenant_token_usage TO {role};
             GRANT INSERT, UPDATE, DELETE ON platform.tenant_leases TO {role};
             GRANT INSERT, UPDATE, DELETE ON platform.operator_sessions TO {role};
             GRANT INSERT ON platform.jobs TO {role};
