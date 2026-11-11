@@ -16,6 +16,7 @@ import { checkDocsMap } from './lib/docs/docs-map.mjs'
 import { gitBaseLineCount, relativePath } from './lib/docs/helpers.mjs'
 import { checkPlannedMarkers } from './lib/docs/planned-markers.mjs'
 import { checkSizes } from './lib/docs/sizes.mjs'
+import { checkStudioSpecFolders } from './lib/docs/studio-spec-folders.mjs'
 import { checkThreatTables } from './lib/docs/threat-tables.mjs'
 
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -27,6 +28,7 @@ export const rules = [
   checkAsvs,
   checkThreatTables,
   checkDevelopmentUsers,
+  checkStudioSpecFolders,
   checkPlannedMarkers,
   checkDecisions,
   checkCodeReferences,
@@ -49,7 +51,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
+  console.log('The docs map, the decisions index, the planned markers and where they sit, the ASVS table, the threat model tables, the development users, the Studio spec folders table, the decisions, sections and milestones the code cites and the doc sizes, the skill word limit, the AGENTS.md word limits and the scripts it names are in order.')
   return 0
 }
 

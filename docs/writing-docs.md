@@ -297,7 +297,8 @@ agrees.
       decision, that no planned marker names a milestone the roadmap calls Done or sits in a sentence, the size
       limits, the word limits of AGENTS.md, the scripts that its Commands table names, the [ASVS](reference/asvs.md#requirements) and threat model tables, and the
       [development users](reference/security.md#development-users) table against the development
-      realm. It also checks the decisions that the code and the docs cite, the sections the code links and
+      realm, and the Studio spec folders table of the [E2E stack](testing.md#the-e2e-stack) against the
+      specs. It also checks the decisions that the code and the docs cite, the sections the code links and
       the milestones the code names, as [references in the code](#references-in-the-code) says. It runs one
       module per rule under `scripts/lib/docs/`, each with its own test.
     - The unit tests of rule 7 compare each list with the code, such as the diagnostic code table.
