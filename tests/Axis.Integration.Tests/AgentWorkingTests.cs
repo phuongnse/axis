@@ -15,7 +15,8 @@ namespace Axis.Integration.Tests;
 /// <c>docs/reference/authoring-requests.md#states</c>. The model is the scripted adapter, and the step reaches the server of <see cref="AuthoringRealm"/> as
 /// the author. A call to a tool that is not offered, or one that names another draft or another application, gets a tool error and never reaches the server.
 /// A step whose model does not end its turn within 50 model calls, or whose answer stops at the output limit, stops the request as <c>failed</c> with the
-/// outcome <c>unfinished</c>, see <c>docs/reference/authoring-requests.md#budgets</c>.
+/// outcome <c>unfinished</c>, see <c>docs/reference/authoring-requests.md#budgets</c>. The checking step of the same host runs right after a working
+/// step, so these tests wait for the working step's row and compare only the tool calls the working step made.
 /// </summary>
 public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
@@ -51,13 +52,14 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not write the plan.");
         using var approved = await StudioPublishTests.SendAsync(client, HttpMethod.Post, $"{Url}/{id}/approve", Host);
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
-        await WaitUntilAsync(async () => await StateAsync(id) == "checking", "The host did not move the request to checking.");
+        await WorkFinishedAsync(id);
         await host.StopAsync(CancellationToken);
 
         var draft = await ScalarAsync($"SELECT coalesce(draft_id::text, '') FROM axis.authoring_requests WHERE id = '{id}'");
         Assert.True(Guid.TryParse(draft, out _), "The request holds no draft.");
         Assert.Matches(@"^\d+:work:-:160:true$", await StepsAsync(id, "work"));
-        Assert.Equal(["list_applications", "list_applications", "create_draft", "write_layer", "write_resource"], server.ToolCalls);
+        Assert.Equal(["list_applications", "list_applications", "create_draft", "write_layer", "write_resource"], server.ToolCalls.Take(5));
+        Assert.NotEqual("working", await StateAsync(id));
         foreach (var tool in new[] { "create_draft", "write_layer", "write_resource" })
         {
             Assert.Equal(
@@ -104,7 +106,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
         await using var host = BuildAgent(_realm, script, server);
         await host.StartAsync(CancellationToken);
-        await WaitUntilAsync(async () => await StateAsync(id) == "checking", "The host did not move the request to checking.");
+        await WorkFinishedAsync(id);
         await host.StopAsync(CancellationToken);
 
         var results = script.Calls[1].Messages[^1].Content.OfType<ModelToolResult>().ToList();
@@ -118,7 +120,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         // The name of the application is matched ignoring letter case, as the server matches it, and the draft is filled in.
         Assert.False(results[5].IsError, results[5].Content);
         // The step's own create_draft is the only one that reaches the server.
-        Assert.Equal(["list_applications", "create_draft", "read_names"], server.ToolCalls);
+        Assert.Equal(["list_applications", "create_draft", "read_names"], server.ToolCalls.Take(3));
         Assert.Equal("1", await ScalarAsync("SELECT count(*) FROM axis.audit_records WHERE action = 'mcp.toolCalled'"));
     }
 
@@ -138,14 +140,16 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
         await using var host = BuildAgent(_realm, script, server);
         await host.StartAsync(CancellationToken);
-        await WaitUntilAsync(async () => await StateAsync(id) == "checking", "The host did not move the request to checking.");
+        await WorkFinishedAsync(id);
         await host.StopAsync(CancellationToken);
 
         // The server finds no draft with the stored id, which shows that the step filled it in.
         var result = Assert.Single(script.Calls[1].Messages[^1].Content.OfType<ModelToolResult>());
         Assert.True(result.IsError);
         Assert.Equal(NoDraft, result.Content);
-        Assert.Equal(["list_applications", "validate_draft"], server.ToolCalls);
+        Assert.Equal(["list_applications", "validate_draft"], server.ToolCalls.Take(2));
+        // The working step finished and moved the request on. The checking step that follows finds no such draft and stops the request.
+        Assert.Matches(@"^\d+:work:-:\d+:true$", await StepsAsync(id, "work"));
         Assert.Contains(stored.ToString("D"), script.Calls[0].System, StringComparison.Ordinal);
         Assert.Equal(stored.ToString("D"), await ScalarAsync($"SELECT draft_id FROM axis.authoring_requests WHERE id = '{id}'"));
     }
@@ -229,8 +233,14 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
     private async Task WorkingAsync(Guid id) =>
         await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'working', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
 
+    // The working step's row is finished when it moved the request on in the same transaction, so the checking step may already run.
+    private Task WorkFinishedAsync(Guid id) =>
+        WaitUntilAsync(
+            async () => await ScalarAsync($"SELECT count(*) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'work' AND finished_at IS NOT NULL") == "1",
+            "The host did not finish the working step.");
+
     // The edited process of the module with one step added, as the layer tool takes it.
-    private static string LayerInput()
+    internal static string LayerInput(Action<JsonNode>? edit = null)
     {
         var edited = JsonNode.Parse(File.ReadAllText(Path.Combine(SampleModules.Path, Module, "1.2.0", "processes", "budget-approval.json")))!;
         ((JsonArray)edited["steps"]!).Add(JsonNode.Parse(
@@ -238,19 +248,21 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
             {
               "name": "financeReview",
               "type": "task",
+              "label": { "textKey": "department-budgets.budgetApproval.review" },
               "assignee": { "role": "approver" },
               "form": "BudgetReview",
               "outcomes": [
-                { "name": "approve", "next": "markApproved" },
-                { "name": "reject", "next": "markRejected" }
+                { "name": "approve", "label": { "textKey": "department-budgets.budgetApproval.approve" }, "next": "markApproved" },
+                { "name": "reject", "label": { "textKey": "department-budgets.budgetApproval.reject" }, "next": "markRejected" }
               ]
             }
             """));
+        edit?.Invoke(edited);
         return new JsonObject { ["application"] = "PurchaseRequests", ["module"] = Module, ["id"] = ProcessId, ["content"] = edited }.ToJsonString();
     }
 
     // A copy of a scenario of the sample with a new id and name.
-    private static string ScenarioInput()
+    internal static string ScenarioInput()
     {
         var scenario = JsonNode.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests", "scenarios", "approval-below-threshold.json")))!;
         scenario["id"] = Guid.NewGuid().ToString("D");

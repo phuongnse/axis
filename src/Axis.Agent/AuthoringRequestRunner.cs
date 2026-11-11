@@ -94,7 +94,7 @@ internal sealed partial class AuthoringRequestRunner(
                 throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
             }
 
-            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, cancellationToken))
+            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, result.Checks, cancellationToken))
             {
                 LogClaimLost(request.Id);
             }

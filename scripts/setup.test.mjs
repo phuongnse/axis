@@ -171,8 +171,10 @@ describe('scripts/setup.sh retries its network steps', () => {
 
 describe('scripts/lib/tools.sh limits every download', () => {
   test('each curl has a connect and a total time limit, and no retry of its own', () => {
-    // Joins the lines that continue a command, so a curl that spans lines is read whole.
-    const lines = toolsSh.replace(/\\\n\s*/g, ' ').split('\n')
+    // Reads the two scripts that hold the downloads. Joins the lines that continue a command, so a curl
+    // that spans lines is read whole.
+    const downloads = ['scripts/lib/tools.sh', 'scripts/lib/trivy.sh'].map((file) => readFileSync(join(root, file), 'utf8'))
+    const lines = downloads.join('\n').replace(/\\\n\s*/g, ' ').split('\n')
     const curls = lines.filter((line) => /(^|\$\()retry 4 curl /.test(line.trim()))
     assert.equal(curls.length, 7)
     for (const line of curls) {

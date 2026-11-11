@@ -21,6 +21,9 @@ public sealed class AuthoringRequestStep
     /// <summary>The step's model messages as JSON, kept for 30 days, or null.</summary>
     public string? Messages { get; init; }
 
+    /// <summary>The results of a check step as JSON, or null.</summary>
+    public string? Checks { get; init; }
+
     public DateTimeOffset StartedAt { get; init; }
 
     public DateTimeOffset? FinishedAt { get; init; }

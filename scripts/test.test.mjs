@@ -58,6 +58,7 @@ function runTest(extraEnv = {}) {
       'scripts/test.sh',
       'scripts/lib/test-results.sh',
       'scripts/lib/tools.sh',
+      'scripts/lib/trivy.sh',
       'scripts/lib/retry.sh',
       'scripts/lib/test-shard.mjs',
       'scripts/lib/shards.mjs',

@@ -273,6 +273,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string? inputSummary,
         string? plan,
         string? messages,
+        string? checks,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
@@ -303,13 +304,14 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         }
 
         await using (var command = new NpgsqlCommand(
-            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, messages = @messages, finished_at = now() WHERE id = @step AND request_id = @id",
+            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, messages = @messages, checks = @checks, finished_at = now() WHERE id = @step AND request_id = @id",
             connection,
             transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("outcome", NpgsqlDbType.Text) { Value = (object?)outcome ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("summary", NpgsqlDbType.Text) { Value = (object?)inputSummary ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("messages", NpgsqlDbType.Jsonb) { Value = (object?)messages ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("checks", NpgsqlDbType.Jsonb) { Value = (object?)checks ?? DBNull.Value });
             command.Parameters.AddWithValue("step", stepId);
             command.Parameters.AddWithValue("id", requestId);
             await command.ExecuteNonQueryAsync(cancellationToken);
