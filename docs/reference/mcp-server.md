@@ -120,23 +120,23 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 A tool with an optional draft reads the working folder without it and the person's own
 [draft](revisions-and-drafts.md#drafts) with it.
 
-| Tool                                 | Input                                         | Output                                                                                                                                                                   |
-| ------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list_applications`                  | none                                          | The applications the person may author                                                                                                                                   |
-| `read_reference`                     | a topic, such as a resource kind              | The schema and reference text of that kind, from the installed version of Axis                                                                                           |
-| `list_resources`                     | application, optional draft                   | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                                                               |
-| `read_resource`                      | application, `id`, optional draft             | The resource's content and version                                                                                                                                       |
-| `read_module_resource`               | application, module, `id`                     | A resource of the pinned module version, with the application's layer applied                                                                                            |
-| `read_names`                         | application, optional draft                   | The names the application defines, as the [names route](authoring.md#names) gives them                                                                                   |
-| `check_expression`                   | application, draft, `id`, path, expression    | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft                                               |
-| `create_draft`                       | application                                   | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from                                                      |
-| `write_resource`                     | application, draft, `content`                 | Creates or replaces a resource in the draft, with its diagnostics                                                                                                        |
-| `write_layer`                        | application, draft, `module`, `id`, `content` | Writes the layer that holds the difference in the draft, as Studio saves do, see [customization layers](customization-layers.md#in-studio), with the draft's diagnostics |
-| `delete_resource`                    | application, draft, `id`                      | Removes a resource from the draft, with the draft's diagnostics                                                                                                          |
-| `validate_draft` _(planned for M35)_ | application, draft                            | The draft's diagnostics, contract checks included                                                                                                                        |
-| `run_scenarios` _(planned for M35)_  | application, draft, optional names            | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher                                                  |
-| `diff_draft` _(planned for M35)_     | application, draft                            | The draft's changes from the working folder, resource by resource                                                                                                        |
-| `accept_draft` _(planned for M35)_   | application, draft                            | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                                                                      |
+| Tool                                | Input                                         | Output                                                                                                                                                                   |
+| ----------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list_applications`                 | none                                          | The applications the person may author                                                                                                                                   |
+| `read_reference`                    | a topic, such as a resource kind              | The schema and reference text of that kind, from the installed version of Axis                                                                                           |
+| `list_resources`                    | application, optional draft                   | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                                                               |
+| `read_resource`                     | application, `id`, optional draft             | The resource's content and version                                                                                                                                       |
+| `read_module_resource`              | application, module, `id`                     | A resource of the pinned module version, with the application's layer applied                                                                                            |
+| `read_names`                        | application, optional draft                   | The names the application defines, as the [names route](authoring.md#names) gives them                                                                                   |
+| `check_expression`                  | application, draft, `id`, path, expression    | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft                                               |
+| `create_draft`                      | application                                   | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from                                                      |
+| `write_resource`                    | application, draft, `content`                 | Creates or replaces a resource in the draft, with its diagnostics                                                                                                        |
+| `write_layer`                       | application, draft, `module`, `id`, `content` | Writes the layer that holds the difference in the draft, as Studio saves do, see [customization layers](customization-layers.md#in-studio), with the draft's diagnostics |
+| `delete_resource`                   | application, draft, `id`                      | Removes a resource from the draft, with the draft's diagnostics                                                                                                          |
+| `validate_draft`                    | application, draft                            | The draft's diagnostics, contract checks included, as the [diagnostics](authoring.md#diagnostics) route gives them                                                       |
+| `run_scenarios` _(planned for M35)_ | application, draft, optional names            | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher                                                  |
+| `diff_draft`                        | application, draft, optional `cursor`         | One page of the draft's changes from the working folder, resource by resource, as the [draft diff](authoring-revisions.md#draft-diff) route gives them                   |
+| `accept_draft` _(planned for M35)_  | application, draft                            | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                                                                      |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
@@ -197,8 +197,10 @@ A call to the server is limited in rate and size, and the agent host's requests 
   model. Requests of the agent host count toward `authoringRequests`, see
   [tenant quotas](tenant-quotas.md#quotas).
 - **Size.** `POST /mcp` refuses a request body over 1 MiB with `413`, so a tool input is at most 1 MiB.
-- **Output pages** _(planned for M35)_. A tool output is at most 1 MiB. A larger output, such as the
-  diff of a large draft, is cut into pages that the tool's `cursor` reads.
+- **Output pages.** `diff_draft` answers the diff of a draft in pages of whole entries of at most 1 MiB, as
+  the [draft diff](authoring-revisions.md#draft-diff) route does, and a page's `cursor` reads the next one.
+- **Output size** _(planned for M35)_. Every tool output is at most 1 MiB, and a larger output of another tool
+  is cut into pages that its `cursor` reads.
 
 ## Audit
 
