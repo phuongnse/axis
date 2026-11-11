@@ -186,6 +186,12 @@
         "tests": { "type": "boolean" }
       }
     },
+    "ai": {
+      "type": "object",
+      "properties": {
+        "allowTenantKeys": { "type": "boolean" }
+      }
+    },
     "identity": {
       "type": "object",
       "properties": {

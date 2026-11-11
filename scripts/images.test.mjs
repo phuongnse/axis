@@ -251,6 +251,8 @@ test('the agent host starts read-only with AI authoring on and its settings in /
       '-e',
       'Ai__DefaultBinding=main',
       '-e',
+      'Ai__AllowTenantKeys=true',
+      '-e',
       'Health__Urls=http://0.0.0.0:5209',
     ]),
   )

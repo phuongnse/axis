@@ -188,6 +188,12 @@ studio:
   persistence: {}
   tests: false
 
+# AI authoring, on the server and the agent host. allowTenantKeys renders Ai__AllowTenantKeys on both, so they
+# agree: the server lets a tenant administrator set the tenant's own model key, and the agent host uses it in
+# place of the installation's key on that tenant's model calls.
+ai:
+  allowTenantKeys: false
+
 # Axis's identity provider: one Keycloak pod, always on, with the Axis theme and the breached-password
 # list. It listens on HTTPS only, with the certificate of secrets.identityCertificate. Its database
 # settings and the axis-admin client secret come from the identity secrets below. Clustering Keycloak

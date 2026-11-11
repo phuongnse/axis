@@ -33,6 +33,10 @@ spec:
           # extension, module or cell setting, so it does not use axis.hostEnv.
           env:
             {{- include "axis.tenancyEnv" . | nindent 12 }}
+            {{- if .Values.ai.allowTenantKeys }}
+            - name: Ai__AllowTenantKeys
+              value: "true"
+            {{- end }}
             # The image keeps the health address on loopback. The kubelet probes the pod address.
             - name: Health__Urls
               value: http://0.0.0.0:5209

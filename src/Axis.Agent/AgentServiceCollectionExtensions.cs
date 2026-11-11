@@ -13,16 +13,17 @@ public static class AgentServiceCollectionExtensions
     /// background service of the agent host. The host reads <c>Ai:Bindings:&lt;name&gt;</c> with its <c>Kind</c>, <c>Endpoint</c>,
     /// <c>Model</c>, <c>KeyFile</c> and <c>MaxOutputTokens</c>, which defaults to 16000, and <c>Ai:DefaultBinding</c> and
     /// <c>Ai:ReviewBinding</c>. With no <c>Ai:DefaultBinding</c> it starts idle, because AI authoring is off: it reads no tenant setting
-    /// and no secret. With one, it reads its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
+    /// and no secret. With one, it reads <c>Ai:AllowTenantKeys</c> and its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
-    /// registered. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// registered. <see cref="TenantModelAdapters"/> gives those steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
     /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, or <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
+    /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
     /// <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, or <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none outside Development and Testing.
     /// Also two registered <see cref="IAuthoringStep"/> work on one state, or one works on a state that needs no work.
@@ -37,14 +38,23 @@ public static class AgentServiceCollectionExtensions
         var health = HealthOptions.Load(configuration, "http://127.0.0.1:5209");
         var settings = AiSettings.Load(configuration);
 
-        var catalog = settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
+        var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
+        (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys)? tenants =
+            settings.DefaultBinding is null ? null : LoadTenantCatalog(configuration, environment);
 
         services.AddSingleton(health);
         services.AddSingleton(settings);
-        if (catalog is not null)
+        if (tenants is var (catalog, modelKeys))
         {
             services.AddTenancy(catalog);
             services.AddSingleton(catalog);
+            services.AddSingleton(tenantKeys!);
+            if (modelKeys is not null)
+            {
+                services.AddSingleton(modelKeys);
+            }
+
+            services.AddSingleton<TenantModelAdapters>();
             services.AddSingleton<AuthoringRequestStore>();
             services.TryAddSingleton(AuthoringLoopOptions.Default);
             services.AddSingleton<AuthoringSteps>();
@@ -64,12 +74,13 @@ public static class AgentServiceCollectionExtensions
     }
 
     // The agent host reads its tenants as the worker does. Under directory it reads them when it runs, retries until a read works,
-    // and reads the directory again every refresh interval. It ignores a Tenants section and holds no key source.
-    private static BackgroundTenantCatalog LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
+    // and reads the directory again every refresh interval. It ignores a Tenants section and holds no key source. Under directory it also
+    // reads a tenant's own model key from the same database, see docs/reference/model-bindings.md#a-tenants-own-key.
+    private static (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys) LoadTenantCatalog(IConfiguration configuration, IHostEnvironment environment)
     {
         if (TenancySettings.Source(configuration) != TenancySource.Directory)
         {
-            return BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
+            return (BackgroundTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment)), null);
         }
 
         var platformConnectionString = configuration.GetConnectionString("Platform");
@@ -83,11 +94,12 @@ public static class AgentServiceCollectionExtensions
         // Read first, so a bad value stops the start even when the database is not there.
         var refreshInterval = TenancySettings.RefreshInterval(configuration);
         var cipher = TenantSecretCipher.Load(configuration);
-        return BackgroundTenantCatalog.FromDirectory(
+        var catalog = BackgroundTenantCatalog.FromDirectory(
             platformConnectionString,
             cipher,
             refreshInterval,
             configuration.GetSection(TenantOptions.SectionName).Exists());
+        return (catalog, new DirectoryTenantModelKeys(platformConnectionString, cipher));
     }
 
     /// <summary>Makes every binding return the scripted answers in order, for tests and the journey.</summary>

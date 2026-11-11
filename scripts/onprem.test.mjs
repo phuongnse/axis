@@ -116,7 +116,7 @@ const openToAll = (dir) => {
 const render = (extraFiles = []) => {
   const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost, ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_IDENTITY_HOST', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
-  for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
+  for (const name of Object.keys(env)) if (name.startsWith('Studio__') || name.startsWith('Ai__')) delete env[name]
   const rendered = spawnSync(
     'docker',
     ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'replicas', 'config', '--format', 'json'],
@@ -414,6 +414,20 @@ describe('the TLS proxy', () => {
     const sites = lines.filter((line) => /^\S/.test(line) && line.trimEnd().endsWith('{') && line.trim() !== '{').map((line) => line.trim())
     assert.deepEqual(sites, [':443 {'])
     assert.ok(!lines.some((line) => line.includes('http://')), 'the Caddyfile names an http:// address')
+  })
+})
+
+describe('the tenant model key setting', () => {
+  test('both servers and the agent host take Ai__AllowTenantKeys from the shell, and no other host does', () => {
+    const { services } = render()
+    for (const name of ['server', 'server-2', 'agent']) {
+      assert.ok(Object.hasOwn(services[name].environment, 'Ai__AllowTenantKeys'), `${name} has no Ai__AllowTenantKeys`)
+      const value = services[name].environment.Ai__AllowTenantKeys
+      assert.ok(value === null || value === undefined || value === '', `${name} sets Ai__AllowTenantKeys`)
+    }
+    for (const name of ['worker', 'publisher', 'admin']) {
+      assert.equal(services[name].environment?.Ai__AllowTenantKeys, undefined, `${name} has Ai__AllowTenantKeys`)
+    }
   })
 })
 
