@@ -215,15 +215,24 @@ describe('durations', () => {
     assert.deepEqual(mergeDurations({ A: 1, B: 2, Gone: 3 }, { A: 10 }, ['A', 'B']), { A: 10, B: 2 })
   })
 
-  test('measures the parallelism as the tests’ seconds over the wall time of the integration suites', () => {
-    // The control plane's tests count toward the seconds, and its suite does not count toward the wall time.
+  test('measures the parallelism over the integration suite alone, so the control plane suite counts on neither side', () => {
     const controlPlaneXml =
       '<testsuite name="/p/Axis.ControlPlane.Integration.Tests.dll" tests="1" time="50">' +
       '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="x" time="50" /></testsuite>'
     const integrationXml =
       '<testsuite name="/p/Axis.Integration.Tests.dll" tests="2" time="100">' +
-      '<testcase classname="N.ATests" name="a" time="60" /><testcase classname="N.BTests" name="b" time="40" /></testsuite>'
+      '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>'
     assert.equal(junitParallelism([controlPlaneXml, integrationXml]), 1.5)
+  })
+
+  test('leaves the scenario suites out of the parallelism on both sides', () => {
+    const integrationXml =
+      '<testsuite name="/p/Axis.Integration.Tests.dll" tests="2" time="100">' +
+      '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>'
+    const scenarioXml =
+      '<testsuites><testsuite name="PurchaseRequests" tests="1" time="40">' +
+      '<testcase classname="PurchaseRequests" name="s" time="40" /></testsuite></testsuites>'
+    assert.equal(junitParallelism([integrationXml, scenarioXml]), 1.5)
   })
 
   test('has no parallelism without an integration suite', () => {
@@ -362,6 +371,39 @@ describe('main', () => {
         'N.ATests': 1,
         'N.BTests': 8,
         parallelism: 0.86,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--durations writes the parallelism of the integration suite alone, with the control plane and scenario files', () => {
+    const dir = project()
+    try {
+      const controlPlane = path.join(dir, 'Axis.ControlPlane.Integration.Tests.xml')
+      const integration = path.join(dir, 'Axis.Integration.Tests.xml')
+      const scenarios = path.join(dir, 'scenarios-PurchaseRequests.xml')
+      writeFileSync(
+        controlPlane,
+        '<testsuite name="/p/Axis.ControlPlane.Integration.Tests.dll" time="50">' +
+          '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="x" time="50" /></testsuite>',
+      )
+      writeFileSync(
+        integration,
+        '<testsuite name="/p/Axis.Integration.Tests.dll" time="100">' +
+          '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>',
+      )
+      writeFileSync(
+        scenarios,
+        '<testsuites><testsuite name="PurchaseRequests" tests="1" time="40">' +
+          '<testcase classname="PurchaseRequests" name="s" time="40" /></testsuite></testsuites>',
+      )
+      main(['--durations', controlPlane, integration, scenarios], dir)
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
+        'Axis.ControlPlane.Integration.Tests': 50,
+        'N.ATests': 90,
+        'N.BTests': 60,
+        parallelism: 1.5,
       })
     } finally {
       rmSync(dir, { recursive: true, force: true })

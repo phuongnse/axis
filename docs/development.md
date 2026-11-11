@@ -422,10 +422,10 @@ check's `max` is at least 2 and a second smoke job would take two rounds past th
   `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
   in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The count estimates a
   shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
-  a collection runs its classes one after another. `--durations` measures the parallelism as all test
-  seconds over the wall time of the suites. The last shard runs every class that the other shards do
-  not, so a class the split does not find still runs. The scenario suites are expected only in the shard
-  that holds `ScenarioRunnerTests`, which writes them. A shard cannot be combined with arguments.
+  a collection runs its classes one after another. `--durations` measures the parallelism as the test seconds of
+  `Axis.Integration.Tests` over those suites' wall time, and the control plane and scenario suites count on
+  neither side. The last shard runs every class that the other shards do not, so a class the split does not
+  find still runs. The scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them. A shard cannot be combined with arguments.
 - **Smoke.** Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`. `NEXKIT_SHARD` works the
   same way beside it, and `AXIS_SMOKE_SHARD` wins when both are set. A shard runs the smoke tests that
   `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
