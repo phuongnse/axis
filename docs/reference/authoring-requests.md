@@ -26,16 +26,17 @@ no shortcut of its own.
 
 ## Acting for the author
 
-_(planned for M35)_
-
 The agent host acts with exactly the grants of the author who sent the request.
 
 - **Token exchange.** When an author sends a request, the server exchanges the author's session for a
   token of the agent host's client, by OAuth 2.0 token exchange (RFC 8693) at the tenant's realm. The
-  token's subject is the author and its audience is the MCP server.
+  token's subject is the author and its audience is the MCP server. The send refuses with `403` a
+  token that does not carry the author role, the check that the MCP server makes on the same token.
 - **Kept with the request.** The refresh token is stored in the request row, encrypted with the
-  tenant's data key, and deleted when the request ends. It ends with the author's realm session, at
-  most 8 hours. A request that outlives it stops as `failed`, and the author sends it again.
+  tenant's data key, and a drop erases it.
+- **Ends with the session.** _(planned for M35)_ The refresh token is deleted when the request ends.
+  It ends with the author's realm session, at most 8 hours. A request that outlives it stops as
+  `failed`, and the author sends it again.
 - **No shortcut.** The agent host holds no role of its own on any tenant. A token exchange for a
   person who has lost the author role is refused.
 
@@ -84,8 +85,12 @@ request, which belongs to [accepting](#accepting).
 
 - **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
   tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),
-  its manifest `id` (`409`), the content type (`415`) and the body (`400`). Just before the insert it
-  counts again under a lock, so sends at the same time cannot pass the quota together. The other
+  its manifest `id` (`409`), the content type (`415`) and the body (`400`). It then gets the agent
+  host's [token](#acting-for-the-author): `409` for a `fapi2` tenant or a tenant that has no agent
+  client, `401` for a grant the realm refuses or a session that keeps no platform token, `503` for a
+  realm that does not answer, and `403` for an exchanged token without the author role. None of these
+  writes a row or an audit record, and a bad body never calls the realm. Just before the insert it
+  counts the quota again under a lock, so sends at the same time cannot pass it together. The other
   routes check the session, the author role and the application, then answer `404` for an `id` that is
   not a UUID of this application. Approve, change plan and drop then answer `403` to anyone but the
   author of the request, and last answer `409` for a request in a state the action does not accept.

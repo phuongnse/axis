@@ -81,7 +81,7 @@ public sealed class SessionTokensTests(KeycloakFixture keycloak, PostgreSqlFixtu
         var stored = row.RefreshToken;
         for (var refresh = 0; refresh < 2; refresh++)
         {
-            var access = await tokens.RefreshAsync(connection, Tenant, null, row.IdHash, CancellationToken);
+            var access = (await tokens.RefreshAsync(connection, Tenant, null, row.IdHash, CancellationToken)).AccessToken;
 
             Assert.NotNull(access);
             var token = new JsonWebToken(access);
@@ -115,7 +115,7 @@ public sealed class SessionTokensTests(KeycloakFixture keycloak, PostgreSqlFixtu
             await insert.ExecuteNonQueryAsync(CancellationToken);
         }
 
-        var access = await Factory.Services.GetRequiredService<SessionTokens>().RefreshAsync(connection, Tenant, null, copy, CancellationToken);
+        var access = (await Factory.Services.GetRequiredService<SessionTokens>().RefreshAsync(connection, Tenant, null, copy, CancellationToken)).AccessToken;
 
         Assert.Null(access);
         Assert.Null(await ReadRefreshTokenAsync(copy));

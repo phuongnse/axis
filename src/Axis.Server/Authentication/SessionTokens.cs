@@ -18,7 +18,8 @@ namespace Axis.Server.Authentication;
 /// through the platform client on a <c>standard</c> tenant stores the token encrypted in the session's <c>axis.sessions</c> row, and
 /// <see cref="RefreshAsync(HttpContext, CancellationToken)"/> turns it into a current access token under a lock on that row. The token
 /// is encrypted in the sensitive value format and bound to the row, so it is never in the database in clear and a copy on another row
-/// does not decrypt. No response carries it.
+/// does not decrypt. No response carries it. A refresh answers a <see cref="SessionRefresh"/>, which tells a session that has no usable
+/// token from a realm that failed to answer.
 /// </summary>
 internal sealed partial class SessionTokens(
     TenantSignInSettings settings,
@@ -53,9 +54,10 @@ internal sealed partial class SessionTokens(
     }
 
     /// <summary>
-    /// Refreshes the token of the request's session. Null when the request has no session, or as <see cref="RefreshAsync(NpgsqlConnection, string, string?, byte[], CancellationToken)"/> says.
+    /// Refreshes the token of the request's session. It has no access token when the request has no session, or as
+    /// <see cref="RefreshAsync(NpgsqlConnection, string, string?, byte[], CancellationToken)"/> says.
     /// </summary>
-    public async Task<string?> RefreshAsync(HttpContext httpContext, CancellationToken cancellationToken)
+    public async Task<SessionRefresh> RefreshAsync(HttpContext httpContext, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
 
@@ -66,7 +68,7 @@ internal sealed partial class SessionTokens(
             || Session.ReadSessionId(result.Principal) is not { } id
             || !Base64Url.IsValid(id))
         {
-            return null;
+            return SessionRefresh.None;
         }
 
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
@@ -76,16 +78,17 @@ internal sealed partial class SessionTokens(
     /// <summary>
     /// Refreshes the token of the session with this id hash and returns the new access token. The row is locked while the token
     /// endpoint answers, so two refreshes never rotate the token at once, and the new refresh token the realm returns replaces the
-    /// stored one. Null when the session keeps no token, when the tenant is <c>fapi2</c> or unknown, and when the refresh failed. A
-    /// token that the realm refuses with <c>invalid_grant</c>, or that no longer decrypts, is cleared. Any other failure keeps it.
+    /// stored one. The result has no access token when the session keeps no token, when the tenant is <c>fapi2</c> or unknown, and when
+    /// the refresh failed. A token that the realm refuses with <c>invalid_grant</c>, or that no longer decrypts, is cleared. Any other
+    /// failure keeps it, and only that failure sets <see cref="SessionRefresh.Unavailable"/>.
     /// </summary>
-    public async Task<string?> RefreshAsync(NpgsqlConnection connection, string tenantId, string? sitePath, byte[] idHash, CancellationToken cancellationToken)
+    public async Task<SessionRefresh> RefreshAsync(NpgsqlConnection connection, string tenantId, string? sitePath, byte[] idHash, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
 
         if (settings.Find(tenantId) is not { } tenant || tenant.Profile == TenantSignInProfiles.Fapi2)
         {
-            return null;
+            return SessionRefresh.None;
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -107,7 +110,7 @@ internal sealed partial class SessionTokens(
         if (stored is null)
         {
             await transaction.CommitAsync(cancellationToken);
-            return null;
+            return SessionRefresh.None;
         }
 
         string current;
@@ -120,7 +123,7 @@ internal sealed partial class SessionTokens(
             LogNotDecrypted(logger, tenantId);
             await StoreAsync(connection, transaction, idHash, null, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-            return null;
+            return SessionRefresh.None;
         }
 
         try
@@ -151,7 +154,7 @@ internal sealed partial class SessionTokens(
                 }
 
                 await transaction.CommitAsync(cancellationToken);
-                return access;
+                return new SessionRefresh(access, false);
             }
 
             if (response.StatusCode == HttpStatusCode.BadRequest
@@ -161,7 +164,7 @@ internal sealed partial class SessionTokens(
                 LogRefused(logger, tenantId);
                 await StoreAsync(connection, transaction, idHash, null, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
-                return null;
+                return SessionRefresh.None;
             }
 
             LogFailed(logger, tenantId, $"status {(int)response.StatusCode}");
@@ -173,7 +176,7 @@ internal sealed partial class SessionTokens(
         }
 
         await transaction.RollbackAsync(cancellationToken);
-        return null;
+        return new SessionRefresh(null, true);
     }
 
     private static async Task StoreAsync(
@@ -196,4 +199,14 @@ internal sealed partial class SessionTokens(
 
     [LoggerMessage(LogLevel.Warning, "Refreshing a session's token of tenant {TenantId} failed with {Reason}. The stored token is kept.")]
     private static partial void LogFailed(ILogger logger, string tenantId, string reason);
+}
+
+/// <summary>
+/// The result of <see cref="SessionTokens"/>'s refresh. <c>AccessToken</c> is the new access token, or <c>null</c> when there is none.
+/// <c>Unavailable</c> is true when the realm failed to answer or answered an error, and false when the session simply has no usable token.
+/// </summary>
+internal sealed record SessionRefresh(string? AccessToken, bool Unavailable)
+{
+    /// <summary>The session has no usable token, and the realm did not fail.</summary>
+    public static SessionRefresh None { get; } = new(null, false);
 }

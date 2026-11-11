@@ -274,6 +274,7 @@ builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
 builder.Services.AddScoped<SiteSignIn>();
 builder.Services.AddSingleton<SessionTokens>();
+builder.Services.AddSingleton<IAuthorTokenExchange, AuthorTokenExchange>();
 builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
 builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 

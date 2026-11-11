@@ -36,9 +36,9 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
     private const string Host = "localhost";
     private const string McpUrl = "https://localhost/mcp";
     private const string PlatformRedirectUri = "https://localhost/api/auth/callback";
-    private const string TokenExchangeGrant = "urn:ietf:params:oauth:grant-type:token-exchange";
-    private const string AccessTokenType = "urn:ietf:params:oauth:token-type:access_token";
-    private const string RefreshTokenType = "urn:ietf:params:oauth:token-type:refresh_token";
+    private const string TokenExchangeGrant = RealmAgentTokens.TokenExchangeGrant;
+    private const string AccessTokenType = RealmAgentTokens.AccessTokenType;
+    private const string RefreshTokenType = RealmAgentTokens.RefreshTokenType;
 
     // The mapper stands in for the roles that tenant realms do not yet put into MCP tokens.
     private static readonly Dictionary<string, object> _rolesMapper = new()

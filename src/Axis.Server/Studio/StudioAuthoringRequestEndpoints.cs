@@ -4,6 +4,8 @@ using System.Text.Json.Serialization;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
+using Axis.Data.Records;
+using Axis.Data.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
@@ -19,9 +21,12 @@ namespace Axis.Server.Studio;
 /// the tenant of the host and answers 202 with the request and a <c>Location</c> for <c>GET .../authoring-requests/{id}</c>.
 /// The checks run in this order: session (401), author role (403), in a cell the tenant's <c>authoringRequests</c> quota
 /// (403 <c>quota-exceeded</c>), the application (404), a manifest with a UUID <c>id</c> (409), the content type (415), then the body
-/// (400), which is <c>{ text, autoAccept? }</c> with a <c>text</c> of up to 4000 characters. Just before the insert the quota is
-/// counted again under a transaction lock, so two sends at once cannot both pass it. The request and its audit record commit
-/// together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
+/// (400), which is <c>{ text, autoAccept? }</c> with a <c>text</c> of up to 4000 characters. Then the send gets the agent host's token for
+/// the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, before the transaction and the quota lock, so a bad
+/// body never calls the realm: a <c>fapi2</c> tenant or one with no agent client answers 409, a refused grant or a session with no
+/// platform token 401, a realm that does not answer 503, and an exchanged token without the author role 403. None of them writes a
+/// row. Just before the insert the quota is counted again under a transaction lock, so two sends at once cannot both pass it. The
+/// request, its encrypted refresh token and its audit record commit together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
 /// reads one with its steps. The session and role checks and the application come first, and then an <c>id</c> that is not a UUID of this
 /// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c> and <c>.../drop</c> run those checks, then answer 403
 /// to anyone but the request's author, for <c>change-plan</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
@@ -74,6 +79,8 @@ internal static class StudioAuthoringRequestEndpoints
         TenantDatabase database,
         TenantQuotas quotas,
         ITenantContextAccessor tenants,
+        IAuthorTokenExchange exchange,
+        SensitiveValues values,
         ILoggerFactory loggers)
     {
         if (await StudioEndpoints.RefuseAsync(httpContext, options) is { } refusal)
@@ -117,6 +124,12 @@ internal static class StudioAuthoringRequestEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid authoring request.");
         }
 
+        var token = await exchange.ExchangeAsync(httpContext, cancellationToken);
+        if (token.Outcome != AuthorTokenOutcome.Exchanged)
+        {
+            return TokenRefusal(token.Outcome);
+        }
+
         var user = (await CurrentUsers.FindAsync(httpContext))!;
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
@@ -154,12 +167,25 @@ internal static class StudioAuthoringRequestEndpoints
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await AuthoringRequestTokens.StoreAsync(connection, transaction, values, tenantId!, id, token.RefreshToken!, cancellationToken);
         await AppendAuditAsync(transaction, user.Id, AuditActions.AuthoringRequestSent, applicationId, id, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var response = await ReadAsync(connection, id, applicationId, application, steps: false, user.DisplayName, cancellationToken);
         return Results.Accepted(Location(application, id), response);
     }
+
+    private static IResult TokenRefusal(AuthorTokenOutcome outcome) => outcome switch
+    {
+        AuthorTokenOutcome.NotOffered => StudioEndpoints.Problem(
+            StatusCodes.Status409Conflict, "This tenant cannot let the agent host act for an author."),
+        AuthorTokenOutcome.Refused => StudioEndpoints.Problem(
+            StatusCodes.Status401Unauthorized, "Sign in again so the agent host can act for you."),
+        AuthorTokenOutcome.NotAuthor => StudioEndpoints.Problem(
+            StatusCodes.Status403Forbidden, "Your sign-in no longer holds the author role."),
+        _ => StudioEndpoints.Problem(
+            StatusCodes.Status503ServiceUnavailable, "The identity provider did not answer. Try again later."),
+    };
 
     private static async Task<IResult> ListAsync(
         string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
