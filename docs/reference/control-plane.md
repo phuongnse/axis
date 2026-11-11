@@ -117,7 +117,7 @@ every business change.
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) and the [period invoices](payments.md#invoices) (`createPeriodInvoices`) each every hour. When the directory and a cell are set, it also queues the
-    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When `ControlPlane:PayOs:Provider` is set, it also queues the [payment links](payments.md#paying-in-vietnam) (`createPaymentLinks`) every 5 minutes. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -230,7 +230,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
   named, the ones it needs are required. The sign-up applications are optional, and each listed one
   needs an id, both titles and both descriptions. The sign-up documents are optional, and once one of
   their settings is set, all of them are required. The sign-up challenge key is optional. The disposable domain list is optional, and once one of its
-  settings is set, both are required. The trial quotas are optional. The public URL is optional.
+  settings is set, both are required. The trial quotas are optional. The public URL is optional. The PayOS provider is optional.
 - **Refused.** A missing or wrong value stops the start, and the message names the setting, with the
   index of a cell or an application, or the quota key, and never its value.
 - **Forwarded headers.** The control plane reads `ForwardedHeaders:KnownProxies` and
@@ -272,6 +272,7 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
+| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake`. Optional. With none the service registers no adapter and no payment link job | `Fake` is refused outside Development and Testing. Any other value is refused |
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |

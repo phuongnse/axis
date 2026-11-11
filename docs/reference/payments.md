@@ -54,18 +54,35 @@ A billing invoice is Axis's own record of what a subscription owes for a period 
 
 ## Paying in Vietnam
 
-_(planned for M34)_
-
 In Vietnam a tenant pays each invoice by bank transfer, through a VietQR code.
 
-- **Provider.** PayOS, with VietQR bank transfers.
-- **A payment link for each invoice.** The control plane creates a PayOS payment request with the
-  invoice's amount in `VND` and a unique integer `orderCode`, and shows its VietQR code and transfer
-  details in the [billing portal](billing-portal.md) and in the reminder emails' link.
-- **No automatic charge.** A bank transfer cannot be pulled, so each period the owner or a billing
+- **Provider** _(planned for M34)_. PayOS, with VietQR bank transfers. Until the real adapter is built,
+  `ControlPlane:PayOs:Provider=Fake` picks a fake PayOS in Development and Testing, and any other
+  environment refuses it, see [settings](control-plane.md#settings). With no provider the control plane
+  registers no PayOS adapter and no payment link job.
+- **A payment link for each invoice.** The recurring job `createPaymentLinks` runs every 5 minutes when
+  a PayOS provider is set. It gives each `open` invoice in `VND` one payment link, and a paid, `void` or
+  `USD` invoice gets none.
+  - **A unique `orderCode`.** Each link has its own whole-number `orderCode` from the sequence
+    `billing.payment_order_codes`, from 1 to 9007199254740991, the largest whole number PayOS accepts.
+    The database refuses a repeated one. A skipped sequence value leaves a gap, which is allowed.
+  - **Saved before the call, reused on retry.** The job saves the `orderCode` in its own transaction
+    before it calls PayOS. A failed or lost call leaves the code in the database, so the next run sends
+    the same one and PayOS never sees two orders for one invoice.
+  - **What PayOS is asked.** The request carries the invoice's amount in `VND`, which the job reads from
+    the [ledger](#the-ledger), the `orderCode` and a description `AXIS <orderCode>`.
+  - **What is stored.** `billing.payment_links` holds one row for each invoice: the `orderCode`, PayOS's
+    payment link id and checkout URL, the VietQR code, and the transfer's bank `bin`, account number,
+    account name and description. It holds no amount, because only the ledger holds money, so a
+    credit or a part payment after the link is made does not change the link. Each new link writes the
+    audit record `paymentLink.created`, with the job as the actor and the invoice as the subject. A rerun
+    sends no second request for an invoice that has its link.
+- **Shown to the payer** _(planned for M34)_. The [billing portal](billing-portal.md) and the reminder
+  emails' link show the VietQR code and the transfer details.
+- **No automatic charge** _(planned for M34)_. A bank transfer cannot be pulled, so each period the owner or a billing
   contact pays its invoice. The reminders of [the timeline](subscriptions.md#the-timeline) ask them
   to.
-- **A transfer without a link.** A transfer that reaches Axis's account outside PayOS is recorded by
+- **A transfer without a link** _(planned for M34)_. A transfer that reaches Axis's account outside PayOS is recorded by
   the operator against its invoice, with `Axis.ControlPlane.Admin`, see
   [operators](control-plane.md#operators).
 

@@ -84,6 +84,15 @@ builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.Fr
 builder.Services.AddSingleton<IJobHandler, PeriodInvoicing>();
 builder.Services.AddSingleton(new RecurringJob(PeriodInvoicing.JobKind, TimeSpan.FromHours(1)));
 
+// The payment links of the open VND invoices, queued every 5 minutes, only when a PayOS provider is named. It needs the control plane's database and the adapter.
+if (string.Equals(options.PayOs.Provider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<FakePayOs>();
+    builder.Services.AddSingleton<IPayOs>(services => services.GetRequiredService<FakePayOs>());
+    builder.Services.AddSingleton<IJobHandler, PaymentLinks>();
+    builder.Services.AddSingleton(new RecurringJob(PaymentLinks.JobKind, TimeSpan.FromMinutes(5)));
+}
+
 // The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
 if (options.SignUp.DisposableDomains.IsComplete)
 {

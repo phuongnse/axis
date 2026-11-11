@@ -73,6 +73,9 @@ public sealed partial class ControlPlaneOptions
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
 
+    /// <summary>The PayOS adapter that creates the payment links of the <c>VND</c> invoices. Optional.</summary>
+    public ControlPlanePayOsOptions PayOs { get; set; } = new();
+
     /// <summary>What the sign-up page offers. Optional.</summary>
     public SignUpOptions SignUp { get; set; } = new();
 
@@ -179,6 +182,7 @@ public sealed partial class ControlPlaneOptions
         }
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
+        problems.AddRange(PayOsProblems(options.PayOs, RequiresVerifiedTls(environment)));
         problems.AddRange(SignUpProblems(options.SignUp));
         problems.AddRange(PlanCatalogue.Problems(options.Plans));
 
@@ -360,6 +364,27 @@ public sealed partial class ControlPlaneOptions
 
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:en", document.Urls.En);
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:vi", document.Urls.Vi);
+    }
+
+    private static List<string> PayOsProblems(ControlPlanePayOsOptions payOs, bool outsideDevelopment)
+    {
+        var problems = new List<string>();
+        var setting = $"{SectionName}:{nameof(PayOs)}:{nameof(ControlPlanePayOsOptions.Provider)}";
+        if (string.IsNullOrWhiteSpace(payOs.Provider))
+        {
+            return problems;
+        }
+
+        if (!string.Equals(payOs.Provider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
+        {
+            problems.Add($"The setting {setting} must be {PayOsProviders.Fake}.");
+        }
+        else if (outsideDevelopment)
+        {
+            problems.Add($"The setting {setting} must not be {PayOsProviders.Fake} outside Development and Testing.");
+        }
+
+        return problems;
     }
 
     private static List<string> DnsProblems(ControlPlaneDnsOptions dns, bool outsideDevelopment)
