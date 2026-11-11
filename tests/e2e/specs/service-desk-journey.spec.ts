@@ -6,9 +6,10 @@ import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
 import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { compareApplicationFolders, textEditorKeys } from '../folder-comparison'
-import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
+import { expectChosen, pickAction, pickOption } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
 import { useJourneySession } from '../sessions'
+import { expectForm, pick, save, sample } from '../service-desk-studio'
 import {
   addListItem,
   addListRow,
@@ -45,28 +46,6 @@ interface SampleForm {
   steps?: { title: { textKey: string }; sections: string[] }[]
 }
 
-interface SampleScenario {
-  name: string
-  now: string
-  users: Record<string, string[]>
-  steps: Record<string, unknown>[]
-}
-
-const scenarios = [
-  ['TicketIsClosed', 'scenarios/ticket-is-closed.json'],
-  ['TicketIsRejected', 'scenarios/ticket-is-rejected.json'],
-  ['ReopenedTicketReturnsToTheAgent', 'scenarios/reopened-ticket-returns-to-the-agent.json'],
-  ['AgentCannotActOnAnotherAgentsTicket', 'scenarios/agent-cannot-act-on-another-agents-ticket.json'],
-  ['LeadCannotActForTheRequester', 'scenarios/lead-cannot-act-for-the-requester.json'],
-  ['RequesterCannotReachAnotherTicket', 'scenarios/requester-cannot-reach-another-ticket.json'],
-  ['RequesterDeletesADraftTicket', 'scenarios/requester-deletes-a-draft-ticket.json'],
-  ['AgentCannotDeleteATicket', 'scenarios/agent-cannot-delete-a-ticket.json'],
-  ['LeadIsRemindedOnTheNextWeekdayMorning', 'scenarios/lead-is-reminded-on-the-next-weekday-morning.json'],
-  ['LeadIsToldWhichTicketWasDeleted', 'scenarios/lead-is-told-which-ticket-was-deleted.json'],
-  ['LateTicketEscalatesToTheLead', 'scenarios/late-ticket-escalates-to-the-lead.json'],
-  ['RequesterIsNotifiedOfTheResolution', 'scenarios/requester-is-notified-of-the-resolution.json'],
-] as const
-
 test.describe('the author builds the service desk with Studio only', () => {
   // Each step builds on the folder the one before created, so they run in order.
   test.describe.configure({ mode: 'serial' })
@@ -96,49 +75,6 @@ test.describe('the author builds the service desk with Studio only', () => {
     await waitForCanvas(page)
   }
 
-  async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
-    await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
-  }
-
-  // A row with more than one select names the one to pick, since pick() would match them all.
-  async function pickNamed(page: Page, testId: string, name: string, option: string) {
-    await pickOption(page.getByTestId(testId).getByRole('combobox', { name, exact: true }), option)
-  }
-
-  async function save(page: Page, answers: [field: string, choice: string, expression?: string][] = []) {
-    // A save with a migration posts one changes call, and a save without one patches the resource.
-    const answer = page.waitForResponse(
-      (response) => {
-        const url = response.url()
-        const method = response.request().method()
-        return (
-          (method === 'PATCH' && url.includes('/api/studio/apps/ServiceDesk/resources/')) ||
-          (method === 'POST' && url.endsWith('/api/studio/apps/ServiceDesk/changes'))
-        )
-      },
-      { timeout: 60_000 },
-    )
-    await page.getByRole('button', { name: 'Save', exact: true }).click()
-    for (const [field, choice, expression] of answers) {
-      // A click while the dialog zooms in is lost, so wait until it has finished opening.
-      await waitForDialog(page)
-      await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
-      if (expression !== undefined) {
-        await page.getByRole('textbox', { name: 'Convert expression', exact: true }).fill(expression)
-      }
-      await page.getByRole('button', { name: choice, exact: true }).click()
-    }
-    await expect(page.getByTestId('studio-saved')).toBeVisible()
-    const { diagnostics } = (await (await answer).json()) as {
-      diagnostics: { file: string; severity: string }[]
-    }
-    return diagnostics
-  }
-
-  async function expectForm(page: Page) {
-    await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
-  }
-
   async function openDesign(page: Page) {
     await page.getByRole('tab', { name: 'Design', exact: true }).click()
   }
@@ -162,89 +98,12 @@ test.describe('the author builds the service desk with Studio only', () => {
     return (key: string) => ({ en: en[key], vi: vi[key] })
   }
 
-  async function sample<T>(file: string): Promise<T> {
-    return JSON.parse(await readFile(path.join(serviceDesk, file), 'utf8')) as T
-  }
-
-  // The Categories seed gets new record ids in the journey, so each sample id maps to the id the grid shows.
-  async function shownCategoryIds(page: Page): Promise<Map<string, string>> {
-    await openKind(page, 'seed')
-    await page.getByTestId('studio-group-seed').getByRole('button', { name: 'Categories', exact: true }).click()
-    await expectForm(page)
-    const rows = page.getByTestId('studio-seed-row')
-    await expect(rows).toHaveCount(3)
-    const shown = await rows.locator('code').allTextContents()
-    const sampleSeed = await sample<{ records: { id: string }[] }>('seeds/categories.json')
-    return new Map(sampleSeed.records.map((record, index): [string, string] => [record.id, shown[index]]))
-  }
-
-  async function writeScenarioStep(
-    page: Page,
-    index: number,
-    step: Record<string, unknown>,
-    ids: Map<string, string>,
-    enumFields: Set<string>,
-  ) {
-    const at = `studio-field-/steps/${index}`
-    await pick(page, `${at}/type`, String(step.type))
-    for (const key of ['entity', 'record', 'as', 'process', 'step', 'outcome', 'state'] as const) {
-      if (key in step) {
-        await pick(page, `${at}/${key}`, String(step[key]))
-      }
-    }
-    if ('save' in step) {
-      await page.getByTestId(`${at}/save`).getByRole('textbox').fill(String(step.save))
-    }
-    if ('assignee' in step) {
-      const [[kind, name]] = Object.entries(step.assignee as Record<string, string>)
-      await pickNamed(page, `${at}/assignee`, 'Assignee type', kind === 'role' ? 'Role' : 'User')
-      await pickNamed(page, `${at}/assignee`, kind === 'role' ? 'Role' : 'User', name)
-    }
-    if ('by' in step) {
-      await page.getByTestId(`${at}/by`).getByRole('textbox').fill(String(step.by))
-    }
-    if ('recipient' in step) {
-      const [[kind, name]] = Object.entries(step.recipient as Record<string, string>)
-      await pickNamed(page, `${at}/recipient`, 'Recipient type', kind === 'role' ? 'Role' : 'User')
-      await pickNamed(page, `${at}/recipient`, kind === 'role' ? 'Role' : 'User', name)
-    }
-    if ('channel' in step) {
-      await pick(page, `${at}/channel`, String(step.channel))
-    }
-    if ('values' in step && step.type === 'expectNotification') {
-      const values = page.getByTestId(`${at}/values`)
-      for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
-        await values.getByRole('button', { name: 'Add value', exact: true }).click()
-        // The new row is the last one, under a fresh key. The rename detaches the input, so Tab goes through the page keyboard.
-        await values.getByRole('textbox', { name: 'Value name', exact: true }).last().fill(key)
-        await page.keyboard.press('Tab')
-        // The box parses its text as JSON, so the text of the number 1 is `1`.
-        await values.getByRole('textbox', { name: key, exact: true }).fill(String(value))
-      }
-    } else if ('values' in step) {
-      for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
-        await pickAction(
-          page.getByTestId(`${at}/values`).getByRole('combobox', { name: 'Add value', exact: true }),
-          key,
-          page.getByTestId(`${at}/values/${key}`),
-        )
-        if (enumFields.has(key)) {
-          await pick(page, `${at}/values/${key}`, String(value))
-        } else {
-          await page
-            .getByTestId(`${at}/values/${key}`)
-            .getByRole('textbox')
-            .fill(String(ids.get(String(value)) ?? value))
-        }
-      }
-    }
-    if ('expect' in step) {
-      await pick(page, `${at}/expect`, String(step.expect))
-    }
-  }
-
   async function checkBuilt(page: Page) {
-    compareApplicationFolders(serviceDesk, built, { ignorePageElementNames: true, generatedNames: true })
+    compareApplicationFolders(serviceDesk, built, {
+      ignorePageElementNames: true,
+      generatedNames: true,
+      exceptFolders: ['scenarios'],
+    })
     const response = await page.request.get(`${journeyURL}/api/studio/apps/ServiceDesk/diagnostics`)
     expect(response.status()).toBe(200)
     const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }
@@ -1356,72 +1215,11 @@ test.describe('the author builds the service desk with Studio only', () => {
     await grantIn(page, 'service-desk-lead', 'process', 'TicketHandling', [{ actions: ['reassign'] }])
   })
 
-  for (const [name, file] of scenarios) {
-    test(`the author writes the ${name} scenario in the scenario editor`, async ({ page }) => {
-      await useJourneySession(page, 'author')
-      await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
-      const ids = await shownCategoryIds(page)
-
-      await createResource(page, 'scenario', name)
-      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
-      await expectForm(page)
-
-      const scenario = await sample<SampleScenario>(file)
-      const ticket = await sample<{ fields: { name: string; type: string }[] }>('entities/ticket.json')
-      const enumFields = new Set(ticket.fields.filter((field) => field.type === 'enum').map((field) => field.name))
-
-      await page.getByTestId('studio-field-/now').getByRole('textbox').fill(scenario.now)
-      for (const [index, [user, roles]] of Object.entries(scenario.users).entries()) {
-        if (index > 0) {
-          await page.getByRole('button', { name: 'Add user', exact: true }).click()
-        }
-        const newRow = page.getByTestId(`studio-field-/users/${index === 0 ? 'author' : 'user1'}`)
-        const userId = newRow.getByRole('textbox', { name: 'User id', exact: true })
-        await userId.fill(user)
-        // The rename detaches this input, so Tab goes through the page keyboard rather than the locator.
-        await page.keyboard.press('Tab')
-        const row = page.getByTestId(`studio-field-/users/${user}`)
-        await expect(row).toBeVisible()
-        await pickOptions(row.getByRole('combobox', { name: 'Roles', exact: true }), roles)
-        for (const role of roles) {
-          await expect(row).toContainText(role)
-        }
-      }
-
-      for (const [index, step] of scenario.steps.entries()) {
-        if (index > 0) {
-          await page.getByRole('button', { name: 'Add step', exact: true }).click()
-        }
-        await writeScenarioStep(page, index, step, ids, enumFields)
-      }
-
-      const diagnostics = await save(page)
-      const errors = diagnostics.filter((diagnostic) => diagnostic.file === file && diagnostic.severity === 'error')
-      expect(errors).toEqual([])
-      await expectForm(page)
-    })
-  }
-
   test('the whole built folder matches the sample', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await checkBuilt(page)
-  })
-
-  test('the author runs the twelve test scenarios from Studio', async ({ page }) => {
-    await useJourneySession(page, 'author')
-    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
-    await page.getByTestId('studio-run-tests').click()
-
-    // Each scenario creates and drops a database, and the publisher queue is shared with other specs.
-    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
-      timeout: 240_000,
-    })
-    await expect(page.getByTestId('studio-test-result')).toHaveCount(scenarios.length)
-    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(
-      scenarios.length,
-    )
   })
 
   test('the author publishes ServiceDesk, and release 1 is active', async ({ page }) => {

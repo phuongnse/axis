@@ -122,6 +122,24 @@ test("an extra file fails naming that file", () => {
   assert.throws(() => compareApplicationFolders(sample, copy), { message: "extra.json: extra file" });
 });
 
+test("an excepted folder may lack a file or hold an extra one, and other folders still compare", () => {
+  const missing = copySample();
+  fs.rmSync(path.join(missing, scenario));
+  const extra = copySample();
+  fs.writeFileSync(path.join(extra, "scenarios/extra.json"), "{}\n");
+  const options = { exceptFolders: ["scenarios"] };
+  assert.throws(() => compareApplicationFolders(sample, missing), { message: `${scenario}: missing` });
+  assert.doesNotThrow(() => compareApplicationFolders(sample, missing, options));
+  assert.doesNotThrow(() => compareApplicationFolders(sample, extra, options));
+  rewriteJson(extra, "entities/category.json", (entity) => {
+    entity.fields[0].maxLength = 200;
+  });
+  assert.throws(
+    () => compareApplicationFolders(sample, extra, options),
+    /entities\/category\.json at \/fields\/0\/maxLength: expected 100, got 200/,
+  );
+});
+
 test("a subset ignores a changed file outside it", () => {
   const copy = copySample();
   rewriteJson(copy, "entities/category.json", (entity) => {
