@@ -92,9 +92,6 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     // The same path as TenantSignIn.CallbackPath in Axis.Server, which this project cannot reference.
     private const string PlatformCallbackPath = "/api/auth/callback";
 
-    // The same path as McpServer.Path in Axis.Server, which this project cannot reference.
-    private const string McpPath = "/mcp";
-
     /// <summary>The client scope whose audience mappers put the <c>/mcp</c> URL of each tenant host into the access token, and which the MCP server's metadata names.</summary>
     public const string AuthoringScope = "axis:authoring";
 
@@ -849,7 +846,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <summary>The audiences of <see cref="AuthoringScope"/>: the <c>/mcp</c> URL of each host, in the order and with the host spelling of <see cref="PlatformAddresses"/>.</summary>
     internal static string[] AuthoringAudiences(IEnumerable<string> hosts) => [.. HostsOf(hosts).Select(AuthoringAudience)];
 
-    private static string AuthoringAudience(string host) => $"https://{host}{McpPath}";
+    private static string AuthoringAudience(string host) => McpProtocol.Url(host).AbsoluteUri;
 
     private static string[] HostsOf(IEnumerable<string> hosts) => hosts
         .Select(host => host.Trim().ToLowerInvariant())

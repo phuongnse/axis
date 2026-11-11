@@ -15,9 +15,10 @@ no shortcut of its own.
 - **A host of its own.** `axis-agent` runs beside the server, the worker and the publisher, from the
   same images, Helm chart and Compose file. It runs the same way in a cell and on premises, and needs
   no GitHub, no CI service and no particular cloud.
-- **One client of the MCP server** _(planned for M35)_. It calls the [MCP server](mcp-server.md) over HTTP, like any
+- **One client of the MCP server.** It calls the [MCP server](mcp-server.md) over HTTP, like any
   client, and has no other way into a tenant. It never opens a tenant database for an application's
-  resources, and never reads a record.
+  resources, and never reads a record. It opens its session on the tenant's first host, at
+  `https://<host>/mcp`, with the author's access token, and follows no redirect.
 - **Its own state.** It reads its tenants as the worker does, see [AI settings](host-settings.md#ai-settings),
   and reads the request tables below in each tenant database with the tenant's runtime role. It refuses a
   tenant whose role can change the schema. It writes claims, steps and tokens there with the same role.
@@ -41,8 +42,10 @@ The agent host acts with exactly the grants of the author who sent the request.
   realm returns. The token ends with the author's realm session, at most 8 hours. A token that the
   realm refuses with `invalid_grant`, a request that keeps none and a token that no longer decrypts
   stop the request as `failed`, with the step outcome `tokenEnded`, and the author sends it again. A
-  realm that does not answer, or answers another error, changes nothing: the lease lapses and a
-  later turn runs the step again.
+  `401` from the MCP server refreshes the token once and the call is made again, for each call on
+  its own. A `403`, or a second `401` on the same call, stops the request as `failed` with the outcome
+  `tokenEnded` too. A realm that does not answer, or answers another error, and any other failure of
+  the MCP server change nothing: the lease lapses and a later turn runs the step again.
 - **No shortcut.** The agent host holds no role of its own on any tenant. A token exchange for a
   person who has lost the author role is refused.
 

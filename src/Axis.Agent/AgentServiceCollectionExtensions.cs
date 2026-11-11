@@ -18,7 +18,7 @@ public static class AgentServiceCollectionExtensions
     /// and no secret. With one, it reads <c>Ai:AllowTenantKeys</c>, its tenants and their data keys as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
-    /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. It also runs every registered <see cref="IAuthoringStep"/> on the
+    /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims nothing while none is
     /// registered. <see cref="TenantModelAdapters"/> gives those steps the adapter of a binding for a tenant. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
@@ -69,6 +69,10 @@ public static class AgentServiceCollectionExtensions
             // A realm call follows no redirect and never logs a body.
             services.AddHttpClient(AuthoringRequestTokenRefresher.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(30))
                 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            // A call to the tenant's MCP server follows no redirect and never logs the token or the session id.
+            services.AddHttpClient(AuthorMcpClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(60))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false })
+                .RedactLoggedHeaders(["Authorization", "Mcp-Session-Id"]);
         }
 
         services.TryAddSingleton(TimeProvider.System);
