@@ -143,7 +143,7 @@ fails when the table and the specs differ.
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`, `studio-process-redraw`, `studio-scenario`, `studio-new-resource`, `studio-tests`, `studio-auto-accept`, `studio-history`, `studio-settings-journey`, `studio-subjectless-process`, `studio-module-form` and `studio-module-page` | A temporary copy of `samples/apps/purchase-requests`, without `texts/vi.json` for `studio-new-resource`. `studio-tests` also copies it again for its server with `Studio:Tests` off. `studio-history` also gets a temporary `Studio:RevisionsPath` |
 | `studio-module-entity`                                                                                                                                                                                                                                                                                           | A temporary copy of `samples/apps/leave-requests`                                                                                                                                                                                                  |
-| `studio-page-design`                                                                                                                                                                                                                                                                                             | A temporary copy of `samples/apps/service-desk`                                                                                                                                                                                                    |
+| `studio-page-design` and `service-desk-scenarios`                                                                                                                                                                                                                                                                | A temporary copy of `samples/apps/service-desk`, without its `scenarios` folder for `service-desk-scenarios`                                                                                                                                       |
 | `studio-module-pickers`, `studio-module-policy`, `studio-module-process`, `studio-module-process-policy` and `studio-module-text`                                                                                                                                                                                | A temporary copy of `tests/e2e/fixtures/module-app`, and a temporary `Modules:Path` with the sample modules and the fixture module `checklists`                                                                                                    |
 | `studio-module-contract`                                                                                                                                                                                                                                                                                         | A temporary copy of `tests/e2e/fixtures/approvals-app`                                                                                                                                                                                             |
 | `studio-new-application`, `studio-page-containers`, `studio-page-dashboard` and `studio-page-parameters`                                                                                                                                                                                                         | A temporary `Studio:ApplicationsPath`                                                                                                                                                                                                              |
@@ -249,19 +249,23 @@ plane output to `artifacts/logs/e2e-controlplane.log`.
 These journeys build or change an application on the journey tenant and use it on its site. Each spec
 file holds its steps. This section says what each proves and what it must not do.
 
-- **`service-desk-journey.spec.ts`** builds the whole service desk with Studio only, as the
-  [product brief](product-brief.md#third-application-service-desk) asks. It never opens the JSON
+- **`service-desk-journey.spec.ts`** builds the service desk with Studio only, except its test scenarios,
+  as the [product brief](product-brief.md#third-application-service-desk) asks. It never opens the JSON
   view and uses no file edit. It builds the data model, the data sources of the lists and the dashboard, the
   two-step ticket form on the form's Design tab, the forms of the tasks, the `TicketHandling` process
   with its escalations and its notify step, the pages, the site, the notify processes and their
-  schedule and delete triggers, the policies in the policy matrix, and the twelve test scenarios in
-  the scenario editor, typing every expression in the expression editor and every label's texts in its
-  label editor. Each save must report no error diagnostic. At the end the built folder must match
-  `samples/apps/service-desk` with no error diagnostic, as [the folder comparison](#the-folder-comparison)
-  says, and the `migrations` folder must be empty, because the sample has none. Run tests must pass all
-  twelve scenarios, and the release history must show release 1 as the one active row. On the
-  `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
-  the requester opening it from the bell, and the lead's bell has no row for that ticket.
+  schedule and delete triggers, and the policies in the policy matrix, typing every expression in the
+  expression editor and every label's texts in its label editor. Each save must report no error diagnostic.
+  At the end the built folder must match `samples/apps/service-desk` with no error diagnostic, except its
+  `scenarios` folder, as [the folder comparison](#the-folder-comparison) says. The `migrations` folder must
+  match the sample's, which holds the one migration that the journey writes when it removes `reopened`. The
+  release history must show release 1 as the one active row. On the `service-desk` site the requester, the
+  service desk lead and the agent take one ticket to `closed`, the requester opening it from the bell, and
+  the lead's bell has no row for that ticket.
+- **`service-desk-scenarios.spec.ts`** writes the twelve test scenarios in the scenario editor, on its own
+  server over a temporary copy of `samples/apps/service-desk` without its `scenarios` folder. Each save must
+  report no error diagnostic. The written folder must then match the whole sample with no error diagnostic,
+  and Run tests must pass all twelve scenarios. The spec does not use the journey tenant.
 - **`first-application-tutorial.spec.ts`** runs the steps of the
   [first application tutorial](tutorials/first-application.md) on the journey tenant, one test for
   each step. The author builds the application in Studio, from the texts and roles to the process,
@@ -328,6 +332,9 @@ sample. `compareApplicationFolders` in `tests/e2e/folder-comparison.ts` throws a
   for each locale, under the sample key it pairs with, or under its own key when none pairs with it. A
   built key that no label uses fails when the sample's labels use that key, and passes when the sample
   holds it with the same texts. A sample key that no built key covers fails as missing.
+- **Excepted folders.** `exceptFolders` leaves out the files under the named top-level folders in both
+  folders, and the other folders compare as before. The service desk journey leaves out `scenarios`, which
+  `service-desk-scenarios.spec.ts` compares in full.
 - **Page element names.** A journey may skip the names of page widgets, actions, columns and tabs with
   `ignorePageElementNames`, because Studio does not name them the way the samples do. Without it, a
   different name fails. With `generatedNames`, a page may hold an extra generated name such as `table1`
