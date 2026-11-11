@@ -21,7 +21,7 @@ when the author approves, changes the plan or drops it. The agent host writes th
   `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
-  (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `started_at` (`timestamptz`) and
+  (`text`, null), `tokens` (`bigint`), `messages` (`jsonb`, null), `checks` (`jsonb`, null), `started_at` (`timestamptz`) and
   `finished_at` (`timestamptz`, null). A comment that asks for another plan is a `planChange` step. A step that
   never finished has the `outcome` `interrupted` once a later host closes it, see
   [resuming](authoring-requests.md#durable-requests). A step that found the author's token ended
@@ -31,3 +31,7 @@ when the author approves, changes the plan or drops it. The agent host writes th
   `outcome` `unfinished`, see [working calls](authoring-requests.md#budgets), and the working step sets
   `draft_id` once it makes the request's draft. `messages` holds the step's model messages as a JSON
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
+  A `check` step has the `outcome` `passed`, `failed` or `unfinished`, see
+  [checking](authoring-requests.md#states) and [checking time](authoring-requests.md#budgets), and its `checks` holds
+  `{ compile, scenarios }`: each has an `outcome` of `passed` or `failed`, and `scenarios` can also be `notRun`. `compile` has its
+  `diagnostics`, and `scenarios` has its `request` id, its `diagnostics` and its `items`, the scenario results of the run.
