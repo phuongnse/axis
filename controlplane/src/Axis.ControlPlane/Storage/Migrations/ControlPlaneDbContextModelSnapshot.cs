@@ -269,6 +269,70 @@ namespace Axis.ControlPlane.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.ControlPlane.Billing.WebhookInboxRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<string>("EventId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset?>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<long?>("OrderCode")
+                        .HasColumnType("bigint")
+                        .HasColumnName("order_code");
+
+                    b.Property<string>("Outcome")
+                        .HasColumnType("text")
+                        .HasColumnName("outcome");
+
+                    b.Property<DateTimeOffset?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("Reason")
+                        .HasColumnType("text")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("Id")
+                        .HasName("pk_webhook_inbox");
+
+                    b.HasIndex(new[] { "OccurredAt", "ReceivedAt", "Id" }, "ix_webhook_inbox_pending")
+                        .HasFilter("outcome IS NULL");
+
+                    b.HasIndex(new[] { "Provider", "EventId" }, "ux_webhook_inbox_event")
+                        .IsUnique();
+
+                    b.ToTable("webhook_inbox", "billing", t =>
+                        {
+                            t.HasCheckConstraint("ck_webhook_inbox_outcome", "outcome IN ('applied', 'outOfPlace')");
+
+                            t.HasCheckConstraint("ck_webhook_inbox_provider", "provider IN ('payos')");
+                        });
+                });
+
             modelBuilder.Entity("Axis.ControlPlane.SignUp.DisposableDomainRow", b =>
                 {
                     b.Property<string>("Domain")

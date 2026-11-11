@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -20,8 +19,6 @@ internal sealed partial class PayOsClient(HttpClient http, ControlPlaneOptions o
     private const string Success = "00";
 
     private static readonly JsonSerializerOptions _camelCase = new(JsonSerializerDefaults.Web);
-
-    private static readonly JsonWriterOptions _relaxed = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly string _baseUrl = (options.PayOs.BaseUrl ?? throw new InvalidOperationException("The PayOS base URL is not set.")).TrimEnd('/');
     private readonly string _clientId = options.PayOs.ClientId ?? throw new InvalidOperationException("The PayOS client id is not set.");
@@ -143,66 +140,9 @@ internal sealed partial class PayOsClient(HttpClient http, ControlPlaneOptions o
 
     private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
-    private string Sign(string text) => Convert.ToHexStringLower(HMACSHA256.HashData(_checksumKey, Encoding.UTF8.GetBytes(text)));
+    private string Sign(string text) => PayOsSignature.Sign(_checksumKey, text);
 
-    private bool IsSigned(JsonElement data, string signature) =>
-        CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(Sign(Canonical(data))),
-            Encoding.UTF8.GetBytes(signature.ToLowerInvariant()));
-
-    // The form that PayOS's SDK signs (sortObjDataByKey and convertObjToQueryStr): the keys in ordinal order as key=value joined by &. A null, "null" or "undefined" is empty,
-    // a string is as it is, a number or a bool is its JSON text, and an array is compact JSON with the keys of each of its objects in ordinal order.
-    private static string Canonical(JsonElement data)
-    {
-        var parts = new List<string>();
-        foreach (var property in data.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
-        {
-            var value = property.Value.ValueKind switch
-            {
-                JsonValueKind.String => property.Value.GetString()!,
-                JsonValueKind.Array => SortedArray(property.Value),
-                _ => property.Value.GetRawText(),
-            };
-            if (value is "null" or "undefined")
-            {
-                value = string.Empty;
-            }
-
-            parts.Add($"{property.Name}={value}");
-        }
-
-        return string.Join('&', parts);
-    }
-
-    private static string SortedArray(JsonElement array)
-    {
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream, _relaxed))
-        {
-            writer.WriteStartArray();
-            foreach (var item in array.EnumerateArray())
-            {
-                if (item.ValueKind != JsonValueKind.Object)
-                {
-                    item.WriteTo(writer);
-                    continue;
-                }
-
-                writer.WriteStartObject();
-                foreach (var property in item.EnumerateObject().OrderBy(p => p.Name, StringComparer.Ordinal))
-                {
-                    writer.WritePropertyName(property.Name);
-                    property.Value.WriteTo(writer);
-                }
-
-                writer.WriteEndObject();
-            }
-
-            writer.WriteEndArray();
-        }
-
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
+    private bool IsSigned(JsonElement data, string signature) => PayOsSignature.IsSigned(_checksumKey, data, signature);
 
     [GeneratedRegex("^[0-9A-Za-z_-]{1,16}$")]
     private static partial Regex PlainCode();

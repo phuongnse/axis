@@ -7,7 +7,7 @@ namespace Axis.ControlPlane.Storage;
 
 /// <summary>
 /// The <c>control_plane</c> and <c>billing</c> schemas of the control plane database. They hold the durable <c>jobs</c>, the
-/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c>, the <c>billing.payment_links</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
+/// append-only <c>audit_records</c>, the <c>sign_ups</c> with their progress secret hash and provisioning progress, the <c>sign_up_challenges</c>, the <c>disposable_domains</c>, the <c>subscriptions</c>, the <c>subscription_emails</c>, the <c>subscription_add_ons</c>, the <c>quota_overrides</c>, the append-only <c>billing.ledger_entries</c>, the <c>billing.invoices</c>, the <c>billing.invoice_lines</c>, the <c>billing.payment_links</c>, the <c>billing.webhook_inbox</c> and the append-only <c>terms_acceptances</c>: the billing issues add the rest.
 /// The caller supplies the connection to the database.
 /// </summary>
 public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext> options) : DbContext(options)
@@ -46,6 +46,8 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
     public DbSet<InvoiceLineRow> InvoiceLines => Set<InvoiceLineRow>();
 
     public DbSet<PaymentLinkRow> PaymentLinks => Set<PaymentLinkRow>();
+
+    public DbSet<WebhookInboxRow> WebhookInbox => Set<WebhookInboxRow>();
 
     public DbSet<TermsAcceptanceRow> TermsAcceptances => Set<TermsAcceptanceRow>();
 
@@ -298,6 +300,28 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
             link.Property(l => l.CreatedAt).HasColumnName("created_at");
             link.HasOne<InvoiceRow>().WithOne().HasForeignKey<PaymentLinkRow>(l => l.InvoiceId).HasConstraintName("fk_payment_links_invoice_id").OnDelete(DeleteBehavior.Restrict);
             link.HasIndex(l => l.OrderCode, "ux_payment_links_order_code").IsUnique();
+        });
+
+        modelBuilder.Entity<WebhookInboxRow>(inbox =>
+        {
+            inbox.ToTable("webhook_inbox", BillingSchema, table =>
+            {
+                table.HasCheckConstraint("ck_webhook_inbox_provider", "provider IN ('payos')");
+                table.HasCheckConstraint("ck_webhook_inbox_outcome", "outcome IN ('applied', 'outOfPlace')");
+            });
+            inbox.HasKey(i => i.Id).HasName("pk_webhook_inbox");
+            inbox.Property(i => i.Id).HasColumnName("id").ValueGeneratedNever();
+            inbox.Property(i => i.Provider).HasColumnName("provider");
+            inbox.Property(i => i.EventId).HasColumnName("event_id");
+            inbox.Property(i => i.OrderCode).HasColumnName("order_code").HasColumnType("bigint");
+            inbox.Property(i => i.OccurredAt).HasColumnName("occurred_at");
+            inbox.Property(i => i.Body).HasColumnName("body");
+            inbox.Property(i => i.ReceivedAt).HasColumnName("received_at").HasDefaultValueSql("now()");
+            inbox.Property(i => i.Outcome).HasColumnName("outcome");
+            inbox.Property(i => i.Reason).HasColumnName("reason");
+            inbox.Property(i => i.ProcessedAt).HasColumnName("processed_at");
+            inbox.HasIndex(i => new { i.Provider, i.EventId }, "ux_webhook_inbox_event").IsUnique();
+            inbox.HasIndex(i => new { i.OccurredAt, i.ReceivedAt, i.Id }, "ix_webhook_inbox_pending").HasFilter("outcome IS NULL");
         });
 
         modelBuilder.Entity<TermsAcceptanceRow>(acceptance =>

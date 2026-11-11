@@ -117,7 +117,7 @@ every business change.
     such as the directory's correction and the expiry of pending [sign-ups](sign-up.md#verifying-the-email-first)
     (`expireSignUps`, which also deletes the used [proof-of-work solutions](sign-up.md#bots-and-abuse) past their expiry), each every 5 minutes, and the [subscription clock](subscriptions.md#one-clock)
     (`advanceSubscriptions`) and the [period invoices](payments.md#invoices) (`createPeriodInvoices`) each every hour. When the directory and a cell are set, it also queues the
-    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When `ControlPlane:PayOs:Provider` is set, it also queues the [payment links](payments.md#paying-in-vietnam) (`createPaymentLinks`) every 5 minutes. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
+    [quota sync](plans.md#from-a-plan-to-the-quotas) (`syncQuotas`) every 24 hours. When `ControlPlane:PayOs:Provider` is set, it also queues the [payment links](payments.md#paying-in-vietnam) (`createPaymentLinks`) every 5 minutes and the [payment webhook events](payments.md#webhooks) (`applyPaymentWebhooks`) every minute. When both `ControlPlane:SignUp:DisposableDomains` settings are set, it also queues the refresh of the
     [disposable mailbox domains](sign-up.md#bots-and-abuse) (`refreshDisposableDomains`) every 7 days. Under a database lock on the kind, it queues
     a job only when none of that kind is `queued` or `running` and none was created within the
     interval, so the replicas together queue at most one job for each interval. The schedule looks
@@ -276,11 +276,11 @@ settings, and secrets are Kubernetes Secrets. The service reads them at start.
 | `ControlPlane:Dns:Zone` | The zone that holds the tenant subdomains, such as `vn.example.com` | A valid domain name, with `Rfc2136` |
 | `ControlPlane:Dns:KeyName` | The name of the TSIG key that the server knows | Not empty, with `Rfc2136` |
 | `ControlPlane:Dns:Key` | The TSIG HMAC-SHA256 key as base64, from the secret `ControlPlane__Dns__Key` | Valid base64, with `Rfc2136`. Never a value in a setting file or a message |
-| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake` or `PayOs`. Optional. With none the service registers no adapter and no payment link job | `Fake` is refused outside Development and Testing. Any other value is refused |
+| `ControlPlane:PayOs:Provider` | The PayOS adapter: `Fake` or `PayOs`. Optional. With none the service registers no adapter, no payment link job and no webhook route or job | `Fake` is refused outside Development and Testing. Any other value is refused |
 | `ControlPlane:PayOs:BaseUrl` | The address of the PayOS API, such as `https://api-merchant.payos.vn` | An absolute `https` URL, with `PayOs` |
 | `ControlPlane:PayOs:ClientId` | The PayOS client id, from the secret `ControlPlane__PayOs__ClientId` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
 | `ControlPlane:PayOs:ApiKey` | The PayOS API key, from the secret `ControlPlane__PayOs__ApiKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
-| `ControlPlane:PayOs:ChecksumKey` | The PayOS checksum key that signs the requests and the answers, from the secret `ControlPlane__PayOs__ChecksumKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
+| `ControlPlane:PayOs:ChecksumKey` | The PayOS checksum key that signs the requests and the answers and checks the webhooks, from the secret `ControlPlane__PayOs__ChecksumKey` | Not empty, with `PayOs`. Never a value in a setting file, a log or a message |
 | `ControlPlane:SignUp:Applications:<n>:Id` | The id of a built-in application that the [sign-up page](sign-up.md#the-page) offers, such as `approvals`. Optional | Not empty and unique |
 | `ControlPlane:SignUp:Applications:<n>:Titles:en` | The English title that the sign-up page shows for that application | Not empty |
 | `ControlPlane:SignUp:Applications:<n>:Titles:vi` | The Vietnamese title that the sign-up page shows for that application | Not empty |
@@ -380,10 +380,11 @@ The control plane reports its health and telemetry as the platform's hosts do.
 - **Telemetry.** Logs, metrics and traces as the platform's hosts write them, under the service name
   `axis-controlplane`, and the platform's security headers on every response. A log never holds a
   payment card, a bank account, a tax code or a webhook body.
-- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed` and the requests that a
-  rate limit refused.
+- **Metrics.** Next to the standard metrics, the service counts the jobs that ended `failed`, the requests that a
+  rate limit refused and the payment events that were out of place.
 
   | Metric | Instrument | Unit | Attributes |
   | --- | --- | --- | --- |
   | `axis.controlplane.jobs.failed` | counter | `{job}` | `axis.job.kind`. Never the job id |
+  | `axis.controlplane.payments.out_of_place` | counter | `{event}` | `axis.payment.provider`, `axis.payment.reason`. Never an id or an amount |
   | `axis.rate_limits.refused` | counter | `{request}` | `axis.partition`, always `sign_up`. Never an address or a domain |
