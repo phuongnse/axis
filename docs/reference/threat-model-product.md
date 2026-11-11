@@ -97,6 +97,7 @@ flowchart LR
 | P13 | The server or worker uses a database role with more rights than it needs. | Server and databases | Elevation of privilege | High | **Mitigated** | `DatabaseRoleTests` (every server and worker session on a tenant database uses the runtime role). |
 | P14 | A tenant's secret is read from the database in clear text. | Server and databases | Information disclosure | High | **Mitigated** | `TenantSecretCipherTests` (an encrypted value hides its plain text and does not decrypt for another tenant or field). |
 | P15 | A slow read or write holds a database connection for too long. | Server and databases | Denial of service | Medium | **Mitigated** | `QueryTimeoutTests` and `WriteTimeoutTests` (a slow read or write answers 503, and is logged and counted). |
+| P144 | A session's refresh token is read from the session row or used for another session. | Server and databases | Information disclosure | High | **Mitigated** | `SessionTokensTests` (the row holds the token encrypted, no response carries it, and a token copied to another row does not decrypt). See [the refresh token](security.md#sign-in-flow). |
 
 ### Caller and server
 

@@ -18,7 +18,11 @@ itself and the routes that need it.
 ### Sign-in flow
 
 Sign-in uses the OIDC authorization code flow with PKCE. The server is the confidential client: it
-exchanges the code for tokens, reads the claims from the ID token and keeps no token after that, as
+exchanges the code for tokens and reads the claims from the ID token. It keeps no token after that,
+except that under the `standard` profile and through the platform client it keeps the refresh token,
+encrypted in the session's row, for the
+[token exchange](authoring-requests.md#acting-for-the-author) that acts for an author. No token
+reaches the browser, as
 [D9](../decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) requires.
 
 The diagram shows the flow, and the numbered steps say the same in words:
@@ -27,9 +31,10 @@ The diagram shows the flow, and the numbered steps say the same in words:
    with a PKCE challenge and `max_age`.
 2. The person logs in at the identity provider, which redirects the browser to `/api/auth/callback` with a code.
 3. The server exchanges the code and the verifier for tokens, as the confidential client, and checks the
-   `aud`, `azp` and `auth_time` claims of the ID token.
+   `aud`, `azp` and `auth_time` claims of the ID token. It keeps the refresh token only under the
+   conditions that the refresh token bullet below gives.
 4. The server writes a sign-in audit record and the user's profile, and inserts the `axis.sessions` row,
-   keyed by the hash of the session id.
+   keyed by the hash of the session id, with the refresh token encrypted when it keeps one.
 5. The server sets the `__Host-Axis.Session` cookie and redirects the browser to `returnUrl`.
 6. Later requests send the cookie, and the server reads the row.
 
@@ -46,10 +51,10 @@ sequenceDiagram
     IdP-->>Browser: Redirect to /api/auth/callback with the code
     Browser->>Server: GET /api/auth/callback
     Server->>IdP: Exchange the code and the verifier for tokens
-    IdP-->>Server: ID token
+    IdP-->>Server: ID token and refresh token
     Server->>Server: Check aud, azp and auth_time
     Server->>TenantDb: Write the sign-in audit record and the user profile
-    Server->>TenantDb: Insert the axis.sessions row, keyed by the hash of the session id
+    Server->>TenantDb: Insert the axis.sessions row, keyed by the hash of the session id, with the encrypted refresh token
     Server-->>Browser: Set the __Host-Axis.Session cookie and redirect to returnUrl
     Browser->>Server: A later request sends the cookie
     Server->>TenantDb: Read the axis.sessions row
@@ -64,6 +69,21 @@ sequenceDiagram
   under a tenant's `fapi2` profile, see [FAPI 2.0 profile](fapi2-profile.md).
 - **One client per tenant.** The server registers one OIDC client per tenant. All of them share the
   callback path, and each one ignores a callback that arrives on another tenant's host.
+- **The refresh token.** A sign-in through the platform client `axis` on a `standard` tenant keeps the
+  refresh token that the realm returns in the row's `refresh_token`, encrypted with the tenant's newest
+  data key in the [sensitive value format](data-encryption.md) and bound to the tenant and the row, so
+  a copy on another row does not decrypt. Every such sign-in keeps it, because the users page gives
+  roles that apply at the next request, so a check at sign-in would miss a person who becomes an author
+  later. `SessionTokens.RefreshAsync` turns it into a current access token, whose audience holds
+  `axis-agent`. It locks the row with `SELECT … FOR UPDATE` in a transaction around the call to the
+  realm's token endpoint, which has a limit of 10 seconds, so two refreshes never rotate the token at
+  once and the session's other requests wait at most that long. It stores the refresh token that the
+  realm returns. When the realm refuses the token with `invalid_grant`, for example because the
+  person's realm session ended, or the stored token no longer decrypts, it clears the column and gives
+  no access token. Any other failure keeps the token and gives none. A sign-in that starts on a site, a
+  sign-in on a site's own host and every sign-in on a `fapi2` tenant keep no token. A tenant without a
+  data key signs people in and keeps no token, and logs a warning, because a token is never stored in
+  clear. Sign-out, expiry and `tenant session end` delete the row, and the token with it.
 - **A site's client.** A sign-in that starts on a site page goes to the tenant's realm as that site's
   client, `site-<path>`, and the callback redeems the code with the secret that derives from the
   platform client's secret. The ID token's `aud`, and its `azp` when present, must be the client that
@@ -238,12 +258,13 @@ browser holds only a cookie with a random session id.
     claim, none for accounts;
   - the roles that each application's provider mapping gave, by application id;
   - the identity provider's session id, the ID token's `sid` claim, which names that session for
-    sign-out and grants nothing.
+    sign-out and grants nothing;
+  - the platform client's refresh token, encrypted, kept as the refresh token bullet of [the sign-in flow](#sign-in-flow) says.
 
   A row with no site path and no provider alias counts as a sign-in through accounts on the tenant's
   own hosts. Given roles are not in the row: the session reads them from `axis.given_roles` at every
   request, and on a preview tenant it reads those of its main tenant, from the main tenant's database.
-  The table never holds the session id or a token, and none reaches the browser.
+  The table never holds the session id, holds no token in clear, and no token reaches the browser.
 - **The session cookie** is `__Host-Axis.Session`, set with `HttpOnly`, `SameSite=Lax`, `Secure`,
   `Path=/` and no domain, so scripts cannot read it, the browser refuses it on plain http or from a
   subdomain, and a cross-site request does not carry it on a write. It holds only the random session

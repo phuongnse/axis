@@ -2,7 +2,7 @@ namespace Axis.Data.Storage;
 
 /// <summary>
 /// A row of <c>axis.sessions</c>: the server-side state of one signed-in session. The row never
-/// holds the session id or a token, only a hash of the id. The cookie holds the id.
+/// holds the session id, only a hash of the id, and it holds no token in clear. The cookie holds the id.
 /// </summary>
 public sealed class SessionRow
 {
@@ -50,4 +50,11 @@ public sealed class SessionRow
     /// created before the column existed.
     /// </summary>
     public string ApplicationRoles { get; init; } = "{}";
+
+    /// <summary>
+    /// The platform client's refresh token, encrypted with the tenant data key in the sensitive value format and bound to this row, see
+    /// <c>docs/reference/security.md#sign-in-flow</c>. It is null for a sign-in on a site, a sign-in on a <c>fapi2</c> tenant, a tenant
+    /// without a data key, a session whose token the identity provider refused, and a session created before the column existed.
+    /// </summary>
+    public byte[]? RefreshToken { get; init; }
 }

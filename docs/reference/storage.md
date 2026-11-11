@@ -85,9 +85,11 @@ erDiagram
 - **Sessions.** A row of `axis.sessions` holds `id_hash` (`bytea`, the primary key, the SHA-256 hash
   of the session id), `user_id`, `display_name`, `roles` (`text[]`), `signed_in_at`,
   `last_request_at`, `authenticated_at` (nullable, the ID token's `auth_time`), `site_path`
-  (nullable, a site's own host), `identity_provider` (nullable, the provider's alias) and
-  `idp_session_id` (nullable, the ID token's `sid`). The server reads, writes and deletes rows, the
-  worker deletes expired ones, and `tenant restore` empties the table. See
+  (nullable, a site's own host), `identity_provider` (nullable, the provider's alias),
+  `idp_session_id` (nullable, the ID token's `sid`) and `refresh_token` (`bytea`, nullable, the
+  platform client's refresh token, encrypted in the sensitive value format and bound to the row). The
+  server reads, writes and deletes rows, the worker deletes expired ones, and `tenant restore` empties
+  the table. See
   [sign-in and the session](security.md#sign-in-and-the-session).
 - **Given roles.** A row of `axis.given_roles` holds `id` (`uuid`, the primary key), `user_id`,
   `application_id` (null for a platform role) and `role` (for a platform role, its kind, such as
