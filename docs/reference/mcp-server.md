@@ -65,7 +65,8 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
   `revoked_at`, it answers `401` with the same `WWW-Authenticate` header as for any refused token, so a
   revoke takes effect on the next call. A token issued after the revoke works, so a client whose
   consent is given again can connect. Each call also records the client's last use in that row, at
-  most once a minute. The revoke action belongs to **Connected apps** below.
+  most once a minute. A tenant administrator revokes a client with
+  [outside MCP clients](user-administration.md#outside-mcp-clients).
 - **Who acts.** The token's subject is the person. The route needs the [author role](authoring.md#settings)
   and answers `403` without it.
 - **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for
@@ -225,7 +226,9 @@ What an agent did is recorded, but never the content it read or wrote.
 - **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
   application, the draft and the resource ids. The fields are in [audit actions](storage.md#audit-actions).
   `run_scenarios` writes none, as a [test](authoring.md#test) writes none.
-- **Consent** _(planned for M35)_. Consent and its revocation write audit records in the realm and a platform audit
+- **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant
+  database and one in the platform database, see [audit actions](storage.md#audit-actions).
+- **Consent** _(planned for M35)_. A consent that a person gives writes an audit record in the realm and a platform audit
   record in Axis.
 - **Logs.** The server logs each call's tool, client id and outcome, and the
   [log inventory](log-inventory.md#security-events) lists the event.

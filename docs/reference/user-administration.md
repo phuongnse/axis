@@ -198,7 +198,7 @@ only, as the command routes do.
 
 An administrator reads and replaces the tenant's switch for outside MCP clients, the settings `Ai:OutsideClients` and
 `Ai:AllowedClients`, see [client registration](mcp-server.md#client-registration) for what each mode means, and reads the
-outside clients that people consented to. The routes answer to an administrator with a browser session only, as the
+outside clients that people consented to, and revokes everyone's consent to one outside client. The routes answer to an administrator with a browser session only, as the
 command routes do.
 The Connected apps tab of the [users page](platform-pages.md#connected-apps) reads and replaces both values through the
 switch routes.
@@ -208,11 +208,13 @@ switch routes.
 | `GET /api/tenant/outside-clients` | None                                                                   | `200` with `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` |
 | `PUT /api/tenant/outside-clients` | `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` | `204`                                                                             |
 | `GET /api/tenant/connected-apps`  | None                                                                   | `200` with `{ "items": [{ "clientId", "name", "lastUsedAt", "people": [{ "userId", "displayName", "email", "consentedAt" }] }] }` |
+| `POST /api/tenant/connected-apps/{clientId}/revoke` | None                                                               | `204`                                                                             |
 
 - **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
   `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview tenant and has
   realm details (`404`), and for `PUT` the body (`400`). The routes work on any host whose tenant has such a row, and the
-  check runs before the body is read. For the connected apps route the `404` also covers a tenant with no users client.
+  check runs before the body is read. For the connected apps routes the `404` also covers a tenant with no users client,
+  and for the revoke, after that, a client id that is not an outside client of the realm.
 - **Replace.** `PUT` replaces both values. `outsideClients` is exactly `all`, `allowList` or `none`. A missing
   `allowedClients` means an empty list, and the client ids are trimmed and made unique. The list is stored under every
   mode, and the realm reads it only under `allowList`. A body that is missing or malformed, a mode that is not one of the
@@ -228,13 +230,26 @@ switch routes.
   no outside client answers an empty list. The route reads the users of the realm one by one, so a tenant with
   many users answers slowly. It does not read whether a consent was revoked. When the identity provider fails, the route
   answers `502` with a fixed title.
+- **Revoke.** `POST /api/tenant/connected-apps/{clientId}/revoke` removes every person's consent to the outside client
+  and stops the tokens it holds, see [revoked consent](mcp-server.md#sign-in). It reads the people who consent to the
+  client, then sets `revoked_at` of the client in [`axis.mcp_clients`](storage.md#system-tables) and writes the tenant
+  audit record in one transaction, and then deletes each consent at the identity provider. An access token that the client
+  got before gets `401` on `/mcp`, and its refresh token is refused. A token issued after a person consents again works.
+  `axis-agent`, one of Keycloak's own clients, a confidential client and an id the realm does not know answer `404` and
+  write nothing. A client that nobody consents to is still revoked: the record lists no people. When the identity
+  provider fails, the route answers `502` with a fixed title and the stored revoke and its record stay. Repeating the
+  `POST` deletes the consents that are left and writes a new record that lists them. A consent that is already gone is
+  not a failure. The route reads the users of the realm one by one, so a tenant with many users answers slowly.
 - **Store, then the realm.** `PUT` stores the change and its record in one transaction and then brings the realm in step:
   it turns outside clients on or off and opens or closes registration. When the identity provider fails, the route answers
   `502` with a fixed title and the stored change and its record stay. Repeating the `PUT` applies it. Two `PUT` requests
   at the same moment can leave the realm matching the earlier one until the next `PUT` or a rerun of `tenant create`.
 - **Audit.** Each accepted `PUT` writes one platform audit record, also when the values are unchanged, and the record
   holds no client id, see [when a record is written](tenant-setting-commands.md#when-a-record-is-written). The change does
-  not need a recent sign-in, and the storage quota never refuses it.
+  not need a recent sign-in, and the storage quota never refuses it. A revoke writes the tenant audit record
+  `mcp.consentRevoked`, see [audit](#audit), and, after the consents are deleted, the platform record
+  `tenant connected-app revoke`, which names `consent` and holds no client id. The storage quota never refuses a revoke,
+  see [refusals](tenant-quotas.md#refusals).
 
 ## Accounts
 
@@ -342,7 +357,7 @@ nothing else in the realm.
 
 ## Audit
 
-Each command writes one audit record in the tenant database, with the administrator as actor and the user it acts on.
+Each command writes one audit record in the tenant database, with the administrator as actor. A user command also names the user it acts on.
 
 | Action                    | Command                                                                          |
 | ------------------------- | -------------------------------------------------------------------------------- |
@@ -353,9 +368,12 @@ Each command writes one audit record in the tenant database, with the administra
 | `user.authenticatorReset` | Reset an authenticator                                                           |
 | `user.roleGiven`          | Give a role, each role given at invite time, and `tenant create --administrator` |
 | `user.roleRemoved`        | Remove a role                                                                    |
+| `mcp.consentRevoked`      | Revoke an outside MCP client's consent, see [outside MCP clients](#outside-mcp-clients) |
 
 - **Details.** `details` holds `userId` and, for an invitation, `email`. A resend writes the new user id in `userId`
   and the old one in `previousUserId`, because the id changes.
+- **Consent revocation.** `details` of `mcp.consentRevoked` holds `clientId` and `userIds`, the people whose consent the
+  identity provider listed just before the revoke, in ordinal order. The list is empty when nobody consented.
 - **Role records.** A role record names the application in its application id, or, for a platform role, has no
   application and says `platform: true` in its details. Its details hold the role, the kind for a platform role.
 - **Not a change.** Giving a role the person holds, or removing one they do not hold, writes no record.

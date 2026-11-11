@@ -14,7 +14,7 @@ namespace Axis.Tenancy.Realms;
 /// alias of the first federated identity. It counts the enabled users. It reads the contact details of one user: the enabled flag, email, display name and locale. It also finds one user, disables or enables a user, ends a user's realm
 /// sessions or one realm session by its id, lists a user's authenticators and removes them. It also invites a person: it finds an account by email, creates an account with
 /// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
-/// adds a required action to every user. It reads the consents of every user. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
+/// adds a required action to every user. It reads the consents of every user and revokes one person's consent to a client. It also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -264,6 +264,24 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
                     email,
                     DateTimeOffset.FromUnixTimeMilliseconds(entry.GetProperty("createdDate").GetInt64()))),
         ];
+    }
+
+    /// <summary>
+    /// Deletes the user's consent to the client, which also ends the refresh tokens that the consent gave. A user or a consent that is already gone
+    /// is not an error.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task RevokeConsentAsync(string userId, string clientId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(
+            token, HttpMethod.Delete, $"{UserPath(userId)}/consents/{Uri.EscapeDataString(clientId)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        EnsureSuccess(response, "revoke the consent of a user");
     }
 
     /// <summary>Ends every session of the user in the realm.</summary>
