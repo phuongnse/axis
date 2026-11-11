@@ -1,6 +1,7 @@
 # The security checks, their exceptions and the authentication default: the dependency and image
-# scans with their accepted lists, the raw HTML and prototype pollution lint rules with their
-# exceptions, and the route authorization. A pull request that changes one needs the owner's review, see
+# scans with their entry scripts, the Trivy install and their accepted lists, the raw HTML and
+# prototype pollution lint rules with their exceptions, the route authorization, and the test that
+# checks this list covers what the scans run. A pull request that changes one needs the owner's review, see
 # docs/decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md.
 # NexKit's review checklist in .nexkit/config.json guards the other checks.
 /tests/Axis.Server.Tests/AuthorizationRouteTests.cs @phuongnse
@@ -10,6 +11,10 @@
 /scripts/scan-images-accepted.json @phuongnse
 /scripts/scan-images.mjs @phuongnse
 /scripts/lib/accepted-findings.mjs @phuongnse
+/scripts/scan.sh @phuongnse
+/scripts/scan-images.sh @phuongnse
+/scripts/lib/tools.sh @phuongnse
+/scripts/codeowners.test.mjs @phuongnse
 /web/.oxlintrc.json @phuongnse
 /web/lint/axis-plugin.mjs @phuongnse
 
