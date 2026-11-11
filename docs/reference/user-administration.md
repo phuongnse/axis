@@ -199,6 +199,7 @@ only, as the command routes do.
 An administrator reads and replaces the tenant's switch for outside MCP clients, the settings `Ai:OutsideClients` and
 `Ai:AllowedClients`, see [client registration](mcp-server.md#client-registration) for what each mode means. The routes
 answer to an administrator with a browser session only, as the command routes do.
+The Connected apps tab of the [users page](platform-pages.md#connected-apps) reads and replaces both values through them.
 
 | Route                             | Body                                                                   | Answer                                                                            |
 | --------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |

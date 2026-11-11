@@ -118,9 +118,10 @@ clients may connect at all.
   already be registered. The confidential clients of Axis, the agent host's included, and Keycloak's
   own clients are never turned off. A tenant administrator reads and changes both settings through the routes in
   [outside MCP clients](user-administration.md#outside-mcp-clients), and each change writes a platform audit record.
-- **Connected apps** _(planned for M35)_. A tenant administrator changes both settings on the
-  [users page](user-administration.md), in a Connected apps tab that lists each client with consent,
-  the people who consented and the last use, and revokes a client's consent there.
+- **Connected apps.** A tenant administrator changes both settings in the Connected apps tab of the
+  [users page](platform-pages.md#connected-apps).
+- **Consents** _(planned for M35)_. The Connected apps tab also lists each client with consent, the people who
+  consented and the last use, and revokes a client's consent there.
 
 ## Tools
 
