@@ -70,7 +70,7 @@ A subscription is in one of these states, and each state says how the tenant wor
 | --- | --- | --- |
 | `trialing` | Works, with the trial's quotas | `active` on the first payment, `readOnly` at the trial's end |
 | `active` | Works, with the plan's quotas | `pastDue` a day after an invoice's due date, when it is unpaid |
-| `pastDue` | Works, with a banner to pay | `active` on payment, `readOnly` after 14 days of grace |
+| `pastDue` | Works, with the plan's quotas | `active` on payment, `readOnly` after 14 days of grace |
 | `readOnly` | Read-only, see [the read-only tenant](#the-read-only-tenant) | `active` on payment, `deleting` after its wait |
 | `cancelled` | Works until the paid period ends | `readOnly` at the period's end |
 | `deleting` | Suspended, in the cell's grace window | `deleted` after the window, `readOnly` if the operator cancels the deletion |
@@ -80,6 +80,7 @@ A subscription is in one of these states, and each state says how the tenant wor
   no payment, see [the hourly job](#one-clock). `pastDue` ends in `readOnly` after 14 days, and
   `cancelled` ends in `readOnly` at the period's end. The end of each `active` period moves
   `period_ends_at` forward one period.
+- **A banner to pay** _(planned for M34)_. A `pastDue` tenant sees a banner that asks the owner to pay.
 - **Paying starts the paid period** _(planned for M34)_. Every move on a payment comes with paid
   plans, and starting the first paid period sets `period_ends_at`. A payment in `pastDue` also moves
   the period forward.
@@ -100,7 +101,7 @@ comes after them.
 | Trial day 23, or 7 days before the due date | Email: 7 days left | Email: invoice due in 7 days |
 | Trial day 29, or 1 day before | Email: 1 day left | Email: invoice due tomorrow |
 | Trial day 30, or the due date | `readOnly`, email | Email: due today; `pastDue` the next day |
-| Due date + 14 | — | `readOnly` |
+| Due date + 15 | — | `readOnly`, 14 days after `pastDue` |
 | 7 days before the deletion | Email: deletion in 7 days, export now | Same |
 | 30 days in `readOnly` for a trial, 90 for a paid tenant | `deleting`: the control plane calls `DELETE /api/cell/tenants/{id}` | Same |
 | 7 days later | The cell purges the tenant, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) | Same |
