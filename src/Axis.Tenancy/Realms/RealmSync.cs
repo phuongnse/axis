@@ -114,6 +114,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string FirstLoginFlowAlias = "axis first login";
 
     private const int ConflictAttempts = 3;
+    private const int OutsideClientPageSize = 100;
+
+    // The clients that Keycloak makes in every realm. Turning off admin-cli or security-admin-console would break administration.
+    private static readonly HashSet<string> _keycloakClientIds = new(StringComparer.Ordinal)
+    {
+        "account", "account-console", "admin-cli", "broker", "realm-management", "security-admin-console",
+    };
+
     private const string ActivationClientId = "axis-activation";
     private const string UserAttributeMapper = "oidc-user-attribute-idp-mapper";
     private const string UsernameMapper = "oidc-username-idp-mapper";
@@ -240,6 +248,126 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
         // On a new realm the scope exists only from here on, so the agent client's optional scope can be attached only now.
         await SyncAgentClientAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}", cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies a tenant's <c>Ai:OutsideClients</c> switch to the realm (<c>docs/reference/mcp-server.md#client-registration</c>).
+    /// <paramref name="outsideClients"/> is one of the <see cref="TenantOutsideClients"/> values, and any other value throws <see cref="ArgumentException"/>.
+    /// Under <c>all</c> the realm has no anonymous Trusted Hosts registration policy, so registration is open. Under <c>allowList</c> and <c>none</c> it has exactly one,
+    /// with no trusted host, which Keycloak answers with <c>403</c> to every registration. A policy that exists is written again, which repairs a widened one.
+    /// An outside client is a public client that is not one of Keycloak's own, and it is turned on when the switch allows it and off otherwise: every one under <c>all</c>, the ones named in
+    /// <paramref name="allowedClients"/> under <c>allowList</c> and none under <c>none</c>. A client that is off gets no code and no token. A confidential client, so every client of Axis,
+    /// and Keycloak's own clients stay as they are. It signs in as <c>axis-activation</c>, whose <c>manage-clients</c> and <c>manage-realm</c> rights cover them.
+    /// An error names the step and the status code, never a response body or a secret.
+    /// </summary>
+    public async Task SyncOutsideClientsAsync(
+        string realm, string activationSecret, string outsideClients, IReadOnlyCollection<string> allowedClients, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(allowedClients);
+        if (outsideClients is not (TenantOutsideClients.All or TenantOutsideClients.AllowList or TenantOutsideClients.None))
+        {
+            throw new ArgumentException($"The outside clients setting '{outsideClients}' is not one of all, allowList or none.", nameof(outsideClients));
+        }
+
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
+        await SyncTrustedHostsAsync(token, realmPath, outsideClients != TenantOutsideClients.All, cancellationToken);
+
+        var allowed = new HashSet<string>(allowedClients, StringComparer.Ordinal);
+        var clientsPath = $"{realmPath}/clients";
+        var outside = new List<(string Uuid, bool Enabled, string ClientId)>();
+        for (var first = 0; ; first += OutsideClientPageSize)
+        {
+            using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?first={first}&max={OutsideClientPageSize}", null, cancellationToken);
+            EnsureSuccess(listed, "list the clients");
+            var page = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+            foreach (var client in page)
+            {
+                var clientId = client.GetProperty("clientId").GetString()!;
+                if (client.TryGetProperty("publicClient", out var isPublic) && isPublic.ValueKind == JsonValueKind.True && !_keycloakClientIds.Contains(clientId))
+                {
+                    outside.Add((client.GetProperty("id").GetString()!, client.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True, clientId));
+                }
+            }
+
+            if (page.Count < OutsideClientPageSize)
+            {
+                break;
+            }
+        }
+
+        foreach (var (uuid, enabled, clientId) in outside)
+        {
+            var allow = outsideClients == TenantOutsideClients.All || (outsideClients == TenantOutsideClients.AllowList && allowed.Contains(clientId));
+            if (allow == enabled)
+            {
+                continue;
+            }
+
+            var clientPath = $"{clientsPath}/{uuid}";
+            using var read = await SendAsync(token, HttpMethod.Get, clientPath, null, cancellationToken);
+            EnsureSuccess(read, $"read the client '{clientId}'");
+            var representation = (await read.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).Deserialize<Dictionary<string, JsonElement>>()!;
+            representation.Remove("secret");
+            representation["enabled"] = JsonSerializer.SerializeToElement(allow);
+            using var updated = await SendAsync(token, HttpMethod.Put, clientPath, representation, cancellationToken);
+            EnsureSuccess(updated, $"{(allow ? "turn on" : "turn off")} the client '{clientId}'");
+        }
+    }
+
+    /// <summary>
+    /// Makes the realm's anonymous Trusted Hosts registration policy exist exactly once, with no trusted host, when <paramref name="closed"/>, and not exist otherwise.
+    /// Every other registration policy stays as it is.
+    /// </summary>
+    private async Task SyncTrustedHostsAsync(string token, string realmPath, bool closed, CancellationToken cancellationToken)
+    {
+        var componentsPath = $"{realmPath}/components";
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{componentsPath}?type={Uri.EscapeDataString(RegistrationPolicyType)}", null, cancellationToken);
+        EnsureSuccess(listed, "list the registration policies");
+        var policies = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Where(component => component.TryGetProperty("subType", out var subType) && subType.GetString() == "anonymous"
+                && component.GetProperty("providerId").GetString() == "trusted-hosts")
+            .ToList();
+
+        foreach (var policy in policies.Skip(closed ? 1 : 0))
+        {
+            using var removed = await SendAsync(token, HttpMethod.Delete, $"{componentsPath}/{policy.GetProperty("id").GetString()}", null, cancellationToken);
+            EnsureSuccess(removed, "remove the trusted hosts registration policy");
+        }
+
+        if (!closed)
+        {
+            return;
+        }
+
+        var config = new Dictionary<string, string[]>
+        {
+            ["trusted-hosts"] = [],
+            ["host-sending-registration-request-must-match"] = ["true"],
+            ["client-uris-must-match"] = ["true"],
+        };
+        if (policies.Count > 0)
+        {
+            var body = policies[0].Deserialize<Dictionary<string, JsonElement>>()!;
+            body["config"] = JsonSerializer.SerializeToElement(config);
+            using var updated = await SendAsync(token, HttpMethod.Put, $"{componentsPath}/{policies[0].GetProperty("id").GetString()}", body, cancellationToken);
+            EnsureSuccess(updated, "close the trusted hosts registration policy");
+            return;
+        }
+
+        using var realm = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
+        EnsureSuccess(realm, "read the realm");
+        var component = new Dictionary<string, object?>
+        {
+            ["name"] = "Trusted Hosts",
+            ["providerId"] = "trusted-hosts",
+            ["providerType"] = RegistrationPolicyType,
+            ["parentId"] = (await realm.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("id").GetString(),
+            ["subType"] = "anonymous",
+            ["config"] = config,
+        };
+        using var created = await SendAsync(token, HttpMethod.Post, componentsPath, component, cancellationToken);
+        EnsureSuccess(created, "add the trusted hosts registration policy");
     }
 
     /// <summary>

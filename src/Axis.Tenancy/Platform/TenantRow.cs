@@ -110,6 +110,15 @@ public sealed class TenantRow
     /// <summary>The version of the tenant's terms. A new version asks users to accept the terms again. It is set exactly when <see cref="TermsUrl"/> is.</summary>
     public string? TermsVersion { get; set; }
 
+    /// <summary>
+    /// The tenant setting <c>Ai:OutsideClients</c>: <c>all</c>, <c>allowList</c> or <c>none</c>. See <see cref="TenantOutsideClients"/> and
+    /// <c>docs/reference/mcp-server.md#client-registration</c>. A new tenant allows none.
+    /// </summary>
+    public string AiOutsideClients { get; set; } = TenantOutsideClients.None;
+
+    /// <summary>The tenant setting <c>Ai:AllowedClients</c>: the client ids that stay on under <c>allowList</c> (<c>docs/reference/mcp-server.md#client-registration</c>).</summary>
+    public string[] AiAllowedClients { get; set; } = [];
+
     /// <summary>The time after which the purge removes the tenant. <c>null</c> when no deletion is scheduled.</summary>
     public DateTimeOffset? DeleteAfter { get; set; }
 

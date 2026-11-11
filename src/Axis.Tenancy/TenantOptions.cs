@@ -61,3 +61,11 @@ public static class TenantSignInProfiles
     public const string Standard = "standard";
     public const string Fapi2 = "fapi2";
 }
+
+/// <summary>The values of a tenant's <c>Ai:OutsideClients</c> setting (<c>docs/reference/mcp-server.md#client-registration</c>).</summary>
+public static class TenantOutsideClients
+{
+    public const string All = "all";
+    public const string AllowList = "allowList";
+    public const string None = "none";
+}

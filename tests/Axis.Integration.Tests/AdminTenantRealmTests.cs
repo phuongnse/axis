@@ -5,6 +5,7 @@ using System.Text.Json;
 using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Hosting;
@@ -16,10 +17,22 @@ namespace Axis.Integration.Tests;
 /// <c>tenant create</c> on a real Keycloak: it creates the tenant's realm with its four clients, stores the generated
 /// client secrets encrypted and points the tenant's <c>Oidc</c> block at the realm. The realm uses the Axis login and email
 /// themes, its account console client is off and <c>manage-account</c> is not among its default roles. A second run sets
-/// all of it again. A preview tenant gets no realm.
+/// all of it again. A preview tenant gets no realm. A new tenant's realm refuses client registration, as the tenant's <c>Ai:OutsideClients</c> switch says
+/// (<c>docs/reference/mcp-server.md#client-registration</c>).
 /// </summary>
 public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
+    // A valid registration of an outside MCP client, so the only reason to refuse it is the realm's closed registration.
+    private static readonly Dictionary<string, object> _registration = new()
+    {
+        ["client_name"] = "Draft helper",
+        ["redirect_uris"] = new[] { "http://127.0.0.1/callback" },
+        ["grant_types"] = new[] { "authorization_code", "refresh_token" },
+        ["response_types"] = new[] { "code" },
+        ["token_endpoint_auth_method"] = "none",
+        ["scope"] = RealmSync.AuthoringScope,
+    };
+
     private readonly HttpClientHandler _handler = new();
     private readonly List<string> _realms = [];
     private Uri _baseAddress = null!;
@@ -81,6 +94,21 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.NotEmpty(await TokenAsync(http, id, "axis-activation", activation));
         Assert.NotEmpty(await TokenAsync(http, id, "axis-users", users));
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Create_leaves_the_realm_refusing_client_registration()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = NewTenantId(scenario);
+
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+
+        Assert.Equal(TenantOutsideClients.None, (await scenario.RowAsync(id)).AiOutsideClients);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        using var response = await http.PostAsJsonAsync(
+            new Uri(_baseAddress, $"realms/{id}/clients-registrations/openid-connect"), _registration, CancellationToken);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
