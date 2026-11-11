@@ -38,7 +38,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
     private static readonly string _callbackAddress = new Uri(_serverAddress, TenantSignIn.CallbackPath).AbsoluteUri;
 
-    private static readonly TenantRealmSecrets _realmSecrets = new("platform-1", "activation-1", "users-1");
+    private static readonly TenantRealmSecrets _realmSecrets = new("platform-1", "activation-1", "users-1", "agent-1");
 
     private string? _schemaConnection;
 

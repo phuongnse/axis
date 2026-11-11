@@ -381,7 +381,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
         const string usersSecret = "users-secret-1";
         var admin = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(tenant, "Acme", new TenantRealmSecrets("platform-secret-1", "activation-secret-1", usersSecret), new Dictionary<string, string>(), CancellationToken);
+            .EnsureAsync(tenant, "Acme", new TenantRealmSecrets("platform-secret-1", "activation-secret-1", usersSecret, "agent-secret-1"), new Dictionary<string, string>(), CancellationToken);
         try
         {
             var tenantDatabase = await CellTestPlatform.AddRealmTenantAsync(database, _platform, tenant, "suspended", _baseAddress, usersSecret, CancellationToken);

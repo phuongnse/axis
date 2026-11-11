@@ -32,6 +32,10 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
     private const string Password = "a-long-enough-password";
     private const string Host = "localhost";
     private const string McpUrl = "https://localhost/mcp";
+    private const string PlatformRedirectUri = "https://localhost/api/auth/callback";
+    private const string TokenExchangeGrant = "urn:ietf:params:oauth:grant-type:token-exchange";
+    private const string AccessTokenType = "urn:ietf:params:oauth:token-type:access_token";
+    private const string RefreshTokenType = "urn:ietf:params:oauth:token-type:refresh_token";
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
     // The mapper stands in for the roles that tenant realms do not yet put into MCP tokens.
@@ -51,7 +55,7 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         },
     };
 
-    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
+    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
 
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
     private readonly List<string> _realms = [];
@@ -316,6 +320,128 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         Assert.Equal("true", Attribute(repaired, "include.in.token.scope"));
     }
 
+    [Fact]
+    public async Task The_agent_client_exchanges_an_authors_token_for_one_whose_audience_is_the_mcp_url_and_that_token_opens_an_mcp_session()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var subject = await PlatformAccessTokenAsync(realm, secret);
+
+        var exchanged = await ExchangeAsync(realm, subject);
+
+        Assert.True(exchanged.Status == HttpStatusCode.OK, exchanged.Body.GetRawText());
+        var access = exchanged.Body.GetProperty("access_token").GetString()!;
+        Assert.Equal(Subject(subject), Subject(access));
+        Assert.Equal([McpUrl], Audiences(access));
+        var response = await InitializeMcpAsync(realm, access);
+        Assert.True(response.Status == HttpStatusCode.OK, response.Body);
+        Assert.False(string.IsNullOrEmpty(response.SessionId));
+    }
+
+    [Fact]
+    public async Task An_exchange_that_asks_for_another_audience_is_refused_and_gives_no_token()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var subject = await PlatformAccessTokenAsync(realm, secret);
+
+        var refused = await ExchangeAsync(realm, subject, audience: TenantRealm.PlatformClientId);
+
+        Assert.Equal(HttpStatusCode.BadRequest, refused.Status);
+        Assert.False(refused.Body.TryGetProperty("access_token", out _), refused.Body.GetRawText());
+        Assert.Equal("invalid_request", refused.Body.GetProperty("error").GetString());
+    }
+
+    [Fact]
+    public async Task Realm_sync_turns_token_exchange_back_on_for_the_agent_client()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var subject = await PlatformAccessTokenAsync(realm, secret);
+        var client = await AgentClientAsync(realm);
+        await SetAgentAttributeAsync(realm, client, RealmAgentClient.TokenExchangeAttribute, "false");
+
+        var refused = await ExchangeAsync(realm, subject);
+
+        Assert.NotEqual(HttpStatusCode.OK, refused.Status);
+        Assert.False(refused.Body.TryGetProperty("access_token", out _), refused.Body.GetRawText());
+
+        await new RealmSync(_http, _baseAddress).SyncAsync(realm, _secrets.Activation, new RealmState([], []), CancellationToken);
+
+        Assert.Equal("true", Attribute(await AgentClientAsync(realm), RealmAgentClient.TokenExchangeAttribute));
+        var exchanged = await ExchangeAsync(realm, subject);
+        Assert.True(exchanged.Status == HttpStatusCode.OK, exchanged.Body.GetRawText());
+    }
+
+    [Fact]
+    public async Task The_refresh_token_of_an_exchange_works_while_the_authors_session_lasts_and_not_after_an_admin_logs_the_author_out()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var exchanged = await ExchangeAsync(realm, await PlatformAccessTokenAsync(realm, secret));
+        Assert.True(exchanged.Status == HttpStatusCode.OK, exchanged.Body.GetRawText());
+        var access = exchanged.Body.GetProperty("access_token").GetString()!;
+
+        var refreshed = await RefreshAsAgentAsync(realm, exchanged.Body.GetProperty("refresh_token").GetString()!);
+
+        Assert.True(refreshed.Status == HttpStatusCode.OK, refreshed.Body.GetRawText());
+        Assert.Equal(Subject(access), Subject(refreshed.Body.GetProperty("access_token").GetString()!));
+        var author = (await GetJsonAsync($"admin/realms/{realm}/users?username={Username}&exact=true")).EnumerateArray().Single().GetProperty("id").GetString();
+        using (var loggedOut = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users/{author}/logout"))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, loggedOut.StatusCode);
+        }
+
+        var ended = await RefreshAsAgentAsync(realm, refreshed.Body.GetProperty("refresh_token").GetString()!);
+
+        Assert.Equal(HttpStatusCode.BadRequest, ended.Status);
+        Assert.Equal("invalid_grant", ended.Body.GetProperty("error").GetString());
+    }
+
+    private async Task<string> PlatformAccessTokenAsync(string realm, string secret) =>
+        (await SignInAsync(realm, secret, TenantRealm.PlatformClientId, PlatformRedirectUri, scope: "openid", clientSecret: _secrets.Platform))
+            .Tokens.GetProperty("access_token").GetString()!;
+
+    // Standard token exchange (RFC 8693): the agent client trades the author's token for one that it holds a refresh token for. It names the scope and no audience,
+    // because the realm's audience parameter takes only client ids and the scope's mappers put the MCP URL into the token.
+    private Task<(HttpStatusCode Status, JsonElement Body)> ExchangeAsync(string realm, string subjectToken, string? audience = null, string? agentSecret = null)
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["grant_type"] = TokenExchangeGrant,
+            ["client_id"] = RealmAgentClient.ClientId,
+            ["client_secret"] = agentSecret ?? _secrets.Agent,
+            ["subject_token"] = subjectToken,
+            ["subject_token_type"] = AccessTokenType,
+            ["requested_token_type"] = RefreshTokenType,
+            ["scope"] = RealmSync.AuthoringScope,
+        };
+        if (audience is not null)
+        {
+            form["audience"] = audience;
+        }
+
+        return TokenAsync(realm, form);
+    }
+
+    private Task<(HttpStatusCode Status, JsonElement Body)> RefreshAsAgentAsync(string realm, string refreshToken) =>
+        TokenAsync(realm, new Dictionary<string, string>
+        {
+            ["grant_type"] = "refresh_token",
+            ["client_id"] = RealmAgentClient.ClientId,
+            ["client_secret"] = _secrets.Agent,
+            ["refresh_token"] = refreshToken,
+        });
+
+    private async Task<JsonElement> AgentClientAsync(string realm) =>
+        (await GetJsonAsync($"admin/realms/{realm}/clients?clientId={RealmAgentClient.ClientId}")).EnumerateArray().Single();
+
+    private async Task SetAgentAttributeAsync(string realm, JsonElement client, string name, string value)
+    {
+        var representation = client.Deserialize<Dictionary<string, JsonElement>>()!;
+        var attributes = client.GetProperty("attributes").Deserialize<Dictionary<string, JsonElement>>()!;
+        attributes[name] = JsonSerializer.SerializeToElement(value);
+        representation["attributes"] = JsonSerializer.SerializeToElement(attributes);
+        using var updated = await SendAsync(HttpMethod.Put, $"admin/realms/{realm}/clients/{client.GetProperty("id").GetString()}", representation);
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+    }
+
     private async Task<JsonElement> AuthoringScopeAsync(string realm) =>
         (await GetJsonAsync($"admin/realms/{realm}/client-scopes")).EnumerateArray()
             .Single(scope => scope.GetProperty("name").GetString() == RealmSync.AuthoringScope);
@@ -343,6 +469,11 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
+        // The agent client gets the same stand-in, because its tokens call /mcp like any other client's.
+        using var agentMapped = await SendAsync(
+            HttpMethod.Post, $"admin/realms/{realm}/clients/{(await AgentClientAsync(realm)).GetProperty("id").GetString()}/protocol-mappers/models", _rolesMapper);
+        Assert.Equal(HttpStatusCode.Created, agentMapped.StatusCode);
+
         const string secret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
         using var user = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new
         {
@@ -367,15 +498,16 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         return (realm, secret);
     }
 
-    private static string AuthorizePath(string realm, string clientId = ClientId, string redirectUri = RedirectUri) =>
-        $"realms/{realm}/protocol/openid-connect/auth?client_id={Uri.EscapeDataString(clientId)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&response_type=code&scope={Uri.EscapeDataString($"openid {RealmSync.AuthoringScope}")}";
+    private static string AuthorizePath(string realm, string clientId = ClientId, string redirectUri = RedirectUri, string scope = $"openid {RealmSync.AuthoringScope}") =>
+        $"realms/{realm}/protocol/openid-connect/auth?client_id={Uri.EscapeDataString(clientId)}&redirect_uri={Uri.EscapeDataString(redirectUri)}&response_type=code&scope={Uri.EscapeDataString(scope)}";
 
     /// <summary>
     /// Signs the person in at the realm as a browser does, with the code flow and PKCE <c>S256</c>, and returns the token response. A client that
     /// requires consent gets the consent page, which the person allows. <paramref name="onConsent"/> sees the client name that the page shows.
     /// </summary>
     private async Task<(JsonElement Tokens, string? ConsentFor)> SignInAsync(
-        string realm, string secret, string clientId = ClientId, string redirectUri = RedirectUri, string? resource = null, Action<string>? onConsent = null)
+        string realm, string secret, string clientId = ClientId, string redirectUri = RedirectUri, string? resource = null, Action<string>? onConsent = null,
+        string scope = $"openid {RealmSync.AuthoringScope}", string? clientSecret = null)
     {
         var pkce = Pkce.New();
         var query = pkce.Query;
@@ -384,7 +516,7 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
             query += $"&resource={Uri.EscapeDataString(resource)}";
         }
 
-        var authorize = new Uri(_baseAddress, AuthorizePath(realm, clientId, redirectUri) + query);
+        var authorize = new Uri(_baseAddress, AuthorizePath(realm, clientId, redirectUri, scope) + query);
         var (password, cookies) = await KeycloakSignIn.SubmitPasswordAsync(_http, authorize, Username, Password);
         var passwordCookies = WithCookies(cookies, password);
         var login = await KeycloakSignIn.SubmitCodeAsync(_http, password, cookies, Username, DevelopmentTotp.CodeFromSecret(secret));
@@ -423,14 +555,20 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         var code = HttpUtility.ParseQueryString(location.Query)["code"];
         Assert.False(string.IsNullOrEmpty(code), location.AbsoluteUri);
 
-        var response = await TokenAsync(realm, new Dictionary<string, string>
+        var form = new Dictionary<string, string>
         {
             ["grant_type"] = "authorization_code",
             ["client_id"] = clientId,
             ["code"] = code,
             ["redirect_uri"] = redirectUri,
             ["code_verifier"] = pkce.Verifier,
-        });
+        };
+        if (clientSecret is not null)
+        {
+            form["client_secret"] = clientSecret;
+        }
+
+        var response = await TokenAsync(realm, form);
         Assert.True(response.Status == HttpStatusCode.OK, response.Body.GetRawText());
         return (response.Body, consentFor);
     }
@@ -533,6 +671,12 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         var payload = accessToken.Split('.')[1].Replace('-', '+').Replace('_', '/');
         payload = payload.PadRight(payload.Length + ((4 - (payload.Length % 4)) % 4), '=');
         return JsonDocument.Parse(Convert.FromBase64String(payload));
+    }
+
+    private static string Subject(string accessToken)
+    {
+        using var claims = Claims(accessToken);
+        return claims.RootElement.GetProperty("sub").GetString()!;
     }
 
     private static List<string> Audiences(string accessToken)

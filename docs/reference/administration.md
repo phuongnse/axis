@@ -135,7 +135,7 @@ database. It has two forms:
 | `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`.                                                                                                                                                                                                           |
 
 **Realm.** The command creates the tenant's realm in
-[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its three clients,
+[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its four clients,
 and sets the tenant's `Oidc` block to the realm itself: the authority
 `<IdentityProvider:Url>/realms/<id>` and the client `axis`. The admin host's `IdentityProvider`
 settings give it the identity provider's admin client. The command takes no `--oidc-*` option, and
@@ -175,7 +175,7 @@ main tenant.
 1. `entry`: validate the id and check that the hosts are unique across all tenants, ignoring letter
    case. Write the directory entry with status `provisioning` and, in the same transaction, the
    tenant's data key 1 and lookup key 1, see [tenant keys](data-encryption.md#tenant-keys).
-2. `realm`: generate the secrets of the realm's three clients, store them encrypted in the directory
+2. `realm`: generate the secrets of the realm's four clients, store them encrypted in the directory
    and point the entry's `Oidc` block at the realm. Then create the tenant's realm in the identity
    provider, or bring an existing one up to date. A preview tenant has no such step.
 3. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime`. Each gets a 32-byte random password,
@@ -203,13 +203,13 @@ code 2.
 
 **What the steps do.**
 
-- `realm` saves three random secrets, each 32 bytes written as 64 lowercase hex characters,
+- `realm` saves four random secrets, each 32 bytes written as 64 lowercase hex characters,
   encrypted, before it calls the identity provider: the secret of the `axis` client, which is the
-  entry's `OidcClientSecret`, and those of `axis-activation` and `axis-users`. It saves the entry's
+  entry's `OidcClientSecret`, and those of `axis-activation`, `axis-users` and `axis-agent`. It saves the entry's
   `Oidc` authority and client id `axis` at the same time, so a stop between the save and the call
   never loses a secret. The realm's name and its display name are the tenant id. The step signs in to
   the `master` realm with the admin client, creates the realm with sessions of at most 8 hours, `en`
-  and `vi` and the three clients, and gives the activation client `manage-realm` among its rights,
+  and `vi` and the four clients, and gives the activation client `manage-realm` among its rights,
   and the realm its mail server, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names the
   step of the identity provider and its status code, never a response body or a secret. After a

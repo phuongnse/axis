@@ -289,7 +289,7 @@ public sealed class WorkerTenantUsageTests(PostgreSqlFixture database, KeycloakF
         {
             // The tenant "a" sorts before the realm's tenant, so the poll handles its failing identity provider first.
             var id = realms.NewRealmName();
-            var secrets = new TenantRealmSecrets("platform-secret-1", "activation-secret-1", "users-secret-1");
+            var secrets = new TenantRealmSecrets("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
             using var http = new HttpClient();
             await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
                 .EnsureAsync(id, "Acme", secrets, new Dictionary<string, string>(), CancellationToken);

@@ -29,12 +29,15 @@ namespace Axis.Tenancy.Realms;
 /// needs the <c>manage-realm</c> right, and removes the label texts (<see cref="LabelKeyPrefix"/>) of providers the realm no longer holds. Each provider also names the realm's own first-login flow
 /// (<see cref="FirstLoginFlowAlias"/>), which always creates a new user and never offers to link one. The sync adds, changes and removes only clients whose id
 /// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/> or <see cref="SamlProviderAliasPrefix"/>,
-/// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
+/// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c>, <c>axis-agent</c> and anything an operator added stay. A removed provider
 /// keeps its users in the realm. An error names the step and the status code, never a response body or a secret. A 409
 /// from the identity provider, which another sync of the same realm at the same time can cause, makes the sync read the
 /// realm again and repeat, up to three attempts. It also writes the tenant's legal links on every client of the realm, turns the realm's Terms and Conditions
 /// step on while the tenant has a terms address, and asks every user to accept the terms again when the terms version changes (<see cref="SyncLegalAsync"/>).
 /// It also keeps the realm's <see cref="AuthoringScope"/> client scope in step with the tenant's hosts (<see cref="SyncPlatformAddressesAsync"/>).
+/// It puts back the settings of the agent client <see cref="RealmAgentClient.ClientId"/>, which <c>tenant create</c> makes, when the realm holds it: token exchange on, refresh tied to the session,
+/// and <see cref="AuthoringScope"/> as its only optional scope. It never creates the client, because it does not hold the client's secret. Site clients do not copy the platform client's
+/// mapper <see cref="RealmAgentClient.AudienceMapperName"/>, so a site sign-in cannot be exchanged.
 /// </summary>
 public sealed class RealmSync(HttpClient http, Uri baseAddress)
 {
@@ -150,6 +153,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             try
             {
                 await SyncSiteClientsAsync(token, realmPath, state.Sites, state.Providers, state.PlatformClientSecret, cancellationToken);
+                await SyncAgentClientAsync(token, realmPath, cancellationToken);
                 await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
                 await SyncLabelsAsync(token, realmPath, state.Providers, cancellationToken);
                 return;
@@ -233,6 +237,102 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         EnsureSuccess(updated, $"update the client '{RealmClientProfile.PlatformClientId}'");
 
         await SyncAuthoringScopeAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}", HostsOf(hosts), cancellationToken);
+
+        // On a new realm the scope exists only from here on, so the agent client's optional scope can be attached only now.
+        await SyncAgentClientAsync(token, $"admin/realms/{Uri.EscapeDataString(realm)}", cancellationToken);
+    }
+
+    /// <summary>
+    /// Puts back the settings of <see cref="RealmAgentClient"/> on the client <c>axis-agent</c>: its flags, token exchange and refresh tied to the session, and
+    /// <see cref="AuthoringScope"/> as its only optional scope. Every other attribute of the client stays and the secret is not sent. It does nothing when the realm has no such client.
+    /// </summary>
+    private async Task SyncAgentClientAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var clientsPath = $"{realmPath}/clients";
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{clientsPath}?clientId={Uri.EscapeDataString(RealmAgentClient.ClientId)}", null, cancellationToken);
+        EnsureSuccess(listed, $"find the client '{RealmAgentClient.ClientId}'");
+        string? uuid = null;
+        foreach (var found in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            if (found.GetProperty("clientId").GetString() == RealmAgentClient.ClientId)
+            {
+                uuid = found.GetProperty("id").GetString();
+                break;
+            }
+        }
+
+        if (uuid is null)
+        {
+            return;
+        }
+
+        var clientPath = $"{clientsPath}/{uuid}";
+        using var read = await SendAsync(token, HttpMethod.Get, clientPath, null, cancellationToken);
+        EnsureSuccess(read, $"read the client '{RealmAgentClient.ClientId}'");
+        var client = await read.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        var current = client.Deserialize<Dictionary<string, JsonElement>>()!;
+        var representation = new Dictionary<string, JsonElement>(current);
+        var differs = false;
+        foreach (var (name, value) in RealmAgentClient.Representation(null))
+        {
+            if (name == "attributes")
+            {
+                continue;
+            }
+
+            var desired = JsonSerializer.SerializeToElement(value);
+            if (!current.TryGetValue(name, out var held) || held.ToString() != desired.ToString())
+            {
+                differs = true;
+            }
+
+            representation[name] = desired;
+        }
+
+        var attributes = RealmClientProfile.ReadAttributes(client);
+        foreach (var (name, value) in RealmAgentClient.Attributes())
+        {
+            if (!attributes.TryGetValue(name, out var held) || held != value)
+            {
+                differs = true;
+            }
+
+            attributes[name] = value;
+        }
+
+        representation.Remove("secret");
+        representation["attributes"] = JsonSerializer.SerializeToElement(attributes);
+        if (differs)
+        {
+            using var updated = await SendAsync(token, HttpMethod.Put, clientPath, representation, cancellationToken);
+            EnsureSuccess(updated, $"update the client '{RealmAgentClient.ClientId}'");
+        }
+
+        using var scopes = await SendAsync(token, HttpMethod.Get, $"{clientPath}/optional-client-scopes", null, cancellationToken);
+        EnsureSuccess(scopes, $"list the optional client scopes of '{RealmAgentClient.ClientId}'");
+        var optional = (await scopes.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Select(scope => (Id: scope.GetProperty("id").GetString()!, Name: scope.GetProperty("name").GetString()))
+            .ToList();
+        foreach (var (id, name) in optional.Where(scope => scope.Name != AuthoringScope))
+        {
+            using var removed = await SendAsync(token, HttpMethod.Delete, $"{clientPath}/optional-client-scopes/{id}", null, cancellationToken);
+            EnsureSuccess(removed, $"take '{name}' out of the optional client scopes of '{RealmAgentClient.ClientId}'");
+        }
+
+        if (optional.All(scope => scope.Name != AuthoringScope))
+        {
+            using var realmScopes = await SendAsync(token, HttpMethod.Get, $"{realmPath}/client-scopes", null, cancellationToken);
+            EnsureSuccess(realmScopes, "list the client scopes");
+            var scopeId = (await realmScopes.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+                .Where(scope => scope.GetProperty("name").GetString() == AuthoringScope)
+                .Select(scope => scope.GetProperty("id").GetString())
+                .FirstOrDefault();
+            if (scopeId is not null)
+            {
+                using var added = await SendAsync(token, HttpMethod.Put, $"{clientPath}/optional-client-scopes/{scopeId}", null, cancellationToken);
+                EnsureSuccess(added, $"add '{AuthoringScope}' to the optional client scopes of '{RealmAgentClient.ClientId}'");
+            }
+        }
     }
 
     /// <summary>
@@ -847,7 +947,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return desired.All(pair => config.TryGetProperty(pair.Key, out var value) && value.GetString() == pair.Value);
     }
 
-    /// <summary>The protocol mappers of the platform client except the one the sync keeps as it is, or none without the client.</summary>
+    /// <summary>The protocol mappers of the platform client except the ones the sync keeps as they are and the agent audience mapper, which site clients do not copy, or none without the client.</summary>
     private static List<(string Name, string Protocol, string Type, Dictionary<string, string> Config)> PlatformMappers(JsonElement? platformClient)
     {
         var mappers = new List<(string Name, string Protocol, string Type, Dictionary<string, string> Config)>();
@@ -861,7 +961,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         foreach (var mapper in array.EnumerateArray())
         {
             var name = mapper.GetProperty("name").GetString()!;
-            if (name is SessionNoteMapperName or AcrSessionNoteMapperName || name.StartsWith(RolesMapperPrefix, StringComparison.Ordinal))
+            if (name is SessionNoteMapperName or AcrSessionNoteMapperName or RealmAgentClient.AudienceMapperName || name.StartsWith(RolesMapperPrefix, StringComparison.Ordinal))
             {
                 continue;
             }

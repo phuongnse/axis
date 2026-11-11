@@ -101,8 +101,9 @@ clients may connect at all.
   included, and a registered client may use only the mapper types that Keycloak allows an anonymous
   client. The realm drops Keycloak's Trusted Hosts policy, which ties registration to the caller's
   address and so refuses every outside client.
-- **The agent host** _(planned for M35)_ is a confidential client of each realm, which `tenant create` sets up. It takes
-  no outside registration.
+- **The agent host** is the confidential client `axis-agent` of each realm, which `tenant create` makes. It
+  takes no outside registration and may exchange an author's token only for one whose audience is the
+  `/mcp` URL, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
 - **The administrator's switch** _(planned for M35)_. The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
   and `none`, decides which outside clients may connect, and `none` is the default of a new tenant.
   Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. A client that the

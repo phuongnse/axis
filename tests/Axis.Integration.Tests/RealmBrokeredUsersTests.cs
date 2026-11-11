@@ -14,7 +14,7 @@ public sealed class RealmBrokeredUsersTests(KeycloakFixture keycloak) : IAsyncLi
     private const string RedirectUri = "http://localhost/callback";
     private const string TenantClientId = "browser";
 
-    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
+    private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1", "agent-secret-1");
 
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
     private Uri _baseAddress = null!;
