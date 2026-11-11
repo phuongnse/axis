@@ -67,6 +67,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             {
                 table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended', 'readOnly')");
                 table.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+                table.HasCheckConstraint("ck_tenants_ai_outside_clients", "ai_outside_clients IN ('all', 'allowList', 'none')");
                 table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
@@ -118,6 +119,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.TermsVersion).HasColumnName("terms_version");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PlatformAccounts).HasColumnName("platform_accounts");
+            tenant.Property(t => t.AiOutsideClients).HasColumnName("ai_outside_clients").HasDefaultValue(TenantOutsideClients.None);
+            tenant.Property(t => t.AiAllowedClients).HasColumnName("ai_allowed_clients").HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");
             tenant.HasOne<TenantRow>()

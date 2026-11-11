@@ -36,8 +36,9 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// It also gets the token rules of the MCP sign-in (see <c>docs/reference/mcp-server.md#sign-in</c>): access tokens of <see cref="AccessTokenLifespanSeconds"/>
 /// seconds, refresh tokens that work once, and a client policy that refuses an authorization request from a public client that sends no PKCE <c>S256</c> challenge.
 /// The client scope <see cref="RealmSync.AuthoringScope"/> comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, which <see cref="EnsureForTenantAsync"/> calls.
-/// It lets an outside MCP client register itself without a token, under the rules of <c>docs/reference/mcp-server.md#client-registration</c>: the client policy
-/// <see cref="RegistrationPolicy"/> and the realm's anonymous registration policies.
+/// It gives the rules of an outside MCP client's registration without a token (<c>docs/reference/mcp-server.md#client-registration</c>): the client policy
+/// <see cref="RegistrationPolicy"/> and the realm's anonymous registration policies. Registration opens only through <see cref="RealmSync.SyncOutsideClientsAsync"/>,
+/// which <see cref="EnsureForTenantAsync"/> calls with the tenant's <c>Ai:OutsideClients</c> setting.
 /// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -132,7 +133,11 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         // The platform client gets the addresses of the tenant's hosts, so a person can finish a sign-in on each of them.
         var hosts = await platform.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToListAsync(cancellationToken);
-        await new RealmSync(http, admin.BaseAddress).SyncPlatformAddressesAsync(id, secrets.Activation, hosts, cancellationToken);
+        var sync = new RealmSync(http, admin.BaseAddress);
+        await sync.SyncPlatformAddressesAsync(id, secrets.Activation, hosts, cancellationToken);
+
+        // The tenant's switch decides whether an outside MCP client can register and sign in (docs/reference/mcp-server.md#client-registration).
+        await sync.SyncOutsideClientsAsync(id, secrets.Activation, row.AiOutsideClients, row.AiAllowedClients, cancellationToken);
 
         // A secret that is stored is kept, so a rerun never changes it.
         bool Ensure(byte[]? stored, string field, Action<byte[]> write)
@@ -354,12 +359,12 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     }
 
     /// <summary>
-    /// Lets an outside MCP client register itself at the realm without a token, as a public client that requires consent
-    /// (<c>docs/reference/mcp-server.md#client-registration</c>). The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
+    /// Gives the rules of an outside MCP client's registration at the realm, as a public client that requires consent
+    /// (<c>docs/reference/mcp-server.md#client-registration</c>). It does not open registration, which only <see cref="RealmSync.SyncOutsideClientsAsync"/> does.
+    /// The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
     /// registration writes and to an update with the registration access token that the registration returns, and never to a client that an administrator or Axis writes. Its executors refuse a redirect address that is neither <c>https</c>
     /// nor <c>http</c> on a loopback address, the implicit flow, the password flow and every client authenticator, which makes a confidential client impossible,
-    /// and they set consent required and the full scope off. The realm's anonymous registration
-    /// policies lose the Trusted Hosts policy, which Keycloak cannot loosen, and a Consent Required policy is added when it is missing. The Allowed Client Scopes
+    /// and they set consent required and the full scope off. A Consent Required anonymous registration policy is added when the realm lacks it. The Allowed Client Scopes
     /// policy comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, because Keycloak refuses <see cref="RealmSync.AuthoringScope"/> before the scope exists.
     /// Every other registration policy stays as it is.
     /// </summary>
@@ -433,12 +438,6 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         EnsureSuccess(listed, "read the registration policies");
         var anonymous = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
             .Where(component => component.TryGetProperty("subType", out var subType) && subType.GetString() == "anonymous").ToList();
-
-        foreach (var trustedHosts in anonymous.Where(component => component.GetProperty("providerId").GetString() == "trusted-hosts"))
-        {
-            using var removed = await SendAsync(token, HttpMethod.Delete, $"{componentsPath}/{trustedHosts.GetProperty("id").GetString()}", null, cancellationToken);
-            EnsureSuccess(removed, "remove the trusted hosts registration policy");
-        }
 
         if (anonymous.Any(component => component.GetProperty("providerId").GetString() == "consent-required"))
         {

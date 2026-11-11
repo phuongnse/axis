@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Web;
 using Axis.Admin;
 using Axis.Server.Tests;
+using Axis.Tenancy;
 using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -20,7 +21,9 @@ namespace Axis.Integration.Tests;
 /// a refresh token works once, and the <c>resource</c> parameter of RFC 8707 does not change the audience. An outside client registers itself at the realm
 /// without a token (<c>docs/reference/mcp-server.md#client-registration</c>): it becomes a public client that requires consent, the consent screen names it,
 /// and the realm refuses a registration of a confidential client, of the implicit or password flow, of an <c>http</c> redirect address that is not a loopback address
-/// and of a scope other than <c>axis:authoring</c> and the realm's default scopes.
+/// and of a scope other than <c>axis:authoring</c> and the realm's default scopes. The tenant's <c>Ai:OutsideClients</c> switch decides who may register and who gets a token:
+/// under <c>none</c> registration answers <c>403</c> and every outside client is off, under <c>allowList</c> only the listed clients are on, under <c>all</c> registration is open,
+/// and the clients of Axis stay on under every value.
 /// </summary>
 public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
@@ -121,6 +124,86 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         var response = await InitializeMcpAsync(realm, tokens.Tokens.GetProperty("access_token").GetString());
         Assert.True(response.Status == HttpStatusCode.OK, response.Body);
         Assert.False(string.IsNullOrEmpty(response.SessionId));
+    }
+
+    [Fact]
+    public async Task Under_none_registration_is_refused_and_a_client_registered_earlier_gets_no_code()
+    {
+        var (realm, _) = await NewRealmAsync();
+        var (created, registered) = await RegisterAsync(realm, []);
+        Assert.True(created == HttpStatusCode.Created, registered.GetRawText());
+        var registeredId = registered.GetProperty("client_id").GetString()!;
+
+        await SwitchAsync(realm, TenantOutsideClients.None);
+
+        var (status, refusal) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Forbidden, refusal.GetRawText());
+        await AssertNoCodeAsync(realm, registeredId, LoopbackRedirectUri);
+        Assert.False((await OutsideClientAsync(realm, registeredId)).GetProperty("enabled").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Under_allow_list_only_the_listed_client_gets_a_token()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        var (firstStatus, first) = await RegisterAsync(realm, []);
+        var (secondStatus, second) = await RegisterAsync(realm, []);
+        Assert.True(firstStatus == HttpStatusCode.Created && secondStatus == HttpStatusCode.Created, $"{first.GetRawText()} {second.GetRawText()}");
+        var listedId = first.GetProperty("client_id").GetString()!;
+        var otherId = second.GetProperty("client_id").GetString()!;
+
+        await SwitchAsync(realm, TenantOutsideClients.AllowList, listedId);
+
+        var tokens = await SignInAsync(realm, secret, listedId, LoopbackRedirectUri);
+        Assert.False(string.IsNullOrEmpty(tokens.Tokens.GetProperty("access_token").GetString()));
+        await AssertNoCodeAsync(realm, otherId, LoopbackRedirectUri);
+        Assert.False((await OutsideClientAsync(realm, otherId)).GetProperty("enabled").GetBoolean());
+        var (status, refusal) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Forbidden, refusal.GetRawText());
+    }
+
+    [Fact]
+    public async Task Under_all_a_newly_registered_client_gets_a_token()
+    {
+        var (realm, secret) = await NewRealmAsync();
+        await SwitchAsync(realm, TenantOutsideClients.None);
+        var (refused, _) = await RegisterAsync(realm, []);
+        Assert.Equal(HttpStatusCode.Forbidden, refused);
+
+        await SwitchAsync(realm, TenantOutsideClients.All);
+
+        var (status, registered) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Created, registered.GetRawText());
+        var tokens = await SignInAsync(realm, secret, registered.GetProperty("client_id").GetString()!, LoopbackRedirectUri);
+        Assert.False(string.IsNullOrEmpty(tokens.Tokens.GetProperty("access_token").GetString()));
+        Assert.True((await OutsideClientAsync(realm, ClientId)).GetProperty("enabled").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData(TenantOutsideClients.All)]
+    [InlineData(TenantOutsideClients.AllowList)]
+    [InlineData(TenantOutsideClients.None)]
+    public async Task The_clients_of_axis_stay_on_under_every_value_of_the_switch(string mode)
+    {
+        var (realm, _) = await NewRealmAsync();
+
+        await SwitchAsync(realm, mode, "client-that-is-not-axis");
+
+        foreach (var clientId in new[] { TenantRealm.PlatformClientId, "axis-activation", "axis-users" })
+        {
+            Assert.True((await OutsideClientAsync(realm, clientId)).GetProperty("enabled").GetBoolean(), $"{clientId} under {mode}");
+        }
+    }
+
+    [Fact]
+    public async Task An_unknown_value_of_the_switch_changes_nothing_and_is_refused()
+    {
+        var (realm, _) = await NewRealmAsync();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => SwitchAsync(realm, "some"));
+
+        var (status, registered) = await RegisterAsync(realm, []);
+        Assert.True(status == HttpStatusCode.Created, registered.GetRawText());
     }
 
     [Theory]
@@ -458,6 +541,9 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         await new TenantRealm(_http, admin).EnsureAsync(realm, "Acme Corporation", _secrets, new Dictionary<string, string>(), CancellationToken);
         await new RealmSync(_http, _baseAddress).SyncPlatformAddressesAsync(realm, _secrets.Activation, [Host], CancellationToken);
 
+        // Most tests here use an outside client, so the realm starts open.
+        await SwitchAsync(realm, TenantOutsideClients.All);
+
         // The client names no scope, so the test shows that the realm's default makes the scope available.
         using var created = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/clients", new
         {
@@ -496,6 +582,21 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak) : IAsync
         });
         Assert.Equal(HttpStatusCode.Created, user.StatusCode);
         return (realm, secret);
+    }
+
+    private Task SwitchAsync(string realm, string mode, params string[] allowed) =>
+        new RealmSync(_http, _baseAddress).SyncOutsideClientsAsync(realm, _secrets.Activation, mode, allowed, CancellationToken);
+
+    private async Task<JsonElement> OutsideClientAsync(string realm, string clientId) =>
+        (await GetJsonAsync($"admin/realms/{realm}/clients?clientId={Uri.EscapeDataString(clientId)}")).EnumerateArray().Single();
+
+    // A client that is off gets no code: Keycloak answers its authorization request with an error page and never with a redirect that carries a code.
+    private async Task AssertNoCodeAsync(string realm, string clientId, string redirectUri)
+    {
+        using var response = await _http.GetAsync(new Uri(_baseAddress, AuthorizePath(realm, clientId, redirectUri) + Pkce.New().Query), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(response.Headers.Location);
     }
 
     private static string AuthorizePath(string realm, string clientId = ClientId, string redirectUri = RedirectUri, string scope = $"openid {RealmSync.AuthoringScope}") =>

@@ -610,6 +610,20 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
+                    b.PrimitiveCollection<string[]>("AiAllowedClients")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("ai_allowed_clients")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<string>("AiOutsideClients")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("none")
+                        .HasColumnName("ai_outside_clients");
+
                     b.Property<string>("ClaimDisplayName")
                         .HasColumnType("text")
                         .HasColumnName("claim_display_name");
@@ -801,6 +815,8 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("tenants", "platform", t =>
                         {
+                            t.HasCheckConstraint("ck_tenants_ai_outside_clients", "ai_outside_clients IN ('all', 'allowList', 'none')");
+
                             t.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
 
                             t.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");

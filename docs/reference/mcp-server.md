@@ -99,15 +99,23 @@ clients may connect at all.
   Registration does not refuse the device authorization grant, but consent and the scope rules hold
   for it too. Keycloak's own limits stay: a realm holds at most 200 clients, those of the realm
   included, and a registered client may use only the mapper types that Keycloak allows an anonymous
-  client. The realm drops Keycloak's Trusted Hosts policy, which ties registration to the caller's
-  address and so refuses every outside client.
+  client. Registration is open only under `all`: the realm keeps Keycloak's Trusted Hosts policy,
+  which ties registration to the caller's address, under `none` and `allowList`, so it answers every
+  registration with `403`, and it drops the policy under `all`, as the
+  administrator's switch below says.
 - **The agent host** is the confidential client `axis-agent` of each realm, which `tenant create` makes. It
   takes no outside registration and may exchange an author's token only for one whose audience is the
   `/mcp` URL, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
-- **The administrator's switch** _(planned for M35)_. The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
+- **The administrator's switch.** The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
   and `none`, decides which outside clients may connect, and `none` is the default of a new tenant.
-  Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. A client that the
-  switch does not allow is refused at the realm, before any token is issued.
+  Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. Both are stored with
+  the tenant, and `tenant create` and `tenant restore` apply them to the realm. An outside client is a
+  public client that is not one of Keycloak's own. One that the switch does not allow is turned off,
+  so it gets no code and no token: every outside client is off under `none`, only the listed ones are
+  on under `allowList`, and every one is on under `all`. A token issued before a client is turned off
+  stays valid until it expires. Under `allowList` registration is closed, so a listed client must
+  already be registered. The confidential clients of Axis, the agent host's included, and Keycloak's
+  own clients are never turned off.
 - **Connected apps** _(planned for M35)_. A tenant administrator changes both settings on the
   [users page](user-administration.md), in a Connected apps tab that lists each client with consent,
   the people who consented and the last use, and revokes a client's consent there. Each change writes a
