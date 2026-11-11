@@ -5,12 +5,19 @@ cd "$(dirname "$0")/.."
 source scripts/lib/tools.sh
 source scripts/lib/retry.sh
 
-retry 4 dotnet restore Axis.slnx
-retry 4 dotnet tool restore
-retry 4 npm ci --prefix web
-retry 4 npm ci --prefix tests/e2e
-if [[ "${CI:-}" == "true" ]]; then
-  retry 4 npx --prefix tests/e2e playwright install-deps chromium
-fi
-retry 4 npx --prefix tests/e2e playwright install chromium
+# Stops a try that runs past its limit, so retry starts the next one, as D147 agrees. Stock macOS has no
+# timeout command, and there a try runs without a limit.
+limit() {
+  if command -v timeout >/dev/null; then
+    timeout "${AXIS_STEP_TIME_LIMIT_SECONDS:-600}" "$@"
+  else
+    "$@"
+  fi
+}
+
+retry 4 limit dotnet restore Axis.slnx
+retry 4 limit dotnet tool restore
+retry 4 limit npm ci --prefix web
+retry 4 limit npm ci --prefix tests/e2e
+retry 4 limit npx --prefix tests/e2e playwright install chromium
 install_tools
