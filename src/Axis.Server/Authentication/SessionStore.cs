@@ -18,7 +18,7 @@ namespace Axis.Server.Authentication;
 /// <summary>
 /// Keeps each <see cref="Session"/> as a row of <c>axis.sessions</c> in the tenant database, so the
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
-/// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
+/// is the SHA-256 hash of those bytes. The row never holds the key. It holds no token in clear: a sign-in through the platform client on a <c>standard</c> tenant stores that client's refresh token encrypted, see <see cref="SessionTokens"/> and <c>docs/reference/security.md#sign-in-flow</c>. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
 /// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, the provider's id of its own session, the ID token's <c>sid</c>, which sign-out ends, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. A given platform role is stored by its kind, and the request maps it to the role name that the host setting configures, which joins the roles of the sign-in. A preview tenant has no users page, so a request on it reads the given roles of its main tenant from the main tenant's database in the same way. It holds the site path of the host that made it, null for the tenant's own
 /// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
@@ -39,15 +39,25 @@ internal sealed class SessionStore : ITicketStore
         }
 
         var id = RandomNumberGenerator.GetBytes(IdSize);
+        var hash = SHA256.HashData(id);
+        // The sign-in callback leaves the platform client's refresh token in a request item. A tenant without a data key keeps none.
+        byte[]? refreshToken = null;
+        if (tenant.SitePath is null && httpContext.Items[TenantSignIn.RefreshTokenItem] is string token)
+        {
+            refreshToken = await httpContext.RequestServices.GetRequiredService<SessionTokens>()
+                .EncryptAsync(tenant.TenantId, hash, token, cancellationToken);
+        }
+
+        httpContext.Items.Remove(TenantSignIn.RefreshTokenItem);
         var now = httpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path, identity_provider, application_roles, idp_session_id)
-            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site, @identityProvider, @applicationRoles, @idpSessionId)
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path, identity_provider, application_roles, idp_session_id, refresh_token)
+            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site, @identityProvider, @applicationRoles, @idpSessionId, @refreshToken)
             """,
             connection);
-        command.Parameters.AddWithValue("hash", SHA256.HashData(id));
+        command.Parameters.AddWithValue("hash", hash);
         command.Parameters.AddWithValue("user", user.Id);
         command.Parameters.AddWithValue("name", user.DisplayName);
         command.Parameters.AddWithValue("roles", user.Roles.ToArray());
@@ -66,6 +76,7 @@ internal sealed class SessionStore : ITicketStore
         {
             Value = (object?)Session.ReadIdpSessionId(ticket.Principal) ?? DBNull.Value,
         });
+        command.Parameters.Add(new NpgsqlParameter("refreshToken", NpgsqlDbType.Bytea) { Value = (object?)refreshToken ?? DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return Base64Url.EncodeToString(id);
     }

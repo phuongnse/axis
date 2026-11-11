@@ -19,8 +19,10 @@ namespace Axis.Server.Authentication;
 /// <summary>
 /// One OIDC client per tenant, using the code flow with PKCE. All of them share the callback path,
 /// and each one skips a callback that arrives on another tenant's host, so a callback can never
-/// complete sign-in for the wrong tenant. After the callback the server keeps no token: it reads
-/// the configured claims from the ID token into a <see cref="Session"/>. A sign-in that starts on a site page goes through
+/// complete sign-in for the wrong tenant. After the callback the server keeps no access token or ID token: it reads
+/// the configured claims from the ID token into a <see cref="Session"/>. Under the <c>standard</c> profile, a sign-in through the platform
+/// client also keeps its refresh token, encrypted in the session's row, see <see cref="SessionTokens"/> and
+/// <c>docs/reference/security.md#sign-in-flow</c>. A sign-in that starts on a site page goes through
 /// that site's client instead, see <see cref="SiteSignIn"/>.
 /// </summary>
 internal static class TenantSignIn
@@ -73,6 +75,12 @@ internal static class TenantSignIn
 
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
     public const string ProfileClaimsItem = "axis:sign_in_profile";
+
+    /// <summary>
+    /// The request item that <c>OnTokenValidated</c> fills with the platform client's refresh token, for the session store to encrypt into the
+    /// session's row. It is set only for a <c>standard</c> tenant and a sign-in that did not start on a site.
+    /// </summary>
+    public const string RefreshTokenItem = "axis:sign_in_refresh_token";
 
     public static string SchemeName(string tenantId) => $"{SchemePrefix}{tenantId}";
 
@@ -297,6 +305,12 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             context.HttpContext.Items[TenantSignIn.ProfileClaimsItem] = new ProfileClaims(
                 Blank(principal.FindFirst(tenant.Claims.Email)?.Value),
                 Blank(principal.FindFirst(tenant.Claims.Locale)?.Value));
+            // Only the platform client's token is kept, for token exchange on a standard tenant. A site's token is for the site's client.
+            if (!fapi2 && sitePath is null && Blank(context.TokenEndpointResponse?.RefreshToken) is { } refreshToken)
+            {
+                context.HttpContext.Items[TenantSignIn.RefreshTokenItem] = refreshToken;
+            }
+
             context.Principal = Session.CreatePrincipal(
                 tenantId,
                 userId,

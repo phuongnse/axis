@@ -487,6 +487,10 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_request_at");
 
+                    b.Property<byte[]>("RefreshToken")
+                        .HasColumnType("bytea")
+                        .HasColumnName("refresh_token");
+
                     b.PrimitiveCollection<string[]>("Roles")
                         .IsRequired()
                         .HasColumnType("text[]")

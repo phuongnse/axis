@@ -11,7 +11,7 @@ namespace Axis.Server.Authentication;
 /// <summary>
 /// The session of a person who signed in through their tenant's identity provider. The state is a
 /// row of <c>axis.sessions</c> in the tenant database, with the user id, the display name, the roles, the roles that each
-/// application's provider mapping gave and the times of sign-in and of the last request, and no token. The cookie holds only the random session
+/// application's provider mapping gave and the times of sign-in and of the last request, and no token in clear. The cookie holds only the random session
 /// id. A session counts as no session on another tenant's host or on another host of its tenant, after
 /// <see cref="IdleTimeout"/> without requests, or <see cref="MaxLifetime"/> after sign-in, and sign-out deletes the row at once.
 /// </summary>

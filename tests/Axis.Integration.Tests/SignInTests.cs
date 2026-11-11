@@ -197,6 +197,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal("Requester User", row.DisplayName);
         Assert.Equal(["employee", "requester"], row.Roles.Order(StringComparer.Ordinal));
         Assert.NotNull(row.AuthenticatedAt);
+        // Tenant a has no data key, so the sign-in succeeds and keeps no token: a token is never stored in clear.
+        Assert.Null(row.RefreshToken);
         Assert.Empty(await ReadSessionsAsync("b"));
     }
 
@@ -936,12 +938,12 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         await using var connection = new NpgsqlConnection(_databases[tenant]);
         await connection.OpenAsync(CancellationToken);
-        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles, authenticated_at, idp_session_id FROM axis.sessions", connection);
+        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles, authenticated_at, idp_session_id, refresh_token FROM axis.sessions", connection);
         var rows = new List<SessionRow>();
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         while (await reader.ReadAsync(CancellationToken))
         {
-            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3), await reader.IsDBNullAsync(4, CancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(4), await reader.IsDBNullAsync(5, CancellationToken) ? null : reader.GetString(5)));
+            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3), await reader.IsDBNullAsync(4, CancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(4), await reader.IsDBNullAsync(5, CancellationToken) ? null : reader.GetString(5), await reader.IsDBNullAsync(6, CancellationToken) ? null : reader.GetFieldValue<byte[]>(6)));
         }
 
         return rows;
@@ -976,7 +978,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
 
-    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles, DateTimeOffset? AuthenticatedAt, string? IdpSessionId);
+    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles, DateTimeOffset? AuthenticatedAt, string? IdpSessionId, byte[]? RefreshToken);
 
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 
