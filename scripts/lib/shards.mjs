@@ -4,7 +4,7 @@
 // budget leaves room under the check timeouts in .nexkit/config.json.
 
 /** The estimated seconds of tests that one shard may take. */
-export const budgetSeconds = 15 * 60
+export const budgetSeconds = 10 * 60
 
 /**
  * The most shards --count prints for each split. A sharded check's max in .nexkit/config.json matches its entry,
