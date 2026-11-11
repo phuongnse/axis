@@ -30,18 +30,21 @@ public sealed class AuthoringStepContext
 {
     private readonly Func<long, CancellationToken, Task> _addTokens;
     private readonly Func<CancellationToken, Task<string>> _accessToken;
+    private readonly Func<Guid, CancellationToken, Task> _setDraft;
 
     internal AuthoringStepContext(
         string tenantId,
         AuthoringRequestToWork request,
         Func<long, CancellationToken, Task> addTokens,
         Func<CancellationToken, Task<string>> accessToken,
+        Func<Guid, CancellationToken, Task> setDraft,
         AuthorMcpClient mcp)
     {
         TenantId = tenantId;
         Request = request;
         _addTokens = addTokens;
         _accessToken = accessToken;
+        _setDraft = setDraft;
         Mcp = mcp;
     }
 
@@ -52,6 +55,10 @@ public sealed class AuthoringStepContext
     /// <summary>Adds the tokens to the step's row and to the request now, so they count even when the step is interrupted later.</summary>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
     public Task AddTokensAsync(long tokens, CancellationToken cancellationToken) => _addTokens(tokens, cancellationToken);
+
+    /// <summary>Stores the id of the request's draft on the request now, so a step that runs again finds it.</summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
+    public Task SetDraftAsync(Guid draftId, CancellationToken cancellationToken) => _setDraft(draftId, cancellationToken);
 
     /// <summary>
     /// Refreshes the request's token at the tenant's realm and answers a current access token of the agent host for the author. The

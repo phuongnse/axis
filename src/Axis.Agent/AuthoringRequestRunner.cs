@@ -129,6 +129,7 @@ internal sealed partial class AuthoringRequestRunner(
                 request,
                 (tokens, token) => store.AddTokensAsync(tenantId, request.Id, stepId, claimedBy, tokens, token),
                 accessToken,
+                (draft, token) => store.SetDraftAsync(tenantId, request.Id, claimedBy, draft, token),
                 mcp);
             return await step.RunAsync(context, linked.Token);
         }

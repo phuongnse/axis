@@ -122,7 +122,7 @@ the checks, an independent review and fix rounds.
 | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
 | `planning`                      | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
 | `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
-| `working` _(planned for M35)_   | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
+| `working`                       | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
 | `checking` _(planned for M35)_  | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
 | `reviewing` _(planned for M35)_ | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
 | `fixing` _(planned for M35)_    | The agent works on the failures and findings                                                                                            | `checking`                            |
@@ -139,6 +139,12 @@ the checks, an independent review and fix rounds.
   tool error from the agent host and never reaches the MCP server. The plan is the text of the model's
   last answer, which ends its turn: an answer that stops at the output limit, or has no text, is no plan.
   The plan goes into the request's `plan` and the request moves to `awaitingApproval`.
+- **Working writes only its draft.** The step makes the draft with `create_draft` and keeps its id in
+  `draft_id` before the first model call, and a step that runs again uses the same draft. The model is offered
+  the five read tools of planning plus `write_resource`, `delete_resource`, `write_layer`, `check_expression`,
+  `validate_draft` and `diff_draft`, and only for the request's application and its draft. A call without a
+  draft gets the request's draft. Any other call gets a tool error from the agent host and never reaches the
+  MCP server. When the model ends its turn, the request moves to `checking`.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
@@ -151,6 +157,10 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Planning calls.** At most 25 model calls in one planning step. A step that has no plan by then stops
   the request as `failed` with the outcome `noPlan`, and so does a request whose application the author
   can no longer list.
+- **Working calls.** At most 50 model calls in one working step. A step whose model has not ended its turn
+  by then, or whose answer stops at the output limit, stops the request as `failed` with the outcome
+  `unfinished`, and so does a request whose application the author can no longer list or whose draft cannot
+  be made.
 - **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
   round stops as `failed`.
 - **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
