@@ -103,6 +103,7 @@ clients may connect at all.
   which ties registration to the caller's address, under `none` and `allowList`, so it answers every
   registration with `403`, and it drops the policy under `all`, as the
   administrator's switch below says.
+
 - **The agent host** is the confidential client `axis-agent` of each realm, which `tenant create` makes. It
   takes no outside registration and may exchange an author's token only for one whose audience is the
   `/mcp` URL, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
@@ -115,11 +116,11 @@ clients may connect at all.
   on under `allowList`, and every one is on under `all`. A token issued before a client is turned off
   stays valid until it expires. Under `allowList` registration is closed, so a listed client must
   already be registered. The confidential clients of Axis, the agent host's included, and Keycloak's
-  own clients are never turned off.
+  own clients are never turned off. A tenant administrator reads and changes both settings through the routes in
+  [outside MCP clients](user-administration.md#outside-mcp-clients), and each change writes a platform audit record.
 - **Connected apps** _(planned for M35)_. A tenant administrator changes both settings on the
   [users page](user-administration.md), in a Connected apps tab that lists each client with consent,
-  the people who consented and the last use, and revokes a client's consent there. Each change writes a
-  platform audit record.
+  the people who consented and the last use, and revokes a client's consent there.
 
 ## Tools
 
@@ -166,31 +167,31 @@ A tool with an optional draft reads the working folder without it and the person
 describe the kind. Both are embedded in the server at build time, so an agent reads the rules of the
 version it talks to. An unknown topic answers a tool error with a fixed title.
 
-| Topic | Pages |
-| --- | --- |
-| `application` | [Resource files](resource-files.md) |
-| `entity` | [Resource files](resource-files.md) |
-| `site` | [Resource files](resource-files.md) |
-| `page` | [Resource files](resource-files.md), [Frontend](frontend.md) |
-| `text` | [Resource files](resource-files.md) |
-| `seed` | [Resource files](resource-files.md) |
-| `dataSource` | [Data sources](data-sources.md) |
-| `rule` | [Resource files](resource-files.md) |
-| `sequence` | [Resource files](resource-files.md) |
-| `process` | [Processes](processes.md), [Process flow](process-flow.md) |
-| `form` | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
-| `role` | [Roles and policies](roles-and-policies.md) |
-| `policy` | [Roles and policies](roles-and-policies.md) |
-| `connector` | [Connectors, events and endpoints](integration-resources.md) |
-| `identityProvider` | [Axis's identity provider](identity-provider.md) |
-| `event` | [Connectors, events and endpoints](integration-resources.md) |
-| `endpoint` | [Connectors, events and endpoints](integration-resources.md) |
-| `trigger` | [Connectors, events and endpoints](integration-resources.md) |
-| `webhook` | [Outbound webhooks](outbound-webhooks.md) |
-| `migration` | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md) |
-| `scenario` | [Test scenarios](test-scenarios.md) |
-| `contract` | [Module contracts](module-contracts.md) |
-| `layer` | [Customization layers](customization-layers.md) |
+| Topic              | Pages                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `application`      | [Resource files](resource-files.md)                                                    |
+| `entity`           | [Resource files](resource-files.md)                                                    |
+| `site`             | [Resource files](resource-files.md)                                                    |
+| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                           |
+| `text`             | [Resource files](resource-files.md)                                                    |
+| `seed`             | [Resource files](resource-files.md)                                                    |
+| `dataSource`       | [Data sources](data-sources.md)                                                        |
+| `rule`             | [Resource files](resource-files.md)                                                    |
+| `sequence`         | [Resource files](resource-files.md)                                                    |
+| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                             |
+| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
+| `role`             | [Roles and policies](roles-and-policies.md)                                            |
+| `policy`           | [Roles and policies](roles-and-policies.md)                                            |
+| `connector`        | [Connectors, events and endpoints](integration-resources.md)                           |
+| `identityProvider` | [Axis's identity provider](identity-provider.md)                                       |
+| `event`            | [Connectors, events and endpoints](integration-resources.md)                           |
+| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                           |
+| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                           |
+| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                              |
+| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)       |
+| `scenario`         | [Test scenarios](test-scenarios.md)                                                    |
+| `contract`         | [Module contracts](module-contracts.md)                                                |
+| `layer`            | [Customization layers](customization-layers.md)                                        |
 
 `McpReferenceTopicsDocumentationTests` compares this table with the server's map and with the resource
 kinds.

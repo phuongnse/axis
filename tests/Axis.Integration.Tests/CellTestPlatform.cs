@@ -74,7 +74,9 @@ internal static class CellTestPlatform
         string status,
         Uri identityProvider,
         string usersSecret,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? activationSecret = null,
+        string? host = null)
     {
         var tenantDatabase = await database.CreateDatabaseAsync("cell_api_realm", cancellationToken);
         await DataDatabaseFixture.MigrateTenantAsync(tenantDatabase, cancellationToken);
@@ -82,8 +84,18 @@ internal static class CellTestPlatform
 
         var row = Tenant(id, status, TenantSchemaVersion.Current, new NpgsqlConnectionStringBuilder(tenantDatabase), new Uri(identityProvider, $"realms/{id}"));
         row.RealmUsersClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, usersSecret);
+        if (activationSecret is not null)
+        {
+            row.RealmActivationClientSecret = _cipher.Encrypt(id, TenantSecretFields.RealmActivationClientSecret, activationSecret);
+        }
+
         await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
         context.Tenants.Add(row);
+        if (host is not null)
+        {
+            context.TenantHosts.Add(new TenantHostRow { TenantId = id, Host = host });
+        }
+
         await context.SaveChangesAsync(cancellationToken);
         return tenantDatabase;
     }

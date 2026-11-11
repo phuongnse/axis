@@ -194,6 +194,35 @@ only, as the command routes do.
 - **Audit.** A set, a change and a remove each write a platform audit record with no key value, see
   [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
 
+### Outside MCP clients
+
+An administrator reads and replaces the tenant's switch for outside MCP clients, the settings `Ai:OutsideClients` and
+`Ai:AllowedClients`, see [client registration](mcp-server.md#client-registration) for what each mode means. The routes
+answer to an administrator with a browser session only, as the command routes do.
+
+| Route                             | Body                                                                   | Answer                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET /api/tenant/outside-clients` | None                                                                   | `200` with `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` |
+| `PUT /api/tenant/outside-clients` | `{ "outsideClients": "allowList", "allowedClients": ["<client id>"] }` | `204`                                                                             |
+
+- **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
+  `Users:AdministratorRole` (`403`), then a tenant with a row in the tenant directory that is not a preview tenant and has
+  realm details (`404`), and for `PUT` the body (`400`). The routes work on any host whose tenant has such a row, and the
+  check runs before the body is read.
+- **Replace.** `PUT` replaces both values. `outsideClients` is exactly `all`, `allowList` or `none`. A missing
+  `allowedClients` means an empty list, and the client ids are trimmed and made unique. The list is stored under every
+  mode, and the realm reads it only under `allowList`. A body that is missing or malformed, a mode that is not one of the
+  three and a blank client id answer `400` with a fixed title, and store nothing, write no record and send nothing to the
+  realm.
+- **Read.** `GET` answers the stored mode and the list.
+- **Store, then the realm.** `PUT` stores the change and its record in one transaction and then brings the realm in step:
+  it turns outside clients on or off and opens or closes registration. When the identity provider fails, the route answers
+  `502` with a fixed title and the stored change and its record stay. Repeating the `PUT` applies it. Two `PUT` requests
+  at the same moment can leave the realm matching the earlier one until the next `PUT` or a rerun of `tenant create`.
+- **Audit.** Each accepted `PUT` writes one platform audit record, also when the values are unchanged, and the record
+  holds no client id, see [when a record is written](tenant-setting-commands.md#when-a-record-is-written). The change does
+  not need a recent sign-in, and the storage quota never refuses it.
+
 ## Accounts
 
 Every realm that `tenant create` makes holds the account rules below: an invitation, a second step, passwords, failed
