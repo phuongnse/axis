@@ -49,10 +49,12 @@ public sealed partial class RateLimitsTests
         Assert.Equal((Partition.SignIn, "10.0.0.1"), RateLimits.Choose(context, "c"));
     }
 
-    [Fact]
-    public void The_callback_counts_with_sign_in_whatever_the_route()
+    [Theory]
+    [InlineData("/api/auth/CALLBACK")]
+    [InlineData("/api/cell/auth/callback")]
+    public void The_callback_counts_with_sign_in_whatever_the_route(string path)
     {
-        var context = Request(route: null, new ClaimsPrincipal(), "10.0.0.1", path: "/api/auth/CALLBACK");
+        var context = Request(route: null, new ClaimsPrincipal(), "10.0.0.1", path: path);
 
         Assert.Equal((Partition.SignIn, "10.0.0.1"), RateLimits.Choose(context, "a"));
     }
