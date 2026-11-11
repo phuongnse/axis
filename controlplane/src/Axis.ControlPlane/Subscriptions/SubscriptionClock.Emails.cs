@@ -31,9 +31,10 @@ internal sealed partial class SubscriptionClock
     /// <summary>
     /// The timeline email that is due for a subscription now, or null. Each email's window starts on its day and lasts until the next
     /// window starts, so a run that comes late sends the current warning and never one that the next step has passed. Once a move is
-    /// due, until it is made, no email is due, and none is due for a <c>deleting</c> subscription.
+    /// due, until it is made, no email is due, and none is due for a <c>deleting</c> subscription. A paid tenant gets no
+    /// <see cref="TenantReadOnly"/>, as its text is about a trial.
     /// </summary>
-    internal static string? DueEmail(string state, DateTimeOffset trialEndsAt, DateTimeOffset? nextAt, DateTimeOffset now)
+    internal static string? DueEmail(string state, bool paid, DateTimeOffset trialEndsAt, DateTimeOffset? nextAt, DateTimeOffset now)
     {
         switch (state)
         {
@@ -45,6 +46,7 @@ internal sealed partial class SubscriptionClock
             case ReadOnly:
                 return nextAt is not { } next || now >= next ? null
                     : now >= next - _week ? DeletionIn7Days
+                    : paid ? null
                     : TenantReadOnly;
             case "deleted":
                 return TenantDeleted;
@@ -59,7 +61,7 @@ internal sealed partial class SubscriptionClock
         var candidates = new List<EmailCandidate>();
         await using (var select = controlPlane.CreateCommand(
             """
-            SELECT s.id, s.tenant_id, s.state, s.trial_ends_at, s.next_at, u.email, u.full_name, u.language,
+            SELECT s.id, s.tenant_id, s.state, s.period_ends_at IS NOT NULL, s.trial_ends_at, s.next_at, u.email, u.full_name, u.language,
                    ARRAY(SELECT e.kind FROM control_plane.subscription_emails e WHERE e.subscription_id = s.id)
             FROM control_plane.subscriptions s
             JOIN control_plane.sign_ups u ON u.id = s.sign_up_id
@@ -76,17 +78,18 @@ internal sealed partial class SubscriptionClock
                     reader.GetGuid(0),
                     reader.GetString(1),
                     reader.GetString(2),
-                    reader.GetFieldValue<DateTimeOffset>(3),
-                    reader.IsDBNull(4) ? null : reader.GetFieldValue<DateTimeOffset>(4),
-                    new Recipient(reader.GetString(5), reader.GetString(6), reader.GetString(7)),
-                    reader.GetFieldValue<string[]>(8)));
+                    reader.GetBoolean(3),
+                    reader.GetFieldValue<DateTimeOffset>(4),
+                    reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
+                    new Recipient(reader.GetString(6), reader.GetString(7), reader.GetString(8)),
+                    reader.GetFieldValue<string[]>(9)));
             }
         }
 
         var failed = 0;
         foreach (var candidate in candidates)
         {
-            if (DueEmail(candidate.State, candidate.TrialEndsAt, candidate.NextAt, now) is not { } kind || candidate.Sent.Contains(kind))
+            if (DueEmail(candidate.State, candidate.Paid, candidate.TrialEndsAt, candidate.NextAt, now) is not { } kind || candidate.Sent.Contains(kind))
             {
                 continue;
             }
@@ -212,5 +215,5 @@ internal sealed partial class SubscriptionClock
     private sealed record Recipient(string Email, string Name, string Language);
 
     private sealed record EmailCandidate(
-        Guid Id, string TenantId, string State, DateTimeOffset TrialEndsAt, DateTimeOffset? NextAt, Recipient Owner, string[] Sent);
+        Guid Id, string TenantId, string State, bool Paid, DateTimeOffset TrialEndsAt, DateTimeOffset? NextAt, Recipient Owner, string[] Sent);
 }

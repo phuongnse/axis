@@ -826,7 +826,7 @@ namespace Axis.ControlPlane.Storage.Migrations
 
                             t.HasCheckConstraint("ck_subscriptions_purchase", "(currency IS NULL) = (period IS NULL) AND (currency IS NULL OR plan_code IS NOT NULL)");
 
-                            t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
+                            t.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'active', 'pastDue', 'readOnly', 'cancelled', 'deleting', 'deleted')");
                         });
                 });
 

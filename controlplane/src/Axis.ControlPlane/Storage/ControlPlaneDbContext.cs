@@ -140,7 +140,7 @@ public sealed class ControlPlaneDbContext(DbContextOptions<ControlPlaneDbContext
         {
             subscription.ToTable("subscriptions", table =>
             {
-                table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'readOnly', 'deleting', 'deleted')");
+                table.HasCheckConstraint("ck_subscriptions_state", "state IN ('trialing', 'active', 'pastDue', 'readOnly', 'cancelled', 'deleting', 'deleted')");
                 table.HasCheckConstraint("ck_subscriptions_plan", "(plan_code IS NULL) = (plan_version IS NULL)");
                 table.HasCheckConstraint("ck_subscriptions_purchase", "(currency IS NULL) = (period IS NULL) AND (currency IS NULL OR plan_code IS NOT NULL)");
                 table.HasCheckConstraint("ck_subscriptions_currency", "currency IN ('VND', 'USD')");

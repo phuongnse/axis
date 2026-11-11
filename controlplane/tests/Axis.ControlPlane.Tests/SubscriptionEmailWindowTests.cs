@@ -21,7 +21,7 @@ public sealed class SubscriptionEmailWindowTests
     {
         var now = _trialEnds.AddDays(daysFromTrialEnd);
 
-        Assert.Equal(expected, SubscriptionClock.DueEmail("trialing", _trialEnds, _trialEnds, now));
+        Assert.Equal(expected, SubscriptionClock.DueEmail("trialing", false, _trialEnds, _trialEnds, now));
     }
 
     [Theory]
@@ -35,27 +35,40 @@ public sealed class SubscriptionEmailWindowTests
     {
         var now = _deletion.AddDays(daysFromDeletion);
 
-        Assert.Equal(expected, SubscriptionClock.DueEmail("readOnly", _trialEnds, _deletion, now));
+        Assert.Equal(expected, SubscriptionClock.DueEmail("readOnly", false, _trialEnds, _deletion, now));
+    }
+
+    [Theory]
+    [InlineData(-60, null)]
+    [InlineData(-8, null)]
+    [InlineData(-7, "deletionIn7Days")]
+    [InlineData(-0.5, "deletionIn7Days")]
+    [InlineData(0, null)]
+    public void A_paid_readOnly_subscription_is_never_due_the_trial_text_and_is_still_due_the_7_day_deletion_warning(double daysFromDeletion, string? expected)
+    {
+        var now = _deletion.AddDays(daysFromDeletion);
+
+        Assert.Equal(expected, SubscriptionClock.DueEmail("readOnly", true, _trialEnds, _deletion, now));
     }
 
     [Fact]
     public void A_deleted_subscription_is_due_the_deletion_done_email_whenever_the_run_comes()
     {
-        Assert.Equal("tenantDeleted", SubscriptionClock.DueEmail("deleted", _trialEnds, null, _deletion));
-        Assert.Equal("tenantDeleted", SubscriptionClock.DueEmail("deleted", _trialEnds, null, _deletion.AddDays(100)));
+        Assert.Equal("tenantDeleted", SubscriptionClock.DueEmail("deleted", false, _trialEnds, null, _deletion));
+        Assert.Equal("tenantDeleted", SubscriptionClock.DueEmail("deleted", false, _trialEnds, null, _deletion.AddDays(100)));
     }
 
     [Fact]
     public void A_deleting_subscription_and_a_readOnly_one_with_no_date_are_due_no_email()
     {
-        Assert.Null(SubscriptionClock.DueEmail("deleting", _trialEnds, _deletion, _deletion));
-        Assert.Null(SubscriptionClock.DueEmail("readOnly", _trialEnds, null, _deletion));
+        Assert.Null(SubscriptionClock.DueEmail("deleting", false, _trialEnds, _deletion, _deletion));
+        Assert.Null(SubscriptionClock.DueEmail("readOnly", false, _trialEnds, null, _deletion));
     }
 
     [Fact]
     public void The_7_day_email_is_no_longer_due_once_the_1_day_window_starts()
     {
-        Assert.Equal("trialEndsIn7Days", SubscriptionClock.DueEmail("trialing", _trialEnds, _trialEnds, _trialEnds.AddDays(-1).AddSeconds(-1)));
-        Assert.Equal("trialEndsTomorrow", SubscriptionClock.DueEmail("trialing", _trialEnds, _trialEnds, _trialEnds.AddDays(-1)));
+        Assert.Equal("trialEndsIn7Days", SubscriptionClock.DueEmail("trialing", false, _trialEnds, _trialEnds, _trialEnds.AddDays(-1).AddSeconds(-1)));
+        Assert.Equal("trialEndsTomorrow", SubscriptionClock.DueEmail("trialing", false, _trialEnds, _trialEnds, _trialEnds.AddDays(-1)));
     }
 }

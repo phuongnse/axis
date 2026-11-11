@@ -21,6 +21,12 @@ namespace Axis.ControlPlane.Subscriptions;
 /// A failed cell call, a job that does not end in time or a tenant with no directory row leaves the subscription as it is and logs a
 /// warning that names the subscription and the cell, never the tenant. The run goes on with the other subscriptions and throws at
 /// the end, so the job queue retries it. After its moves the run queues the timeline emails, see <c>SubscriptionClock.Emails.cs</c>.
+/// A subscription whose <see cref="SubscriptionRow.PeriodEndsAt"/> is set is a paid tenant, and its moves are these. An <c>active</c> one is
+/// due when its period has ended or an open invoice is <see cref="PastDueAfter"/> past its due date, and it is never due by its next
+/// date. An overdue invoice makes it <c>pastDue</c> with no cell call. Otherwise the end of the period moves the period forward once,
+/// with no audit record and no cell call, see <see cref="AdvancePeriodAsync"/>. A <c>pastDue</c> one becomes <c>readOnly</c> after
+/// <see cref="PastDueGrace"/> and a <c>cancelled</c> one at its next date, which is the end of its period, each with one read-only cell
+/// call. A paid tenant stays <c>readOnly</c> for <see cref="PaidReadOnlyWait"/> before it is <c>deleting</c>.
 /// </summary>
 internal sealed partial class SubscriptionClock(
     NpgsqlDataSource controlPlane,
@@ -39,9 +45,21 @@ internal sealed partial class SubscriptionClock(
     /// <summary>How long a tenant stays read-only before its deletion is scheduled.</summary>
     public static readonly TimeSpan ReadOnlyWait = TimeSpan.FromDays(30);
 
+    /// <summary>How long after its due date an open invoice makes an <c>active</c> subscription <c>pastDue</c>.</summary>
+    public static readonly TimeSpan PastDueAfter = TimeSpan.FromDays(1);
+
+    /// <summary>How long a subscription stays <c>pastDue</c> before it becomes <c>readOnly</c>.</summary>
+    public static readonly TimeSpan PastDueGrace = TimeSpan.FromDays(14);
+
+    /// <summary>How long a paid tenant stays read-only before its deletion is scheduled.</summary>
+    public static readonly TimeSpan PaidReadOnlyWait = TimeSpan.FromDays(90);
+
     /// <summary>How long a <c>deleting</c> subscription waits before it asks the cell about the tenant again.</summary>
     public static readonly TimeSpan DeletingCheck = TimeSpan.FromHours(1);
 
+    private const string Active = "active";
+    private const string PastDue = "pastDue";
+    private const string Cancelled = "cancelled";
     private const string ReadOnly = "readOnly";
     private const string Deleting = "deleting";
 
@@ -51,25 +69,52 @@ internal sealed partial class SubscriptionClock(
     {
         ArgumentNullException.ThrowIfNull(job);
         var now = clock.GetUtcNow();
-        var due = new List<(Guid Id, string TenantId, string State, Guid StepId)>();
+        var due = new List<DueSubscription>();
         await using (var select = controlPlane.CreateCommand(
             """
-            SELECT id, tenant_id, state, step_id FROM control_plane.subscriptions
-            WHERE state IN ('trialing', 'readOnly', 'deleting') AND next_at <= @now
-            ORDER BY next_at, id
+            SELECT s.id, s.tenant_id, s.state, s.step_id, s.period, s.period_ends_at,
+                   EXISTS (SELECT 1 FROM billing.invoices i WHERE i.subscription_id = s.id AND i.status = 'open' AND i.due_at <= @overdue)
+            FROM control_plane.subscriptions s
+            WHERE (s.state IN ('trialing', 'pastDue', 'cancelled', 'readOnly', 'deleting') AND s.next_at <= @now)
+               OR (s.state = 'active' AND (s.period_ends_at <= @now
+                   OR EXISTS (SELECT 1 FROM billing.invoices i WHERE i.subscription_id = s.id AND i.status = 'open' AND i.due_at <= @overdue)))
+            ORDER BY s.next_at, s.id
             """))
         {
             select.Parameters.AddWithValue("now", now);
+            select.Parameters.AddWithValue("overdue", now - PastDueAfter);
             await using var reader = await select.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                due.Add((reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetGuid(3)));
+                due.Add(new DueSubscription(
+                    reader.GetGuid(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetGuid(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
+                    reader.GetBoolean(6)));
             }
         }
 
         var failed = 0;
-        foreach (var (id, tenantId, state, stepId) in due)
+        foreach (var (id, tenantId, state, stepId, period, periodEndsAt, overdue) in due)
         {
+            if (state == Active)
+            {
+                // An active subscription makes no cell call, so it needs no cell. A move to pastDue wins over the period's move.
+                if (overdue)
+                {
+                    await CommitAsync(job, id, Active, stepId, PastDue, now + PastDueGrace, cancellationToken);
+                }
+                else if (periodEndsAt is { } end)
+                {
+                    await AdvancePeriodAsync(id, end, period, cancellationToken);
+                }
+
+                continue;
+            }
+
             var cellId = await TenantCells.FindCellIdAsync(directory, tenantId, cancellationToken);
             if (cellId is null && state == Deleting)
             {
@@ -114,6 +159,11 @@ internal sealed partial class SubscriptionClock(
                 await FollowAsync(cell, await cell.PostAsync($"{path}/read-only", new CellOperation("read-only", stepId), null, cancellationToken), cancellationToken);
                 await CommitAsync(job, id, "trialing", stepId, ReadOnly, now + ReadOnlyWait, cancellationToken);
                 break;
+            case PastDue:
+            case Cancelled:
+                await FollowAsync(cell, await cell.PostAsync($"{path}/read-only", new CellOperation("read-only", stepId), null, cancellationToken), cancellationToken);
+                await CommitAsync(job, id, state, stepId, ReadOnly, now + PaidReadOnlyWait, cancellationToken);
+                break;
             case ReadOnly:
                 await FollowAsync(cell, await cell.DeleteAsync(path, new CellOperation("delete", stepId), cancellationToken), cancellationToken);
                 await CommitAsync(job, id, ReadOnly, stepId, Deleting, now + DeletingCheck, cancellationToken);
@@ -122,6 +172,20 @@ internal sealed partial class SubscriptionClock(
                 await CheckDeletionAsync(job, cell, id, tenantId, path, stepId, now, cancellationToken);
                 break;
         }
+    }
+
+    // The end of a paid period moves the period forward. It is not a move, so it writes no audit record and keeps the step id. It runs
+    // once, as the new end is later than now and the old end in the condition no longer matches.
+    private async Task AdvancePeriodAsync(Guid id, DateTimeOffset periodEndsAt, string? period, CancellationToken cancellationToken)
+    {
+        var end = periodEndsAt.UtcDateTime;
+        var next = new DateTimeOffset(period == "year" ? end.AddYears(1) : end.AddMonths(1), TimeSpan.Zero);
+        await using var advance = controlPlane.CreateCommand(
+            "UPDATE control_plane.subscriptions SET period_ends_at = @next, next_at = @next WHERE id = @id AND state = 'active' AND period_ends_at = @old");
+        advance.Parameters.AddWithValue("next", next);
+        advance.Parameters.AddWithValue("id", id);
+        advance.Parameters.AddWithValue("old", periodEndsAt);
+        await advance.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task CheckDeletionAsync(
@@ -195,6 +259,8 @@ internal sealed partial class SubscriptionClock(
         await AuditRecords.AppendAsync(transaction, AuditActorKind.Job, job.Id.ToString(), $"subscription.{to}", id.ToString(), cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
+
+    private sealed record DueSubscription(Guid Id, string TenantId, string State, Guid StepId, string? Period, DateTimeOffset? PeriodEndsAt, bool Overdue);
 
     [LoggerMessage(LogLevel.Warning, "The subscription {SubscriptionId} could not be moved: its tenant has no row in the region directory, or its cell is not one of the region's. It stays as it is.")]
     private partial void LogNoCell(Guid subscriptionId);
