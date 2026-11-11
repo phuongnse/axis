@@ -12,7 +12,7 @@ that a separate publisher runs ([D47](d47-publishing-from-studio.md)).
 
 ## Decision
 
-- **A test is a publish request.** Studio stores a request of a fourth kind, `test`, which holds a
+- **A test is a publish request.** Studio stores a request of its own kind, `test`, which holds a
   snapshot of the folder and, optionally, the names of the scenarios to run. With no names, every
   scenario runs. The author role is enough, because a test changes no tenant, and a test writes no
   audit record and makes no release.
