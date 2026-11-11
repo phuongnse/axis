@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, posix } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-// The owner alone guards the security checks, so every file that CI's dependency and image scans run, and every
-// accepted list, is listed in .github/CODEOWNERS. See
+// The owner alone guards the security checks, so every file that CI's dependency and image scans run, through every
+// source and import, and every accepted list, is listed in .github/CODEOWNERS. See
 // docs/decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md. The workflow is
 // read line by line, since the scripts' tests have no YAML dependency.
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -49,13 +49,28 @@ const jobBlocks = (ci) => {
   return blocks
 }
 
-// The problems of each file a scan job runs, or an accepted list, that CODEOWNERS does not list. An entry script is
-// followed one step down: the files it sources and the .mjs file it runs, but not that file's imports.
+// The files that `path` runs: a shell script's sourced files and the .mjs files it runs with node, and a .mjs
+// file's own imports by a relative path. Package imports such as `node:fs` are not the repository's code.
+const filesRunBy = (path, text) => {
+  if (path.endsWith('.sh')) {
+    return [
+      ...[...text.matchAll(/^\s*source\s+(scripts\/[\w./-]+)/gm)].map((match) => match[1]),
+      ...[...text.matchAll(/\bnode\s+(scripts\/[\w./-]+\.mjs)\b/g)].map((match) => match[1]),
+    ]
+  }
+  return [...text.matchAll(/(?:\bfrom\s+|\bimport\s*\(?\s*)['"](\.{1,2}\/[^'"]+)['"]/g)].map((match) =>
+    posix.join(posix.dirname(path), match[1]),
+  )
+}
+
+// The problems of each file a scan job runs, or an accepted list, that CODEOWNERS does not list. Each entry script
+// is followed to every file it sources, runs or imports, and on through theirs.
 const scanOwnershipProblems = ({ codeowners, ci, read, acceptedLists }) => {
   const patterns = ownedPatterns(codeowners)
   const blocks = jobBlocks(ci)
   const problems = []
   const files = new Set(acceptedLists)
+  const pending = []
   for (const job of scanJobs) {
     const block = blocks.get(job)
     if (block === undefined) {
@@ -64,12 +79,14 @@ const scanOwnershipProblems = ({ codeowners, ci, read, acceptedLists }) => {
     }
     for (const line of block) {
       const entry = /^\s*run:\s*(scripts\/[\w./-]+\.sh)\s*$/.exec(line)?.[1]
-      if (entry === undefined) continue
-      files.add(entry)
-      const text = read(entry) ?? ''
-      for (const [, path] of text.matchAll(/^\s*source\s+(scripts\/[\w./-]+)/gm)) files.add(path)
-      for (const [, path] of text.matchAll(/\bnode\s+(scripts\/[\w./-]+\.mjs)\b/g)) files.add(path)
+      if (entry !== undefined) pending.push(entry)
     }
+  }
+  while (pending.length > 0) {
+    const path = pending.pop()
+    if (files.has(path)) continue
+    files.add(path)
+    pending.push(...filesRunBy(path, read(path) ?? ''))
   }
   for (const path of files) {
     if (!isOwned(patterns, path)) problems.push(`${path} runs in a scan but CODEOWNERS does not list it`)
@@ -117,7 +134,7 @@ describe('CODEOWNERS lists every file the dependency and image scans run', () =>
 
   test('a file that a scan script sources is reported when CODEOWNERS lacks it', () => {
     const scripts = {
-      'scripts/scan-images.sh': 'source scripts/lib/tools.sh\ninstall_trivy\nexec node scripts/scan-images.mjs "$@"\n',
+      'scripts/scan-images.sh': 'source scripts/lib/trivy.sh\ninstall_trivy\nexec node scripts/scan-images.mjs "$@"\n',
     }
 
     assert.deepEqual(
@@ -127,7 +144,32 @@ describe('CODEOWNERS lists every file the dependency and image scans run', () =>
         read: (path) => scripts[path],
         acceptedLists: [],
       }),
-      ['ci.yml has no dependency-scan job', 'scripts/lib/tools.sh runs in a scan but CODEOWNERS does not list it'],
+      ['ci.yml has no dependency-scan job', 'scripts/lib/trivy.sh runs in a scan but CODEOWNERS does not list it'],
+    )
+  })
+
+  test('a file reached through a sourced script or a relative import is reported when CODEOWNERS lacks it', () => {
+    const scripts = {
+      'scripts/scan-images.sh': 'source scripts/lib/trivy.sh\nexec node scripts/scan-images.mjs "$@"\n',
+      'scripts/lib/trivy.sh': 'source scripts/lib/retry.sh\n',
+      'scripts/scan-images.mjs':
+        "import { spawnSync } from 'node:child_process'\nimport { findImages } from './lib/images.mjs'\n",
+      'scripts/lib/images.mjs': "import { readdirSync } from 'node:fs'\n",
+    }
+    const owned = ['/scripts/scan-images.sh', '/scripts/lib/trivy.sh', '/scripts/scan-images.mjs']
+
+    assert.deepEqual(
+      scanOwnershipProblems({
+        codeowners: owned.map((path) => `${path} @owner`).join('\n'),
+        ci: fixtureCi(imageScanJob),
+        read: (path) => scripts[path],
+        acceptedLists: [],
+      }),
+      [
+        'ci.yml has no dependency-scan job',
+        'scripts/lib/images.mjs runs in a scan but CODEOWNERS does not list it',
+        'scripts/lib/retry.sh runs in a scan but CODEOWNERS does not list it',
+      ],
     )
   })
 
