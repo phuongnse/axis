@@ -270,8 +270,9 @@ describe('refresh', () => {
 })
 
 describe('cli', () => {
-  // A gh that serves each page of open issues from open-<page>.json, the successful runs from runs.txt, and each run's
-  // artifacts from runs/<id>, failing for a run without that folder. It logs each other call with its standard input.
+  // A gh that serves each page of open issues from open-<page>.json, the successful dispatched runs from runs.txt and
+  // no runs for a list of other events, and each run's artifacts from runs/<id>, failing for a run without that
+  // folder. It logs each other call with its standard input.
   function withGh(dir, open, run) {
     const gh = path.join(dir, 'gh')
     const log = path.join(dir, 'gh.log')
@@ -279,7 +280,8 @@ describe('cli', () => {
       gh,
       `#!/bin/bash\nif [ "$1" = api ]; then re='[?&]page=([0-9]+)'; [[ "$*" =~ $re ]]; f="${dir}/open-\${BASH_REMATCH[1]}.json"; ` +
         `if [ -f "$f" ]; then cat "$f"; else echo '[]'; fi; exit 0; fi\n` +
-        `if [ "$1 $2" = 'run list' ]; then cat "${dir}/runs.txt" 2>/dev/null; exit 0; fi\n` +
+        `if [ "$1 $2" = 'run list' ]; then [[ " $* " == *' --event workflow_dispatch '* ]] && cat "${dir}/runs.txt" 2>/dev/null; ` +
+        `exit 0; fi\n` +
         `if [ "$1 $2" = 'run download' ]; then [ -d "${dir}/runs/$3" ] || exit 1; mkdir -p "\${@: -1}"; ` +
         `cp -r "${dir}/runs/$3/." "\${@: -1}"; exit 0; fi\n` +
         `{ echo "ARGS $*"; cat; echo; } >> "${log}"\necho "https://github.com/phuongnse/axis/issues/9"\n`,
@@ -299,7 +301,7 @@ describe('cli', () => {
     }
   }
 
-  test('downloads the results of the latest successful runs but this one, and leaves out a run without any', () => {
+  test('downloads the results of the latest successful dispatched runs but this one, and leaves out a run without any', () => {
     withRun((root, results, dir) =>
       withGh(dir, [], () => {
         writeFileSync(path.join(dir, 'runs.txt'), '42\n41\n40\n39\n38\n37\n')

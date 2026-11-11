@@ -6,8 +6,8 @@
 //
 // The results folder holds the run's test-results-* artifacts, one sub-folder each, as
 // actions/download-artifact writes them. The script downloads the same artifacts of the latest successful CI
-// runs on main before it, so that `runsMeasured` runs count in all. For each split, its own --durations command
-// measures each run from the durations file as it was, and each entry becomes the median of its measures, so one
+// runs dispatched on main before it, so that `runsMeasured` runs count in all and no run of a pull request whose
+// branch is also called main does. For each split, its own --durations command measures each run from the durations file as it was, and each entry becomes the median of its measures, so one
 // slow or fast run moves no entry. Its --count command then gives its `Over budget:` lines. A file drifts when
 // its entries that moved by at least `minimumMove` seconds add up to more than `driftShare` of its old total. The
 // script commits nothing: the issue holds the new files, and NexKit's round commits them. CI's durations job runs
@@ -33,7 +33,7 @@ export const driftShare = 0.05
 /** The CI runs on main whose median makes the durations: the run itself and the latest successful ones before it. */
 export const runsMeasured = 5
 
-/** The most successful CI runs on main that the script looks through for earlier results, since a scheduled run has none. */
+/** The most successful CI runs dispatched on main that the script looks through for earlier results, since one may have none. */
 export const runsSearched = 20
 
 /** The fewest seconds an entry must move to count, so run-to-run noise on short tests is left out. */
@@ -289,13 +289,14 @@ export function openProcessIssues(gh) {
 }
 
 /**
- * Downloads into folders under `dir` the test-results-* artifacts of the latest successful CI runs on main other
- * than `runId`, at most `count` of them, and returns those folders, the latest first. A run that has no such
- * artifacts, such as a scheduled one or one whose artifacts expired, is skipped.
+ * Downloads into folders under `dir` the test-results-* artifacts of the latest successful CI runs dispatched on main
+ * other than `runId`, at most `count` of them, and returns those folders, the latest first. Only dispatched runs
+ * count, so a run of a pull request whose branch is also called main does not. A run that has no such artifacts,
+ * such as one whose artifacts expired, is skipped.
  */
 export function earlierResults(gh, runId, dir, count, log = (line) => console.log(line)) {
   const repo = new URL(repository).pathname.slice(1)
-  const list = ['run', 'list', '--repo', repo, '--workflow', 'ci.yml', '--branch', 'main', '--status', 'success']
+  const list = ['run', 'list', '--repo', repo, '--workflow', 'ci.yml', '--branch', 'main', '--event', 'workflow_dispatch', '--status', 'success']
   const ids = run(gh, [...list, '--limit', String(runsSearched), '--json', 'databaseId', '--jq', '.[].databaseId'])
     .split('\n')
     .map((id) => id.trim())

@@ -141,7 +141,7 @@ jobs:
           retention-days: 14
 
   # After every check job of a run on main passed, refreshes the shard durations from the JUnit files of
-  # the run and of the latest successful runs on main before it, each entry the median of its measures,
+  # the run and of the latest successful runs dispatched on main before it, each entry the median of its measures,
   # which actions: read lets the script download. It opens or updates one process issue when they drift,
   # and opens one for each test that alone passes the budget. It runs no model and commits nothing
   # (docs/development.md#shards).

@@ -439,15 +439,15 @@ check's `max` is at least 2 and a second smoke job would take two rounds past th
   `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
   file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
   prints, because no number of shards makes such a spec, class or file fit.
-- **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its
-  `Shard durations` job, with no model, no commit and only `contents: read`, `actions: read` and `issues:
-  write`, runs `scripts/shard-durations.mjs` on the `test-results-*` artifacts of the run and of the latest
-  successful runs on `main` before it. Each split's `--durations` measures each run from the file as it was,
-  each entry becomes the median of its measures, and each `--count` is read. A file drifts when its entries
-  that moved past one run's noise pass a set share of its old total. The script sets the runs, the noise and
-  the share. Drifted files go into one `process` issue, which NexKit's round commits, and each `Over budget:`
-  unit gets its own unless one is open. By hand, `--durations` takes `web*.xml`, `playwright-*.xml`, each
-  integration shard's `Axis.Integration.Tests.xml` with shard 1's control plane one, and the smoke suites' files.
+- **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its `Shard
+  durations` job, with no model, no commit and only `contents: read`, `actions: read` and `issues: write`, runs
+  `scripts/shard-durations.mjs` on the `test-results-*` artifacts of the run and of the latest successful runs
+  dispatched on `main` before it. Each split's `--durations` measures each run from the file as it was, each
+  entry becomes the median of its measures, and each `--count` is read. A file drifts when its entries that
+  moved past one run's noise pass a set share of its old total. The script sets the runs, the noise and the
+  share. Drifted files go into one `process` issue, which NexKit's round commits, and each `Over budget:` unit
+  gets its own unless one is open. By hand, `--durations` takes `web*.xml`, `playwright-*.xml`, each integration
+  shard's `Axis.Integration.Tests.xml` with shard 1's control plane one, and the smoke suites' files.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
