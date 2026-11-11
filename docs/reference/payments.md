@@ -116,20 +116,43 @@ Abroad a merchant of record sells the subscription and takes the payment.
 
 ## Webhooks
 
-_(planned for M34)_
-
 Both providers tell Axis about payments by webhooks, at `POST /api/payments/payos/webhook` and
-`POST /api/payments/paddle/webhook` on the regional control plane.
+`POST /api/payments/paddle/webhook` on the regional control plane. Each webhook is checked, kept once
+and applied in order.
 
-1. **Signature first.** The control plane checks the provider's signature over the raw body before it
-   parses anything: PayOS's HMAC-SHA256 checksum with its checksum key, and Paddle's
-   `Paddle-Signature` with its secret and a timestamp no older than 5 minutes. A bad signature answers
-   `401` and is logged without the body.
+1. **Signature first.** The control plane checks the provider's signature before it trusts any field
+   of the body. A bad signature answers `401` and is logged without the body.
 2. **Inbox.** It stores the event in `billing.webhook_inbox`, unique on the provider and the
    provider's event id, and answers `200`. A repeated event finds its row and changes nothing.
-3. **In order.** A job applies the inbox's events for each invoice in the order the provider sent
-   them, through the subscription's state machine. An event that does not fit the current state, such
-   as a payment for a cancelled invoice, is kept and alerts the operator.
+3. **In order.** A job applies the inbox's events in the order the provider sent them. Each one
+   records a payment against its invoice, see [invoices](#invoices). An event that does not fit its
+   invoice is kept and alerts the operator.
+
+- **PayOS.** The route exists when `ControlPlane:PayOs:Provider` is set. The checksum is the one that
+  PayOS signs its answers with, over the event's `data` and made with the checksum key, and a body
+  that is not JSON or has no checksum gets the same `401`. Without a checksum key every webhook gets
+  `401`. A signed event with no `orderCode`, `amount` or `reference` answers `400` and is not stored,
+  so PayOS sends it again.
+  - **The event id.** PayOS sends no id of its own, so the event id is the transfer's bank `reference`
+    from the event's `data`, and the ledger's idempotency key is `payos:` and that reference.
+  - **The order.** PayOS sends no sequence number, so the order is the event's `transactionDateTime`,
+    which is Vietnam time. Events with the same time, and events with no readable time, follow the
+    order of arrival.
+  - **The job.** `applyPaymentWebhooks` runs every minute and takes the waiting events in that one
+    order, each in its own transaction. It finds the invoice by the `orderCode`, records a `payment`
+    ledger entry for the amount in the event's currency, `VND` when it names none, and marks the
+    event `applied`. A recorded payment writes the audit record `payment.recorded`, with the actor
+    kind `webhook` and the inbox row as the actor. When payments cover the invoice, the settlement
+    of [invoices](#invoices) makes it `paid`. Any other error stops the run, so the job queue
+    retries it and a later event never overtakes an earlier one.
+  - **Out of place.** An event is out of place when its `orderCode` is unknown (`unknownOrder`), its
+    invoice is `void` (`voidInvoice`), PayOS did not report the transfer as paid, which is a `code`
+    other than `00` or an amount that is not above zero (`notPaid`), or its currency is not the
+    subscription's (`currency`). The event is kept and marked `outOfPlace` with its reason, nothing
+    is written to the ledger, an error log names the inbox row and the reason and never the body, and
+    the metric `axis.controlplane.payments.out_of_place` counts it.
+- **Paddle** _(planned for M34)_. The `Paddle-Signature` header is checked with Paddle's secret and a
+  timestamp no older than 5 minutes.
 
 ## Reconciliation
 

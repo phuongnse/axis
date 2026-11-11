@@ -103,6 +103,10 @@ if (!string.IsNullOrWhiteSpace(payOsProvider))
 {
     builder.Services.AddSingleton<IJobHandler, PaymentLinks>();
     builder.Services.AddSingleton(new RecurringJob(PaymentLinks.JobKind, TimeSpan.FromMinutes(5)));
+
+    // The application of the PayOS webhook events kept in the inbox, queued every minute.
+    builder.Services.AddSingleton<IJobHandler, PaymentWebhookEvents>();
+    builder.Services.AddSingleton(new RecurringJob(PaymentWebhookEvents.JobKind, TimeSpan.FromMinutes(1)));
 }
 
 // The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
@@ -164,6 +168,12 @@ app.UseStaticFiles();
 
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
+
+// The PayOS webhook, see docs/reference/payments.md#webhooks. Mapped only when a PayOS provider is named.
+if (!string.IsNullOrWhiteSpace(payOsProvider))
+{
+    app.MapPaymentWebhookEndpoints();
+}
 
 // The sign-up page, its verify page and its progress page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");
