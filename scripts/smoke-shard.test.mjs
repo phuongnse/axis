@@ -131,12 +131,12 @@ describe('main', () => {
     })
   })
 
-  test('--count prints 2 for the real numbers, whose 840 s pass the budget while two shards take 480 s, and no warning', () => {
+  test('--count prints 1 for the real numbers, whose 840 s fit the budget, and no warning', () => {
     withDurations(real, (file) => {
       const warnings = []
       assert.equal(
         main(['--count'], file, (line) => warnings.push(line)),
-        '2',
+        '1',
       )
       assert.deepEqual(warnings, [])
     })
