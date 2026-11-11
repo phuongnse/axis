@@ -1,9 +1,17 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Axis.Data.Audit;
+using Axis.Data.Records;
+using Axis.Data.Storage;
 using Axis.Server.Tests;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -271,6 +279,69 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
             using var drop = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/drop", Host);
             Assert.Equal(HttpStatusCode.NotFound, drop.StatusCode);
         }
+    }
+
+    [Fact]
+    public async Task A_stored_refresh_token_is_encrypted_never_answered_and_erased_by_a_drop()
+    {
+        const string token = "refresh-token-of-the-author-7f3a9c";
+        var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_token", CancellationToken);
+        await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", Host, connectionString)])
+            .WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:DataKeys:1", key));
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        var requestId = Guid.Parse(id);
+
+        await using (var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(connectionString)))
+        {
+            await connection.OpenAsync(CancellationToken);
+            Assert.True(await AuthoringRequestTokens.StoreAsync(
+                connection, null, factory.Services.GetRequiredService<SensitiveValues>(), "a", requestId, token, CancellationToken));
+        }
+
+        // The column holds ciphertext, which only the tenant's data key opens, for this tenant and this request.
+        var stored = (byte[]?)await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken);
+        Assert.NotNull(stored);
+        var plain = Encoding.UTF8.GetBytes(token);
+        Assert.False(stored.AsSpan().SequenceEqual(plain));
+        Assert.True(stored.AsSpan().IndexOf(plain) < 0);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Tenants:a:DataKeys:1"] = key }).Build();
+        var values = new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(configuration)));
+        Assert.Equal(token, await values.DecryptTextAsync(AuthoringRequestTokens.Scope("a", requestId), AuthoringRequestTokens.FieldName, stored, CancellationToken));
+
+        // No answer carries the token, for the author or for another author.
+        foreach (var client in new[] { author, employee })
+        {
+            foreach (var path in new[] { Url, $"{Url}/{id}" })
+            {
+                using var response = await StudioPublishTests.SendAsync(client, HttpMethod.Get, path, Host);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                var body = await response.Content.ReadAsStringAsync(CancellationToken);
+                Assert.DoesNotContain("refreshToken", body, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("refresh_token", body, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(token, body, StringComparison.Ordinal);
+            }
+        }
+
+        // The drop erases the token, and a dropped request takes no new one.
+        using var dropped = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/drop", Host);
+        Assert.Equal(HttpStatusCode.OK, dropped.StatusCode);
+        Assert.Equal(true, await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token IS NULL FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken));
+        await using (var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(connectionString)))
+        {
+            await connection.OpenAsync(CancellationToken);
+            Assert.False(await AuthoringRequestTokens.StoreAsync(
+                connection, null, factory.Services.GetRequiredService<SensitiveValues>(), "a", requestId, token, CancellationToken));
+        }
+
+        Assert.Equal(true, await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token IS NULL FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken));
     }
 
     private static WebApplicationFactory<Program> NewCellFactory(string folder, string connectionString) =>

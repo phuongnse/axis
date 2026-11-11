@@ -140,6 +140,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("plan");
 
+                    b.Property<byte[]>("RefreshToken")
+                        .HasColumnType("bytea")
+                        .HasColumnName("refresh_token");
+
                     b.Property<int>("Round")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")

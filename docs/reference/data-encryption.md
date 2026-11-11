@@ -230,7 +230,9 @@ counts the values it re-encrypted and the hashes it recomputed, so `0` means tha
 
 - **Which columns.** Rotate reads the tenant database's catalogue, not the active release. It takes every `bytea`
   column named `f_` and a field name in the `entities` schema, and the `_lookup` column beside it. That includes child
-  tables, and tables that no active release uses any more.
+  tables, and tables that no active release uses any more. It leaves the `refresh_token` of an
+  [authoring request](authoring-request-storage.md#authoring-requests) alone, and so does retire, because that token
+  lives at most the 8 hours of the author's realm session.
 - **A host that writes meanwhile.** Rotate writes a value back only if the row still holds the bytes it read, so a row
   that a host changed while rotate ran stays as the host wrote it. A host that read the keys before the rotation writes
   with its older key until it reads a value under the new one, or restarts. Those values name an older key, and a

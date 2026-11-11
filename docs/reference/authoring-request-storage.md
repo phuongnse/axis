@@ -14,7 +14,10 @@ when the author approves, changes the plan or drops it. The agent host writes th
   (`text`, see [states](authoring-requests.md#states)), `binding`, `plan`, `claimed_by` (all `text`,
   null), `draft_id` (`uuid`, null), `round` (`integer`) and `tokens` (`bigint`), both 0 at first,
   `auto_accept` (`boolean`, false at first), `sent_at` (`timestamptz`), and `approved_at`,
-  `finished_at` and `claimed_until` (`timestamptz`, null). Indexes on
+  `finished_at` and `claimed_until` (`timestamptz`, null), and `refresh_token` (`bytea`, null). The
+  `refresh_token` holds the agent host's refresh token, encrypted with the tenant data key in the
+  [sensitive value format](data-encryption.md#sensitive-field-values) and bound to the tenant and the
+  request. No route answers it, and a drop sets it to null. Indexes on
   `(application_id, sent_at, id)` and `(sent_at)` serve the list and the monthly count.
 - **`axis.authoring_request_steps`.** One row per step: `id` (`uuid`), `request_id` (`uuid`, deleted
   with its request), `ordinal` (`integer`, unique per request), `kind`, `input_summary` and `outcome`
