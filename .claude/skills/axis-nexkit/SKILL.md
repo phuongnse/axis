@@ -78,9 +78,8 @@ marks between issues, in NexKit's `request` skill.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
    `journey` label and its docs sweep the `docs-sweep` label, with no
-   *blocked by* marks: the journey waits for every other issue of its
-   milestone, and the sweep for the journey too, also those opened later. A
-   `bug` issue goes first, as [how issues run](../../../docs/delivery.md#how-issues-run)
+   *blocked by* marks, and [how issues run](../../../docs/delivery.md#how-issues-run)
+   says when each one starts. A `bug` issue goes first, as the same section
    says. A follow-up is an issue from the start, blocked by the work it waits
    for: [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
    gives the rule.
