@@ -1,7 +1,7 @@
 {
   "$schema": "../case.schema.json",
   "start": { "from": "application", "name": "approvals" },
-  "request": "Add a cost centre to every request. The requester picks it from a list when they create the request, and approvers see it on the request page.",
+  "request": "Add a required cost centre to every request. The requester picks it from a list of Sales, Operations and Engineering when they create the request, and approvers see it on the request page.",
   "outcome": {
     "kind": "change",
     "scenarios": ["RequestGoesToManagerThenNamedEmployee", "AmountIsFrozenAfterSubmit"],
