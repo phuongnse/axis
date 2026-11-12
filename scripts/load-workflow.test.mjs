@@ -3,14 +3,12 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { blockAfter, indentOf, isContent } from './lib/workflow-lines.mjs'
+import { blockAfter, indentOf, isContent, stepsOf, unquote, valueOf } from './lib/workflow-lines.mjs'
 
 // The load test of D82 runs in exactly one workflow, only once a week and on demand, and keeps its results whatever
 // the run's result. See docs/reference/performance.md#load-test. The workflows are read line by line with
 // scripts/lib/workflow-lines.mjs.
 const root = fileURLToPath(new URL('..', import.meta.url))
-
-const unquote = (value) => value.trim().replace(/^(['"])(.*)\1$/, '$2')
 
 const days = /^([0-7]|sun|mon|tue|wed|thu|fri|sat)$/i
 
@@ -24,27 +22,6 @@ const isWeekly = (cron) => {
     fields[3] === '*' &&
     days.test(fields[4])
   )
-}
-
-// The step blocks of a workflow: each runs from a `- ` line to the next `- ` line at the same or lower indentation.
-const stepsOf = (lines) => {
-  const steps = []
-  lines.forEach((line, index) => {
-    if (!/^\s*-\s/.test(line)) return
-    const indent = indentOf(line)
-    const rest = []
-    for (const next of lines.slice(index + 1)) {
-      if (isContent(next) && indentOf(next) <= indent && (/^\s*-\s/.test(next) || indentOf(next) < indent)) break
-      rest.push(next)
-    }
-    steps.push([line.replace('-', ' '), ...rest])
-  })
-  return steps
-}
-
-const valueOf = (step, key) => {
-  const line = step.find((candidate) => new RegExp(`^\\s*${key}:`).test(candidate))
-  return line === undefined ? undefined : unquote(line.replace(new RegExp(`^\\s*${key}:`), ''))
 }
 
 const loadWorkflowProblems = (files) => {

@@ -131,8 +131,12 @@ jobs:
             echo "::endgroup::"
           done < <(jq -r '.[] | [.name, .timeout_minutes, .run] | @tsv' <<<"$CHECKS")
           exit $status
+      # The upload keeps the results for NexKit's evidence and the shard durations. GitHub's artifact
+      # service fails at times, so a failed upload does not fail a job whose checks passed: the Checks
+      # step alone decides the job's result (docs/delivery.md#ci-on-main).
       - name: Upload test results
         if: ${{ !cancelled() && matrix.results != '' }}
+        continue-on-error: true
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: test-results-${{ matrix.name }}
