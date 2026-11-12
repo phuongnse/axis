@@ -48,7 +48,7 @@ install_trivy() {
   mkdir -p "$tools_dir"
   work="$(mktemp -d "$tools_dir/.install.XXXXXX")"
   mkdir "$work/trivy"
-  retry 4 curl -fsSL --retry 3 -o "$work/$archive" \
+  retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$work/$archive" \
     "https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION/$archive"
   verify_sha256 "$work/$archive" "$sum"
   tar -xzf "$work/$archive" -C "$work/trivy" trivy
