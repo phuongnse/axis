@@ -25,9 +25,8 @@ const durationsFile = path.join(root, 'scripts/smoke-durations.json')
 /** The suites of scripts/smoke.sh, in its order. */
 export const suites = ['dev-script', 'compose', 'images', 'onprem']
 
-/** The suites with their seconds from the durations file. A suite without an entry weighs the median of the known ones, or 1. */
-export function readSuites(file) {
-  const durations = JSON.parse(readFileSync(file, 'utf8'))
+/** The suites with their seconds from `durations`, by default the file's. A suite without an entry weighs the median of the known ones, or 1. */
+export function readSuites(file, durations = JSON.parse(readFileSync(file, 'utf8'))) {
   const known = suites.filter((name) => durations[name] !== undefined).map((name) => durations[name])
   const fallback = median(known) ?? 1
   return suites.map((name) => ({ name, seconds: durations[name] ?? fallback }))
@@ -45,17 +44,32 @@ export function split(list, total) {
   return packLightest(units(list), total).map((shard) => shard.names.sort())
 }
 
+/** The estimated seconds of the longest of `shards`, each a list of suite names, weighed by the seconds of `list`. */
+export function longestShard(shards, list) {
+  return Math.max(
+    ...shards.map((names) =>
+      list.filter((suite) => names.includes(suite.name)).reduce((sum, suite) => sum + suite.seconds, 0),
+    ),
+  )
+}
+
+/** The longest estimated shard, weighed with `weighBy`, of the split that `splitBy` gives at its own count. */
+export function longest(splitBy, weighBy) {
+  const suites = readSuites(durationsFile, splitBy)
+  const { total } = count(suites)
+  return longestShard(split(suites, total), readSuites(durationsFile, weighBy))
+}
+
 /** The fewest shards that fit the budget, and an `Over budget:` line for each suite that alone does not. */
 export function count(list, budget = budgetSeconds, max = maxShards.smoke) {
-  const all = units(list)
-  const longest = (total) => Math.max(...packLightest(all, total).map((shard) => shard.seconds))
+  const longestOf = (total) => longestShard(split(list, total), list)
   const overBudget = list
     .filter((suite) => suite.seconds > budget)
     .map(
       (suite) =>
         `Over budget: ${suite.name} takes about ${Math.round(suite.seconds)} s, longer than the budget of ${budget} s.`,
     )
-  return { total: shardCount(longest, budget, max), overBudget }
+  return { total: shardCount(longestOf, budget, max), overBudget }
 }
 
 /** The seconds of each suite in node --test JUnit files, by file name without .xml. Only top-level elements count, since nested tests belong to their describe block. */

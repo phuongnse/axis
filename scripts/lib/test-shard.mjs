@@ -10,9 +10,11 @@ const web = path.join(root, 'web')
 // vitestWorkers on a 4-core, 16 GB runner, as GitHub's standard runners are.
 export const workers = 4
 
-/** The Vitest files of the folder, sorted, with the seconds of each from vitest-durations.json. */
-export function readFiles(dir = web) {
-  const durations = JSON.parse(readFileSync(path.join(dir, 'vitest-durations.json'), 'utf8'))
+/** The Vitest files of the folder, sorted, with the seconds of each from `durations`, by default vitest-durations.json. */
+export function readFiles(
+  dir = web,
+  durations = JSON.parse(readFileSync(path.join(dir, 'vitest-durations.json'), 'utf8')),
+) {
   const fallback = median(Object.values(durations)) ?? 1
   return globSync('**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}', {
     cwd: dir,
@@ -53,6 +55,13 @@ export function split(files, vitestShards, workers) {
   return pack(files, vitestShards, workers).map((shard) => shard.map((file) => file.path).sort())
 }
 
+/** The longest estimated shard, weighed with `weighBy`, of the split that `splitBy` gives at its own count. */
+export function longest(splitBy, weighBy, dir = web) {
+  const files = readFiles(dir, splitBy)
+  const shards = split(files, count(files, workers).total - 1, workers)
+  return longestShard(shards, readFiles(dir, weighBy), workers)
+}
+
 /** The paths of the Vitest files of shard `index` (1-based) of `total`. */
 export function shardFiles(files, index, total, workers) {
   if (total === 1) return files.map((file) => file.path)
@@ -60,17 +69,22 @@ export function shardFiles(files, index, total, workers) {
   return split(files, total - 1, workers)[index - 2]
 }
 
+/** The estimated seconds of the longest of `shards`, each a list of file paths, with each file weighed by `files`. */
+export function longestShard(shards, files, workers) {
+  const byPath = new Map(files.map((file) => [file.path, file]))
+  return Math.max(...shards.map((paths) => estimate(paths.map((filePath) => byPath.get(filePath)), workers)))
+}
+
 /** The fewest test shards that fit the budget, and an `Over budget:` line for each file that alone does not. */
 export function count(files, workers, budget = budgetSeconds, max = maxShards.test) {
-  const longest = (vitestShards) =>
-    Math.max(...pack(files, vitestShards, workers).map((shard) => estimate(shard, workers)))
+  const longestOf = (vitestShards) => longestShard(split(files, vitestShards, workers), files, workers)
   const overBudget = files
     .filter((file) => file.seconds > budget)
     .map(
       (file) =>
         `Over budget: ${file.path} takes about ${Math.round(file.seconds)} s, longer than the budget of ${budget} s.`,
     )
-  return { total: 1 + shardCount(longest, budget, max - 1), overBudget }
+  return { total: 1 + shardCount(longestOf, budget, max - 1), overBudget }
 }
 
 /** The seconds of each file in Vitest JUnit texts, by path relative to web/. */

@@ -3,21 +3,21 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { budgetSeconds } from './lib/shards.mjs'
 import {
   cli,
-  drift,
-  driftShare,
   earlierResults,
   issuesFrom,
   junitFiles,
   marker,
   maxBody,
   medianDurations,
-  minimumMove,
   perPage,
   refresh,
   runsMeasured,
+  splits,
   title,
+  weighed,
 } from './shard-durations.mjs'
 
 // About 2,700 seconds, as tests/e2e/spec-durations.json held on 2026-11-10.
@@ -30,20 +30,6 @@ const overBudget = {
   kind: 'e2e',
   line: 'Over budget: specs/service-desk-journey.spec.ts takes about 1020 s, longer than the budget of 900 s.',
 }
-
-describe('drift', () => {
-  test('leaves out moves under the minimum, and counts added and removed entries in full', () => {
-    const before = { a: 100, b: 100, gone: 30 }
-    assert.equal(drift(before, { a: 100 + minimumMove - 1, b: 100, gone: 30 }), 0)
-    assert.equal(drift(before, { a: 100 + minimumMove, b: 100, gone: 30 }), minimumMove / 230)
-    assert.equal(drift(before, { a: 100, b: 100, added: 20 }), (30 + 20) / 230)
-  })
-
-  test('is all of a file that had no seconds and now has some, and nothing when both are empty', () => {
-    assert.equal(drift({}, { a: 12 }), 1)
-    assert.equal(drift({}, {}), 0)
-  })
-})
 
 describe('medianDurations', () => {
   test('gives each entry the median of its measures, so one slow run moves nothing', () => {
@@ -62,15 +48,10 @@ describe('medianDurations', () => {
 })
 
 describe('issuesFrom', () => {
-  test('opens no issue when the files moved by less than the share and nothing passes the budget', () => {
-    const after = { ...specs, 'specs/service-desk-journey.spec.ts': 396 + 80 }
-    assert.ok(drift(specs, after) < driftShare)
-    assert.deepEqual(issuesFrom([{ path: e2eFile, before: specs, after }], [], [], 42), [])
-  })
-
-  test('opens one process issue with the new file when a file moves by more than the share', () => {
+  test('opens one process issue with the new file when a shard of its split passes the budget and the new split is shorter', () => {
     const after = { ...specs, 'specs/service-desk-journey.spec.ts': 570 }
-    const issues = issuesFrom([{ path: e2eFile, before: specs, after }], [], [{ number: 7, body: 'Another issue.' }], 42)
+    const file = { path: e2eFile, before: specs, after, held: 640, fresh: 320 }
+    const issues = issuesFrom([file], [], [{ number: 7, body: 'Another issue.' }], 42)
     assert.equal(issues.length, 1)
     const [issue] = issues
     assert.equal(issue.action, 'create')
@@ -80,15 +61,17 @@ describe('issuesFrom', () => {
     assert.equal(lines[0], '<!-- nexkit:workflow ci.yml 42 -->')
     assert.equal(lines.at(-1), marker)
     assert.match(issue.body, /^CI run \[42\]\(.*\/actions\/runs\/42\) on `main` measured the shards/m)
+    assert.ok(issue.body.includes(`### \`${e2eFile}\`, a shard of about 640 s, past the budget of 600 s`))
     assert.match(issue.body, /- \[ \] `tests\/e2e\/spec-durations.json` holds the durations below\./)
     assert.match(issue.body, /- \[ \] `scripts\/test.sh` and `scripts\/lint.sh` pass\./)
     assert.ok(issue.body.includes(JSON.stringify(after, null, 2)))
   })
 
-  test('updates the open issue on a later drift, and keeps the first line that names the run that opened it', () => {
+  test('updates the open issue on a later stale file, and keeps the first line that names the run that opened it', () => {
     const after = { ...specs, 'specs/service-desk-journey.spec.ts': 600 }
     const open = { number: 3700, body: `<!-- nexkit:workflow ci.yml 41 -->\nOlder text.\n\n${marker}` }
-    const issues = issuesFrom([{ path: e2eFile, before: specs, after }], [], [{ number: 7, body: 'Other.' }, open], 42)
+    const file = { path: e2eFile, before: specs, after, held: 650, fresh: 330 }
+    const issues = issuesFrom([file], [], [{ number: 7, body: 'Other.' }, open], 42)
     assert.equal(issues.length, 1)
     const [issue] = issues
     assert.equal(issue.action, 'edit')
@@ -98,8 +81,9 @@ describe('issuesFrom', () => {
     assert.ok(issue.body.includes(JSON.stringify(after, null, 2)))
   })
 
-  test('opens an issue of its own for an Over budget line, even when no file drifted', () => {
-    const issues = issuesFrom([{ path: e2eFile, before: specs, after: specs }], [overBudget], [], 42)
+  test('opens an issue of its own for an Over budget line, even when no file is stale', () => {
+    const file = { path: e2eFile, before: specs, after: specs, held: 300, fresh: 300 }
+    const issues = issuesFrom([file], [overBudget], [], 42)
     assert.equal(issues.length, 1)
     const [issue] = issues
     assert.equal(issue.action, 'create')
@@ -112,9 +96,10 @@ describe('issuesFrom', () => {
     assert.doesNotMatch(issue.body, /holds the durations below/)
   })
 
-  test('keeps the drifted files and the Over budget lines in separate issues', () => {
+  test('keeps the stale files and the Over budget lines in separate issues', () => {
     const after = { ...specs, 'specs/service-desk-journey.spec.ts': 1020 }
-    const issues = issuesFrom([{ path: e2eFile, before: specs, after }], [overBudget], [], 42)
+    const file = { path: e2eFile, before: specs, after, held: 1020, fresh: 500 }
+    const issues = issuesFrom([file], [overBudget], [], 42)
     assert.deepEqual(
       issues.map((issue) => issue.title),
       [title, 'specs/service-desk-journey.spec.ts fits within the shard budget'],
@@ -134,7 +119,8 @@ describe('issuesFrom', () => {
     const before = Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`Axis.Integration.Tests.Class${i}Tests`, 20]))
     const after = { ...before, 'Axis.Integration.Tests.Class1Tests': 4000, 'Axis.Integration.Tests.NewTests': 15 }
     delete after['Axis.Integration.Tests.Class2Tests']
-    const [issue] = issuesFrom([{ path: 'tests/Axis.Integration.Tests/class-durations.json', before, after }], [], [], 42)
+    const file = { path: 'tests/Axis.Integration.Tests/class-durations.json', before, after, held: 900, fresh: 450 }
+    const [issue] = issuesFrom([file], [], [], 42)
     assert.equal(issue.action, 'create')
     assert.ok(issue.body.length <= maxBody)
     assert.match(issue.body, /holds the durations below, with the other entries as they are\./)
@@ -142,6 +128,136 @@ describe('issuesFrom', () => {
     assert.ok(issue.body.includes('"Axis.Integration.Tests.NewTests": 15'))
     assert.ok(issue.body.includes('Remove these entries: `Axis.Integration.Tests.Class2Tests`.'))
     assert.ok(!issue.body.includes('Class3Tests'))
+  })
+})
+
+// The keys of each split's units, as its durations file names them. Smoke's suites are fixed.
+const unitKeys = {
+  test: (n) => Array.from({ length: n }, (_, i) => `file-${i}.test.ts`),
+  e2e: (n) => Array.from({ length: n }, (_, i) => `specs/spec-${i}.spec.ts`),
+  integration: (n) =>
+    Array.from({ length: n }, (_, i) => `Axis.Integration.Tests.Class${String(i).padStart(2, '0')}Tests`),
+  smoke: () => ['dev-script', 'compose', 'images', 'onprem'],
+}
+
+function writeUnder(root, file, text) {
+  mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+  writeFileSync(path.join(root, file), text)
+}
+
+// Writes the unit `key` of a split under `root`: a Vitest file, a Playwright spec or a test class. Smoke has none.
+function writeUnit(root, kind, key) {
+  if (kind === 'test') writeUnder(root, `web/${key}`, '')
+  if (kind === 'e2e') {
+    writeUnder(root, `tests/e2e/${key}`, key.includes('journey') ? "test.describe.configure({ mode: 'serial' })\n" : '')
+  }
+  if (kind === 'integration') {
+    const name = key.split('.').pop()
+    writeUnder(
+      root,
+      `tests/Axis.Integration.Tests/${name}.cs`,
+      `namespace Axis.Integration.Tests;\npublic class ${name}\n{\n    [Fact]\n    public void Works() { }\n}\n`,
+    )
+  }
+}
+
+// Runs `run` with a repository under a temporary folder, holding the units of `kind` that `keys` name.
+function withUnits(kind, keys, run) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'shard-durations-units-'))
+  try {
+    const root = path.join(dir, 'root')
+    for (const key of keys) writeUnit(root, kind, key)
+    return run(root)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+const fill = (count, seconds) => Array.from({ length: count }, () => seconds)
+
+// Each split's cases: `before` and `after` give each unit's seconds. `past` names the longest shard it must get,
+// and `over` has one unit, `unit`, that alone passes the budget. Keys default to the split's unitKeys.
+const cases = {
+  test: {
+    within: { before: fill(8, 200), after: fill(8, 290) },
+    past: { before: fill(8, 200), after: fill(8, 320), held: 640 },
+    over: { before: [700], after: [720], unit: 'file-0.test.ts' },
+  },
+  e2e: {
+    within: { before: fill(8, 200), after: fill(8, 290) },
+    past: { before: fill(8, 200), after: fill(8, 320), held: 640 },
+    over: { keys: ['specs/journey.spec.ts'], before: [700], after: [720], unit: 'specs/journey.spec.ts' },
+  },
+  integration: {
+    within: { before: fill(6, 100), after: fill(6, 90) },
+    past: { before: fill(6, 100), after: fill(6, 110), held: 660 },
+    over: { before: [700], after: [720], unit: 'Axis.Integration.Tests.Class00Tests' },
+  },
+  smoke: {
+    within: { before: fill(4, 150), after: fill(4, 140) },
+    past: { before: fill(4, 150), after: fill(4, 160), held: 640 },
+    over: { before: [700, 10, 10, 10], after: [720, 10, 10, 10], unit: 'dev-script' },
+  },
+}
+
+describe('the rule for each split, weighed as refresh weighs it', () => {
+  const durationsOf = (keys, seconds) => Object.fromEntries(keys.map((key, i) => [key, seconds[i]]))
+
+  // Runs `run` with the file that `weighed` gives for a case of a split, on a repository holding the case's units.
+  function fileOf(split, scenario, run) {
+    const keys = scenario.keys ?? unitKeys[split.kind](scenario.before.length)
+    return withUnits(split.kind, keys, (root) =>
+      run(weighed(split, root, durationsOf(keys, scenario.before), durationsOf(keys, scenario.after))),
+    )
+  }
+
+  for (const split of splits) {
+    const { kind } = split
+    const { within, past, over } = cases[kind]
+
+    test(`${kind}: entries that moved by over 5% open no issue while the current shards fit the budget`, () => {
+      fileOf(split, within, (file) => {
+        const total = within.before.reduce((sum, seconds) => sum + seconds, 0)
+        const moved = within.before.reduce((sum, seconds, i) => sum + Math.abs(within.after[i] - seconds), 0)
+        assert.ok(moved > 0.05 * total)
+        assert.ok(file.held <= budgetSeconds)
+        assert.deepEqual(issuesFrom([file], [], [], 42), [])
+      })
+    })
+
+    test(`${kind}: a shard past the budget files the durations, naming its seconds and the budget`, () => {
+      fileOf(split, past, (file) => {
+        assert.equal(file.held, past.held)
+        assert.ok(file.fresh < file.held)
+        const issues = issuesFrom([file], [], [], 42)
+        assert.equal(issues.length, 1)
+        const [issue] = issues
+        assert.equal(issue.title, title)
+        assert.ok(issue.body.includes(`### \`${split.file}\`, a shard of about ${past.held} s, past the budget of 600 s`))
+      })
+    })
+
+    test(`${kind}: a unit over the budget gets its own issue and no durations issue when the new file splits it no better`, () => {
+      fileOf(split, over, (file) => {
+        assert.ok(file.held > budgetSeconds)
+        assert.equal(file.fresh, file.held)
+        const line = `Over budget: ${over.unit} takes about 720 s, longer than the budget of ${budgetSeconds} s.`
+        const issues = issuesFrom([file], [{ kind, line }], [], 42)
+        assert.deepEqual(
+          issues.map((issue) => issue.title),
+          [`${over.unit} fits within the shard budget`],
+        )
+      })
+    })
+  }
+
+  test('integration: a split at its cap that cannot fit files no durations issue when the new file splits it no better', () => {
+    const integration = splits.find((split) => split.kind === 'integration')
+    fileOf(integration, { before: fill(12, 300), after: fill(12, 310) }, (file) => {
+      assert.ok(file.held > budgetSeconds)
+      assert.equal(file.fresh, file.held)
+      assert.deepEqual(issuesFrom([file], [], [], 42), [])
+    })
   })
 })
 
@@ -242,8 +358,16 @@ describe('refresh', () => {
           path: 'tests/e2e/spec-durations.json',
           before: { 'specs/fast.spec.ts': 20, 'specs/slow.spec.ts': 100 },
           after: { 'specs/fast.spec.ts': 20, 'specs/slow.spec.ts': 2000 },
+          held: 1010,
+          fresh: 1000,
         },
-        { path: 'tests/Axis.Integration.Tests/class-durations.json', before: {}, after: { 'Axis.Integration.Tests.FooTests': 30 } },
+        {
+          path: 'tests/Axis.Integration.Tests/class-durations.json',
+          before: {},
+          after: { 'Axis.Integration.Tests.FooTests': 30 },
+          held: 30,
+          fresh: 30,
+        },
       ])
       assert.deepEqual(
         overBudget.map((entry) => entry.kind),
@@ -341,7 +465,7 @@ describe('cli', () => {
   test('updates the open durations issue and opens no second Over budget issue', () => {
     withRun((root, results, dir) => {
       const opened = issuesFrom(
-        [{ path: e2eFile, before: { 'specs/slow.spec.ts': 100 }, after: { 'specs/slow.spec.ts': 1900 } }],
+        [{ path: e2eFile, before: { 'specs/slow.spec.ts': 100 }, after: { 'specs/slow.spec.ts': 1900 }, held: 1010, fresh: 1000 }],
         [{ kind: 'e2e', line: 'Over budget: specs/slow.spec.ts takes about 950 s, longer than the budget of 900 s.' }],
         [],
         41,
@@ -360,7 +484,7 @@ describe('cli', () => {
   test('finds the open durations and Over budget issues past the first page, and opens no second one', () => {
     withRun((root, results, dir) => {
       const opened = issuesFrom(
-        [{ path: e2eFile, before: { 'specs/slow.spec.ts': 100 }, after: { 'specs/slow.spec.ts': 1900 } }],
+        [{ path: e2eFile, before: { 'specs/slow.spec.ts': 100 }, after: { 'specs/slow.spec.ts': 1900 }, held: 1010, fresh: 1000 }],
         [{ kind: 'e2e', line: 'Over budget: specs/slow.spec.ts takes about 950 s, longer than the budget of 900 s.' }],
         [],
         41,
@@ -378,7 +502,7 @@ describe('cli', () => {
     })
   })
 
-  test('calls gh only to read the runs and the open issues when nothing drifted or passes the budget', () => {
+  test('calls gh only to read the runs and the open issues when no file needs a new split and nothing passes the budget', () => {
     withRun((root, results, dir) => {
       rmSync(results, { recursive: true, force: true })
       mkdirSync(results)
@@ -387,7 +511,7 @@ describe('cli', () => {
         const lines = []
         assert.equal(cli([results, '42'], root, (line) => lines.push(line)), 0)
         assert.throws(() => log(), /ENOENT/)
-        assert.deepEqual(lines, ['The shard durations did not drift, and nothing passes the budget.'])
+        assert.deepEqual(lines, ['No durations file needs a new split, and nothing passes the budget.'])
       })
     })
   })

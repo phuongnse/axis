@@ -453,10 +453,14 @@ jobs may wait.
   job, with no model, no commit and only `contents: read`, `actions: read` and `issues: write`, runs
   `scripts/shard-durations.mjs` on the `test-results-*` artifacts of the run and of the latest successful runs
   dispatched on `main` before it. Each split's `--durations` measures each run from the file as it was, each entry
-  becomes the median of its measures, and each `--count` is read. A file drifts when its entries that moved past one
-  run's noise pass a set share of its old total. The script sets the runs, the noise and the share. Drifted files go
-  into one `process` issue, which NexKit's round commits, and each `Over budget:` unit gets its own unless one is open,
-  citing [the rules for tests](testing.md#rules-for-tests). By hand, `--durations` takes `web*.xml`, `playwright-*.xml`,
+  becomes the median of its measures, and each `--count` is read. A durations file goes into one `process` issue,
+  which NexKit's round commits, when a shard of the split that the current file gives at its count, weighed with the
+  new durations, runs past the budget and the new file's split has a shorter longest shard. The issue names that
+  shard's estimated seconds and the budget. Entries that move a lot while every shard fits the budget do not qualify,
+  because run-to-run noise moves entries without making a split run long. A split that could use fewer shards alone
+  files nothing. A split at its cap that cannot fit, or that holds an `Over budget:` unit, files nothing unless the
+  new file splits it better. Each `Over budget:` unit gets its own issue unless one is open, citing
+  [the rules for tests](testing.md#rules-for-tests). By hand, `--durations` takes `web*.xml`, `playwright-*.xml`,
   each integration shard's `Axis.Integration.Tests.xml` with shard 1's control plane one, and the smoke suites' files.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
