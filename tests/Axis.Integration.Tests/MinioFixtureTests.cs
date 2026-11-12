@@ -7,8 +7,9 @@ using Amazon.S3.Model;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The helpers that read an object from MinIO and upload one to it try again when MinIO drops a connection or answers that the client disconnected,
-/// and fail when every try does. The waits between tries grow from half a second. An upload that fails with any other S3 error fails at once.
+/// The helpers that create a bucket, read an object from MinIO and upload one to it try again when MinIO drops a connection or answers that the client
+/// disconnected, and fail when every try does. The waits between tries grow from half a second. A create or an upload that fails with any other S3 error
+/// fails at once. A bucket create that finds the bucket already owned fails on its first try, but counts as created on a retry.
 /// </summary>
 public sealed class MinioFixtureTests
 {
@@ -193,6 +194,111 @@ public sealed class MinioFixtureTests
             _noWait));
 
         Assert.Equal(5, calls);
+    }
+
+    [Fact]
+    public async Task A_bucket_create_whose_connection_is_reset_creates_the_bucket()
+    {
+        var calls = 0;
+        PutBucketRequest? created = null;
+
+        await MinioFixture.CreateBucketAsync(
+            (request, _) =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset));
+                }
+
+                created = request;
+                return Task.CompletedTask;
+            },
+            "bucket",
+            CancellationToken,
+            wait: _noWait);
+
+        Assert.Equal("bucket", created?.BucketName);
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task A_bucket_create_whose_connection_is_dropped_every_time_fails_after_five_attempts()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<IOException>(() => MinioFixture.CreateBucketAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new IOException("Connection reset by peer", new SocketException((int)SocketError.ConnectionReset));
+            },
+            "bucket",
+            CancellationToken,
+            wait: _noWait));
+
+        Assert.Equal(5, calls);
+    }
+
+    [Fact]
+    public async Task A_bucket_create_retried_after_a_dropped_answer_counts_the_bucket_already_owned_as_created()
+    {
+        var calls = 0;
+
+        await MinioFixture.CreateBucketAsync(
+            (_, _) =>
+            {
+                calls++;
+                if (calls == 1)
+                {
+                    throw new AmazonS3Exception("Client disconnected before response was ready") { ErrorCode = "ClientDisconnected" };
+                }
+
+                throw new AmazonS3Exception("Your previous request to create the named bucket succeeded and you already own it.") { ErrorCode = "BucketAlreadyOwnedByYou" };
+            },
+            "bucket",
+            CancellationToken,
+            wait: _noWait);
+
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
+    public async Task A_bucket_already_owned_on_the_first_try_fails_at_once()
+    {
+        var calls = 0;
+
+        await Assert.ThrowsAsync<AmazonS3Exception>(() => MinioFixture.CreateBucketAsync(
+            (_, _) =>
+            {
+                calls++;
+                throw new AmazonS3Exception("Your previous request to create the named bucket succeeded and you already own it.") { ErrorCode = "BucketAlreadyOwnedByYou" };
+            },
+            "bucket",
+            CancellationToken,
+            wait: _noWait));
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public async Task A_bucket_created_with_object_lock_asks_MinIO_for_object_lock()
+    {
+        PutBucketRequest? created = null;
+
+        await MinioFixture.CreateBucketAsync(
+            (request, _) =>
+            {
+                created = request;
+                return Task.CompletedTask;
+            },
+            "bucket",
+            CancellationToken,
+            objectLock: true,
+            wait: _noWait);
+
+        Assert.NotNull(created);
+        Assert.True(created.ObjectLockEnabledForBucket);
     }
 
     private static Func<TimeSpan, CancellationToken, Task> Recording(List<TimeSpan> waits) =>

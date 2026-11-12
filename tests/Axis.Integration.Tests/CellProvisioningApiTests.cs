@@ -1937,7 +1937,7 @@ public sealed class CellProvisioningApiTests(PostgreSqlFixture database, Keycloa
             var bucket = $"exports-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}";
             _exportStorage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
             using var s3 = _exportStorage.NewClient();
-            await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, CancellationToken);
+            await MinioFixture.CreateBucketAsync(s3, bucket, CancellationToken);
         }
 
         return new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>

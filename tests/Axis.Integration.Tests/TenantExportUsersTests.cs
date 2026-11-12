@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Amazon.S3;
-using Amazon.S3.Model;
 using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Packages;
@@ -211,7 +210,7 @@ public sealed class TenantExportUsersTests(KeycloakFixture keycloak, PostgreSqlF
     private static async Task<string> NewBucketAsync(IAmazonS3 s3)
     {
         var bucket = $"exports-{Convert.ToHexStringLower(System.Security.Cryptography.RandomNumberGenerator.GetBytes(6))}";
-        await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, CancellationToken);
+        await MinioFixture.CreateBucketAsync(s3, bucket, CancellationToken);
         return bucket;
     }
 
