@@ -223,13 +223,19 @@ only [publishing](authoring.md#publishing) does.
 - **Who.** The author of a `ready` request accepts its draft through the accept route, see
   [routes](#routes). The route stores an `accept` with the client `studio`, and the request stays
   `ready` until the accept succeeds.
-- **In Studio and by the agent** _(planned for M35)_. Studio gives the author an Accept button for the
-  route. The agent may accept the draft through `accept_draft` only when all of these hold:
+- **In Studio** _(planned for M35)_. Studio gives the author an Accept button for the route.
+- **By the agent.** The agent, or any MCP client of the author, asks through `accept_draft`, see
+  [tools](mcp-server.md#tools). The tool stores an `accept` with the client's id only when all of these hold:
   - the application's auto-accept setting is on, see
     [AI authoring in Studio](ai-authoring-in-studio.md#auto-accept);
   - the request asked for it when it was sent;
-  - its checks and its review passed in the last round;
-  - the author still holds the author role.
+  - its checks and its review passed in the last round, which means the newest `check` step and the newest
+    `review` step have the outcome `passed` and the review comes after the check;
+  - the caller holds the author role, which the MCP route checks and answers `403` without it, and is the
+    author of the `ready` request that owns the draft.
+
+  A refused call is a tool error that stores nothing. A call while an accept of the draft is queued or running
+  answers that accept and stores no second one.
 - **Through the publisher.** An accept is a [publish request](authoring.md#publishing) of the kind
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
   interleave. When an accept succeeds, the publisher moves the `ready` request of that draft to

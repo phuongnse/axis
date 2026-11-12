@@ -122,7 +122,7 @@ internal static class StudioSettingsEndpoints
     }
 
     // No row means the default: off.
-    private static async Task<bool> ReadAutoAcceptAsync(
+    internal static async Task<bool> ReadAutoAcceptAsync(
         NpgsqlConnection connection, NpgsqlTransaction? transaction, Guid applicationId, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
