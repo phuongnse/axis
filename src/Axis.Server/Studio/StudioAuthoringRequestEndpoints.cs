@@ -33,7 +33,8 @@ namespace Axis.Server.Studio;
 /// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
 /// token, and no answer carries it. <c>POST .../{id}/accept</c> takes no body and runs the same checks, then answers 409 for a request that is not
 /// <c>ready</c> or has no draft, and 409 for a draft that already has an accept queued or running. Otherwise it stores an <c>accept</c> publish request
-/// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. It changes no authoring request:
+/// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. The accept writes the draft as a revision, so over the <c>storage</c> quota it is refused before any of these checks, as a save is, see
+/// <c>docs/reference/tenant-quotas.md#refusals</c>. It changes no authoring request:
 /// the publisher moves it to <c>accepted</c> when the accept succeeds, see <c>docs/reference/authoring-requests.md#accepting</c>.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
@@ -76,7 +77,7 @@ internal static class StudioAuthoringRequestEndpoints
                 ChangeAsync(Action.Drop, application, id, httpContext, options, database));
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/accept",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
-                ChangeAsync(Action.Accept, application, id, httpContext, options, database));
+                ChangeAsync(Action.Accept, application, id, httpContext, options, database)).WithStorageQuota();
     }
 
     private static async Task<IResult> SendAsync(
@@ -264,7 +265,7 @@ internal static class StudioAuthoringRequestEndpoints
         }
 
         var cancellationToken = httpContext.RequestAborted;
-        if (!Guid.TryParseExact(id, "D", out var requestId) || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        if (!Guid.TryParseExact(id, "D", out var requestId) || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
             return NoRequest();
         }
@@ -333,7 +334,7 @@ internal static class StudioAuthoringRequestEndpoints
 
         if (action == Action.Accept)
         {
-            return await AcceptAsync(application, applicationId, draftId!.Value, name: StudioFolder.ReadManifest(folder)!.Name ?? application, user, connection, transaction, cancellationToken);
+            return await AcceptAsync(application, applicationId, draftId!.Value, name: manifest.Name ?? application, user, connection, transaction, cancellationToken);
         }
 
         switch (action)

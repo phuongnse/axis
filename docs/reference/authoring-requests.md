@@ -107,7 +107,10 @@ an accept, which [accepting](#accepting) describes.
   not a UUID of this application. Approve, change plan, drop and accept then answer `403` to anyone but
   the author of the request, and last answer `409` for a request in a state the action does not accept.
   Accept answers `409` for a request that is not `ready` or has no draft, and for a draft that already
-  has an accept queued or running. A refused accept stores nothing.
+  has an accept queued or running. A refused accept stores nothing. In a cell, an accept over the
+  [`storage` quota](tenant-quotas.md#refusals) is refused with the quota's `403` before these checks,
+  as a save is, because it writes the draft as a revision. A drop is not, so the author can still end
+  the request.
 - **Who.** Any author lists and reads the requests of an application. Only the author of a request
   approves its plan, changes it, drops it or accepts its draft.
 - **Body.** A send takes `{ text, autoAccept? }` with a `text` of 1 to 4,000 characters. A change of
