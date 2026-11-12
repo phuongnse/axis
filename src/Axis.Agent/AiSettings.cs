@@ -12,6 +12,9 @@ public sealed class AiSettings
     private const string RequestTokenBudgetSetting = "Ai:RequestTokenBudget";
     private const string RequestTimeoutSetting = "Ai:RequestTimeout";
 
+    /// <summary>The setting that names a file of scripted answers, see <c>docs/reference/model-bindings.md#bindings</c>.</summary>
+    internal const string ScriptedAnswersFileSetting = "Ai:ScriptedAnswersFile";
+
     /// <summary>The fix rounds of a request when <c>Ai:FixRounds</c> is not set.</summary>
     public const int DefaultFixRounds = 3;
 
@@ -34,6 +37,7 @@ public sealed class AiSettings
         FixRoundsSetting,
         RequestTokenBudgetSetting,
         RequestTimeoutSetting,
+        ScriptedAnswersFileSetting,
     ];
 
     /// <summary>The bindings by name.</summary>
@@ -52,6 +56,9 @@ public sealed class AiSettings
 
     /// <summary>How long a request may run after its plan is approved, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
     public TimeSpan RequestTimeout { get; init; } = DefaultRequestTimeout;
+
+    /// <summary>The file of recorded answers that every binding replays, or <see langword="null"/> to call the providers. Only Development and Testing accept it.</summary>
+    public string? ScriptedAnswersFile { get; init; }
 
     /// <summary>The output limit of the binding. A name that is not configured, which only the scripted adapter of the tests answers for, gets the default.</summary>
     public int MaxOutputTokensOf(string binding) =>
@@ -84,6 +91,7 @@ public sealed class AiSettings
             FixRounds = ReadFixRounds(configuration[FixRoundsSetting]),
             RequestTokenBudget = ParseTokenBudget(configuration[RequestTokenBudgetSetting]),
             RequestTimeout = ParseTimeout(configuration[RequestTimeoutSetting]),
+            ScriptedAnswersFile = Text(configuration[ScriptedAnswersFileSetting]),
         };
     }
 
