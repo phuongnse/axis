@@ -628,9 +628,10 @@ panel, its undo and its drag and drop.
   shows a short notice. The canvas is mounted only while the Design tab is active.
 - **Redraw.** The canvas posts the draft to [the draft page metadata route](draft-page-metadata.md)
   300 ms after the last edit and redraws from its answer. A widget redraws only from a new answer, so an
-  edit redraws it once, after the post, and a drag over the same target redraws none. From an edit
-  until it draws the answer to that draft, the canvas has `aria-busy`, which the tests wait on before a
-  drag.
+  edit redraws it once, after the post, and a drag over the same target redraws none. The canvas also
+  posts the draft after each save. Save writes the texts of new label keys, which the route compiles
+  with, and the draft stays the same. From an edit or a save until it draws the answer, the canvas has
+  `aria-busy`, which the tests wait on before a drag.
 - **Placeholders and marks.** A widget that does not compile draws as a placeholder with its type and a
   line for each of its diagnostics, with the code and the message. A widget is marked when a diagnostic
   of the page, of any severity, names its `path` or a path inside it, so a container is marked too when

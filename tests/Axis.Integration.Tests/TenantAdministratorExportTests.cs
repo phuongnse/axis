@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Amazon.S3;
-using Amazon.S3.Model;
 using Axis.Administration;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
@@ -189,7 +188,7 @@ public sealed class TenantAdministratorExportTests(PostgreSqlFixture database, K
         _storage = new CellBackupStorage(minio.ServiceUrl, "us-east-1", bucket, minio.AccessKey, minio.SecretKey);
         using (var s3 = _storage.NewClient())
         {
-            await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, CancellationToken);
+            await MinioFixture.CreateBucketAsync(s3, bucket, CancellationToken);
         }
 
         var platform = _platform;

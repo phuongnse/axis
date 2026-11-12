@@ -8,8 +8,12 @@ public sealed class AiSettings
     private const string BindingsSection = "Ai:Bindings";
     private const string DefaultBindingSetting = "Ai:DefaultBinding";
     private const string ReviewBindingSetting = "Ai:ReviewBinding";
+    private const string FixRoundsSetting = "Ai:FixRounds";
     private const string RequestTokenBudgetSetting = "Ai:RequestTokenBudget";
     private const string RequestTimeoutSetting = "Ai:RequestTimeout";
+
+    /// <summary>The fix rounds of a request when <c>Ai:FixRounds</c> is not set.</summary>
+    public const int DefaultFixRounds = 3;
 
     /// <summary>The token budget of a request when <c>Ai:RequestTokenBudget</c> is not set.</summary>
     public const long DefaultRequestTokenBudget = 2_000_000;
@@ -27,6 +31,7 @@ public sealed class AiSettings
         $"{BindingsSection}:<name>:MaxOutputTokens",
         DefaultBindingSetting,
         ReviewBindingSetting,
+        FixRoundsSetting,
         RequestTokenBudgetSetting,
         RequestTimeoutSetting,
     ];
@@ -40,6 +45,8 @@ public sealed class AiSettings
     /// <summary>The binding of the review session, or <see langword="null"/> to use the request's binding, or else the default binding.</summary>
     public string? ReviewBinding { get; init; }
 
+    /// <summary>The most fix rounds one request gets, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+    public int FixRounds { get; init; } = DefaultFixRounds;
     /// <summary>The tokens one request may use, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
     public long RequestTokenBudget { get; init; } = DefaultRequestTokenBudget;
 
@@ -56,8 +63,8 @@ public sealed class AiSettings
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A binding has an unknown kind, no model, a key file that cannot be read or a <c>MaxOutputTokens</c> that is not a whole number of at least 1,
-    /// or the default or review binding names no binding, or <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1,
-    /// or <c>Ai:RequestTimeout</c> is not a positive time span.
+    /// the default or review binding names no binding, <c>Ai:FixRounds</c> is not a whole number of at least 0,
+    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, or <c>Ai:RequestTimeout</c> is not a positive time span.
     /// </exception>
     public static AiSettings Load(IConfiguration configuration)
     {
@@ -74,6 +81,7 @@ public sealed class AiSettings
             Bindings = bindings,
             DefaultBinding = NamedBinding(configuration, DefaultBindingSetting, bindings),
             ReviewBinding = NamedBinding(configuration, ReviewBindingSetting, bindings),
+            FixRounds = ReadFixRounds(configuration[FixRoundsSetting]),
             RequestTokenBudget = ParseTokenBudget(configuration[RequestTokenBudgetSetting]),
             RequestTimeout = ParseTimeout(configuration[RequestTimeoutSetting]),
         };
@@ -134,6 +142,18 @@ public sealed class AiSettings
         return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var tokens) && tokens >= 1
             ? tokens
             : throw new InvalidOperationException($"'{setting}' must be a whole number of at least 1.");
+    }
+
+    private static int ReadFixRounds(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return DefaultFixRounds;
+        }
+
+        return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var rounds)
+            ? rounds
+            : throw new InvalidOperationException($"'{FixRoundsSetting}' must be a whole number of at least 0.");
     }
 
     private static long ParseTokenBudget(string? text)

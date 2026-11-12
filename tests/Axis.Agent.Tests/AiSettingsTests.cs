@@ -32,6 +32,8 @@ public sealed class AiSettingsTests : IDisposable
         { "max-output-tokens-zero", "Ai:Bindings:main:MaxOutputTokens" },
         { "max-output-tokens-text", "Ai:Bindings:main:MaxOutputTokens" },
         { "max-output-tokens-fraction", "Ai:Bindings:main:MaxOutputTokens" },
+        { "fix-rounds-negative", "Ai:FixRounds" },
+        { "fix-rounds-text", "Ai:FixRounds" },
         { "request-token-budget-zero", "Ai:RequestTokenBudget" },
         { "request-token-budget-text", "Ai:RequestTokenBudget" },
         { "request-timeout-zero", "Ai:RequestTimeout" },
@@ -80,6 +82,12 @@ public sealed class AiSettingsTests : IDisposable
             case "max-output-tokens-fraction":
                 values["Ai:Bindings:main:MaxOutputTokens"] = "70707.5";
                 break;
+            case "fix-rounds-negative":
+                values["Ai:FixRounds"] = "-4242";
+                break;
+            case "fix-rounds-text":
+                values["Ai:FixRounds"] = "three-rounds";
+                break;
             case "request-token-budget-zero":
                 values["Ai:RequestTokenBudget"] = "0";
                 break;
@@ -100,7 +108,7 @@ public sealed class AiSettingsTests : IDisposable
 
         var text = exception.ToString();
         Assert.Contains($"'{setting}'", text, StringComparison.Ordinal);
-        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, Key, "other-binding-name", "lots-of-tokens", "70707.5", "half-an-hour-value" })
+        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, Key, "other-binding-name", "lots-of-tokens", "70707.5", "half-an-hour-value", "-4242", "three-rounds" })
         {
             Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
         }
@@ -128,6 +136,14 @@ public sealed class AiSettingsTests : IDisposable
         Assert.Equal((ModelBindingKind.OpenAiCompatible, "http://localhost:11434/v1", (string?)null, 4000), (local.Kind, local.Endpoint, local.Key, local.MaxOutputTokens));
         Assert.Equal(("main", "local"), (settings.DefaultBinding, settings.ReviewBinding));
         Assert.DoesNotContain(Key, main.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_fix_rounds_are_3_when_unset_and_0_is_accepted()
+    {
+        Assert.Equal(3, AiSettings.Load(Configure(new Dictionary<string, string?>())).FixRounds);
+        Assert.Equal(0, AiSettings.Load(Configure(new Dictionary<string, string?> { ["Ai:FixRounds"] = "0" })).FixRounds);
+        Assert.Equal(5, AiSettings.Load(Configure(new Dictionary<string, string?> { ["Ai:FixRounds"] = "5" })).FixRounds);
     }
 
     [Fact]

@@ -1071,6 +1071,7 @@ export function StudioEditor({
                                         application={application}
                                         resourceId={item.id}
                                         draft={draft}
+                                        version={loadedVersion}
                                         selected={widgetPath}
                                         onSelect={setWidgetPath}
                                         onChange={change}
@@ -1093,6 +1094,7 @@ export function StudioEditor({
                                           application={application}
                                           resourceId={item.id}
                                           draft={draft}
+                                          version={loadedVersion}
                                           selected={formPath}
                                           onSelect={setFormPath}
                                           onChange={change}

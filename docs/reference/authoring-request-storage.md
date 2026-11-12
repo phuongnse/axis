@@ -15,6 +15,7 @@ when the author approves, changes the plan or drops it. The agent host writes th
   null), `draft_id` (`uuid`, null), `round` (`integer`) and `tokens` (`bigint`), both 0 at first,
   `auto_accept` (`boolean`, false at first), `sent_at` (`timestamptz`), and `approved_at`,
   `finished_at` and `claimed_until` (`timestamptz`, null), and `refresh_token` (`bytea`, null). The
+  `round` counts the request's moves to `fixing`, its fix rounds, see [fix rounds](authoring-requests.md#budgets). The
   `refresh_token` holds the agent host's refresh token, encrypted with the tenant data key in the
   [sensitive value format](data-encryption.md#sensitive-field-values) and bound to the tenant and the
   request. No route answers it, and a drop, an accept or a failure sets it to null. Indexes on
@@ -29,7 +30,9 @@ when the author approves, changes the plan or drops it. The agent host writes th
   A planning step that wrote no plan has the `outcome` `noPlan`, see
   [planning calls](authoring-requests.md#budgets). A working step that did not finish the change has the
   `outcome` `unfinished`, see [working calls](authoring-requests.md#budgets), and the working step sets
-  `draft_id` once it makes the request's draft. A step stopped by the token budget has the `outcome`
+  `draft_id` once it makes the request's draft. A `fix` step works on that draft, see
+  [fixing](authoring-requests.md#states). It has no `outcome` when it moves the request to `checking`, and
+  the `outcome` `unfinished` otherwise, and it stores no `checks`. A step stopped by the token budget has the `outcome`
   `overBudget`, and one stopped by the time limit has `timedOut`, see [budgets](authoring-requests.md#budgets). `messages` holds the step's model messages as a JSON
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
   A `check` step has the `outcome` `passed`, `failed` or `unfinished`, see
