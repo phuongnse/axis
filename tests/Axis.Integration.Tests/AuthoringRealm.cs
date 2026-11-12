@@ -48,7 +48,6 @@ internal sealed class AuthoringRealm(
     private readonly string _password = Guid.NewGuid().ToString("N");
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
     private Uri _baseAddress = null!;
-    private string _adminToken = null!;
     private string? _userId;
     private string? _schemaConnection;
     private TemporaryFolder? _folder;
@@ -75,7 +74,6 @@ internal sealed class AuthoringRealm(
     public async Task InitializeAsync()
     {
         _baseAddress = await keycloak.BaseAddressAsync();
-        _adminToken = await MasterTokenAsync();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
             .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, ActivationSecret, "users-secret-1", AgentSecret), new Dictionary<string, string>(), CancellationToken);
 
@@ -264,10 +262,11 @@ internal sealed class AuthoringRealm(
         return await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
     }
 
+    // The master realm's tokens last a minute and a test of the agent runs longer, so each admin call takes a fresh token.
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, object? body = null)
     {
         using var request = new HttpRequestMessage(method, new Uri(_baseAddress, path));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _adminToken);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await MasterTokenAsync());
         if (body is not null)
         {
             request.Content = JsonContent.Create(body);
