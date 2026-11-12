@@ -194,7 +194,9 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
  * would give them one colour.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
-  const { colour, type } = designTokensFor(mode, page)
+  const { colour, type, spacing } = designTokensFor(mode, page)
+  // A select's list keeps Ant Design's inset round its options, so its headings and grouped options count from it.
+  const selectListInset = theme.getDesignToken(antThemeFor(mode)).paddingXXS
   return [
     // A message sits 4px under its control. The item keeps its own bottom margin under the message.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
@@ -210,6 +212,13 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     // review on #3263.
     '.ant-dropdown .ant-dropdown-menu { padding-inline: 0; }',
     '.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-list { margin-inline: 0; }',
+    // Proposed: every list with group headings draws them as the sidebar does, the heading at spacing-md from the
+    // list's edge and its items at spacing-lg, and a menu's items stay at spacing-lg with no heading too, see the review
+    // on #3263. A select with no groups keeps its options in line with its field's text.
+    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item { padding-inline: ${spacing.lg}px; }`,
+    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-title { padding-inline: ${spacing.md}px; }`,
+    `.ant-select-dropdown .ant-select-item-group { padding-inline: ${spacing.md - selectListInset}px; font-size: ${type.fontSize}px; color: ${colour.textMuted}; }`,
+    `.ant-select-dropdown .ant-select-item-option-grouped { padding-inline-start: ${spacing.lg - selectListInset}px; }`,
   ].join('\n')
 }
 

@@ -256,10 +256,10 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     {
-      // Proposed: the account menu holds the legal line, as a page with a sidebar has no footer.
+      // Proposed: the account menu's items sit where a grouped menu's items do, see the review on #3263.
       caption: 'Account menu',
       draw: () => (
-        <ClickOnMount selector='[data-testid="user-menu"]'>
+        <ClickOnMount selector="button:has(.ant-avatar)">
           <ShellPreview />
         </ClickOnMount>
       ),
