@@ -17,7 +17,7 @@ const changeCase = {
   request: 'Add a cost centre to every request.',
   outcome: { kind: 'change', scenarios: ['AmountIsFrozenAfterSubmit'], unchanged: ['roles/admin.json'] },
 }
-const tokens = { input: 1200, output: 340 }
+const tokens = 1540
 
 const draftRelaxing = (...points) => ({
   application: { modules: [{ id: 'approvals', relax: points.map((point) => ({ point })) }] },

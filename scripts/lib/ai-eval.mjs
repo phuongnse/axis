@@ -1,9 +1,10 @@
 // Judges the cases of the authoring eval and writes its report, see docs/reference/model-bindings.md#the-authoring-eval.
 //
 // A TESTCASE is a case file's JSON plus `name`, the file name without .json. A RUN is what the eval saw for that case:
-//   { accepted: [{ application, scenarios: [{ name, outcome }], changed: ['roles/admin.json'] }], tokens: { input, output }, durationMs }
-// where `accepted` lists the accepted drafts in order, `application` is the draft's application.json and `changed` names the
-// resources that differ from the starting application. A case that was not run has no RUN.
+//   { accepted: [{ application, scenarios: [{ name, outcome }], changed: ['roles/admin.json'] }], tokens, durationMs }
+// where `tokens` is the request's token count, a number, `accepted` lists the accepted drafts in order, `application` is
+// the draft's application.json and `changed` names the resources that differ from the starting application. A case that was
+// not run has no RUN.
 import { mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
