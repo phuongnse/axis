@@ -113,8 +113,6 @@ internal sealed class AuthoringRealm(
 
         _folder?.Dispose();
 
-        // A test that runs the checks can outlast the master realm's 60-second token, so the delete takes a fresh one.
-        _adminToken = await MasterTokenAsync();
         using var response = await SendAsync(HttpMethod.Delete, $"admin/realms/{_realm}");
         Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound);
         _http.Dispose();
