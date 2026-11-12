@@ -98,6 +98,7 @@ if [ "$run_rest" = 1 ]; then
   node --test scripts/load-cell.test.mjs || status=1
   node --test scripts/load-cell-tenants.test.mjs || status=1
   node --test scripts/load-workflow.test.mjs || status=1
+  node --test scripts/ci-workflow.test.mjs || status=1
   node --test scripts/smoke.test.mjs || status=1
   node --test scripts/install-modules.test.mjs || status=1
   node --test scripts/compose-status.test.mjs || status=1

@@ -175,7 +175,10 @@ that holds it.
 - **CI's jobs come from [NexKit's checks](#nexkits-checks):** each check, or `group` of checks, in
   `.nexkit/config.json` is one parallel job, and a sharded check is one job per shard, named
   `<name>-k`, as many as its count prints. Each job runs its commands with the check's timeout and
-  uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
+  uploads its `results` folders as the artifact `test-results-<name>`. GitHub's artifact service fails
+  at times, so a failed upload does not fail a job whose checks passed: the checks alone decide the
+  job's result, and that job's results are then missing from NexKit's evidence and from the shard
+  durations. A run takes as long as its
   slowest job, and adding, removing or resharding a check changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
   no model refreshes the durations from the results of that run and the latest runs dispatched on `main`
