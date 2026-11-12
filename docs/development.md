@@ -478,15 +478,23 @@ Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run wri
 | `e2e-purchasing.log`     | The purchasing system stub |
 | `e2e-controlplane.log`   | The E2E control plane      |
 
-`scripts/test-report.mjs` then prints a summary per suite and the failed tests with their
-`file:line`. On GitHub Actions the summary goes to the job summary, and each failed test becomes an
-error annotation. The failed tests are also listed at the end of the job log, with each message cut to
-20 lines.
+`scripts/test-report.mjs` then writes the test summary for the job. When every suite passed, the summary
+starts with one line. It gives the tests passed, the total time and the suites skipped as not affected by
+the change. The per-suite table sits in a collapsed block below that line.
+
+When a suite has failed tests or wrote no results file, the failed tests come first, each with its
+`file:line`. The per-suite table follows them and stays open.
+
+Every summary ends with a collapsed list of the job's five slowest test cases. It gives each case's name,
+suite and time from its JUnit file. On GitHub Actions the summary goes to the job summary, and each failed
+test becomes an error annotation. The failed tests are also listed at the end of the job log, with each
+message cut to 20 lines.
 
 The Duration column shows how long the suite's command ran, as `run_suite` measures it. A suite that no
 command of its own runs, such as `scenarios-<application name>` and the control plane integration suite,
 shows the time in its JUnit file instead. Vitest's JUnit file adds up its files' times across parallel
-workers, so the Vitest rows are measured too.
+workers, so the Vitest rows are measured too. The total time adds up the measured times. A suite without
+one is left out. When no suite has a measured time, the total adds up the JUnit times instead.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
