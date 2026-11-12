@@ -190,14 +190,21 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
     }
 
     // The client reaches the server of the factory through a handler that records the tools it calls. A test that stops a request in fixing and asserts
-    // its exact steps leaves out the fix step, so the host does not claim the request again.
+    // its exact steps leaves out the fix step, so the host does not claim the request again. A test may leave out other steps by the name of their class.
     internal static WebApplication BuildAgent(
         AuthoringRealm realm,
         ScriptedModelAdapter script,
         RecordingHandler server,
         IReadOnlyDictionary<string, string?>? settings = null,
-        bool fixing = true)
+        bool fixing = true,
+        IReadOnlyCollection<string>? without = null)
     {
+        List<string> left = [.. without ?? []];
+        if (!fixing)
+        {
+            left.Add("FixingStep");
+        }
+
         var values = realm.AgentSettings();
         foreach (var (name, value) in settings ?? new Dictionary<string, string?>())
         {
@@ -213,9 +220,9 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
                 services.AddSingleton(_options);
                 services.AddSingleton(script);
                 services.AddHttpClient(AuthorMcpClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => server);
-                if (!fixing)
+                foreach (var step in left)
                 {
-                    services.Remove(services.Single(service => service.ServiceType == typeof(IAuthoringStep) && service.ImplementationType?.Name == "FixingStep"));
+                    services.Remove(services.Single(service => service.ServiceType == typeof(IAuthoringStep) && service.ImplementationType?.Name == step));
                 }
             });
     }

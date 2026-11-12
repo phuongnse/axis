@@ -38,7 +38,7 @@ public sealed record AuthoringRequestToWork(
 public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
 {
     /// <summary>The states of a request that need work, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
-    public static readonly IReadOnlyList<string> StatesNeedingWork = ["planning", "working", "checking", "reviewing", "fixing"];
+    public static readonly IReadOnlyList<string> StatesNeedingWork = ["planning", "working", "checking", "reviewing", "fixing", "ready"];
 
     /// <summary>Every state of a request, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
     public static readonly IReadOnlyList<string> States =
@@ -61,9 +61,23 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
               ORDER BY r.ordinal DESC LIMIT 1)
         """;
 
+    // The condition under which a request of one of the states needs work. A ready request needs it only when it asked for auto-accept, has a draft and no
+    // accept step has finished since its newest review: an accept that was interrupted does not count. The application's auto-accept is left to accept_draft.
+    private static string NeedsWork(string alias) =>
+        $"""
+        {alias}.state = ANY(@states)
+          AND ({alias}.state <> 'ready'
+               OR ({alias}.auto_accept AND {alias}.draft_id IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM axis.authoring_request_steps s
+                                   WHERE s.request_id = {alias}.id AND s.kind = 'accept' AND s.finished_at IS NOT NULL
+                                     AND s.outcome IS DISTINCT FROM 'interrupted'
+                                     AND s.ordinal > coalesce((SELECT max(v.ordinal) FROM axis.authoring_request_steps v
+                                                               WHERE v.request_id = {alias}.id AND v.kind = 'review'), 0))))
+        """;
+
     private readonly ConcurrentDictionary<string, bool> _checked = new(StringComparer.Ordinal);
 
-    /// <summary>Lists the requests of the tenant in a state that needs work, oldest first.</summary>
+    /// <summary>Lists the requests of the tenant that need work, oldest first. A <c>ready</c> request needs work only under the rule of <see cref="ClaimAsync"/>.</summary>
     /// <exception cref="InvalidOperationException">The tenant is not configured, or its role fails the runtime role check. The message names the tenant and the role.</exception>
     public async Task<IReadOnlyList<AuthoringRequestToWork>> ListNeedingWorkAsync(string tenantId, CancellationToken cancellationToken = default)
     {
@@ -72,7 +86,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             $"""
             SELECT {RequestColumns}
             FROM axis.authoring_requests a
-            WHERE a.state = ANY(@states)
+            WHERE {NeedsWork("a")}
             ORDER BY a.sent_at, a.id
             """,
             connection);
@@ -88,8 +102,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     }
 
     /// <summary>
-    /// Claims the oldest request of the tenant that is in one of the states and has no claim or a lapsed one. It sets <c>claimed_by</c> and
-    /// <c>claimed_until</c>, and answers <c>null</c> when no request qualifies.
+    /// Claims the oldest request of the tenant that is in one of the states and has no claim or a lapsed one. A <c>ready</c> request qualifies only when it asked for
+    /// auto-accept, has a draft and no <c>accept</c> step has finished since its newest <c>review</c> step, see <c>docs/reference/authoring-requests.md#durable-requests</c>. An <c>accept</c> step
+    /// that was interrupted does not count. It sets <c>claimed_by</c> and <c>claimed_until</c>, and answers <c>null</c> when no request qualifies.
     /// </summary>
     /// <exception cref="InvalidOperationException">The tenant is not configured, or its role fails the runtime role check.</exception>
     public async Task<AuthoringRequestToWork?> ClaimAsync(string tenantId, IReadOnlyCollection<string> states, string claimedBy, TimeSpan lease, CancellationToken cancellationToken = default)
@@ -103,7 +118,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             $"""
             WITH next AS (
               SELECT r.id FROM axis.authoring_requests r
-              WHERE r.state = ANY(@states) AND (r.claimed_until IS NULL OR r.claimed_until < clock_timestamp())
+              WHERE {NeedsWork("r")} AND (r.claimed_until IS NULL OR r.claimed_until < clock_timestamp())
               ORDER BY r.sent_at, r.id LIMIT 1
               FOR UPDATE SKIP LOCKED)
             UPDATE axis.authoring_requests a
@@ -278,8 +293,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
 
     /// <summary>
     /// Commits a finished step with the request's next state in one transaction. The commit frees the request, so a later claim runs the
-    /// next step. A move to <c>fixing</c> adds 1 to the request's <c>round</c>. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token. It
-    /// answers <c>false</c> and writes nothing when the host no longer holds the claim.
+    /// next step. A move to <c>fixing</c> adds 1 to the request's <c>round</c>. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token.
+    /// With <paramref name="dropDraft"/> it clears the request's <c>draft_id</c> in the same commit. It answers <c>false</c> and writes nothing when the host no longer holds the claim,
+    /// and also when the request is <c>accepted</c> and the next state is not: no step moves an accepted request.
     /// </summary>
     public async Task<bool> FinishStepAsync(
         string tenantId,
@@ -292,6 +308,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string? plan,
         string? messages,
         string? checks,
+        bool dropDraft = false,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
@@ -300,18 +317,20 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             """
             UPDATE axis.authoring_requests
             SET state = @next,
+                draft_id = CASE WHEN @dropDraft THEN NULL ELSE draft_id END,
                 plan = coalesce(@plan, plan),
                 round = CASE WHEN @next = 'fixing' THEN round + 1 ELSE round END,
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
                 refresh_token = CASE WHEN @next IN ('accepted', 'dropped', 'failed') THEN NULL ELSE refresh_token END,
                 claimed_by = NULL,
                 claimed_until = NULL
-            WHERE id = @id AND claimed_by = @me
+            WHERE id = @id AND claimed_by = @me AND (state <> 'accepted' OR @next = 'accepted')
             """,
             connection,
             transaction))
         {
             command.Parameters.AddWithValue("next", nextState);
+            command.Parameters.AddWithValue("dropDraft", dropDraft);
             command.Parameters.Add(new NpgsqlParameter("plan", NpgsqlDbType.Text) { Value = (object?)plan ?? DBNull.Value });
             command.Parameters.AddWithValue("id", requestId);
             command.Parameters.AddWithValue("me", claimedBy);

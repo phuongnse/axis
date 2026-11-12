@@ -5,9 +5,11 @@ using Axis.Configuration.Tests;
 using Axis.Processes.Storage;
 using Axis.Server.Studio;
 using Axis.Studio;
+using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -32,6 +34,7 @@ public sealed class McpAcceptDraftTests(KeycloakFixture keycloak, PostgreSqlFixt
     private string? _token;
     private string? _session;
     private string? _subject;
+    private string? _platform;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -125,11 +128,33 @@ public sealed class McpAcceptDraftTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(1L, await AuditCountAsync(draft));
     }
 
+    [Fact]
+    public async Task A_call_with_the_request_reads_the_accept_after_the_publisher_has_removed_the_draft_and_an_id_of_another_draft_is_unknown()
+    {
+        var (draft, _) = await SeedReadyRequestAsync();
+        var accept = (await CallAsync("accept_draft", Arguments(("draft", draft)))).Output!["request"]!.GetValue<string>();
+        await SetAsync($"UPDATE axis.publish_requests SET status = 'succeeded' WHERE id = '{accept}'");
+        var writeLock = new PlatformStudioWriteLock(NpgsqlDataSource.Create(_platform!), NullLogger<PlatformStudioWriteLock>.Instance);
+        Assert.Null((await StudioDrafts.For(_revisions, Folder, _subject!, "Author", writeLock)!.DropAsync(draft, CancellationToken)).Refusal);
+
+        // The draft is gone, as a successful accept leaves it, and the accept is still read.
+        var read = await CallAsync("accept_draft", Arguments(("draft", draft), ("request", accept)));
+        Assert.False(read.IsError, read.Error);
+        Assert.Equal(accept, read.Output!["request"]!.GetValue<string>());
+        Assert.Equal("succeeded", read.Output["status"]!.GetValue<string>());
+
+        // Without the request the call still needs the draft, and a request of another draft is unknown.
+        Assert.Equal(StudioRevisionEndpoints.NoDraft, (await CallAsync("accept_draft", Arguments(("draft", draft)))).Error);
+        var other = Guid.NewGuid().ToString("D");
+        Assert.Equal(StudioPublishEndpoints.NoRequest, (await CallAsync("accept_draft", Arguments(("draft", other), ("request", accept)))).Error);
+        Assert.Equal(StudioRevisionEndpoints.NoDraft, (await CallAsync("accept_draft", Arguments(("draft", "not-a-draft"), ("request", accept)))).Error);
+    }
+
     public async ValueTask InitializeAsync()
     {
         var authority = await keycloak.StartAsync();
         StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), Folder);
-        var platform = await database.CreateDatabaseAsync("mcp_accept_draft", CancellationToken);
+        var platform = _platform = await database.CreateDatabaseAsync("mcp_accept_draft", CancellationToken);
         await using (var connection = new NpgsqlConnection(database.ConnectionString))
         {
             await connection.OpenAsync(CancellationToken);

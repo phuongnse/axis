@@ -43,3 +43,8 @@ when the author approves, changes the plan or drops it. The publisher moves a `r
   A `review` step has the `outcome` `passed`, `findings` or `unfinished`, see [reviewing](authoring-requests.md#states) and
   [review calls](authoring-requests.md#budgets), and its `checks` holds `{ review: { outcome, findings } }`: the `outcome` is `passed` or
   `findings`, and `findings` is the text of the review, null when it passed. A review that is `unfinished` stores no `checks`.
+  An `accept` step has the `outcome` `accepted`, `refused`, `conflict` or `notAccepted`, see
+  [accepting by the agent](authoring-requests.md#states) and [accepting time](authoring-requests.md#budgets), and it stores
+  no `checks`. A `conflict` clears the request's `draft_id` in the commit that moves it to `working`. The publisher
+  keeps `claimed_by` and `claimed_until` when it moves a request to `accepted`, so the host's own commit of its `accept`
+  step finds its claim, and a step never moves an `accepted` request.
