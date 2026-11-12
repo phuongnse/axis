@@ -20,7 +20,7 @@ namespace Axis.Server.Mcp;
 /// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
 /// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The tools are
 /// <c>list_applications</c>, <c>read_reference</c> of <see cref="McpReference"/>, the read tools of <see cref="McpReadTools"/> and the
-/// tools of <see cref="McpWriteTools"/> that change a draft, check an expression, validate a draft, diff a draft and run its scenarios. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// tools of <see cref="McpWriteTools"/> that change a draft, check an expression, validate a draft, diff a draft, run its scenarios and accept it. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
 /// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
@@ -55,6 +55,7 @@ internal static partial class McpServer
     private const string ValidateDraftTool = "validate_draft";
     private const string DiffDraftTool = "diff_draft";
     private const string RunScenariosTool = "run_scenarios";
+    private const string AcceptDraftTool = "accept_draft";
     private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
 
@@ -81,6 +82,8 @@ internal static partial class McpServer
         "array");
     private static readonly ToolProperty _requestInput = new(
         "request", "The id of a request this tool answered for the same draft. Leave it out to start a new run.", false);
+    private static readonly ToolProperty _acceptRequestInput = new(
+        "request", "The id of an accept this tool answered for the same draft. Leave it out to ask for the accept.", false);
     private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
     private static readonly ToolProperty _layerContentInput = new(
         "content", "The edited module resource whole, a JSON object, as read_module_resource answers its content.", true, "object");
@@ -150,6 +153,12 @@ internal static partial class McpServer
             "Runs the scenarios of your draft through the publisher. Without request it starts a run and answers its request id at once. "
             + "With request it answers that run's status, diagnostics and scenario results. The working folder is not used.",
             [_applicationInput, _writeDraftInput, _namesInput, _requestInput]),
+        new(
+            AcceptDraftTool,
+            "Asks the publisher to move your draft into the working folder. It does so only when the application allows auto-accept, "
+            + "the authoring request of the draft asked for it and its last checks and review passed. Without request it answers the accept it queued, "
+            + "or the one already queued or running for the draft. With request it answers that accept's status and diagnostics. Nothing goes live.",
+            [_applicationInput, _writeDraftInput, _acceptRequestInput]),
     ];
 
     /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
@@ -412,6 +421,12 @@ internal static partial class McpServer
                 arguments[_writeDraftInput.Name],
                 arguments.TryGetValue(_namesInput.Name, out var names) ? names : null,
                 arguments.TryGetValue(_requestInput.Name, out var request) ? request : null,
+                ct),
+            AcceptDraftTool => await McpWriteTools.AcceptDraftAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments.TryGetValue(_acceptRequestInput.Name, out var accept) ? accept : null,
                 ct),
             _ => throw new InvalidOperationException("The tool has no implementation."),
         };

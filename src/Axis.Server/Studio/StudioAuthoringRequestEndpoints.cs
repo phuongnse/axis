@@ -388,17 +388,7 @@ internal static class StudioAuthoringRequestEndpoints
         NpgsqlTransaction transaction,
         CancellationToken cancellationToken)
     {
-        bool pending;
-        await using (var check = new NpgsqlCommand(
-            "SELECT EXISTS (SELECT 1 FROM axis.publish_requests WHERE kind = 'accept' AND draft_id = @draft AND status IN ('queued', 'running'))",
-            connection,
-            transaction))
-        {
-            check.Parameters.AddWithValue("draft", draftId);
-            pending = (bool)(await check.ExecuteScalarAsync(cancellationToken))!;
-        }
-
-        if (pending)
+        if (await FindPendingAcceptAsync(connection, transaction, draftId, cancellationToken) is not null)
         {
             await transaction.RollbackAsync(cancellationToken);
             return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The draft already has an accept that has not finished.");
@@ -412,6 +402,18 @@ internal static class StudioAuthoringRequestEndpoints
 
         var response = await StudioPublishEndpoints.ReadResponseAsync(connection, applicationId, id, name, cancellationToken);
         return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
+    }
+
+    /// <summary>The accept of the draft that is queued or running, or null. The route and <c>accept_draft</c> both queue only when there is none.</summary>
+    internal static async Task<Guid?> FindPendingAcceptAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var check = new NpgsqlCommand(
+            "SELECT id FROM axis.publish_requests WHERE kind = 'accept' AND draft_id = @draft AND status IN ('queued', 'running') LIMIT 1",
+            connection,
+            transaction);
+        check.Parameters.AddWithValue("draft", draftId);
+        return await check.ExecuteScalarAsync(cancellationToken) as Guid?;
     }
 
     private static async Task ExecuteAsync(
