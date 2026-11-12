@@ -194,7 +194,7 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
  * would give them one colour.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
-  const { colour, type, spacing } = designTokensFor(mode, page)
+  const { colour, type, spacing, size } = designTokensFor(mode, page)
   // A select's list keeps Ant Design's inset round its options, so its headings and grouped options count from it.
   const selectListInset = theme.getDesignToken(antThemeFor(mode)).paddingXXS
   return [
@@ -211,6 +211,8 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     // Proposed: a dropdown menu keeps its space above and below its items, and its items span its width, see the
     // review on #3263.
     '.ant-dropdown .ant-dropdown-menu { padding-inline: 0; }',
+    // Proposed: every dropdown menu is at least `menu` wide, see the review on #3263.
+    `.ant-dropdown .ant-dropdown-menu { min-width: ${size.menu}px; }`,
     '.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-list { margin-inline: 0; }',
     // Proposed: every list with group headings draws them as the sidebar does, the heading at spacing-md from the
     // list's edge and its items at spacing-lg, and a menu's items stay at spacing-lg with no heading too, see the review
