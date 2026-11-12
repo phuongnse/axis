@@ -78,6 +78,28 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
         var drafts = StudioDrafts.For(_revisions, stepApp, subject, subject, factory.Services.GetRequiredService<IStudioWriteLock>())!;
         var draft = (await drafts.CreateAsync(
             StudioRevisions.For(_revisions, stepApp, subject, subject, NullLogger<StudioRevisions>.Instance)!, CancellationToken)).Value!.Id;
+
+        // The draft's authoring request is ready and asked for auto-accept, the application allows it, and its last check and review passed,
+        // so accept_draft queues an accept instead of refusing.
+        var authoringRequest = Guid.NewGuid();
+        await fixture.ExecuteAsync(
+            TaskApiFixture.TenantA,
+            "INSERT INTO axis.application_settings (application_id, auto_accept) VALUES (@application, true)",
+            ("application", Guid.Parse(StepAppManifestId())));
+        await fixture.ExecuteAsync(
+            TaskApiFixture.TenantA,
+            "INSERT INTO axis.authoring_requests (id, application_id, author, text, state, draft_id, auto_accept) VALUES (@id, @application, @author, 'Add a field.', 'ready', @draft, true)",
+            ("id", authoringRequest),
+            ("application", Guid.Parse(StepAppManifestId())),
+            ("author", subject),
+            ("draft", Guid.Parse(draft)));
+        await fixture.ExecuteAsync(
+            TaskApiFixture.TenantA,
+            "INSERT INTO axis.authoring_request_steps (id, request_id, ordinal, kind, outcome) VALUES (@check, @id, 1, 'check', 'passed'), (@review, @id, 2, 'review', 'passed')",
+            ("check", Guid.NewGuid()),
+            ("review", Guid.NewGuid()),
+            ("id", authoringRequest));
+
         var written = new JsonObject
         {
             ["id"] = Guid.NewGuid().ToString("D"),
@@ -127,6 +149,7 @@ public sealed class McpToolOutputTests(KeycloakFixture keycloak, TaskApiFixture 
                 ["validate_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
                 ["diff_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
                 ["run_scenarios"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
+                ["accept_draft"] = $$"""{"application":"StepApp","draft":"{{draft}}"}""",
             },
             (tool, arguments) => SendAsync(McpTestCalls.ToolCall(tool, arguments)),
             [TaskApiFixture.RequestTitle(record), secret, url, KeycloakFixture.ClientSecret],
