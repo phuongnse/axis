@@ -12,7 +12,7 @@ const start = { from: 'application', name: 'approvals' }
 const changeCase = {
   start,
   request: 'Add a cost centre to every request.',
-  outcome: { kind: 'change', scenarios: ['AmountIsFrozenAfterSubmit'], unchanged: ['contracts/request.json'] },
+  outcome: { kind: 'change', scenarios: ['AmountIsFrozenAfterSubmit'], unchanged: ['roles/admin.json'] },
 }
 const refusalCase = {
   start,

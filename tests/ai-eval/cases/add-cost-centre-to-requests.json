@@ -5,6 +5,6 @@
   "outcome": {
     "kind": "change",
     "scenarios": ["RequestGoesToManagerThenNamedEmployee", "AmountIsFrozenAfterSubmit"],
-    "unchanged": ["contracts/request.json"]
+    "unchanged": ["roles/admin.json"]
   }
 }
