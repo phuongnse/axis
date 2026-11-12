@@ -159,7 +159,8 @@
         "~/.cache/axis-docker"
       ],
       "key_files": [
-        "Dockerfile"
+        "Dockerfile",
+        "scripts/docker-images.json"
       ]
     }
   ],
