@@ -2,15 +2,16 @@
 // once, before the images and onprem suites, and `remove <version>` when it exits. The suites call smokeImages.
 // The PostgreSQL tools layer of axis-admin comes from the admin-tools stage, which the build saves with its base
 // image in admin-tools-<hash>.tar in the cache folder and loads in a later run, see docs/development.md#smoke-tests.
-// AXIS_DOCKER_CACHE_DIR sets the folder, which is ~/.cache/axis-docker by default.
+// The base image is pulled only when Docker lacks it: scripts/lib/docker-images.mjs loads the saved images first, see
+// docs/development.md#setup. AXIS_DOCKER_CACHE_DIR sets the folder, which is ~/.cache/axis-docker by default.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
-import { homedir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildImage, runDocker } from './docker-build.mjs'
+import { cacheDirectory, present } from './docker-images.mjs'
 import { productionTargets, stageText } from './images.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -18,7 +19,7 @@ const toolsStage = 'admin-tools'
 
 // Builds the production images, with axis-admin on the admin-tools layer that an earlier run saved when its stage
 // text is unchanged. A saved file that does not load is deleted and the layer is built again.
-export async function buildSmokeImages(version, { dir = process.env.AXIS_DOCKER_CACHE_DIR ?? path.join(homedir(), '.cache/axis-docker') } = {}) {
+export async function buildSmokeImages(version, { dir = cacheDirectory() } = {}) {
   const text = stageText(root, toolsStage)
   const base = text.split('\n')[0].match(/^FROM\s+(\S+)/i)[1]
   const hash = createHash('sha256').update(text).digest('hex').slice(0, 12)
@@ -36,7 +37,7 @@ export async function buildSmokeImages(version, { dir = process.env.AXIS_DOCKER_
     }
   }
   if (!loaded) {
-    await runDocker(['pull', base])
+    if (!present(base)) await runDocker(['pull', base])
     await buildImage({ target: toolsStage, tag, buildArgs: ['BUILDKIT_INLINE_CACHE=1'] })
     mkdirSync(dir, { recursive: true })
     for (const old of readdirSync(dir)) {

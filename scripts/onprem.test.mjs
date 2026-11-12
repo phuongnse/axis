@@ -35,6 +35,7 @@ import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
+import { listedImage } from './lib/docker-images.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -836,7 +837,7 @@ describe('the on-premises installation', () => {
         JSON.stringify({
           services: {
             postgres: {
-              image: 'postgres:18-alpine',
+              image: listedImage(root, 'postgres'),
               environment: { POSTGRES_USER: 'postgres', POSTGRES_PASSWORD: passwords.postgres },
               entrypoint: ['sh', '-c', postgresTlsScript],
               volumes: [

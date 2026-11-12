@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { listedImage } from './lib/docker-images.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -81,7 +82,7 @@ before(
       `${join(root, 'samples/postgres/init-roles.sql')}:/docker-entrypoint-initdb.d/init-roles.sql:ro`,
       '-v',
       `${certificates.serverDir}:${serverCertificateMount}:ro`,
-      'postgres:18-alpine',
+      listedImage(root, 'postgres'),
       '-c',
       postgresTlsScript,
     ])

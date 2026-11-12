@@ -19,6 +19,7 @@ ${log('docker')}case "$1" in
   run) echo stub-container ;;
   port) case "$3" in 1025/tcp) echo 127.0.0.1:41025 ;; 8025/tcp) echo 127.0.0.1:48025 ;; *) echo 127.0.0.1:5432 ;; esac ;;
   inspect) echo true ;;
+  image) [ -z "$STUB_IMAGES_MISSING" ] || exit 1 ;;
 esac
 exit 0
 `,
@@ -59,6 +60,9 @@ function runE2e(shard, args = [], extraEnv = {}) {
       'scripts/lib/e2e-shard.mjs',
       'scripts/lib/shards.mjs',
       'scripts/test-report.mjs',
+      'scripts/lib/docker-images.mjs',
+      'scripts/lib/docker-build.mjs',
+      'scripts/docker-images.json',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
@@ -132,6 +136,40 @@ const playwrightCall = (run) => {
 }
 
 const smokeSuites = ['compose', 'images', 'onprem']
+
+describe('scripts/e2e.sh loads the saved container images', () => {
+  test('loads the archive before the first container starts and pulls no image', () => {
+    const cache = mkdtempSync(join(tmpdir(), 'axis-e2e-cache-'))
+    try {
+      writeFileSync(join(cache, 'images.tar'), 'archive')
+      writeFileSync(join(cache, 'images.json'), '["postgres:18-alpine"]')
+      const run = runE2e(undefined, [], { AXIS_DOCKER_CACHE_DIR: cache, STUB_IMAGES_MISSING: '1' })
+
+      assert.equal(run.status, 0, run.stdout + run.stderr)
+      const load = run.calls.indexOf(`docker load -i ${join(cache, 'images.tar')}`)
+      const first = run.calls.findIndex((call) => call.startsWith('docker run '))
+      assert.ok(load >= 0, run.calls.join('\n'))
+      assert.ok(first > load, run.calls.join('\n'))
+      assert.ok(!run.calls.some((call) => call.startsWith('docker pull ')), run.calls.join('\n'))
+    } finally {
+      rmSync(cache, { recursive: true, force: true })
+    }
+  })
+
+  test('loads nothing when Docker holds every saved image', () => {
+    const cache = mkdtempSync(join(tmpdir(), 'axis-e2e-cache-'))
+    try {
+      writeFileSync(join(cache, 'images.tar'), 'archive')
+      writeFileSync(join(cache, 'images.json'), '["postgres:18-alpine"]')
+      const run = runE2e(undefined, [], { AXIS_DOCKER_CACHE_DIR: cache })
+
+      assert.equal(run.status, 0, run.stdout + run.stderr)
+      assert.ok(!run.calls.some((call) => call.startsWith('docker load ')), run.calls.join('\n'))
+    } finally {
+      rmSync(cache, { recursive: true, force: true })
+    }
+  })
+})
 
 describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD', () => {
   test('a shard runs the specs that the split by duration gives it, and no smoke test', () => {

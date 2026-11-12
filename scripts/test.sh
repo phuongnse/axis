@@ -64,7 +64,7 @@ if [ "$run_vitest" = 1 ]; then
 fi
 
 # The report, smoke test selection, link check, docs structure check and its rules, bundle budget check,
-# font check, licence writer, design-system bundle check, dependency scan, SPA lock file, image scan, the scans' code owners, setup retries, image build retries, E2E, integration, smoke and test shard
+# font check, licence writer, design-system bundle check, dependency scan, SPA lock file, image scan, the scans' code owners, setup retries, saved container images, image build retries, E2E, integration, smoke and test shard
 # splits, the shard durations refresh, NexKit's sharded checks, the test script's shards, load script, load test workflow, load objectives, cell load scenarios, cell load script, cell load tenants, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, contrast helper, Compose status
 # helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests.
 if [ "$run_rest" = 1 ]; then
@@ -105,6 +105,7 @@ if [ "$run_rest" = 1 ]; then
   node --test scripts/dev-stop.test.mjs || status=1
   node --test scripts/development-realm.test.mjs || status=1
   node --test scripts/docker-build.test.mjs || status=1
+  node --test scripts/docker-images.test.mjs || status=1
   node --test tests/e2e/folder-comparison.test.ts || status=1
   node --test tests/e2e/hang-guard.test.ts || status=1
   node --test tests/e2e/dialogs.test.ts || status=1

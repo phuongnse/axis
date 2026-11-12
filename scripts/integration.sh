@@ -2,6 +2,9 @@
 # Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
 # The integration tests also run the test scenarios of every application under samples/apps/.
 # The Keycloak theme is built first, because the tests' Keycloak loads it.
+# Before that, scripts/lib/docker-images.mjs loads the container images that setup saved in ~/.cache/axis-docker, so the
+# tests pull none that the cache holds, see docs/development.md#integration-tests. Testcontainers' cleanup helper is
+# pinned here, because it is one of those images.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
 # in the `unaffected_by` lists of .nexkit/config.json, which scripts/lib/affected.mjs reads. The smoke
@@ -26,6 +29,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
+
+export TESTCONTAINERS_RYUK_CONTAINER_IMAGE=testcontainers/ryuk:0.14.0
 
 # A shard runs its own classes; without one, every class but the performance tests runs.
 filter=(--filter-not-class '*PerformanceTests')
@@ -73,6 +78,7 @@ fi
 build_theme() { npm run build:keycloak-theme --prefix web; }
 
 if [ "$#" -gt 0 ]; then
+  node scripts/lib/docker-images.mjs load
   build_theme
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "$@"
@@ -80,6 +86,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 if affected integration; then
+  node scripts/lib/docker-images.mjs load
   build_theme
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   if [ "$control_plane" = true ]; then

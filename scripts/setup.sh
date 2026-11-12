@@ -21,3 +21,7 @@ retry 4 limit npm ci --prefix web
 retry 4 limit npm ci --prefix tests/e2e
 retry 4 limit npx --prefix tests/e2e playwright install chromium
 install_tools
+# On CI, keeps every container image of the integration, E2E and smoke checks in the cache folder, see docs/development.md#setup.
+if [[ "${CI:-}" == "true" ]]; then
+  node scripts/lib/docker-images.mjs save
+fi

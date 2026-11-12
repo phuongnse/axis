@@ -13,7 +13,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 
 | Script                          | What it does                                                                                                                                                      | Needs           |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser and the pinned Helm tools                                                                                  | Network         |
+| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools and, on CI, the container images                                                    | Network         |
 | `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` |                 |
 | `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                 |
 | `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                |                 |
@@ -38,6 +38,15 @@ with waits of 15, 30 and 60 seconds, so a short `403` is retried. A try of a res
 after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A download gives up after 30
 seconds without a connection or 5 minutes. A service that does not answer fails its try in time for the
 next. See [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md).
+
+On CI, setup also keeps every container image that the integration, E2E and smoke checks pull, the ones listed in
+`scripts/docker-images.json`, in one archive in `~/.cache/axis-docker`, which NexKit's `docker` cache entry restores, as
+[D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
+agrees. One archive stores each layer that images share once. Setup pulls only the images the archive lacks and saves
+the whole set again, so every job leaves the full set in the folder. Each try of a pull has the same time limit as
+a restore step, so a registry that stalls fails the try and the next one starts, while the write of the archive has
+none. An image that still fails to pull is left out with a warning, and the job goes on: the suite that needs it pulls it itself. A test fails when a fixture, a Compose
+file, the `Dockerfile` or a test script names an image that the list lacks.
 
 ### Build
 
@@ -138,7 +147,7 @@ jsdom matches every rule on each query. A test that checks a style calls `withAn
 
 ### Integration tests
 
-`scripts/integration.sh` builds the Keycloak theme, then runs the .NET tests against real PostgreSQL
+`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme, then runs the .NET tests against real PostgreSQL
 and Keycloak through Testcontainers. They also run the test scenarios of every application under
 `samples/apps/` on that PostgreSQL, and the control plane's `Axis.ControlPlane.Integration.Tests`.
 The performance tests, whose class names end in `PerformanceTests`, stay out: `scripts/performance.sh`
@@ -154,7 +163,7 @@ runs them.
 
 ### End-to-end tests
 
-`scripts/e2e.sh` builds the Keycloak theme, then starts the stack that Playwright runs against, and
+`scripts/e2e.sh` loads the [saved images](#setup), builds the Keycloak theme, then starts the stack that Playwright runs against, and
 runs Playwright in Chromium. It:
 
 - starts PostgreSQL, Keycloak, the built purchasing system stub, the server, the worker and the
@@ -188,7 +197,7 @@ in [Testing](testing.md).
 ### Smoke tests
 
 `scripts/smoke.sh` runs four smoke tests. It first installs the built-in and sample modules in
-`artifacts/modules`, for the `onprem` test.
+`artifacts/modules`, for the `onprem` test, and then loads the [saved images](#setup).
 
 | Test         | What it does                                                          |
 | ------------ | --------------------------------------------------------------------- |
@@ -205,9 +214,10 @@ agent host. The test removes the Compose project at the end.
 and removes them when it exits. A change that skips both tests builds nothing. The PostgreSQL tools layer of
 `axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
 image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
-comments, and loads the file in a later run, so the run does not download the packages again. NexKit's `docker`
-cache entry restores the folder, and CI on `main` saves it. The layer is built again when the stage changes,
-when the `Dockerfile` changes, or when GitHub drops the cache after 7 days without use. The saved layer can be
+comments, and loads the file in a later run, so the run does not download the packages again, and pulls the base
+image only when Docker lacks it. NexKit's `docker` cache entry restores the folder, and CI on `main` saves it. The
+layer is built again when the stage changes, when the entry's key changes, or when GitHub drops the cache after 7 days
+without use. The saved layer can be
 weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
 The [image scan](#workflows-outside-nexkits-checks) never uses the saved layer: it builds from scratch and sees
 each new package release.
@@ -491,7 +501,7 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 
 | Cause                                      | Guard                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| An outside download or service             | NexKit's caches hold the NuGet and npm packages, the Playwright browser, the tools and the smoke tests' Docker image files, so a run downloads only what they miss. `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again. Each try of setup's steps has a time limit, see [setup](#setup), as [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) says                                                                                                                                                                                                                 |
+| An outside download or service             | NexKit's caches hold the NuGet and npm packages, the Playwright browser, the tools and the container images, so a run downloads only what they miss. Setup saves the images in one archive and the suites load it, see [setup](#setup). `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again. Each try of setup's steps has a time limit, see [setup](#setup), as [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) says                                                                                                                                                                                                                 |
 | A click during an animation or a redraw    | Playwright asks for reduced motion, and the SPA then shows dialogs and overlays without animation. `waitForDialog`, `confirmDialog` and the drag helper wait until the element is ready, and the drag helper and the binding choice in the journeys wait until the page canvas has drawn the dropped draft (`waitForCanvas`). `openFormTab` and `addMapping` wait until no expression editor of the open resource is loading or checking (`aria-busy`), because a check's answer adds a line under its editor and moves what is below. A spec that slows animations on purpose, to prove a wait, asks for motion again with `test.use({ reducedMotion: 'no-preference' })` |
 | The real clock                             | A test fixes the time with `axis.now` and runs schedules in UTC                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | State left by another test                 | A test counts from its own baseline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -862,37 +872,6 @@ parameters are the ones in [widget previews](reference/widget-previews.md#the-bu
 The server serves the harness, the modules it loads and the files in `web/`. Paths that begin with `/api` or
 `/health` go to the Axis server, and answer `502` while it is not running. Any other path that names none of
 these, such as the one Chrome's developer tools request when they open, answers `404`.
-
-## Running a host on its own
-
-A host can also run alone, outside `scripts/dev.sh`. To run the worker, run
-`dotnet run --project src/Axis.Worker`. It reads its tenants from its `Tenants` section, as the server
-does, and runs their due work items. It waits until the server has migrated each tenant database, so
-either can start first. If you moved PostgreSQL with `AXIS_POSTGRES_PORT`, override
-`Tenants__default__ConnectionString` for the worker.
-
-`dotnet run` of the server or the worker stops at start when a folder it reads does not exist. Create
-them first:
-
-- `Extensions:Path`: build the sample extension package, with `scripts/build.sh` or
-  `dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj`;
-- `Modules:Path`: install the built-in and sample modules, with `scripts/build.sh` or
-  `bash scripts/lib/install-modules.sh`;
-- `Templates:Path`, the server only: `bash scripts/lib/install-sample-templates.sh` creates it.
-
-## Activating other application folders
-
-The development server activates the four samples at start, and can activate any other folder.
-`src/Axis.Server/appsettings.Development.json` lists the purchase request sample,
-`../../samples/apps/purchase-requests`, the leave request sample, `../../samples/apps/leave-requests`,
-the service desk sample, `../../samples/apps/service-desk`, and the asset management sample,
-`../../samples/apps/asset-management`, in `ActivateOnStartup`. So `scripts/dev.sh` migrates every
-tenant database, then compiles and activates all four samples before it listens, and stops on any
-diagnostic.
-
-To activate another application folder, add it to that list, or set `ActivateOnStartup__0=<folder>`
-to activate it in place of the purchase request sample, while the other samples stay active. Relative
-paths are resolved from `src/Axis.Server`.
 
 ## Formatting
 

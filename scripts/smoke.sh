@@ -16,6 +16,8 @@
 # times with a wait of 15 and 30 seconds, and removes them when it exits. Both suites use them. The PostgreSQL tools
 # layer of axis-admin comes from the admin-tools stage, which scripts/lib/smoke-images.mjs saves in
 # ~/.cache/axis-docker and loads in a later run while the stage is unchanged, see docs/development.md#smoke-tests.
+# Before the first suite, scripts/lib/docker-images.mjs loads the container images that setup saved in
+# ~/.cache/axis-docker, once, when a suite of the shard is affected, so the suites pull none that the cache holds.
 # Each is skipped when NexKit gives a commit to compare with and every path changed since it is in the
 # `unaffected_by` list of .nexkit/config.json, which scripts/lib/affected.mjs reads. CI and NexKit run this script in
 # shards, one job per shard, see docs/development.md#shards.
@@ -43,6 +45,13 @@ fi
 in_shard() { [ -z "$shard" ] || grep -qx "$1" <<<"$shard_suites"; }
 
 bash scripts/lib/install-modules.sh
+
+for suite in dev-script compose images onprem; do
+  if in_shard "$suite" && affected "$suite"; then
+    node scripts/lib/docker-images.mjs load
+    break
+  fi
+done
 
 if in_shard dev-script; then
   run_suite_if_affected dev-script . node --test --test-reporter=spec --test-reporter-destination=stdout \
