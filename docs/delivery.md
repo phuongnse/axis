@@ -94,9 +94,11 @@ that holds it.
   Its [`dependabot`][nexkit-dependabot] setting holds the lowest severity it takes.
   NexKit's App reads the alerts with its *Dependabot alerts: read* permission.
 - **Autopilot answers with the recommended option,** with its `answer` setting, even when the
-  recommendation rests on a **Proposed** decision, so a question never stops an issue. The owner sees
-  the answers on the issue and can change one with a comment before `/nexkit go`, or with
-  `/nexkit fix` on the pull request.
+  recommendation rests on a **Proposed** decision, so a question stops an issue only when a blocked
+  fix round recommends changing the issue's scope, which a new plan would have to carry out. When a
+  blocked `/nexkit go` recommends such a change, such as a split, autopilot answers with
+  `/nexkit plan`. The owner sees the answers on the issue and can change one with a comment before
+  the next round, or with `/nexkit fix` on the pull request.
 - **Issues run in parallel unless one needs another.** Marks follow the rules of NexKit's
   [`request` skill][nexkit-request]. A milestone ends in two waves, which the `labels` setting gives to
   two labels, the journey's first: its journey carries `journey`, so it starts once every other issue
