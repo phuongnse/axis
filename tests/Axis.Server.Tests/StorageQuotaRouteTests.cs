@@ -141,8 +141,9 @@ public sealed class StorageQuotaRouteTests
         "POST /api/studio/apps/{application}/test",
         "POST /api/studio/apps/{application}/validate",
 
-        // Authoring requests are counted by their own quota, authoringRequests, and are not storage writes.
+        // Authoring requests are counted by their own quota, authoringRequests, and are not storage writes. An accept only queues a publish request and goes on over the quota, see docs/reference/tenant-quotas.md#refusals.
         "POST /api/studio/apps/{application}/authoring-requests",
+        "POST /api/studio/apps/{application}/authoring-requests/{id}/accept",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/approve",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/drop",
