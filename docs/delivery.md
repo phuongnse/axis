@@ -178,8 +178,8 @@ that holds it.
   uploads its `results` folders as the artifact `test-results-<name>`. GitHub's artifact service fails
   at times, so a failed upload does not fail a job whose checks passed: the checks alone decide the
   job's result, and that job's results are then missing from NexKit's evidence and from the shard
-  durations. A run takes as long as its
-  slowest job, and adding, removing or resharding a check changes CI with it.
+  durations. A run takes as long as its slowest job, and adding, removing or resharding a check
+  changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
   no model refreshes the durations from the results of that run and the latest runs dispatched on `main`
   before it, each entry the median of its measures. It opens or updates one `process` issue when they

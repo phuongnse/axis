@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { stepsOf, valueOf } from './lib/workflow-lines.mjs'
+import { blockAfter, indentOf, isContent, stepsOf, valueOf } from './lib/workflow-lines.mjs'
 
 // In CI, a failed upload of test results does not fail a job whose checks passed, and the Checks step alone decides
 // the job's result. See docs/delivery.md#ci-on-main. The workflow is read line by line with
@@ -10,8 +10,21 @@ import { stepsOf, valueOf } from './lib/workflow-lines.mjs'
 const workflow = fileURLToPath(new URL('../.github/workflows/ci.yml', import.meta.url))
 
 const ciWorkflowProblems = (text) => {
-  const steps = stepsOf(text.split(/\r?\n/))
+  const lines = text.split(/\r?\n/)
+  const steps = stepsOf(lines)
   const problems = []
+
+  // The checks job's own keys: the lines of its block at the indentation of its first key, which excludes its steps.
+  const job = lines.findIndex((line) => /^\s*checks:\s*$/.test(line))
+  if (job === -1) {
+    problems.push('ci.yml has no checks job')
+  } else {
+    const block = blockAfter(lines, job, indentOf(lines[job])).filter(isContent)
+    const keys = block.filter((line) => indentOf(line) === indentOf(block[0]))
+    if (keys.some((line) => /^\s*continue-on-error:/.test(line))) {
+      problems.push('the checks job must not have continue-on-error')
+    }
+  }
 
   const uploads = steps.filter(
     (step) =>
@@ -69,6 +82,11 @@ describe('CI workflow', () => {
   test('a Checks step with continue-on-error is a problem', () => {
     const text = good.replace('      - name: Checks\n', '      - name: Checks\n        continue-on-error: true\n')
     assert.deepEqual(ciWorkflowProblems(text), ['the Checks step must not have continue-on-error'])
+  })
+
+  test('a checks job with continue-on-error is a problem', () => {
+    const text = good.replace('    runs-on: ubuntu-24.04\n', '    runs-on: ubuntu-24.04\n    continue-on-error: true\n')
+    assert.deepEqual(ciWorkflowProblems(text), ['the checks job must not have continue-on-error'])
   })
 
   test('a workflow without the upload of test results is a problem', () => {
