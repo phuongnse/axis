@@ -4,9 +4,12 @@
 //
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
 // the root, that the suite's relative file paths start from. A --duration gives the measured
-// time of a suite, which replaces the file's time in the Duration column. The Markdown summary is
-// appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub Actions
-// every failed test also gets an ::error annotation, and every skipped suite a ::notice one, so
+// time of a suite, which replaces the file's time in the Duration column and in the total. The
+// Markdown summary is appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. A
+// passing run gets one line with the tests passed, the total time and the suites skipped, and its
+// per-suite table is collapsed. Otherwise the failed tests come first and the table stays open.
+// Both end with the five slowest test cases. On GitHub Actions every failed test also gets an
+// ::error annotation, and every skipped suite a ::notice one, so
 // the run's page lists what a check skipped. When the summary goes to that file,
 // the failed tests are also listed on stdout, for the job log. A suite named by --skipped
 // did not run and has no results file. It is reported as skipped. Exits 1 when any other
@@ -77,6 +80,7 @@ export function parseJunit(xml) {
         classname: attributes.classname,
         file: attributes.file,
         line: attributes.line ? Number(attributes.line) : undefined,
+        time,
         status: 'passed',
         message: '',
         details: '',
@@ -130,9 +134,13 @@ export function locateFailure(test, root, cwd) {
   return frames[0] ?? {}
 }
 
+const slowestCount = 5
+
 /** Reads the results of each suite. Suites are "NAME:CWD" strings or { name, cwd } objects.
- * durations maps a suite NAME to its measured seconds, which replace the time in its file. */
+ * durations maps a suite NAME to its measured seconds, which replace the time in its file. The
+ * duration of the report adds up the measured times, or the file times when no suite has one. */
 export function buildReport({ suites, resultsDir, root, skipped = [], durations = {} }) {
+  const cases = []
   const results = suites.map((suite) => {
     const [name, cwd = '.'] = typeof suite === 'string' ? suite.split(/:(.*)/s) : [suite.name, suite.cwd]
     if (skipped.includes(name)) {
@@ -153,6 +161,9 @@ export function buildReport({ suites, resultsDir, root, skipped = [], durations 
     }
 
     const { tests, time } = parseJunit(readFileSync(file, 'utf8'))
+    for (const test of tests) {
+      if (test.time > 0) cases.push({ suite: name, name: test.name, time: test.time })
+    }
     const count = (status) => tests.filter((test) => test.status === status).length
     const failures = tests
       .filter((test) => test.status === 'failed')
@@ -172,7 +183,17 @@ export function buildReport({ suites, resultsDir, root, skipped = [], durations 
       failures,
     }
   })
-  return { suites: results, ok: results.every((suite) => !suite.missing && suite.failed === 0) }
+  const measured = results.filter((suite) => durations[suite.name] !== undefined)
+  const duration =
+    measured.length > 0
+      ? measured.reduce((total, suite) => total + durations[suite.name], 0)
+      : results.reduce((total, suite) => total + suite.duration, 0)
+  return {
+    suites: results,
+    ok: results.every((suite) => !suite.missing && suite.failed === 0),
+    duration,
+    slowest: cases.sort((a, b) => b.time - a.time).slice(0, slowestCount),
+  }
 }
 
 export function formatDuration(seconds) {
@@ -208,14 +229,8 @@ function summaryEntries(tests) {
   })
 }
 
-/** The Markdown summary: one table row per suite, then each failed test. */
-export function formatSummary(report) {
-  const lines = [
-    '## Test results',
-    '',
-    '| Suite | Passed | Failed | Skipped | Duration |',
-    '| --- | ---: | ---: | ---: | ---: |',
-  ]
+function suiteTable(report) {
+  const lines = ['| Suite | Passed | Failed | Skipped | Duration |', '| --- | ---: | ---: | ---: | ---: |']
   for (const suite of report.suites) {
     if (suite.unaffected) {
       lines.push(`| ${tableCell(suite.name)} (skipped: not affected by this change) | - | - | - | - |`)
@@ -227,9 +242,39 @@ export function formatSummary(report) {
       )
     }
   }
+  return lines
+}
 
-  const failures = report.suites.flatMap((suite) => suite.failures)
-  if (failures.length > 0) lines.push('', '### Failed tests', '', ...summaryEntries(failures))
+function leadLine(report) {
+  const passed = report.suites.reduce((total, suite) => total + suite.passed, 0)
+  const skipped = report.suites.filter((suite) => suite.unaffected).length
+  const skippedClause =
+    skipped > 0 ? `, ${skipped} ${skipped === 1 ? 'suite' : 'suites'} skipped as not affected by this change` : ''
+  return `✓ ${passed} ${passed === 1 ? 'test' : 'tests'} passed in ${formatDuration(report.duration)}${skippedClause}`
+}
+
+function slowestTable(tests) {
+  return [
+    '| Test | Suite | Time |',
+    '| --- | --- | ---: |',
+    ...tests.map((test) => `| ${tableCell(codeSpan(test.name))} | ${tableCell(test.suite)} | ${formatDuration(test.time)} |`),
+  ]
+}
+
+/** The Markdown summary. A passing run gets one line, and its per-suite table is collapsed. Otherwise
+ * the failed tests come first and the table stays open. Both end with a collapsed list of the slowest tests. */
+export function formatSummary(report) {
+  const lines = ['## Test results', '']
+  if (report.ok) {
+    lines.push(leadLine(report), '', '<details><summary>Suites</summary>', '', ...suiteTable(report), '', '</details>')
+  } else {
+    const failures = report.suites.flatMap((suite) => suite.failures)
+    if (failures.length > 0) lines.push('### Failed tests', '', ...summaryEntries(failures))
+    lines.push(...suiteTable(report))
+  }
+  if (report.slowest.length > 0) {
+    lines.push('', '<details><summary>Slowest tests</summary>', '', ...slowestTable(report.slowest), '', '</details>')
+  }
   return `${lines.join('\n').trimEnd()}\n`
 }
 

@@ -162,6 +162,77 @@ describe('buildReport', () => {
     assert.equal(report.suites[0].duration, 462)
     assert.match(formatSummary(report), /^\| measured \| 1 \| 0 \| 0 \| 7m 42s \|$/m)
   })
+
+  test('leads a passing run with one line and collapses its table', () => {
+    const summary = formatSummary(
+      buildReport({ suites: ['passing:tests/Sample.Tests', 'absent:web'], resultsDir, root, skipped: ['absent'] }),
+    )
+
+    assert.equal(summary.split('\n')[2], '✓ 2 tests passed in 1.5s, 1 suite skipped as not affected by this change')
+    assert.match(summary, /<details><summary>Suites<\/summary>\n\n\| Suite \|[\s\S]*?\n\n<\/details>/)
+  })
+
+  test('totals the measured times, or the file times when no suite has one', () => {
+    const measured = buildReport({
+      suites: ['passing:tests/Sample.Tests', 'absent:web'],
+      resultsDir,
+      root,
+      skipped: ['absent'],
+      durations: { passing: 462 },
+    })
+    assert.equal(
+      formatSummary(measured).split('\n')[2],
+      '✓ 2 tests passed in 7m 42s, 1 suite skipped as not affected by this change',
+    )
+
+    const unmeasured = buildReport({ suites: ['passing:tests/Sample.Tests'], resultsDir, root })
+    assert.equal(formatSummary(unmeasured).split('\n')[2], '✓ 2 tests passed in 1.5s')
+  })
+
+  test('leaves a suite without a measured time out of the total', () => {
+    const report = buildReport({
+      suites: ['measured:web', 'passing:tests/Sample.Tests'],
+      resultsDir,
+      root,
+      durations: { measured: 462 },
+    })
+
+    assert.equal(report.duration, 462)
+    assert.equal(formatSummary(report).split('\n')[2], '✓ 3 tests passed in 7m 42s')
+  })
+
+  test('lists the failed tests before an open table when a suite failed', () => {
+    const summary = formatSummary(buildReport({ suites: ['failing:web'], resultsDir, root }))
+
+    assert.ok(summary.indexOf('### Failed tests') < summary.indexOf('| Suite |'))
+    assert.doesNotMatch(summary, /<details><summary>Suites|✓/)
+  })
+
+  test('shows an open table with no total when a suite wrote no results', () => {
+    const summary = formatSummary(buildReport({ suites: ['absent:web'], resultsDir, root }))
+
+    assert.match(summary, /^\| absent \(missing: no results file\) \| - \| - \| - \| - \|$/m)
+    assert.doesNotMatch(summary, /<details><summary>Suites|✓|Slowest tests/)
+  })
+
+  test('lists the five slowest test cases of the run, slowest first', () => {
+    const report = buildReport({ suites: ['passing:tests/Sample.Tests', 'failing:web'], resultsDir, root })
+
+    assert.deepEqual(
+      report.slowest.map((t) => [t.suite, t.name, t.time]),
+      [
+        ['failing', 'Sample.Tests.SampleTests.Compares_text', 1.25],
+        ['passing', 'Sample.Tests.SampleTests.First_passes', 0.9],
+        ['passing', 'Sample.Tests.SampleTests.Second_passes', 0.6],
+        ['failing', 'Sample > adds numbers', 0.5],
+        ['failing', 'Sample > subtracts numbers', 0.25],
+      ],
+    )
+    const summary = formatSummary(report)
+    const slowest = summary.slice(summary.indexOf('<details><summary>Slowest tests</summary>'))
+    assert.match(slowest, /^\| `Sample\.Tests\.SampleTests\.Compares_text` \| failing \| 1\.3s \|$/m)
+    assert.doesNotMatch(slowest, /Throws/)
+  })
 })
 
 describe('command line', () => {
