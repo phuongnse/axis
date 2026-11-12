@@ -10,6 +10,8 @@ namespace Axis.Agent;
 /// A request stops as <c>failed</c> with the outcome <c>overBudget</c> when a model call would pass the token budget, and with <c>timedOut</c> when its step starts after
 /// <c>Ai:RequestTimeout</c> from the approval or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
+/// A step that moves a request to <c>fixing</c> when its <c>round</c> has reached <c>Ai:FixRounds</c> stops the request as <c>failed</c> instead and keeps its draft,
+/// see <c>docs/reference/authoring-requests.md#budgets</c>.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
@@ -106,6 +108,12 @@ internal sealed partial class AuthoringRequestRunner(
                     LogOverBudget(request.Id);
                     result = new AuthoringStepResult("failed", "overBudget");
                 }
+            }
+
+            // The step keeps its own outcome. Only the request's state shows that no fix round is left.
+            if (result.NextState == "fixing" && request.Round >= settings.FixRounds)
+            {
+                result = result with { NextState = "failed" };
             }
 
             if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))

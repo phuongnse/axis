@@ -4,7 +4,7 @@ using Axis.Agent.Models;
 namespace Axis.Agent;
 
 /// <summary>
-/// The one policy that the working and the review step share for a tool call of the model, see <c>docs/reference/authoring-requests.md#states</c>.
+/// The one policy that the working, the fixing and the review step share for a tool call of the model, see <c>docs/reference/authoring-requests.md#states</c>.
 /// </summary>
 internal static class DraftToolPolicy
 {

@@ -32,7 +32,7 @@ public sealed class AgentReviewingTests(KeycloakFixture keycloak, PostgreSqlFixt
         await ReviewingAsync(id);
         var script = new ScriptedModelAdapter([Plan(Findings, 40, 10)]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
-        await using var host = BuildAgent(_realm, script, server);
+        await using var host = BuildAgent(_realm, script, server, fixing: false);
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "fixing", "The host did not move the request to fixing.");
         await host.StopAsync(CancellationToken);
