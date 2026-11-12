@@ -1,9 +1,10 @@
 // Reports on the JUnit XML files written by the test scripts.
 //
-// Usage: node scripts/test-report.mjs [--results-dir DIR] [--root DIR] [--skipped NAME]... NAME:CWD...
+// Usage: node scripts/test-report.mjs [--results-dir DIR] [--root DIR] [--skipped NAME]... [--duration NAME=SECONDS]... NAME:CWD...
 //
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
-// the root, that the suite's relative file paths start from. The Markdown summary is
+// the root, that the suite's relative file paths start from. A --duration gives the measured
+// time of a suite, which replaces the file's time in the Duration column. The Markdown summary is
 // appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub Actions
 // every failed test also gets an ::error annotation, and every skipped suite a ::notice one, so
 // the run's page lists what a check skipped. When the summary goes to that file,
@@ -129,8 +130,9 @@ export function locateFailure(test, root, cwd) {
   return frames[0] ?? {}
 }
 
-/** Reads the results of each suite. Suites are "NAME:CWD" strings or { name, cwd } objects. */
-export function buildReport({ suites, resultsDir, root, skipped = [] }) {
+/** Reads the results of each suite. Suites are "NAME:CWD" strings or { name, cwd } objects.
+ * durations maps a suite NAME to its measured seconds, which replace the time in its file. */
+export function buildReport({ suites, resultsDir, root, skipped = [], durations = {} }) {
   const results = suites.map((suite) => {
     const [name, cwd = '.'] = typeof suite === 'string' ? suite.split(/:(.*)/s) : [suite.name, suite.cwd]
     if (skipped.includes(name)) {
@@ -166,7 +168,7 @@ export function buildReport({ suites, resultsDir, root, skipped = [] }) {
       passed: count('passed'),
       failed: failures.length,
       skipped: count('skipped'),
-      duration: time,
+      duration: durations[name] ?? time,
       failures,
     }
   })
@@ -288,15 +290,20 @@ export function main(args, env = process.env, stdout = process.stdout) {
   let root = scriptRoot
   const suites = []
   const skipped = []
+  const durations = {}
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--results-dir') resultsDir = args[++i]
     else if (args[i] === '--root') root = args[++i]
     else if (args[i] === '--skipped') skipped.push(args[++i])
-    else suites.push(args[i])
+    else if (args[i] === '--duration') {
+      const value = args[++i]
+      const separator = value.lastIndexOf('=')
+      durations[value.slice(0, separator)] = Number(value.slice(separator + 1))
+    } else suites.push(args[i])
   }
   root = path.resolve(root)
   resultsDir = path.resolve(resultsDir ?? path.join(root, 'artifacts/test-results'))
-  const report = buildReport({ suites, resultsDir, root, skipped })
+  const report = buildReport({ suites, resultsDir, root, skipped, durations })
 
   const summary = formatSummary(report)
   if (env.GITHUB_STEP_SUMMARY) appendFileSync(env.GITHUB_STEP_SUMMARY, `${summary}\n`)

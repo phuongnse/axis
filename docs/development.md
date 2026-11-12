@@ -483,6 +483,11 @@ Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run wri
 error annotation. The failed tests are also listed at the end of the job log, with each message cut to
 20 lines.
 
+The Duration column shows how long the suite's command ran, as `run_suite` measures it. A suite that no
+command of its own runs, such as `scenarios-<application name>` and the control plane integration suite,
+shows the time in its JUnit file instead. Vitest's JUnit file adds up its files' times across parallel
+workers, so the Vitest rows are measured too.
+
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
 A failure names the scenario and the step. To run them by hand, run
