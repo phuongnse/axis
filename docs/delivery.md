@@ -214,8 +214,9 @@ that holds it.
   checks nor in CI's integration jobs, because they depend on the runner's load, as
   [D97](decisions/d97-reliable-test-runs.md) says.
 - **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm, the Playwright
-  browsers, the pinned chart tools and schemas of [setup](development.md#setup) and the PostgreSQL
-  tools layer of the [smoke tests](development.md#smoke-tests). The entries are in NexKit's
+  browsers, the pinned chart tools and schemas of [setup](development.md#setup), the container images
+  of the integration, E2E and smoke checks, and the PostgreSQL tools layer of the
+  [smoke tests](development.md#smoke-tests). The entries are in NexKit's
   [`cache`][nexkit-caches] setting, and each workflow that runs setup restores them with NexKit's cache
   action, which reads the same entries and saves them on `main`. An entry's key files are the files
   that pin what it holds, as

@@ -256,6 +256,12 @@ describe('the repository', () => {
     for (const image of listed) assert.ok(named.has(image), `${image} is listed but no file names it`)
   })
 
+  test("keys NexKit's docker cache entry on the image list and the Dockerfile, which pin what it holds", () => {
+    const config = JSON.parse(readFileSync(path.join(root, '.nexkit/config.json'), 'utf8'))
+    const docker = config.cache.find((entry) => entry.name === 'docker')
+    assert.deepEqual([...docker.key_files].sort(), ['Dockerfile', 'scripts/docker-images.json'])
+  })
+
   test('is sorted and free of duplicates', () => {
     const text = JSON.parse(readFileSync(path.join(root, 'scripts/docker-images.json'), 'utf8'))
     assert.deepEqual(text, [...new Set(text)].sort())
