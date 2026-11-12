@@ -43,7 +43,7 @@ The agent host reads these settings:
 | `Ai:Bindings:<name>:KeyFile`         | A file that holds the API key, as other secrets are files. Empty for a self-served model with no key   |
 | `Ai:Bindings:<name>:MaxOutputTokens` | The largest output of one call, 16,000 by default                                                      |
 | `Ai:DefaultBinding`                  | The binding requests use. With no value, AI authoring is off and Studio shows no request panel         |
-| `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the default binding                                      |
+| `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the request's binding, or else the default binding       |
 | `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default. The server and the agent host read it      |
 | `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ |
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default, see [budgets](authoring-requests.md#budgets)                 |

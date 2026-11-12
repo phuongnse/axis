@@ -37,7 +37,7 @@ public sealed class AiSettings
     /// <summary>The binding that requests use, or <see langword="null"/> when AI authoring is off.</summary>
     public string? DefaultBinding { get; init; }
 
-    /// <summary>The binding of the review session, or <see langword="null"/> to use the default binding.</summary>
+    /// <summary>The binding of the review session, or <see langword="null"/> to use the request's binding, or else the default binding.</summary>
     public string? ReviewBinding { get; init; }
 
     /// <summary>The tokens one request may use, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>

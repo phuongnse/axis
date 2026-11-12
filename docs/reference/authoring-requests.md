@@ -112,7 +112,7 @@ request, which belongs to [accepting](#accepting).
 - **Answer.** A request has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
   `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
-  the results of a `check` step and null on any other step.
+  the results of a `check` step or the review of a `review` step, and null on any other step.
 
 ## States
 
@@ -125,7 +125,7 @@ the checks, an independent review and fix rounds.
 | `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
 | `working`                       | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
 | `checking`                      | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
-| `reviewing` _(planned for M35)_ | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
+| `reviewing`                     | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
 | `fixing` _(planned for M35)_    | The agent works on the failures and findings                                                                                            | `checking`                            |
 | `ready`                         | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
 | `accepted`                      | The draft is in the working folder as a revision                                                                                        | none                                  |
@@ -156,6 +156,15 @@ the checks, an independent review and fix rounds.
   outcome `passed`. Otherwise it moves to `fixing` with the outcome `failed`. A step whose run does not end in
   time, whose tool call is a tool error, whose request has no draft, or whose application the author can no longer
   list stops the request as `failed` with the outcome `unfinished`. A step that runs again starts a new run.
+- **Reviewing reads only.** The step starts a new model conversation with no memory of the working session, on
+  `Ai:ReviewBinding`, or else the request's binding or `Ai:DefaultBinding`. The model sees the request text, the
+  approved plan and the latest check results. It is offered `read_reference`, `list_resources`, `read_resource`,
+  `read_module_resource`, `read_names` and `diff_draft`, and only for the request's application and its draft. A
+  call without a draft gets the request's draft. Any other call gets a tool error from the agent host and never
+  reaches the MCP server. The verdict is the text of the model's last answer. When its first line is exactly
+  `PASSED`, the request moves to `ready` with the outcome `passed`. Any other text moves it to `fixing` with the
+  outcome `findings`, and the text is the findings. The step stores `{ review: { outcome, findings } }` in `checks`
+  on its `review` step, with `findings` null when the review passed.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
@@ -175,6 +184,9 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Checking time.** At most 450 polls of the scenario run, 2 seconds apart, which is about 15 minutes. A
   run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
   never starts does not hold the agent host for ever. The publisher stops a test run after 10 minutes.
+- **Review calls.** At most 25 model calls in one review step. A step whose model has not ended its turn by
+  then, whose answer stops at the output limit or has no text, stops the request as `failed` with the outcome
+  `unfinished`, and so does a request without a draft or whose application the author can no longer list.
 - **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
   round stops as `failed`.
 - **Tokens.** At most `Ai:RequestTokenBudget` tokens, input and output together, across every model

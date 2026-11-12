@@ -45,7 +45,7 @@ public sealed class CheckingStepTests
     private static AuthoringStepContext NewContext(RecordingHandler handler, Guid? draft = null)
     {
         var client = new AuthorMcpClient(new HttpClient(handler), "a.example.test", _ => Task.FromResult("token"));
-        var request = new AuthoringRequestToWork(Guid.NewGuid(), "checking", DateTimeOffset.UtcNow, _applicationId, "Add a review", "A plan", null, [], draft ?? _draftId, 0, null);
+        var request = new AuthoringRequestToWork(Guid.NewGuid(), "checking", DateTimeOffset.UtcNow, _applicationId, "Add a review", "A plan", null, [], draft ?? _draftId, null, 0, null);
         return new AuthoringStepContext(
             "tenant",
             request,
@@ -151,7 +151,7 @@ public sealed class CheckingStepTests
     {
         var handler = Opened(new RecordingHandler());
         var step = new CheckingStep(new CheckingOptions(TimeSpan.Zero, 2), TimeProvider.System);
-        var request = new AuthoringRequestToWork(Guid.NewGuid(), "checking", DateTimeOffset.UtcNow, _applicationId, "Add a review", "A plan", null, [], null, 0, null);
+        var request = new AuthoringRequestToWork(Guid.NewGuid(), "checking", DateTimeOffset.UtcNow, _applicationId, "Add a review", "A plan", null, [], null, null, 0, null);
         var client = new AuthorMcpClient(new HttpClient(handler), "a.example.test", _ => Task.FromResult("token"));
         var context = new AuthoringStepContext("tenant", request, (_, _) => Task.CompletedTask, _ => Task.FromResult("token"), (_, _) => Task.CompletedTask, client, long.MaxValue);
 
