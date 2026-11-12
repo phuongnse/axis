@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { judgeCase, passBar, writeReport } from './lib/ai-eval.mjs'
+import { agentEnvironment, applicationName, startingTemplate } from './lib/ai-eval-stack.mjs'
 
 const refusalCase = {
   name: 'approver-is-requester',
@@ -210,5 +211,53 @@ describe('writeReport', () => {
   test('reports a passing model as passing', () => {
     const file = writeReport([judgeCase(refusalCase, runOf([]))], folder)
     assert.equal(JSON.parse(readFileSync(file, 'utf8')).passes, true)
+  })
+})
+
+describe('the settings of the eval stack', () => {
+  test('an answers file makes the scripted binding the default and names the file', () => {
+    assert.deepEqual(agentEnvironment({ answersFile: '/tmp/answers.json' }), {
+      Ai__Bindings__scripted__Kind: 'anthropic',
+      Ai__Bindings__scripted__Model: 'scripted',
+      Ai__DefaultBinding: 'scripted',
+      Ai__ScriptedAnswersFile: '/tmp/answers.json',
+    })
+  })
+
+  test('a binding is the default and brings only its own variables from the environment', () => {
+    const environment = {
+      Ai__Bindings__opus__Kind: 'anthropic',
+      Ai__Bindings__opus__Model: 'claude-opus-5-5',
+      Ai__Bindings__opus__KeyFile: '/run/secrets/opus',
+      Ai__Bindings__other__Kind: 'openai-compatible',
+      Ai__Bindings__opus2__Kind: 'anthropic',
+      Ai__ScriptedAnswersFile: '/tmp/answers.json',
+      PATH: '/usr/bin',
+    }
+    assert.deepEqual(agentEnvironment({ binding: 'opus', environment }), {
+      Ai__DefaultBinding: 'opus',
+      Ai__Bindings__opus__Kind: 'anthropic',
+      Ai__Bindings__opus__Model: 'claude-opus-5-5',
+      Ai__Bindings__opus__KeyFile: '/run/secrets/opus',
+    })
+  })
+
+  test('both a binding and an answers file, or neither, throw', () => {
+    assert.throws(() => agentEnvironment({ binding: 'opus', answersFile: '/tmp/answers.json' }), /exactly one/)
+    assert.throws(() => agentEnvironment({}), /exactly one/)
+  })
+
+  test('an application or a template starts from the installed template of its name', () => {
+    assert.equal(startingTemplate({ from: 'application', name: 'approvals' }), 'approvals')
+    assert.equal(startingTemplate({ from: 'template', name: 'blank-crud' }), 'blank-crud')
+  })
+
+  test('a sample start throws', () => {
+    assert.throws(() => startingTemplate({ from: 'sample', name: 'leave-requests' }), /cannot start from a sample/)
+  })
+
+  test('the application name is the start name and the tenant id in PascalCase', () => {
+    assert.equal(applicationName({ from: 'application', name: 'approvals' }, 'eval-smoke'), 'ApprovalsEvalSmoke')
+    assert.equal(applicationName({ from: 'template', name: 'purchase-requests' }, 'case1'), 'PurchaseRequestsCase1')
   })
 })

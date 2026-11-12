@@ -22,7 +22,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { longest as longestE2e, main as e2e } from './lib/e2e-shard.mjs'
 import { longest as longestIntegration, main as integration } from './lib/integration-shard.mjs'
-import { longest as longestSmoke, main as smoke } from './lib/smoke-shard.mjs'
+import { longest as longestSmoke, main as smoke, suites as smokeSuites } from './lib/smoke-shard.mjs'
 import { budgetSeconds, median } from './lib/shards.mjs'
 import { longest as longestTest, main as test } from './lib/test-shard.mjs'
 
@@ -82,7 +82,7 @@ export const splits = [
     at: 'scripts/smoke-durations.json',
     main: smoke,
     longest: longestSmoke,
-    junit: /^(dev-script|compose|images|onprem)\.xml$/,
+    junit: new RegExp(`^(${smokeSuites.join('|')})\\.xml$`),
   },
 ]
 
