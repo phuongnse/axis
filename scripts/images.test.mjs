@@ -1,7 +1,7 @@
-// Smoke test for the production images: builds axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, checks what they
-// hold, and runs them read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a
-// certificate from an authority made for the run, and the connection strings set SSL Mode=VerifyFull, which the
-// production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
+// Smoke test for the production images axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, which
+// scripts/smoke.sh builds: checks what they hold, and runs them read-only with their settings in /run/secrets files.
+// The test PostgreSQL serves TLS with a certificate from an authority made for the run, and the connection strings
+// set SSL Mode=VerifyFull, which the production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -9,13 +9,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildImage } from './lib/docker-build.mjs'
+import { listedImage } from './lib/docker-images.mjs'
+import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
 const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane']
-const suffix = `images-test-${process.pid}`
 const network = `axis-images-${process.pid}`
 const postgres = `axis-images-postgres-${process.pid}`
 const secretKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
@@ -25,7 +25,7 @@ let folder
 let trustDir
 const containers = []
 
-const image = (target) => `${target}:${suffix}`
+const image = (target) => `${target}:${version}`
 
 const docker = (args, options = {}) => spawnSync('docker', args, { cwd: root, encoding: 'utf8', ...options })
 
@@ -49,9 +49,8 @@ const writeSecrets = (name, settings) => {
 
 before(
   async () => {
-    version = `0.0.0-test.${process.pid}`
+    version = smokeImages(targets)
     folder = mkdtempSync(join(tmpdir(), 'axis-images-'))
-    for (const target of targets) await buildImage({ target, version, tag: image(target) })
 
     const certificates = issuePostgresCertificate({
       folder,
@@ -83,7 +82,7 @@ before(
       `${join(root, 'samples/postgres/init-roles.sql')}:/docker-entrypoint-initdb.d/init-roles.sql:ro`,
       '-v',
       `${certificates.serverDir}:${serverCertificateMount}:ro`,
-      'postgres:18-alpine',
+      listedImage(root, 'postgres'),
       '-c',
       postgresTlsScript,
     ])
@@ -110,7 +109,6 @@ after(() => {
   for (const container of [...containers, postgres]) docker(['rm', '-f', container], { stdio: 'ignore' })
   docker(['network', 'rm', network], { stdio: 'ignore' })
   if (folder) rmSync(folder, { recursive: true, force: true })
-  for (const target of targets) docker(['rmi', '-f', image(target)], { stdio: 'ignore' })
 })
 
 test('no image holds samples, development settings or source control metadata', { timeout }, () => {
@@ -164,6 +162,7 @@ test('no image holds samples, development settings or source control metadata', 
     }
     if (target === 'axis-controlplane') {
       assert.ok(paths.includes('app/wwwroot/sign-up.html'), 'the control plane holds no sign-up page')
+      assert.ok(paths.includes('app/admin/Axis.ControlPlane.Admin.dll'), 'the control plane holds no operator commands')
     }
 
     const config = JSON.parse(run(['image', 'inspect', image(target)]))[0].Config
@@ -253,6 +252,8 @@ test('the agent host starts read-only with AI authoring on and its settings in /
       '-e',
       'Ai__DefaultBinding=main',
       '-e',
+      'Ai__AllowTenantKeys=true',
+      '-e',
       'Health__Urls=http://0.0.0.0:5209',
     ]),
   )
@@ -262,18 +263,20 @@ test('the control plane starts read-only with its connection string in /run/secr
   const secrets = writeSecrets('controlplane', {
     ControlPlane__ConnectionString: `Host=${postgres};Database=axis;Username=axis;Password=images-test${verifyFull('/run/test-ca/ca.crt')}`,
   })
-  await waitLive(
-    startReadOnly('axis-controlplane', secrets, 8080, [
-      '-e',
-      'ControlPlane__Region=vn',
-      '-e',
-      'ControlPlane__TenantDomain=vn.example.com',
-      '-e',
-      'ControlPlane__MailFrom=no-reply@vn.example.com',
-      '-e',
-      'ControlPlane__Mail__Host=mail.invalid',
-    ]),
-  )
+  const started = startReadOnly('axis-controlplane', secrets, 8080, [
+    '-e',
+    'ControlPlane__Region=vn',
+    '-e',
+    'ControlPlane__TenantDomain=vn.example.com',
+    '-e',
+    'ControlPlane__MailFrom=no-reply@vn.example.com',
+    '-e',
+    'ControlPlane__Mail__Host=mail.invalid',
+  ])
+  await waitLive(started)
+  // The operator's commands read the same settings and the schema that the service has migrated.
+  const list = run(['exec', started.id, 'dotnet', '/app/admin/Axis.ControlPlane.Admin.dll', 'sign-ups', 'list'])
+  assert.ok(list.startsWith('id'), 'sign-ups list printed no header')
 })
 
 test('the admin tool prints its version and has the PostgreSQL 18 tools', { timeout }, () => {

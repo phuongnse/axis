@@ -1,4 +1,5 @@
 using Axis.Data.Storage;
+using Axis.Hosting;
 using Axis.Tenancy;
 
 namespace Axis.Agent;
@@ -8,7 +9,8 @@ namespace Axis.Agent;
 /// its tenants as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: under the <c>directory</c> source it retries the
 /// first read of the tenant directory every <c>Tenancy:RefreshInterval</c> until it works, and then reads the directory again every
 /// interval. A tenant whose runtime database role fails the <see cref="RuntimeRoleCheck"/> is left out until it passes. Beside the refresh it
-/// runs the work loop of the <see cref="AuthoringRequestRunner"/>, which claims a request only in a state that has a registered step, see
+/// runs the work loop: it takes the tenants in turn through <see cref="TenantRounds"/> and runs one step of one request per turn with the
+/// <see cref="AuthoringRequestRunner"/>, which claims a request only in a state that has a registered step, see
 /// <c>docs/reference/authoring-requests.md#durable-requests</c>.
 /// </summary>
 internal sealed partial class AgentService(
@@ -22,6 +24,9 @@ internal sealed partial class AgentService(
     AuthoringRequestRunner? runner = null,
     AuthoringLoopOptions? loop = null) : BackgroundService
 {
+    // Every tenant gets one step per turn, with the same share.
+    private readonly TenantRounds _rounds = new(1, _ => 1);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         if (settings.DefaultBinding is null || tenants is null)
@@ -48,7 +53,8 @@ internal sealed partial class AgentService(
         }
     }
 
-    // With no registered step, nothing is claimed and the loop ends at once.
+    // With no registered step, nothing is claimed and the loop ends at once. Each poll interval adds the served tenants to the turns, and a tenant
+    // whose claim finds nothing leaves them until a later poll.
     private async Task WorkAsync(BackgroundTenantCatalog catalog, CancellationToken stoppingToken)
     {
         if (steps is null || runner is null || loop is null || !steps.Any)
@@ -56,11 +62,31 @@ internal sealed partial class AgentService(
             return;
         }
 
+        var joinedAt = time.GetUtcNow();
+        _rounds.Join(catalog.Tenants.Select(tenant => tenant.Id));
         while (true)
         {
-            if (!await runner.RunRoundAsync(catalog.Tenants, stoppingToken))
+            var now = time.GetUtcNow();
+            if (now - joinedAt >= loop.PollInterval)
             {
-                await Task.Delay(loop.PollInterval, time, stoppingToken);
+                joinedAt = now;
+                _rounds.Join(catalog.Tenants.Select(tenant => tenant.Id));
+            }
+
+            if (!_rounds.TryTake(out var tenantId, out var ticket))
+            {
+                await Task.Delay(TimeSpan.FromTicks(Math.Max(0, (joinedAt + loop.PollInterval - now).Ticks)), time, stoppingToken);
+                continue;
+            }
+
+            var claimed = false;
+            try
+            {
+                claimed = await runner.RunTurnAsync(tenantId, stoppingToken);
+            }
+            finally
+            {
+                _rounds.Done(tenantId, ticket, claimed);
             }
         }
     }
@@ -112,6 +138,7 @@ internal sealed partial class AgentService(
                 }
 
                 store?.Forget(tenantId);
+                _rounds.Leave(tenantId);
             }
 
             LogRefreshed(result.TenantCount, result.CheckedCount, result.WithheldCount);

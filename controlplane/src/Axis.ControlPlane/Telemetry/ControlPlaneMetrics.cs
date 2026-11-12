@@ -12,11 +12,31 @@ internal static class ControlPlaneMetrics
     /// <summary>The attribute that names the kind of a job. A job id is never an attribute.</summary>
     public const string JobKindTag = "axis.job.kind";
 
+    /// <summary>The provider events that were kept and applied nothing because they do not fit their invoice, by <see cref="PaymentProviderTag"/> and <see cref="PaymentReasonTag"/>.</summary>
+    public const string PaymentsOutOfPlace = "axis.controlplane.payments.out_of_place";
+
+    /// <summary>The attribute that names a payment provider.</summary>
+    public const string PaymentProviderTag = "axis.payment.provider";
+
+    /// <summary>The attribute that names why an event is out of place. An invoice id and an amount are never attributes.</summary>
+    public const string PaymentReasonTag = "axis.payment.reason";
+
     private static readonly Counter<long> _failedJobs = AxisMetrics.Meter.CreateCounter<long>(
         JobsFailed,
         "{job}",
         "Jobs that ended failed after their last attempt.");
 
+    private static readonly Counter<long> _outOfPlacePayments = AxisMetrics.Meter.CreateCounter<long>(
+        PaymentsOutOfPlace,
+        "{event}",
+        "Payment provider events that were kept and applied nothing because they do not fit their invoice.");
+
     public static void RecordJobFailed(string kind) =>
         _failedJobs.Add(1, new KeyValuePair<string, object?>(JobKindTag, kind));
+
+    public static void RecordPaymentOutOfPlace(string provider, string reason) =>
+        _outOfPlacePayments.Add(
+            1,
+            new KeyValuePair<string, object?>(PaymentProviderTag, provider),
+            new KeyValuePair<string, object?>(PaymentReasonTag, reason));
 }

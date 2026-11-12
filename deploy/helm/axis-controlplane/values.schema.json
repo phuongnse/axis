@@ -11,6 +11,14 @@
       },
       "additionalProperties": false
     },
+    "namedSecretReference": {
+      "type": "object",
+      "description": "A reference to an existing Kubernetes Secret whose keys are fixed, so it holds only the name. It never holds a value.",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "tlsSecretReference": {
       "type": "object",
       "description": "A reference to an existing Kubernetes TLS Secret, with the keys tls.crt and tls.key. It never holds a value.",
@@ -55,6 +63,14 @@
             "userName": { "type": "string" }
           },
           "additionalProperties": false
+        },
+        "payOs": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string", "enum": ["", "PayOs"] },
+            "baseUrl": { "type": "string" }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
@@ -64,7 +80,9 @@
       "properties": {
         "connectionString": { "$ref": "#/definitions/secretReference" },
         "mailPassword": { "$ref": "#/definitions/secretReference" },
-        "certificate": { "$ref": "#/definitions/tlsSecretReference" }
+        "challengeKey": { "$ref": "#/definitions/secretReference" },
+        "certificate": { "$ref": "#/definitions/tlsSecretReference" },
+        "payOs": { "$ref": "#/definitions/namedSecretReference" }
       },
       "additionalProperties": false
     }

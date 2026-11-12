@@ -74,6 +74,24 @@ afterEach(() => {
   localStorage.clear()
 })
 
+describe('Blocks', () => {
+  it('draws each block as a panel with its title as its heading', () => {
+    renderOverview({ resources: [], history: live })
+
+    const blocks: [string, string][] = [
+      ['get-started', 'Get started'],
+      ['live', 'Live'],
+      ['changes', 'Changes since the live release'],
+      ['more', 'More you can add'],
+    ]
+    for (const [name, title] of blocks) {
+      expect(
+        within(screen.getByTestId(`studio-section-${name}`)).getByRole('heading', { name: title }),
+      ).toBeInTheDocument()
+    }
+  })
+})
+
 describe('Get started', () => {
   it('leads with the four steps while the application has no entity', () => {
     renderOverview({ resources: [] })

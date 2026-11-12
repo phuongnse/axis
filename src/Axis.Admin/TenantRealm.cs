@@ -14,8 +14,8 @@ namespace Axis.Admin;
 /// <summary>The identity provider's admin address and the client that <see cref="TenantRealm"/> signs in as, in the master realm.</summary>
 internal sealed record IdentityProviderAdmin(Uri BaseAddress, string ClientId, string ClientSecret);
 
-/// <summary>The secrets of the three clients of a tenant's realm.</summary>
-internal sealed record TenantRealmSecrets(string Platform, string Activation, string Users);
+/// <summary>The secrets of the four clients of a tenant's realm.</summary>
+internal sealed record TenantRealmSecrets(string Platform, string Activation, string Users, string Agent);
 
 /// <summary>
 /// Creates a tenant's realm in Axis's identity provider through its admin API, or brings an existing one up to date.
@@ -25,18 +25,20 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
 /// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose steps are a deny step that <see cref="RealmUsersQuota"/> switches, off when made, and one that creates a new user, and it turns off the Verify Profile step. It also turns off the account console client and takes <c>manage-account</c> out of the
-/// realm's default roles, as Axis's account page replaces Keycloak's. It also gets three clients: the platform client
-/// <c>axis</c>, which <see cref="EnsureForTenantAsync"/> gives the redirect addresses of the tenant's hosts, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
+/// realm's default roles, as Axis's account page replaces Keycloak's. It also gets four clients: the platform client
+/// <c>axis</c>, which <see cref="EnsureForTenantAsync"/> gives the redirect addresses of the tenant's hosts and whose access token names <c>axis-agent</c> in its audience (<see cref="RealmAgentClient.AudienceMapperName"/>), <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
-/// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme and <see cref="EmailTheme"/> as its email theme. The identity provider
+/// rights over its users only, and the agent host's client <see cref="RealmAgentClient.ClientId"/>, which can only exchange a token and has no roles
+/// (<c>docs/reference/identity-provider.md#keeping-the-realm-in-step</c>). The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme and <see cref="EmailTheme"/> as its email theme. The identity provider
 /// must hold the themes and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
 /// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the themes, the client and the roles again. An error names the step and the status code,
 /// never a response body or a secret. A server error (5xx) makes it read the realm again and repeat, up to three attempts.
 /// It also gets the token rules of the MCP sign-in (see <c>docs/reference/mcp-server.md#sign-in</c>): access tokens of <see cref="AccessTokenLifespanSeconds"/>
 /// seconds, refresh tokens that work once, and a client policy that refuses an authorization request from a public client that sends no PKCE <c>S256</c> challenge.
 /// The client scope <see cref="RealmSync.AuthoringScope"/> comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, which <see cref="EnsureForTenantAsync"/> calls.
-/// It lets an outside MCP client register itself without a token, under the rules of <c>docs/reference/mcp-server.md#client-registration</c>: the client policy
-/// <see cref="RegistrationPolicy"/> and the realm's anonymous registration policies.
+/// It gives the rules of an outside MCP client's registration without a token (<c>docs/reference/mcp-server.md#client-registration</c>): the client policy
+/// <see cref="RegistrationPolicy"/> and the realm's anonymous registration policies. Registration opens only through <see cref="RealmSync.SyncOutsideClientsAsync"/>,
+/// which <see cref="EnsureForTenantAsync"/> calls with the tenant's <c>Ai:OutsideClients</c> setting.
 /// <see cref="DeleteAsync"/> deletes a realm, and a realm that is already gone counts as deleted.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -93,7 +95,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public Uri BaseAddress => admin.BaseAddress;
 
     /// <summary>
-    /// Makes the realm of a main tenant, named after the tenant id, and points the tenant's sign-in settings at it. The three
+    /// Makes the realm of a main tenant, named after the tenant id, and points the tenant's sign-in settings at it. The four
     /// client secrets are generated, or kept when the row holds them already. They and the <c>Oidc</c> block are saved,
     /// encrypted, before the identity provider is called, so a stop between the two never loses a secret.
     /// </summary>
@@ -104,6 +106,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         changed |= Ensure(row.OidcClientSecret, TenantSecretFields.OidcClientSecret, value => row.OidcClientSecret = value);
         changed |= Ensure(row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
         changed |= Ensure(row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
+        changed |= Ensure(row.RealmAgentClientSecret, TenantSecretFields.RealmAgentClientSecret, value => row.RealmAgentClientSecret = value);
 
         var authority = new Uri(admin.BaseAddress, $"realms/{Uri.EscapeDataString(id)}").ToString();
         if (row.OidcAuthority != authority || row.OidcClientId != PlatformClientId)
@@ -122,14 +125,19 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         var secrets = new TenantRealmSecrets(
             cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal(),
             cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal(),
-            cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
+            cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal(),
+            cipher.Decrypt(id, TenantSecretFields.RealmAgentClientSecret, row.RealmAgentClientSecret!).Reveal());
 
         // The realm has no display name until the command takes the organization's name, so the pages name Axis, never the tenant id.
         await EnsureAsync(id, string.Empty, secrets, mail.For(DirectoryTenantCatalog.Email(row, cipher)), cancellationToken);
 
         // The platform client gets the addresses of the tenant's hosts, so a person can finish a sign-in on each of them.
         var hosts = await platform.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToListAsync(cancellationToken);
-        await new RealmSync(http, admin.BaseAddress).SyncPlatformAddressesAsync(id, secrets.Activation, hosts, cancellationToken);
+        var sync = new RealmSync(http, admin.BaseAddress);
+        await sync.SyncPlatformAddressesAsync(id, secrets.Activation, hosts, cancellationToken);
+
+        // The tenant's switch decides whether an outside MCP client can register and sign in (docs/reference/mcp-server.md#client-registration).
+        await sync.SyncOutsideClientsAsync(id, secrets.Activation, row.AiOutsideClients, row.AiAllowedClients, cancellationToken);
 
         // A secret that is stored is kept, so a rerun never changes it.
         bool Ensure(byte[]? stored, string field, Action<byte[]> write)
@@ -203,7 +211,9 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
         await EnsureNoAccountConsoleAsync(token, realmPath, cancellationToken);
-        await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
+        var platform = await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
+        await EnsurePlatformAudienceMapperAsync(token, realmPath, platform, cancellationToken);
+        await EnsureClientAsync(token, realmPath, RealmAgentClient.Representation(secrets.Agent), cancellationToken);
         var activation = await EnsureClientAsync(token, realmPath, ServiceClient(ActivationClientId, secrets.Activation), cancellationToken);
         var users = await EnsureClientAsync(token, realmPath, ServiceClient(UsersClientId, secrets.Users), cancellationToken);
 
@@ -349,12 +359,12 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     }
 
     /// <summary>
-    /// Lets an outside MCP client register itself at the realm without a token, as a public client that requires consent
-    /// (<c>docs/reference/mcp-server.md#client-registration</c>). The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
+    /// Gives the rules of an outside MCP client's registration at the realm, as a public client that requires consent
+    /// (<c>docs/reference/mcp-server.md#client-registration</c>). It does not open registration, which only <see cref="RealmSync.SyncOutsideClientsAsync"/> does.
+    /// The client policy <see cref="RegistrationPolicy"/> applies to a client that an anonymous
     /// registration writes and to an update with the registration access token that the registration returns, and never to a client that an administrator or Axis writes. Its executors refuse a redirect address that is neither <c>https</c>
     /// nor <c>http</c> on a loopback address, the implicit flow, the password flow and every client authenticator, which makes a confidential client impossible,
-    /// and they set consent required and the full scope off. The realm's anonymous registration
-    /// policies lose the Trusted Hosts policy, which Keycloak cannot loosen, and a Consent Required policy is added when it is missing. The Allowed Client Scopes
+    /// and they set consent required and the full scope off. A Consent Required anonymous registration policy is added when the realm lacks it. The Allowed Client Scopes
     /// policy comes from <see cref="RealmSync.SyncPlatformAddressesAsync"/>, because Keycloak refuses <see cref="RealmSync.AuthoringScope"/> before the scope exists.
     /// Every other registration policy stays as it is.
     /// </summary>
@@ -428,12 +438,6 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         EnsureSuccess(listed, "read the registration policies");
         var anonymous = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
             .Where(component => component.TryGetProperty("subType", out var subType) && subType.GetString() == "anonymous").ToList();
-
-        foreach (var trustedHosts in anonymous.Where(component => component.GetProperty("providerId").GetString() == "trusted-hosts"))
-        {
-            using var removed = await SendAsync(token, HttpMethod.Delete, $"{componentsPath}/{trustedHosts.GetProperty("id").GetString()}", null, cancellationToken);
-            EnsureSuccess(removed, "remove the trusted hosts registration policy");
-        }
 
         if (anonymous.Any(component => component.GetProperty("providerId").GetString() == "consent-required"))
         {
@@ -739,6 +743,60 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/clients/{uuid}", client, cancellationToken);
         EnsureSuccess(updated, $"update the client '{clientId}'");
         return uuid;
+    }
+
+    /// <summary>
+    /// Gives the platform client the mapper <see cref="RealmAgentClient.AudienceMapperName"/>, which puts <see cref="RealmAgentClient.ClientId"/> into the audience of its access token,
+    /// or corrects it. A client update does not touch mappers, so a rerun needs this step.
+    /// </summary>
+    private async Task EnsurePlatformAudienceMapperAsync(string token, string realmPath, string platformUuid, CancellationToken cancellationToken)
+    {
+        var mappersPath = $"{realmPath}/clients/{platformUuid}/protocol-mappers/models";
+        var config = new Dictionary<string, string>
+        {
+            ["included.client.audience"] = RealmAgentClient.ClientId,
+            ["access.token.claim"] = "true",
+            ["id.token.claim"] = "false",
+            ["introspection.token.claim"] = "true",
+        };
+        var representation = new Dictionary<string, object?>
+        {
+            ["name"] = RealmAgentClient.AudienceMapperName,
+            ["protocol"] = "openid-connect",
+            ["protocolMapper"] = "oidc-audience-mapper",
+            ["config"] = config,
+        };
+
+        using var listed = await SendAsync(token, HttpMethod.Get, mappersPath, null, cancellationToken);
+        EnsureSuccess(listed, $"list the mappers of the client '{PlatformClientId}'");
+        JsonElement? current = null;
+        foreach (var mapper in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            if (mapper.GetProperty("name").GetString() == RealmAgentClient.AudienceMapperName)
+            {
+                current = mapper;
+                break;
+            }
+        }
+
+        if (current is not { } existing)
+        {
+            using var created = await SendAsync(token, HttpMethod.Post, mappersPath, representation, cancellationToken);
+            EnsureSuccess(created, $"create the mapper '{RealmAgentClient.AudienceMapperName}' of the client '{PlatformClientId}'");
+            return;
+        }
+
+        var inStep = existing.GetProperty("protocolMapper").GetString() == "oidc-audience-mapper"
+            && existing.TryGetProperty("config", out var held)
+            && held.ValueKind == JsonValueKind.Object
+            && config.All(pair => held.TryGetProperty(pair.Key, out var value) && value.GetString() == pair.Value);
+        if (!inStep)
+        {
+            var id = existing.GetProperty("id").GetString();
+            representation["id"] = id;
+            using var updated = await SendAsync(token, HttpMethod.Put, $"{mappersPath}/{id}", representation, cancellationToken);
+            EnsureSuccess(updated, $"update the mapper '{RealmAgentClient.AudienceMapperName}' of the client '{PlatformClientId}'");
+        }
     }
 
     internal async Task<string?> ClientUuidAsync(string token, string realmPath, string clientId, CancellationToken cancellationToken)

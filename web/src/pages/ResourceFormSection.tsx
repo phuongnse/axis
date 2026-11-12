@@ -13,9 +13,8 @@ export function ResourceFormSections({ children }: { children: ReactNode }) {
 }
 
 /**
- * A section of a resource form, see docs/reference/studio-resource-form.md#sections: a panel with an optional heading,
- * its line and a slot for an action on the right of the heading. A section with no heading is the panel alone.
- * Proposed: a heading's line is optional; see the review on #3263.
+ * A section of a Studio page, see docs/reference/studio-resource-form.md#sections: a panel with an optional heading,
+ * its optional line and a slot for an action on the right of the heading. A section with no heading is the panel alone.
  */
 export function ResourceFormSection({
   testName,
@@ -25,7 +24,7 @@ export function ResourceFormSection({
 }: {
   /** In `data-testid="studio-section-<testName>"`. */
   testName: string
-  /** The heading and its line. None for the last section of unnamed properties. */
+  /** The heading, and its line when it has one. None for the last section of unnamed properties. */
   heading?: { title: string; line?: string }
   /** On the right of the heading, such as a list's Add. A function child draws the slot in its place. */
   action?: ReactNode

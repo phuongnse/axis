@@ -61,6 +61,7 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
             || uri.AbsolutePath.EndsWith("/client-scopes", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/default-optional-client-scopes", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/default-default-client-scopes", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/optional-client-scopes", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/components", StringComparison.Ordinal)
             || uri.AbsolutePath.EndsWith("/mappers", StringComparison.Ordinal))
         {

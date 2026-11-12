@@ -129,7 +129,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         var item = Assert.Single(body.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal("PurchaseRequests", item.GetProperty("name").GetString());
-        Assert.Equal(["name", "titles", "descriptions"], item.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["name", "id", "titles", "descriptions"], item.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("219102bc-864f-42ed-874a-c19eaee0d1ba", item.GetProperty("id").GetString());
         Assert.Equal("Purchase requests", item.GetProperty("titles").GetProperty("en").GetString());
     }
 

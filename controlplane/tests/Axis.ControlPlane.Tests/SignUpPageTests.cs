@@ -1,7 +1,11 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Axis.Server.Http;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Axis.ControlPlane.Tests;
 
@@ -37,6 +41,19 @@ public sealed class SignUpPageTests : IDisposable
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync("/sign-up/verify", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Page, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        AssertPlatformPolicy(response);
+    }
+
+    [Fact]
+    public async Task The_progress_page_is_served_at_sign_up_progress_with_the_platforms_content_security_policy()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/sign-up/progress", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(Page, await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -87,6 +104,39 @@ public sealed class SignUpPageTests : IDisposable
         using var client = factory.CreateClient();
 
         var response = await client.GetAsync("/api/sign-up/documents", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task The_challenge_is_signed_with_the_key_and_expires_ten_minutes_after_it_is_served()
+    {
+        var key = Encoding.UTF8.GetBytes("thirty-two-bytes-key-for-testing");
+        var served = new DateTimeOffset(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        using var factory = ControlPlaneFactory
+            .Create(settings: new Dictionary<string, string?> { ["ControlPlane:SignUp:ChallengeKey"] = Convert.ToBase64String(key) })
+            .WithWebHostBuilder(builder => builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(new FixedClock(served))));
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/sign-up/challenge", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        var root = body.RootElement;
+        var challenge = root.GetProperty("challenge").GetString()!;
+        Assert.Equal(Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(challenge))), root.GetProperty("signature").GetString());
+        Assert.Equal("SHA-256", root.GetProperty("algorithm").GetString());
+        Assert.Equal(100_000, root.GetProperty("maxnumber").GetInt32());
+        Assert.EndsWith($"?expires={served.AddMinutes(10).ToUnixTimeSeconds()}&", root.GetProperty("salt").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task With_no_challenge_key_the_challenge_answers_unavailable()
+    {
+        using var factory = ControlPlaneFactory.Create();
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/sign-up/challenge", TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
@@ -160,5 +210,10 @@ public sealed class SignUpPageTests : IDisposable
                 Assert.Contains(source, _allowedSources);
             }
         }
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 }

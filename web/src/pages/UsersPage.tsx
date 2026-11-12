@@ -1,10 +1,11 @@
-import { Button, Flex, Input, Modal, Result, Tag, Typography } from 'antd'
+import { Button, Flex, Input, Modal, Result, Tabs, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { AxisTable } from '../platform/AxisTable'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { fetchTenantOutsideClients, type TenantOutsideClients } from '../platform/tenantOutsideClients'
 import { useDesignTokens } from '../platform/themeMode'
 import {
   fetchUsers,
@@ -16,10 +17,12 @@ import {
   type UserListResult,
 } from '../platform/users'
 import { visuallyHidden } from '../platform/visuallyHidden'
+import { ConnectedAppsTab } from './ConnectedAppsTab'
 import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { TenantExportSection } from './TenantExportSection'
+import { TenantModelKeySection } from './TenantModelKeySection'
 import { TenantUsageSection } from './TenantUsageSection'
 
 const pageSize = 20
@@ -57,7 +60,10 @@ const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
  * person's page, which shows their roles. The Invite button opens the form that invites a person. An invited account has a Resend
  * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
  * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
- * resend gives the person a new id. Below the list an administrator in a cell tenant has the Export data and Usage sections.
+ * resend gives the person a new id. The page has two tabs. People holds the list and, below it, the Export data and
+ * Usage sections for an administrator in a cell tenant and the Model key section where the installation allows tenant
+ * keys. Connected apps holds the outside MCP clients switch and the apps with consent, and shows only when
+ * `GET /api/tenant/outside-clients` answers `200`. See docs/reference/platform-pages.md#connected-apps.
  */
 export function UsersPage() {
   const t = useText()
@@ -76,6 +82,24 @@ export function UsersPage() {
   const [problem, setProblem] = useState<string>()
   // Counts the commands, so each one loads the list again.
   const [reloads, setReloads] = useState(0)
+  const [outsideClients, setOutsideClients] = useState<TenantOutsideClients | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchTenantOutsideClients(controller.signal).then(
+      (answer) => {
+        if (!controller.signal.aborted) {
+          setOutsideClients(answer)
+        }
+      },
+      (error: unknown) => {
+        if (!controller.signal.aborted) {
+          console.warn('Loading the outside clients setting failed', error)
+        }
+      },
+    )
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -143,114 +167,144 @@ export function UsersPage() {
       )}
       {loadFailed && <AxisAlert data-testid="users-error" kind="error" message={t('shell.users.loadFailed')} />}
       {list && !refusal && (
-        <>
-          <AxisTable<UserListItem>
-            rowKey={(row) => row.id}
-            dataSource={list.items}
-            emptyText={t('shell.users.empty')}
-            pagination={{ current: page, pageSize, total: list.totalCount }}
-            onChange={(pagination) => setPage(pagination.current ?? 1)}
-            toolbar={{
-              view: (
-                <Input.Search
-                  allowClear
-                  maxLength={200}
-                  aria-label={t('shell.users.search')}
-                  placeholder={t('shell.users.search')}
-                  style={{ maxWidth: 400 }}
-                  onSearch={(value) => {
-                    setSearch(value.trim())
-                    setPage(1)
-                  }}
-                />
-              ),
-              main: (
-                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    setDone(undefined)
-                    setProblem(undefined)
-                    setInviting(true)
-                  }}
-                >
-                  {t('shell.users.invite')}
-                </Button>
-              ),
-            }}
-            below={
-              <>
-                {done && <AxisAlert data-testid="users-done" kind="success" message={t(`shell.users.${done}.done`)} />}
-                {problem && <AxisAlert data-testid="users-command-problem" kind="error" message={t(problem)} />}
-              </>
-            }
-            columns={[
-              {
-                key: 'displayName',
-                kind: 'freeText',
-                title: t('shell.users.displayName'),
-                render: (_value, row) => <Link to={`/users/${encodeURIComponent(row.id)}`}>{row.displayName}</Link>,
-              },
-              { key: 'email', kind: 'freeText', title: t('shell.users.email'), render: (_value, row) => row.email },
-              {
-                key: 'provider',
-                kind: 'fixed',
-                title: t('shell.users.signIn'),
-                render: (_value, row) => row.provider ?? t('shell.users.account'),
-              },
-              {
-                key: 'status',
-                kind: 'fixed',
-                title: t('shell.users.status'),
-                render: (_value, row) => (
-                  <Tag color={statusColors[row.status]}>{t(`shell.users.status.${row.status}`)}</Tag>
-                ),
-              },
-              {
-                key: 'lastSignedInAt',
-                kind: 'fixed',
-                title: t('shell.users.lastSignedInAt'),
-                render: (_value, row) =>
-                  row.lastSignedInAt ? new Date(row.lastSignedInAt).toLocaleString(locale) : null,
-              },
-              {
-                key: 'commands',
-                kind: 'fixed',
-                title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
-                render: (_value, row) => {
-                  // Brokered users get no Resend and no Reset: those routes answer 409 for them.
-                  const buttons: Command[] = []
-                  if (row.status === 'invited' && row.provider === null) {
-                    buttons.push('resend')
-                  }
-                  buttons.push(row.status === 'disabled' ? 'enable' : 'disable')
-                  if (row.provider === null) {
-                    buttons.push('reset')
-                  }
-                  return (
-                    <Flex gap="small">
-                      {buttons.map((command) => (
+        <Tabs
+          defaultActiveKey="people"
+          items={[
+            {
+              key: 'people',
+              label: t('shell.users.people'),
+              children: (
+                <>
+                  <AxisTable<UserListItem>
+                    rowKey={(row) => row.id}
+                    dataSource={list.items}
+                    emptyText={t('shell.users.empty')}
+                    pagination={{ current: page, pageSize, total: list.totalCount }}
+                    onChange={(pagination) => setPage(pagination.current ?? 1)}
+                    toolbar={{
+                      view: (
+                        <Input.Search
+                          allowClear
+                          maxLength={200}
+                          aria-label={t('shell.users.search')}
+                          placeholder={t('shell.users.search')}
+                          style={{ maxWidth: 400 }}
+                          onSearch={(value) => {
+                            setSearch(value.trim())
+                            setPage(1)
+                          }}
+                        />
+                      ),
+                      main: (
                         // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
                         <Button
-                          key={command}
-                          size="small"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setPending({ command, user: row })
+                          type="primary"
+                          onClick={() => {
+                            setDone(undefined)
+                            setProblem(undefined)
+                            setInviting(true)
                           }}
                         >
-                          {t(`shell.users.${command}`)}
+                          {t('shell.users.invite')}
                         </Button>
-                      ))}
-                    </Flex>
-                  )
-                },
-              },
-            ]}
-          />
-          <TenantExportSection />
-          <TenantUsageSection />
-        </>
+                      ),
+                    }}
+                    below={
+                      <>
+                        {done && (
+                          <AxisAlert data-testid="users-done" kind="success" message={t(`shell.users.${done}.done`)} />
+                        )}
+                        {problem && <AxisAlert data-testid="users-command-problem" kind="error" message={t(problem)} />}
+                      </>
+                    }
+                    columns={[
+                      {
+                        key: 'displayName',
+                        kind: 'freeText',
+                        title: t('shell.users.displayName'),
+                        render: (_value, row) => (
+                          <Link to={`/users/${encodeURIComponent(row.id)}`}>{row.displayName}</Link>
+                        ),
+                      },
+                      {
+                        key: 'email',
+                        kind: 'freeText',
+                        title: t('shell.users.email'),
+                        render: (_value, row) => row.email,
+                      },
+                      {
+                        key: 'provider',
+                        kind: 'fixed',
+                        title: t('shell.users.signIn'),
+                        render: (_value, row) => row.provider ?? t('shell.users.account'),
+                      },
+                      {
+                        key: 'status',
+                        kind: 'fixed',
+                        title: t('shell.users.status'),
+                        render: (_value, row) => (
+                          <Tag color={statusColors[row.status]}>{t(`shell.users.status.${row.status}`)}</Tag>
+                        ),
+                      },
+                      {
+                        key: 'lastSignedInAt',
+                        kind: 'fixed',
+                        title: t('shell.users.lastSignedInAt'),
+                        render: (_value, row) =>
+                          row.lastSignedInAt ? new Date(row.lastSignedInAt).toLocaleString(locale) : null,
+                      },
+                      {
+                        key: 'commands',
+                        kind: 'fixed',
+                        title: <span style={visuallyHidden}>{t('shell.table.rowActions')}</span>,
+                        render: (_value, row) => {
+                          // Brokered users get no Resend and no Reset: those routes answer 409 for them.
+                          const buttons: Command[] = []
+                          if (row.status === 'invited' && row.provider === null) {
+                            buttons.push('resend')
+                          }
+                          buttons.push(row.status === 'disabled' ? 'enable' : 'disable')
+                          if (row.provider === null) {
+                            buttons.push('reset')
+                          }
+                          return (
+                            <Flex gap="small">
+                              {buttons.map((command) => (
+                                // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
+                                <Button
+                                  key={command}
+                                  size="small"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    setPending({ command, user: row })
+                                  }}
+                                >
+                                  {t(`shell.users.${command}`)}
+                                </Button>
+                              ))}
+                            </Flex>
+                          )
+                        },
+                      },
+                    ]}
+                  />
+                  <TenantExportSection />
+                  <TenantUsageSection />
+                  <TenantModelKeySection />
+                </>
+              ),
+            },
+            ...(outsideClients
+              ? [
+                  {
+                    key: 'connectedApps',
+                    label: t('shell.users.connectedApps.title'),
+                    children: <ConnectedAppsTab initial={outsideClients} />,
+                  },
+                ]
+              : []),
+          ]}
+        />
       )}
       {inviting && (
         <InviteUserModal

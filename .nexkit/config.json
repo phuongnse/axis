@@ -40,7 +40,11 @@
       "timeout_minutes": 30,
       "results": [
         "artifacts/test-results"
-      ]
+      ],
+      "shards": {
+        "count": "node scripts/lib/test-shard.mjs --count",
+        "max": 3
+      }
     },
     {
       "name": "smoke",
@@ -55,11 +59,15 @@
         ".github/**",
         ".nexkit/**",
         "**/*.md"
-      ]
+      ],
+      "shards": {
+        "count": "node scripts/lib/smoke-shard.mjs --count",
+        "max": 3
+      }
     },
     {
-      "name": "integration-1",
-      "run": "AXIS_INTEGRATION_SHARD=1/3 scripts/integration.sh",
+      "name": "integration",
+      "run": "scripts/integration.sh",
       "timeout_minutes": 30,
       "slow": true,
       "results": [
@@ -77,55 +85,15 @@
         "!web/vite.config.ts",
         "!web/vite.keycloak-theme.config.ts",
         "**/*.md"
-      ]
-    },
-    {
-      "name": "integration-2",
-      "run": "AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh",
-      "timeout_minutes": 30,
-      "slow": true,
-      "results": [
-        "artifacts/test-results"
       ],
-      "unaffected_by": [
-        "docs/**",
-        ".github/**",
-        ".nexkit/**",
-        "tests/e2e/**",
-        "web/**",
-        "!web/package.json",
-        "!web/package-lock.json",
-        "!web/keycloak-theme/**",
-        "!web/vite.config.ts",
-        "!web/vite.keycloak-theme.config.ts",
-        "**/*.md"
-      ]
+      "shards": {
+        "count": "node scripts/lib/integration-shard.mjs --count",
+        "max": 5
+      }
     },
     {
-      "name": "integration-3",
-      "run": "AXIS_INTEGRATION_SHARD=3/3 scripts/integration.sh",
-      "timeout_minutes": 30,
-      "slow": true,
-      "results": [
-        "artifacts/test-results"
-      ],
-      "unaffected_by": [
-        "docs/**",
-        ".github/**",
-        ".nexkit/**",
-        "tests/e2e/**",
-        "web/**",
-        "!web/package.json",
-        "!web/package-lock.json",
-        "!web/keycloak-theme/**",
-        "!web/vite.config.ts",
-        "!web/vite.keycloak-theme.config.ts",
-        "**/*.md"
-      ]
-    },
-    {
-      "name": "e2e-1",
-      "run": "AXIS_E2E_SHARD=1/3 scripts/e2e.sh",
+      "name": "e2e",
+      "run": "scripts/e2e.sh",
       "timeout_minutes": 30,
       "slow": true,
       "results": [
@@ -138,41 +106,11 @@
         ".github/**",
         ".nexkit/**",
         "**/*.md"
-      ]
-    },
-    {
-      "name": "e2e-2",
-      "run": "AXIS_E2E_SHARD=2/3 scripts/e2e.sh",
-      "timeout_minutes": 30,
-      "slow": true,
-      "results": [
-        "artifacts/test-results",
-        "artifacts/logs",
-        "tests/e2e/test-results"
       ],
-      "unaffected_by": [
-        "docs/**",
-        ".github/**",
-        ".nexkit/**",
-        "**/*.md"
-      ]
-    },
-    {
-      "name": "e2e-3",
-      "run": "AXIS_E2E_SHARD=3/3 scripts/e2e.sh",
-      "timeout_minutes": 30,
-      "slow": true,
-      "results": [
-        "artifacts/test-results",
-        "artifacts/logs",
-        "tests/e2e/test-results"
-      ],
-      "unaffected_by": [
-        "docs/**",
-        ".github/**",
-        ".nexkit/**",
-        "**/*.md"
-      ]
+      "shards": {
+        "count": "node scripts/lib/e2e-shard.mjs --count",
+        "max": 5
+      }
     }
   ],
   "cache": [
@@ -204,6 +142,25 @@
       ],
       "key_files": [
         "tests/e2e/package-lock.json"
+      ]
+    },
+    {
+      "name": "tools",
+      "paths": [
+        "~/.cache/axis-tools"
+      ],
+      "key_files": [
+        "scripts/lib/tools.sh"
+      ]
+    },
+    {
+      "name": "docker",
+      "paths": [
+        "~/.cache/axis-docker"
+      ],
+      "key_files": [
+        "Dockerfile",
+        "scripts/docker-images.json"
       ]
     }
   ],
@@ -291,7 +248,8 @@
     "max_parallel": 3,
     "watch_workflows": [],
     "trusted_workflows": [
-      "docs-audit.yml"
+      "docs-audit.yml",
+      "ci.yml"
     ],
     "priority": [
       "nexkit:ci",
@@ -310,21 +268,20 @@
       },
       "on-hold": {
         "hold": true
+      },
+      "hand-made": {
+        "hold": true
       }
     },
     "dependabot": "high"
   },
   "evidence": {
     "artifacts": [
-      "test-results-e2e-1",
-      "test-results-e2e-2",
-      "test-results-e2e-3",
-      "test-results-integration-1",
-      "test-results-integration-2",
-      "test-results-integration-3",
+      "test-results-e2e-*",
+      "test-results-integration-*",
       "test-results-performance",
-      "test-results-smoke",
-      "test-results-test"
+      "test-results-smoke-*",
+      "test-results-test-*"
     ]
   },
   "notify": [

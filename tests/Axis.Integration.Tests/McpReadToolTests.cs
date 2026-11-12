@@ -182,6 +182,7 @@ public sealed class McpReadToolTests(KeycloakFixture keycloak, PostgreSqlFixture
         var authority = await keycloak.StartAsync();
         StudioReleaseHistoryTests.CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), Folder);
         var platform = await database.CreateDatabaseAsync("mcp_read_tools", CancellationToken);
+        await DataDatabaseFixture.MigrateTenantAsync(database.ConnectionString, CancellationToken);
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");

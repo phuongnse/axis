@@ -3,6 +3,8 @@ import path from "node:path";
 
 export interface CompareOptions {
   files?: string[];
+  /** Leaves out the files under these top-level folders in both folders, such as `scenarios`. */
+  exceptFolders?: string[];
   /** Ignores the `name` of page widgets, actions, columns and tabs. Studio's generated names differ from the samples' names. */
   ignorePageElementNames?: boolean;
   /**
@@ -36,8 +38,8 @@ type TextResource = Record<string, unknown> & { texts: Record<string, string> };
  * pairing.
  */
 export function compareApplicationFolders(expected: string, actual: string, options: CompareOptions = {}): void {
-  const expectedFiles = listFiles(expected);
-  const actualFiles = listFiles(actual);
+  const expectedFiles = listFiles(expected).filter((file) => !inFolders(file, options.exceptFolders));
+  const actualFiles = listFiles(actual).filter((file) => !inFolders(file, options.exceptFolders));
   const expectedSet = new Set(expectedFiles);
   const actualSet = new Set(actualFiles);
 
@@ -117,6 +119,10 @@ function isPickedLabel(file: string, pointer: string): boolean {
   if (file.startsWith("entities/")) return pointer.startsWith("/fields/");
   if (file.startsWith("processes/")) return /^\/steps\/\d+(\/outcomes\/\d+)?\/label\/textKey$/.test(pointer);
   return false;
+}
+
+function inFolders(file: string, folders: string[] = []): boolean {
+  return folders.some((folder) => file.startsWith(`${folder}/`));
 }
 
 function listFiles(root: string): string[] {

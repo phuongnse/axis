@@ -37,10 +37,13 @@ interface CellProps {
   value: unknown
   problem: string | undefined
   onChange: (next: unknown) => void
+  /** The id and description that `AxisField` gives its input. */
+  id?: string
+  'aria-describedby'?: string
 }
 
 /** A number cell keeps the text as typed, because `1.50` and `1.` are not the number the text stands for. */
-function NumberCell({ field, value, problem, onChange }: CellProps) {
+function NumberCell({ field, value, problem, onChange, id, 'aria-describedby': describedBy }: CellProps) {
   const type = field.type === 'integer' ? 'integer' : 'decimal'
   const [text, setText] = useState(display(value))
 
@@ -56,6 +59,8 @@ function NumberCell({ field, value, problem, onChange }: CellProps) {
 
   return (
     <Input
+      id={id}
+      aria-describedby={describedBy}
       aria-label={field.name}
       aria-invalid={problem !== undefined}
       status={problem ? 'error' : undefined}
@@ -75,7 +80,7 @@ function isTextLike(field: SeedField): boolean {
 }
 
 export function FieldCell(props: CellProps) {
-  const { field, value, problem, onChange } = props
+  const { field, value, problem, onChange, id, 'aria-describedby': describedBy } = props
   const status = problem ? ('error' as const) : undefined
   switch (field.type) {
     case 'integer':
@@ -86,6 +91,8 @@ export function FieldCell(props: CellProps) {
       return (
         <Select
           virtual={false}
+          id={id}
+          aria-describedby={describedBy}
           aria-label={field.name}
           aria-invalid={problem !== undefined}
           status={status}
@@ -105,6 +112,8 @@ export function FieldCell(props: CellProps) {
           showSearch
           optionFilterProp="label"
           virtual={false}
+          id={id}
+          aria-describedby={describedBy}
           aria-label={field.name}
           aria-invalid={problem !== undefined}
           status={status}
@@ -118,6 +127,8 @@ export function FieldCell(props: CellProps) {
     default:
       return (
         <Input
+          id={id}
+          aria-describedby={describedBy}
           aria-label={field.name}
           aria-invalid={problem !== undefined}
           status={status}

@@ -1,0 +1,11 @@
+Subject: Your Axis trial has 1 day left
+
+Hello {{name}},
+
+The trial of the workspace at {{tenantAddress}} ends in 1 day, on {{nextStepAt}}. After that the workspace is read-only.
+
+To stop that, pay in the billing portal before then:
+
+{{billingPortalUrl}}
+
+The Axis team

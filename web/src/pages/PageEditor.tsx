@@ -1,5 +1,5 @@
 import { Button, Card, Flex, Input, InputNumber, Select, Switch, Typography } from 'antd'
-import { lazy, Suspense, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AxisButton } from '../platform/AxisButton'
 import { AxisField, type AxisFieldProps } from '../platform/AxisField'
 import { AxisFieldGroup } from '../platform/AxisFieldGroup'
@@ -30,19 +30,17 @@ import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
 import type { StudioNamePage, StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { WarningLine } from './CatalogControls'
 import { LabelTexts } from './LabelTexts'
 import { LayerMarkTag, RemovedRows, type DesignerLayer } from './LayerMarkViews'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
 import { useFieldTexts } from './fieldTexts'
 import { MappingRows } from './MappingRows'
 import { stepLabels, usePartLabel } from './pagePaletteSupport'
+import { Expression } from './ProcessFields'
 import { uniqueStepName } from './processPalette'
 import { ReferencePicker } from './ReferencePicker'
 import { ResourceFormSection, ResourceFormSections } from './ResourceFormSection'
 import type { ChangeHandler } from './SchemaForm'
-
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
 type Content = Record<string, unknown>
 
@@ -606,16 +604,14 @@ function WidgetPanel({
   onSelect: (pointer: string) => void
   onChange: ChangeHandler
 }) {
-  const t = useText()
   const type = isContent(widget) && typeof widget.type === 'string' ? widget.type : undefined
 
   if (type !== undefined && containerTypes.includes(type)) {
     return (
       <Flex vertical gap="small" data-testid={`studio-field-${base}`}>
-        <div data-testid={`studio-field-${base}/type`}>
-          <div>{t('shell.studio.page.widgetType')}</div>
-          <Typography.Text>{type}</Typography.Text>
-        </div>
+        <PageField pointer={`${base}/type`}>
+          <Input readOnly value={type} />
+        </PageField>
         {isContent(widget) && type === 'columns' && (
           <ColumnsPanel base={base} columns={widget.columns} layer={layer} onChange={onChange} />
         )}
@@ -766,25 +762,24 @@ function WidgetPanel({
  */
 function ColumnField({
   pointer,
-  label,
   current,
   options,
   onPick,
 }: {
   pointer: string
-  label: string
   current: unknown
   /** The columns the picker lists, or `undefined` while the application's names have not loaded. */
   options: string[] | undefined
   onPick: (next: string) => void
 }) {
+  const { field } = useFieldTexts('page')
+  const { label } = field(pageFieldPath(pointer))
   const value = typeof current === 'string' ? current : undefined
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
-      <div>{label}</div>
+    <PageField pointer={pointer}>
       {options === undefined ? (
-        <Input aria-label={label} value={text(value)} onChange={(event) => onPick(event.target.value)} />
+        <Input value={text(value)} onChange={(event) => onPick(event.target.value)} />
       ) : (
         <ReferencePicker
           name={label}
@@ -794,7 +789,7 @@ function ColumnField({
           onChange={(next) => onPick(next ?? '')}
         />
       )}
-    </div>
+    </PageField>
   )
 }
 
@@ -831,10 +826,9 @@ function ParameterBindings({
   const pointer = `${base}/parameters`
   if (value !== undefined && !isContent(value)) {
     return (
-      <div data-testid={`studio-field-${pointer}`}>
-        <div>{t('shell.studio.page.parameterBindings')}</div>
+      <PageFieldGroup pointer={pointer}>
         <JsonOnly />
-      </div>
+      </PageFieldGroup>
     )
   }
 
@@ -842,9 +836,8 @@ function ParameterBindings({
   const candidates = Array.isArray(pageParameters) ? pageParameters : []
 
   return (
-    <div data-testid={`studio-field-${pointer}`}>
+    <PageFieldGroup pointer={pointer}>
       <Flex vertical gap="small">
-        <Typography.Text strong>{t('shell.studio.page.parameterBindings')}</Typography.Text>
         {parameters.map((parameter) => {
           const key =
             Object.keys(bound).find((name) => name.toLowerCase() === parameter.name.toLowerCase()) ?? parameter.name
@@ -857,19 +850,23 @@ function ParameterBindings({
           )
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
-              <Typography.Text type="secondary">{`${parameter.name}, ${parameter.type}`}</Typography.Text>
-              <ReferencePicker
-                name={parameter.name}
-                value={typeof current === 'string' ? current : undefined}
-                required={false}
-                options={options}
-                onChange={(next) => onChange(rowPointer, next)}
-              />
+              <AxisField
+                label={parameter.name}
+                help={t('shell.studio.page.parameterBinding.help').replace('{type}', parameter.type)}
+              >
+                <ReferencePicker
+                  name={parameter.name}
+                  value={typeof current === 'string' ? current : undefined}
+                  required={false}
+                  options={options}
+                  onChange={(next) => onChange(rowPointer, next)}
+                />
+              </AxisField>
             </div>
           )
         })}
       </Flex>
-    </div>
+    </PageFieldGroup>
   )
 }
 
@@ -895,6 +892,7 @@ function KpiPanel({
   onChange: ChangeHandler
 }) {
   const t = useText()
+  const { group } = useFieldTexts('page')
   const names = useContext(StudioNamesContext)
   const measures =
     names === undefined
@@ -924,16 +922,14 @@ function KpiPanel({
       />
       <ColumnField
         pointer={`${base}/measure`}
-        label={t('shell.studio.page.measure')}
         current={widget.measure}
         options={measures}
         onPick={(next) => onChange(`${base}/measure`, next)}
       />
-      <div data-testid={`studio-field-${base}/label`}>
-        <div>{t('shell.studio.page.kpiLabel')}</div>
+      <PageFieldGroup pointer={`${base}/label`}>
         <LabelTexts pointer={`${base}/label`} value={widget.label} onChange={onChange} />
-      </div>
-      <div data-testid={`studio-field-${base}/comparison`}>
+      </PageFieldGroup>
+      <PageFieldGroup pointer={`${base}/comparison`}>
         <Flex vertical gap="small">
           {comparison === undefined ? (
             <div>
@@ -944,18 +940,15 @@ function KpiPanel({
             </div>
           ) : isContent(comparison) ? (
             <>
-              <Typography.Text strong>{t('shell.studio.page.comparison')}</Typography.Text>
               <ColumnField
                 pointer={`${base}/comparison/measure`}
-                label={t('shell.studio.page.measure')}
                 current={comparison.measure}
                 options={measures}
                 onPick={(next) => onChange(`${base}/comparison/measure`, next)}
               />
-              <div data-testid={`studio-field-${base}/comparison/label`}>
-                <div>{t('shell.studio.page.kpiLabel')}</div>
+              <PageFieldGroup pointer={`${base}/comparison/label`}>
                 <LabelTexts pointer={`${base}/comparison/label`} value={comparison.label} onChange={onChange} />
-              </div>
+              </PageFieldGroup>
               <div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button danger onClick={() => onChange(`${base}/comparison`, undefined)}>
@@ -967,7 +960,7 @@ function KpiPanel({
             <JsonOnly />
           )}
         </Flex>
-      </div>
+      </PageFieldGroup>
       <div
         ref={navigateRef}
         data-testid={`studio-field-${base}/navigate`}
@@ -978,40 +971,41 @@ function KpiPanel({
             : undefined
         }
       >
-        <Flex vertical gap="small">
-          {navigate === undefined ? (
-            <div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button
-                onClick={() => {
-                  onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })
-                  onSelect(`${base}/navigate`)
-                }}
-              >
-                {t('shell.studio.page.addNavigateAction')}
-              </Button>
-            </div>
-          ) : isContent(navigate) ? (
-            <>
-              <Typography.Text strong>{t('shell.studio.page.navigate')}</Typography.Text>
-              <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
+        <AxisFieldGroup {...group(pageFieldPath(`${base}/navigate`))}>
+          <Flex vertical gap="small">
+            {navigate === undefined ? (
               <div>
                 {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
                 <Button
-                  danger
                   onClick={() => {
-                    onChange(`${base}/navigate`, undefined)
-                    onSelect(base)
+                    onChange(`${base}/navigate`, { type: 'navigate', page: '', label: { textKey: '' } })
+                    onSelect(`${base}/navigate`)
                   }}
                 >
-                  {t('shell.studio.page.removeNavigate')}
+                  {t('shell.studio.page.addNavigateAction')}
                 </Button>
               </div>
-            </>
-          ) : (
-            <JsonOnly />
-          )}
-        </Flex>
+            ) : isContent(navigate) ? (
+              <>
+                <NavigateFields pointer={`${base}/navigate`} action={navigate} onChange={onChange} />
+                <div>
+                  {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                  <Button
+                    danger
+                    onClick={() => {
+                      onChange(`${base}/navigate`, undefined)
+                      onSelect(base)
+                    }}
+                  >
+                    {t('shell.studio.page.removeNavigate')}
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <JsonOnly />
+            )}
+          </Flex>
+        </AxisFieldGroup>
       </div>
     </>
   )
@@ -1062,31 +1056,26 @@ function ChartPanel({
         pageParameters={parameters}
         onChange={onChange}
       />
-      <div data-testid={`studio-field-${base}/kind`}>
-        <div>{t('shell.studio.page.chartKind')}</div>
+      <PageField pointer={`${base}/kind`}>
         <Select
-          aria-label={t('shell.studio.page.chartKind')}
           virtual={false}
           style={{ minWidth: 240 }}
           value={typeof widget.kind === 'string' ? widget.kind : undefined}
           options={chartKinds.map((kind) => ({ value: kind, label: kind }))}
           onChange={(next: string) => onChange(`${base}/kind`, next)}
         />
-      </div>
+      </PageField>
       <ColumnField
         pointer={`${base}/category`}
-        label={t('shell.studio.page.category')}
         current={widget.category}
         options={categories}
         onPick={(next) => onChange(`${base}/category`, next)}
       />
-      <div data-testid={`studio-field-${base}/title`}>
-        <div>{t('shell.studio.page.chartTitle')}</div>
+      <PageFieldGroup pointer={`${base}/title`}>
         <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
-      </div>
-      <div data-testid={`studio-field-${base}/measures`}>
+      </PageFieldGroup>
+      <PageFieldGroup pointer={`${base}/measures`}>
         <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.page.measures')}</Typography.Text>
           {!Array.isArray(measures) ? (
             <JsonOnly />
           ) : (
@@ -1098,13 +1087,11 @@ function ChartPanel({
                       <>
                         <ColumnField
                           pointer={`${base}/measures/${index}/name`}
-                          label={t('shell.studio.page.measure')}
                           current={measure.name}
                           options={numbers}
                           onPick={(next) => onChange(`${base}/measures/${index}/name`, next)}
                         />
-                        <div data-testid={`studio-field-${base}/measures/${index}/label`}>
-                          <div>{t('shell.studio.page.measureLabel')}</div>
+                        <PageFieldGroup pointer={`${base}/measures/${index}/label`}>
                           <LabelTexts
                             // The label editors keep their state by position, so they remount when a measure is
                             // added or removed.
@@ -1113,7 +1100,7 @@ function ChartPanel({
                             value={measure.label}
                             onChange={onChange}
                           />
-                        </div>
+                        </PageFieldGroup>
                       </>
                     ) : (
                       <JsonOnly />
@@ -1147,7 +1134,7 @@ function ChartPanel({
             </>
           )}
         </Flex>
-      </div>
+      </PageFieldGroup>
     </>
   )
 }
@@ -1221,10 +1208,8 @@ function ColumnsPanel({
               <LayerMarkTag layer={layer} list={`${base}/columns`} index={index} name={column.name} />
             )}
             {isContent(column) ? (
-              <div data-testid={`studio-field-${base}/columns/${index}/width`}>
-                <div>{t('shell.studio.page.width')}</div>
+              <PageField pointer={`${base}/columns/${index}/width`}>
                 <InputNumber
-                  aria-label={t('shell.studio.page.width')}
                   min={1}
                   max={12}
                   precision={0}
@@ -1235,7 +1220,7 @@ function ColumnsPanel({
                     }
                   }}
                 />
-              </div>
+              </PageField>
             ) : (
               <JsonOnly />
             )}
@@ -1295,8 +1280,7 @@ function TabsPanel({
               <LayerMarkTag layer={layer} list={`${base}/tabs`} index={index} name={tab.name} />
             )}
             {isContent(tab) ? (
-              <div data-testid={`studio-field-${base}/tabs/${index}/label`}>
-                <div>{t('shell.studio.page.tabLabel')}</div>
+              <PageFieldGroup pointer={`${base}/tabs/${index}/label`}>
                 <LabelTexts
                   // The label editors keep their state by position, so they remount when a tab is added or removed.
                   key={`${index}:${tabs.length}`}
@@ -1304,7 +1288,7 @@ function TabsPanel({
                   value={tab.label}
                   onChange={onChange}
                 />
-              </div>
+              </PageFieldGroup>
             ) : (
               <JsonOnly />
             )}
@@ -1339,24 +1323,17 @@ function TabsPanel({
 
 /** The title of a section and its Collapsed switch. Switching it off removes the key, because a section starts expanded. */
 function SectionPanel({ base, widget, onChange }: { base: string; widget: Content; onChange: ChangeHandler }) {
-  const t = useText()
-
   return (
     <Flex vertical gap="small">
-      <div data-testid={`studio-field-${base}/title`}>
-        <div>{t('shell.studio.page.title')}</div>
+      <PageFieldGroup pointer={`${base}/title`}>
         <LabelTexts pointer={`${base}/title`} value={widget.title} onChange={onChange} />
-      </div>
-      <div data-testid={`studio-field-${base}/collapsed`}>
-        <Flex gap="small" align="center">
-          <Switch
-            aria-label={t('shell.studio.page.collapsed')}
-            checked={widget.collapsed === true}
-            onChange={(checked) => onChange(`${base}/collapsed`, checked ? true : undefined)}
-          />
-          <span>{t('shell.studio.page.collapsed')}</span>
-        </Flex>
-      </div>
+      </PageFieldGroup>
+      <PageField pointer={`${base}/collapsed`}>
+        <Switch
+          checked={widget.collapsed === true}
+          onChange={(checked) => onChange(`${base}/collapsed`, checked ? true : undefined)}
+        />
+      </PageField>
     </Flex>
   )
 }
@@ -1429,8 +1406,9 @@ function pageNamed(names: StudioNames | undefined, name: unknown): StudioNamePag
 }
 
 /**
- * One expression for each parameter the target page declares, and nothing for a parameter left empty. A value the
- * page does not declare stays visible with a note and Remove, because the compiler refuses it.
+ * One expression for each parameter the target page declares, labelled by the parameter's name, and nothing for a
+ * parameter left empty. A value the page does not declare stays visible with a note under it and Remove, because the
+ * compiler refuses it.
  */
 function ParameterExpressions({
   pointer,
@@ -1444,7 +1422,6 @@ function ParameterExpressions({
   onChange: ChangeHandler
 }) {
   const t = useText()
-  const check = useContext(ExpressionCheckContext)
 
   if (value !== undefined && !isContent(value)) {
     return (
@@ -1459,32 +1436,6 @@ function ParameterExpressions({
   const undeclared = entries.filter(([key]) => !declared.includes(key.toLowerCase()))
   const expressionName = t('shell.studio.process.expression')
 
-  function expression(rowPointer: string, current: string) {
-    if (check) {
-      return (
-        <Suspense fallback={<Input aria-label={expressionName} value={current} readOnly aria-busy="true" />}>
-          <LazyExpressionEditor
-            application={check.application}
-            resourceId={check.resourceId}
-            path={rowPointer}
-            name={expressionName}
-            value={current}
-            required={false}
-            options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
-            onChange={onChange}
-          />
-        </Suspense>
-      )
-    }
-    return (
-      <Input
-        aria-label={expressionName}
-        value={current}
-        onChange={(event) => onChange(rowPointer, event.target.value === '' ? undefined : event.target.value)}
-      />
-    )
-  }
-
   return (
     <PageFieldGroup pointer={pointer}>
       <Flex vertical gap="small">
@@ -1493,31 +1444,50 @@ function ParameterExpressions({
             entries.find(([name]) => name.toLowerCase() === parameter.name.toLowerCase())?.[0] ?? parameter.name
           const rowPointer = `${pointer}/${escapeSegment(key)}`
           const current = value?.[key]
+          const help = t(
+            parameter.required
+              ? 'shell.studio.page.requiredParameterExpression.help'
+              : 'shell.studio.page.parameterExpression.help',
+          ).replace('{type}', parameter.type)
           return (
             <div key={parameter.name} data-testid={`studio-field-${rowPointer}`}>
-              <Typography.Text type="secondary">
-                {`${parameter.name}, ${parameter.type}${parameter.required ? `, ${t('shell.studio.field.page.parameters.required').toLowerCase()}` : ''}`}
-              </Typography.Text>
-              {expression(rowPointer, typeof current === 'string' ? current : '')}
+              <AxisField label={parameter.name} help={help}>
+                <Expression
+                  pointer={rowPointer}
+                  name={expressionName}
+                  value={typeof current === 'string' ? current : ''}
+                  required={false}
+                  onChange={onChange}
+                />
+              </AxisField>
             </div>
           )
         })}
         {undeclared.map(([key, entry]) => {
           const rowPointer = `${pointer}/${escapeSegment(key)}`
           return (
-            <Flex key={key} gap="small" align="flex-start" wrap data-testid={`studio-field-${rowPointer}`}>
-              <div>
-                <Typography.Text>{key}</Typography.Text>
-                <div>
-                  <Typography.Text type="warning">{t('shell.studio.page.undeclaredParameter')}</Typography.Text>
+            <div key={key} data-testid={`studio-field-${rowPointer}`}>
+              <Flex gap="small" align="flex-end" wrap>
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <AxisField label={key} help={t('shell.studio.page.undeclaredParameter.help')}>
+                    <Expression
+                      pointer={rowPointer}
+                      name={expressionName}
+                      value={typeof entry === 'string' ? entry : ''}
+                      required={false}
+                      onChange={onChange}
+                    />
+                  </AxisField>
                 </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 240 }}>
-                {expression(rowPointer, typeof entry === 'string' ? entry : '')}
-              </div>
-              {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-              <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
-            </Flex>
+                {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
+                <Button onClick={() => onChange(rowPointer, undefined)}>
+                  {t('shell.studio.process.removeMapping')}
+                </Button>
+              </Flex>
+              <WarningLine testId="studio-parameter-undeclared">
+                {t('shell.studio.page.undeclaredParameter')}
+              </WarningLine>
+            </div>
           )
         })}
       </Flex>

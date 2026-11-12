@@ -1,12 +1,15 @@
 using Axis.ControlPlane;
+using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Cells;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Emails;
 using Axis.ControlPlane.Health;
 using Axis.ControlPlane.Jobs;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.RegionDirectory;
 using Axis.ControlPlane.SignUp;
 using Axis.ControlPlane.Storage;
+using Axis.ControlPlane.Subscriptions;
 using Axis.ControlPlane.Telemetry;
 using Axis.Server.Http;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,6 +23,17 @@ builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
 // Read before any database work, so a missing or wrong setting stops the start.
 var options = ControlPlaneOptions.Load(builder.Configuration, builder.Environment);
 builder.Services.AddSingleton(options);
+
+// The plan versions, built from the checked settings. The migration start then checks the versions that subscriptions pin.
+builder.Services.AddSingleton(PlanCatalogue.Create(options.Plans));
+
+// The proxies whose forwarded headers are trusted, by the platform's rules: the client address is then the real one, see
+// docs/reference/control-plane.md#settings. Read before any database work too, so a bad value stops the start.
+var forwardedHeaders = ForwardedHeadersSettings.Load(builder.Configuration);
+builder.Services.PostConfigure<ForwardedHeadersOptions>(forwardedHeaders.Apply);
+
+// The sign-up limits, kept in memory by each replica, see docs/reference/sign-up.md#bots-and-abuse.
+builder.Services.AddSingleton<SignUpLimits>();
 
 // Read next to the settings, so a kind without both languages stops the start.
 builder.Services.AddSingleton(EmailTemplates.LoadEmbedded());
@@ -66,11 +80,64 @@ if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString))
 // The expiry of the pending sign-ups, queued every 5 minutes. It needs only the control plane's database.
 builder.Services.AddSingleton(new RecurringJob(SignUpExpiry.JobKind, TimeSpan.FromMinutes(5)));
 
+// The period invoices, queued every hour. It needs only the control plane's database.
+builder.Services.AddSingleton<IJobHandler, PeriodInvoicing>();
+builder.Services.AddSingleton(new RecurringJob(PeriodInvoicing.JobKind, TimeSpan.FromHours(1)));
+
+// The payment links of the open VND invoices, queued every 5 minutes, only when a PayOS provider is named. It needs the control plane's database and the adapter.
+// The settings guarantee the keys and the base URL of the real one.
+var payOsProvider = options.PayOs.Provider;
+if (string.Equals(payOsProvider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddSingleton<FakePayOs>();
+    builder.Services.AddSingleton<IPayOs>(services => services.GetRequiredService<FakePayOs>());
+}
+else if (string.Equals(payOsProvider, PayOsProviders.PayOs, StringComparison.OrdinalIgnoreCase))
+{
+    // The job handler is a singleton, so it keeps one client for the life of the process. Its connections are recycled, so a changed PayOS address is followed.
+    builder.Services.AddHttpClient<IPayOs, PayOsClient>(client => client.Timeout = TimeSpan.FromSeconds(30))
+        .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(2) });
+}
+
+if (!string.IsNullOrWhiteSpace(payOsProvider))
+{
+    builder.Services.AddSingleton<IJobHandler, PaymentLinks>();
+    builder.Services.AddSingleton(new RecurringJob(PaymentLinks.JobKind, TimeSpan.FromMinutes(5)));
+
+    // The application of the PayOS webhook events kept in the inbox, queued every minute.
+    builder.Services.AddSingleton<IJobHandler, PaymentWebhookEvents>();
+    builder.Services.AddSingleton(new RecurringJob(PaymentWebhookEvents.JobKind, TimeSpan.FromMinutes(1)));
+}
+
+// The weekly refresh of the disposable mailbox domains, queued only when the list and its hash are both set. The options guarantee both.
+if (options.SignUp.DisposableDomains.IsComplete)
+{
+    builder.Services.AddSingleton<IJobHandler, DisposableDomainRefresh>();
+    builder.Services.AddSingleton(new RecurringJob(DisposableDomainRefresh.JobKind, TimeSpan.FromDays(7)));
+
+    // Known lists are about 100 KB, so the cap only stops a wrong address from filling the replica's memory.
+    builder.Services.AddHttpClient(DisposableDomainRefresh.HttpClientName, client => client.MaxResponseContentBufferSize = 10 * 1024 * 1024);
+}
+
 // The correction of the directory from the cells' tenant lists, queued every 5 minutes. It needs the directory and a cell to read.
 if (!string.IsNullOrWhiteSpace(options.DirectoryConnectionString) && options.Cells.Count > 0)
 {
     builder.Services.AddSingleton<IJobHandler, DirectoryCorrection>();
     builder.Services.AddSingleton(new RecurringJob(DirectoryCorrection.JobKind, TimeSpan.FromMinutes(5)));
+
+    // The provisioning of a confirmed sign-up. It places the tenant in a cell, so it needs the directory and a cell to call.
+    builder.Services.AddSingleton<CellPicker>();
+    builder.Services.AddSingleton<IJobHandler, ProvisionTenantJobHandler>();
+
+    // The clock of the subscriptions, queued every hour. It finds each tenant's cell in the directory and calls it.
+    builder.Services.AddSingleton<IJobHandler, SubscriptionClock>();
+    builder.Services.AddSingleton(new RecurringJob(SubscriptionClock.JobKind, TimeSpan.FromHours(1)));
+
+    // The write of a subscription's quotas to its cell, the resume of a tenant that a payment made active, and the quotas sync over every subscription, queued every 24 hours. Each finds the tenant's cell in the directory and calls it.
+    builder.Services.AddSingleton<IJobHandler, SubscriptionQuotas>();
+    builder.Services.AddSingleton<IJobHandler, SubscriptionResume>();
+    builder.Services.AddSingleton<IJobHandler, QuotaSync>();
+    builder.Services.AddSingleton(new RecurringJob(QuotaSync.JobKind, TimeSpan.FromDays(1)));
 }
 
 // The schedule that queues the recurring jobs above. It is idle when there are none.
@@ -91,14 +158,28 @@ app.UseSecurityHeaders(strictTransportSecurity: !app.Environment.IsDevelopment()
 // Outermost after the security headers, so an unexpected error on any path is a 500 problem without exception text.
 app.UseExceptionHandler();
 
+// Before the routes, so the sign-up limits see the client address. The built-in middleware skips the proxy check when a
+// request has no client address, so such a request is kept out of it. Off when no proxy is named.
+if (!forwardedHeaders.IsEmpty)
+{
+    app.UseWhen(context => context.Connection.RemoteIpAddress is not null, branch => branch.UseForwardedHeaders());
+}
+
 app.UseStaticFiles();
 
 app.MapHealthEndpoints();
 app.MapSignUpEndpoints();
 
-// The sign-up page and its verify page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
+// The PayOS webhook, see docs/reference/payments.md#webhooks. Mapped only when a PayOS provider is named.
+if (!string.IsNullOrWhiteSpace(payOsProvider))
+{
+    app.MapPaymentWebhookEndpoints();
+}
+
+// The sign-up page, its verify page and its progress page, built by web/vite.sign-up.config.ts into the web root. The bundle picks the page by its path.
 app.MapFallbackToFile("/sign-up", "sign-up.html");
 app.MapFallbackToFile("/sign-up/verify", "sign-up.html");
+app.MapFallbackToFile("/sign-up/progress", "sign-up.html");
 
 app.Run();
 

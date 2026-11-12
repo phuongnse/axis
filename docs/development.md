@@ -11,31 +11,42 @@ The scripts build, check and run Axis, and NexKit and CI run the same ones as th
 from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` to
 `scripts/smoke.sh`; the others say which workflow runs them, or that they run on demand only.
 
-| Script                          | What it does                                                                                        | Needs           |
-| ------------------------------- | --------------------------------------------------------------------------------------------------- | --------------- |
-| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser and the pinned Helm tools                    | Network         |
+| Script                          | What it does                                                                                                                                                      | Needs           |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools and, on CI, the container images                                                    | Network         |
 | `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` |                 |
-| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint |                 |
-| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                  |                 |
-| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                        | Docker          |
-| `scripts/e2e.sh`                | Playwright against the full stack                                                                   | Docker          |
-| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install         | Docker          |
-| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                        | Docker          |
-| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                    | Network         |
-| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                         | Docker, network |
-| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes | Network         |
-| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them | Network         |
-| `scripts/load.sh`               | The load test against the reference stack                                                           | Docker          |
-| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                           | Docker, network |
-| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                    | Docker          |
+| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                 |
+| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                |                 |
+| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                                                                                      | Docker          |
+| `scripts/e2e.sh`                | Playwright against the full stack                                                                                                                                 | Docker          |
+| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install                                                                       | Docker          |
+| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                                                                                      | Docker          |
+| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                                                                                  | Network         |
+| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                                                                                       | Docker, network |
+| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes                                                               | Network         |
+| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them                                                               | Network         |
+| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue                                                           | Network         |
+| `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker          |
+| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network |
+| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker          |
 
 ### Setup
 
-`scripts/setup.sh` restores the .NET packages, installs the npm packages and the Playwright browser,
-and installs pinned Helm, kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step
-and each tool download gets up to 4 tries, with waits of 15, 30 and 60 seconds between them, so a
-short refusal such as a `403` is retried. On CI the Playwright system packages install in a step of
-their own.
+`scripts/setup.sh` restores the .NET and npm packages and the Playwright browser, and installs pinned Helm,
+kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step and download gets up to 4 tries,
+with waits of 15, 30 and 60 seconds, so a short `403` is retried. A try of a restore or install step stops
+after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A download gives up after 30
+seconds without a connection or 5 minutes. A service that does not answer fails its try in time for the
+next. See [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md).
+
+On CI, setup also keeps every container image that the integration, E2E and smoke checks pull, the ones listed in
+`scripts/docker-images.json`, in one archive in `~/.cache/axis-docker`, which NexKit's `docker` cache entry restores, as
+[D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
+agrees. One archive stores each layer that images share once. Setup pulls only the images the archive lacks and saves
+the whole set again, so every job leaves the full set in the folder. Each try of a pull has the same time limit as
+a restore step, so a registry that stalls fails the try and the next one starts, while the write of the archive has
+none. An image that still fails to pull is left out with a warning, and the job goes on: the suite that needs it pulls it itself. A test fails when a fixture, a Compose
+file, the `Dockerfile` or a test script names an image that the list lacks.
 
 ### Build
 
@@ -66,13 +77,13 @@ The bundle budget keeps the SPA's first load small. The main bundle is the entry
 `index.html` and the scripts it preloads, gzipped. It may grow by 50 KB over the baseline that
 `web/bundle-budget.json` holds. These parts load in chunks of their own, apart from the main bundle:
 
-| Chunk                           | What it holds                                                          |
-| ------------------------------- | ---------------------------------------------------------------------- |
-| `assets/ChartDrawing-*.js`      | The chart library, loaded lazily                                       |
-| `assets/StudioPageDesign-*.js`  | The page designer's canvas and palette, loaded when the Design tab opens |
-| `assets/StudioFormDesign-*.js`  | The form designer's Design tab, loaded when it first opens             |
-| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens        |
-| `assets/DragAndDrop-*.js`       | The drag and drop library `@dnd-kit`, which the three designers share  |
+| Chunk                             | What it holds                                                            |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `assets/ChartDrawing-*.js`        | The chart library, loaded lazily                                         |
+| `assets/StudioPageDesign-*.js`    | The page designer's canvas and palette, loaded when the Design tab opens |
+| `assets/StudioFormDesign-*.js`    | The form designer's Design tab, loaded when it first opens               |
+| `assets/StudioProcessDesign-*.js` | The process designer's Design tab, loaded when it first opens            |
+| `assets/DragAndDrop-*.js`         | The drag and drop library `@dnd-kit`, which the three designers share    |
 
 [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs) runs after the SPA build. It prints the
 sizes and fails when the main bundle is over budget, when the chart, page design, process design or
@@ -121,6 +132,9 @@ on purpose with a reason. `RouteTableDocTests` reads the same file and every `Ro
 heading under `docs/`. It fails, naming each route, when one side has a route that the other lacks.
 See [how the docs stay correct](writing-docs.md#how-the-docs-stay-correct).
 
+Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`, to run one shard of these suites,
+see [test runs and reports](#test-runs-and-reports).
+
 When Vitest starts, it runs one worker for each GiB of free memory above 1 GiB, and no more workers than CPU
 cores. The count is never below 2 or above 6. `vitestWorkers` in `web/vitestWorkers.ts` computes it, and
 `web/vite.config.ts` passes it the free memory and the core count. A worker holds about 1 GB, so too many
@@ -133,7 +147,7 @@ jsdom matches every rule on each query. A test that checks a style calls `withAn
 
 ### Integration tests
 
-`scripts/integration.sh` builds the Keycloak theme, then runs the .NET tests against real PostgreSQL
+`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme, then runs the .NET tests against real PostgreSQL
 and Keycloak through Testcontainers. They also run the test scenarios of every application under
 `samples/apps/` on that PostgreSQL, and the control plane's `Axis.ControlPlane.Integration.Tests`.
 The performance tests, whose class names end in `PerformanceTests`, stay out: `scripts/performance.sh`
@@ -144,12 +158,12 @@ runs them.
 - **`AXIS_INTEGRATION_SHARD`**, such as `1/3`, runs only that shard, see
   [test runs and reports](#test-runs-and-reports).
 - **A skip.** The script skips every suite when NexKit gives a commit to compare with and every
-  file changed since it is in the `unaffected_by` list of the integration checks in
+  file changed since it is in the `unaffected_by` list of the integration check in
   `.nexkit/config.json`, see [skipped suites](#skipped-suites).
 
 ### End-to-end tests
 
-`scripts/e2e.sh` builds the Keycloak theme, then starts the stack that Playwright runs against, and
+`scripts/e2e.sh` loads the [saved images](#setup), builds the Keycloak theme, then starts the stack that Playwright runs against, and
 runs Playwright in Chromium. It:
 
 - starts PostgreSQL, Keycloak, the built purchasing system stub, the server, the worker and the
@@ -183,22 +197,37 @@ in [Testing](testing.md).
 ### Smoke tests
 
 `scripts/smoke.sh` runs four smoke tests. It first installs the built-in and sample modules in
-`artifacts/modules`, for the `onprem` test.
+`artifacts/modules`, for the `onprem` test, and then loads the [saved images](#setup).
 
-| Test         | What it does                                                                  |
-| ------------ | ----------------------------------------------------------------------------- |
-| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                           |
-| `compose`    | Runs the Compose stack                                                        |
-| `images`     | Builds and runs the production images, from `scripts/images.test.mjs`         |
-| `onprem`     | Installs `deploy/compose/` from the production images for two tenants          |
+| Test         | What it does                                                          |
+| ------------ | --------------------------------------------------------------------- |
+| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                   |
+| `compose`    | Runs the Compose stack                                                |
+| `images`     | Runs the production images, from `scripts/images.test.mjs`            |
+| `onprem`     | Installs `deploy/compose/` from the production images for two tenants |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
 agent host. The test removes the Compose project at the end.
 
+`scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
+and removes them when it exits. A change that skips both tests builds nothing. The PostgreSQL tools layer of
+`axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
+image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
+comments, and loads the file in a later run, so the run does not download the packages again, and pulls the base
+image only when Docker lacks it. NexKit's `docker` cache entry restores the folder, and CI on `main` saves it. The
+layer is built again when the stage changes, when the entry's key changes, or when GitHub drops the cache after 7 days
+without use. The saved layer can be
+weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
+The [image scan](#workflows-outside-nexkits-checks) never uses the saved layer: it builds from scratch and sees
+each new package release.
+
+Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`, to run only the smoke tests of one
+[shard](#shards). A shard builds the production images only when it holds `images` or `onprem`.
+
 Each test is skipped when NexKit gives a commit to compare with and every file changed since it is
 in the `unaffected_by` list of the smoke check in `.nexkit/config.json`: under `docs/`, `.github/` or
-`.nexkit/`, or a Markdown file. CI and NexKit each run the smoke tests as a job of their own.
+`.nexkit/`, or a Markdown file. CI and NexKit run the smoke tests in [shards](#shards), one job per shard.
 
 ### Performance and load tests
 
@@ -241,9 +270,8 @@ value, from both files. The exit code is the checker's when it fails, otherwise 
 wrote no summary. Arguments after `--` go to k6, and any other argument exits with code 2. The host
 ports default to 18080, 18081, 18443 and 15208, and the `AXIS_*` port variables override them.
 
-`scripts/load-cell.sh` is the [cell load test](reference/performance.md#cell-load-test). It runs on
-demand against a staging cell, with the address of its provisioning API as its only argument, and
-never in CI or NexKit.
+`scripts/load-cell.sh` is the [cell load test](reference/performance.md#cell-load-test). It runs on demand against a
+staging cell, with the address of its provisioning API as its only argument, and never in CI or NexKit.
 
 1. It writes the generated application into `artifacts/load-cell` for its roles.
 2. It creates the 1,000 load tenants once, 50 busy, 949 idle and `load-backlog`, through the
@@ -321,7 +349,7 @@ that adds a source changes this section too.
   and unknown findings and pass. People keep those time frames in the routine update.
 - **A fix that does not exist yet.** When no fixed version exists, record the finding in
   `scripts/scan-accepted.json`: `{ "advisory": "GHSA-...", "package": "<name>", "found": "YYYY-MM-DD",
-  "reason": "<why it waits>" }`. `found` is the day the scan first found it. The scan then passes
+"reason": "<why it waits>" }`. `found` is the day the scan first found it. The scan then passes
   the finding until `found` plus its time frame, and prints `accepted until <date>`.
 - **Past the deadline.** After that date the scan fails again and prints
   `past its time frame since <date>` on the finding's line. Update or remove the package, and delete
@@ -374,20 +402,27 @@ change since NexKit's commit can affect.
 
 ### Shards
 
-NexKit's checks split the E2E and integration tests into shards, one check each, such as `e2e-1` and
-`integration-1`, as [D97](decisions/d97-reliable-test-runs.md) says, and
-[CI on main](delivery.md#ci-on-main) runs those checks as its jobs. `.nexkit/config.json` holds the
-checks and their `timeout_minutes`. The whole integration suite in one job came close to that limit.
-The smoke tests run in a job of their own, so the shards hold only their own tests.
+NexKit's `e2e`, `integration`, `smoke` and `test` checks run in as many shards as their split's `--count` prints,
+as [D97](decisions/d97-reliable-test-runs.md) says: `e2e-1` to `e2e-N`, each with `NEXKIT_SHARD=k/N`, and [CI on
+main](delivery.md#ci-on-main) runs the same. A check's `max` matches its split's cap, since NexKit fails a count
+above it. Two NexKit rounds at their caps fit within the jobs that GitHub's Pro plan runs at once, as
+`nexkit-shards.test.mjs` checks, and when a third round or CI on `main` and its two scans run beside them, a few
+jobs may wait.
 
+- **Unit tests.** Set `AXIS_TEST_SHARD`, such as `AXIS_TEST_SHARD=2/3 scripts/test.sh`. `NEXKIT_SHARD` works
+  the same way beside it, and `AXIS_TEST_SHARD` wins when both are set. Shard 1 runs the .NET unit tests,
+  the control plane's unit tests and the scripts' own tests, and no Vitest file. Shards 2 to N split the
+  Vitest files between them. A file weighs its seconds in `web/vitest-durations.json`, and a new file
+  weighs the median. A shard's results go to `artifacts/test-results/web-<n>.xml`. With `1/1` or no shard,
+  the whole suite runs.
 - **E2E.** Set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.sh`. `NEXKIT_SHARD` works the
   same way beside it, and `AXIS_E2E_SHARD` wins when both are set. Its Playwright results go
   to `artifacts/test-results/playwright-<n>.xml`. The shards split the specs by how long they run, not
   by how many tests they hold: each spec weighs its seconds in `tests/e2e/spec-durations.json`, and a
   new spec weighs the median. A serial spec, such as a Studio journey, runs on one worker from start
-  to end, so the split gives a long one a shard with little else. When the shards drift apart by
-  minutes, refresh the durations from the JUnit files of a full run on `main`:
-  `node scripts/lib/e2e-shard.mjs --durations artifacts/test-results/playwright-*.xml`.
+  to end, so the split gives a long one a shard with little else. The count adds the shard setup, the
+  seconds a shard pays besides its specs, under `shard setup` in the same file. `--durations` measures it
+  as each file's wall time minus its specs' estimate, averaged.
 - **Integration.** Set `AXIS_INTEGRATION_SHARD`, such as `AXIS_INTEGRATION_SHARD=2/3 scripts/integration.sh`.
   `NEXKIT_SHARD` works the same way beside it, and `AXIS_INTEGRATION_SHARD` wins when both are set.
   A shard runs whole test classes of `Axis.Integration.Tests`, which `scripts/lib/integration-shard.mjs`
@@ -395,18 +430,38 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
   lightest shard. A class weighs its seconds in `tests/Axis.Integration.Tests/class-durations.json`,
   or, without an entry, its number of tests times the median seconds per test. Shard 1 also runs
   `Axis.ControlPlane.Integration.Tests`, which the split counts as its seconds under that suite's name
-  in the same file. Shard 1 starts with those seconds, so it gets fewer classes. The last shard runs
-  every class that the other shards do not, so a class the split does not find still runs. The
-  scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them.
-  A shard cannot be combined with arguments. When the shards drift apart by minutes, refresh the
-  durations from the JUnit files of a full run on `main`: each shard's `Axis.Integration.Tests.xml`
-  and shard 1's `Axis.ControlPlane.Integration.Tests.xml`, with
-  `node scripts/lib/integration-shard.mjs --durations <those files>`.
-- **Shard count.** `node scripts/lib/e2e-shard.mjs --count` and `node scripts/lib/integration-shard.mjs --count`
-  print the fewest shards whose longest estimated shard fits the time budget. They never print more than
-  the most shards allowed. Both values live in `scripts/lib/shards.mjs`. A spec, test class, collection
-  or the control plane suite that alone takes longer than the budget gets an `Over budget:` line on
-  stderr. The count still prints, because no number of shards makes such a spec or class fit.
+  in the same file. Shard 1 starts with those seconds, so it gets fewer classes, or none and then runs only that
+  suite. The count estimates a shard as its seconds over the `parallelism` in that file, or its heaviest collection if longer, since
+  a collection runs its classes one after another. `--durations` measures the parallelism as the test seconds of
+  `Axis.Integration.Tests` over those suites' wall time, and the control plane and scenario suites count on
+  neither side. The last shard runs every class that the other shards do not, so a class the split does not
+  find still runs. The scenario suites are expected only in the shard that holds `ScenarioRunnerTests`, which writes them. A shard cannot be combined with arguments.
+- **Smoke.** Set `AXIS_SMOKE_SHARD`, such as `AXIS_SMOKE_SHARD=3/3 scripts/smoke.sh`. `NEXKIT_SHARD` works the
+  same way beside it, and `AXIS_SMOKE_SHARD` wins when both are set. A shard runs the smoke tests that
+  `scripts/lib/smoke-shard.mjs` gives it, so each test runs in exactly one shard. Each test weighs its seconds in
+  `scripts/smoke-durations.json`, and a test without an entry weighs the median. A shard builds the production
+  images only when it holds `images` or `onprem`. The image builds are not in those seconds, so such a shard
+  takes longer than its estimate.
+- **Shard count.** `node scripts/lib/e2e-shard.mjs --count`, `node scripts/lib/integration-shard.mjs --count`,
+  `node scripts/lib/smoke-shard.mjs --count` and `node scripts/lib/test-shard.mjs --count` print the fewest
+  shards whose longest estimated shard fits the time budget. The unit test count includes shard 1, so it is
+  never below 2. Each count stops at its split's cap, and the caps and the budget live in
+  `scripts/lib/shards.mjs`. A spec, test class, collection, the control plane suite, a smoke test or a Vitest
+  file that alone takes longer than the budget gets an `Over budget:` line on stderr. The count still
+  prints, because no number of shards makes such a spec, class or file fit.
+- **Durations.** When every check job of a [CI run on `main`](delivery.md#ci-on-main) passes, its `Shard durations`
+  job, with no model, no commit and only `contents: read`, `actions: read` and `issues: write`, runs
+  `scripts/shard-durations.mjs` on the `test-results-*` artifacts of the run and of the latest successful runs
+  dispatched on `main` before it. Each split's `--durations` measures each run from the file as it was, each entry
+  becomes the median of its measures, and each `--count` is read. A durations file goes into one `process` issue,
+  which NexKit's round commits, when a shard of the split that the current file gives at its count, weighed with the
+  new durations, runs past the budget and the new file's split has a shorter longest shard. The issue names that
+  shard's estimated seconds and the budget. Entries that move a lot while every shard fits the budget do not qualify,
+  because run-to-run noise moves entries without making a split run long. A split that could use fewer shards alone
+  files nothing. A split at its cap that cannot fit, or that holds an `Over budget:` unit, files nothing unless the
+  new file splits it better. Each `Over budget:` unit gets its own issue unless one is open, citing
+  [the rules for tests](testing.md#rules-for-tests). By hand, `--durations` takes `web*.xml`, `playwright-*.xml`,
+  each integration shard's `Axis.Integration.Tests.xml` with shard 1's control plane one, and the smoke suites' files.
 - **Performance tests.** A performance test class name ends in `PerformanceTests`. It stays out of
   `scripts/integration.sh`, so neither NexKit's checks nor CI's integration jobs run it, and
   `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
@@ -418,19 +473,32 @@ The smoke tests run in a job of their own, so the shards hold only their own tes
 Each suite writes a JUnit file to `artifacts/test-results/`, and the E2E run writes its logs to
 `artifacts/logs/`:
 
-| Log                         | Output of                    |
-| --------------------------- | ---------------------------- |
-| `e2e-server.log`            | The E2E server               |
-| `e2e-worker.log`            | The E2E worker               |
-| `e2e-journey-server.log`    | The E2E journey server       |
-| `e2e-publisher.log`         | The E2E publisher            |
-| `e2e-purchasing.log`        | The purchasing system stub   |
-| `e2e-controlplane.log`      | The E2E control plane        |
+| Log                      | Output of                  |
+| ------------------------ | -------------------------- |
+| `e2e-server.log`         | The E2E server             |
+| `e2e-worker.log`         | The E2E worker             |
+| `e2e-journey-server.log` | The E2E journey server     |
+| `e2e-publisher.log`      | The E2E publisher          |
+| `e2e-purchasing.log`     | The purchasing system stub |
+| `e2e-controlplane.log`   | The E2E control plane      |
 
-`scripts/test-report.mjs` then prints a summary per suite and the failed tests with their
-`file:line`. On GitHub Actions the summary goes to the job summary, and each failed test becomes an
-error annotation. The failed tests are also listed at the end of the job log, with each message cut to
-20 lines.
+`scripts/test-report.mjs` then writes the test summary for the job. When every suite passed, the summary
+starts with one line. It gives the tests passed, the total time and the suites skipped as not affected by
+the change. The per-suite table sits in a collapsed block below that line.
+
+When a suite has failed tests or wrote no results file, the failed tests come first, each with its
+`file:line`. The per-suite table follows them and stays open.
+
+Every summary ends with a collapsed list of the job's five slowest test cases. It gives each case's name,
+suite and time from its JUnit file. On GitHub Actions the summary goes to the job summary, and each failed
+test becomes an error annotation. The failed tests are also listed at the end of the job log, with each
+message cut to 20 lines.
+
+The Duration column shows how long the suite's command ran, as `run_suite` measures it. A suite that no
+command of its own runs, such as `scenarios-<application name>` and the control plane integration suite,
+shows the time in its JUnit file instead. Vitest's JUnit file adds up its files' times across parallel
+workers, so the Vitest rows are measured too. The total time adds up the measured times. A suite without
+one is left out. When no suite has a measured time, the total adds up the JUnit times instead.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
@@ -439,9 +507,8 @@ A failure names the scenario and the step. To run them by hand, run
 
 ### Flaky tests
 
-Playwright does not retry a failed test, on CI or locally, so a flaky test fails its job, and the
-trace of a failed test is kept. On `main`, NexKit runs a failed job once more, and a run that passes
-only on that second attempt is recorded on a `bug` issue.
+Playwright does not retry a failed test, on CI or locally, so a flaky test fails its job, and its trace is kept. On
+`main`, NexKit runs a failed job once more, and a run that passes only on that retry is recorded on a `bug` issue.
 
 A test that fails at times is fixed by its cause, for every test with that cause, as
 [D97](decisions/d97-reliable-test-runs.md) says. The plan of its `bug` issue names the cause's
@@ -450,45 +517,31 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 
 | Cause                                      | Guard                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| An outside download or service             | `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| An outside download or service             | NexKit's caches hold the NuGet and npm packages, the Playwright browser, the tools and the container images, so a run downloads only what they miss. Setup saves the images in one archive and the suites load it, see [setup](#setup). `scripts/setup.sh`, the CI install steps and the Docker builds of the smoke tests try again. Each try of setup's steps has a time limit, see [setup](#setup), as [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) says                                                                                                                                                                                                                 |
 | A click during an animation or a redraw    | Playwright asks for reduced motion, and the SPA then shows dialogs and overlays without animation. `waitForDialog`, `confirmDialog` and the drag helper wait until the element is ready, and the drag helper and the binding choice in the journeys wait until the page canvas has drawn the dropped draft (`waitForCanvas`). `openFormTab` and `addMapping` wait until no expression editor of the open resource is loading or checking (`aria-busy`), because a check's answer adds a line under its editor and moves what is below. A spec that slows animations on purpose, to prove a wait, asks for motion again with `test.use({ reducedMotion: 'no-preference' })` |
 | The real clock                             | A test fixes the time with `axis.now` and runs schedules in UTC                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | State left by another test                 | A test counts from its own baseline                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Planner statistics                         | A seed that a plan depends on runs `ANALYZE` over every row                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| The MinIO test container cuts a connection | `MinioFixture.ReadObjectAsync` reads an object and `MinioFixture.UploadObjectAsync` uploads one, and each tries again from the start up to five times when the connection drops or MinIO answers that the client disconnected, waiting half a second, then 1, 2 and 4 seconds                                                                                                                                                                                                                                                                                                                                                                                              |
+| The MinIO test container cuts a connection | `MinioFixture.ReadObjectAsync` reads an object, `MinioFixture.UploadObjectAsync` uploads one and `MinioFixture.CreateBucketAsync` creates a bucket. Each tries again from the start up to five times when the connection drops or MinIO answers that the client disconnected, waiting half a second, then 1, 2 and 4 seconds. A retry that finds the bucket already owned counts as created                                                                                                                                                                                                                                                                                |
 | A read of the page that does not wait      | A step that acts on what a list shows waits for it with a retrying assertion such as `toHaveCount`, not a single `count()` right after a click or a change of address, and a step that needs to know which files the server wrote reads them from the folder                                                                                                                                                                                                                                                                                                                                                                                                               |
-
-## Production images and Axis.Admin
-
-The production images and the admin tool are the same in development as in an install. The
-`Dockerfile` has four production targets, `axis-server`, `axis-worker`, `axis-admin` and
-`axis-controlplane`, which hold no samples, development settings or source control metadata. Build one
-with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. The default target is
-the development server. The `images` and `onprem` smoke tests build each image up to three times, with
-waits of 15 and then 30 seconds between attempts, because a download in the build can fail at times.
-
-`Axis.Admin` is the console tool that the platform operator runs. It creates, suspends, resumes,
-lists, backs up and restores tenants, and it migrates and activates them. Run it with
-`dotnet run --project src/Axis.Admin -- <command>`, or with the `axis-admin` image. See
-[administration](reference/administration.md). The production install is in `deploy/compose/`
-and `deploy/helm/axis/`, see [installation](reference/installation.md).
+| A canvas drawing older than the last save  | The page and form canvases post the draft again after each save, so a label whose texts Save wrote draws without its error, see [page designer](reference/studio.md#page-designer)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Docker Compose
 
 Docker Compose runs the whole stack from source, with nothing but Docker installed. Run
 `docker compose up --build`. It starts:
 
-| Service                   | Address                  | Port setting             |
-| ------------------------- | ------------------------ | ------------------------ |
-| The server, with the four samples | http://localhost:5206 | `AXIS_SERVER_PORT`  |
-| PostgreSQL                | `localhost:5432`         | `AXIS_POSTGRES_PORT`     |
-| Keycloak, with the [development realms](#development-realm-and-users) | http://localhost:8080 | `AXIS_KEYCLOAK_PORT` |
-| The purchasing system stub | http://localhost:5207   | `AXIS_PURCHASING_PORT`   |
-| Mailpit, SMTP             | `localhost:1025`         | `AXIS_MAILPIT_SMTP_PORT` |
-| Mailpit, web page         | http://localhost:8025    | `AXIS_MAILPIT_WEB_PORT`  |
-| The worker                | none                     |                          |
-| The agent host            | none                     |                          |
-| The publisher             | none                     |                          |
+| Service                                                               | Address               | Port setting             |
+| --------------------------------------------------------------------- | --------------------- | ------------------------ |
+| The server, with the four samples                                     | http://localhost:5206 | `AXIS_SERVER_PORT`       |
+| PostgreSQL                                                            | `localhost:5432`      | `AXIS_POSTGRES_PORT`     |
+| Keycloak, with the [development realms](#development-realm-and-users) | http://localhost:8080 | `AXIS_KEYCLOAK_PORT`     |
+| The purchasing system stub                                            | http://localhost:5207 | `AXIS_PURCHASING_PORT`   |
+| Mailpit, SMTP                                                         | `localhost:1025`      | `AXIS_MAILPIT_SMTP_PORT` |
+| Mailpit, web page                                                     | http://localhost:8025 | `AXIS_MAILPIT_WEB_PORT`  |
+| The worker                                                            | none                  |                          |
+| The agent host                                                        | none                  |                          |
+| The publisher                                                         | none                  |                          |
 
 All six ports are published on `127.0.0.1` only. The Keycloak admin console login is `admin` /
 `admin`.
@@ -542,13 +595,13 @@ Compose, `scripts/dev.sh` and `scripts/e2e.sh` do the same.
 
 PostgreSQL loads `samples/postgres/init-roles.sql` on its first start. It creates:
 
-| Role or database        | What it is for                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------- |
-| `axis_schema`           | Owns the tenant database. The server uses it for `SchemaConnectionString` and `ConnectionStrings:PlatformSchema` |
-| `axis_runtime`          | Every other connection string of the server, and the worker's only one. The worker gets no `SchemaConnectionString` |
-| `axis_preview`          | The database of the preview tenant `default-preview`                                                  |
-| `axis_preview_schema`, `axis_preview_runtime` | The same two parts for `default-preview`                                        |
-| `axis_scenario`         | A role with `CREATEDB` that owns no database. The publisher gets it as `Scenarios__ServerConnectionString`, so Studio can run test scenarios |
+| Role or database                              | What it is for                                                                                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `axis_schema`                                 | Owns the tenant database. The server uses it for `SchemaConnectionString` and `ConnectionStrings:PlatformSchema`                             |
+| `axis_runtime`                                | Every other connection string of the server, and the worker's only one. The worker gets no `SchemaConnectionString`                          |
+| `axis_preview`                                | The database of the preview tenant `default-preview`                                                                                         |
+| `axis_preview_schema`, `axis_preview_runtime` | The same two parts for `default-preview`                                                                                                     |
+| `axis_scenario`                               | A role with `CREATEDB` that owns no database. The publisher gets it as `Scenarios__ServerConnectionString`, so Studio can run test scenarios |
 
 Every role has the development password `axis`. `axis` stays the bootstrap superuser, for setup and
 health checks only. Studio runs scenarios only when the server turns on `Studio:Tests`: E2E sets
@@ -590,7 +643,7 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
   `samples/keycloak/axis-realm.json` names `mailpit:1025`. Keycloak reaches Mailpit by the name
   `mailpit` on the Docker network: Compose has it already, and `scripts/e2e.sh` starts Mailpit and
   Keycloak on a network of their own.
-- **The whole identity provider in the Axis theme** _(planned for M31)_. Every other page of the
+- **The whole identity provider in the Axis theme** _(planned for M33)_. Every other page of the
   identity provider is the Axis theme, the realm's `emailTheme` is `axis`, and the realm sets the
   example legal links and the terms step of [legal](reference/legal.md), so every link and the terms
   page show.
@@ -610,14 +663,14 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
 
 The realm's clients:
 
-| Client           | Secret                               | What uses it                                                                                                                                                                                                                                                                                                                                     |
-| ---------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `axis`           | `axis-development-secret`            | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                 |
-| `axis-activation` | `axis-activation-development-secret` | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
-| `axis-users`     | `axis-users-development-secret`      | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them |
-| `axis-mcp-test`  | `axis-mcp-test-development-secret`   | An integration test host only, for the [MCP server](reference/mcp-server.md). Its password grant gives the realm's users tokens with the audience `https://localhost/mcp`, so `McpServerTests` signs in as `author` and `requester` through it |
-| `axis-mcp-other-test` | `axis-mcp-other-test-development-secret` | An integration test host only, a second client with the same audience as `axis-mcp-test`, so `McpRateLimitTests` signs in as a second client of one tenant |
-| `axis-fapi`      | Development keys in `samples/keycloak` | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                |
+| Client                | Secret                                   | What uses it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `axis`                | `axis-development-secret`                | The server's sign-in of people, as the `default` tenant's OIDC client in the Development and E2E settings. The sample roles are its client roles                                                                                                                                                                                                                                                                                                                                                             |
+| `axis-activation`     | `axis-activation-development-secret`     | The server's startup activation. Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details under `scripts/dev.sh` and E2E name the realm `axis` and this secret, so activation signs in as the client, adds the `site-` client of each sample site, creates the brokered provider `oidc-companyissuer` from the purchase request sample's `company` provider and lists it in the `site-purchasing` client's `axis.providers` |
+| `axis-users`          | `axis-users-development-secret`          | The users page. Its service account holds `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names this secret, so `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them                                                                                           |
+| `axis-mcp-test`       | `axis-mcp-test-development-secret`       | An integration test host only, for the [MCP server](reference/mcp-server.md). Its password grant gives the realm's users tokens with the audience `https://localhost/mcp`, so `McpServerTests` signs in as `author` and `requester` through it                                                                                                                                                                                                                                                               |
+| `axis-mcp-other-test` | `axis-mcp-other-test-development-secret` | An integration test host only, a second client with the same audience as `axis-mcp-test`, so `McpRateLimitTests` signs in as a second client of one tenant                                                                                                                                                                                                                                                                                                                                                   |
+| `axis-fapi`           | Development keys in `samples/keycloak`   | An integration test host only, for the `fapi2` sign-in profile, see [FAPI 2.0 profile](reference/fapi2-profile.md)                                                                                                                                                                                                                                                                                                                                                                                           |
 
 The confidential clients `purchasing-system`, a [machine caller](reference/security.md#machine-callers),
 and `reporting-system`, a [service account](reference/security.md#service-accounts), get tokens through
@@ -636,7 +689,7 @@ organization's own identity provider, which the `axis` realm brokers to.
   with the password `axis`.
 - In E2E, Keycloak listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its
   container, so the `axis` realm reaches the `company` realm at the address the browser uses.
-- **Its own look** _(planned for M31)_. Its login theme `example-company`, in
+- **Its own look** _(planned for M33)_. Its login theme `example-company`, in
   `samples/keycloak/themes`, looks like another company's sign-in on purpose, so a person sees that
   they left Axis, and `scripts/dev.sh` copies it beside the Axis theme. It is sample data and never
   ships.
@@ -659,25 +712,25 @@ The realm `axis-operators`, from `samples/keycloak/axis-operators-realm.json`, i
 
 Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant these bindings:
 
-| Binding                                | Value                                                         | Read by                                       |
-| -------------------------------------- | ------------------------------------------------------------- | --------------------------------------------- |
-| `CompanyIssuer`                        | The `company` realm's issuer URL                              | The purchase request sample's `company` provider |
-| `CompanyClientId`                      | `axis-broker`                                                 | The same                                      |
-| `CompanyClientSecret`                  | `axis-broker-development-secret`                              | The same                                      |
-| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route        | The purchase request sample's approval webhook |
-| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                             | The same                                      |
+| Binding                                | Value                                                  | Read by                                          |
+| -------------------------------------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `CompanyIssuer`                        | The `company` realm's issuer URL                       | The purchase request sample's `company` provider |
+| `CompanyClientId`                      | `axis-broker`                                          | The same                                         |
+| `CompanyClientSecret`                  | `axis-broker-development-secret`                       | The same                                         |
+| `PurchaseRequestApprovedWebhookUrl`    | The stub's `/webhooks/purchase-request-approved` route | The purchase request sample's approval webhook   |
+| `PurchaseRequestApprovedWebhookSecret` | The stub's default webhook secret                      | The same                                         |
 
 ### The samples and their users
 
 Each sample uses development users of the `axis` realm, in a site of its own, and declares one
 `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one.
 
-| Sample                                                      | Site                | Users and roles                                                                                                                                                                                         |
-| ----------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Purchase requests, `samples/apps/purchase-requests`         | `/purchasing`       | Declares `organization`, seeds the same employees and departments as leave requests, lets `operator` administer the organization and `department-manager` read it. A request goes to the head of its department. `operator` opens the Approvals inspector page |
-| Leave requests, `samples/apps/leave-requests`               | `/leave`            | Reuses `employee` and `department-manager`. Declares `organization`, seeds an employee for each of its users and three departments headed by `finance-reviewer`, `manager` and `manager-2`, and sends a leave request to the head of its department |
-| Service desk, `samples/apps/service-desk`                   | `/service-desk`     | Adds `agent` and two `service-desk-lead` users and gives an employee `requester`. `approver` stays in the realm for the service desk E2E, which assigns tickets to it                                     |
-| Asset management, `samples/apps/asset-management`           | `/asset-management` | Adds `asset-manager` and `auditor`, and uses `employee` as the holder of assets                                                                                                                          |
+| Sample                                              | Site                | Users and roles                                                                                                                                                                                                                                                |
+| --------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Purchase requests, `samples/apps/purchase-requests` | `/purchasing`       | Declares `organization`, seeds the same employees and departments as leave requests, lets `operator` administer the organization and `department-manager` read it. A request goes to the head of its department. `operator` opens the Approvals inspector page |
+| Leave requests, `samples/apps/leave-requests`       | `/leave`            | Reuses `employee` and `department-manager`. Declares `organization`, seeds an employee for each of its users and three departments headed by `finance-reviewer`, `manager` and `manager-2`, and sends a leave request to the head of its department            |
+| Service desk, `samples/apps/service-desk`           | `/service-desk`     | Adds `agent` and two `service-desk-lead` users and gives an employee `requester`. `approver` stays in the realm for the service desk E2E, which assigns tickets to it                                                                                          |
+| Asset management, `samples/apps/asset-management`   | `/asset-management` | Adds `asset-manager` and `auditor`, and uses `employee` as the holder of assets                                                                                                                                                                                |
 
 - **Sign-in per site.** The purchase request sample also declares the `oidc` provider `company` in
   `identity-providers/company.json`, which brokers to the `company` realm through the
@@ -729,7 +782,7 @@ Docker, .NET and Node, and works on a fresh clone.
    since the last install. It installs no Playwright browser.
 2. It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service
    mounts, and copies the email theme with it. It fails when one of the theme's files is missing.
-3. **Sample themes and licences** _(planned for M31)_. It copies the sample themes of
+3. **Sample themes and licences** _(planned for M33)_. It copies the sample themes of
    `samples/keycloak/themes` beside the Axis theme, and writes the list of
    [open source licences](reference/legal.md#open-source-licences) that `/licences` shows.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
@@ -755,10 +808,10 @@ Docker, .NET and Node, and works on a fresh clone.
    starts the worker once the server has migrated the tenant databases. The SPA proxies `/api` and
    `/health` to the server.
 10. It runs one publisher, `axis-admin publisher`, once the server has migrated the tenant databases.
-   The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
-   tenant settings as environment variables of that process only, because `Axis.Admin` reads no
-   `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
-   [publisher](reference/administration.md#publisher).
+    The publisher runs from the built `Axis.Admin.dll`, not under `dotnet watch`. The script sets its
+    tenant settings as environment variables of that process only, because `Axis.Admin` reads no
+    `appsettings` file. They cover `default` and `default-preview`, so it runs preview requests too, see
+    [publisher](reference/administration.md#publisher).
 
 Each output line starts with `[server]`, `[worker]`, `[web]`, `[publisher]` or `[agent]`, and the script's own
 messages start with `[dev]`.
@@ -833,36 +886,9 @@ non-zero.
 widget swaps in place in the open page. An edit to the previews or the fixtures reloads the page. The query
 parameters are the ones in [widget previews](reference/widget-previews.md#the-bundle).
 
-## Running a host on its own
-
-A host can also run alone, outside `scripts/dev.sh`. To run the worker, run
-`dotnet run --project src/Axis.Worker`. It reads its tenants from its `Tenants` section, as the server
-does, and runs their due work items. It waits until the server has migrated each tenant database, so
-either can start first. If you moved PostgreSQL with `AXIS_POSTGRES_PORT`, override
-`Tenants__default__ConnectionString` for the worker.
-
-`dotnet run` of the server or the worker stops at start when a folder it reads does not exist. Create
-them first:
-
-- `Extensions:Path`: build the sample extension package, with `scripts/build.sh` or
-  `dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj`;
-- `Modules:Path`: install the built-in and sample modules, with `scripts/build.sh` or
-  `bash scripts/lib/install-modules.sh`;
-- `Templates:Path`, the server only: `bash scripts/lib/install-sample-templates.sh` creates it.
-
-## Activating other application folders
-
-The development server activates the four samples at start, and can activate any other folder.
-`src/Axis.Server/appsettings.Development.json` lists the purchase request sample,
-`../../samples/apps/purchase-requests`, the leave request sample, `../../samples/apps/leave-requests`,
-the service desk sample, `../../samples/apps/service-desk`, and the asset management sample,
-`../../samples/apps/asset-management`, in `ActivateOnStartup`. So `scripts/dev.sh` migrates every
-tenant database, then compiles and activates all four samples before it listens, and stops on any
-diagnostic.
-
-To activate another application folder, add it to that list, or set `ActivateOnStartup__0=<folder>`
-to activate it in place of the purchase request sample, while the other samples stay active. Relative
-paths are resolved from `src/Axis.Server`.
+The server serves the harness, the modules it loads and the files in `web/`. Paths that begin with `/api` or
+`/health` go to the Axis server, and answer `502` while it is not running. Any other path that names none of
+these, such as the one Chrome's developer tools request when they open, answers `404`.
 
 ## Formatting
 

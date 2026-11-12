@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Admin;
@@ -81,6 +82,23 @@ public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal("POST", proof.GetPayloadValue<string>("htm"));
         Assert.Equal(token.Url, proof.GetPayloadValue<string>("htu"));
         Assert.All(fapi.Where(call => call.Form.Count > 0), call => Assert.DoesNotContain("client_secret", call.Form.Keys));
+    }
+
+    [Fact]
+    public async Task A_fapi2_sign_in_on_a_tenant_with_a_data_key_stores_no_refresh_token()
+    {
+        var authority = await keycloak.StartAsync();
+        var (factory, _, _, databases) = await StartConfigurationHostAsync(authority, dataKeys: true);
+        await using var _ = factory;
+        using var client = CreateClient(factory, _fapiAddress);
+
+        var callback = await LogInAtKeycloakAsync(client, authority, "requester", _fapiAddress, par: true);
+        using var signedIn = await SendAsync(client, callback.PathAndQuery);
+
+        Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+        Assert.Equal("requester", await MeAsync(client));
+        Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(databases["fapi"], "SELECT count(*) FROM axis.sessions", CancellationToken));
+        Assert.Null(await PostgreSqlServer.AdminScalarAsync(databases["fapi"], "SELECT refresh_token FROM axis.sessions", CancellationToken));
     }
 
     [Fact]
@@ -313,9 +331,10 @@ public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture
 
     /// <summary>
     /// Starts a host with the configuration tenants <c>fapi</c>, <c>plain</c> and <c>nopar</c>, and records each
-    /// tenant's calls to Keycloak. Also returns the schema connection string of each tenant's database.
+    /// tenant's calls to Keycloak. Also returns the schema connection string of each tenant's database. Tenant <c>fapi</c> has a data key
+    /// when <paramref name="dataKeys"/> is set.
     /// </summary>
-    private async Task<(WebApplicationFactory<Program> Factory, Dictionary<string, RecordingHandler> Calls, LogCollector Logs, Dictionary<string, string> Databases)> StartConfigurationHostAsync(Uri authority)
+    private async Task<(WebApplicationFactory<Program> Factory, Dictionary<string, RecordingHandler> Calls, LogCollector Logs, Dictionary<string, string> Databases)> StartConfigurationHostAsync(Uri authority, bool dataKeys = false)
     {
         var databases = new Dictionary<string, string>();
         foreach (var id in _tenantIds)
@@ -350,6 +369,11 @@ public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture
                 builder.UseSetting($"Tenants:{id}:Oidc:Profile", TenantSignInProfiles.Fapi2);
                 builder.UseSetting($"Tenants:{id}:Oidc:ClientKey", KeycloakFixture.FapiClientKey("key-1"));
                 builder.UseSetting($"Tenants:{id}:Oidc:ClientKeyId", "key-1");
+            }
+
+            if (dataKeys)
+            {
+                builder.UseSetting("Tenants:fapi:DataKeys:1", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
             }
 
             builder.UseSetting("Tenants:plain:Oidc:ClientId", KeycloakFixture.ClientId);

@@ -36,6 +36,19 @@ describe('ResourceFormSection', () => {
     expect(within(section).getByText('Fields')).toBeVisible()
   })
 
+  it('shows a heading with no line as its title alone', () => {
+    renderSections(
+      <ResourceFormSection testName="live" heading={{ title: 'Live' }}>
+        <span>Fields</span>
+      </ResourceFormSection>,
+    )
+
+    const section = screen.getByRole('region', { name: 'Live' })
+    expect(section).toBe(screen.getByTestId('studio-section-live'))
+    expect(within(section).getByRole('heading', { name: 'Live' })).toBeVisible()
+    expect(section).toHaveTextContent(/^LiveFields$/)
+  })
+
   it('draws a section with no heading as its fields alone', () => {
     renderSections(
       <ResourceFormSection testName="rest">

@@ -202,7 +202,7 @@ database.
 | `Tenancy:RefreshInterval`          | `00:00:30`      | How often the server and the worker read the tenant directory again, and the agent host as [AI settings](#ai-settings) say. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, and of the agent host as [AI settings](#ai-settings) say, naming the setting.                                                                                                                                                                                                                                                                                                       |
 | `Platform:SecretKey`               | none            | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, by the worker and `Axis.Admin` under `directory`, and by the agent host as [AI settings](#ai-settings) say. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start.                                                                                                                                                                                  |
 | `Platform:PreviousSecretKey`       | none            | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it, and the agent host as [AI settings](#ai-settings) say. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key).                                                                                           |
-| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage` and `platform.tenant_usage_latest`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. The server and the worker need it under `directory`, and the agent host as [AI settings](#ai-settings) say. Outside Development and Testing the server, and the worker and the agent host under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
+| `ConnectionStrings:Platform`       | none            | A role that reads the `platform` schema and writes only these: rows it inserts into `platform.data_protection_keys` and `platform.jobs`, the rows of `platform.tenant_usage`, `platform.tenant_usage_latest` and `platform.tenant_token_usage`, the rows of `platform.tenant_leases`, and rows it inserts and updates in `platform.tenant_daily_counters`. The server and the worker need it under `directory`, and the agent host as [AI settings](#ai-settings) say. Outside Development and Testing the server, and the worker and the agent host under `directory`, refuse a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls). |
 | `ConnectionStrings:PlatformSchema` | none            | The role that owns the `platform` schema. The server reads it at start for the platform migrations, under both sources, and for each `PUT /api/cell/tenants/{id}/quotas`, which opens an unpooled connection for that write alone. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. Outside Development and Testing the server refuses a value with `SSL Mode` below `VerifyFull` or none, see [TLS](installation.md#tls).                                                   |
 
 As environment variables they are `Tenancy__Source`, `Tenancy__RefreshInterval`,
@@ -292,9 +292,9 @@ the environment variable `Tenants__<id>__PreviewOf`. A blank value counts as uns
   tenant's.
 - **Sign-in.** A preview tenant has no `Oidc` block. It copies its main tenant's `Authority`,
   `ClientId`, `ClientSecret`, `Profile`, `ClientKey`, `ClientKeyId` and `Claims`. It does not copy
-  `EndpointAudience`, `ServiceAudience` or `UsersClientSecret`, so the preview accepts no
-  machine-caller or service account token and lists no realm users. A preview tenant with its own
-  `Oidc` block stops the start.
+  `EndpointAudience`, `ServiceAudience`, `UsersClientSecret` or `AgentClientSecret`, so the preview
+  accepts no machine-caller or service account token, lists no realm users and has no agent client.
+  A preview tenant with its own `Oidc` block stops the start.
 - **Bindings.** The bindings are empty unless the tenant sets some. A preview never takes its main
   tenant's bindings, so it never calls a real system by accident. See
   [deployment bindings](integration-resources.md#deployment-bindings).
@@ -342,9 +342,18 @@ activation and `Axis.Admin` activation use it, see
   authority stops the start, and the message never shows the secret. Under `directory` the server
   decrypts the stored `realm_users_client_secret`, and the realm name is the tenant id. A tenant with
   no users client has no users page, see [the users page](user-administration.md#the-users-page).
+- **Agent client.** The entry also carries what the server and the agent host need to exchange an author's token for
+  the agent host and to refresh it: the secret of the `axis-agent` client, with the same address and realm name. Under
+  `configuration`, `Tenants:{id}:Oidc:AgentClientSecret` gives it, as the environment variable
+  `Tenants__<id>__Oidc__AgentClientSecret`, and a blank value means the tenant has no agent client.
+  It follows the authority rule of the users client: a secret with an authority that does not end in
+  `/realms/<name>` stops the start, and the message never shows the secret. Under `directory` the
+  server decrypts the stored `realm_agent_client_secret`, and the realm name is the tenant id. A row
+  without the secret, and a tenant that signs in with an outside identity provider, has no agent
+  client.
 - **Preview tenants.** A preview tenant has no realm details of its own, and a `Realm` block on one
-  stops the start. It has no users client either, so it does not copy `UsersClientSecret` from its
-  main tenant.
+  stops the start. It has no users client or agent client either, so it does not copy
+  `UsersClientSecret` or `AgentClientSecret` from its main tenant.
 
 ## Data settings
 
@@ -467,30 +476,35 @@ minute for one replica. The rules of the limits are in
 
 ## AI settings
 
-The agent host reads the `Ai` settings: the model bindings and the default and review bindings. Their
-table is in [model bindings](model-bindings.md#bindings). The server reads `Ai:AllowTenantKeys`, see
-[a tenant's own key](model-bindings.md#a-tenants-own-key).
+The agent host reads the `Ai` settings: the model bindings, the default and review bindings, the
+[budgets of a request](authoring-requests.md#budgets) and the file of scripted answers of the tests. Their table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
+`Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key).
 
 With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the worker does under
 [tenancy settings](#tenancy-settings). With it unset, AI authoring is off and the agent host starts
 idle, reading none of the settings below.
 
-- **What it reads.** `Tenancy:Source`, `Tenancy:RefreshInterval`, `ConnectionStrings:Platform`,
-  `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of the tenancy settings. Under
-  `directory` it needs `ConnectionStrings:Platform` and `Platform:SecretKey`, and never reads
-  `ConnectionStrings:PlatformSchema`. Under `configuration` it reads the `Tenants` section.
+- **What it reads.** `Ai:AllowTenantKeys`, `Tenancy:Source`, `Tenancy:RefreshInterval`,
+  `ConnectionStrings:Platform`, `Platform:SecretKey` and `Platform:PreviousSecretKey`, with the rules of
+  the tenancy settings. Under `directory` it needs `ConnectionStrings:Platform` and
+  `Platform:SecretKey`, and never reads `ConnectionStrings:PlatformSchema`. Under `configuration` it
+  reads the `Tenants` section. For each tenant it reads the data keys that decrypt a request's stored
+  token and the [agent client](#tenant-realm) secret that refreshes it, from the `Tenants`
+  section or, under `directory`, from the tenant directory as the server does.
 - **The tenant directory.** It reads its `active` tenants over `ConnectionStrings:Platform`. If its first
   read fails, it retries every `Tenancy:RefreshInterval`. Then it reads the directory again every
   interval and keeps the last good read when a refresh fails. It leaves out a read-only tenant, as the
   worker does. Its readiness does not show the directory read.
+- **A tenant's own model key.** It reads the key from the same directory, see
+  [a tenant's own key](model-bindings.md#a-tenants-own-key).
+- **Token usage.** Under `directory` it writes the tokens of each model call to the tenant's
+  [usage](tenant-quotas.md#usage) over `ConnectionStrings:Platform`. Under `configuration` it
+  writes none.
 - **The tenant role.** It opens a tenant database only with the tenant's runtime role, and refuses a
   tenant whose role fails the [runtime role check](storage.md#database-roles). The error names the
   tenant and the role and never a connection string.
 - **A bad setting** stops the start, and the message names the setting and never a connection value.
   With AI authoring off, a missing platform connection does not stop the agent host.
-
-**The budgets of a request** _(planned for M35)_ are settings of the same section and
-of the same table.
 
 ## Telemetry export
 

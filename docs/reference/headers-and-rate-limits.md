@@ -62,7 +62,7 @@ cannot use up a replica.
 
 | Partition  | Routes                                                        | Counted by           | Setting                 |
 | ---------- | ------------------------------------------------------------- | -------------------- | ----------------------- |
-| Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`          | Client address       | `RateLimits:SignIn`     |
+| Sign-in    | `GET /api/auth/sign-in` and `GET /api/auth/callback`, and the [cell console](cell-console.md#sign-in)'s `GET /api/cell/auth/sign-in` and `GET /api/cell/auth/callback` | Client address       | `RateLimits:SignIn`     |
 | Session    | Every other route that takes a session                        | Tenant and user      | `RateLimits:Session`    |
 | Bearer     | Inbound endpoints and [service accounts](security.md#service-accounts) | Tenant and caller id | `RateLimits:Bearer`     |
 | Publishing | Studio validate, publish, preview, activate and test requests | Tenant and user      | `RateLimits:Publishing` |
@@ -90,21 +90,23 @@ cannot use up a replica.
   write costs nothing and the caller is known. A request that fails the CSRF check, or has no valid session or token,
   still gets its `403` or `401`, never a `429`. The one exception is the sign-in callback.
 - **The partition follows the route and the kind of caller.** A bearer request on a route that also takes a session
-  counts as bearer. The status poll `GET /api/studio/apps/{application}/requests/{id}` and `POST /api/auth/sign-out`
-  count as session, not as publishing or sign-in.
+  counts as bearer. The status poll `GET /api/studio/apps/{application}/requests/{id}`, `POST /api/auth/sign-out` and the
+  cell console's `POST /api/cell/auth/sign-out` count as session, not as publishing or sign-in.
 - **No valid session or token.** A request on a session or bearer route with no valid session or token counts in that
   route's partition by tenant and client address. So it is not unlimited, and a user's empty bucket never turns an
   anonymous `401` into a `429`. On an MCP route that count is by tenant and client address too.
 - **MCP.** A call to `/mcp` counts in the MCP partition, whatever its method. The count key is the tenant and the
   token's client id, which is its `azp` claim, so everyone who uses one client in a tenant shares one count and
   another client of the tenant has its own. A valid token with no `azp` claim counts by tenant and person.
-- **The callback.** The OIDC handler answers `GET /api/auth/callback` inside authentication, so the limiter counts the
-  callback just before authentication. It shares the sign-in count of its client address.
+- **The callback.** The OIDC handlers answer `GET /api/auth/callback` and the cell console's `GET /api/cell/auth/callback`
+  inside authentication, so the limiter counts each callback just before authentication. It shares the sign-in count of
+  its client address.
 - **Open routes.** `GET /api/site`, `GET /api/texts/{locale}`, `GET /.well-known/oauth-protected-resource/mcp`, `/health` and
   the SPA's static files and pages have no limit.
 - **The control plane** _(planned for M33)_. The [control plane](control-plane.md) is another service with limits of
   its own: the `sign_up` partition of [sign-up](sign-up.md#bots-and-abuse), and the
-  [billing portal](billing-portal.md#rules)'s.
+  [billing portal](billing-portal.md#rules)'s. It counts its refusals in the same metric, with `sign_up` as
+  `axis.partition`, see [the control plane's metrics](control-plane.md).
 
 ### A refused request
 

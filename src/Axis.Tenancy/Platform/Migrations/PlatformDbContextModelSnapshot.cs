@@ -610,6 +610,20 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("id");
 
+                    b.PrimitiveCollection<string[]>("AiAllowedClients")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text[]")
+                        .HasColumnName("ai_allowed_clients")
+                        .HasDefaultValueSql("'{}'::text[]");
+
+                    b.Property<string>("AiOutsideClients")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("none")
+                        .HasColumnName("ai_outside_clients");
+
                     b.Property<string>("ClaimDisplayName")
                         .HasColumnType("text")
                         .HasColumnName("claim_display_name");
@@ -714,6 +728,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("realm_activation_client_secret");
 
+                    b.Property<byte[]>("RealmAgentClientSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("realm_agent_client_secret");
+
                     b.Property<byte[]>("RealmUsersClientSecret")
                         .HasColumnType("bytea")
                         .HasColumnName("realm_users_client_secret");
@@ -797,6 +815,8 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("tenants", "platform", t =>
                         {
+                            t.HasCheckConstraint("ck_tenants_ai_outside_clients", "ai_outside_clients IN ('all', 'allowList', 'none')");
+
                             t.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
 
                             t.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
@@ -839,6 +859,51 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("tenant_site_legal_links", "platform", t =>
                         {
                             t.HasCheckConstraint("ck_tenant_site_legal_links_url", "privacy_url IS NOT NULL OR terms_url IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantTokenUsageRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateOnly>("Day")
+                        .HasColumnType("date")
+                        .HasColumnName("day");
+
+                    b.Property<string>("Binding")
+                        .HasColumnType("text")
+                        .HasColumnName("binding");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("text")
+                        .HasColumnName("model");
+
+                    b.Property<bool>("OwnKey")
+                        .HasColumnType("boolean")
+                        .HasColumnName("own_key");
+
+                    b.Property<long>("InputTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("input_tokens");
+
+                    b.Property<long>("OutputTokens")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasDefaultValue(0L)
+                        .HasColumnName("output_tokens");
+
+                    b.HasKey("TenantId", "Day", "Binding", "Model", "OwnKey")
+                        .HasName("pk_tenant_token_usage");
+
+                    b.ToTable("tenant_token_usage", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_token_usage_input_tokens", "input_tokens >= 0");
+
+                            t.HasCheckConstraint("ck_tenant_token_usage_output_tokens", "output_tokens >= 0");
                         });
                 });
 
@@ -1075,6 +1140,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_site_legal_links_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantTokenUsageRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_token_usage_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantUsageLatestRow", b =>

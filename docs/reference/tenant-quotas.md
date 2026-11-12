@@ -14,17 +14,17 @@ asks.
 
 Each quota has a key, a cell-wide default and a kind, which says how it is counted.
 
-| Quota | What it counts | Default | Kind |
-| --- | --- | --- | --- |
-| `storage` | The tenant database's size plus the bytes of its stored files, in bytes | 10 GiB | Sampled |
-| `users` | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50 | Exact |
-| `applications` | The applications of the tenant: folders in its Studio folder and applications with a release | 10 | Exact |
-| `emailsPerDay` | Emails sent for the tenant since 00:00 UTC | 1,000 | Exact |
-| `concurrentImports` | Imports and exports that run at once | 2 | Lease |
-| `concurrentConnectorCalls` | Connector and package calls in flight at once | 10 | Lease |
-| `concurrentQueries` | Data source queries and record list reads that run at once | 10 | Lease |
-| `workerWeight` | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md) | 1 | Weight |
-| `authoringRequests` | AI authoring requests sent in a calendar month in UTC, see [budgets](authoring-requests.md#budgets) | None | Exact |
+| Quota                      | What it counts                                                                                        | Default | Kind    |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- | ------- | ------- |
+| `storage`                  | The tenant database's size plus the bytes of its stored files, in bytes                               | 10 GiB  | Sampled |
+| `users`                    | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50      | Exact   |
+| `applications`             | The applications of the tenant: folders in its Studio folder and applications with a release          | 10      | Exact   |
+| `emailsPerDay`             | Emails sent for the tenant since 00:00 UTC                                                            | 1,000   | Exact   |
+| `concurrentImports`        | Imports and exports that run at once                                                                  | 2       | Lease   |
+| `concurrentConnectorCalls` | Connector and package calls in flight at once                                                         | 10      | Lease   |
+| `concurrentQueries`        | Data source queries and record list reads that run at once                                            | 10      | Lease   |
+| `workerWeight`             | The tenant's share of the worker, see [worker scheduling](worker-scheduling.md)                       | 1       | Weight  |
+| `authoringRequests`        | AI authoring requests sent in a calendar month in UTC, see [budgets](authoring-requests.md#budgets)   | None    | Exact   |
 
 - **Where they live.** `platform.tenant_quotas` holds one row for each quota that a tenant overrides:
   `tenant_id`, `quota`, `value` and `updated_at`. A quota with no row takes the cell's default,
@@ -35,9 +35,9 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
   [provisioning API](tenant-lifecycle.md#provisioning-api), and each change writes a platform audit
   record that names the keys of the request. The [create route](tenant-lifecycle.md#creating-a-tenant)
   can also set the first rows.
-- **The operator as actor** _(planned for M31)_. The audit record of a quota change names the operator
+- **The operator as actor** _(planned for M33)_. The audit record of a quota change names the operator
   or the machine caller in its `actor` column.
-- **From a plan** _(planned for M34)_. The [control plane](control-plane.md) writes a SaaS tenant's
+- **From a plan.** The [control plane](control-plane.md) writes a SaaS tenant's
   rows from its [plan](plans.md#from-a-plan-to-the-quotas), with no schema change.
 - **Authoring requests.** `authoringRequests` counts the requests sent since 00:00 UTC on the first
   day of the month, once each, when the author sends it. A dropped or failed request still counts,
@@ -80,13 +80,21 @@ nothing:
 
 - **`storage`.** Once the last sample is at or over the quota, these are refused: a record create or
   update through the record API, an import, an inbound endpoint call that writes, a file upload, a
-  save, reset or undo in Studio and a publish. A delete is never refused, and neither is a change of an
+  save, reset or undo in Studio, a publish and the author's [accept](authoring-requests.md#accepting)
+  of a draft, which writes the draft as a revision. A delete is never refused, and neither is a change of an
   [application setting](authoring.md#application-settings), which stores one flag. Process steps, task completions,
   effects and triggers go on, so running work does not fail half-way. The overshoot is what the
   tenant writes in one sampling interval. The server reads the last sample on each such write. A
   tenant with no sample yet is not refused, and neither is a write when the platform database cannot
   be read: the server logs a warning and the write goes on, because a quota is a billing limit and not
   a security boundary.
+- **Platform rows only.** The routes of a tenant administrator that write only platform rows, such as its
+  [model key](user-administration.md#the-tenants-model-key) and its
+  [outside clients](user-administration.md#outside-mcp-clients), are never refused over the `storage` quota,
+  because they write no tenant data.
+- **Consent revokes.** A tenant administrator's [revoke of an outside client's consent](user-administration.md#outside-mcp-clients)
+  is never refused over the `storage` quota. Revoking is a security action, and a billing limit must never stop it. It
+  writes one small row and one audit record.
 - **`users`.** Inviting an account and enabling one on the [users page](user-administration.md) are
   refused when the count would pass the quota. A person who signs in through a brokered provider for
   the first time, and would pass the quota, is refused at the identity provider with a page that asks
@@ -124,13 +132,13 @@ in the platform database, so it holds for the whole cell.
 
 What waits, and how:
 
-| Work | Lease | When none is free |
-| --- | --- | --- |
-| The dry run or the commit of an import, in the worker | `concurrentImports`, held until the work has committed | It does not run. Its work item is due again in 1 second and the import keeps its state, `pending` or `checked`, so any worker can run it once a lease is free. |
-| The `export` job of the publisher, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) | `concurrentImports`, held until the ZIP is stored | The job stays `running` and the publisher tries again about a second later. The wait uses none of the job's three claims, so a busy tenant never fails an export. |
-| A connector or package call, in the worker | `concurrentConnectorCalls`, held until the run of the item ends | The worker does not claim it. The work item stays due, the worker runs other tenants' work, and it retries the claim at the tenant's next turn, after one of its items ends or at the next poll. |
-| A data source query or a record list read | `concurrentQueries` | It waits up to 5 seconds, then answers `503`, see below. |
-| A record export or a data source export | `concurrentImports`, released when the file is complete, before it is sent | It waits up to 5 seconds, then answers `503`, see below. |
+| Work                                                                                                | Lease                                                                      | When none is free                                                                                                                                                                                |
+| --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The dry run or the commit of an import, in the worker                                               | `concurrentImports`, held until the work has committed                     | It does not run. Its work item is due again in 1 second and the import keeps its state, `pending` or `checked`, so any worker can run it once a lease is free.                                   |
+| The `export` job of the publisher, see [exporting a tenant](tenant-lifecycle.md#exporting-a-tenant) | `concurrentImports`, held until the ZIP is stored                          | The job stays `running` and the publisher tries again about a second later. The wait uses none of the job's three claims, so a busy tenant never fails an export.                                |
+| A connector or package call, in the worker                                                          | `concurrentConnectorCalls`, held until the run of the item ends            | The worker does not claim it. The work item stays due, the worker runs other tenants' work, and it retries the claim at the tenant's next turn, after one of its items ends or at the next poll. |
+| A data source query or a record list read                                                           | `concurrentQueries`                                                        | It waits up to 5 seconds, then answers `503`, see below.                                                                                                                                         |
+| A record export or a data source export                                                             | `concurrentImports`, released when the file is complete, before it is sent | It waits up to 5 seconds, then answers `503`, see below.                                                                                                                                         |
 
 - **The busy answer.** A read or an export that waited 5 seconds answers `503` problem details titled
   "This tenant is busy. Try again in a moment.", with `Retry-After: 1`. The query timeout counts from
@@ -185,8 +193,9 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
 ## Usage
 
 The worker of a cell measures each tenant's usage: its storage every hour and its counts as it runs
-work. A worker with no `Cell:Id` measures nothing and writes no usage row. Usage holds counts and
-sizes only, never a record value, a file name or a user name.
+work. A worker with no `Cell:Id` measures nothing and writes no usage row. The agent host writes the
+tokens of its model calls. Usage holds counts and sizes only, never a record value, a file name or a
+user name.
 
 - **Sampling.** A worker job samples each tenant's storage every hour and keeps the newest sample in
   `platform.tenant_usage_latest`, which the storage check reads. The same pass counts the tenant's
@@ -206,12 +215,21 @@ sizes only, never a record value, a file name or a user name.
   the day, the emails sent, the connector and package calls, and the work items run. A sample
   replaces the day's pair of sizes only when its total is larger. Rows are kept for 13 months, and
   the sampling job deletes the tenant's rows older than that.
-- **Users, applications and emails sent** _(planned for M31)_. The daily row's users, applications
+- **Users, applications and emails sent** _(planned for M33)_. The daily row's users, applications
   and emails-sent columns are filled from the counts of their quotas, see [quotas](#quotas) and
   [emails a day](#emails-a-day).
-- **Authoring requests** _(planned for M35)_. The daily row also holds the authoring requests sent
-  and the tokens of each model, with a tenant's own key counted apart, see
-  [authoring requests](authoring-requests.md#audit).
+- **Tokens.** `platform.tenant_token_usage` holds the tokens of the agent host's model calls: one
+  row per tenant, UTC day, binding, model and `own_key`, which is true for tokens that the tenant's
+  own key paid, see [a tenant's own key](model-bindings.md#a-tenants-own-key), so own-key tokens
+  never share a row with the installation's. A row holds input tokens and output tokens. After each
+  model call, review included, the agent host adds the call's tokens to its row, and a tenant's
+  calls on one day for one binding and model share one row. A write that fails is logged as a
+  warning that names the tenant, and the call and its step go on. The host writes whenever it reads
+  the tenant directory, with or without `Cell:Id`, and writes nothing under
+  `Tenancy:Source=configuration`. Each write deletes the tenant's token rows older than 13 months.
+  The usage route and the cell console do not show these rows yet.
+- **Authoring requests sent** _(planned for M35)_. The daily row also holds the authoring requests
+  sent, see [authoring requests](authoring-requests.md#audit).
 - **Counts.** Each work item the worker runs adds one to the day's work-item count, and a connector
   call or a package call adds one to the day's call count too. A retry that the handler reschedules
   counts, because every attempt is real work. The count is added in a short transaction on the
@@ -220,7 +238,8 @@ sizes only, never a record value, a file name or a user name.
   write is logged and never fails the work item. An item whose claim another worker took counts
   nowhere in this worker.
 - **Who writes.** The platform role of `ConnectionStrings:Platform` may insert, update and delete
-  rows of both usage tables, see [storage](storage.md#database-roles).
+  rows of the three usage tables, see [storage](storage.md#database-roles). The worker writes the two
+  tables of the sizes and counts, and the agent host writes the tokens.
 - **Readers.** The [cell console](cell-console.md#views) shows the usage through the
   [provisioning API's tenant reads](tenant-lifecycle.md#routes), which answer `usage`. The single tenant
   read also answers the day rows of the last 13 months. A tenant's administrator reads it through

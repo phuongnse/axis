@@ -176,6 +176,123 @@ const noAntdComponent = (component, message) => ({
 const noAntdButton = noAntdComponent('Button', 'Use AxisButton with a role, not the Button of antd.')
 const noAntdAlert = noAntdComponent('Alert', 'Use AxisAlert with a kind, not the Alert of antd.')
 
+// A field label drawn through AxisField, see docs/reference/frontend.md#platform-field-help.
+const antdInputs = new Set([
+  'AutoComplete',
+  'Cascader',
+  'Checkbox',
+  'ColorPicker',
+  'DatePicker',
+  'Input',
+  'InputNumber',
+  'Mentions',
+  'Radio',
+  'Rate',
+  'Segmented',
+  'Select',
+  'Slider',
+  'Switch',
+  'TimePicker',
+  'Transfer',
+  'TreeSelect',
+  'Upload',
+])
+const axisInputs = new Set(['ReferencePicker', 'ExpressionEditor', 'LazyExpressionEditor', 'FieldInput', 'FileInput'])
+const textElements = new Set(['span', 'div', 'p', 'strong'])
+const typographyTexts = new Set(['Text', 'Title', 'Paragraph'])
+const bareTexts = new Set(['Text', 'Title'])
+
+const isLabelAttribute = (attribute) => attribute.type === 'JSXAttribute' && attribute.name?.name === 'label'
+const isTextChild = (child) =>
+  child.type === 'JSXText' ||
+  (child.type === 'JSXExpressionContainer' &&
+    child.expression.type !== 'JSXElement' &&
+    child.expression.type !== 'JSXFragment')
+const isSkippedChild = (child) =>
+  (child.type === 'JSXText' && child.value.trim() === '') ||
+  (child.type === 'JSXExpressionContainer' && child.expression.type === 'JSXEmptyExpression')
+
+const fieldLabelThroughAxisField = {
+  meta: {
+    type: 'problem',
+    messages: {
+      formItemLabel: 'Draw a field label through AxisField, not a label on Form.Item.',
+      rawLabel: 'Draw a field label through AxisField or AxisFieldGroup, not a raw <label> or <legend>.',
+      textBeforeInput: 'A text before an input is a hand-drawn label. Draw the field through AxisField.',
+    },
+    schema: [],
+  },
+  create(context) {
+    const formNames = new Set()
+    const typographyNames = new Set()
+    const inputNames = new Set()
+
+    const isInputName = (name) => {
+      if (name.type === 'JSXIdentifier') return inputNames.has(name.name) || axisInputs.has(name.name)
+      return (
+        name.type === 'JSXMemberExpression' && name.object.type === 'JSXIdentifier' && inputNames.has(name.object.name)
+      )
+    }
+    const isInput = (element) => {
+      const name = element.openingElement.name
+      if (isInputName(name)) return true
+      return (
+        name.type === 'JSXIdentifier' &&
+        name.name === 'Suspense' &&
+        element.children.some((child) => child.type === 'JSXElement' && isInputName(child.openingElement.name))
+      )
+    }
+    const isText = (element) => {
+      const name = element.openingElement.name
+      const named = name.type === 'JSXIdentifier' && (textElements.has(name.name) || bareTexts.has(name.name))
+      const typography =
+        name.type === 'JSXMemberExpression' &&
+        name.object.type === 'JSXIdentifier' &&
+        typographyNames.has(name.object.name) &&
+        typographyTexts.has(name.property.name)
+      return (named || typography) && element.children.length > 0 && element.children.every(isTextChild)
+    }
+
+    function checkChildren(node) {
+      const children = node.children.filter((child) => !isSkippedChild(child))
+      for (let index = 0; index < children.length - 1; index++) {
+        const [first, second] = [children[index], children[index + 1]]
+        if (first.type === 'JSXElement' && second.type === 'JSXElement' && isText(first) && isInput(second))
+          context.report({ node: first, messageId: 'textBeforeInput' })
+      }
+    }
+
+    return {
+      ImportDeclaration(node) {
+        if (node.source.value !== 'antd') return
+        for (const specifier of node.specifiers) {
+          if (specifier.type !== 'ImportSpecifier') continue
+          const imported = specifier.imported.name ?? specifier.imported.value
+          if (imported === 'Form') formNames.add(specifier.local.name)
+          else if (imported === 'Typography') typographyNames.add(specifier.local.name)
+          else if (antdInputs.has(imported)) inputNames.add(specifier.local.name)
+        }
+      },
+      JSXOpeningElement(node) {
+        const name = node.name
+        if (name.type === 'JSXMemberExpression') {
+          if (
+            name.object.type === 'JSXIdentifier' &&
+            formNames.has(name.object.name) &&
+            name.property.name === 'Item' &&
+            node.attributes.some(isLabelAttribute)
+          )
+            context.report({ node, messageId: 'formItemLabel' })
+        } else if (name.type === 'JSXIdentifier' && (name.name === 'label' || name.name === 'legend')) {
+          context.report({ node, messageId: 'rawLabel' })
+        }
+      },
+      JSXElement: checkChildren,
+      JSXFragment: checkChildren,
+    }
+  },
+}
+
 const locatorMethods = new Set(['getByRole', 'getByLabel', 'getByText', 'getByTitle'])
 const wrappers = new Set(['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression'])
 const scopes = new Set(['BlockStatement', 'StaticBlock', 'Program'])
@@ -296,6 +413,7 @@ export default {
     'no-preset-tag-colour': noPresetTagColour,
     'no-antd-button': noAntdButton,
     'no-antd-alert': noAntdAlert,
+    'field-label-through-axis-field': fieldLabelThroughAxisField,
     'exact-locators': exactLocators,
   },
 }

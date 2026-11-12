@@ -41,8 +41,8 @@ sign-in. Tenants share nothing in it, as they share no database. `tenant create`
   self-registration.
 - **Themes.** The realm's login theme is the Axis theme `axis`, and so is its email theme, see
   [theme](#theme).
-- **Contents.** The realm also has its people, its brokered identity providers and a client for each
-  site.
+- **Contents.** The realm also has its people, its brokered identity providers, a client for each
+  site and the agent host's client `axis-agent`.
 - **Display name.** Every sign-in page shows the realm's display name, the organization's name, above
   its card, and Axis while the realm has none, see [theme](#theme). `tenant create` gives the realm no
   display name, and a rerun clears one that holds the tenant id, so the pages never name the tenant
@@ -50,7 +50,9 @@ sign-in. Tenants share nothing in it, as they share no database. `tenant create`
 - **MCP sign-in.** The realm holds what an outside MCP client needs to sign a person in: the client
   scope `axis:authoring`, whose audiences are the `/mcp` URLs of the tenant's hosts, a client policy
   that requires PKCE of every public client, access tokens of 5 minutes and refresh tokens that work
-  once. The rules are in [sign-in](mcp-server.md#sign-in).
+  once. The rules are in [sign-in](mcp-server.md#sign-in). The agent host's client `axis-agent` can
+  trade a person's token for one with the same audience, see
+  [keeping the realm in step](#keeping-the-realm-in-step).
 - **Preview tenants.** A preview tenant has no realm. It signs people in through its main tenant's
   realm, see [preview tenants](#preview-tenants).
 
@@ -322,13 +324,26 @@ keep it matching what the tenant's releases and settings declare. Only `Axis.Adm
 provider's admin rights over every realm, from the `IdentityProvider` settings of its own, see
 [administration](administration.md#settings).
 
-- **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client `axis`,
-  and two clients that Axis's hosts use to change the realm: `axis-activation` for activation, with
-  rights over the realm's providers and clients and `manage-realm` for the providers' label texts,
-  which Keycloak requires for realm texts and which also covers every realm setting, and `axis-users`
-  for the users page, with rights over its users only. It stores their secrets and the platform
-  client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm.
+- **Created by `Axis.Admin`:** `tenant create` and `tenant restore` create the tenant's realm, its
+  platform client `axis`, two clients that Axis's hosts use to change the realm: `axis-activation`
+  for activation, with rights over the realm's providers and clients and `manage-realm` for the
+  providers' label texts, which Keycloak requires for realm texts and which also covers every realm
+  setting, and `axis-users` for the users page, with rights over its users only, and the agent host's
+  client `axis-agent`. It stores their secrets and the platform client's secret encrypted in the
+  tenant directory and points the tenant's `Oidc` block at the realm. A rerun keeps each secret.
   It also:
+  - makes `axis-agent` a confidential client that can do one thing, standard token exchange
+    ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)), where it trades a person's token for a new
+    token for that person. It cannot sign people in, use the password flow or act as a service account,
+    needs no consent and has no roles. Its full scope is off, so the `/mcp` URL that the scope
+    `axis:authoring` puts into the token is the exchanged token's only audience, and a request for any
+    other audience is refused. An exchange asks for the scope and sends no `audience` parameter,
+    because the parameter takes only client ids. The exchanged token's subject is the person, and the
+    MCP server takes it like any other client's token, see [sign-in](mcp-server.md#sign-in). An
+    exchange can return a refresh token, which stops working when the person's realm session ends.
+    `axis:authoring` is its only optional scope. The access token of `axis` names `axis-agent` in its
+    audience, through the mapper `axis-agent audience`, so a person's Studio sign-in can be exchanged.
+    The mapper is created and corrected on every run, because a client update does not change mappers;
   - turns off Keycloak's account console client `account-console` and removes `manage-account` from the
     realm's default roles, because Axis's [account page](platform-pages.md#account-page) replaces it.
     The older `account` client stays, as Keycloak's application-initiated actions may need it;
@@ -347,9 +362,10 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     tokens, and the client policy `axis-public-pkce` that requires PKCE of public clients, see
     [sign-in](mcp-server.md#sign-in). The client scope `axis:authoring` comes with the
     [redirect addresses](#keeping-the-realm-in-step), because its audiences come from the hosts;
-  - lets an outside MCP client register itself without a token, with the client policy
-    `axis-mcp-registration` and the realm's anonymous registration policies, under the rules of
-    [client registration](mcp-server.md#client-registration).
+  - lets an outside MCP client register itself without a token only when the tenant's
+    `Ai:OutsideClients` setting allows it, with the client policy `axis-mcp-registration` and the
+    realm's anonymous registration policies, under the rules of
+    [client registration](mcp-server.md#client-registration). A new tenant allows none.
 
   A second run updates the realm, brings it up to the account rules and the token rules and sets its
   login theme and its email theme to `axis` again. When the identity provider answers a server error (5xx), the realm step
@@ -361,7 +377,8 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
   see `deploy/keycloak/README.md`. Without the file, `tenant create` fails at its realm step, also for a
   realm that exists.
 - **Redirect addresses:** `tenant create`, `tenant restore` and `tenant host add`, `remove` and `move`
-  set the platform client `axis` from the tenant's hosts.
+  set the platform client `axis` from the tenant's hosts, and put back the settings of `axis-agent`
+  after they write the scope `axis:authoring`, which a new realm has only from then on.
   - For each host the client gets the redirect address `https://<host>/api/auth/callback`, the web
     origin `https://<host>` and the post-logout redirect address `https://<host>/?signedOut`, which is
     the exact address that sign-out sends when the server could not end the session itself. Every
@@ -383,8 +400,12 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     for the tenant writes the realm again.
 - **Realm sync:** the realm sync signs in to the realm as `axis-activation` and makes the realm's
   `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. It touches no other
-  client or provider, apart from the legal links, so `axis`, `axis-activation`, `axis-users` and
-  anything an operator added stay. Every provider it writes names the realm's first-login flow, and it
+  client or provider, apart from the legal links, so `axis`, `axis-activation`, `axis-users`,
+  `axis-agent` and anything an operator added stay. The one exception is the settings of `axis-agent`:
+  when the realm holds it, the sync puts back token exchange, the refresh token tied to the session,
+  its flags and `axis:authoring` as its only optional scope, and keeps every other attribute. It never
+  creates `axis-agent`, because it does not hold the client's secret, so `tenant create` creates it,
+  also in a realm made before the client existed. Every provider it writes names the realm's first-login flow, and it
   refuses an alias that is empty or contains a space.
   - **Site clients.** A site client that the sync creates or updates copies the client authentication
     and the PAR, PKCE, DPoP and key settings of `axis`, so activation never undoes what
@@ -397,7 +418,9 @@ provider's admin rights over every realm, from the `IdentityProvider` settings o
     `identity_provider_acr` claim, and one mapper for each roles claim of the providers its site allows,
     named `axis_roles_<claim>`, which puts that user attribute into the ID token. The `identity provider`
     and `identity provider acr` mappers stay as they are, and the sync removes an `axis_roles_` mapper
-    that the site no longer needs.
+    that the site no longer needs. A site client does not copy the mapper `axis-agent audience`:
+    authoring starts only from Studio, which signs in through `axis`, so a site sign-in, such as a
+    citizen's, cannot be exchanged.
   - **Site client attributes.** Every sync rewrites `axis.providers`, the aliases of the providers the
     site allows separated by spaces, and `axis.accounts`, `true` or `false`. The legal sync writes
     `axis.privacyUrl`, `axis.termsUrl` and `axis.licencesUrl`, the links of the site's legal line, see

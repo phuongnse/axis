@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ -z "${TRIVY:-}" ]; then
-  source scripts/lib/tools.sh
+  source scripts/lib/trivy.sh
   install_trivy
   export TRIVY="$trivy"
 fi

@@ -16,6 +16,7 @@ import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
+import { SignUpPreview } from './SignUpPreview'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import { ClickOnMount, PreviewWindow, ShellPreview } from './ShellPreview'
 import { studioFixtures } from './studioFixtures'
@@ -50,6 +51,9 @@ import {
   processInspectorWidget,
   requestId,
   sectionWidget,
+  signUpApplications,
+  signUpDocuments,
+  signUpRegion,
   siteTexts,
   sitePath,
   tableWidget,
@@ -380,6 +384,20 @@ export const previews: Record<string, readonly PreviewState[]> = {
         </ClickOnMount>
       ),
       frameHeight: 600,
+    },
+  ],
+  signUp: [
+    {
+      caption: 'Typical',
+      draw: () => <SignUpPreview />,
+      frameHeight: 1200,
+      routes: {
+        '/api/sign-up/applications': () => signUpApplications,
+        // No challenge, so the page sends the form without a proof of work and solves nothing in the preview.
+        '/api/sign-up/challenge': () => new Response(null, { status: 404 }),
+        '/api/sign-up/documents': () => signUpDocuments,
+        '/api/sign-up/region': () => signUpRegion,
+      },
     },
   ],
 }

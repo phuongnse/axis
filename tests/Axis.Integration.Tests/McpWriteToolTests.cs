@@ -16,7 +16,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The tools of the MCP server that change a draft, <c>create_draft</c>, <c>write_resource</c>, <c>delete_resource</c> and <c>write_layer</c>, and
-/// <c>check_expression</c>, see docs/reference/mcp-server.md#tools. The server is tenant <c>a</c> on a real PostgreSQL database,
+/// <c>check_expression</c>, <c>validate_draft</c> and <c>diff_draft</c>, which write nothing, see docs/reference/mcp-server.md#tools. The server is tenant <c>a</c> on a real PostgreSQL database,
 /// because a draft holds the folder's write lock, which lives in the platform database, and each write call writes an audit
 /// record to the tenant database. The folder holds the purchase-requests sample.
 /// </summary>
@@ -27,6 +27,7 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     private const string Application = "PurchaseRequests";
     private const string ManifestId = "219102bc-864f-42ed-874a-c19eaee0d1ba";
     private const string NoDraft = "The application has no draft with this id.";
+    private const string NoRequest = "The application has no publish request with this id.";
     private const string NoResource = "The application has no resource with this id.";
     private const string KindChange = "A patch may not change id or kind.";
     private const string Module = "department-budgets";
@@ -313,6 +314,84 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
     }
 
     [Fact]
+    public async Task A_grant_past_a_modules_ceiling_is_a_diagnostic_of_validate_draft_that_writes_nothing()
+    {
+        var before = FolderState();
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var clean = await CallAsync("validate_draft", Arguments(("draft", draft)));
+        Assert.False(clean.IsError, clean.Error);
+        Assert.DoesNotContain(clean.Output!["diagnostics"]!.AsArray(), diagnostic => diagnostic!["code"]!.GetValue<string>() == "AXC0334");
+
+        // The department manager is the module's approver, whose ceiling allows read, create and update.
+        var policy = Guid.NewGuid().ToString("D");
+        var content = new JsonObject
+        {
+            ["id"] = policy,
+            ["kind"] = "policy",
+            ["name"] = "BudgetDeleteAccess",
+            ["formatVersion"] = 1,
+            ["roles"] = new JsonArray("department-manager"),
+            ["grants"] = new JsonArray(new JsonObject
+            {
+                ["name"] = "budgetDelete",
+                ["entity"] = "department-budgets/Budget",
+                ["actions"] = new JsonArray("delete"),
+            }),
+        };
+        Assert.False((await CallAsync("write_resource", Arguments(("draft", draft)), Content(content.ToJsonString()))).IsError);
+        var records = await AuditCountAsync(draft, null);
+
+        var validated = await CallAsync("validate_draft", Arguments(("draft", draft)));
+
+        Assert.False(validated.IsError, validated.Error);
+        Assert.Contains(
+            validated.Output!["diagnostics"]!.AsArray(),
+            diagnostic => diagnostic!["code"]!.GetValue<string>() == "AXC0334" && diagnostic["resourceId"]?.GetValue<string>() == policy);
+        Assert.Equal(0L, await AuditCountAsync(draft, "validate_draft"));
+        Assert.Equal(records, await AuditCountAsync(draft, null));
+        Assert.Equal(before, FolderState());
+    }
+
+    [Fact]
+    public async Task A_diff_over_one_mebibyte_comes_in_pages_that_the_cursor_reads_and_writes_nothing()
+    {
+        var before = FolderState();
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var expected = new List<string>();
+        for (var number = 1; number <= 6; number++)
+        {
+            var big = new JsonObject
+            {
+                ["id"] = Guid.NewGuid().ToString("D"),
+                ["kind"] = "policy",
+                ["name"] = "Big" + number,
+                ["description"] = new string('x', 300_000),
+            };
+            Assert.Null((await Drafts(_user!).WriteAsync(draft, big, CancellationToken)).Refusal);
+            expected.Add($"policies/big{number}.json");
+        }
+
+        var pages = new List<JsonNode> { (await CallAsync("diff_draft", Arguments(("draft", draft)))).Output! };
+        while (pages[^1]["cursor"] is { } cursor)
+        {
+            var next = await CallAsync("diff_draft", Arguments(("draft", draft), ("cursor", cursor.GetValue<string>())));
+            Assert.False(next.IsError, next.Error);
+            pages.Add(next.Output!);
+            Assert.True(pages.Count < 10);
+        }
+
+        Assert.True(pages.Count > 1);
+        Assert.All(pages, page => Assert.True(page.ToJsonString().Length <= StudioDrafts.DiffPageBytes));
+        Assert.All(pages, page => Assert.Equal(pages[0]["tip"]!.GetValue<string>(), page["tip"]!.GetValue<string>()));
+        Assert.Null(pages[^1]["cursor"]);
+        Assert.Equal(expected, pages.SelectMany(page => page["resources"]!.AsArray()).Select(entry => entry!["file"]!.GetValue<string>()));
+        Assert.Equal("The cursor is not one this draft gave.", (await CallAsync("diff_draft", Arguments(("draft", draft), ("cursor", "garbage")))).Error);
+        Assert.Equal(0L, await AuditCountAsync(draft, "diff_draft"));
+        Assert.Equal(1L, await AuditCountAsync(draft, null));
+        Assert.Equal(before, FolderState());
+    }
+
+    [Fact]
     public async Task Another_persons_draft_and_an_unknown_one_answer_no_draft_and_change_nothing_and_write_no_audit_record()
     {
         var theirs = (await Drafts("someone-else").CreateAsync(Revisions("someone-else"), CancellationToken)).Value!;
@@ -330,6 +409,7 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
         };
         var before = FolderState();
         var records = await PersonsAuditCountAsync();
+        var requests = await CountAsync("SELECT count(*) FROM axis.publish_requests");
         var theirFiles = (await Drafts("someone-else").FilesAsync(theirs.Id, CancellationToken)).Value!.Select(file => file.File).ToList();
         var unknown = Guid.NewGuid().ToString("D");
 
@@ -341,7 +421,14 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
                 NoDraft,
                 (await CallAsync("write_layer", Arguments(("draft", draft), ("module", Module), ("id", ProcessId)), Content("""{ "id": "x" }"""))).Error);
             Assert.Equal(NoDraft, (await CallAsync("check_expression", Arguments(("draft", draft), ("id", role), ("path", "/expression"), ("expression", "1")))).Error);
+            Assert.Equal(NoDraft, (await CallAsync("validate_draft", Arguments(("draft", draft)))).Error);
+            Assert.Equal(NoDraft, (await CallAsync("diff_draft", Arguments(("draft", draft)))).Error);
+            Assert.Equal(NoDraft, (await CallAsync("run_scenarios", Arguments(("draft", draft)))).Error);
+            Assert.Equal(NoDraft, (await CallAsync("run_scenarios", Arguments(("draft", draft), ("request", Guid.NewGuid().ToString("D"))))).Error);
         }
+
+        Assert.Equal(0L, await CountAsync($"SELECT count(*) FROM axis.publish_requests WHERE draft_id = '{theirs.Id}'"));
+        Assert.Equal(requests, await CountAsync("SELECT count(*) FROM axis.publish_requests"));
 
         Assert.Equal(theirFiles, (await Drafts("someone-else").FilesAsync(theirs.Id, CancellationToken)).Value!.Select(file => file.File).ToList());
         Assert.Empty((await Drafts("someone-else").DiffAsync(theirs.Id, null, CancellationToken)).Value!.Resources);
@@ -349,6 +436,43 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
         Assert.Equal(0L, await AuditCountAsync(theirs.Id, null));
         Assert.Equal(0L, await AuditCountAsync(unknown, null));
         Assert.Equal(records, await PersonsAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task A_run_is_answered_only_to_the_person_and_the_draft_it_was_stored_for()
+    {
+        var draft = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var other = (await CallAsync("create_draft", Arguments())).Output!["id"]!.GetValue<string>();
+        var stored = await CallAsync("run_scenarios", Arguments(("draft", draft)));
+        Assert.False(stored.IsError, stored.Error);
+        var own = stored.Output!["request"]!.GetValue<string>();
+        Assert.Equal("queued", stored.Output["status"]!.GetValue<string>());
+        Assert.Equal("queued", (await CallAsync("run_scenarios", Arguments(("draft", draft), ("request", own)))).Output!["status"]!.GetValue<string>());
+
+        var theirs = Guid.CreateVersion7().ToString("D");
+        var withoutDraft = Guid.CreateVersion7().ToString("D");
+        var publish = Guid.CreateVersion7().ToString("D");
+        foreach (var (id, kind, by, forDraft) in new[]
+        {
+            (theirs, "test", "someone-else", $"'{draft}'"),
+            (withoutDraft, "test", _user!, "NULL"),
+            (publish, "validate", _user!, $"'{draft}'"),
+        })
+        {
+            await ScalarAsync(
+                $"""
+                INSERT INTO axis.publish_requests (id, application_id, kind, target, status, requested_by, requested_at, draft_id)
+                VALUES ('{id}', '{ManifestId}', '{kind}', 'tenant', 'queued', '{by}', now(), {forDraft})
+                """);
+        }
+
+        // The draft is the person's, but the request is not a test of it by them, or is a test of another draft of theirs.
+        foreach (var request in new[] { theirs, withoutDraft, publish, Guid.NewGuid().ToString("D"), "not-a-guid" })
+        {
+            Assert.Equal(NoRequest, (await CallAsync("run_scenarios", Arguments(("draft", draft), ("request", request)))).Error);
+        }
+
+        Assert.Equal(NoRequest, (await CallAsync("run_scenarios", Arguments(("draft", other), ("request", own)))).Error);
     }
 
     [Fact]
@@ -366,6 +490,9 @@ public sealed class McpWriteToolTests(KeycloakFixture keycloak, PostgreSqlFixtur
             ("write_resource", $$"""{"application":"{{Application}}","draft":"{{draft}}","content":["{{secret}}"]}"""),
             ("delete_resource", $$"""{"application":"{{Application}}","id":"{{draft}}"}"""),
             ("check_expression", $$"""{"application":"{{Application}}","draft":"{{draft}}","id":"{{draft}}","path":1,"expression":"{{secret}}"}"""),
+            ("run_scenarios", $$"""{"application":"{{Application}}","draft":"{{draft}}","names":"{{secret}}"}"""),
+            ("run_scenarios", $$"""{"application":"{{Application}}","draft":"{{draft}}","names":[1]}"""),
+            ("run_scenarios", $$"""{"application":"{{Application}}","draft":"{{draft}}","names":["{{secret}}",{"a":"{{secret}}"}]}"""),
         })
         {
             Assert.Equal("The input does not match the tool's input schema.", (await CallAsync(tool, arguments)).Error);

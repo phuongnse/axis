@@ -1,8 +1,8 @@
-import { Button, Flex, Form, Input, Modal, Radio, Tag, Typography } from 'antd'
-import { AxisAlert } from '../platform/AxisAlert'
+import { Button, Form, Input, Modal } from 'antd'
 import { useContext, useEffect, useState } from 'react'
 import { AxisField } from '../platform/AxisField'
 import { requiredMark } from '../platform/requiredMark'
+import { StartFromField } from '../platform/StartFromField'
 import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
@@ -22,7 +22,7 @@ type Values = { name: string; template: string }
  * [New application](docs/reference/studio.md#new-application). Create is on until a create runs. A click with the name
  * empty or breaking the API's rule shows what is wrong under it and focuses it, and sends nothing. A `409` shows that
  * the name is taken, and a `400` that it is refused, and the dialog stays open in both cases. When the template list does
- * not load, the dialog offers only Blank. `onCreated` gets the new application's name once the create succeeds.
+ * not load, the dialog offers only Blank, and the field's warning says Blank is still there. `onCreated` gets the new application's name once the create succeeds.
  * Given `open` and `onOpenChange`, the dialog is controlled by its parent and draws no button, so another control can open it.
  */
 export function StudioNewApplication({
@@ -129,7 +129,7 @@ export function StudioNewApplication({
           form={form}
           layout="vertical"
           requiredMark={requiredMark}
-          initialValues={{ name: '', template: '' }}
+          initialValues={{ name: '' }}
           scrollToFirstError={{ focus: true }}
           onFinish={create}
         >
@@ -157,32 +157,23 @@ export function StudioNewApplication({
               }}
             />
           </AxisField>
-          <AxisField
+          <StartFromField
             name="template"
             label={t('shell.studio.newApplication.template')}
             help={t('shell.studio.newApplication.template.help')}
-          >
-            <Radio.Group aria-label={t('shell.studio.newApplication.template')}>
-              <Flex vertical>
-                <Radio value="">{t('shell.studio.newApplication.blank')}</Radio>
-                {Array.isArray(templates) &&
-                  templates.map((item) => (
-                    <Radio key={item.id} value={item.id}>
-                      <span>{localized(item.title, locale)}</span>
-                      {item.builtIn && (
-                        <Tag style={{ marginInlineStart: 8 }}>{t('shell.studio.newApplication.builtIn')}</Tag>
-                      )}
-                      <Typography.Text type="secondary" style={{ display: 'block' }}>
-                        {localized(item.description, locale)}
-                      </Typography.Text>
-                    </Radio>
-                  ))}
-              </Flex>
-            </Radio.Group>
-          </AxisField>
-          {templates === 'failed' && (
-            <AxisAlert kind="warning" message={t('shell.studio.newApplication.templatesFailed')} />
-          )}
+            blank={t('shell.studio.newApplication.blank')}
+            failedMessage={t('shell.studio.newApplication.templatesFailed')}
+            choices={
+              Array.isArray(templates)
+                ? templates.map((item) => ({
+                    id: item.id,
+                    title: localized(item.title, locale),
+                    description: localized(item.description, locale),
+                    mark: item.builtIn ? t('shell.studio.newApplication.builtIn') : undefined,
+                  }))
+                : templates
+            }
+          />
         </Form>
       </Modal>
     </>

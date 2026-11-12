@@ -32,12 +32,12 @@ function auditActors(action: string, userId: string): string[] {
   )
 }
 
-test('tenant create makes an active tenant with a realm that has its three clients', async () => {
+test('tenant create makes an active tenant with a realm that has its four clients', async () => {
   const result = await runAdmin(createArgs)
 
   expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
   expect(directoryStatus()).toBe('active')
-  expect(await realmClientIds(tenant)).toEqual(expect.arrayContaining(['axis', 'axis-activation', 'axis-users']))
+  expect(await realmClientIds(tenant)).toEqual(expect.arrayContaining(['axis', 'axis-activation', 'axis-users', 'axis-agent']))
 })
 
 test('tenant create refuses a tenant that exists and leaves its entry active', async () => {

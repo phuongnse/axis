@@ -110,11 +110,10 @@ This section installs Axis on one machine with Docker Compose, from the example 
 PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server with its own database
 on that PostgreSQL server.
 
-The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider, the TLS
-proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second
-server replica sits under the `replicas` profile, see
-[TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password, client
-secret or key.
+The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
+the TLS proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
+under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
+client secret or key.
 
 - **The server, the worker and the agent host** run the production images with a read-only root file system. The
   identity provider cannot, because Keycloak rebuilds itself at start and writes into its image.
@@ -188,7 +187,7 @@ CREATE ROLE axis_identity_reader LOGIN PASSWORD '<password>';
 | Database role | Used for |
 | --- | --- |
 | `axis_platform_schema` | `ConnectionStrings:PlatformSchema`. It owns the `platform` schema. |
-| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the two usage tables `platform.tenant_usage` and `platform.tenant_usage_latest`, to `platform.tenant_leases` and to `platform.operator_sessions`, insert on `platform.jobs`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
+| `axis_platform` | `ConnectionStrings:Platform`. The server gives it read access to the `platform` schema, insert on `platform.data_protection_keys`, write access to the three usage tables `platform.tenant_usage`, `platform.tenant_usage_latest` and `platform.tenant_token_usage`, to `platform.tenant_leases` and to `platform.operator_sessions`, insert on `platform.jobs`, and insert and update on `platform.tenant_daily_counters`. It has no access to `platform.audit_records`. |
 | `axis_admin` | `Admin:ConnectionString`. It has `CREATEDB` and `CREATEROLE` and is not a superuser. |
 | `axis_identity` | The identity provider's own database, `axis_identity`. It owns that database and nothing else. |
 | `axis_identity_reader` | `IdentityProvider:DatabaseConnectionString`. It reads Keycloak's `credential` table and nothing else, so `tenant backup` can write `realm.json`. |
@@ -342,9 +341,8 @@ Install in this order:
 The hosts serve a tenant after their next refresh, which `Tenancy__RefreshInterval` sets, 30 seconds
 by default.
 
-- **The OIDC authority must be `https`.** The server runs in `Production`, which refuses an identity
-  provider over plain `http`, so `tenant create` refuses a plain `http` `IdentityProvider__Url` there
-  too.
+- **The OIDC authority must be `https`.** The server runs in `Production`, which refuses an identity provider
+  over plain `http`, so `tenant create` refuses a plain `http` `IdentityProvider__Url` there too.
 - **A private certificate authority.** When the proxy's certificate comes from your own authority, add
   its certificate to the trust store of the server, of the admin host and of the publisher, because
   they reach the identity host through the proxy. Do not replace the store: pointing `SSL_CERT_FILE` at
@@ -697,6 +695,7 @@ The values of the chart, with their defaults:
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
 | `secrets.scenarioServerConnection` | empty | Publisher and the cell restore-check CronJob. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. A cell whose tenants have Studio applications needs it set for the weekly restore check to pass. Create the role as in [the scenario role](#the-scenario-role). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
+| `ai.allowTenantKeys` | `false` | Server and agent host. `true` renders `Ai__AllowTenantKeys` on both, so a tenant administrator can set the tenant's own model key and the agent host uses it. See [a tenant's own key](model-bindings.md#a-tenants-own-key). |
 | `publisher.terminationGracePeriodSeconds` | 360 | Seconds the publisher gets to finish its running request on `SIGTERM`. Keep it longer than the five-minute lease. |
 | `migrate.parallel` | 1 | Tenant databases the Job migrates at once. |
 | `tenancy.refreshInterval` | empty | `Tenancy__RefreshInterval`. Empty keeps the host default. Use the time span format `hh:mm:ss`, such as `00:00:30`. "30s" stops the hosts at start. |

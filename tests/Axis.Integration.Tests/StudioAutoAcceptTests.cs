@@ -11,7 +11,6 @@ namespace Axis.Integration.Tests;
 /// The application setting "Let AI accept its own drafts" lives in the tenant database. Only a publisher changes it,
 /// each change is audited, and nothing that writes the application's files can change it.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class StudioAutoAcceptTests : IAsyncLifetime
 {
     private const string SettingsUrl = "/api/studio/apps/PurchaseRequests/settings";

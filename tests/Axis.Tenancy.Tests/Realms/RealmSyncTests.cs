@@ -10,6 +10,7 @@ public sealed class RealmSyncTests
 {
     private const string ClientsPath = "/admin/realms/r/clients?max=1000";
     private const string ClientUpdatePath = "/admin/realms/r/clients/u1";
+    private const string AgentClientPath = "/admin/realms/r/clients?clientId=axis-agent";
     private const string MappersPath = "/admin/realms/r/clients/u1/protocol-mappers/models";
 
     private const string ClientsWithRoles = """
@@ -133,6 +134,38 @@ public sealed class RealmSyncTests
         Assert.Single(handler.Requests("PUT", MappersPath + "/m1"));
     }
 
+    [Fact]
+    public async Task A_realm_without_the_agent_client_gets_none_from_the_sync()
+    {
+        using var handler = new ScriptedHandler(HttpStatusCode.NoContent);
+
+        await Sync(handler);
+
+        Assert.Equal(1, handler.Count("GET", AgentClientPath));
+        Assert.Empty(handler.Requests("POST", "/admin/realms/r/clients"));
+    }
+
+    [Fact]
+    public async Task A_site_client_does_not_copy_the_agent_audience_mapper_of_the_platform_client()
+    {
+        using var handler = new ScriptedHandler(
+            clients: """
+                [
+                  {"id":"u0","clientId":"axis","protocolMappers":[
+                    {"id":"p1","name":"roles","protocol":"openid-connect","protocolMapper":"oidc-usermodel-client-role-mapper","config":{"claim.name":"roles"}},
+                    {"id":"p2","name":"axis-agent audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","config":{"included.client.audience":"axis-agent"}}
+                  ]},
+                  {"id":"u1","clientId":"site-a"}
+                ]
+                """,
+            siteMappers: "[]");
+
+        await Sync(handler);
+
+        Assert.Contains(handler.Requests("POST", MappersPath), request => MapperName(request.Body) == "roles");
+        Assert.DoesNotContain(handler.Requests("POST", MappersPath), request => MapperName(request.Body) == RealmAgentClient.AudienceMapperName);
+    }
+
     private static string? MapperName(string? body)
     {
         using var document = JsonDocument.Parse(body!);
@@ -179,6 +212,7 @@ public sealed class RealmSyncTests
         {
             ("POST", "/realms/r/protocol/openid-connect/token") => Json(HttpStatusCode.OK, """{"access_token":"t"}"""),
             ("GET", ClientsPath) => Json(HttpStatusCode.OK, clients),
+            ("GET", AgentClientPath) => Json(HttpStatusCode.OK, "[]"),
             ("PUT", ClientUpdatePath) => new HttpResponseMessage(_clientUpdates.Dequeue()),
             ("GET", MappersPath) => Json(HttpStatusCode.OK, siteMappers),
             ("POST", MappersPath) => new HttpResponseMessage(HttpStatusCode.Created),

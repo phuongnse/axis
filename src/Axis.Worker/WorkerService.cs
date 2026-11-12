@@ -6,6 +6,7 @@ using Axis.Core.Tenancy;
 using Axis.Data.Files;
 using Axis.Data.Records;
 using Axis.Data.Storage;
+using Axis.Hosting;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;

@@ -40,6 +40,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<TenantUsageRow> TenantUsage => Set<TenantUsageRow>();
 
+    public DbSet<TenantTokenUsageRow> TenantTokenUsage => Set<TenantTokenUsageRow>();
+
     public DbSet<TenantLeaseRow> TenantLeases => Set<TenantLeaseRow>();
 
     public DbSet<TenantDailyCounterRow> TenantDailyCounters => Set<TenantDailyCounterRow>();
@@ -67,6 +69,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             {
                 table.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended', 'readOnly')");
                 table.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+                table.HasCheckConstraint("ck_tenants_ai_outside_clients", "ai_outside_clients IN ('all', 'allowList', 'none')");
                 table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
@@ -110,6 +113,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ModelKey).HasColumnName("model_key").HasColumnType("bytea");
             tenant.Property(t => t.RealmActivationClientSecret).HasColumnName("realm_activation_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
+            tenant.Property(t => t.RealmAgentClientSecret).HasColumnName("realm_agent_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
             tenant.Property(t => t.DeleteAfter).HasColumnName("delete_after");
             tenant.Property(t => t.PrivacyUrl).HasColumnName("privacy_url");
@@ -117,6 +121,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.TermsVersion).HasColumnName("terms_version");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PlatformAccounts).HasColumnName("platform_accounts");
+            tenant.Property(t => t.AiOutsideClients).HasColumnName("ai_outside_clients").HasDefaultValue(TenantOutsideClients.None);
+            tenant.Property(t => t.AiAllowedClients).HasColumnName("ai_allowed_clients").HasColumnType("text[]").HasDefaultValueSql("'{}'::text[]");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");
             tenant.HasOne<TenantRow>()
@@ -178,6 +184,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .WithOne()
                 .HasForeignKey(usage => usage.TenantId)
                 .HasConstraintName("fk_tenant_usage_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantTokenUsageRow>()
+                .WithOne()
+                .HasForeignKey(usage => usage.TenantId)
+                .HasConstraintName("fk_tenant_token_usage_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
             tenant.HasMany<TenantLeaseRow>()
                 .WithOne()
@@ -344,6 +355,23 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             usage.Property(u => u.EmailsSent).HasColumnName("emails_sent").HasColumnType("integer").HasDefaultValue(0);
             usage.Property(u => u.ConnectorCalls).HasColumnName("connector_calls").HasColumnType("bigint").HasDefaultValue(0L);
             usage.Property(u => u.WorkItemsRun).HasColumnName("work_items_run").HasColumnType("bigint").HasDefaultValue(0L);
+        });
+
+        modelBuilder.Entity<TenantTokenUsageRow>(usage =>
+        {
+            usage.ToTable("tenant_token_usage", table =>
+            {
+                table.HasCheckConstraint("ck_tenant_token_usage_input_tokens", "input_tokens >= 0");
+                table.HasCheckConstraint("ck_tenant_token_usage_output_tokens", "output_tokens >= 0");
+            });
+            usage.HasKey(u => new { u.TenantId, u.Day, u.Binding, u.Model, u.OwnKey }).HasName("pk_tenant_token_usage");
+            usage.Property(u => u.TenantId).HasColumnName("tenant_id");
+            usage.Property(u => u.Day).HasColumnName("day").HasColumnType("date");
+            usage.Property(u => u.Binding).HasColumnName("binding");
+            usage.Property(u => u.Model).HasColumnName("model");
+            usage.Property(u => u.OwnKey).HasColumnName("own_key");
+            usage.Property(u => u.InputTokens).HasColumnName("input_tokens").HasColumnType("bigint").HasDefaultValue(0L);
+            usage.Property(u => u.OutputTokens).HasColumnName("output_tokens").HasColumnType("bigint").HasDefaultValue(0L);
         });
 
         modelBuilder.Entity<TenantLeaseRow>(lease =>

@@ -1181,10 +1181,42 @@ export const siteTexts: Record<string, string> = {
   'page.requests': 'Requests',
 }
 
+export const signUpApplications = {
+  applications: [
+    {
+      id: 'approvals',
+      titles: { en: 'Approvals', vi: 'Phê duyệt' },
+      descriptions: {
+        en: 'Requests that people approve in steps.',
+        vi: 'Các yêu cầu được duyệt theo từng bước.',
+      },
+    },
+  ],
+}
+
+export const signUpDocuments = {
+  terms: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/terms', vi: 'https://axis.example.com/vi/dieu-khoan' },
+  },
+  dpa: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/dpa', vi: 'https://axis.example.com/vi/xu-ly-du-lieu' },
+  },
+  privacy: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/privacy', vi: 'https://axis.example.com/vi/quyen-rieng-tu' },
+  },
+  licencesUrl: 'https://axis.example.com/licences',
+}
+
+export const signUpRegion = { tenantDomain: 'vn.example.com' }
+
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
 export const fixtureScopes = [
   `${apiPath}/`,
   '/api/studio/',
+  '/api/sign-up/',
   '/api/sites',
   '/api/me',
   '/api/about',

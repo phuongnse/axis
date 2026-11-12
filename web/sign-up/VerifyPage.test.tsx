@@ -10,11 +10,27 @@ const pending = {
   address: 'acme.vn.example.com',
 }
 
+const documents = {
+  terms: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/terms', vi: 'https://axis.example.com/vi/dieu-khoan' },
+  },
+  dpa: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/dpa', vi: 'https://axis.example.com/vi/xu-ly-du-lieu' },
+  },
+  privacy: {
+    version: '2026-11-01',
+    urls: { en: 'https://axis.example.com/privacy', vi: 'https://axis.example.com/vi/quyen-rieng-tu' },
+  },
+  licencesUrl: 'https://axis.example.com/licences',
+}
+
 function answer(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
-/** Stubs the two routes of the verify page. Each answer is a function, so a test can change it between calls. */
+/** Stubs the routes of the verify page. Each answer is a function, so a test can change it between calls. */
 function stubServer(verification: () => Response, confirm: () => Response = () => answer({ id: 'x', secret: 'y' })) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/api/sign-up/verification') {
@@ -22,6 +38,18 @@ function stubServer(verification: () => Response, confirm: () => Response = () =
     }
     if (input === '/api/sign-up/confirm') {
       return confirm()
+    }
+    if (input === '/api/sign-up/x') {
+      return answer({ step: 'verified', address: 'https://acme.vn.example.com' })
+    }
+    if (input === '/api/sign-up/documents') {
+      return answer(documents)
+    }
+    if (input === '/api/sign-up/applications') {
+      return answer({ applications: [] })
+    }
+    if (input === '/api/sign-up/region') {
+      return answer({ tenantDomain: 'vn.example.com' })
     }
     throw new Error(`Unexpected request to ${input}`)
   })
@@ -98,14 +126,17 @@ describe('the verify page', () => {
     expect(fetchMock.mock.calls.filter(([input]) => input === '/api/sign-up/verification')).toHaveLength(2)
   })
 
-  it('confirms with the fragment in the body and then shows already confirmed', async () => {
+  it('confirms with the fragment in the body and then goes to the progress page, in place of the verify link', async () => {
     const fetchMock = stubServer(() => answer(pending))
     const user = userEvent.setup()
     render(<SignUpEntry />)
 
     await user.click(await screen.findByRole('button', { name: 'Confirm' }))
 
-    expect(await screen.findByRole('heading', { name: 'Already confirmed' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Setting up the trial' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Setting up the trial. You can close this page')
+    expect(window.location.pathname).toBe('/sign-up/progress')
+    expect(window.location.hash).toBe('#x.y')
     expect(bodyOf(fetchMock, '/api/sign-up/confirm')).toEqual({ token: 'abc' })
   })
 
@@ -142,14 +173,12 @@ describe('the verify page', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
-  it('shows the sign-up form at any other path', () => {
+  it('shows the sign-up form at any other path, without checking a link', () => {
     window.history.replaceState(null, '', '/sign-up')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () => answer({ applications: [] })),
-    )
+    const fetchMock = stubServer(() => answer(pending))
     render(<SignUpEntry />)
 
     expect(screen.getByRole('heading', { name: 'Sign up' })).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/sign-up/verification', expect.anything())
   })
 })

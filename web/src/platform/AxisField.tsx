@@ -22,6 +22,8 @@ type FormFieldProps = {
   valuePropName?: FormItemProps['valuePropName']
   /** For an input whose change event is not the value, such as an `Upload`'s. Ant Design's form setting of that name. */
   getValueFromEvent?: FormItemProps['getValueFromEvent']
+  /** The value the field starts at and returns to on reset. Ant Design's form setting of that name. */
+  initialValue?: FormItemProps['initialValue']
   /** What the screen found about the field, such as whether a name is free. It takes the place of the field's own errors while shown. */
   status?: AxisFieldStatus
   /** The input, such as an `Input` or a `Select`. Ant Design's form gives it its value and its change handler. */
@@ -37,6 +39,7 @@ type OwnFieldProps = {
   rules?: never
   valuePropName?: never
   getValueFromEvent?: never
+  initialValue?: never
   status?: never
   /** The input, such as an `Input` or a `Select`. The caller gives it its `value` and its change handler. */
   children: FieldInput
@@ -129,6 +132,7 @@ function FormField({
   rules,
   valuePropName,
   getValueFromEvent,
+  initialValue,
   status,
   children,
 }: FormFieldProps) {
@@ -140,6 +144,7 @@ function FormField({
       required={requiredMessage !== undefined}
       valuePropName={valuePropName}
       getValueFromEvent={getValueFromEvent}
+      initialValue={initialValue}
       rules={[
         ...(requiredMessage === undefined
           ? []

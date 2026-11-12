@@ -34,7 +34,7 @@ The legal line closes every page with the copyright and the legal links.
 
 - **One line in two places.** Every page of the identity provider ends in it, under the card and as wide as the card,
   and so does the shell's footer, see [layout](shell.md#layout).
-- **The sign-up pages** _(planned for M33)_. Every page of [sign-up](sign-up.md#the-page) ends in the line
+- **The sign-up pages**. Every page of [sign-up](sign-up.md#the-page) ends in the line
   too, in the page's language. Its Privacy, Terms and Licences addresses come from the control plane, see
   [the documents](sign-up.md#the-documents).
 - **Copyright at the start, links at the end.** The line starts with the copyright in `textMuted`. At its end sit the

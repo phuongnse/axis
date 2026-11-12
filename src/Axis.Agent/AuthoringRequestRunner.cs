@@ -5,36 +5,34 @@ namespace Axis.Agent;
 
 /// <summary>
 /// Claims authoring requests with a lease and runs the step of their state, see <c>docs/reference/authoring-requests.md#durable-requests</c>.
-/// A round takes the tenants in turn and claims at most one request in each. A host that stops, or a step that throws, writes nothing more:
-/// the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
+/// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A step that needs the author's token and finds it ended
+/// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+/// A request stops as <c>failed</c> with the outcome <c>overBudget</c> when a model call would pass the token budget, and with <c>timedOut</c> when its step starts after
+/// <c>Ai:RequestTimeout</c> from the approval or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
+/// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
+/// A step that moves a request to <c>fixing</c> when its <c>round</c> has reached <c>Ai:FixRounds</c> stops the request as <c>failed</c> instead and keeps its draft,
+/// see <c>docs/reference/authoring-requests.md#budgets</c>. A <c>ready</c> request is claimed for the accept step only under the rule of <see cref="AuthoringRequestStore.ClaimAsync"/>,
+/// and the publisher keeps the claim when it accepts the draft, so the commit of the accept step still finds it.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
     AuthoringSteps steps,
+    AuthoringRequestTokenRefresher refresher,
+    ITenantCatalog catalog,
+    IHttpClientFactory httpClients,
     AuthoringLoopOptions options,
+    AiSettings settings,
     TimeProvider time,
     ILogger<AuthoringRequestRunner> logger)
 {
-    // The last failure logged for each tenant, so a tenant that fails in every round is logged once until it changes or recovers.
+    // The last failure logged for each tenant, so a tenant that fails in every turn is logged once until it changes or recovers.
     private readonly ConcurrentDictionary<string, string> _failures = new(StringComparer.Ordinal);
 
-    /// <summary>Runs one round over the tenants and answers whether it claimed any request.</summary>
-    public async Task<bool> RunRoundAsync(IReadOnlyList<TenantEntry> tenants, CancellationToken cancellationToken)
+    /// <summary>Runs one turn of the tenant: claims one request and runs one step of it. It answers whether it claimed a request.</summary>
+    public async Task<bool> RunTurnAsync(string tenantId, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(tenants);
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
 
-        var claimedAny = false;
-        foreach (var tenant in tenants)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            claimedAny |= await RunTenantAsync(tenant.Id, cancellationToken);
-        }
-
-        return claimedAny;
-    }
-
-    private async Task<bool> RunTenantAsync(string tenantId, CancellationToken cancellationToken)
-    {
         // A new value for each claim keeps the fence sound when the same host claims the request again, and where the process id is 1 and the machine name repeats.
         var claimedBy = $"{Environment.MachineName}-{Environment.ProcessId}-{Guid.CreateVersion7():N}";
         AuthoringRequestToWork? request;
@@ -61,11 +59,11 @@ internal sealed partial class AuthoringRequestRunner(
             return false;
         }
 
-        await RunRequestAsync(tenantId, request, claimedBy, cancellationToken);
+        await RunStepOfRequestAsync(tenantId, request, claimedBy, cancellationToken);
         return true;
     }
 
-    private async Task RunRequestAsync(string tenantId, AuthoringRequestToWork request, string claimedBy, CancellationToken cancellationToken)
+    private async Task RunStepOfRequestAsync(string tenantId, AuthoringRequestToWork request, string claimedBy, CancellationToken cancellationToken)
     {
         try
         {
@@ -75,30 +73,58 @@ internal sealed partial class AuthoringRequestRunner(
                 return;
             }
 
-            var current = request;
-            while (steps.Find(current.State) is { } step)
+            // The claim only finds a request in a state that has a step.
+            var step = steps.Find(request.State)
+                ?? throw new InvalidOperationException($"The request is in state '{request.State}', which has no registered step.");
+            var stepId = await store.StartStepAsync(tenantId, request.Id, claimedBy, step.Kind, cancellationToken);
+            if (stepId is null)
             {
-                var stepId = await store.StartStepAsync(tenantId, request.Id, claimedBy, step.Kind, cancellationToken);
-                if (stepId is null)
-                {
-                    LogClaimLost(request.Id);
-                    return;
-                }
+                LogClaimLost(request.Id);
+                return;
+            }
 
-                var result = await RunStepAsync(step, tenantId, current, stepId.Value, claimedBy, cancellationToken);
-                if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))
+            // The time counts from the approval, so a request that is still planning has no deadline.
+            DateTimeOffset? deadline = request.ApprovedAt + settings.RequestTimeout;
+            AuthoringStepResult result;
+            if (deadline <= time.GetUtcNow())
+            {
+                LogTimedOut(request.Id);
+                result = new AuthoringStepResult("failed", "timedOut");
+            }
+            else
+            {
+                try
                 {
-                    throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
+                    result = await RunStepAsync(step, tenantId, request, stepId.Value, claimedBy, deadline, cancellationToken);
                 }
-
-                var keepClaim = steps.Has(result.NextState);
-                if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, keepClaim, options.Lease, cancellationToken))
+                catch (AuthoringTokenEndedException)
                 {
-                    LogClaimLost(request.Id);
-                    return;
+                    // The commit below is fenced by the claim and erases the token.
+                    LogTokenEnded(request.Id);
+                    result = new AuthoringStepResult("failed", "tokenEnded");
                 }
+                catch (AuthoringOverBudgetException)
+                {
+                    // The commit below keeps the draft and the tokens already added.
+                    LogOverBudget(request.Id);
+                    result = new AuthoringStepResult("failed", "overBudget");
+                }
+            }
 
-                current = current with { State = result.NextState };
+            // The step keeps its own outcome. Only the request's state shows that no fix round is left.
+            if (result.NextState == "fixing" && request.Round >= settings.FixRounds)
+            {
+                result = result with { NextState = "failed" };
+            }
+
+            if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))
+            {
+                throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
+            }
+
+            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, result.Checks, result.DropDraft, cancellationToken))
+            {
+                LogClaimLost(request.Id);
             }
         }
         catch (OperationCanceledException)
@@ -117,24 +143,49 @@ internal sealed partial class AuthoringRequestRunner(
         }
     }
 
-    // The renewal runs beside the step and cancels the step's token when the claim is gone.
-    private async Task<AuthoringStepResult> RunStepAsync(IAuthoringStep step, string tenantId, AuthoringRequestToWork request, Guid stepId, string claimedBy, CancellationToken cancellationToken)
+    // The renewal runs beside the step and cancels the step's token when the claim is gone. The deadline cancels it too, and that ends the step as timedOut.
+    private async Task<AuthoringStepResult> RunStepAsync(
+        IAuthoringStep step, string tenantId, AuthoringRequestToWork request, Guid stepId, string claimedBy, DateTimeOffset? deadline, CancellationToken cancellationToken)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource(DelayUntil(deadline), time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var renewal = RenewAsync(tenantId, request.Id, claimedBy, linked);
         try
         {
+            Func<CancellationToken, Task<string>> accessToken = token => refresher.AccessTokenAsync(tenantId, request.Id, claimedBy, token);
+            var mcp = new AuthorMcpClient(httpClients.CreateClient(AuthorMcpClient.HttpClientName), catalog.Find(tenantId)?.Hosts is [var host, ..] ? host : null, accessToken);
             var context = new AuthoringStepContext(
                 tenantId,
                 request,
-                (tokens, token) => store.AddTokensAsync(tenantId, request.Id, stepId, claimedBy, tokens, token));
+                (tokens, token) => store.AddTokensAsync(tenantId, request.Id, stepId, claimedBy, tokens, token),
+                accessToken,
+                (draft, token) => store.SetDraftAsync(tenantId, request.Id, claimedBy, draft, token),
+                mcp,
+                settings.RequestTokenBudget);
             return await step.RunAsync(context, linked.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            LogTimedOut(request.Id);
+            return new AuthoringStepResult("failed", "timedOut");
         }
         finally
         {
             await linked.CancelAsync();
             await renewal;
         }
+    }
+
+    // A source takes a delay of 0 up to about 49 days, so the delay is clamped to that.
+    private TimeSpan DelayUntil(DateTimeOffset? deadline)
+    {
+        if (deadline is not { } at)
+        {
+            return Timeout.InfiniteTimeSpan;
+        }
+
+        var delay = at - time.GetUtcNow();
+        return delay < TimeSpan.Zero ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, uint.MaxValue - 1));
     }
 
     private async Task RenewAsync(string tenantId, Guid requestId, string claimedBy, CancellationTokenSource linked)
@@ -169,6 +220,15 @@ internal sealed partial class AuthoringRequestRunner(
 
     [LoggerMessage(LogLevel.Error, "Claiming an authoring request of tenant {TenantId} failed. {Cause}")]
     private partial void LogTenantFailed(string tenantId, string cause);
+
+    [LoggerMessage(LogLevel.Information, "The token of authoring request {RequestId} has ended, so the request stops as failed.")]
+    private partial void LogTokenEnded(Guid requestId);
+
+    [LoggerMessage(LogLevel.Information, "Authoring request {RequestId} would pass its token budget, so the request stops as failed.")]
+    private partial void LogOverBudget(Guid requestId);
+
+    [LoggerMessage(LogLevel.Information, "Authoring request {RequestId} has passed its time limit, so the request stops as failed.")]
+    private partial void LogTimedOut(Guid requestId);
 
     [LoggerMessage(LogLevel.Warning, "The agent host no longer holds the claim on authoring request {RequestId}. It writes nothing more to it.")]
     private partial void LogClaimLost(Guid requestId);

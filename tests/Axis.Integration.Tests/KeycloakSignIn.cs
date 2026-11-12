@@ -13,6 +13,7 @@ internal static partial class KeycloakSignIn
     /// response of the server to the sign-in request, for a test that checks its responses. A <paramref name="returnUrl"/>
     /// goes to the sign-in request as a query value. The defaults are a tenant's sign-in and callback paths and the user's
     /// current code from the development realm. The cell console passes its own paths, and a <paramref name="code"/> for a user of another realm.
+    /// A user of another realm also has a <paramref name="password"/> of its own.
     /// </summary>
     public static async Task<Uri> LogInAsync(
         HttpClient client,
@@ -23,7 +24,8 @@ internal static partial class KeycloakSignIn
         string? returnUrl = null,
         string signInPath = "/api/auth/sign-in",
         string callbackPath = "/api/auth/callback",
-        string? code = null)
+        string? code = null,
+        string? password = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var path = returnUrl is null ? signInPath : $"{signInPath}?returnUrl={Uri.EscapeDataString(returnUrl)}";
@@ -40,8 +42,8 @@ internal static partial class KeycloakSignIn
         // browser sends to http://localhost but a CookieContainer does not, so the client carries them itself.
         using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
         using var browser = new HttpClient(browserHandler);
-        var (password, cookieHeader) = await SubmitPasswordAsync(browser, authorize, username);
-        var login = await SubmitCodeAsync(browser, password, cookieHeader, username, code);
+        var (passwordResponse, cookieHeader) = await SubmitPasswordAsync(browser, authorize, username, password);
+        var login = await SubmitCodeAsync(browser, passwordResponse, cookieHeader, username, code);
         Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(cancellationToken));
         var callback = login.Headers.Location!;
         Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}{callbackPath}", callback.GetLeftPart(UriPartial.Path));

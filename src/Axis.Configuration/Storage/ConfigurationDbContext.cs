@@ -253,6 +253,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             request.Property(r => r.FinishedAt).HasColumnName("finished_at");
             request.Property(r => r.ClaimedBy).HasColumnName("claimed_by");
             request.Property(r => r.ClaimedUntil).HasColumnName("claimed_until");
+            request.Property(r => r.RefreshToken).HasColumnName("refresh_token");
             // Serves the list of an application's newest requests.
             request.HasIndex(r => new { r.ApplicationId, r.SentAt, r.Id })
                 .HasDatabaseName("ix_authoring_requests_application_id_sent_at_id");
@@ -272,6 +273,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             step.Property(s => s.Outcome).HasColumnName("outcome");
             step.Property(s => s.Tokens).HasColumnName("tokens").HasDefaultValue(0L);
             step.Property(s => s.Messages).HasColumnName("messages").HasColumnType("jsonb");
+            step.Property(s => s.Checks).HasColumnName("checks").HasColumnType("jsonb");
             step.Property(s => s.StartedAt).HasColumnName("started_at").HasDefaultValueSql("now()");
             step.Property(s => s.FinishedAt).HasColumnName("finished_at");
             step.HasIndex(s => new { s.RequestId, s.Ordinal }).IsUnique()

@@ -105,7 +105,7 @@ that it controls the host.
      Kubernetes API with its own service account, names it after the host, and uses the Issuer
      `<release>-tenant-hosts` that the chart renders for the HTTP-01 challenge. A `Certificate` that
      exists counts as done, and a cell without `cell.certificate.enabled` writes none.
-  4. **Route** _(planned for M31)_. The cell's ingress gets a route for the verified host, so the
+  4. **Route** _(planned for M33)_. The cell's ingress gets a route for the verified host, so the
      tenant is served on it.
   5. A host that is not verified is never served: the ingress has no route for it, and the server
      answers `404` for it, as for any unknown host.

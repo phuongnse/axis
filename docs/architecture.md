@@ -30,6 +30,7 @@ flowchart LR
         SPA[SPA]
         Server[Axis.Server]
         Worker[Axis.Worker]
+        Agent[Axis.Agent]
         Admin[Axis.Admin]
         Publisher[axis-admin publisher]
         SysDb[(Platform database)]
@@ -53,6 +54,8 @@ flowchart LR
     Worker --> TenantDb
     Worker -->|connectors| External
     Worker -->|email| Smtp
+    Agent --> SysDb
+    Agent --> TenantDb
     ControlPlane -->|provisioning API on Cell:InternalUrl| Server
 ```
 
@@ -78,6 +81,10 @@ flowchart LR
   loads package code itself only in Development. See
   [package runners](reference/extension-packages.md#package-runners) and
   [D90](decisions/d90-extension-packages-run-out-of-process.md).
+- **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
+  With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads
+  them from the platform database. It works on the request tables in each tenant database with the
+  tenant's runtime role. With AI authoring off, it starts idle.
 - **Axis.Admin** is the console host that the platform operator runs. It creates tenants, migrates
   tenant databases, activates releases, and backs up and restores tenants. It is the only host that
   writes the [tenant directory](#tenant-directory), holds an admin connection to the database server,
@@ -171,7 +178,8 @@ Axis ships as production images, as
 - `axis-server`, `axis-worker` and `axis-agent` run the hosts. They hold no sample and no development setting.
 - `axis-admin` runs `Axis.Admin` and the publisher, `axis-admin publisher`, and holds the
   PostgreSQL 18 client tools.
-- `axis-controlplane` runs `Axis.ControlPlane`. It is not part of an installation, and
+- `axis-controlplane` runs `Axis.ControlPlane` and also holds the operator's commands,
+  `Axis.ControlPlane.Admin`. It is not part of an installation, and
   `deploy/helm/axis-controlplane/` installs it, see [control plane](reference/control-plane.md#image-and-chart).
 - `deploy/compose/` and `deploy/helm/axis/` install the four installation images on one machine and
   on Kubernetes.
@@ -240,7 +248,7 @@ Startup fails with an `InvalidOperationException` that names every problem when:
 - a tenant has no connection string, or one that is only whitespace;
 - a tenant's site hosts break the rules of [tenancy settings](reference/host-settings.md#tenancy-settings);
 - a tenant's legal links break the rules of [legal settings](reference/legal.md#legal-settings);
-- a tenant's `Realm` block or `Oidc:UsersClientSecret` breaks the rules of
+- a tenant's `Realm` block, `Oidc:UsersClientSecret` or `Oidc:AgentClientSecret` breaks the rules of
   [tenant realm](reference/host-settings.md#tenant-realm);
 - a tenant's `Email` block is invalid, see [mail settings](reference/notifications.md#mail-settings);
 - the same host is listed under two tenants, compared ignoring letter case;

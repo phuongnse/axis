@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { createRef, type RefObject } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { identityFrameTexts, identityLegal } from '../designSystem/fixtures'
 import { CardPage } from './CardPage'
@@ -20,16 +21,16 @@ const texts = new Map<string, string>([
 
 function renderPage({
   organization,
+  titleRef,
   onLocaleChange = vi.fn(),
-}: { organization?: string; onLocaleChange?: () => void } = {}) {
+}: { organization?: string; titleRef?: RefObject<HTMLElement | null>; onLocaleChange?: () => void } = {}) {
   return render(
     <TextContext.Provider value={(key) => texts.get(key) ?? key}>
       <CardPage
         organization={organization}
         title="Sign in"
-        locales={['en', 'vi']}
-        locale="en"
-        onLocaleChange={onLocaleChange}
+        titleRef={titleRef}
+        preferences={{ locales: ['en', 'vi'], locale: 'en', onLocaleChange }}
         legal={identityLegal}
       >
         <p>Body</p>
@@ -47,6 +48,15 @@ describe('CardPage', () => {
 
     renderPage()
     expect(screen.getByTestId('organization-heading')).toHaveTextContent('Axis')
+  })
+
+  it('moves the focus to the title through titleRef', () => {
+    const titleRef = createRef<HTMLElement>()
+    renderPage({ titleRef })
+
+    titleRef.current?.focus()
+
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toHaveFocus()
   })
 
   it('draws the title above the children in the card', () => {
@@ -73,6 +83,23 @@ describe('CardPage', () => {
 
     expect(container.querySelector('.ant-card')).toHaveStyle({ maxWidth: width })
     expect(screen.getByTestId('card-page-legal')).toHaveStyle({ maxWidth: width })
+  })
+
+  it("draws no 'Language and theme' button and no legal line when the frame has its own", () => {
+    render(
+      <TextContext.Provider value={(key) => texts.get(key) ?? key}>
+        <CardPage title="Sign in">
+          <p>Body</p>
+        </CardPage>
+      </TextContext.Provider>,
+      { wrapper: ThemeModeProvider },
+    )
+
+    expect(screen.queryByRole('button', { name: 'Language and theme' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('card-page-legal')).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Legal' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByText('Body')).toBeInTheDocument()
   })
 
   it('draws the legal line after the card, with the copyright and the links', () => {

@@ -17,8 +17,7 @@ namespace Axis.Integration.Tests;
 /// The Studio features stay fast at realistic sizes: the names of a typical application, 20 rule patches in one
 /// <c>changes</c> call, an application created from a template of 300 files, and a <c>test</c> request of 20
 /// scenarios run by a real publisher. All tests are in one class, so xUnit runs them one after another and they do
-/// not compete for CPU. The class runs after every parallel collection, so <see cref="PublisherTestRequestTests"/>,
-/// which drops every scenario database before each test, cannot drop the databases of this class's run.
+/// not compete for CPU. The class runs after every parallel collection.
 /// </summary>
 [Collection(PerformanceTiming.Name)]
 public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>

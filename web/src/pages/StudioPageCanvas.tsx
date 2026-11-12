@@ -38,8 +38,12 @@ import { PlatformContext } from './context'
 import { CanvasAlert } from './CanvasAlert'
 import { canvasTexts, cancel, debounceMs, diagnosticsAt } from './studioCanvas'
 
-/** The route's latest answer, or `'failed'`, with the draft it answers. */
-type Answered = { draft: Record<string, unknown>; answer: StudioPageMetadataAnswer | 'failed' }
+/** The route's latest answer, or `'failed'`, with the draft and the saved version it answers. */
+type Answered = {
+  draft: Record<string, unknown>
+  version: string | undefined
+  answer: StudioPageMetadataAnswer | 'failed'
+}
 
 type CanvasWidth = 'desktop' | 'phone'
 
@@ -54,8 +58,8 @@ const CanvasLeaf = memo(PageLeaf)
 
 /**
  * Draws the unsaved draft of a page with the site's own widgets. It posts the draft to the draft page metadata
- * route 300 ms after the last edit and redraws from the answer. From an edit until it draws the answer to that draft,
- * the canvas has `aria-busy`. A widget redraws only from a new answer, not on each
+ * route 300 ms after the last edit or after a save, and redraws from the answer. From an edit or a save until it draws
+ * the answer, the canvas has `aria-busy`. A widget redraws only from a new answer, not on each
  * edit or on a drag over the same target. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
@@ -82,6 +86,7 @@ export function StudioPageCanvas({
   module,
   resourceId,
   draft,
+  version,
   selected,
   onSelect,
   onMove,
@@ -91,6 +96,12 @@ export function StudioPageCanvas({
   module?: string
   resourceId: string
   draft: Record<string, unknown>
+  /**
+   * The version of the saved file. A save changes it, and the canvas then posts the draft again, because Save writes
+   * the texts that the draft names before the patch and the draft stays the same, see
+   * docs/reference/studio.md#page-designer.
+   */
+  version?: string
   /** The pointer of the selected widget, or of the selected action of a widget. */
   selected: string
   onSelect: (path: string) => void
@@ -106,7 +117,7 @@ export function StudioPageCanvas({
   const [width, setWidth] = useState<CanvasWidth>('desktop')
   const phone = width === 'phone'
   const answer = answered?.answer
-  const busy = answered?.draft !== draft
+  const busy = answered?.draft !== draft || answered?.version !== version
   const drawn = answer === undefined || answer === 'failed' ? undefined : answer
   const page = drawn?.page ?? null
   const diagnostics = drawn?.diagnostics ?? []
@@ -136,7 +147,7 @@ export function StudioPageCanvas({
       request.then(
         (result) => {
           if (!controller.signal.aborted) {
-            setAnswered({ draft, answer: result })
+            setAnswered({ draft, version, answer: result })
           }
         },
         (error: unknown) => {
@@ -148,7 +159,7 @@ export function StudioPageCanvas({
             return
           }
           console.warn(`Drawing the page '${resourceId}' failed`, error)
-          setAnswered({ draft, answer: 'failed' })
+          setAnswered({ draft, version, answer: 'failed' })
         },
       )
     }, debounceMs)
@@ -156,7 +167,7 @@ export function StudioPageCanvas({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, module, resourceId, draft, generation, lost])
+  }, [application, module, resourceId, draft, version, generation, lost])
 
   // A layout effect, because the widgets fetch in passive effects. A child's effect runs before its parent's, so a
   // passive effect here would let the widgets' first requests reach the server. Layout effects run before any of them.

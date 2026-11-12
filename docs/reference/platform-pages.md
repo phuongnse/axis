@@ -53,6 +53,10 @@ their roles. Who may open it, the rules of each command, its routes and its audi
 [user administration](user-administration.md#the-users-page). The page shows names, never translated
 labels, and never shows a field marked `sensitive` or record data. Its texts are `shell.users.*`.
 
+The page has two tabs, and People is open by default. People holds [the list](#the-list) and the
+[Export data and usage](#export-data-and-usage) and [Model key](#model-key) sections. The [Connected apps](#connected-apps)
+tab shows only to an administrator of a tenant that has the setting.
+
 ### The list
 
 The page lists the tenant's users from `GET /api/users`, 20 to a page, and fetches each page from the
@@ -125,7 +129,7 @@ one for the platform, where the administrator gives and removes them. Their text
 
 ### Export data and usage
 
-In a tenant of a cell, the users page has two more sections for an administrator:
+In a tenant of a cell, the People tab has two more sections for an administrator:
 
 - **Export data.** Described below.
 - **Usage.** The tenant's quotas and its usage of the last 30 days, see [usage](tenant-quotas.md#usage).
@@ -157,3 +161,54 @@ are `shell.users.usage.*`.
   use on a line of its own when the server counts it. A quota whose use the server does not count shows its limit only, with no bar.
 - **Days.** A table lists the tenant's rows of the last 30 days, newest first: the database and file sizes, users,
   applications, emails sent, connector calls and work items run. A count the server does not keep shows the em dash. The cell console's Tenant view shows the same table.
+
+### Model key
+
+Where `Ai:AllowTenantKeys` is on, the People tab has a "Model key" section below Usage, where an administrator sets,
+changes and removes the tenant's own model key, see [the tenant's model key](user-administration.md#the-tenants-model-key).
+The section is a component of its own. It loads `GET /api/tenant/model-key` and renders nothing unless the route answers
+`200`. That keeps it hidden from a user who is not an administrator, where `Ai:AllowTenantKeys` is off, and for a tenant
+with no directory row or a preview tenant. A `403` or `404` is not logged, and any other failure is logged. Its texts are
+`shell.users.modelKey.*`.
+
+- **State.** The section says "No key is set." or shows a set key as `••••` followed by its last four characters. A key
+  of four characters or fewer shows `••••` alone. The page never holds the whole key after it is saved.
+- **Set and change.** The "Set key…" button, which reads "Change key…" once a key is set, opens a dialog with a password
+  field. Its "Save" button is the only thing that sends the key, as `PUT /api/tenant/model-key`, and it stays disabled
+  while the field is blank. Closing the dialog clears the field. A failed save shows "The key was not saved."
+- **Remove.** The "Remove key…" button opens a confirmation titled "Remove the model key?". Only the confirmation's
+  "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
+- **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
+
+### Connected apps
+
+The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, sees the
+apps that people consented to and revokes one, see [outside MCP clients](user-administration.md#outside-mcp-clients) and
+[client registration](mcp-server.md#client-registration). The tab reads `GET /api/tenant/outside-clients` and shows only
+when the route answers `200`. That keeps it hidden from a user who is not an administrator, for a preview tenant and for a
+tenant with no directory row. A `403` or `404` is not logged, and any other failure is logged. Its texts are
+`shell.users.connectedApps.*`.
+
+- **Mode.** A choice of "All", "Allow list" or "None" shows the stored mode.
+- **Client IDs.** Under "Allow list", an editable list of client IDs shows. A typed ID is added with Enter. The tab keeps
+  the list when another mode is chosen and sends it under every mode, because the server stores it under every mode.
+- **Save.** The "Save" button sends both values with `PUT /api/tenant/outside-clients`, then reads
+  `GET /api/tenant/outside-clients` again, so the tab shows what the server stored, with the IDs trimmed and without
+  repeats. It then says "The setting was saved."
+- **A failed save.** The tab says "The setting was not saved." and keeps the edited values on screen. A `502` says "The
+  setting was stored, but the identity provider did not apply it. Save again to apply it.", because the server keeps the
+  stored change when the identity provider fails.
+- **Apps with consent.** Below the switch, a table headed "Apps with consent" lists each outside MCP client that people
+  consented to, from `GET /api/tenant/connected-apps`: its "Name", its "Client ID", the "People who consented" and
+  "Last used". Each person shows the display name and, when there is one, the email. A client with no name and a client
+  that was never used show the em dash. With no such client, the table says "No app has consent yet. People give
+  consent when they connect an MCP client." A list that does not load says "The apps with consent could not be
+  loaded." in place of the rows, and the switch above still works.
+- **Revoke.** Each row has a "Revoke…" button that opens a confirmation titled "Revoke the consent?". It names the
+  client by its name, or by its client ID when it has no name: "Every person's consent to {client} is removed, and its
+  tokens stop working at once. People must consent again to use it." Only the confirmation's "Revoke" button sends
+  `POST /api/tenant/connected-apps/{clientId}/revoke`. On `204` the tab reads `GET /api/tenant/connected-apps` again, so
+  the client drops out.
+- **A failed revoke.** The row stays as it was and the tab says "The consent was not revoked." A `502` says "The
+  identity provider did not finish the revoke. Revoke again to finish it.", because the server keeps the stored revoke
+  when the identity provider fails and revoking again finishes it.

@@ -147,7 +147,7 @@ public sealed class OwnAuthenticatorsTests(KeycloakFixture keycloak, PostgreSqlF
         _baseAddress = await keycloak.BaseAddressAsync();
         _adminToken = await MasterTokenAsync();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret), new Dictionary<string, string>(), CancellationToken);
+            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret, "agent-secret-1"), new Dictionary<string, string>(), CancellationToken);
 
         var connectionString = await database.CreateDatabaseAsync("own_authenticators", CancellationToken);
         await DataDatabaseFixture.MigrateTenantAsync(connectionString, CancellationToken);

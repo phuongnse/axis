@@ -69,9 +69,13 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+const outsideClientsPath = '/api/tenant/outside-clients'
+
 function stubServer(answer: (input: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
-    input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : answer(input, init),
+    input === '/api/tenant/usage' || input === outsideClientsPath
+      ? new Response(null, { status: 404 })
+      : answer(input, init),
   )
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
@@ -161,6 +165,47 @@ describe('UsersPage', () => {
     const other = screen.getByText('Bob Active').closest('tr')!
     expect(within(other).getByText('google')).toBeVisible()
     expect(within(other).getByText('Active')).toBeVisible()
+  })
+
+  it('shows the Connected apps tab next to People when the outside clients route answers 200', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        if (input === outsideClientsPath) {
+          return json({ outsideClients: 'allowList', allowedClients: ['claude'] })
+        }
+        if (input === '/api/tenant/connected-apps') {
+          return json({ items: [] })
+        }
+        return input === '/api/tenant/usage' ? new Response(null, { status: 404 }) : json(users)
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('tab', { name: 'People', selected: true })).toBeVisible()
+    expect(screen.getByText('Ann Invited')).toBeVisible()
+    await userEvent.click(screen.getByRole('tab', { name: 'Connected apps' }))
+    expect(await screen.findByTestId('connected-apps')).toBeVisible()
+    expect(screen.getByRole('radio', { name: 'Allow list' })).toBeChecked()
+    expect(screen.getByText('claude')).toBeVisible()
+  })
+
+  it('shows no Connected apps tab when the outside clients route answers 403', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) =>
+        input === outsideClientsPath
+          ? new Response(null, { status: 403 })
+          : input === '/api/tenant/usage'
+            ? new Response(null, { status: 404 })
+            : json(users),
+      ),
+    )
+    renderPage()
+
+    expect(await screen.findByText('Ann Invited')).toBeVisible()
+    expect(screen.getByRole('tab', { name: 'People' })).toBeVisible()
+    expect(screen.queryByRole('tab', { name: 'Connected apps' })).toBeNull()
   })
 
   it('searches from page 1 and pages from the server', async () => {
@@ -275,6 +320,18 @@ describe('UsersPage', () => {
     expect(form.querySelector('form')).toHaveClass('ant-form-vertical')
   })
 
+  it('gives the email and the display name of the invite form their help', async () => {
+    stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite…' }))
+    const form = await confirmation('Invite a person')
+
+    expect(within(form).getByLabelText('Email')).toHaveAccessibleDescription('The invitation goes to this address.')
+    expect(within(form).getByLabelText('Display name')).toHaveAccessibleDescription(
+      'The name that shows for the person in the users list.',
+    )
+  })
+
   it('asks for the fields of the form before it asks to invite', async () => {
     const fetchMock = stubInvitations()
     renderPage()
@@ -284,6 +341,7 @@ describe('UsersPage', () => {
     await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
 
     await vi.waitFor(() => expect(form.querySelectorAll('.ant-form-item-explain-error').length).toBe(2))
+    expect(within(form).getByText('Enter a display name.')).toBeInTheDocument()
     expect(screen.queryByText('Invite this person?')).toBeNull()
     expect(posts(fetchMock)).toHaveLength(0)
   })

@@ -1,7 +1,5 @@
 # Plans
 
-_(planned for M34)_
-
 A plan is what a tenant of Axis SaaS pays for: a price for the whole tenant and the quotas it sets.
 This page covers the catalogue of plans, how a plan becomes the tenant's quotas, add-ons, and
 changing a plan. The prices are set from what the [cell load test](performance.md#cell-load-test)
@@ -53,24 +51,54 @@ The numbers above show the shape only. They are not prices.
 - **Versions.** Changing a plan's quotas or prices adds a new version. A subscription pins the
   version it bought and keeps it until its plan changes, so a price rise never reaches a customer
   in the middle of what they agreed. A plan version that a subscription pins is never removed.
-- **The trial's plan** _(planned for M33)_. A plan marked `"trial": true` sets a trial's quotas:
-  those of a mid plan, with at most 10 users. It has no price.
+- **The start check.** The control plane checks `ControlPlane:Plans` at start and stops on a bad
+  catalogue. It refuses a number that is not plain digits, such as a decimal price, a missing
+  currency or quota key, a repeated code and version, and a trial plan with a price. The message
+  names the plan code, version and setting, and never holds a value. The quota keys it requires are
+  the platform's own list of quotas except `users`, so a new quota makes every catalogue invalid
+  until its plans set it. An empty catalogue is valid.
+- **The pin.** A subscription holds a plan code and version, a currency and a period (`month` or
+  `year`). They are empty until a plan is bought, and a trial works without them. After the
+  migrations the start reads every pinned version, and it stops when `ControlPlane:Plans` no longer
+  lists one, naming each missing plan code and version.
+- **The trial's plan.** A plan marked `"trial": true` has no price and no add-ons.
+- **The trial's quotas** _(planned for M33)_. The trial plan sets a trial's quotas: those of a mid
+  plan, with at most 10 users.
 
 ## From a plan to the quotas
 
 The control plane turns a subscription's plan and add-ons into the tenant's quotas on the cell.
 
-- **The control plane writes them.** When a subscription starts, changes its plan, adds or drops an
-  add-on, or becomes `active` again, the control plane writes the tenant's quota rows through
-  `PUT /api/cell/tenants/{id}/quotas`, see [quotas](tenant-quotas.md#quotas).
-- **Users.** `users` is `includedUsers` plus the users of every add-on.
-- **One source.** The plan is the only source of a SaaS tenant's quotas. An operator who sets a quota
-  by hand writes an override in the control plane, with a reason and an end date, and the control
-  plane writes it to the cell. A quota set on the cell directly is put back at the next sync.
-- **Sync.** Each night the control plane writes every subscription's quotas again, so a lost call is
-  corrected within a day.
+- **The `writeQuotas` job.** One `PUT /api/cell/tenants/{id}/quotas` for a subscription sets every
+  quota of its pinned plan version, with `users` and any override on top, see
+  [quotas](tenant-quotas.md#quotas). The call names every quota, so repeating it writes the same
+  rows, and it carries no idempotency key. A `deleting` or `deleted` subscription, and one that pins
+  no plan, gets no call. A job that cannot reach the cell, or whose tenant has no directory row, fails
+  and the job queue retries it.
+- **A payment.** A payment that makes a subscription `active` queues `writeQuotas` in the same
+  transaction, see [states](subscriptions.md#states).
+- **The other events** _(planned for M34)_. When a subscription starts, changes its plan or adds or
+  drops an add-on, the code that makes the move queues `writeQuotas` in the same transaction,
+  through the one helper that every move uses.
+- **Users.** `users` is `includedUsers` plus the users of every add-on pack the subscription holds. The
+  packs are the rows of `control_plane.subscription_add_ons`: `subscription_id`, `add_on_code`,
+  `quantity` and `created_at`, one row for each code. A code that the pinned plan version does not list
+  fails the job, so that the tenant never loses users quietly.
+- **Overrides.** An operator who sets a quota by hand writes an override with
+  [`quota override`](control-plane.md#operators), which holds a reason and an end date. The rows of
+  `control_plane.quota_overrides` are `subscription_id`, `quota`, `value`, `reason`, `until`,
+  `operator` and `created_at`, one row for each subscription and quota, so a new override replaces the
+  old one. The job writes the override instead of the plan's value until its end date, and an override
+  that has ended drops out of the next write. A subscription that pins no plan takes no override.
+- **One source.** The plan is the only source of a SaaS tenant's quotas, and the override is the only
+  other. A quota set on the cell directly is put back at the next sync.
+- **Sync.** Each night the recurring `syncQuotas` job queues one `writeQuotas` job for every
+  subscription that pins a plan and is not `deleting` or `deleted`, so a lost call is corrected within
+  a day.
 
 ## Add-ons
+
+_(planned for M34)_
 
 An add-on lets a business buy more users without moving to the next plan.
 
@@ -82,6 +110,8 @@ An add-on lets a business buy more users without moving to the next plan.
   users than the new number is refused, naming how many users to disable first.
 
 ## Changing a plan
+
+_(planned for M34)_
 
 A larger plan applies at once, with the rest of the period prorated, and a smaller one applies at the
 period's end.

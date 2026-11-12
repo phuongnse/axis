@@ -210,6 +210,53 @@ describe('axis/no-antd-alert', () => {
   })
 })
 
+describe('axis/field-label-through-axis-field', () => {
+  const rules = { 'axis/field-label-through-axis-field': 'error' }
+  const rule = 'axis(field-label-through-axis-field)'
+
+  it('reports a label on Form.Item, a raw label and a legend', () => {
+    const source = [
+      "import { Form } from 'antd'",
+      'const a = <Form.Item label="Name" name="name" />',
+      'const b = <label>Name</label>',
+      'const c = <legend>Name</legend>',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([`${rule}:2`, `${rule}:3`, `${rule}:4`])
+  })
+
+  it('reports a text straight before an input, or before a Suspense that wraps one', () => {
+    const source = [
+      "import { Input, Typography } from 'antd'",
+      'const a = (',
+      '  <>',
+      "    <Typography.Text>{t('x')}</Typography.Text>",
+      '    <Input />',
+      '    <span>Name</span>',
+      '    <Suspense fallback={null}>',
+      '      <LazyExpressionEditor />',
+      '    </Suspense>',
+      '  </>',
+      ')',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([`${rule}:4`, `${rule}:6`])
+  })
+
+  it('allows AxisField, a Form.Item with no label, a Button before a Select and a Checkbox with its own text', () => {
+    const source = [
+      "import { Button, Checkbox, Form, Input, Select, Tag, Typography } from 'antd'",
+      'const a = <AxisField label="a" help="b"><Input /></AxisField>',
+      'const b = <Form.Item name="a"><Input /></Form.Item>',
+      'const c = (<><Button>Remove</Button><Select /></>)',
+      'const d = (<><Checkbox>a</Checkbox><Checkbox>b</Checkbox></>)',
+      'const e = (<><Typography.Text>a</Typography.Text><Tag>b</Tag></>)',
+      '',
+    ].join('\n')
+    expect(lint(source, { rules })).toEqual([])
+  })
+})
+
 describe('axis/exact-locators', () => {
   const rules = { 'axis/exact-locators': 'error' }
   const reported = (source, options = rules) => lint(source, { rules: options, extension: 'ts' })
@@ -362,6 +409,34 @@ describe('the rules of web/.oxlintrc.json', () => {
       ).diagnostics.map((diagnostic) => diagnostic.code)
     expect(run('src/platform/AxisAlert.tsx')).toEqual([])
     expect(run('src/pages/Other.tsx')).toEqual(['axis(no-antd-alert)'])
+  })
+
+  it('refuses a hand-drawn field label outside the sign-in pages and allows it inside', () => {
+    const copy = path.join(folder, 'real-config-labels')
+    mkdirSync(path.join(copy, 'src/pages'), { recursive: true })
+    mkdirSync(path.join(copy, 'src/identitySignIn'), { recursive: true })
+    const configFile = path.join(copy, '.oxlintrc.json')
+    const source = [
+      "import { Input } from 'antd'",
+      'export function Editor() {',
+      '  return (',
+      '    <>',
+      '      <span>Name</span>',
+      '      <Input />',
+      '    </>',
+      '  )',
+      '}',
+      '',
+    ].join('\n')
+    writeFileSync(configFile, JSON.stringify(realConfig))
+    writeFileSync(path.join(copy, 'src/pages/Editor.tsx'), source)
+    writeFileSync(path.join(copy, 'src/identitySignIn/SignIn.tsx'), source)
+    const run = (file) =>
+      JSON.parse(
+        spawnSync(oxlint, ['-c', configFile, '--format', 'json', file], { cwd: copy, encoding: 'utf8' }).stdout,
+      ).diagnostics.map((diagnostic) => diagnostic.code)
+    expect(run('src/pages/Editor.tsx')).toEqual(['axis(field-label-through-axis-field)'])
+    expect(run('src/identitySignIn/SignIn.tsx')).toEqual([])
   })
 
   it('reports Object.assign, DOMParser and a Table imported from antd', () => {

@@ -35,21 +35,22 @@ Each common job has one shared widget or helper:
 | A tag's colour                                 | The colour tokens, never a preset name such as `blue` or `success`                                     |
 | A choice of a name that an application defines | `ReferencePicker`, whose choices come from `referenceOptions`, each named by its label                 |
 | A value with nothing to show                   | `EmptyDash`                                                                                            |
-| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M31)_, and a `status` for what the screen found about a field |
+| A field of a platform screen                   | `AxisField` and `AxisFieldGroup`, with `AxisCheckboxField`, `AxisChoiceField` and `AxisFieldRow` _(planned for M33)_, and a `status` for what the screen found about a field |
 | A row of actions                               | `AxisActionRow`                                                                                        |
-| A text in the author's language                | `textIn`, else `en` _(planned for M31)_                                                                |
+| A section of a Studio page                     | `ResourceFormSection`, in `ResourceFormSections`                                                       |
+| A text in the author's language                | `textIn`, else `en` _(planned for M33)_                                                                |
 | The address of a Studio resource               | `studioResourceAddress`                                                                                |
 | Asking before unsaved changes are left         | `useUnsavedChanges`, which `SaveBar` calls                                                            |
-| An expression in an editor                     | `ExpressionEditor`, through `ExpressionField` _(planned for M31)_                                      |
+| An expression in an editor                     | `ExpressionEditor`, through `ExpressionField` _(planned for M33)_                                      |
 | Words                                          | `useText`                                                                                              |
 | A size, a space or a colour                    | `useDesignTokens`                                                                                      |
 | A dialog's width                               | A dialog size token, `small`, `medium` or `large`, through `useDesignTokens`, never a width of its own |
 | The current page of a pagination               | `markCurrentPage`                                                                                      |
-| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, the language menu and the legal line |
+| A page that is one card, as wide as the `small` dialog size token and with no size of its own | `CardPage`, with the organization's mark and name, and the language menu and the legal line unless the page's frame has its own |
 | A required box that accepts terms, each document a link | `AcceptTermsField`, which never starts ticked and links each document in a new tab through `FilledText` |
 | A sentence with parts in it, such as a name in bold or a link | `FilledText`, which fills a text's `{name}` placeholders so a sentence keeps its word order in every language |
 | The steps of a wizard or a set-up | `StepsBar`, with `vertical` for one step on each line |
-| The application a new tenant or a new application starts from | `StartFromField`, with Blank first _(planned for M33)_ |
+| The application a new tenant or a new application starts from | `StartFromField`, with Blank first and chosen, and a warning `status` when the list does not load |
 | A message that only a screen reader hears      | `Announcement`, a polite status region built on `visuallyHidden`                                       |
 | Asking again until a job ends                  | `useFollowJob`, which `useFollowCellJob` wraps                                                         |
 
@@ -65,6 +66,11 @@ files are not checked. The plugin's rule for the end-to-end tests is on in `test
   that may use it.
 - **`no-restricted-imports`** refuses a named `Table` import from `antd`. `AxisTable.tsx` is the one
   file that may use it. It does not see an import from a deep path such as `antd/es/table`.
+- **`axis/field-label-through-axis-field`** refuses a hand-drawn field label: a `label` on Ant Design's
+  `Form.Item`, a raw `<label>` or `<legend>`, or a text straight before an input. `AxisField` and
+  `AxisFieldGroup` draw the labels. It is off in sign-in pages, the record form, a table's filter bar, `AxisField`,
+  `AxisFieldGroup`, widget previews and tests. It matches syntax, so it does not see a label after its input, a text
+  before a wrapper such as `Form.Item`, or a label drawn through a helper of the file's own.
 - **`axis/no-preset-tag-colour`** refuses a `Tag` whose `color` is an Ant Design colour name, with or
   without `-inverse` (such as `blue` or `blue-inverse`), or a status preset (`success`, `error`,
   `warning`, `processing` or `default`). It sees a preset written as a string or inside a `color={…}`

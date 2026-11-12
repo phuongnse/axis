@@ -60,9 +60,16 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
   one, and using the old one again is refused with `invalid_grant`. Refresh tokens end with the realm
   session, at most 8 hours. These rules, and the PKCE policy, hold for every client of the tenant's
   realm.
+- **Revoked consent.** The server reads the client's row in `axis.mcp_clients` (see
+  [storage](storage.md)) on every call. When the token's `iat` is not later than the row's
+  `revoked_at`, it answers `401` with the same `WWW-Authenticate` header as for any refused token, so a
+  revoke takes effect on the next call. A token issued after the revoke works, so a client whose
+  consent is given again can connect. Each call also records the client's last use in that row, at
+  most once a minute. A tenant administrator revokes a client with
+  [outside MCP clients](user-administration.md#outside-mcp-clients).
 - **Who acts.** The token's subject is the person. The route needs the [author role](authoring.md#settings)
   and answers `403` without it.
-- **Tool grants** _(planned for M35)_. Every tool runs with the person's grants: the author role for
+- **Tool grants.** Every tool runs with the person's grants: the author role for
   reading and writing drafts, and the rules of [accepting](authoring-requests.md#accepting) for
   `accept_draft`.
 - **Consent.** A client that requires consent gets a screen in the [Axis theme](identity-provider.md#theme)
@@ -99,18 +106,29 @@ clients may connect at all.
   Registration does not refuse the device authorization grant, but consent and the scope rules hold
   for it too. Keycloak's own limits stay: a realm holds at most 200 clients, those of the realm
   included, and a registered client may use only the mapper types that Keycloak allows an anonymous
-  client. The realm drops Keycloak's Trusted Hosts policy, which ties registration to the caller's
-  address and so refuses every outside client.
-- **The agent host** _(planned for M35)_ is a confidential client of each realm, which `tenant create` sets up. It takes
-  no outside registration.
-- **The administrator's switch** _(planned for M35)_. The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
+  client. Registration is open only under `all`: the realm keeps Keycloak's Trusted Hosts policy,
+  which ties registration to the caller's address, under `none` and `allowList`, so it answers every
+  registration with `403`, and it drops the policy under `all`, as the
+  administrator's switch below says.
+
+- **The agent host** is the confidential client `axis-agent` of each realm, which `tenant create` makes. It
+  takes no outside registration and may exchange an author's token only for one whose audience is the
+  `/mcp` URL, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
+- **The administrator's switch.** The tenant setting `Ai:OutsideClients`, one of `all`, `allowList`
   and `none`, decides which outside clients may connect, and `none` is the default of a new tenant.
-  Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. A client that the
-  switch does not allow is refused at the realm, before any token is issued.
-- **Connected apps** _(planned for M35)_. A tenant administrator changes both settings on the
-  [users page](user-administration.md), in a Connected apps tab that lists each client with consent,
-  the people who consented and the last use, and revokes a client's consent there. Each change writes a
-  platform audit record.
+  Under `allowList`, `Ai:AllowedClients` lists the client ids that may connect. Both are stored with
+  the tenant, and `tenant create` and `tenant restore` apply them to the realm. An outside client is a
+  public client that is not one of Keycloak's own. One that the switch does not allow is turned off,
+  so it gets no code and no token: every outside client is off under `none`, only the listed ones are
+  on under `allowList`, and every one is on under `all`. A token issued before a client is turned off
+  stays valid until it expires. Under `allowList` registration is closed, so a listed client must
+  already be registered. The confidential clients of Axis, the agent host's included, and Keycloak's
+  own clients are never turned off. A tenant administrator reads and changes both settings through the routes in
+  [outside MCP clients](user-administration.md#outside-mcp-clients), and each change writes a platform audit record.
+- **Connected apps.** A tenant administrator changes both settings in the Connected apps tab of the
+  [users page](platform-pages.md#connected-apps).
+- **Consents.** The Connected apps tab also lists each client with consent, the people who consented and the last
+  use, and revokes a client's consent there, see [connected apps](platform-pages.md#connected-apps).
 
 ## Tools
 
@@ -119,23 +137,23 @@ through the authoring API's checks, so a tool can do nothing that the person cou
 A tool with an optional draft reads the working folder without it and the person's own
 [draft](revisions-and-drafts.md#drafts) with it.
 
-| Tool                                 | Input                                         | Output                                                                                                                                                                   |
-| ------------------------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list_applications`                  | none                                          | The applications the person may author                                                                                                                                   |
-| `read_reference`                     | a topic, such as a resource kind              | The schema and reference text of that kind, from the installed version of Axis                                                                                           |
-| `list_resources`                     | application, optional draft                   | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                                                               |
-| `read_resource`                      | application, `id`, optional draft             | The resource's content and version                                                                                                                                       |
-| `read_module_resource`               | application, module, `id`                     | A resource of the pinned module version, with the application's layer applied                                                                                            |
-| `read_names`                         | application, optional draft                   | The names the application defines, as the [names route](authoring.md#names) gives them                                                                                   |
-| `check_expression`                   | application, draft, `id`, path, expression    | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft                                               |
-| `create_draft`                       | application                                   | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from                                                      |
-| `write_resource`                     | application, draft, `content`                 | Creates or replaces a resource in the draft, with its diagnostics                                                                                                        |
-| `write_layer`                        | application, draft, `module`, `id`, `content` | Writes the layer that holds the difference in the draft, as Studio saves do, see [customization layers](customization-layers.md#in-studio), with the draft's diagnostics |
-| `delete_resource`                    | application, draft, `id`                      | Removes a resource from the draft, with the draft's diagnostics                                                                                                          |
-| `validate_draft` _(planned for M35)_ | application, draft                            | The draft's diagnostics, contract checks included                                                                                                                        |
-| `run_scenarios` _(planned for M35)_  | application, draft, optional names            | The results of the application's scenarios and the contract scenarios of its modules, run on the draft by the publisher                                                  |
-| `diff_draft` _(planned for M35)_     | application, draft                            | The draft's changes from the working folder, resource by resource                                                                                                        |
-| `accept_draft` _(planned for M35)_   | application, draft                            | Asks for an accept, under the rules of [accepting](authoring-requests.md#accepting)                                                                                      |
+| Tool                   | Input                                                    | Output                                                                                                                                                                                                                                                                                                |
+| ---------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `list_applications`    | none                                                     | The applications the person may author, each with its name and `id`                                                                                                                                                                                                                                   |
+| `read_reference`       | a topic, such as a resource kind                         | The schema and reference text of that kind, from the installed version of Axis                                                                                                                                                                                                                        |
+| `list_resources`       | application, optional draft                              | Each resource's `id`, `kind`, `name`, `file` and `version`                                                                                                                                                                                                                                            |
+| `read_resource`        | application, `id`, optional draft                        | The resource's content and version                                                                                                                                                                                                                                                                    |
+| `read_module_resource` | application, module, `id`                                | A resource of the pinned module version, with the application's layer applied                                                                                                                                                                                                                         |
+| `read_names`           | application, optional draft                              | The names the application defines, as the [names route](authoring.md#names) gives them                                                                                                                                                                                                                |
+| `check_expression`     | application, draft, `id`, path, expression               | The expression's type and diagnostics, as [the expression check](authoring.md#expression-check) answers them, in the draft                                                                                                                                                                            |
+| `create_draft`         | application                                              | A new [draft](revisions-and-drafts.md#drafts): its id and the commit of the working folder's history it starts from                                                                                                                                                                                   |
+| `write_resource`       | application, draft, `content`                            | Creates or replaces a resource in the draft, with its diagnostics                                                                                                                                                                                                                                     |
+| `write_layer`          | application, draft, `module`, `id`, `content`            | Writes the layer that holds the difference in the draft, as Studio saves do, see [customization layers](customization-layers.md#in-studio), with the draft's diagnostics                                                                                                                              |
+| `delete_resource`      | application, draft, `id`                                 | Removes a resource from the draft, with the draft's diagnostics                                                                                                                                                                                                                                       |
+| `validate_draft`       | application, draft                                       | The draft's diagnostics, contract checks included, as the [diagnostics](authoring.md#diagnostics) route gives them                                                                                                                                                                                    |
+| `run_scenarios`        | application, draft, optional `names`, optional `request` | Without `request`, a `test` request of the draft stored for the publisher, as `{ request, status, diagnostics, scenarios }`. With `request`, the same for that request of this draft and person, see [test](authoring.md#test)                                                                        |
+| `diff_draft`           | application, draft, optional `cursor`                    | One page of the draft's changes from the working folder, resource by resource, as the [draft diff](authoring-revisions.md#draft-diff) route gives them                                                                                                                                                |
+| `accept_draft`         | application, draft, optional `request`                   | Without `request`, an `accept` publish request of the draft stored for the publisher, or the one already queued or running, as `{ request, status, diagnostics }`, under the rules of [accepting](authoring-requests.md#accepting). With `request`, the same for that accept of this draft and person, also after the accept has removed the draft |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
@@ -157,31 +175,31 @@ A tool with an optional draft reads the working folder without it and the person
 describe the kind. Both are embedded in the server at build time, so an agent reads the rules of the
 version it talks to. An unknown topic answers a tool error with a fixed title.
 
-| Topic | Pages |
-| --- | --- |
-| `application` | [Resource files](resource-files.md) |
-| `entity` | [Resource files](resource-files.md) |
-| `site` | [Resource files](resource-files.md) |
-| `page` | [Resource files](resource-files.md), [Frontend](frontend.md) |
-| `text` | [Resource files](resource-files.md) |
-| `seed` | [Resource files](resource-files.md) |
-| `dataSource` | [Data sources](data-sources.md) |
-| `rule` | [Resource files](resource-files.md) |
-| `sequence` | [Resource files](resource-files.md) |
-| `process` | [Processes](processes.md), [Process flow](process-flow.md) |
-| `form` | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
-| `role` | [Roles and policies](roles-and-policies.md) |
-| `policy` | [Roles and policies](roles-and-policies.md) |
-| `connector` | [Connectors, events and endpoints](integration-resources.md) |
-| `identityProvider` | [Axis's identity provider](identity-provider.md) |
-| `event` | [Connectors, events and endpoints](integration-resources.md) |
-| `endpoint` | [Connectors, events and endpoints](integration-resources.md) |
-| `trigger` | [Connectors, events and endpoints](integration-resources.md) |
-| `webhook` | [Outbound webhooks](outbound-webhooks.md) |
-| `migration` | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md) |
-| `scenario` | [Test scenarios](test-scenarios.md) |
-| `contract` | [Module contracts](module-contracts.md) |
-| `layer` | [Customization layers](customization-layers.md) |
+| Topic              | Pages                                                                                  |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `application`      | [Resource files](resource-files.md)                                                    |
+| `entity`           | [Resource files](resource-files.md)                                                    |
+| `site`             | [Resource files](resource-files.md)                                                    |
+| `page`             | [Resource files](resource-files.md), [Frontend](frontend.md)                           |
+| `text`             | [Resource files](resource-files.md)                                                    |
+| `seed`             | [Resource files](resource-files.md)                                                    |
+| `dataSource`       | [Data sources](data-sources.md)                                                        |
+| `rule`             | [Resource files](resource-files.md)                                                    |
+| `sequence`         | [Resource files](resource-files.md)                                                    |
+| `process`          | [Processes](processes.md), [Process flow](process-flow.md)                             |
+| `form`             | [Form resource and form widget](form-widget.md), [Form conditions](form-conditions.md) |
+| `role`             | [Roles and policies](roles-and-policies.md)                                            |
+| `policy`           | [Roles and policies](roles-and-policies.md)                                            |
+| `connector`        | [Connectors, events and endpoints](integration-resources.md)                           |
+| `identityProvider` | [Axis's identity provider](identity-provider.md)                                       |
+| `event`            | [Connectors, events and endpoints](integration-resources.md)                           |
+| `endpoint`         | [Connectors, events and endpoints](integration-resources.md)                           |
+| `trigger`          | [Connectors, events and endpoints](integration-resources.md)                           |
+| `webhook`          | [Outbound webhooks](outbound-webhooks.md)                                              |
+| `migration`        | [Migrations and recomputing](migrations.md), [Resource files](resource-files.md)       |
+| `scenario`         | [Test scenarios](test-scenarios.md)                                                    |
+| `contract`         | [Module contracts](module-contracts.md)                                                |
+| `layer`            | [Customization layers](customization-layers.md)                                        |
 
 `McpReferenceTopicsDocumentationTests` compares this table with the server's map and with the resource
 kinds.
@@ -196,8 +214,10 @@ A call to the server is limited in rate and size, and the agent host's requests 
   model. Requests of the agent host count toward `authoringRequests`, see
   [tenant quotas](tenant-quotas.md#quotas).
 - **Size.** `POST /mcp` refuses a request body over 1 MiB with `413`, so a tool input is at most 1 MiB.
-- **Output pages** _(planned for M35)_. A tool output is at most 1 MiB. A larger output, such as the
-  diff of a large draft, is cut into pages that the tool's `cursor` reads.
+- **Output pages.** `diff_draft` answers the diff of a draft in pages of whole entries of at most 1 MiB, as
+  the [draft diff](authoring-revisions.md#draft-diff) route does, and a page's `cursor` reads the next one.
+- **Output size** _(planned for M35)_. Every tool output is at most 1 MiB, and a larger output of another tool
+  is cut into pages that its `cursor` reads.
 
 ## Audit
 
@@ -205,7 +225,11 @@ What an agent did is recorded, but never the content it read or wrote.
 
 - **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
   application, the draft and the resource ids. The fields are in [audit actions](storage.md#audit-actions).
-- **Consent** _(planned for M35)_. Consent and its revocation write audit records in the realm and a platform audit
+  `run_scenarios` writes none, as a [test](authoring.md#test) writes none. `accept_draft` writes one only when it queues an accept,
+  and none when it answers an accept that is already queued or running or reads one.
+- **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant
+  database and one in the platform database, see [audit actions](storage.md#audit-actions).
+- **Consent** _(planned for M35)_. A consent that a person gives writes an audit record in the realm and a platform audit
   record in Axis.
 - **Logs.** The server logs each call's tool, client id and outcome, and the
   [log inventory](log-inventory.md#security-events) lists the event.

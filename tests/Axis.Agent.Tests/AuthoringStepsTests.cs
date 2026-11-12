@@ -22,11 +22,13 @@ public sealed class AuthoringStepsTests
     {
         var working = new FakeStep("working");
         var checking = new FakeStep("checking");
+        var accepting = new FakeStep("ready");
 
-        var steps = new AuthoringSteps([working, checking]);
+        var steps = new AuthoringSteps([working, checking, accepting]);
 
         Assert.True(steps.Any);
-        Assert.Equal(["working", "checking"], steps.States);
+        Assert.Equal(["working", "checking", "ready"], steps.States);
+        Assert.Same(accepting, steps.Find("ready"));
         Assert.Same(working, steps.Find("working"));
         Assert.True(steps.Has("checking"));
         Assert.False(steps.Has("planning"));
@@ -52,7 +54,6 @@ public sealed class AuthoringStepsTests
 
     [Theory]
     [InlineData("awaitingApproval")]
-    [InlineData("ready")]
     [InlineData("accepted")]
     [InlineData("dropped")]
     [InlineData("failed")]
@@ -66,7 +67,7 @@ public sealed class AuthoringStepsTests
 
     [Theory]
     [InlineData("working", "working", "Two authoring steps")]
-    [InlineData("awaitingApproval", "ready", "needs no work")]
+    [InlineData("awaitingApproval", "accepted", "needs no work")]
     public void A_bad_set_of_steps_stops_the_agent_host_from_starting(string first, string second, string message)
     {
         var services = new ServiceCollection();

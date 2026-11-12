@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Tenancy;
 using Npgsql;
@@ -6,8 +7,27 @@ using NpgsqlTypes;
 
 namespace Axis.Agent;
 
-/// <summary>A request whose state needs work, as the agent host lists it.</summary>
-public sealed record AuthoringRequestToWork(Guid Id, string State, DateTimeOffset SentAt);
+/// <summary>
+/// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, the
+/// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, the <c>checks</c> of its newest
+/// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when its plan was approved, its <c>round</c>, and the
+/// findings of its newest <c>review</c> step after that check, if the review had any.
+/// </summary>
+public sealed record AuthoringRequestToWork(
+    Guid Id,
+    string State,
+    DateTimeOffset SentAt,
+    Guid ApplicationId,
+    string Text,
+    string? Plan,
+    string? Binding,
+    IReadOnlyList<string> PlanChanges,
+    Guid? DraftId,
+    string? LatestChecks,
+    long Tokens,
+    DateTimeOffset? ApprovedAt,
+    int Round = 0,
+    string? LatestFindings = null);
 
 /// <summary>
 /// The agent host's reads and writes of <c>axis.authoring_requests</c> and <c>axis.authoring_request_steps</c> in a tenant database, see
@@ -18,25 +38,56 @@ public sealed record AuthoringRequestToWork(Guid Id, string State, DateTimeOffse
 public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
 {
     /// <summary>The states of a request that need work, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
-    public static readonly IReadOnlyList<string> StatesNeedingWork = ["planning", "working", "checking", "reviewing", "fixing"];
+    public static readonly IReadOnlyList<string> StatesNeedingWork = ["planning", "working", "checking", "reviewing", "fixing", "ready"];
 
     /// <summary>Every state of a request, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
     public static readonly IReadOnlyList<string> States =
         ["planning", "awaitingApproval", "working", "checking", "reviewing", "fixing", "ready", "accepted", "dropped", "failed"];
 
+    // The columns of a listed or claimed request, in the order of ReadRequest. The findings are those of the newest review step after the newest check step.
+    private const string RequestColumns =
+        """
+        a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
+        ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
+              WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal),
+        a.draft_id,
+        (SELECT s.checks::text FROM axis.authoring_request_steps s
+              WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1),
+        a.tokens, a.approved_at, a.round,
+        (SELECT r.checks->'review'->>'findings' FROM axis.authoring_request_steps r
+              WHERE r.request_id = a.id AND r.kind = 'review' AND r.checks IS NOT NULL
+                AND r.ordinal > coalesce((SELECT max(c.ordinal) FROM axis.authoring_request_steps c
+                                          WHERE c.request_id = a.id AND c.kind = 'check' AND c.checks IS NOT NULL), 0)
+              ORDER BY r.ordinal DESC LIMIT 1)
+        """;
+
+    // The condition under which a request of one of the states needs work. A ready request needs it only when it asked for auto-accept, has a draft and no
+    // accept step has finished since its newest review: an accept that was interrupted does not count. The application's auto-accept is left to accept_draft.
+    private static string NeedsWork(string alias) =>
+        $"""
+        {alias}.state = ANY(@states)
+          AND ({alias}.state <> 'ready'
+               OR ({alias}.auto_accept AND {alias}.draft_id IS NOT NULL
+                   AND NOT EXISTS (SELECT 1 FROM axis.authoring_request_steps s
+                                   WHERE s.request_id = {alias}.id AND s.kind = 'accept' AND s.finished_at IS NOT NULL
+                                     AND s.outcome IS DISTINCT FROM 'interrupted'
+                                     AND s.ordinal > coalesce((SELECT max(v.ordinal) FROM axis.authoring_request_steps v
+                                                               WHERE v.request_id = {alias}.id AND v.kind = 'review'), 0))))
+        """;
+
     private readonly ConcurrentDictionary<string, bool> _checked = new(StringComparer.Ordinal);
 
-    /// <summary>Lists the requests of the tenant in a state that needs work, oldest first.</summary>
+    /// <summary>Lists the requests of the tenant that need work, oldest first. A <c>ready</c> request needs work only under the rule of <see cref="ClaimAsync"/>.</summary>
     /// <exception cref="InvalidOperationException">The tenant is not configured, or its role fails the runtime role check. The message names the tenant and the role.</exception>
     public async Task<IReadOnlyList<AuthoringRequestToWork>> ListNeedingWorkAsync(string tenantId, CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
         await using var command = new NpgsqlCommand(
-            """
-            SELECT id, state, sent_at
-            FROM axis.authoring_requests
-            WHERE state = ANY(@states)
-            ORDER BY sent_at, id
+            $"""
+            SELECT {RequestColumns}
+            FROM axis.authoring_requests a
+            WHERE {NeedsWork("a")}
+            ORDER BY a.sent_at, a.id
             """,
             connection);
         command.Parameters.AddWithValue("states", StatesNeedingWork.ToArray());
@@ -51,8 +102,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     }
 
     /// <summary>
-    /// Claims the oldest request of the tenant that is in one of the states and has no claim or a lapsed one. It sets <c>claimed_by</c> and
-    /// <c>claimed_until</c>, and answers <c>null</c> when no request qualifies.
+    /// Claims the oldest request of the tenant that is in one of the states and has no claim or a lapsed one. A <c>ready</c> request qualifies only when it asked for
+    /// auto-accept, has a draft and no <c>accept</c> step has finished since its newest <c>review</c> step, see <c>docs/reference/authoring-requests.md#durable-requests</c>. An <c>accept</c> step
+    /// that was interrupted does not count. It sets <c>claimed_by</c> and <c>claimed_until</c>, and answers <c>null</c> when no request qualifies.
     /// </summary>
     /// <exception cref="InvalidOperationException">The tenant is not configured, or its role fails the runtime role check.</exception>
     public async Task<AuthoringRequestToWork?> ClaimAsync(string tenantId, IReadOnlyCollection<string> states, string claimedBy, TimeSpan lease, CancellationToken cancellationToken = default)
@@ -63,16 +115,16 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         await using var connection = await OpenAsync(tenantId, cancellationToken);
         // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
         await using var command = new NpgsqlCommand(
-            """
+            $"""
             WITH next AS (
               SELECT r.id FROM axis.authoring_requests r
-              WHERE r.state = ANY(@states) AND (r.claimed_until IS NULL OR r.claimed_until < clock_timestamp())
+              WHERE {NeedsWork("r")} AND (r.claimed_until IS NULL OR r.claimed_until < clock_timestamp())
               ORDER BY r.sent_at, r.id LIMIT 1
               FOR UPDATE SKIP LOCKED)
             UPDATE axis.authoring_requests a
             SET claimed_by = @me, claimed_until = clock_timestamp() + @lease
             FROM next WHERE a.id = next.id
-            RETURNING a.id, a.state, a.sent_at
+            RETURNING {RequestColumns}
             """,
             connection);
         command.Parameters.AddWithValue("states", states.ToArray());
@@ -188,10 +240,62 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         await transaction.CommitAsync(cancellationToken);
     }
 
+    /// <summary>Stores the id of the request's draft, see <c>docs/reference/authoring-requests.md#states</c>.</summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim. Nothing is written.</exception>
+    public async Task SetDraftAsync(string tenantId, Guid requestId, string claimedBy, Guid draftId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(tenantId, cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.authoring_requests SET draft_id = @draft WHERE id = @id AND claimed_by = @me",
+            connection);
+        command.Parameters.AddWithValue("draft", draftId);
+        command.Parameters.AddWithValue("id", requestId);
+        command.Parameters.AddWithValue("me", claimedBy);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+        {
+            throw new AuthoringClaimLostException();
+        }
+    }
+
     /// <summary>
-    /// Commits a finished step with the request's next state in one transaction. The host keeps the claim when <paramref name="keepClaim"/> is
-    /// <c>true</c>, extending the lease by <paramref name="lease"/>, and frees the request otherwise. It answers <c>false</c> and writes nothing
-    /// when the host no longer holds the claim.
+    /// Reads the request's stored refresh token, still encrypted, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+    /// It answers <c>null</c> when the request keeps none.
+    /// </summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim.</exception>
+    public async Task<byte[]?> ReadTokenAsync(string tenantId, Guid requestId, string claimedBy, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(tenantId, cancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT refresh_token FROM axis.authoring_requests WHERE id = @id AND claimed_by = @me",
+            connection);
+        command.Parameters.AddWithValue("id", requestId);
+        command.Parameters.AddWithValue("me", claimedBy);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            throw new AuthoringClaimLostException();
+        }
+
+        return await reader.IsDBNullAsync(0, cancellationToken) ? null : reader.GetFieldValue<byte[]>(0);
+    }
+
+    /// <summary>Encrypts the refresh token and stores it on the request in place of the old one, see <see cref="AuthoringRequestTokens.StoreAsync"/>.</summary>
+    /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request has ended.</exception>
+    public async Task StoreTokenAsync(
+        string tenantId, Guid requestId, string claimedBy, SensitiveValues values, string refreshToken, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(tenantId, cancellationToken);
+        if (!await AuthoringRequestTokens.StoreAsync(connection, null, values, tenantId, requestId, refreshToken, claimedBy, cancellationToken))
+        {
+            throw new AuthoringClaimLostException();
+        }
+    }
+
+    /// <summary>
+    /// Commits a finished step with the request's next state in one transaction. The commit frees the request, so a later claim runs the
+    /// next step. A move to <c>fixing</c> adds 1 to the request's <c>round</c>. A next state that ends the request, <c>accepted</c>, <c>dropped</c> or <c>failed</c>, also erases its refresh token.
+    /// With <paramref name="dropDraft"/> it clears the request's <c>draft_id</c> in the same commit. It answers <c>false</c> and writes nothing when the host no longer holds the claim,
+    /// and also when the request is <c>accepted</c> and the next state is not: no step moves an accepted request.
     /// </summary>
     public async Task<bool> FinishStepAsync(
         string tenantId,
@@ -201,8 +305,10 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         string nextState,
         string? outcome,
         string? inputSummary,
-        bool keepClaim,
-        TimeSpan lease,
+        string? plan,
+        string? messages,
+        string? checks,
+        bool dropDraft = false,
         CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(tenantId, cancellationToken);
@@ -211,17 +317,21 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             """
             UPDATE axis.authoring_requests
             SET state = @next,
+                draft_id = CASE WHEN @dropDraft THEN NULL ELSE draft_id END,
+                plan = coalesce(@plan, plan),
+                round = CASE WHEN @next = 'fixing' THEN round + 1 ELSE round END,
                 finished_at = CASE WHEN @next = 'failed' THEN now() ELSE finished_at END,
-                claimed_by = CASE WHEN @keep THEN claimed_by END,
-                claimed_until = CASE WHEN @keep THEN clock_timestamp() + @lease END
-            WHERE id = @id AND claimed_by = @me
+                refresh_token = CASE WHEN @next IN ('accepted', 'dropped', 'failed') THEN NULL ELSE refresh_token END,
+                claimed_by = NULL,
+                claimed_until = NULL
+            WHERE id = @id AND claimed_by = @me AND (state <> 'accepted' OR @next = 'accepted')
             """,
             connection,
             transaction))
         {
             command.Parameters.AddWithValue("next", nextState);
-            command.Parameters.AddWithValue("keep", keepClaim);
-            command.Parameters.AddWithValue("lease", lease);
+            command.Parameters.AddWithValue("dropDraft", dropDraft);
+            command.Parameters.Add(new NpgsqlParameter("plan", NpgsqlDbType.Text) { Value = (object?)plan ?? DBNull.Value });
             command.Parameters.AddWithValue("id", requestId);
             command.Parameters.AddWithValue("me", claimedBy);
             if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
@@ -232,12 +342,14 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         }
 
         await using (var command = new NpgsqlCommand(
-            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, finished_at = now() WHERE id = @step AND request_id = @id",
+            "UPDATE axis.authoring_request_steps SET outcome = @outcome, input_summary = @summary, messages = @messages, checks = @checks, finished_at = now() WHERE id = @step AND request_id = @id",
             connection,
             transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("outcome", NpgsqlDbType.Text) { Value = (object?)outcome ?? DBNull.Value });
             command.Parameters.Add(new NpgsqlParameter("summary", NpgsqlDbType.Text) { Value = (object?)inputSummary ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("messages", NpgsqlDbType.Jsonb) { Value = (object?)messages ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("checks", NpgsqlDbType.Jsonb) { Value = (object?)checks ?? DBNull.Value });
             command.Parameters.AddWithValue("step", stepId);
             command.Parameters.AddWithValue("id", requestId);
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -251,7 +363,21 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
     public void Forget(string tenantId) => _checked.TryRemove(tenantId, out _);
 
     private static AuthoringRequestToWork ReadRequest(NpgsqlDataReader reader) =>
-        new(reader.GetGuid(0), reader.GetString(1), reader.GetFieldValue<DateTimeOffset>(2));
+        new(
+            reader.GetGuid(0),
+            reader.GetString(1),
+            reader.GetFieldValue<DateTimeOffset>(2),
+            reader.GetGuid(3),
+            reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.GetFieldValue<string?[]>(7).OfType<string>().ToList(),
+            reader.IsDBNull(8) ? null : reader.GetGuid(8),
+            reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.GetInt64(10),
+            reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11),
+            reader.GetInt32(12),
+            reader.IsDBNull(13) ? null : reader.GetString(13));
 
     // Locks the request's row when the host still holds the claim, so a drop or a claim by another host waits for the transaction.
     private static async Task<bool> LockClaimAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string claimedBy, CancellationToken cancellationToken)

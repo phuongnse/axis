@@ -1,5 +1,5 @@
 import { render, screen, within } from '@testing-library/react'
-import type { ComponentProps } from 'react'
+import { useDeferredValue, type ComponentProps, type ReactNode } from 'react'
 import userEvent from '@testing-library/user-event'
 import { Input } from 'antd'
 import { describe, expect, it, vi } from 'vitest'
@@ -120,6 +120,37 @@ describe('the list of objects', () => {
     expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveFocus()
     expect(dialog).toBeVisible()
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('focuses the first empty field when its message is drawn after the render of Done', async () => {
+    // The deferred value draws the message one render after the one that Done causes, as a dialog may draw late.
+    function LateProblem({ problem }: { problem: ReactNode }) {
+      return useDeferredValue(problem)
+    }
+    renderList(vi.fn(), false, {
+      required: ['name', 'version'],
+      fields: (copy, change, _index, problem) => (
+        <>
+          {columns.slice(0, 2).map((column) => (
+            <div key={column.key}>
+              <Input
+                aria-label={column.title}
+                value={String(copy[column.key] ?? '')}
+                onChange={(event) => change(`/${column.key}`, event.target.value)}
+              />
+              <LateProblem problem={problem(column.key)} />
+            </div>
+          ))}
+        </>
+      ),
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add module…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Add module' })
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+
+    expect(within(dialog).getAllByText('Fill in this field.')).toHaveLength(2)
+    expect(within(dialog).getByRole('textbox', { name: 'Module' })).toHaveFocus()
   })
 
   it('removes the message once the field is filled, then Done writes the item with one change', async () => {

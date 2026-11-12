@@ -1,3 +1,4 @@
+using Axis.ControlPlane.Billing;
 using Axis.ControlPlane.Dns;
 using Axis.ControlPlane.Jobs;
 using Axis.ControlPlane.RegionDirectory;
@@ -326,6 +327,15 @@ public sealed class ControlPlaneOptionsTests
         ["ControlPlane:Dns:Key"] = DnsKey,
     };
 
+    private static Dictionary<string, string?> PayOsSettings() => new()
+    {
+        ["ControlPlane:PayOs:Provider"] = "PayOs",
+        ["ControlPlane:PayOs:BaseUrl"] = "https://api-merchant.payos.test",
+        ["ControlPlane:PayOs:ClientId"] = "client-id-48151623420",
+        ["ControlPlane:PayOs:ApiKey"] = "api-key-91827364550",
+        ["ControlPlane:PayOs:ChecksumKey"] = "checksum-key-27182818280",
+    };
+
     [Theory]
     [InlineData("ControlPlane:Dns:Server")]
     [InlineData("ControlPlane:Dns:Zone")]
@@ -354,6 +364,19 @@ public sealed class ControlPlaneOptionsTests
 
         Assert.Contains("ControlPlane:Dns:Key", exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("not base64", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("not base64 challenge key!")]
+    [InlineData("c2l4dGVlbi1ieXRlcy1vaw==")]
+    public void A_challenge_key_that_is_not_base64_of_at_least_32_bytes_stops_the_start_and_the_message_holds_no_value(string key)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:SignUp:ChallengeKey"] = key });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:ChallengeKey", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(key, exception.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -407,6 +430,109 @@ public sealed class ControlPlaneOptionsTests
     }
 
     [Fact]
+    public void Outside_Development_and_Testing_the_fake_PayOS_provider_stops_the_start()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:PayOs:Provider"] = "Fake",
+            ["ControlPlane:ConnectionString"] = ControlPlaneFactory.UnreachableConnectionString + ";SSL Mode=VerifyFull",
+            ["ControlPlane:Mail:UseTls"] = "true",
+        };
+        using var factory = ControlPlaneFactory.Create(environment: "Production", settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:ConnectionString", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_unknown_PayOS_provider_stops_the_start()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Other" });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:Provider", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Fake or PayOs", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Other", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void In_Testing_the_fake_PayOS_provider_loads_and_registers_the_adapter_and_the_payment_link_job()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?> { ["ControlPlane:PayOs:Provider"] = "Fake" });
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<FakePayOs>(factory.Services.GetRequiredService<IPayOs>());
+        Assert.Same(factory.Services.GetRequiredService<FakePayOs>(), factory.Services.GetRequiredService<IPayOs>());
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
+        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
+    }
+
+    [Theory]
+    [InlineData("BaseUrl")]
+    [InlineData("ClientId")]
+    [InlineData("ApiKey")]
+    [InlineData("ChecksumKey")]
+    public void The_PayOS_provider_without_one_of_its_settings_stops_the_start_and_the_message_names_only_that_setting(string name)
+    {
+        var settings = PayOsSettings();
+        settings[$"ControlPlane:PayOs:{name}"] = string.Empty;
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:PayOs:{name}", exception.Message, StringComparison.Ordinal);
+        foreach (var (setting, value) in PayOsSettings().Where(pair => pair.Key != "ControlPlane:PayOs:Provider"))
+        {
+            Assert.DoesNotContain(value!, exception.Message, StringComparison.Ordinal);
+            if (!setting.EndsWith($":{name}", StringComparison.Ordinal))
+            {
+                Assert.DoesNotContain(setting, exception.Message, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Fact]
+    public void A_PayOS_base_URL_that_is_not_https_stops_the_start()
+    {
+        var settings = PayOsSettings();
+        settings["ControlPlane:PayOs:BaseUrl"] = "http://api-merchant.payos.test";
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:PayOs:BaseUrl", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-merchant.payos.test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_PayOS_provider_with_all_its_settings_registers_the_real_adapter_and_the_payment_link_job()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: PayOsSettings());
+
+        using var client = factory.CreateClient();
+
+        Assert.IsType<PayOsClient>(factory.Services.GetRequiredService<IPayOs>());
+        Assert.Null(factory.Services.GetService<FakePayOs>());
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks" && job.Interval == TimeSpan.FromMinutes(5));
+        Assert.Contains(factory.Services.GetServices<IJobHandler>(), handler => handler.Kind == "createPaymentLinks");
+    }
+
+    [Fact]
+    public void Without_a_PayOS_provider_no_adapter_and_no_payment_link_job_are_registered()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Null(factory.Services.GetService<IPayOs>());
+        Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "createPaymentLinks");
+    }
+
+    [Fact]
     public void The_RFC_2136_provider_with_all_its_settings_loads_and_is_registered()
     {
         using var factory = ControlPlaneFactory.Create(settings: DnsSettings());
@@ -455,6 +581,99 @@ public sealed class ControlPlaneOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
 
         Assert.Contains("ControlPlane:SignUp:Applications:1:Id", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("not a domain")]
+    [InlineData("user@gmail.com")]
+    [InlineData("https://gmail.com")]
+    [InlineData("203.0.113.1")]
+    public void A_public_mailbox_domain_that_is_not_a_domain_name_stops_the_start_and_the_message_names_the_setting(string entry)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = entry,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:PublicMailboxDomains:1", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("ControlPlane:SignUp:PublicMailboxDomains:0", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_public_mailbox_domains_load()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:PublicMailboxDomains:0"] = "gmail.com",
+            ["ControlPlane:SignUp:PublicMailboxDomains:1"] = "outlook.com",
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        using var client = factory.CreateClient();
+
+        Assert.Equal(["gmail.com", "outlook.com"], factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.PublicMailboxDomains);
+    }
+
+    [Fact]
+    public void Valid_trial_quotas_load()
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:TrialQuotas:users"] = "10",
+            ["ControlPlane:SignUp:TrialQuotas:authoringRequests"] = null,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        using var client = factory.CreateClient();
+
+        var quotas = factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.TrialQuotas;
+        Assert.Equal(2, quotas.Count);
+        Assert.Equal(10, quotas["users"]);
+        Assert.Null(quotas["authoringRequests"]);
+    }
+
+    [Fact]
+    public void A_trial_quota_with_an_unknown_key_stops_the_start_and_the_message_names_the_setting()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:TrialQuotas:seats"] = "5",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:TrialQuotas:seats", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("-1")]
+    [InlineData("2.5")]
+    [InlineData("ten")]
+    public void A_trial_quota_that_is_not_a_whole_number_of_zero_or_more_stops_the_start_and_the_message_names_the_setting(string value)
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:TrialQuotas:users"] = value,
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains("ControlPlane:SignUp:TrialQuotas:users", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void With_no_trial_quotas_the_service_starts_with_none()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.Empty(factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.TrialQuotas);
     }
 
     [Fact]
@@ -537,6 +756,53 @@ public sealed class ControlPlaneOptionsTests
         Assert.Equal("2026-03", signUp.Privacy.Version);
         Assert.Equal("https://example.com/privacy/en", signUp.Privacy.Urls.En);
         Assert.Equal("https://example.com/licences", signUp.LicencesUrl);
+    }
+
+    [Theory]
+    [InlineData("https://lists.example/only-url-4f9c.conf", null, "Sha256", "https://lists.example/only-url-4f9c.conf")]
+    [InlineData(null, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Url", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    [InlineData("http://lists.example/plain-http-4f9c.conf", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Url", "http://lists.example/plain-http-4f9c.conf")]
+    [InlineData("https://lists.example/short-hash.conf", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde", "Sha256", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde")]
+    [InlineData("https://lists.example/bad-hash.conf", "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "Sha256", "g123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")]
+    public void A_disposable_domain_list_that_is_half_set_or_wrong_stops_the_start_and_the_message_holds_no_value(string? url, string? sha256, string refused, string value)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:DisposableDomains:Url"] = url,
+            ["ControlPlane:SignUp:DisposableDomains:Sha256"] = sha256,
+        };
+        using var factory = ControlPlaneFactory.Create(settings: settings);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+
+        Assert.Contains($"ControlPlane:SignUp:DisposableDomains:{refused}", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_disposable_domain_list_with_an_https_url_and_a_64_character_hash_loads_and_queues_the_refresh()
+    {
+        using var factory = ControlPlaneFactory.Create(settings: new Dictionary<string, string?>
+        {
+            ["ControlPlane:SignUp:DisposableDomains:Url"] = "https://lists.example/disposable.conf",
+            ["ControlPlane:SignUp:DisposableDomains:Sha256"] = new string('A', 64),
+        });
+
+        using var client = factory.CreateClient();
+
+        var disposable = factory.Services.GetRequiredService<ControlPlaneOptions>().SignUp.DisposableDomains;
+        Assert.True(disposable.IsComplete);
+        Assert.Contains(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains" && job.Interval == TimeSpan.FromDays(7));
+    }
+
+    [Fact]
+    public void Without_the_disposable_domain_settings_the_refresh_is_not_queued()
+    {
+        using var factory = ControlPlaneFactory.Create();
+
+        using var client = factory.CreateClient();
+
+        Assert.DoesNotContain(factory.Services.GetServices<RecurringJob>(), job => job.Kind == "refreshDisposableDomains");
     }
 
     [Fact]

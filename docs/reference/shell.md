@@ -207,7 +207,9 @@ addresses of [the sign-in card](#the-sign-in-card).
 Axis shows a card only where going straight to sign-in would loop or surprise. It has the identity
 provider's frame: the organization's mark and name above one card in the middle of the page, or Axis
 while the organization is not known, see [theme](identity-provider.md#theme). A tenant has no name until
-`tenant create` takes one, see [realms](identity-provider.md#realms). The card is on `surface` with a
+`tenant create` takes one, see [realms](identity-provider.md#realms). The [card page](shared-widgets.md#which-widget)
+draws the card, as wide as the `small` dialog size token. It leaves out the language menu and the legal line, because
+the shell's header and footer have them. The card is on `surface` with a
 `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. The header shows no second Sign in
 button there, and nothing starts sign-in until the person clicks the card's button. A signed-in person
 who opens any of these addresses sees the launcher.
@@ -323,7 +325,7 @@ to the frame shows in every state. How previews work is in
 - **The identity provider's pages are the theme's own.** `identitySignIn` is built from fixtures
   through the shared sign-in components in `web/src/identitySignIn/`. Its states from Two-step
   verification to Error are the same components that the theme draws.
-- **More sign-in states** _(planned for M31)_. `identitySignIn` also shows Fields left empty, Terms and
+- **More sign-in states** _(planned for M33)_. `identitySignIn` also shows Fields left empty, Terms and
   privacy, and Terms not accepted.
 - **A frame holds the whole shell.** A shell preview draws the shell, from the header to the footer, in
   a frame at least as tall as its height, which grows to hold the whole shell, so several states fit
@@ -332,6 +334,6 @@ to the frame shows in every state. How previews work is in
   through the shell over fixtures of the purchase request sample, in seven states: Typical, Empty,
   Loading, Failed, Many rows, Long names and Access denied. Clicks in the sidebar move between
   Overview, Settings, the kind lists and Releases, all answered from fixtures.
-- **More Studio states** _(planned for M31)_. `studio` also shows Overview with errors and changes not
+- **More Studio states** _(planned for M33)_. `studio` also shows Overview with errors and changes not
   live, Overview of a new application, Entity and Policy matrix. The previews `studioPageDesign`,
   `studioFormDesign` and `studioProcessDesign` follow it.

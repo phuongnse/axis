@@ -81,7 +81,11 @@ public static class AuditActions
 
     public const string AuthoringRequestApproved = "authoringRequest.approved";
 
+    public const string AuthoringRequestAccepted = "authoringRequest.accepted";
+
     public const string AuthoringRequestDropped = "authoringRequest.dropped";
 
     public const string McpToolCalled = "mcp.toolCalled";
+
+    public const string McpConsentRevoked = "mcp.consentRevoked";
 }

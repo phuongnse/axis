@@ -72,6 +72,20 @@ These rules keep the tests reliable, and `scripts/lint.sh` enforces the ones a m
 - **Removals.** A removal deletes the thing and its tests, and adds no test of its own. A test checks
   what the code does now. A guard against a kind of mistake is a lint rule or a check of the current
   rule, such as "every chart import goes through `ChartDrawing`", never a list of removed names.
+- **Over the shard budget.** A spec, test class, collection or file that alone takes longer than the
+  [shard budget](development.md#shards) is fixed in this order. A test is slow for a reason, and a split
+  can drop what it proves, such as a journey's whole flow.
+  1. **Faster, with the same proof.** Time spent on what the test does not check goes first. Setup through
+     the UI that the test does not assert moves to the API or a fixture, and a wait for time becomes a wait
+     for a state.
+  2. **Shared state removed at its cause.** Classes that share an xUnit collection only because one of them
+     clears what the others use get their own resources, rather than being cut into collections of
+     arbitrary size.
+  3. **A split only along a seam.** The parts share no state, and together they still prove everything that
+     the test's section of the docs says the whole proved. That section then says which part proves what. A
+     test whose section or decision asks for one whole flow keeps it.
+  4. **Otherwise the owner decides.** When none of these fits, the owner decides, and the test keeps what it
+     proves rather than being narrowed.
 
 ## Shared test services
 
@@ -87,7 +101,8 @@ The integration tests share their containers, so a run starts each service at mo
   database a fixture creates has a name unique in the run. A fixture never starts its own container.
   Tenant isolation tests still use one tenant database per tenant. Tests that read
   `pg_stat_activity` filter on `current_database()`, so they neither see nor end other classes'
-  sessions.
+  sessions. Tests that count or drop scenario databases use the scenario role `axis_scenario_counted`,
+  act only on its databases, and share one collection, so they never drop each other's.
 - **Models.** No test calls a paid model. Tests that need a model's answer use the scripted adapter,
   see [model bindings](reference/model-bindings.md#bindings).
 - **Scenarios.** `scripts/integration.sh` runs the scenarios of every application under
@@ -97,7 +112,8 @@ The integration tests share their containers, so a run starts each service at mo
   repository. Unit tests in `Axis.Configuration.Tests` compare the diagnostic code table and the
   resource kinds in the [configuration pipeline](reference/configuration.md#configuration-pipeline)
   with `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by heading or table
-  header, so the sections may move within `docs/`.
+  header, so the sections may move within `docs/`. `scripts/check-docs.mjs` compares the Studio spec
+  folders table with the specs that start their own server over a Studio folder.
 
 ## The E2E stack
 
@@ -134,17 +150,22 @@ changes a file under `samples/`.
 - No spec opens Studio on the main E2E server or names its folder, except `studio-new-application`,
   which only reads it to check that the main server offers no New application button.
 
-The Studio specs use these folders:
+The table lists every spec that starts its own server over a Studio folder. `scripts/check-docs.mjs`
+fails when the table and the specs differ.
 
-| Specs                                                                                                                                                         | Folder                                                                                                                       |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`, `studio-process-redraw`, `studio-scenario`, `studio-new-resource` and `studio-tests` | A temporary copy of `samples/apps/purchase-requests`, without `texts/vi.json` for `studio-new-resource`. `studio-tests` also copies it again for its server with `Studio:Tests` off |
-| `studio-module-entity`                                                                                                                                        | A temporary copy of `samples/apps/leave-requests`                                                                            |
-| `studio-module-pickers`                                                                                                                                       | A temporary copy of `tests/e2e/fixtures/module-app`, and a temporary `Modules:Path` with the sample modules and the fixture module `checklists` |
-| `studio-new-application`, `studio-page-containers` and `studio-page-parameters`                                                                              | A temporary `Studio:ApplicationsPath`                                                                                        |
-| `studio-entity-migrations` and `purchase-request-release`                                                                                                     | Folders under the test's output path                                                                                         |
-| `service-desk-journey`, `asset-management-journey`, `approvals-application-journey` and `journey-tenant`                                                      | Each its own application under the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`                     |
-| `first-application-tutorial`                                                                                                                                  | Each its own application under the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`                     |
+| Specs                                                                                                                                                                                                                                                                                                            | Folder                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`, `studio-process-redraw`, `studio-scenario`, `studio-new-resource`, `studio-tests`, `studio-auto-accept`, `studio-history`, `studio-settings-journey`, `studio-subjectless-process`, `studio-module-form` and `studio-module-page` | A temporary copy of `samples/apps/purchase-requests`, without `texts/vi.json` for `studio-new-resource`. `studio-tests` also copies it again for its server with `Studio:Tests` off. `studio-history` also gets a temporary `Studio:RevisionsPath` |
+| `studio-module-entity`                                                                                                                                                                                                                                                                                           | A temporary copy of `samples/apps/leave-requests`                                                                                                                                                                                                  |
+| `studio-page-design` and `service-desk-scenarios`                                                                                                                                                                                                                                                                | A temporary copy of `samples/apps/service-desk`, without its `scenarios` folder for `service-desk-scenarios`                                                                                                                                       |
+| `studio-module-pickers`, `studio-module-policy`, `studio-module-process`, `studio-module-process-policy` and `studio-module-text`                                                                                                                                                                                | A temporary copy of `tests/e2e/fixtures/module-app`, and a temporary `Modules:Path` with the sample modules and the fixture module `checklists`                                                                                                    |
+| `studio-module-contract`                                                                                                                                                                                                                                                                                         | A temporary copy of `tests/e2e/fixtures/approvals-app`                                                                                                                                                                                             |
+| `studio-new-application`, `studio-page-containers`, `studio-page-dashboard` and `studio-page-parameters`                                                                                                                                                                                                         | A temporary `Studio:ApplicationsPath`                                                                                                                                                                                                              |
+| `studio-entity-migrations` and `purchase-request-release`                                                                                                                                                                                                                                                        | Folders under the test's output path                                                                                                                                                                                                               |
+
+The specs on the journey server, such as `service-desk-journey`, do not start their own server over a Studio
+folder, so the table does not list them. Each builds its own application under the journey server's
+applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`, see [journeys on the journey tenant](#journeys-on-the-journey-tenant).
 
 **Activating another folder.** A spec can activate another folder during the run, to test releases.
 The helper `tests/e2e/activate.ts` starts the built server once more on a spare port, with the same
@@ -227,7 +248,8 @@ webhook delivers.
 output on `AXIS_E2E_CONTROL_PLANE_PORT` (default 5290), and fails if it does not answer. Specs find it at
 `AXIS_E2E_CONTROL_PLANE_URL`. It runs in `Testing`, with its own database `axis_controlplane` and the region
 directory's database `axis_directory`, both created through `psql`. It uses the `InMemory` DNS provider and sends
-its emails to the run's Mailpit, and the links in them start with `AXIS_E2E_CONTROL_PLANE_URL`. Specs read Mailpit
+its emails to the run's Mailpit, and the links in them start with `AXIS_E2E_CONTROL_PLANE_URL`. It has a test challenge
+key and the document settings, so the sign-up page solves a real challenge and sends the document versions. Specs read Mailpit
 at `AXIS_E2E_MAILPIT_URL`, through `tests/e2e/mailpit.ts`. It serves the
 [sign-up page](reference/sign-up.md#the-page), and the sign-up spec seeds its own tenant in the directory, so the
 subdomain check finds a taken name.
@@ -241,19 +263,23 @@ plane output to `artifacts/logs/e2e-controlplane.log`.
 These journeys build or change an application on the journey tenant and use it on its site. Each spec
 file holds its steps. This section says what each proves and what it must not do.
 
-- **`service-desk-journey.spec.ts`** builds the whole service desk with Studio only, as the
-  [product brief](product-brief.md#third-application-service-desk) asks. It never opens the JSON
+- **`service-desk-journey.spec.ts`** builds the service desk with Studio only, except its test scenarios,
+  as the [product brief](product-brief.md#third-application-service-desk) asks. It never opens the JSON
   view and uses no file edit. It builds the data model, the data sources of the lists and the dashboard, the
   two-step ticket form on the form's Design tab, the forms of the tasks, the `TicketHandling` process
   with its escalations and its notify step, the pages, the site, the notify processes and their
-  schedule and delete triggers, the policies in the policy matrix, and the twelve test scenarios in
-  the scenario editor, typing every expression in the expression editor and every label's texts in its
-  label editor. Each save must report no error diagnostic. At the end the built folder must match
-  `samples/apps/service-desk` with no error diagnostic, as [the folder comparison](#the-folder-comparison)
-  says, and the `migrations` folder must be empty, because the sample has none. Run tests must pass all
-  twelve scenarios, and the release history must show release 1 as the one active row. On the
-  `service-desk` site the requester, the service desk lead and the agent take one ticket to `closed`,
-  the requester opening it from the bell, and the lead's bell has no row for that ticket.
+  schedule and delete triggers, and the policies in the policy matrix, typing every expression in the
+  expression editor and every label's texts in its label editor. Each save must report no error diagnostic.
+  At the end the built folder must match `samples/apps/service-desk` with no error diagnostic, except its
+  `scenarios` folder, as [the folder comparison](#the-folder-comparison) says. The `migrations` folder must
+  match the sample's, which holds the one migration that the journey writes when it removes `reopened`. The
+  release history must show release 1 as the one active row. On the `service-desk` site the requester, the
+  service desk lead and the agent take one ticket to `closed`, the requester opening it from the bell, and
+  the lead's bell has no row for that ticket.
+- **`service-desk-scenarios.spec.ts`** writes the twelve test scenarios in the scenario editor, on its own
+  server over a temporary copy of `samples/apps/service-desk` without its `scenarios` folder. Each save must
+  report no error diagnostic. The written folder must then match the whole sample with no error diagnostic,
+  and Run tests must pass all twelve scenarios. The spec does not use the journey tenant.
 - **`first-application-tutorial.spec.ts`** runs the steps of the
   [first application tutorial](tutorials/first-application.md) on the journey tenant, one test for
   each step. The author builds the application in Studio, from the texts and roles to the process,
@@ -320,6 +346,9 @@ sample. `compareApplicationFolders` in `tests/e2e/folder-comparison.ts` throws a
   for each locale, under the sample key it pairs with, or under its own key when none pairs with it. A
   built key that no label uses fails when the sample's labels use that key, and passes when the sample
   holds it with the same texts. A sample key that no built key covers fails as missing.
+- **Excepted folders.** `exceptFolders` leaves out the files under the named top-level folders in both
+  folders, and the other folders compare as before. The service desk journey leaves out `scenarios`, which
+  `service-desk-scenarios.spec.ts` compares in full.
 - **Page element names.** A journey may skip the names of page widgets, actions, columns and tabs with
   `ignorePageElementNames`, because Studio does not name them the way the samples do. Without it, a
   different name fails. With `generatedNames`, a page may hold an extra generated name such as `table1`

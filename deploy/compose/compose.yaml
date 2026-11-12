@@ -48,6 +48,9 @@
 # AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore`. It is never stored here.
 # Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
 #                       Studio stays off without them. The publisher gets Studio__Folders__0 alone.
+# Ai__AllowTenantKeys   Passes through from the shell to both servers and the agent host. The servers let an
+#                       administrator set a tenant's own model key and the agent host uses it, so give all three
+#                       the same value. It stays off without it.
 x-host: &host
   read_only: true
   tmpfs:
@@ -74,6 +77,8 @@ x-server: &server
     Studio__Folders__0:
     Studio__AuthorRole:
     Studio__PublisherRole:
+    # No value: this passes through from the shell, and the agent host takes the same value.
+    Ai__AllowTenantKeys:
   networks:
     default:
       aliases:
@@ -181,7 +186,8 @@ services:
       - ConnectionStrings__Platform
       - Platform__SecretKey
 
-  # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on.
+  # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on. It reads
+  # a tenant's own model key from the platform database only with Ai__AllowTenantKeys on.
   # It gets no extension or module folder, and never the schema connection string.
   agent:
     image: ${AXIS_IMAGE_PREFIX:-}axis-agent:${AXIS_VERSION:?Set AXIS_VERSION}
@@ -193,6 +199,8 @@ services:
       Tenancy__Source: directory
       # All interfaces inside the container. The published port stays on 127.0.0.1.
       Health__Urls: http://0.0.0.0:5209
+      # No value: this passes through from the shell, and both servers take the same value.
+      Ai__AllowTenantKeys:
     ports:
       - "127.0.0.1:${AXIS_AGENT_HEALTH_PORT:-5209}:5209"
     secrets:

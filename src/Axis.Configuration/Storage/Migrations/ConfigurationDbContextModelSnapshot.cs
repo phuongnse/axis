@@ -140,6 +140,10 @@ namespace Axis.Configuration.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("plan");
 
+                    b.Property<byte[]>("RefreshToken")
+                        .HasColumnType("bytea")
+                        .HasColumnName("refresh_token");
+
                     b.Property<int>("Round")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -185,6 +189,10 @@ namespace Axis.Configuration.Storage.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("Checks")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("checks");
 
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone")

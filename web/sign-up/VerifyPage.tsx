@@ -6,6 +6,7 @@ import { AxisButton } from '../src/platform/AxisButton'
 import { FilledText } from '../src/platform/FilledText'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
+import type { SignUpDocuments } from './documents'
 import { SignUpFrame } from './SignUpFrame'
 import type { SignUpLocale } from './texts'
 
@@ -27,15 +28,19 @@ function postToken(url: string, token: string, signal?: AbortSignal) {
 
 /**
  * The page that the link of the confirm email opens, see docs/reference/sign-up.md#the-verify-page. It reads the token after
- * `#`, checks the link, says what will start and confirms when the person presses Confirm. Until the progress page exists, a
- * confirm that succeeds shows the already confirmed state.
+ * `#`, checks the link, says what will start and confirms when the person presses Confirm. A confirm that succeeds hands the
+ * id and the secret that it answered to `onConfirmed`, which opens the progress page.
  */
 export function VerifyPage({
   locale,
   onLocaleChange,
+  documents,
+  onConfirmed,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
+  documents: SignUpDocuments | undefined
+  onConfirmed: (id: string, secret: string) => void
 }) {
   const t = useText()
   const { spacing } = useDesignTokens()
@@ -88,8 +93,8 @@ export function VerifyPage({
     try {
       const response = await postToken('/api/sign-up/confirm', token)
       if (response.ok) {
-        moveFocus.current = true
-        setPage({ state: 'confirmed' })
+        const { id, secret } = (await response.json()) as { id: string; secret: string }
+        onConfirmed(id, secret)
       } else if (response.status === 409) {
         // The link was used or expired while the page was open, so the page shows the state that the answer names.
         const { state } = (await response.json()) as { state: 'confirmed' | 'expired' }
@@ -103,7 +108,7 @@ export function VerifyPage({
     } finally {
       setConfirming(false)
     }
-  }, [token])
+  }, [token, onConfirmed])
 
   const title =
     page.state === 'confirmed'
@@ -113,7 +118,13 @@ export function VerifyPage({
         : t('signUp.verify.title')
 
   return (
-    <SignUpFrame locale={locale} onLocaleChange={onLocaleChange} title={title} titleRef={titleRef}>
+    <SignUpFrame
+      locale={locale}
+      onLocaleChange={onLocaleChange}
+      title={title}
+      titleRef={titleRef}
+      documents={documents}
+    >
       {page.state === 'checking' && (
         <Typography.Paragraph style={{ margin: 0 }}>{t('signUp.verify.checking')}</Typography.Paragraph>
       )}

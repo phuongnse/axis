@@ -1,6 +1,7 @@
 import { Button, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd'
 import { AxisAlert } from '../platform/AxisAlert'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, useEffect, useMemo, useState } from 'react'
+import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { diffPatch, setAt } from '../platform/jsonPatch'
 import {
@@ -21,6 +22,7 @@ import {
 import { useStudioConnection } from '../platform/studioConnection'
 import { useText } from '../platform/texts'
 import { expressionScope } from './expressionScope'
+import { ExpressionInput } from './SchemaForm'
 import { newGrant, newPolicy, ownGrantIndexes, targetActions } from './policyMatrixDraft'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
@@ -480,9 +482,8 @@ function OwnGrants({
             </Flex>
             {target.kind === 'entity' && (
               <>
-                <div>
-                  <Typography.Text type="secondary">{t('shell.studio.matrix.filter')}</Typography.Text>
-                  <Suspense
+                <AxisField label={t('shell.studio.matrix.filter')} help={t('shell.studio.matrix.filter.help')}>
+                  <ExpressionInput
                     fallback={
                       <Input aria-label={t('shell.studio.matrix.filter')} value={filter} readOnly aria-busy="true" />
                     }
@@ -497,8 +498,8 @@ function OwnGrants({
                       options={expressionScope('policy', draft, filterPath, names)}
                       onChange={(path, next) => edit(path, next)}
                     />
-                  </Suspense>
-                </div>
+                  </ExpressionInput>
+                </AxisField>
                 <Select
                   mode="multiple"
                   aria-label={t('shell.studio.matrix.fields')}

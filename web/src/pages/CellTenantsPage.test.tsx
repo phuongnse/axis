@@ -299,6 +299,38 @@ describe('CellTenantsPage', () => {
     expect(sent).toHaveLength(0)
   })
 
+  it('gives the tenant id, the application and the administrator their help', async () => {
+    stubCreate([])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+
+    expect(within(dialog).getByLabelText('Tenant ID')).toHaveAccessibleDescription(
+      '1 to 50 lower-case letters, digits and hyphens, such as acme.',
+    )
+    expect(within(dialog).getByLabelText('Application')).toHaveAccessibleDescription(
+      'The ID of an installed application template, such as approvals.',
+    )
+    expect(within(dialog).getByLabelText("Administrator's email")).toHaveAccessibleDescription(
+      "The tenant's first administrator, who gets an invitation at this address.",
+    )
+  })
+
+  it('says what to enter in each empty field and sends nothing', async () => {
+    const { sent } = stubCreate([])
+    const user = userEvent.setup()
+    renderPage()
+
+    const dialog = await openDialog(user)
+    await user.click(createButton(dialog))
+
+    expect(await within(dialog).findByText('Enter the tenant ID.')).toBeInTheDocument()
+    expect(within(dialog).getByText("Enter the application's ID.")).toBeInTheDocument()
+    expect(within(dialog).getByText("Enter the administrator's email.")).toBeInTheDocument()
+    expect(sent).toHaveLength(0)
+  })
+
   it('shows the title of a refusal in the open dialog', async () => {
     stubCreate([{ status: 409, body: { title: 'A tenant of the cell already has this id.' } }])
     const user = userEvent.setup()

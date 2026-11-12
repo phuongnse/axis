@@ -3,7 +3,8 @@ namespace Axis.Configuration.Storage;
 /// <summary>
 /// A change that an author describes in words, stored by the server and worked on by the agent host. The server
 /// inserts a row in the <c>planning</c> state and changes its state when the author approves, changes the plan or
-/// drops it. The agent host changes everything else.
+/// drops it. The publisher moves a <c>ready</c> row to <c>accepted</c> when the accept of its draft succeeds. The agent host
+/// changes everything else.
 /// </summary>
 public sealed class AuthoringRequest
 {
@@ -42,4 +43,7 @@ public sealed class AuthoringRequest
     public string? ClaimedBy { get; init; }
 
     public DateTimeOffset? ClaimedUntil { get; init; }
+
+    /// <summary>The agent host's refresh token for the author, encrypted with the tenant data key, or null when none is stored.</summary>
+    public byte[]? RefreshToken { get; init; }
 }

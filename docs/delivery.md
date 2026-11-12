@@ -20,13 +20,18 @@ Three actors take part in the work, the owner, the local agent session and NexKi
   owner merges hand-made pull requests, see [hand-made pull requests](#hand-made-pull-requests), and
   vouches with [`/nexkit trust`][nexkit-trust] for an issue that autopilot leaves alone, after reading
   it. NexKit mentions the owner when a run needs a person, through its `notify` setting.
+  The owner gets NexKit's command-line tool at the pinned release through NexKit's Claude Code plugin,
+  which `.claude/settings.json` offers when the owner trusts the folder, or with `pipx install` of
+  `nexkit_repository` at the tag that `nexkit_ref` names, as [NexKit's install steps][nexkit-install]
+  say. The plugin's skills are for a person's session, and NexKit's agents do not load them.
 - **The local agent session** works for the owner when the owner asks. It writes issues and their
   order, checks whether a milestone is ready and breaks it down, proposes changes to the NexKit
   settings as hand-made pull requests, runs design reviews and publishes the Design System artifact in
   Claude from the repository, as [design changes](#design-changes) describes. When the owner asks, it
   also lists what waits for the owner, merges by hand the conflicts in paths NexKit may not change, and
   makes the hand-made changes that a plan lists under *Needs a hand-made change*, opening their pull
-  requests. It asks the owner before it pushes, and it never approves or merges. Its runbooks are the
+  requests. It runs the command-line tool from its clone of NexKit at the pinned release. It asks the
+  owner before it pushes, and it never approves or merges. Its runbooks are the
   [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
   [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not review plans or merged
   pull requests, because NexKit's review stage does.
@@ -71,16 +76,18 @@ that holds it.
   shared mechanism and keeps its behaviour. Both go before the milestones' features, because every
   later issue is built with what they change, and a feature built first would add one more copy to
   move.
-- **A held issue waits for the owner.** An issue with the `on-hold` label, which the `labels` setting
-  makes a hold, gets no plan, no round and no merge until the label is removed. The owner holds an
-  issue to stop work on it without closing it. A [design issue](#design-changes) is held until its
-  review ends.
+- **A held issue waits for the owner.** An issue with the `on-hold` or the `hand-made` label, which the
+  `labels` setting makes holds, gets no plan, no round and no merge until the label is removed. The
+  owner holds an issue with `on-hold` to stop work on it without closing it, and a
+  [design issue](#design-changes) is held so until its review ends. `hand-made` holds an issue that a
+  [hand-made pull request](#hand-made-pull-requests) closes.
 - **Autopilot takes only trusted issues.** An issue is trusted when a person with write access opens
   it, or when NexKit's App opens it: for a failure of CI on `main`, a flaky test, a Dependabot advisory
-  or a part of a split. The docs audit's issues are trusted too, because autopilot's
-  [`trusted_workflows`][nexkit-workflow-issues] setting lists `docs-audit.yml`. NexKit checks that the
-  issue came from a run of that workflow on `main` that NexKit or a writer started, never a pull
-  request. Any other issue waits until the owner reads it and comments
+  or a part of a split. The issues of the docs audit and of CI's
+  [shard durations](development.md#shards) job are trusted too, because autopilot's
+  [`trusted_workflows`][nexkit-workflow-issues] setting lists the workflows of both. NexKit
+  checks that the issue came from a run of that workflow on `main` that NexKit or a writer started,
+  never a pull request. Any other issue waits until the owner reads it and comments
   [`/nexkit trust`][nexkit-trust] on it.
 - **Autopilot opens and takes an issue for each Dependabot advisory** of a high or critical alert,
   as [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees.
@@ -100,6 +107,11 @@ that holds it.
   tunes it, as [D144](decisions/d144-branches-need-not-be-up-to-date.md) agrees.
 - **A second Claude subscription takes over at the usage limit,** as the fallback agent in
   `agents`, so NexKit pauses only when both are at their limit.
+- **A run that stops on a transient error runs again after NexKit's waits,** its
+  [`retry`][nexkit-retry] setting, which Axis leaves at NexKit's default, so an outage of an outside
+  service delays a round and asks for the owner only when it outlasts the waits, as
+  [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
+  agrees.
 - **A parent issue closes when its last part does,** with `close_parent_issues` on.
 
 ### How pull requests merge
@@ -161,24 +173,35 @@ that holds it.
 - **A CI run on `main` always finishes.** A newer run replaces only one that is still waiting to
   start. On any other branch a newer push stops the older run.
 - **CI's jobs come from [NexKit's checks](#nexkits-checks):** each check, or `group` of checks, in
-  `.nexkit/config.json` is one parallel job that runs the check's commands with its timeout and
-  uploads its `results` folders as the artifact `test-results-<name>`. A run takes as long as its
-  slowest job, and adding, removing or resharding a check changes CI with it.
+  `.nexkit/config.json` is one parallel job, and a sharded check is one job per shard, named
+  `<name>-k`, as many as its count prints. Each job runs its commands with the check's timeout and
+  uploads its `results` folders as the artifact `test-results-<name>`. GitHub's artifact service fails
+  at times, so a failed upload does not fail a job whose checks passed: the checks alone decide the
+  job's result, and that job's results are then missing from NexKit's evidence and from the shard
+  durations. A run takes as long as its slowest job, and adding, removing or resharding a check
+  changes CI with it.
+- **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
+  no model refreshes the durations from the results of that run and the latest runs dispatched on `main`
+  before it, each entry the median of its measures. It opens or updates one `process` issue when the current
+  split of a durations file would run a shard past the shard budget and the new durations split it better, and opens
+  one for each test that alone passes the shard budget, as [the shards section](development.md#shards) says.
 
 ### NexKit's checks
 
 - **The checks run in parallel jobs,** with `parallel_checks` on: the build and lint share one job,
-  the group `build-lint`, and the unit tests, the smoke tests and each integration and E2E shard get
-  one each. A check round then takes about as long as its slowest job, instead of all of them in a
-  row. A check gets a job of its own when sharing one made that job the slowest, and the integration
-  and E2E suites are split into shards because one job for either came close to the check's
-  `timeout_minutes`. [CI on main](#ci-on-main) runs the same checks as jobs of the same names, so
-  NexKit matches a failed check with the CI job that failed on `main`.
+  the group `build-lint`, and the unit, integration, smoke and E2E tests get one per
+  shard, as many as their split counts up to its cap, as [the shards section](development.md#shards)
+  says. A check round then takes about as long as its slowest job, instead of all of them in a row. A
+  check gets a job of its own when sharing one made that job the slowest, and a suite splits into
+  shards so that no job comes close to the check's `timeout_minutes`. [CI on main](#ci-on-main) runs
+  the same count commands and checks as jobs of the same names, so NexKit matches a failed check with
+  the CI job that failed on `main`.
 - **The slow checks are marked `slow`, and the checks name their `results`,** so NexKit keeps what a
   failure needs: the JUnit files, and for E2E the logs and the Playwright traces.
 - **NexKit reads CI's evidence.** Its [`evidence`][nexkit-evidence] setting names the test result
-  artifacts of the CI and performance workflows, which hold the Playwright traces and
-  `error-context.md` files, so a fix sees why `main` failed.
+  artifacts of the CI and performance workflows, a sharded check's by one name ending in `*` for all
+  its shards. They hold the Playwright traces and `error-context.md` files, so a fix sees why `main`
+  failed.
 - **A check skips the suites that a change cannot affect,** so a round after a small change is short.
   A suite runs unless no file changed since the check last passed can affect it, and any doubt runs
   it. In the automatic review that brings a branch up to date, NexKit goes further: the smoke,
@@ -190,10 +213,15 @@ that holds it.
 - **The performance tests run on `main` only,** in the performance workflow, and neither in NexKit's
   checks nor in CI's integration jobs, because they depend on the runner's load, as
   [D97](decisions/d97-reliable-test-runs.md) says.
-- **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm and the Playwright
-  browsers. The entries are in NexKit's [`cache`][nexkit-caches] setting, and each workflow that runs
-  setup restores them with NexKit's cache action, which reads the same entries and saves them on
-  `main`. A change to what setup downloads changes the entries in a hand-made pull request.
+- **NexKit restores the dependency caches that CI on `main` saves:** NuGet, npm, the Playwright
+  browsers, the pinned chart tools and schemas of [setup](development.md#setup), the container images
+  of the integration, E2E and smoke checks, and the PostgreSQL tools layer of the
+  [smoke tests](development.md#smoke-tests). The entries are in NexKit's
+  [`cache`][nexkit-caches] setting, and each workflow that runs setup restores them with NexKit's cache
+  action, which reads the same entries and saves them on `main`. An entry's key files are the files
+  that pin what it holds, as
+  [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
+  agrees. A change to what setup downloads changes the entries in a hand-made pull request.
 
 ### Hand-made pull requests
 
@@ -209,6 +237,9 @@ that holds it.
   merges nothing there. The owner merges once both are green, with no admin bypass. The bypass is left
   for a pull request that needs the owner's code-owner review and that the owner opened, since GitHub
   does not let an author approve their own pull request.
+- **The issue it closes has the `hand-made` label,** a hold as [how issues run](#how-issues-run) says,
+  so autopilot plans nothing that a person makes. An issue opened for hand-made work gets it at once,
+  and the local agent session adds it when a plan finds a hand-made change. It stays after the merge.
 - **One that closes an issue carries the issue's labels and milestone.** NexKit sets them only on the
   pull requests it opens, so whoever opens a hand-made pull request sets them as they open it, the owner
   or the local agent session. One that closes no issue, such as a NexKit version bump, gets labels by the
@@ -268,8 +299,8 @@ follows NexKit's rules too. Axis adds these rules for writing it.
   notes never holds a follow-up. A change in a path NexKit may not change is an issue like any other:
   its plan lists the change under *Needs a hand-made change*, and the local agent session makes it as a
   [hand-made pull request](#hand-made-pull-requests) when the owner asks. A hand-made pull request that other work waits
-  for closes an issue of its own with the `on-hold` label, which [how issues run](#how-issues-run)
-  makes a hold, and the follow-ups are *blocked by* that issue.
+  for closes an issue of its own, with the `hand-made` label, and the follow-ups are *blocked by* that
+  issue.
 
 ## The life of a milestone
 
@@ -437,6 +468,7 @@ issues, pull requests and sub-issues.
   owner deletes them. A branch with an open pull request, or any other closed one that was not merged,
   stays.
 
+[nexkit-install]: https://github.com/phuongnse/nexkit/blob/main/README.md
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
 [nexkit-troubleshooting]: https://github.com/phuongnse/nexkit/blob/main/docs/troubleshooting.md
@@ -456,3 +488,4 @@ issues, pull requests and sub-issues.
 [nexkit-person-review]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#reviewing-your-own-pull-requests
 [nexkit-branches]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md#stages
 [nexkit-labels]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
+[nexkit-retry]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#transient-errors

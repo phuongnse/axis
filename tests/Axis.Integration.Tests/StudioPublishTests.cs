@@ -16,7 +16,6 @@ namespace Axis.Integration.Tests;
 /// The validate and publish routes of the authoring API store a snapshot of the folder as a publish request in the
 /// database of the host's tenant, and the publisher runs it. The server and the publisher run together here.
 /// </summary>
-[Collection("Test scenario runs")]
 public sealed class StudioPublishTests : IAsyncLifetime
 {
     internal const string HostA = "a.example.test";
@@ -370,7 +369,12 @@ public sealed class StudioPublishTests : IAsyncLifetime
     // Runs the publisher of one tenant in this process until it is disposed. The server has migrated the database by now.
     // With a previewConnectionString, it serves the tenant's preview tenant too.
     internal static RunningPublisher RunPublisher(
-        string tenant, string host, string connectionString, string? previewConnectionString = null, string? modulesPath = null)
+        string tenant,
+        string host,
+        string connectionString,
+        string? previewConnectionString = null,
+        string? modulesPath = null,
+        (string Folder, string RevisionsPath)? studio = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -399,6 +403,13 @@ public sealed class StudioPublishTests : IAsyncLifetime
         foreach (var (key, value) in CompanyBindings.Settings(tenant))
         {
             settings[key] = value;
+        }
+        // An accept request needs the application's folder, its revisions and the folder's write lock, which the server keeps in the same database.
+        if (studio is var (folder, revisionsPath))
+        {
+            settings["Studio:Folders:0"] = folder;
+            settings["Studio:RevisionsPath"] = revisionsPath;
+            settings["ConnectionStrings:Platform"] = PostgreSqlServer.RuntimeConnectionString(connectionString);
         }
         if (previewConnectionString is not null)
         {

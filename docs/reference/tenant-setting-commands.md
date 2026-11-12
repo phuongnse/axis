@@ -31,13 +31,13 @@ These rules hold for every command on this page unless its section says otherwis
 A tenant's [deployment bindings](integration-resources.md#deployment-bindings) hold the values that
 its releases resolve at run time: URLs, storage and secrets. These commands list and change them.
 
-| Command                                              | What it does                                                                                                                                                                                                 |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tenant binding list <id>`                           | Prints a table of each binding's name, kind and value, ordered by name. It also lists a tenant that is still `provisioning`.                                                                                |
-| `tenant binding set <id> <name> --url <value>`       | Adds or replaces a `url` binding. The value is an absolute `http` or `https` URL.                                                                                                                            |
-| `tenant binding set <id> <name> --storage database`  | Adds or replaces a `storage` binding. Its only value is `database`, and any other value exits with code 2 and writes nothing, not even an audit record.                                                      |
-| `tenant binding set <id> <name> --secret`            | Adds or replaces a `secret` binding. The value comes from `AXIS_BINDING_SECRET`, or from standard input when the variable is not set.                                                                        |
-| `tenant binding remove <id> <name>`                  | Removes a binding. A binding that does not exist exits with code 2.                                                                                                                                          |
+| Command                                             | What it does                                                                                                                                            |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tenant binding list <id>`                          | Prints a table of each binding's name, kind and value, ordered by name. It also lists a tenant that is still `provisioning`.                            |
+| `tenant binding set <id> <name> --url <value>`      | Adds or replaces a `url` binding. The value is an absolute `http` or `https` URL.                                                                       |
+| `tenant binding set <id> <name> --storage database` | Adds or replaces a `storage` binding. Its only value is `database`, and any other value exits with code 2 and writes nothing, not even an audit record. |
+| `tenant binding set <id> <name> --secret`           | Adds or replaces a `secret` binding. The value comes from `AXIS_BINDING_SECRET`, or from standard input when the variable is not set.                   |
+| `tenant binding remove <id> <name>`                 | Removes a binding. A binding that does not exist exits with code 2.                                                                                     |
 
 - **What the list shows.** A `url` binding shows its URL and a `storage` binding its value, `database`.
   A `secret` binding shows `(hidden)` when it has a value and `(not set)` when it has none, never the
@@ -63,13 +63,13 @@ its releases resolve at run time: URLs, storage and secrets. These commands list
 `tenant oidc set <id>` changes how a main tenant's server signs people in: the audiences it accepts,
 the sign-in profile and the client keys. It takes one or more of these options:
 
-| Option                         | Meaning                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
-| `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
-| `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](fapi2-profile.md)                      |
-| `--client-key`                 | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
-| `--retire-client-key <kid>`    | Removes the client key with that key id                                                       |
+| Option                        | Meaning                                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------------------- |
+| `--endpoint-audience <value>` | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it   |
+| `--service-audience <value>`  | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it  |
+| `--profile standard\|fapi2`   | The sign-in profile, see [FAPI 2.0 profile](fapi2-profile.md)                                   |
+| `--client-key`                | Adds a client key for `private_key_jwt`, as a PEM from `AXIS_OIDC_CLIENT_KEY` or standard input |
+| `--retire-client-key <kid>`   | Removes the client key with that key id                                                         |
 
 A successful run prints `<id> oidc ok`. With `--client-key` it then prints `<id> client-key <kid>`
 and the public key as a PEM.
@@ -140,19 +140,19 @@ and the public key as a PEM.
 tenant directory: whether the accounts of the tenant's realm may sign in, and the brokered providers that the home
 page, Studio and the operator console accept.
 
-| Option                         | Meaning                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `--accounts true\|false`       | Whether realm accounts may sign in. Required, once                                                                   |
-| `--provider <name>`            | Starts one brokered provider. The options below belong to the provider that came last                                |
-| `--type oidc\|saml`            | The provider's type. Required                                                                                        |
-| `--issuer <binding>`           | `oidc`: the binding that holds the issuer. Required                                                                  |
-| `--client-id <binding>`        | `oidc`: the binding that holds the client id. Required                                                               |
-| `--client-secret <binding>`    | `oidc`: the binding that holds the client secret. Exactly one of this and `--client-key`                             |
-| `--client-key <binding>`       | `oidc`: the binding that holds the client key. Exactly one of this and `--client-secret`                             |
-| `--metadata <binding>`         | `saml`: the binding that holds the metadata. Required. An `oidc` provider takes none                                 |
-| `--claim <name>=<claim>`       | The provider's claim for `displayName`, `email` or `locale`. May repeat                                              |
-| `--roles-claim <claim>`        | The claim that holds the person's roles                                                                              |
-| `--role <value>=<role>`        | Maps a value of the roles claim to `author`, `publisher`, `operator` or `administrator`. May repeat                  |
+| Option                      | Meaning                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------- |
+| `--accounts true\|false`    | Whether realm accounts may sign in. Required, once                                                  |
+| `--provider <name>`         | Starts one brokered provider. The options below belong to the provider that came last               |
+| `--type oidc\|saml`         | The provider's type. Required                                                                       |
+| `--issuer <binding>`        | `oidc`: the binding that holds the issuer. Required                                                 |
+| `--client-id <binding>`     | `oidc`: the binding that holds the client id. Required                                              |
+| `--client-secret <binding>` | `oidc`: the binding that holds the client secret. Exactly one of this and `--client-key`            |
+| `--client-key <binding>`    | `oidc`: the binding that holds the client key. Exactly one of this and `--client-secret`            |
+| `--metadata <binding>`      | `saml`: the binding that holds the metadata. Required. An `oidc` provider takes none                |
+| `--claim <name>=<claim>`    | The provider's claim for `displayName`, `email` or `locale`. May repeat                             |
+| `--roles-claim <claim>`     | The claim that holds the person's roles                                                             |
+| `--role <value>=<role>`     | Maps a value of the roles claim to `author`, `publisher`, `operator` or `administrator`. May repeat |
 
 A successful run prints `<id> sign-in ok`. The options are named after the fields of the
 [`identityProvider` resource](identity-provider.md#identity-provider-resource), and the per-type rules are those of the
@@ -203,14 +203,14 @@ resource.
 through it, and the settings replace the host's `Email` settings as a whole, see
 [mail settings](notifications.md#mail-settings).
 
-| Option                  | Meaning                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------- |
-| `--host <host>`         | The SMTP server. Required                                                        |
-| `--from <address>`      | The sender address of every email. Required                                      |
-| `--port <n>`            | The SMTP port, 1 to 65535. The default is 587                                    |
-| `--tls true\|false`     | Whether to encrypt the connection. The default is `true`                         |
-| `--user-name <name>`    | The user to sign in as. Without it the worker sends without signing in           |
-| `--password`            | The password of the user, from `AXIS_SMTP_PASSWORD` or standard input            |
+| Option               | Meaning                                                                |
+| -------------------- | ---------------------------------------------------------------------- |
+| `--host <host>`      | The SMTP server. Required                                              |
+| `--from <address>`   | The sender address of every email. Required                            |
+| `--port <n>`         | The SMTP port, 1 to 65535. The default is 587                          |
+| `--tls true\|false`  | Whether to encrypt the connection. The default is `true`               |
+| `--user-name <name>` | The user to sign in as. Without it the worker sends without signing in |
+| `--password`         | The password of the user, from `AXIS_SMTP_PASSWORD` or standard input  |
 
 `tenant email clear <id>` removes the tenant's own settings, so the tenant uses the host's again. A
 successful run of either command prints `<id> email ok`.
@@ -470,23 +470,23 @@ A command writes its record either when its work for a tenant starts or together
   it. The line is `<tenant> audit failed: <message>`, and the command exits `1`. The other tenants of
   `migrate` and `activate` go on. A record that is written prints no line.
 
-| Command                                                                                                                         | When                                                                                                  | `changed`                                                                                                        |
-| ------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `tenant create`, `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant backup`, `tenant restore`, `migrate`, `activate` | When the work starts. `tenant backup` writes one because an archive holds a tenant's data             | Empty, because the command already says what changed                                                             |
-| `tenant rotate-passwords`                                                                                                       | When the work starts                                                                                  | Both roles, `axis_<id>_runtime` and `axis_<id>_schema`, never a password                                         |
-| `tenant oidc set`                                                                                                               | After its checks and before the change                                                                | The [settings](#sign-in-settings) it was given and the client key ids, never a value                             |
-| `tenant session end`                                                                                                            | After its checks and before the delete                                                                | `user:<user>` or `all`                                                                                           |
-| `tenant data-key rotate`                                                                                                        | Before it adds the keys                                                                               | `data_key:<n>` and `lookup_key:<k>`, the numbers it adds                                                         |
-| `tenant data-key retire`                                                                                                        | After its count passes and before the delete. A refused run, and one with nothing to delete, write none | `data_key:<i>` and `lookup_key:<j>` for each key it deletes                                                    |
-| `tenant sign-in set`                                                                                                            | With the change                                                                                       | `accounts`, then `provider:<name>` for each provider, never a value                                              |
-| `tenant binding set`, `tenant binding remove`                                                                                   | With the change                                                                                       | `binding:<name>`                                                                                                 |
-| `tenant host add`, `tenant host remove`                                                                                         | With the change                                                                                       | `host:<host>`, and `site:<path>` for a site's host                                                               |
-| `tenant host move`                                                                                                              | With the change, one record on the target tenant                                                      | `host:<host>` and `from:<source id>`                                                                             |
-| `tenant email set`, `tenant email clear`                                                                                        | With the change                                                                                       | The [mail settings](#mail-settings) it was given, or `email`                                                     |
-| `tenant legal set`, `tenant legal clear`                                                                                        | With the change                                                                                       | The [legal links](#legal-links) options it was given, or `legal`, then `site:<path>` with `--site`               |
-| `platform rekey`                                                                                                                | One per run, with no tenant, after every value has decrypted and before the first update             | `tenant secrets: <n>` and `data protection keys: <m>`                                                            |
-| `cell backup`, `cell restore-check`, `cell operator invite`                                                                     | See [cell backup](administration.md#cell-backup), [cell restore check](administration.md#cell-restore-check) and [cell operator invite](administration.md#cell-operator-invite) | As those sections say |
-| `tenant list`, `tenant binding list`, `version`, `publisher`                                                                    | None of their own                                                                                     |                                                                                                                  |
+| Command                                                                                                                          | When                                                                                                                                                                            | `changed`                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `tenant create`, `tenant suspend`, `tenant resume`, `tenant read-only`, `tenant backup`, `tenant restore`, `migrate`, `activate` | When the work starts. `tenant backup` writes one because an archive holds a tenant's data                                                                                       | Empty, because the command already says what changed                                               |
+| `tenant rotate-passwords`                                                                                                        | When the work starts                                                                                                                                                            | Both roles, `axis_<id>_runtime` and `axis_<id>_schema`, never a password                           |
+| `tenant oidc set`                                                                                                                | After its checks and before the change                                                                                                                                          | The [settings](#sign-in-settings) it was given and the client key ids, never a value               |
+| `tenant session end`                                                                                                             | After its checks and before the delete                                                                                                                                          | `user:<user>` or `all`                                                                             |
+| `tenant data-key rotate`                                                                                                         | Before it adds the keys                                                                                                                                                         | `data_key:<n>` and `lookup_key:<k>`, the numbers it adds                                           |
+| `tenant data-key retire`                                                                                                         | After its count passes and before the delete. A refused run, and one with nothing to delete, write none                                                                         | `data_key:<i>` and `lookup_key:<j>` for each key it deletes                                        |
+| `tenant sign-in set`                                                                                                             | With the change                                                                                                                                                                 | `accounts`, then `provider:<name>` for each provider, never a value                                |
+| `tenant binding set`, `tenant binding remove`                                                                                    | With the change                                                                                                                                                                 | `binding:<name>`                                                                                   |
+| `tenant host add`, `tenant host remove`                                                                                          | With the change                                                                                                                                                                 | `host:<host>`, and `site:<path>` for a site's host                                                 |
+| `tenant host move`                                                                                                               | With the change, one record on the target tenant                                                                                                                                | `host:<host>` and `from:<source id>`                                                               |
+| `tenant email set`, `tenant email clear`                                                                                         | With the change                                                                                                                                                                 | The [mail settings](#mail-settings) it was given, or `email`                                       |
+| `tenant legal set`, `tenant legal clear`                                                                                         | With the change                                                                                                                                                                 | The [legal links](#legal-links) options it was given, or `legal`, then `site:<path>` with `--site` |
+| `platform rekey`                                                                                                                 | One per run, with no tenant, after every value has decrypted and before the first update                                                                                        | `tenant secrets: <n>` and `data protection keys: <m>`                                              |
+| `cell backup`, `cell restore-check`, `cell operator invite`                                                                      | See [cell backup](administration.md#cell-backup), [cell restore check](administration.md#cell-restore-check) and [cell operator invite](administration.md#cell-operator-invite) | As those sections say                                                                              |
+| `tenant list`, `tenant binding list`, `version`, `publisher`                                                                     | None of their own                                                                                                                                                               |                                                                                                    |
 
 The publisher and the server also write records for the operator's work in a cell:
 
@@ -500,7 +500,7 @@ The publisher and the server also write records for the operator's work in a cel
 - **Quotas.** The quotas route of the provisioning API, `PUT /api/cell/tenants/{id}/quotas`, writes
   `tenant quotas set` in one transaction with the quota rows, with the quota keys it was given in
   `changed`.
-- **The actor of a quota change** _(planned for M31)_. The record of the quotas route names the operator
+- **The actor of a quota change** _(planned for M33)_. The record of the quotas route names the operator
   or the machine caller as its actor.
 - **Export downloads.** The exports route, `GET /api/cell/tenants/{id}/exports/{exportId}`, and the
   tenant administrator's route, `GET /api/tenant/exports/{exportId}`, write `tenant export download`
@@ -513,3 +513,11 @@ The publisher and the server also write records for the operator's work in a cel
   `tenant model-key remove` in one transaction with the change, with the administrator as actor and
   `modelKey` in `changed`, never the key. A remove with no key writes none. See
   [the tenant's model key](user-administration.md#the-tenants-model-key).
+- **Outside clients.** `PUT /api/tenant/outside-clients` writes `tenant outside-clients set` in one transaction with the
+  change, with the administrator as actor and `outsideClients` and `allowedClients` in `changed`, never a client id. Each
+  accepted `PUT` writes one, also when the values are unchanged. See
+  [outside MCP clients](user-administration.md#outside-mcp-clients).
+- **Connected app revokes.** `POST /api/tenant/connected-apps/{clientId}/revoke` writes `tenant connected-app revoke` after
+  the consents are deleted, with the administrator as actor and `consent` in `changed`, never a client id. A revoke that
+  fails at the identity provider writes none, and the repeat that finishes it writes one. See
+  [outside MCP clients](user-administration.md#outside-mcp-clients).

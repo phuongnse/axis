@@ -108,6 +108,41 @@
       "en": "billing portal",
       "vi": "trang thanh toán",
       "status": "proposed"
+    },
+    {
+      "concept": "Model key",
+      "en": "model key",
+      "vi": "khóa mô hình AI",
+      "status": "proposed",
+      "note": "A tenant's own key for the AI model provider, set on the users page."
+    },
+    {
+      "concept": "MCP client",
+      "en": "MCP client",
+      "vi": "ứng dụng khách MCP",
+      "status": "proposed",
+      "note": "A program outside Axis that connects to the MCP server, such as an AI assistant."
+    },
+    {
+      "concept": "Consent",
+      "en": "consent",
+      "vi": "chấp thuận",
+      "status": "proposed",
+      "note": "A person's agreement that an MCP client may act for them."
+    },
+    {
+      "concept": "Connected apps",
+      "en": "Connected apps",
+      "vi": "Ứng dụng đã kết nối",
+      "status": "proposed",
+      "note": "The users page tab where an administrator chooses which outside MCP clients may connect."
+    },
+    {
+      "concept": "Action: Revoke (consent)",
+      "en": "Revoke",
+      "vi": "Thu hồi",
+      "status": "proposed",
+      "note": "Removes every person's consent to an MCP client."
     }
   ]
 }

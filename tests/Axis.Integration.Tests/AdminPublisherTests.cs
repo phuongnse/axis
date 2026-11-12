@@ -17,7 +17,6 @@ using static Axis.Integration.Tests.Polling;
 
 namespace Axis.Integration.Tests;
 
-[Collection("Test scenario runs")]
 public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";

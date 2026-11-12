@@ -54,7 +54,9 @@ namespace Axis.Admin;
 /// then a <c>test</c> step with the application's own test scenarios, in the same way and with the same limit as a <c>test</c>
 /// request, except that a stop never cuts them short. Only then does it write the changed files and commit one revision, and on any
 /// failure the folder and <c>main</c> stay as they were. It stores the outcomes of the scenarios on the request, the contract
-/// scenarios first. It has no audit record.
+/// scenarios first. When an accept succeeds, it moves the <c>ready</c> authoring request of the draft to <c>accepted</c>, erases that
+/// request's refresh token and writes <c>authoringRequest.accepted</c>, in the transaction that ends the request, see
+/// <see href="docs/reference/authoring-requests.md#accepting">accepting</see>.
 /// The first four kinds share one queue for each application, oldest first. The <c>test</c> requests form a queue of their
 /// own for each application, and run in a second loop of this process, so a long test holds up no publish and a publish holds
 /// up no test. While a request runs,
@@ -838,7 +840,7 @@ internal sealed class Publisher(
     }
 
     // The final status, the diagnostics and the audit record commit together, so a request never ends without its record. A
-    // validate has no audit record. A publisher that lost its claim changes nothing and writes no record.
+    // validate has no release audit record. A publisher that lost its claim changes nothing and writes no record.
     private async Task FinishAsync(string tenantId, ITenantConnections connections, ClaimedRequest request, ReleaseRun run, List<Diagnostic> diagnostics, bool audit, string? scenarioResults = null)
     {
         var connection = await connections.SchemaConnectionAsync();
@@ -867,7 +869,44 @@ internal sealed class Publisher(
             await AppendAuditAsync(transaction, request.Kind, request.Id, request.ApplicationId, request.RequestedBy, run.Succeeded, ReleaseOf(request, run));
         }
 
+        if (request.Kind == "accept" && run.Succeeded && request.DraftId is { } draft)
+        {
+            await MoveAuthoringRequestsAsync(transaction, request.ApplicationId, draft);
+        }
+
         await transaction.CommitAsync();
+    }
+
+    // A successful accept ends the authoring request of its draft, whatever the client of the accept. It keeps the claim of the agent host, so the commit
+    // of the host's accept step still finds it. See docs/reference/authoring-requests.md#accepting.
+    private static async Task MoveAuthoringRequestsAsync(NpgsqlTransaction transaction, Guid applicationId, Guid draftId)
+    {
+        var moved = new List<(Guid Id, string Author)>();
+        await using (var command = new NpgsqlCommand(
+            """
+            UPDATE axis.authoring_requests
+            SET state = 'accepted', finished_at = now(), refresh_token = NULL
+            WHERE application_id = @application AND draft_id = @draft AND state = 'ready'
+            RETURNING id, author
+            """,
+            transaction.Connection,
+            transaction))
+        {
+            command.Parameters.AddWithValue("application", applicationId);
+            command.Parameters.AddWithValue("draft", draftId);
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                moved.Add((reader.GetGuid(0), reader.GetString(1)));
+            }
+        }
+
+        foreach (var (id, author) in moved)
+        {
+            await AuditRecords.AppendAsync(
+                transaction,
+                new AuditEntry(author, AuditActions.AuthoringRequestAccepted, applicationId, null, null, null, new JsonObject { ["requestId"] = id.ToString("D") }));
+        }
     }
 
     // An activate names its release from the start, so a failed one still has it. A publish has it once it is compiled.

@@ -35,7 +35,8 @@ import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
-import { buildImage } from './lib/docker-build.mjs'
+import { listedImage } from './lib/docker-images.mjs'
+import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -116,7 +117,7 @@ const openToAll = (dir) => {
 const render = (extraFiles = []) => {
   const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost, ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_IDENTITY_HOST', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
-  for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
+  for (const name of Object.keys(env)) if (name.startsWith('Studio__') || name.startsWith('Ai__')) delete env[name]
   const rendered = spawnSync(
     'docker',
     ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'replicas', 'config', '--format', 'json'],
@@ -417,6 +418,20 @@ describe('the TLS proxy', () => {
   })
 })
 
+describe('the tenant model key setting', () => {
+  test('both servers and the agent host take Ai__AllowTenantKeys from the shell, and no other host does', () => {
+    const { services } = render()
+    for (const name of ['server', 'server-2', 'agent']) {
+      assert.ok(Object.hasOwn(services[name].environment, 'Ai__AllowTenantKeys'), `${name} has no Ai__AllowTenantKeys`)
+      const value = services[name].environment.Ai__AllowTenantKeys
+      assert.ok(value === null || value === undefined || value === '', `${name} sets Ai__AllowTenantKeys`)
+    }
+    for (const name of ['worker', 'publisher', 'admin']) {
+      assert.equal(services[name].environment?.Ai__AllowTenantKeys, undefined, `${name} has Ai__AllowTenantKeys`)
+    }
+  })
+})
+
 describe('the Studio folder', () => {
   test('only the servers and the publisher mount the Studio folder, read-write, and Studio is off without shell values', () => {
     const { services } = render()
@@ -450,7 +465,7 @@ describe('the Studio folder', () => {
 
 describe('the on-premises installation', () => {
   const project = `axis-onprem-${process.pid}`
-  const version = `0.0.0-onprem.${process.pid}`
+  let version
   let folder
   let env
   let serverPort
@@ -676,8 +691,8 @@ describe('the on-premises installation', () => {
       const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
       assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
 
-      // Step 1, the images. The four targets are tagged with the version that compose.yaml requires.
-      for (const target of targets) await buildImage({ target, version, tag: `${target}:${version}` })
+      // Step 1, the images. scripts/smoke.sh built the four targets with the version that compose.yaml requires.
+      version = smokeImages(targets)
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
       const secrets = join(folder, 'secrets')
@@ -822,7 +837,7 @@ describe('the on-premises installation', () => {
         JSON.stringify({
           services: {
             postgres: {
-              image: 'postgres:18-alpine',
+              image: listedImage(root, 'postgres'),
               environment: { POSTGRES_USER: 'postgres', POSTGRES_PASSWORD: passwords.postgres },
               entrypoint: ['sh', '-c', postgresTlsScript],
               volumes: [
@@ -874,7 +889,6 @@ describe('the on-premises installation', () => {
   after(() => {
     compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,replicas' } })
     if (folder) rmSync(folder, { recursive: true, force: true })
-    for (const target of targets) docker(['rmi', '-f', `${target}:${version}`], { stdio: 'ignore' })
   })
 
   test('the guide installs two tenants and serves them', { timeout }, async () => {

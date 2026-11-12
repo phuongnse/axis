@@ -273,6 +273,8 @@ builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
 builder.Services.AddScoped<SiteSignIn>();
+builder.Services.AddSingleton<SessionTokens>();
+builder.Services.AddSingleton<IAuthorTokenExchange, AuthorTokenExchange>();
 builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
 builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 
@@ -387,6 +389,7 @@ sessions.MapCellEndpoints();
 sessions.MapTenantExportEndpoints();
 sessions.MapTenantUsageEndpoints();
 sessions.MapTenantModelKeyEndpoints();
+sessions.MapTenantOutsideClientsEndpoints();
 
 // An /api path that matches no route answers a 404 problem, never the SPA's page. GET and HEAD only, as the SPA fallback,
 // so a wrong method on a real route still answers 405. It is a request delegate, because the Request Delegate Generator

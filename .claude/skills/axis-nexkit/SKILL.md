@@ -46,7 +46,7 @@ says.
   default, from its configuration doc at the pinned ref.
 
   ```bash
-  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('parallel_checks', 'fix', 'merge', 'conflicts', 'usage_limit', 'close_parent_issues', 'autopilot', 'notify')}, indent=1))"
+  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('parallel_checks', 'fix', 'merge', 'conflicts', 'usage_limit', 'retry', 'close_parent_issues', 'autopilot', 'notify')}, indent=1))"
   python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('default_profile', 'profiles', 'cache')}, indent=1))"
   ```
 
@@ -78,12 +78,14 @@ marks between issues, in NexKit's `request` skill.
 4. Mark what it waits for, as NexKit's `request` skill says, before the next
    sweep, or autopilot plans it at once. A milestone's journey gets the
    `journey` label and its docs sweep the `docs-sweep` label, with no
-   *blocked by* marks: the journey waits for every other issue of its
-   milestone, and the sweep for the journey too, also those opened later. A
-   `bug` issue goes first, as [how issues run](../../../docs/delivery.md#how-issues-run)
+   *blocked by* marks, and [how issues run](../../../docs/delivery.md#how-issues-run)
+   says when each one starts. A `bug` issue goes first, as the same section
    says. A follow-up is an issue from the start, blocked by the work it waits
    for: [the life of an issue](../../../docs/delivery.md#the-life-of-an-issue)
-   gives the rule.
+   gives the rule. An issue for a hand-made pull request gets the `hand-made`
+   label, not `on-hold`, as
+   [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
+   says.
 
 ## Breaking down a milestone
 
@@ -121,6 +123,8 @@ Upgrading is rare. Follow [upgrading-nexkit.md](upgrading-nexkit.md).
 
 ## Hand merges and hand-made changes
 
-When the owner asks you to look at a stopped issue, read `nexkit status` and
-NexKit's troubleshooting doc at the pinned ref. For a hand merge or a
+When the owner asks you to look at a stopped issue, run
+`python3 "$KIT/bin/nexkit" status` from the clone in
+[Where the values live](#where-the-values-live) and read NexKit's
+troubleshooting doc at the pinned ref. For a hand merge or a
 hand-made change, follow [hand-made-changes.md](hand-made-changes.md).

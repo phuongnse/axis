@@ -7,8 +7,6 @@ tell people what comes next.
 
 ## One clock
 
-_(planned for M33)_
-
 One state machine in the control plane owns every date of a subscription, and the cell knows no
 commerce.
 
@@ -20,35 +18,87 @@ commerce.
   and a deletion. A cell never counts days for billing.
 - **Runs as jobs.** A job checks each subscription's next date every hour, so a restart or an outage
   delays a step and never skips one. Every change of state writes an audit record.
+- **The `control_plane.subscriptions` table.** `id`, `tenant_id`, `sign_up_id`, `state` (`trialing`,
+  `active`, `pastDue`, `readOnly`, `cancelled`, `deleting` or `deleted`), `trial_ends_at`, `next_at`, `step_id`, `plan_code`,
+  `plan_version`, `currency` (`VND` or `USD`), `period` (`month` or `year`), `period_ends_at` and `created_at`. The
+  plan, currency and period are empty until a plan is bought, see
+  [the catalogue](plans.md#the-catalogue). `period_ends_at` is the end of the current paid period,
+  which is the start of the next one, and it is empty until the first paid period starts. A
+  subscription with a `period_ends_at` is a paid tenant. The [period invoice job](payments.md#invoices) reads it and never writes it. The currency is fixed once the subscription has a ledger
+  entry, see [invoices](payments.md#invoices). A [confirmed sign-up](sign-up.md#the-verify-page) starts the subscription as `trialing`, with the
+  trial ending 30 days later, and writes the first audit record with the sign-up as actor. A tenant
+  has one subscription that is not `deleted`. `next_at` is the date of the next move, and it is empty
+  once the subscription is `deleted`. The dates come from the control plane's clock.
+- **The hourly job.** The recurring job `advanceSubscriptions` makes one move for each subscription
+  that is due, oldest first, and never two for one subscription in a run. A subscription is due when
+  its `next_at` has passed. An `active` one is due when its `period_ends_at` has passed or when an
+  open invoice is a day past its due date, and `next_at` does not decide it. The job finds the
+  tenant's cell in the [region directory](region-directory.md). A move calls the cell, follows its
+  job, and then commits the new state, the next date and one audit record in one transaction, with
+  the job as actor. The `active` to `pastDue` move calls no cell. The wait in `readOnly` is 30 days
+  after a trial and 90 days for a paid tenant. It counts from the run that made the tenant
+  read-only, and so do the 14 days of `pastDue`, so a late run delays the next step and never
+  shortens the wait. After its moves, the run queues the due [emails](#emails).
+- **The period moves forward.** At the end of an `active` subscription's period, the job sets
+  `period_ends_at` and `next_at` one month or one year later. It does this once, writes no audit
+  record, makes no cell call and keeps the step id. When an invoice is also overdue, the move to
+  `pastDue` comes first and the period stays.
+- **A failed call is retried.** A call to the cell that fails, or a job that does not end in time,
+  leaves the subscription as it was. The run goes on with the others and then fails, so the job queue
+  retries it. Every cell call of a move carries the idempotency key `<operation>:<step id>`. The step
+  id is new each time a move commits, so a retry of the same move gets the cell's first job, and a
+  later move gets a new key.
+- **The operator can extend a trial.** [`trial extend`](control-plane.md#operators) adds days to the
+  trial end and the next date of a `trialing` subscription. The email windows follow the new end,
+  and an email that is already queued is not sent again.
+- **History is the audit records.** Each move writes the action `subscription.<new state>` with the
+  subscription as its subject, and an operator's extension writes `subscription.trialExtended`. The
+  table keeps no history of its own.
+- **`deleting` ends when the cell lets the tenant go.** While `deleting`, each hourly run reads
+  `GET /api/cell/tenants/{id}`. A `404` means the cell purged the tenant after its grace, and the
+  subscription is `deleted`. So does a tenant whose row the [region directory](region-directory.md)
+  dropped after the purge. The control plane does not count the grace.
+- **A cancelled deletion.** When the cell reports a status other than `deleting`, an operator
+  cancelled the deletion. The control plane resumes the tenant if it is suspended, makes it
+  read-only, and sets the subscription back to `readOnly` with a new 30-day wait.
 
 ## States
-
-_(planned for M33)_
 
 A subscription is in one of these states, and each state says how the tenant works.
 
 | State | The tenant | Next |
 | --- | --- | --- |
 | `trialing` | Works, with the trial's quotas | `active` on the first payment, `readOnly` at the trial's end |
-| `active` | Works, with the plan's quotas | `pastDue` when an invoice is unpaid on its due date |
-| `pastDue` | Works, with a banner to pay | `active` on payment, `readOnly` after 14 days of grace |
+| `active` | Works, with the plan's quotas | `pastDue` a day after an invoice's due date, when it is unpaid |
+| `pastDue` | Works, with the plan's quotas | `active` on payment, `readOnly` after 14 days of grace |
 | `readOnly` | Read-only, see [the read-only tenant](#the-read-only-tenant) | `active` on payment, `deleting` after its wait |
 | `cancelled` | Works until the paid period ends | `readOnly` at the period's end |
 | `deleting` | Suspended, in the cell's grace window | `deleted` after the window, `readOnly` if the operator cancels the deletion |
 | `deleted` | Gone | — |
 
-- **Paid states** _(planned for M34)_. `active`, `pastDue` and `cancelled`, and every move on a
-  payment, come with paid plans.
-- **Paying ends any wait** _(planned for M34)_. A payment in `pastDue` or `readOnly` makes the
-  subscription `active` again at once: the control plane resumes the tenant and writes the plan's
-  quotas.
+- **Paid states.** The hourly job makes the moves of `active`, `pastDue` and `cancelled` that need
+  no payment, see [the hourly job](#one-clock). `pastDue` ends in `readOnly` after 14 days, and
+  `cancelled` ends in `readOnly` at the period's end. The end of each `active` period moves
+  `period_ends_at` forward one period.
+- **A banner to pay** _(planned for M34)_. A `pastDue` tenant sees a banner that asks the owner to pay.
+- **Paying starts the paid period.** A trial paid early keeps its tenant and its records, and its
+  first paid period starts at the trial's end, so the payment sets `period_ends_at` one period
+  later. A trial that ended unpaid and is then paid starts its period at the payment.
+- **A payment in `pastDue` also moves the period forward** _(planned for M34)_. A late payer's next
+  period then starts from the payment.
+- **Paying ends any wait.** A payment that settles its invoice and leaves no open invoice past its
+  due date makes a `trialing`, `pastDue` or `readOnly` subscription `active` at once, in the
+  payment's own transaction. The move writes the audit record `subscription.active`, with the
+  webhook as its actor, and queues `writeQuotas`, so the tenant gets the plan's quotas. From
+  `pastDue` or `readOnly` it also queues `resumeTenant`, which calls the cell's resume with the key
+  `resume:<step id>`. The job queue retries a failed call with the same key. The job does nothing
+  once a later move has changed the step id. A part payment changes no state: the subscription moves
+  when a later payment completes the invoice.
 - **Cancelling** _(planned for M34)_. The owner cancels in the [billing portal](billing-portal.md).
   The tenant keeps working to the end of the paid period, then follows the same path as an unpaid
   one.
 
 ## The timeline
-
-_(planned for M33)_
 
 The days count from the trial's end or from a missed payment, and the cell's 7-day deletion grace
 comes after them.
@@ -58,13 +108,14 @@ comes after them.
 | Trial day 23, or 7 days before the due date | Email: 7 days left | Email: invoice due in 7 days |
 | Trial day 29, or 1 day before | Email: 1 day left | Email: invoice due tomorrow |
 | Trial day 30, or the due date | `readOnly`, email | Email: due today; `pastDue` the next day |
-| Due date + 14 | — | `readOnly`, email |
+| Due date + 15 | — | `readOnly`, 14 days after `pastDue` |
 | 7 days before the deletion | Email: deletion in 7 days, export now | Same |
 | 30 days in `readOnly` for a trial, 90 for a paid tenant | `deleting`: the control plane calls `DELETE /api/cell/tenants/{id}` | Same |
 | 7 days later | The cell purges the tenant, see [deleting a tenant](tenant-lifecycle.md#deleting-a-tenant) | Same |
 
-- **A paid tenant's timeline** _(planned for M34)_. The column of a paid tenant that stops paying
-  comes with paid plans.
+- **The emails.** The emails of the rows above, see [emails](#emails).
+- **A paid tenant's reminder emails** _(planned for M34)_. The emails in the column of a paid tenant
+  that stops paying come with paid plans.
 - **Export until the deletion.** While `readOnly`, a tenant administrator exports the data from the
   application, see
   [exports by an administrator](tenant-lifecycle.md#exports-by-a-tenant-administrator). During the
@@ -99,18 +150,35 @@ and `POST /api/cell/tenants/{id}/read-only` set and `resume` clears.
 
 ## Emails
 
-_(planned for M33)_
-
 The control plane emails the people of a subscription before each step, so nobody is surprised by
 one.
 
 - **Who gets them.** Every administrator of the tenant, read through
-  `GET /api/cell/tenants/{id}/administrators`, and every
-  [billing contact](billing-portal.md#people) of the subscription, each once.
-- **From where.** The control plane's own mail domain, in the subscription's language, see
-  [its own work](control-plane.md#its-own-work).
+  `GET /api/cell/tenants/{id}/administrators`, and the person who signed up, the first
+  [owner](billing-portal.md#people), each address once. The deletion's email goes to the owner only,
+  because the cell has purged the tenant and its administrators by then.
+- **Other owners and billing contacts** _(planned for M34)_. The other owners and billing contacts of
+  the billing portal get them too.
+- **In their language.** An administrator gets the email in the language set in the realm, and the
+  owner in the language chosen at sign-up. An administrator with neither `en` nor `vi` gets the
+  language of the sign-up.
+- **From where.** The control plane's own mail domain, see [its own work](control-plane.md#its-own-work).
 - **Which.** Those of [the timeline](#the-timeline), plus: the trial has started, and the deletion is
-  done. Each states the date of the next step and what stops it.
+  done. Each states the date and time of the next step in UTC and what stops it. A paid tenant gets
+  no `tenantReadOnly` email, because its text is about a trial. It still gets the one 7 days before
+  the deletion.
+- **When.** After its moves, each hourly run queues the one email that is due for each subscription,
+  see [the hourly job](#one-clock). Each email's window starts on its day: the trial's start, then
+  day 23, day 29, the move to `readOnly`, 7 days before the deletion, and the move to `deleted`. A
+  run that comes after a window has closed skips that email and sends the one of the current window.
+  The tenant must exist in its cell, so the first email can come up to an hour after the tenant is
+  ready. A failed read of the administrators queues nothing for that subscription, and the run
+  fails, so the job queue retries it.
+- **Once per subscription and kind.** The `control_plane.subscription_emails` table holds
+  `subscription_id`, `kind` and `queued_at`, with the key (`subscription_id`, `kind`). The row is
+  written in the same transaction as the `sendEmail` jobs, so a rerun, a retry or two runs that
+  overlap send nothing twice. A deletion that is cancelled sends no second read-only or deletion
+  email.
 - **Billing emails** _(planned for M34)_. A payment is received, an e-invoice is issued, a plan or
   add-on changes, and a subscription is cancelled. Each states the date of the next step and what
   stops it.

@@ -49,6 +49,7 @@ public static class RuntimeRoleGrants
         "computed_field_errors",
         "pending_computed_fields",
         "sessions",
+        "mcp_clients",
         "given_roles",
         "application_settings",
         "resource_writes",

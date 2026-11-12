@@ -1,16 +1,30 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Axis.Data.Audit;
+using Axis.Data.Records;
+using Axis.Data.Storage;
+using Axis.Server.Studio;
 using Axis.Server.Tests;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The authoring request routes store a request and its steps in the database of the host's tenant, count each send toward the
-/// <c>authoringRequests</c> quota, and let only the request's author approve, change or drop it. Nothing here moves a
-/// request out of <c>planning</c> by itself, so the tests set the state in the database, as the agent host will.
+/// <c>authoringRequests</c> quota, and let only the request's author approve, change, drop or accept it. Nothing here moves a
+/// request out of <c>planning</c> by itself, so the tests set the state in the database, as the agent host will. A send gets the agent
+/// host's token from <see cref="IAuthorTokenExchange"/>. These tests replace it with a stub that gives a fixed token, which the send
+/// stores encrypted on the new row, and the realm's answers are tested with Keycloak in <see cref="AuthoringRequestExchangeTests"/>. A
+/// <c>fapi2</c> tenant has no exchange, so its send answers 409 and writes nothing.
 /// </summary>
 public sealed class AuthoringRequestTests : IAsyncLifetime
 {
@@ -19,6 +33,10 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     private const string Url = "/api/studio/apps/PurchaseRequests/authoring-requests";
 
     private const string Text = """{ "text": "Add a cost centre to every purchase request." }""";
+
+    private const string StubToken = "stub-refresh-token-of-the-agent-host";
+
+    private static readonly string _dataKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     private readonly PostgreSqlFixture _database = new();
 
@@ -165,11 +183,67 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_authors_accept_of_a_ready_request_queues_an_accept_of_its_draft_and_every_refusal_stores_nothing()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_accept", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        var draft = Guid.NewGuid();
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = '{draft}' WHERE id = '{id}'", CancellationToken);
+
+        // Another author learns nothing of the state, and a request that is not ready or has no draft cannot be accepted.
+        using var other = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Forbidden, other.StatusCode);
+        Assert.Equal("Only the author of the request may do this.", (await StudioPublishTests.ReadAsync(other)).RootElement.GetProperty("title").GetString());
+        Assert.Equal(0L, await CountPublishRequestsAsync(connectionString));
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        using var notReady = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
+        Assert.Equal("The request is not in a state that allows this.", (await StudioPublishTests.ReadAsync(notReady)).RootElement.GetProperty("title").GetString());
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = NULL WHERE id = '{id}'", CancellationToken);
+        using var noDraft = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, noDraft.StatusCode);
+        Assert.Equal(0L, await CountPublishRequestsAsync(connectionString));
+
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET draft_id = '{draft}' WHERE id = '{id}'", CancellationToken);
+        using var accepted = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var body = await StudioPublishTests.ReadAsync(accepted);
+        var requestId = body.RootElement.GetProperty("id").GetString()!;
+        Assert.Equal($"/api/studio/apps/PurchaseRequests/requests/{requestId}", accepted.Headers.Location?.OriginalString);
+        Assert.Equal("accept", body.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("queued", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            $"accept|queued|{draft}|PurchaseRequests|studio|author|tenant|true",
+            await StringAsync(
+                connectionString,
+                $"SELECT kind || '|' || status || '|' || draft_id || '|' || folder || '|' || client || '|' || requested_by || '|' || target || '|' || (snapshot IS NULL) FROM axis.publish_requests WHERE id = '{requestId}'"));
+        Assert.Equal("ready", await StateAsync(connectionString, id));
+        Assert.Equal(1L, await CountPublishRequestsAsync(connectionString));
+
+        // The accept that has not finished refuses a second one, and it stores nothing.
+        using var again = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Equal(
+            "The draft already has an accept that has not finished.",
+            (await StudioPublishTests.ReadAsync(again)).RootElement.GetProperty("title").GetString());
+        Assert.Equal(1L, await CountPublishRequestsAsync(connectionString));
+        Assert.Equal("ready", await StateAsync(connectionString, id));
+    }
+
+    [Fact]
     public async Task Sending_approving_and_dropping_each_write_one_audit_record_with_the_author_the_application_and_the_request()
     {
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("authoring_requests_audit", CancellationToken);
-        await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", Host, connectionString)]);
+        await using var factory = NewFactory(folder.Path, connectionString);
         using var author = factory.CreateClient().SignedInAs("author");
 
         var approved = await SendRequestAsync(author);
@@ -221,7 +295,7 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     {
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("authoring_requests_list", CancellationToken);
-        await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", Host, connectionString)]);
+        await using var factory = NewFactory(folder.Path, connectionString);
         using var author = factory.CreateClient().SignedInAs("author");
 
         var first = await SendRequestAsync(author);
@@ -273,9 +347,113 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task A_stored_refresh_token_is_encrypted_never_answered_and_erased_by_a_drop()
+    {
+        const string token = "refresh-token-of-the-author-7f3a9c";
+        var key = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_token", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString, key);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        var requestId = Guid.Parse(id);
+
+        // The send already stored the token of the exchange, encrypted for this tenant and this request.
+        var sentToken = (byte[]?)await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken);
+        Assert.NotNull(sentToken);
+        Assert.True(sentToken.AsSpan().IndexOf(Encoding.UTF8.GetBytes(StubToken)) < 0);
+        var sentKeys = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Tenants:a:DataKeys:1"] = key }).Build();
+        Assert.Equal(
+            StubToken,
+            await new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(sentKeys)))
+                .DecryptTextAsync(AuthoringRequestTokens.Scope("a", requestId), AuthoringRequestTokens.FieldName, sentToken, CancellationToken));
+
+        await using (var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(connectionString)))
+        {
+            await connection.OpenAsync(CancellationToken);
+            Assert.True(await AuthoringRequestTokens.StoreAsync(
+                connection, null, factory.Services.GetRequiredService<SensitiveValues>(), "a", requestId, token, CancellationToken));
+        }
+
+        // The column holds ciphertext, which only the tenant's data key opens, for this tenant and this request.
+        var stored = (byte[]?)await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken);
+        Assert.NotNull(stored);
+        var plain = Encoding.UTF8.GetBytes(token);
+        Assert.False(stored.AsSpan().SequenceEqual(plain));
+        Assert.True(stored.AsSpan().IndexOf(plain) < 0);
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Tenants:a:DataKeys:1"] = key }).Build();
+        var values = new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(configuration)));
+        Assert.Equal(token, await values.DecryptTextAsync(AuthoringRequestTokens.Scope("a", requestId), AuthoringRequestTokens.FieldName, stored, CancellationToken));
+
+        // No answer carries the token, for the author or for another author.
+        foreach (var client in new[] { author, employee })
+        {
+            foreach (var path in new[] { Url, $"{Url}/{id}" })
+            {
+                using var response = await StudioPublishTests.SendAsync(client, HttpMethod.Get, path, Host);
+                Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+                var body = await response.Content.ReadAsStringAsync(CancellationToken);
+                Assert.DoesNotContain("refreshToken", body, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain("refresh_token", body, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(token, body, StringComparison.Ordinal);
+            }
+        }
+
+        // The drop erases the token, and a dropped request takes no new one.
+        using var dropped = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/drop", Host);
+        Assert.Equal(HttpStatusCode.OK, dropped.StatusCode);
+        Assert.Equal(true, await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token IS NULL FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken));
+        await using (var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(connectionString)))
+        {
+            await connection.OpenAsync(CancellationToken);
+            Assert.False(await AuthoringRequestTokens.StoreAsync(
+                connection, null, factory.Services.GetRequiredService<SensitiveValues>(), "a", requestId, token, CancellationToken));
+        }
+
+        Assert.Equal(true, await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"SELECT refresh_token IS NULL FROM axis.authoring_requests WHERE id = '{id}'", CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_send_on_a_fapi2_tenant_answers_409_and_writes_no_request_and_no_audit_record()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_fapi2", CancellationToken);
+        await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", Host, connectionString)]).WithWebHostBuilder(builder =>
+        {
+            using var clientKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+            builder.UseSetting("Tenants:a:Oidc:Authority", "https://127.0.0.1:1/realms/axis");
+            builder.UseSetting("Tenants:a:Oidc:ClientId", "axis");
+            builder.UseSetting("Tenants:a:Oidc:ClientSecret", null);
+            builder.UseSetting("Tenants:a:Oidc:Profile", "fapi2");
+            builder.UseSetting("Tenants:a:Oidc:ClientKey", clientKey.ExportPkcs8PrivateKeyPem());
+            builder.UseSetting("Tenants:a:Oidc:ClientKeyId", "key-1");
+        });
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        using var refused = await StudioPublishTests.SendAsync(author, HttpMethod.Post, Url, Host, Text);
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        Assert.Equal(0L, await CountRequestsAsync(connectionString));
+        Assert.Equal(0L, await CountAuditAsync(connectionString, AuditActions.AuthoringRequestSent));
+    }
+
     private static WebApplicationFactory<Program> NewCellFactory(string folder, string connectionString) =>
-        StudioPublishTests.NewFactory(folder, [("a", Host, connectionString)])
-            .WithWebHostBuilder(builder => builder.InCell(1, QuotaKeys.AuthoringRequests));
+        NewFactory(folder, connectionString).WithWebHostBuilder(builder => builder.InCell(1, QuotaKeys.AuthoringRequests));
+
+    // A server whose exchange is the stub, and whose tenant has a data key so the stored token can be encrypted.
+    private static WebApplicationFactory<Program> NewFactory(string folder, string connectionString, string? dataKey = null) =>
+        StudioPublishTests.NewFactory(folder, [("a", Host, connectionString)]).WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Tenants:a:DataKeys:1", dataKey ?? _dataKey);
+            builder.ConfigureTestServices(services => services.AddSingleton<IAuthorTokenExchange>(new StubExchange()));
+        });
 
     private static async Task<string> SendRequestAsync(HttpClient client)
     {
@@ -308,6 +486,18 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
     private static Task<long> CountAuditAsync(string connectionString, string action) =>
         ScalarAsync(connectionString, $"SELECT count(*) FROM axis.audit_records WHERE action = '{action}'");
 
+    private static Task<long> CountPublishRequestsAsync(string connectionString) =>
+        ScalarAsync(connectionString, "SELECT count(*) FROM axis.publish_requests");
+
+    private static async Task<string?> StringAsync(string connectionString, string sql) =>
+        (string?)await PostgreSqlServer.AdminScalarAsync(connectionString, sql, CancellationToken);
+
     private static async Task<long> ScalarAsync(string connectionString, string sql) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(connectionString, sql, CancellationToken))!;
+
+    private sealed class StubExchange : IAuthorTokenExchange
+    {
+        public Task<AuthorTokenExchangeResult> ExchangeAsync(HttpContext httpContext, CancellationToken cancellationToken) =>
+            Task.FromResult(new AuthorTokenExchangeResult(AuthorTokenOutcome.Exchanged, StubToken));
+    }
 }

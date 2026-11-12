@@ -4,6 +4,8 @@ using System.Text.Json.Serialization;
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
+using Axis.Data.Records;
+using Axis.Data.Storage;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
@@ -19,13 +21,21 @@ namespace Axis.Server.Studio;
 /// the tenant of the host and answers 202 with the request and a <c>Location</c> for <c>GET .../authoring-requests/{id}</c>.
 /// The checks run in this order: session (401), author role (403), in a cell the tenant's <c>authoringRequests</c> quota
 /// (403 <c>quota-exceeded</c>), the application (404), a manifest with a UUID <c>id</c> (409), the content type (415), then the body
-/// (400), which is <c>{ text, autoAccept? }</c> with a <c>text</c> of up to 4000 characters. Just before the insert the quota is
-/// counted again under a transaction lock, so two sends at once cannot both pass it. The request and its audit record commit
-/// together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
+/// (400), which is <c>{ text, autoAccept? }</c> with a <c>text</c> of up to 4000 characters. Then the send gets the agent host's token for
+/// the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, before the transaction and the quota lock, so a bad
+/// body never calls the realm: a <c>fapi2</c> tenant or one with no agent client answers 409, a refused grant or a session with no
+/// platform token 401, a realm that does not answer 503, and an exchanged token without the author role 403. None of them writes a
+/// row. Just before the insert the quota is counted again under a transaction lock, so two sends at once cannot both pass it. The
+/// request, its encrypted refresh token and its audit record commit together. <c>GET .../authoring-requests</c> lists the newest 100 requests of the application and <c>GET .../authoring-requests/{id}</c>
 /// reads one with its steps. The session and role checks and the application come first, and then an <c>id</c> that is not a UUID of this
 /// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c> and <c>.../drop</c> run those checks, then answer 403
 /// to anyone but the request's author, for <c>change-plan</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
-/// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request.
+/// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
+/// token, and no answer carries it. <c>POST .../{id}/accept</c> takes no body and runs the same checks, then answers 409 for a request that is not
+/// <c>ready</c> or has no draft, and 409 for a draft that already has an accept queued or running. Otherwise it stores an <c>accept</c> publish request
+/// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. The accept writes the draft as a revision, so over the <c>storage</c> quota it is refused before any of these checks, as a save is, see
+/// <c>docs/reference/tenant-quotas.md#refusals</c>. It changes no authoring request:
+/// the publisher moves it to <c>accepted</c> when the accept succeeds, see <c>docs/reference/authoring-requests.md#accepting</c>.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
 {
@@ -48,6 +58,7 @@ internal static class StudioAuthoringRequestEndpoints
         Approve,
         ChangePlan,
         Drop,
+        Accept,
     }
 
     public static void MapStudioAuthoringRequestEndpoints(this IEndpointRouteBuilder endpoints)
@@ -64,6 +75,9 @@ internal static class StudioAuthoringRequestEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/drop",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.Drop, application, id, httpContext, options, database));
+        endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/accept",
+            (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
+                ChangeAsync(Action.Accept, application, id, httpContext, options, database)).WithStorageQuota();
     }
 
     private static async Task<IResult> SendAsync(
@@ -73,6 +87,8 @@ internal static class StudioAuthoringRequestEndpoints
         TenantDatabase database,
         TenantQuotas quotas,
         ITenantContextAccessor tenants,
+        IAuthorTokenExchange exchange,
+        SensitiveValues values,
         ILoggerFactory loggers)
     {
         if (await StudioEndpoints.RefuseAsync(httpContext, options) is { } refusal)
@@ -116,6 +132,12 @@ internal static class StudioAuthoringRequestEndpoints
             return StudioEndpoints.Problem(StatusCodes.Status400BadRequest, "The body is not a valid authoring request.");
         }
 
+        var token = await exchange.ExchangeAsync(httpContext, cancellationToken);
+        if (token.Outcome != AuthorTokenOutcome.Exchanged)
+        {
+            return TokenRefusal(token.Outcome);
+        }
+
         var user = (await CurrentUsers.FindAsync(httpContext))!;
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
@@ -153,12 +175,25 @@ internal static class StudioAuthoringRequestEndpoints
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await AuthoringRequestTokens.StoreAsync(connection, transaction, values, tenantId!, id, token.RefreshToken!, cancellationToken);
         await AppendAuditAsync(transaction, user.Id, AuditActions.AuthoringRequestSent, applicationId, id, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
 
         var response = await ReadAsync(connection, id, applicationId, application, steps: false, user.DisplayName, cancellationToken);
         return Results.Accepted(Location(application, id), response);
     }
+
+    private static IResult TokenRefusal(AuthorTokenOutcome outcome) => outcome switch
+    {
+        AuthorTokenOutcome.NotOffered => StudioEndpoints.Problem(
+            StatusCodes.Status409Conflict, "This tenant cannot let the agent host act for an author."),
+        AuthorTokenOutcome.Refused => StudioEndpoints.Problem(
+            StatusCodes.Status401Unauthorized, "Sign in again so the agent host can act for you."),
+        AuthorTokenOutcome.NotAuthor => StudioEndpoints.Problem(
+            StatusCodes.Status403Forbidden, "Your sign-in no longer holds the author role."),
+        _ => StudioEndpoints.Problem(
+            StatusCodes.Status503ServiceUnavailable, "The identity provider did not answer. Try again later."),
+    };
 
     private static async Task<IResult> ListAsync(
         string application, HttpContext httpContext, StudioOptions options, TenantDatabase database)
@@ -230,7 +265,7 @@ internal static class StudioAuthoringRequestEndpoints
         }
 
         var cancellationToken = httpContext.RequestAborted;
-        if (!Guid.TryParseExact(id, "D", out var requestId) || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        if (!Guid.TryParseExact(id, "D", out var requestId) || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId } manifest)
         {
             return NoRequest();
         }
@@ -271,23 +306,35 @@ internal static class StudioAuthoringRequestEndpoints
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        string? state;
+        string? state = null;
+        Guid? draftId = null;
         await using (var lockRow = new NpgsqlCommand(
-            "SELECT state FROM axis.authoring_requests WHERE id = @id FOR UPDATE", connection, transaction))
+            "SELECT state, draft_id FROM axis.authoring_requests WHERE id = @id FOR UPDATE", connection, transaction))
         {
             lockRow.Parameters.AddWithValue("id", requestId);
-            state = await lockRow.ExecuteScalarAsync(cancellationToken) as string;
+            await using var reader = await lockRow.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                state = reader.GetString(0);
+                draftId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
+            }
         }
 
         var allowed = action switch
         {
             Action.Drop => state is not (null or "accepted" or "dropped"),
+            Action.Accept => state == "ready" && draftId is not null,
             _ => state == "awaitingApproval",
         };
         if (!allowed)
         {
             await transaction.RollbackAsync(cancellationToken);
             return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The request is not in a state that allows this.");
+        }
+
+        if (action == Action.Accept)
+        {
+            return await AcceptAsync(application, applicationId, draftId!.Value, name: manifest.Name ?? application, user, connection, transaction, cancellationToken);
         }
 
         switch (action)
@@ -320,7 +367,7 @@ internal static class StudioAuthoringRequestEndpoints
                 break;
             default:
                 await ExecuteAsync(
-                    "UPDATE axis.authoring_requests SET state = 'dropped', finished_at = now(), claimed_by = NULL, claimed_until = NULL WHERE id = @id",
+                    "UPDATE axis.authoring_requests SET state = 'dropped', finished_at = now(), claimed_by = NULL, claimed_until = NULL, refresh_token = NULL WHERE id = @id",
                     connection, transaction, requestId, cancellationToken);
                 await AppendAuditAsync(transaction, user.Id, AuditActions.AuthoringRequestDropped, applicationId, requestId, cancellationToken);
                 break;
@@ -328,6 +375,45 @@ internal static class StudioAuthoringRequestEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(await ReadAsync(connection, requestId, applicationId, application, steps: false, user.DisplayName, cancellationToken));
+    }
+
+    // Queues the accept of the request's draft. It changes no authoring request: the publisher moves the request to accepted when the accept succeeds.
+    private static async Task<IResult> AcceptAsync(
+        string application,
+        Guid applicationId,
+        Guid draftId,
+        string name,
+        CurrentUserResponse user,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (await FindPendingAcceptAsync(connection, transaction, draftId, cancellationToken) is not null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The draft already has an accept that has not finished.");
+        }
+
+        var id = Guid.CreateVersion7();
+        await StudioPublishEndpoints.InsertRequestAsync(
+            connection, id, "accept", applicationId, "tenant", snapshot: null, releaseId: null, label: null, note: null, user.Id, scenarioNames: null, draftId,
+            folder: application, client: "studio", cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var response = await StudioPublishEndpoints.ReadResponseAsync(connection, applicationId, id, name, cancellationToken);
+        return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
+    }
+
+    /// <summary>The accept of the draft that is queued or running, or null. The route and <c>accept_draft</c> both queue only when there is none.</summary>
+    internal static async Task<Guid?> FindPendingAcceptAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, Guid draftId, CancellationToken cancellationToken)
+    {
+        await using var check = new NpgsqlCommand(
+            "SELECT id FROM axis.publish_requests WHERE kind = 'accept' AND draft_id = @draft AND status IN ('queued', 'running') LIMIT 1",
+            connection,
+            transaction);
+        check.Parameters.AddWithValue("draft", draftId);
+        return await check.ExecuteScalarAsync(cancellationToken) as Guid?;
     }
 
     private static async Task ExecuteAsync(
@@ -378,7 +464,7 @@ internal static class StudioAuthoringRequestEndpoints
         {
             await using var command = new NpgsqlCommand(
                 """
-                SELECT kind, input_summary, outcome, tokens, started_at, finished_at
+                SELECT kind, input_summary, outcome, tokens, started_at, finished_at, checks
                 FROM axis.authoring_request_steps WHERE request_id = @id ORDER BY ordinal
                 """,
                 connection);
@@ -392,7 +478,8 @@ internal static class StudioAuthoringRequestEndpoints
                     reader.IsDBNull(2) ? null : reader.GetString(2),
                     reader.GetInt64(3),
                     reader.GetFieldValue<DateTimeOffset>(4),
-                    reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5)));
+                    reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5),
+                    reader.IsDBNull(6) ? null : JsonDocument.Parse(reader.GetString(6)).RootElement.Clone()));
             }
         }
 
@@ -521,14 +608,15 @@ internal sealed record AuthoringRequestResponse(
     DateTimeOffset? FinishedAt,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AuthoringRequestStepResponse>? Steps);
 
-/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens and its times.</summary>
+/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens, its times and the checks of a <c>check</c> or <c>review</c> step, null on any other.</summary>
 internal sealed record AuthoringRequestStepResponse(
     string Kind,
     string? Summary,
     string? Outcome,
     long Tokens,
     DateTimeOffset StartedAt,
-    DateTimeOffset? FinishedAt);
+    DateTimeOffset? FinishedAt,
+    JsonElement? Checks);
 
 /// <summary>The newest requests of an application, newest first.</summary>
 internal sealed record AuthoringRequestListResponse(IReadOnlyList<AuthoringRequestResponse> Items);

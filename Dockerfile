@@ -125,6 +125,7 @@ RUN dotnet publish src/Axis.Agent/Axis.Agent.csproj -c Release -p:InformationalV
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/admin
 RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane \
     && test -f /out/controlplane/wwwroot/sign-up.html
+RUN dotnet publish controlplane/src/Axis.ControlPlane.Admin/Axis.ControlPlane.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane-admin
 RUN rm -f /out/*/appsettings.Development.json
 
 # Production server. It runs as the non-root user of the base image and can run on a read-only root file
@@ -163,15 +164,21 @@ COPY --from=production-build /out/agent .
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Agent.dll"]
 
-# Production admin tool, with the PostgreSQL 18 client tools from the PostgreSQL apt repository.
-FROM mcr.microsoft.com/dotnet/runtime:10.0 AS axis-admin
-ARG AXIS_VERSION
-LABEL org.opencontainers.image.version=$AXIS_VERSION
+# The PostgreSQL 18 client tools from the PostgreSQL apt repository, for the production admin tool. The stage takes no
+# build argument, so its layer is the same for every Axis version and scripts/smoke.sh can save it and reuse it,
+# see docs/development.md#smoke-tests. The image scan builds without that saved layer.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS admin-tools
 RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-common \
     && /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y \
     && apt-get install -y --no-install-recommends postgresql-client-18 \
     && rm -rf /var/lib/apt/lists/*
+
+# Production admin tool, built on the admin-tools stage so a build with another version reuses the package layer,
+# see docs/production-images.md#production-images-and-axisadmin.
+FROM admin-tools AS axis-admin
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
 ENV DOTNET_ENVIRONMENT=Production PATH=/usr/lib/postgresql/18/bin:$PATH
 WORKDIR /app
 COPY --from=production-build /out/admin .
@@ -181,13 +188,15 @@ ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
 # Production control plane, which a region runs on a cluster of its own. It runs as the non-root user of the base
 # image and can run on a read-only root file system. Settings come from environment variables and files in
-# /run/secrets. The image has no curl and holds no extension package or module.
+# /run/secrets. The image also holds the operator's commands in /app/admin. It has no curl and holds no extension
+# package or module.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS axis-controlplane
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
 ENV DOTNET_ENVIRONMENT=Production ASPNETCORE_ENVIRONMENT=Production
 WORKDIR /app
 COPY --from=production-build /out/controlplane .
+COPY --from=production-build /out/controlplane-admin ./admin
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.ControlPlane.dll"]

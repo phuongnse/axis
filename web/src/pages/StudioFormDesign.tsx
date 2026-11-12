@@ -38,6 +38,7 @@ export default function StudioFormDesign({
   module,
   resourceId,
   draft,
+  version,
   selected,
   onSelect,
   onChange,
@@ -50,6 +51,8 @@ export default function StudioFormDesign({
   module?: string
   resourceId: string
   draft: Record<string, unknown>
+  /** The version of the saved file, which the canvas redraws on after a save. */
+  version?: string
   /** The pointer of the selected field, section or step, or null. */
   selected: string | null
   onSelect: (pointer: string | null) => void
@@ -96,6 +99,7 @@ export default function StudioFormDesign({
             module={module}
             resourceId={resourceId}
             draft={draft}
+            version={version}
             selected={selected}
             onSelect={onSelect}
             onChange={onChange}

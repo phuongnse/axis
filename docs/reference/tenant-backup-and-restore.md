@@ -279,8 +279,8 @@ The command runs these steps in order, and each writes its own line.
 The `realm` step gives a tenant that gets a new realm its realm, its clients and, when the archive
 holds `realm.json`, its people.
 
-1. It creates the realm named after the new tenant id, with the clients `axis`, `axis-activation` and
-   `axis-users`, and saves the generated client secrets, encrypted, as `tenant create` does.
+1. It creates the realm named after the new tenant id, with the clients `axis`, `axis-activation`,
+   `axis-users` and `axis-agent`, and saves the generated client secrets, encrypted, as `tenant create` does.
 2. It brings the realm in step with the tenant's active releases: a `site-` client for each site, and a
    brokered provider for each `oidc` identity provider. The archive holds no secret value, so a provider
    whose bindings have no value yet is left out, with a `<id> warning ...` line on standard error that
@@ -426,7 +426,7 @@ hours 15 minutes, see [the Helm chart](installation.md#settings-and-secrets).
   point. When `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` is set, the command
   exports the gauge over OTLP before it exits, see [telemetry export](host-settings.md#telemetry-export).
   With no endpoint, nothing is exported.
-- **An alert on a stale backup** _(planned for M31)_. An alert fires on a gauge that is too old.
+- **An alert on a stale backup** _(planned for M33)_. An alert fires on a gauge that is too old.
 - **Settings.** `Cell:BackupStorage:ServiceUrl`, `:Region`, `:Bucket`, `:AccessKeyId` and
   `:SecretAccessKey` name an S3-compatible service, reached with the AWS SDK and path-style addressing,
   see [host settings](host-settings.md#cell-settings). All five are required. The command's other

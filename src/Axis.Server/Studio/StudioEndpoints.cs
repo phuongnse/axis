@@ -148,7 +148,7 @@ internal static class StudioEndpoints
             .Select(application =>
             {
                 var (titles, descriptions) = StudioApplicationTexts.Read(application.Folder);
-                return new StudioApplicationItem(application.Name, titles, descriptions);
+                return new StudioApplicationItem(application.Name, StudioFolder.ReadManifest(application.Folder)?.Id, titles, descriptions);
             })]);
 
     private static async Task<IResult> ListAsync(
@@ -1214,11 +1214,12 @@ internal static class StudioEndpoints
 internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
 
 /// <summary>
-/// One application in the list: the <c>name</c> in its manifest, and its title and description by locale. A locale
-/// whose text resource lacks the manifest's <c>label</c> or <c>description</c> key is left out.
+/// One application in the list: the <c>name</c> and <c>id</c> in its manifest, and its title and description by locale. The
+/// <c>id</c> is null when the manifest has none. A locale whose text resource lacks the manifest's <c>label</c> or
+/// <c>description</c> key is left out.
 /// </summary>
 internal sealed record StudioApplicationItem(
-    string Name, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string> Descriptions);
+    string Name, Guid? Id, IReadOnlyDictionary<string, string> Titles, IReadOnlyDictionary<string, string> Descriptions);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);

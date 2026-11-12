@@ -6,15 +6,17 @@ import { describe, test } from 'node:test'
 import {
   controlPlane,
   count,
+  estimate,
   filterArgs,
   junitDurations,
+  junitParallelism,
   main,
-  mergeDurations,
   parseSource,
   readClasses,
   split,
   weigh,
 } from './lib/integration-shard.mjs'
+import { budgetSeconds, maxShards, mergeDurations } from './lib/shards.mjs'
 
 const testClass = (name, seconds, collection) => ({ name: `N.${name}`, seconds, collection, tests: 1 })
 
@@ -52,6 +54,26 @@ describe('count', () => {
       total: 6,
       overBudget: [`Over budget: ${controlPlane} takes about 25 s, longer than the budget of 20 s.`],
     })
+  })
+
+  test('divides the seconds by the parallelism, so four 10 s classes fit one shard at parallelism 2', () => {
+    assert.equal(count(four, 0, 25, 6, 2).total, 1)
+  })
+
+  test('estimates two 100 s classes at parallelism 2 as 100 s in separate collections and 200 s in one', () => {
+    const separate = [testClass('ATests', 100), testClass('BTests', 100)]
+    const shared = [testClass('ATests', 100, 'Scratch'), testClass('BTests', 100, 'Scratch')]
+    // A shard of separate classes takes 100 s, which fits the 150 s budget. The shared collection takes 200 s
+    // whatever the shards, since its classes run one after another.
+    assert.deepEqual(count(separate, 0, 150, 6, 2), { total: 1, overBudget: [] })
+    assert.equal(count(shared, 0, 150, 6, 2).total, 6)
+  })
+})
+
+describe('estimate', () => {
+  test('is the seconds over the parallelism, or the heaviest collection when that is longer', () => {
+    assert.equal(estimate(200, 100, 2), 100)
+    assert.equal(estimate(200, 200, 2), 200)
   })
 })
 
@@ -192,6 +214,30 @@ describe('durations', () => {
   test('keeps known classes that were not measured and drops classes that no longer exist', () => {
     assert.deepEqual(mergeDurations({ A: 1, B: 2, Gone: 3 }, { A: 10 }, ['A', 'B']), { A: 10, B: 2 })
   })
+
+  test('measures the parallelism over the integration suite alone, so the control plane suite counts on neither side', () => {
+    const controlPlaneXml =
+      '<testsuite name="/p/Axis.ControlPlane.Integration.Tests.dll" tests="1" time="50">' +
+      '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="x" time="50" /></testsuite>'
+    const integrationXml =
+      '<testsuite name="/p/Axis.Integration.Tests.dll" tests="2" time="100">' +
+      '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>'
+    assert.equal(junitParallelism([controlPlaneXml, integrationXml]), 1.5)
+  })
+
+  test('leaves the scenario suites out of the parallelism on both sides', () => {
+    const integrationXml =
+      '<testsuite name="/p/Axis.Integration.Tests.dll" tests="2" time="100">' +
+      '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>'
+    const scenarioXml =
+      '<testsuites><testsuite name="PurchaseRequests" tests="1" time="40">' +
+      '<testcase classname="PurchaseRequests" name="s" time="40" /></testsuite></testsuites>'
+    assert.equal(junitParallelism([integrationXml, scenarioXml]), 1.5)
+  })
+
+  test('has no parallelism without an integration suite', () => {
+    assert.equal(junitParallelism(['<testcase classname="N.ATests" name="a" time="1" />']), undefined)
+  })
 })
 
 describe('main', () => {
@@ -237,13 +283,26 @@ describe('main', () => {
     }
   })
 
-  test('--count prints the count alone and warns about each class over the budget', () => {
+  test('--count prints the cap, and warns about each class over the budget', () => {
     const dir = project()
     try {
-      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 1000, "N.BTests": 5 }\n')
+      const big = budgetSeconds + 100
+      writeFileSync(path.join(dir, 'class-durations.json'), `{ "N.ATests": ${big}, "N.BTests": 5 }\n`)
       const warnings = []
-      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '6')
-      assert.deepEqual(warnings, ['Over budget: N.ATests takes about 1000 s, longer than the budget of 900 s.'])
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), String(maxShards.integration))
+      assert.deepEqual(warnings, [`Over budget: N.ATests takes about ${big} s, longer than the budget of ${budgetSeconds} s.`])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count divides the seconds by the measured parallelism', () => {
+    const dir = project()
+    try {
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 500, "N.BTests": 500, "parallelism": 2 }\n')
+      assert.equal(main(['--count'], dir), '1')
+      writeFileSync(path.join(dir, 'class-durations.json'), '{ "N.ATests": 500, "N.BTests": 500 }\n')
+      assert.equal(main(['--count'], dir), '2')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -299,7 +358,69 @@ describe('main', () => {
     }
   })
 
-  test('splits the real test project into three shards that each hold classes', () => {
-    for (const shard of ['1/3', '2/3', '3/3']) assert.notEqual(main(['--classes', shard]), '')
+  test('--durations writes the parallelism beside the class seconds', () => {
+    const dir = project()
+    try {
+      const junit = path.join(dir, 'Axis.Integration.Tests.xml')
+      writeFileSync(
+        junit,
+        '<testsuite name="/p/Axis.Integration.Tests.dll" time="10">' +
+          '<testcase classname="N.ATests" name="t" time="1" /><testcase classname="N.BTests" name="t" time="7.6" /></testsuite>',
+      )
+      main(['--durations', junit], dir)
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
+        'N.ATests': 1,
+        'N.BTests': 8,
+        parallelism: 0.86,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--durations writes the parallelism of the integration suite alone, with the control plane and scenario files', () => {
+    const dir = project()
+    try {
+      const controlPlane = path.join(dir, 'Axis.ControlPlane.Integration.Tests.xml')
+      const integration = path.join(dir, 'Axis.Integration.Tests.xml')
+      const scenarios = path.join(dir, 'scenarios-PurchaseRequests.xml')
+      writeFileSync(
+        controlPlane,
+        '<testsuite name="/p/Axis.ControlPlane.Integration.Tests.dll" time="50">' +
+          '<testcase classname="Axis.ControlPlane.Integration.Tests.XTests" name="x" time="50" /></testsuite>',
+      )
+      writeFileSync(
+        integration,
+        '<testsuite name="/p/Axis.Integration.Tests.dll" time="100">' +
+          '<testcase classname="N.ATests" name="a" time="90" /><testcase classname="N.BTests" name="b" time="60" /></testsuite>',
+      )
+      writeFileSync(
+        scenarios,
+        '<testsuites><testsuite name="PurchaseRequests" tests="1" time="40">' +
+          '<testcase classname="PurchaseRequests" name="s" time="40" /></testsuite></testsuites>',
+      )
+      main(['--durations', controlPlane, integration, scenarios], dir)
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'class-durations.json'), 'utf8')), {
+        'Axis.ControlPlane.Integration.Tests': 50,
+        'N.ATests': 90,
+        'N.BTests': 60,
+        parallelism: 1.5,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('splits the real test project into the shards --count prints, each class in one, every shard but the first with classes', () => {
+    const total = Number(main(['--count'], undefined, () => {}))
+    const shards = Array.from({ length: total }, (_, i) => main(['--classes', `${i + 1}/${total}`]).split('\n').filter(Boolean))
+    // Shard 1 may hold no class: it runs the control plane suite, which can outweigh a shard's share alone.
+    for (const [i, names] of shards.entries()) if (i > 0) assert.notEqual(names.length, 0, `shard ${i + 1}/${total}`)
+    const all = shards.flat()
+    assert.equal(new Set(all).size, all.length)
+    assert.deepEqual(
+      [...all].sort(),
+      readClasses().map((c) => c.name),
+    )
   })
 })

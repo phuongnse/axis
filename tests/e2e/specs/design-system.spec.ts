@@ -98,6 +98,11 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
       exact: true,
       level: 4,
     }),
+  signUp: (page) =>
+    figure(page, "Typical").getByRole("textbox", {
+      name: "Full name",
+      exact: true,
+    }),
 };
 
 /** A key element of each state of the shell, sign-in and identity sign-in previews, relative to the state's figure. */
@@ -614,7 +619,7 @@ for (const mode of modes) {
       const heading = state.getByTestId("organization-heading");
       await expect(heading).toContainText("Axis");
       const headingBox = await heading.boundingBox();
-      const cardBox = await state.getByTestId("sign-in-card").boundingBox();
+      const cardBox = await state.getByTestId("card-page-card").boundingBox();
       if (!headingBox || !cardBox) {
         throw new Error("The heading or the sign-in card has no box");
       }

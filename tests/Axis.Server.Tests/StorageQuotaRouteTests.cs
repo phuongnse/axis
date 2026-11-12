@@ -36,6 +36,7 @@ public sealed class StorageQuotaRouteTests
         "PATCH /api/apps/{app}/entities/{module}/{entity}/records/{id}",
         "PATCH /api/studio/apps/{application}/resources/{id}",
         "POST /api/studio/apps",
+        "POST /api/studio/apps/{application}/authoring-requests/{id}/accept",
         "POST /api/studio/apps/{application}/changes",
         "POST /api/studio/apps/{application}/modules/{module}/resources/{id}/reset",
         "POST /api/studio/apps/{application}/publish",
@@ -84,6 +85,12 @@ public sealed class StorageQuotaRouteTests
         // The tenant's model key is a platform row and no tenant data, so the storage quota does not count it.
         "DELETE /api/tenant/model-key",
         "PUT /api/tenant/model-key",
+
+        // The tenant's outside clients setting is a platform row and no tenant data, so the storage quota does not count it.
+        "PUT /api/tenant/outside-clients",
+
+        // A consent revoke is a security action and is never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
+        "POST /api/tenant/connected-apps/{clientId}/revoke",
 
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
@@ -135,7 +142,7 @@ public sealed class StorageQuotaRouteTests
         "POST /api/studio/apps/{application}/test",
         "POST /api/studio/apps/{application}/validate",
 
-        // Authoring requests are counted by their own quota, authoringRequests, and are not storage writes.
+        // Authoring requests are counted by their own quota, authoringRequests, and are not storage writes. Their accept is a storage write and is checked.
         "POST /api/studio/apps/{application}/authoring-requests",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/approve",
         "POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan",

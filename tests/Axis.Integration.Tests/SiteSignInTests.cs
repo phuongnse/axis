@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Web;
 using Axis.Admin;
@@ -38,7 +39,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
     private static readonly string _callbackAddress = new Uri(_serverAddress, TenantSignIn.CallbackPath).AbsoluteUri;
 
-    private static readonly TenantRealmSecrets _realmSecrets = new("platform-1", "activation-1", "users-1");
+    private static readonly TenantRealmSecrets _realmSecrets = new("platform-1", "activation-1", "users-1", "agent-1");
 
     private string? _schemaConnection;
 
@@ -59,6 +60,23 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         Assert.Equal(1L, await CountAsync("axis.sessions"));
         Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
         Assert.Null(await SessionIdentityProviderAsync());
+    }
+
+    [Fact]
+    public async Task A_site_sign_in_stores_no_refresh_token_and_a_platform_sign_in_on_the_same_host_stores_one()
+    {
+        await using var host = await StartInDevelopmentRealmAsync(dataKey: true);
+
+        var site = await KeycloakSignIn.LogInAsync(host.Client, host.Authority, "requester", _serverAddress, returnUrl: "/sitesaccounts");
+        using var siteSignedIn = await host.Client.GetAsync(site.PathAndQuery, CancellationToken);
+        Assert.Equal(HttpStatusCode.Found, siteSignedIn.StatusCode);
+        Assert.Equal(1L, await CountAsync("axis.sessions"));
+        Assert.Null(await SessionRefreshTokenAsync());
+
+        var platform = await KeycloakSignIn.LogInAsync(host.Client, host.Authority, "requester", _serverAddress, returnUrl: "/studio");
+        using var platformSignedIn = await host.Client.GetAsync(platform.PathAndQuery, CancellationToken);
+        Assert.Equal(HttpStatusCode.Found, platformSignedIn.StatusCode);
+        Assert.NotNull(await SessionRefreshTokenAsync());
     }
 
     [Fact]
@@ -594,9 +612,9 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// Starts the server in front of the shared development realm. Its startup activation leaves the realm with the clients of
     /// the sites <c>sitesaccounts</c> and <c>sitesother</c>.
     /// </summary>
-    private async Task<SiteHost> StartInDevelopmentRealmAsync(IdTokenRewriteHandler? provider = null) =>
+    private async Task<SiteHost> StartInDevelopmentRealmAsync(IdTokenRewriteHandler? provider = null, bool dataKey = false) =>
         await StartAsync(
-            partner: false, await keycloak.StartAsync(), "axis", KeycloakFixture.ClientSecret, KeycloakFixture.ActivationClientSecret, provider);
+            partner: false, await keycloak.StartAsync(), "axis", KeycloakFixture.ClientSecret, KeycloakFixture.ActivationClientSecret, provider, dataKey: dataKey);
 
     /// <summary>Starts the server for tenant <c>a</c>, which has the details of <paramref name="realm"/>. Starting it runs the activation, which syncs the realm.</summary>
     private async Task<SiteHost> StartAsync(
@@ -612,7 +630,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         string[]? partnerAcr = null,
         Uri? samlMetadata = null,
         bool roles = false,
-        long? usersQuota = null)
+        long? usersQuota = null,
+        bool dataKey = false)
     {
         var baseAddress = await keycloak.BaseAddressAsync();
         var applications = Applications(partner, partnerAcr, saml: samlMetadata is not null, roles);
@@ -641,6 +660,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             }
 
             builder.UseSetting("ActivateOnStartup:0", applications.Path);
+            if (dataKey)
+            {
+                builder.UseSetting("Tenants:a:DataKeys:1", Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)));
+            }
+
             if (usersQuota is not null)
             {
                 builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", _realmSecrets.Users);
@@ -678,6 +702,10 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         });
         return new SiteHost(factory, client, applications, authority);
     }
+
+    // The newest row, because a sign-in that carries the cookie of an earlier session deletes that session's row.
+    private async Task<byte[]?> SessionRefreshTokenAsync() =>
+        await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT refresh_token FROM axis.sessions ORDER BY signed_in_at DESC LIMIT 1", CancellationToken) as byte[];
 
     private async Task<string?> SessionIdentityProviderAsync() =>
         await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT identity_provider FROM axis.sessions", CancellationToken) as string;

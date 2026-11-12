@@ -5,9 +5,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { listedImages } from './lib/docker-images.mjs'
 
 // Runs scripts/setup.sh with dotnet, npm and npx replaced by stubs. The stubs fail the first
-// STUB_FAIL_TIMES calls of each command line. The home cache is filled in, so no tool downloads.
+// STUB_FAIL_TIMES calls of each command line. STUB_HANG names one command line whose first call
+// sleeps past the step limit. The home cache is filled in, so no tool downloads.
 const root = fileURLToPath(new URL('..', import.meta.url))
 const toolsSh = readFileSync(join(root, 'scripts/lib/tools.sh'), 'utf8')
 const version = (name) => toolsSh.match(new RegExp(`^${name}=(\\S+)$`, 'm'))[1]
@@ -21,7 +23,16 @@ echo "$line" >> "$STUB_LOG"
 counter="$STUB_COUNTS/$(printf '%s' "$line" | tr -c 'A-Za-z0-9' '_')"
 count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$counter"
+if [ "$line" = "\${STUB_HANG:-}" ] && [ "$count" -eq 1 ]; then exec sleep 30; fi
 if [ "$count" -le "$STUB_FAIL_TIMES" ]; then exit "$STUB_FAIL_STATUS"; fi
+exit 0
+`
+
+// Stands in for docker and logs to DOCKER_LOG, so STUB_LOG keeps the lines of the tools only. Its images are all
+// missing when DOCKER_EMPTY is set.
+const dockerStub = `#!/usr/bin/env bash
+echo "$*" >> "$DOCKER_LOG"
+if [ "$1 $2" = "image inspect" ] && [ -n "$DOCKER_EMPTY" ]; then exit 1; fi
 exit 0
 `
 
@@ -53,12 +64,6 @@ const commands = [
   'npx --prefix tests/e2e playwright install chromium',
 ]
 
-const ciCommands = [
-  ...commands.slice(0, 4),
-  'npx --prefix tests/e2e playwright install-deps chromium',
-  'npx --prefix tests/e2e playwright install chromium',
-]
-
 // Fills the home cache. With schemas, every schema file is cached except the ones in missing.
 function cacheTools(home, { schemas = true, missing = [] } = {}) {
   const tools = join(home, '.cache', 'axis-tools')
@@ -85,7 +90,7 @@ function cacheTools(home, { schemas = true, missing = [] } = {}) {
   }
 }
 
-function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
+function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = false, hang = '' } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-setup-'))
   try {
     const bin = join(dir, 'bin')
@@ -96,6 +101,16 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
     mkdirSync(counts)
     for (const name of ['dotnet', 'npm', 'npx']) {
       writeFileSync(join(bin, name), stub, { mode: 0o755 })
+    }
+
+    writeFileSync(join(bin, 'docker'), dockerStub, { mode: 0o755 })
+    const dockerLog = join(dir, 'docker-log')
+    // The folder that holds the images setup saves: complete when savedImages is set, empty otherwise.
+    const images = join(dir, 'images')
+    mkdirSync(images)
+    if (savedImages) {
+      writeFileSync(join(images, 'images.tar'), 'archive')
+      writeFileSync(join(images, 'images.json'), JSON.stringify(listedImages(root)))
     }
 
     cacheTools(home)
@@ -109,14 +124,20 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
         HOME: home,
         CI: ci ? 'true' : '',
         AXIS_RETRY_DELAY_SECONDS: '0',
+        AXIS_DOCKER_CACHE_DIR: images,
+        DOCKER_LOG: dockerLog,
+        DOCKER_EMPTY: savedImages ? '' : '1',
+        AXIS_STEP_TIME_LIMIT_SECONDS: hang ? '1' : '',
         STUB_LOG: log,
         STUB_COUNTS: counts,
         STUB_FAIL_TIMES: String(failTimes),
         STUB_FAIL_STATUS: String(failStatus),
+        STUB_HANG: hang,
       },
     })
     const ran = existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : []
-    return { ...result, ran }
+    const docker = existsSync(dockerLog) ? readFileSync(dockerLog, 'utf8').trimEnd().split('\n') : []
+    return { ...result, ran, docker }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -130,7 +151,7 @@ describe('scripts/setup.sh retries its network steps', () => {
       assert.equal(result.ran.filter((line) => line === command).length, 2, command)
     }
     assert.equal(result.ran.length, commands.length * 2)
-    assert.match(result.stderr, /Attempt 1 of 4 failed with status 1: dotnet restore Axis\.slnx/)
+    assert.match(result.stderr, /Attempt 1 of 4 failed with status 1: limit dotnet restore Axis\.slnx/)
   })
 
   test('an outage of three failures per step still succeeds on the fourth try', () => {
@@ -146,7 +167,7 @@ describe('scripts/setup.sh retries its network steps', () => {
     const result = runSetup({ failTimes: 99, failStatus: 7 })
     assert.equal(result.status, 7, result.stderr)
     assert.deepEqual(result.ran, [commands[0], commands[0], commands[0], commands[0]])
-    assert.match(result.stderr, /Failed after 4 attempts: dotnet restore/)
+    assert.match(result.stderr, /Failed after 4 attempts: limit dotnet restore/)
   })
 
   test('a step that succeeds the first time runs once and logs no retry', () => {
@@ -156,10 +177,57 @@ describe('scripts/setup.sh retries its network steps', () => {
     assert.doesNotMatch(result.stderr, /Attempt/)
   })
 
-  test('on CI the Playwright system packages install as a step of their own', () => {
+  test('on CI setup runs the same steps as elsewhere', () => {
     const result = runSetup({ ci: true })
     assert.equal(result.status, 0, result.stderr)
-    assert.deepEqual(result.ran, ciCommands)
+    assert.deepEqual(result.ran, commands)
+  })
+
+  test('a step that hangs fails its try at the limit, and the next try succeeds', () => {
+    const result = runSetup({ hang: commands[0] })
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.ran.filter((line) => line === commands[0]).length, 2)
+    assert.equal(result.ran.length, commands.length + 1)
+    assert.match(result.stderr, /Attempt 1 of 4 failed with status 124: limit dotnet restore Axis\.slnx/)
+  })
+})
+
+describe('scripts/lib/tools.sh limits every download', () => {
+  test('each curl has a connect and a total time limit, and no retry of its own', () => {
+    // Reads the two scripts that hold the downloads. Joins the lines that continue a command, so a curl
+    // that spans lines is read whole.
+    const downloads = ['scripts/lib/tools.sh', 'scripts/lib/trivy.sh'].map((file) => readFileSync(join(root, file), 'utf8'))
+    const lines = downloads.join('\n').replace(/\\\n\s*/g, ' ').split('\n')
+    const curls = lines.filter((line) => /(^|\$\()retry 4 curl /.test(line.trim()))
+    assert.equal(curls.length, 7)
+    for (const line of curls) {
+      assert.match(line, /--connect-timeout \d+/, line)
+      assert.match(line, /--max-time \d+/, line)
+      assert.doesNotMatch(line, /--retry /, line)
+    }
+  })
+})
+
+describe('scripts/setup.sh keeps the container images of the checks', () => {
+  test('on CI with every listed image saved it makes no Docker call', () => {
+    const result = runSetup({ ci: true, savedImages: true })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.docker, [])
+  })
+
+  test('on CI it pulls the listed images that neither Docker nor the saved archive holds', () => {
+    const result = runSetup({ ci: true })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(
+      result.docker.filter((line) => line.startsWith('pull ')),
+      listedImages(root).map((image) => `pull ${image}`),
+    )
+  })
+
+  test('off CI it makes no Docker call', () => {
+    const result = runSetup({ savedImages: false })
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(result.docker, [])
   })
 })
 

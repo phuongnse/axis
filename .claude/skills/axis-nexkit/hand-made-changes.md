@@ -21,7 +21,10 @@ When the latest plan says the change is in paths NexKit may not change, under
 *Needs a hand-made change*, or a `/nexkit go` or fix round stopped as blocked
 because its change needs those paths:
 
-1. Make the change on an `ops/<topic>` branch, exactly as the plan says.
+1. Add the `hand-made` label to the issue, as
+   [hand-made pull requests](../../../docs/delivery.md#hand-made-pull-requests)
+   says: `gh issue edit <n> --add-label hand-made`. Then make the change on an
+   `ops/<topic>` branch, exactly as the plan says.
 2. Run at least the plan's check commands, `node scripts/check-links.mjs` and
    `node scripts/check-docs.mjs`.
 3. Ask the owner before you push.

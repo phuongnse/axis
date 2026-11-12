@@ -578,7 +578,7 @@ public sealed class TenantExportJobTests(AdminBackupFixture fixture, MinioFixtur
     private static async Task<string> NewBucketAsync(IAmazonS3 s3)
     {
         var bucket = $"exports-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}";
-        await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket }, CancellationToken);
+        await MinioFixture.CreateBucketAsync(s3, bucket, CancellationToken);
         return bucket;
     }
 

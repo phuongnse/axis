@@ -8,11 +8,12 @@ import {
   estimate,
   isSerial,
   junitDurations,
+  junitSetup,
   main,
-  mergeDurations,
   readSpecs,
   split,
 } from './lib/e2e-shard.mjs'
+import { budgetSeconds, maxShards, mergeDurations } from './lib/shards.mjs'
 
 const spec = (name, seconds, serial = false) => ({ path: `specs/${name}.spec.ts`, seconds, serial })
 
@@ -41,6 +42,13 @@ describe('count', () => {
   test('counts a parallel spec by its seconds on the workers', () => {
     // 1600 s shares two workers to 800 s, so it fits the 900 s budget.
     assert.deepEqual(count([spec('wide', 1600)], 2, 900, 6), { total: 1, overBudget: [] })
+  })
+
+  test('adds the shard setup to each shard, so a suite may need one more shard', () => {
+    // Three 100 s specs take 150 s in one shard and 100 s in two. A 30 s setup makes two shards 130 s.
+    const three = [spec('a', 100), spec('b', 100), spec('c', 100)]
+    assert.deepEqual(count(three, 2, 120, 6), { total: 2, overBudget: [] })
+    assert.deepEqual(count(three, 2, 120, 6, 30), { total: 3, overBudget: [] })
   })
 })
 
@@ -124,17 +132,54 @@ describe('readSpecs and main', () => {
     }
   })
 
-  test('--count prints the count alone and warns about each spec over the budget', () => {
+  test('--count prints the cap, and warns about each spec over the budget', () => {
+    const big = budgetSeconds + 100
     const dir = fixture(
-      { 'specs/big.spec.ts': 1000, 'specs/a.spec.ts': 10 },
+      { 'specs/big.spec.ts': big, 'specs/a.spec.ts': 10 },
       { 'big.spec.ts': "test.describe.configure({ mode: 'serial' })", 'a.spec.ts': '' },
     )
     const warnings = []
     try {
-      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), '6')
+      assert.equal(main(['--count'], dir, (line) => warnings.push(line)), String(maxShards.e2e))
       assert.deepEqual(warnings, [
-        'Over budget: specs/big.spec.ts takes about 1000 s, longer than the budget of 900 s.',
+        `Over budget: specs/big.spec.ts takes about ${big} s, longer than the budget of ${budgetSeconds} s.`,
       ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('--count adds the measured shard setup to each shard', () => {
+    // Two specs of 100 s under the budget take that long in one shard on two workers, which fits the budget.
+    // A 200 s setup takes the shard past it, so each spec needs a shard of its own.
+    const seconds = budgetSeconds - 100
+    const dir = fixture({ 'specs/a.spec.ts': seconds, 'specs/b.spec.ts': seconds }, { 'a.spec.ts': '', 'b.spec.ts': '' })
+    try {
+      assert.equal(main(['--count'], dir), '1')
+      writeFileSync(
+        path.join(dir, 'spec-durations.json'),
+        JSON.stringify({ 'specs/a.spec.ts': seconds, 'specs/b.spec.ts': seconds, 'shard setup': 200 }),
+      )
+      assert.equal(main(['--count'], dir), '2')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('weighs a new spec as the median of the specs, without the shard setup', () => {
+    const dir = fixture(
+      { 'specs/a.spec.ts': 10, 'specs/b.spec.ts': 30, 'shard setup': 1000 },
+      { 'a.spec.ts': '', 'b.spec.ts': '', 'new.spec.ts': '' },
+    )
+    try {
+      assert.deepEqual(
+        readSpecs(dir).map((s) => [s.path, s.seconds]),
+        [
+          ['specs/a.spec.ts', 10],
+          ['specs/b.spec.ts', 30],
+          ['specs/new.spec.ts', 20],
+        ],
+      )
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -164,6 +209,43 @@ describe('readSpecs and main', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  test('--durations measures the shard setup from the wall time of each file', () => {
+    const dir = fixture({ 'specs/a.spec.ts': 10 }, { 'a.spec.ts': '' })
+    const junit = path.join(dir, 'playwright-1.xml')
+    writeFileSync(
+      junit,
+      '<testsuites tests="1" time="100"><testsuite name="a.spec.ts" hostname="chromium" time="60"></testsuite></testsuites>',
+    )
+    try {
+      main(['--durations', junit], dir)
+
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'spec-durations.json'), 'utf8')), {
+        'specs/a.spec.ts': 60,
+        'shard setup': 70,
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('junitSetup', () => {
+  test('averages each file’s wall time minus the estimate of the specs it ran', () => {
+    const specs = [spec('a', 60), spec('b', 60)]
+    // The first file runs a alone: 60 s on two workers is 30 s, so its setup is 80 - 30 = 50 s.
+    // The second runs both: 120 s on two workers is 60 s, so its setup is 100 - 60 = 40 s.
+    const first =
+      '<testsuites tests="1" time="80"><testsuite name="a.spec.ts" hostname="chromium" time="60"></testsuite></testsuites>'
+    const second =
+      '<testsuites tests="2" time="100"><testsuite name="a.spec.ts" hostname="chromium" time="60"></testsuite>' +
+      '<testsuite name="b.spec.ts" hostname="chromium" time="60"></testsuite></testsuites>'
+    assert.equal(junitSetup([first, second], specs, 2), 45)
+  })
+
+  test('is undefined when no file has a wall time', () => {
+    assert.equal(junitSetup(['<testsuites></testsuites>'], [], 2), undefined)
   })
 })
 

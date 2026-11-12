@@ -108,11 +108,12 @@ export async function checkStudioExpression(
 }
 
 /**
- * An application in the list of `GET /api/studio/apps`. `titles` and `descriptions` map a locale to a text and are
- * empty when the folder gives none.
+ * An application in the list of `GET /api/studio/apps`. `id` is the manifest `id`, null when the manifest has none.
+ * `titles` and `descriptions` map a locale to a text and are empty when the folder gives none.
  */
 export interface StudioApplication {
   name: string
+  id?: string | null
   titles: Record<string, string>
   descriptions: Record<string, string>
 }

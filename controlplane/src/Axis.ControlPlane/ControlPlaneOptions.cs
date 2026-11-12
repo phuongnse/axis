@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Axis.ControlPlane.Cells;
+using Axis.ControlPlane.Plans;
 using Axis.ControlPlane.SignUp;
+using Axis.Tenancy;
 using MimeKit;
 using Npgsql;
 
@@ -13,7 +15,11 @@ namespace Axis.ControlPlane;
 /// and the mail relay are required, except the relay's user name. The directory connection string is optional, and once it is set a DNS provider is required. The cell
 /// settings are optional, and once a cell is listed, all of them are required. The DNS settings are optional, and once a
 /// provider is named, the ones it needs are required. The sign-up applications are optional, and each needs an id, both titles and both descriptions.
-/// The sign-up documents are optional as a group, and once one is set, all of them are required.
+/// The sign-up documents are optional as a group, and once one is set, all of them are required. The sign-up challenge key is optional, and when set it must be base64 of at least 32 bytes.
+/// The sign-up disposable domain list is optional as a pair, and once one of its settings is set, both are required, as an https URL and a 64-character hex SHA-256.
+/// The plans are optional, and each needs a code, a version, both names, included users, every quota except the users, and a price in each currency, unless it is a trial plan, which has no price. A number is plain digits.
+/// The sign-up trial quotas are optional, and each must be a quota key with a whole number of zero or more, or empty.
+/// The PayOS provider is optional, and with <c>PayOs</c> the base URL, the client id, the API key and the checksum key are required.
 /// The public URL is optional and defaults to <c>https://account.&lt;TenantDomain&gt;</c>. A bad value stops the start. A message names the setting and never holds its value.
 /// </summary>
 public sealed partial class ControlPlaneOptions
@@ -68,8 +74,14 @@ public sealed partial class ControlPlaneOptions
     /// <summary>The DNS server that holds the tenant subdomains. Optional.</summary>
     public ControlPlaneDnsOptions Dns { get; set; } = new();
 
+    /// <summary>The PayOS adapter that creates the payment links of the <c>VND</c> invoices. Optional.</summary>
+    public ControlPlanePayOsOptions PayOs { get; set; } = new();
+
     /// <summary>What the sign-up page offers. Optional.</summary>
     public SignUpOptions SignUp { get; set; } = new();
+
+    /// <summary>The plan versions that Axis SaaS sells, see <c>docs/reference/plans.md#the-catalogue</c>. Optional.</summary>
+    public List<PlanOptions> Plans { get; } = [];
 
     /// <summary>Reads and checks the settings, and returns them.</summary>
     /// <exception cref="InvalidOperationException">
@@ -84,6 +96,7 @@ public sealed partial class ControlPlaneOptions
         configuration.GetSection(SectionName).Bind(options);
 
         var problems = new List<string>();
+        options.SignUp.TrialQuotas = TrialQuotas(configuration, problems);
         if (string.IsNullOrWhiteSpace(options.Region))
         {
             problems.Add(Required(nameof(Region)));
@@ -170,7 +183,9 @@ public sealed partial class ControlPlaneOptions
         }
 
         problems.AddRange(DnsProblems(options.Dns, RequiresVerifiedTls(environment)));
+        problems.AddRange(PayOsProblems(options.PayOs, RequiresVerifiedTls(environment)));
         problems.AddRange(SignUpProblems(options.SignUp));
+        problems.AddRange(PlanCatalogue.Problems(options.Plans));
 
         if (problems.Count > 0)
         {
@@ -181,6 +196,36 @@ public sealed partial class ControlPlaneOptions
             ? $"https://account.{options.TenantDomain}"
             : options.PublicUrl.Trim().TrimEnd('/');
         return options;
+    }
+
+    // Read from the configuration, not bound, so an empty value stays no limit and an absent key stays not set,
+    // see the settings table in docs/reference/control-plane.md#settings. The messages never hold a value.
+    private static Dictionary<string, long?> TrialQuotas(IConfiguration configuration, List<string> problems)
+    {
+        var quotas = new Dictionary<string, long?>(StringComparer.Ordinal);
+        var prefix = $"{SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.TrialQuotas)}";
+        foreach (var child in configuration.GetSection(prefix).GetChildren())
+        {
+            var name = $"{prefix}:{child.Key}";
+            if (!QuotaKeys.All.Contains(child.Key, StringComparer.Ordinal))
+            {
+                problems.Add($"The setting {name} is not a quota key. The quota keys are {string.Join(", ", QuotaKeys.All)}.");
+            }
+            else if (string.IsNullOrWhiteSpace(child.Value))
+            {
+                quotas[child.Key] = null;
+            }
+            else if (long.TryParse(child.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var value))
+            {
+                quotas[child.Key] = value;
+            }
+            else
+            {
+                problems.Add($"The setting {name} must be a whole number of zero or more, or empty for no limit.");
+            }
+        }
+
+        return quotas;
     }
 
     private static List<string> CellProblems(ControlPlaneOptions options)
@@ -271,6 +316,34 @@ public sealed partial class ControlPlaneOptions
             }
         }
 
+        for (var index = 0; index < signUp.PublicMailboxDomains.Count; index++)
+        {
+            if (Uri.CheckHostName(signUp.PublicMailboxDomains[index]) != UriHostNameType.Dns)
+            {
+                problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.PublicMailboxDomains)}:{index.ToString(CultureInfo.InvariantCulture)} must be a domain name.");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(signUp.ChallengeKey)
+            && !(Convert.TryFromBase64String(signUp.ChallengeKey, new byte[signUp.ChallengeKey.Length], out var written) && written >= SignUpChallenge.MinimumKeyBytes))
+        {
+            problems.Add($"The setting {SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.ChallengeKey)} must be base64 of at least {SignUpChallenge.MinimumKeyBytes} bytes.");
+        }
+
+        if (signUp.DisposableDomains.IsSet)
+        {
+            var prefix = $"{SectionName}:{nameof(SignUp)}:{nameof(SignUpOptions.DisposableDomains)}";
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDisposableDomainsOptions.Url)}", signUp.DisposableDomains.Url);
+            if (string.IsNullOrWhiteSpace(signUp.DisposableDomains.Sha256))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpDisposableDomainsOptions.Sha256)} is required.");
+            }
+            else if (!Sha256Hex().IsMatch(signUp.DisposableDomains.Sha256))
+            {
+                problems.Add($"The setting {prefix}:{nameof(SignUpDisposableDomainsOptions.Sha256)} must be 64 hex characters.");
+            }
+        }
+
         if (signUp.HasDocuments)
         {
             var prefix = $"{SectionName}:{nameof(SignUp)}";
@@ -292,6 +365,44 @@ public sealed partial class ControlPlaneOptions
 
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:en", document.Urls.En);
         AddHttpsUrlProblem(problems, $"{prefix}:{nameof(SignUpDocumentOptions.Urls)}:vi", document.Urls.Vi);
+    }
+
+    private static List<string> PayOsProblems(ControlPlanePayOsOptions payOs, bool outsideDevelopment)
+    {
+        var problems = new List<string>();
+        var prefix = $"{SectionName}:{nameof(PayOs)}";
+        var setting = $"{prefix}:{nameof(ControlPlanePayOsOptions.Provider)}";
+        if (string.IsNullOrWhiteSpace(payOs.Provider))
+        {
+            return problems;
+        }
+
+        if (string.Equals(payOs.Provider, PayOsProviders.PayOs, StringComparison.OrdinalIgnoreCase))
+        {
+            AddHttpsUrlProblem(problems, $"{prefix}:{nameof(ControlPlanePayOsOptions.BaseUrl)}", payOs.BaseUrl);
+            foreach (var (name, value) in new[]
+            {
+                (nameof(ControlPlanePayOsOptions.ClientId), payOs.ClientId),
+                (nameof(ControlPlanePayOsOptions.ApiKey), payOs.ApiKey),
+                (nameof(ControlPlanePayOsOptions.ChecksumKey), payOs.ChecksumKey),
+            })
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    problems.Add($"The setting {prefix}:{name} is required.");
+                }
+            }
+        }
+        else if (!string.Equals(payOs.Provider, PayOsProviders.Fake, StringComparison.OrdinalIgnoreCase))
+        {
+            problems.Add($"The setting {setting} must be {PayOsProviders.Fake} or {PayOsProviders.PayOs}.");
+        }
+        else if (outsideDevelopment)
+        {
+            problems.Add($"The setting {setting} must not be {PayOsProviders.Fake} outside Development and Testing.");
+        }
+
+        return problems;
     }
 
     private static List<string> DnsProblems(ControlPlaneDnsOptions dns, bool outsideDevelopment)
@@ -410,4 +521,7 @@ public sealed partial class ControlPlaneOptions
 
     [GeneratedRegex("^[a-z0-9]+(-[a-z0-9]+)*$")]
     private static partial Regex CellId();
+
+    [GeneratedRegex("^[0-9a-fA-F]{64}$")]
+    private static partial Regex Sha256Hex();
 }

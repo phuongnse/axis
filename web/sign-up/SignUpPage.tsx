@@ -1,20 +1,26 @@
-import { Checkbox, Flex, Form, Input, Select, Typography } from 'antd'
+import { Flex, Form, Input, Select, Typography } from 'antd'
 import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from '../src/platform/api'
+import { AcceptTermsField } from '../src/platform/AcceptTermsField'
 import { AxisAlert } from '../src/platform/AxisAlert'
 import { AxisButton } from '../src/platform/AxisButton'
 import { AxisField, type AxisFieldStatus } from '../src/platform/AxisField'
+import { FilledText } from '../src/platform/FilledText'
 import { placeProblemErrors } from '../src/platform/problemErrors'
 import { requiredMark } from '../src/platform/requiredMark'
+import { StartFromField } from '../src/platform/StartFromField'
 import { useText } from '../src/platform/texts'
 import { useDesignTokens } from '../src/platform/themeMode'
+import type { SignUpDocuments } from './documents'
 import { SignUpFrame } from './SignUpFrame'
 import { suggestSubdomain } from './suggestSubdomain'
 import { signUpLocales, type SignUpLocale } from './texts'
+import { useProofOfWork } from './useProofOfWork'
 
 interface SignUpApplication {
   id: string
   titles: Record<SignUpLocale, string>
+  descriptions: Record<SignUpLocale, string>
 }
 
 type SubdomainStatus =
@@ -31,7 +37,7 @@ interface SubdomainAnswer {
 }
 
 /** The fields of the form in the order the page shows them, which is the order a click checks them in. */
-const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'application', 'language'] as const
+const formFields = ['fullName', 'email', 'businessName', 'subdomain', 'language', 'application', 'terms'] as const
 type FormField = (typeof formFields)[number]
 
 interface SignUpValues {
@@ -45,7 +51,13 @@ interface SignUpValues {
 
 const checkDelay = 300
 
+/** The document versions that the form sends, which a refusal puts under the terms box. */
+const versionKeys = ['termsVersion', 'dpaVersion', 'privacyVersion']
+
 function fieldOf(segments: string[]): FormField | null {
+  if (segments.length === 1 && versionKeys.includes(segments[0])) {
+    return 'terms'
+  }
   return formFields.find((field) => segments.length === 1 && segments[0] === field) ?? null
 }
 
@@ -73,17 +85,23 @@ function subdomainStatusOf(status: SubdomainStatus, t: (key: string) => string):
 export function SignUpPage({
   locale,
   onLocaleChange,
+  documents,
+  onDocumentsRefused,
 }: {
   locale: SignUpLocale
   onLocaleChange: (locale: SignUpLocale) => void
+  documents: SignUpDocuments | undefined
+  /** Called when the control plane refuses a document version, so the page loads the documents again. */
+  onDocumentsRefused: () => void
 }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const [form] = Form.useForm()
   const subdomain = Form.useWatch<string | undefined>('subdomain', form)
   const subdomainEdited = useRef(false)
   const languageEdited = useRef(false)
-  const [applications, setApplications] = useState<SignUpApplication[]>([])
+  const [applications, setApplications] = useState<SignUpApplication[] | 'failed'>()
+  const [tenantDomain, setTenantDomain] = useState<string>()
   const [answer, setAnswer] = useState<SubdomainAnswer | null>(null)
   const [sending, setSending] = useState(false)
   const [formErrors, setFormErrors] = useState<string[]>([])
@@ -91,17 +109,34 @@ export function SignUpPage({
   const formErrorRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLElement>(null)
   const focusEmail = useRef(false)
+  const proofOfWork = useProofOfWork()
 
   useEffect(() => {
     const controller = new AbortController()
     apiFetch('/api/sign-up/applications', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
       .then(async (response) => {
+        setApplications(
+          response.ok ? ((await response.json()) as { applications: SignUpApplication[] }).applications : 'failed',
+        )
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setApplications('failed')
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch('/api/sign-up/region', { signal: controller.signal }, { promptSignInOnUnauthorized: false })
+      .then(async (response) => {
         if (response.ok) {
-          setApplications(((await response.json()) as { applications: SignUpApplication[] }).applications)
+          setTenantDomain(((await response.json()) as { tenantDomain: string }).tenantDomain)
         }
       })
       .catch(() => {
-        // The list stays empty. The person can still fill in the rest of the form.
+        // The subdomain shows alone when the region does not answer.
       })
     return () => controller.abort()
   }, [])
@@ -176,12 +211,27 @@ export function SignUpPage({
       ? answer.status
       : { state: 'checking' }
   const subdomainStatus = subdomainStatusOf(status, t)
+  const choices = Array.isArray(applications)
+    ? applications.map((application) => ({
+        id: application.id,
+        title: application.titles[locale],
+        description: application.descriptions[locale],
+      }))
+    : applications
 
   const showRefusal = (errors: Record<string, string[]>) => {
     const placed = placeProblemErrors<FormField>(errors, fieldOf)
     form.setFields(
-      placed.fields.map(({ field, messages }) => ({ name: field, errors: messages.map((message) => t(message)) })),
+      placed.fields.map(({ field, messages }) => ({
+        name: field,
+        errors: messages.map((message) => t(message)),
+        // A refused version means the box was ticked for documents that are no longer current, so it asks for the box again.
+        ...(field === 'terms' ? { value: false } : {}),
+      })),
     )
+    if (placed.fields.some(({ field }) => field === 'terms')) {
+      onDocumentsRefused()
+    }
     const first = formFields.find((field) => placed.fields.some((refused) => refused.field === field))
     if (first) {
       form.scrollToField(first, { focus: true })
@@ -193,6 +243,24 @@ export function SignUpPage({
     setFormErrors(shown)
   }
 
+  // The message of a 429: the wait in minutes from Retry-After for the address limit, or tomorrow for the domain limit.
+  // See docs/reference/sign-up.md#sending-the-form. An answer without a usable wait or a known limit gets the failed text.
+  const limitMessage = async (response: Response) => {
+    const limit = ((await response.json().catch(() => ({}))) as { limit?: string }).limit
+    if (limit === 'domain') {
+      return t('signUp.limit.domain')
+    }
+    const header = response.headers.get('Retry-After')
+    const seconds = header !== null && /^\d+$/.test(header) ? Number(header) : 0
+    if (limit !== 'address' || seconds <= 0) {
+      return t('signUp.failed')
+    }
+    const minutes = Math.ceil(seconds / 60)
+    return minutes === 1
+      ? t('signUp.limit.address.one')
+      : t('signUp.limit.address').replace('{minutes}', new Intl.NumberFormat(locale).format(minutes))
+  }
+
   const send = async (values: SignUpValues) => {
     if (status.state === 'checking' || status.state === 'refused') {
       form.scrollToField('subdomain', { focus: true })
@@ -201,6 +269,7 @@ export function SignUpPage({
     setSending(true)
     setFormErrors([])
     try {
+      const altcha = await proofOfWork.solution()
       const response = await apiFetch(
         '/api/sign-up',
         {
@@ -213,18 +282,29 @@ export function SignUpPage({
             subdomain: values.subdomain,
             language: values.language,
             application: values.application ?? '',
+            termsVersion: documents?.terms.version,
+            dpaVersion: documents?.dpa.version,
+            privacyVersion: documents?.privacy.version,
+            ...(altcha ? { altcha } : {}),
           }),
         },
         { promptSignInOnUnauthorized: false },
       )
       if (response.status === 202) {
         setSent({ email: values.email.trim() })
-      } else if (response.status === 400) {
-        showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
       } else {
-        setFormErrors([t('signUp.failed')])
+        // A solved challenge is for one try, so the next try solves a new one.
+        proofOfWork.renew()
+        if (response.status === 400) {
+          showRefusal(((await response.json()) as { errors?: Record<string, string[]> }).errors ?? {})
+        } else if (response.status === 429) {
+          setFormErrors([await limitMessage(response)])
+        } else {
+          setFormErrors([t('signUp.failed')])
+        }
       }
     } catch {
+      proofOfWork.renew()
       setFormErrors([t('signUp.failed')])
     } finally {
       setSending(false)
@@ -242,6 +322,7 @@ export function SignUpPage({
       onLocaleChange={onLocaleChange}
       title={sent ? t('signUp.inbox.title') : t('signUp.title')}
       titleRef={titleRef}
+      documents={documents}
     >
       {formErrors.length > 0 && (
         <div ref={formErrorRef} tabIndex={-1}>
@@ -312,17 +393,14 @@ export function SignUpPage({
             <Input
               autoComplete="off"
               spellCheck={false}
+              suffix={
+                tenantDomain === undefined ? undefined : (
+                  <span style={{ color: colour.textMuted }}>.{tenantDomain}</span>
+                )
+              }
               onChange={() => {
                 subdomainEdited.current = true
               }}
-            />
-          </AxisField>
-          <AxisField label={t('signUp.application')} help={t('signUp.application.help')} name="application">
-            <Select
-              options={applications.map((application) => ({
-                value: application.id,
-                label: application.titles[locale],
-              }))}
             />
           </AxisField>
           <AxisField
@@ -338,19 +416,42 @@ export function SignUpPage({
               }}
             />
           </AxisField>
-          <Form.Item
+          <StartFromField
+            name="application"
+            label={t('signUp.startFrom')}
+            help={t('signUp.startFrom.help')}
+            blank={t('signUp.startFrom.blank')}
+            choices={choices}
+            failedMessage={t('signUp.startFrom.failed')}
+          />
+          <AcceptTermsField
             name="terms"
-            valuePropName="checked"
-            style={{ marginBottom: 0 }}
-            rules={[
-              {
-                validator: (_rule, checked: boolean) =>
-                  checked ? Promise.resolve() : Promise.reject(new Error(t('signUp.terms.required'))),
-              },
-            ]}
-          >
-            <Checkbox>{t('signUp.terms')}</Checkbox>
-          </Form.Item>
+            text={t('signUp.terms')}
+            documents={{
+              terms: { label: t('signUp.terms.termsOfService'), href: documents?.terms.urls[locale] },
+              dpa: { label: t('signUp.terms.dpa'), href: documents?.dpa.urls[locale] },
+            }}
+            requiredMessage={t('signUp.terms.required')}
+          />
+          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+            <FilledText
+              text={t('signUp.privacyNotice')}
+              parts={{
+                privacy: documents ? (
+                  <Typography.Link
+                    href={documents.privacy.urls[locale]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: colour.primaryText }}
+                  >
+                    {t('signUp.privacyNotice.privacyPolicy')}
+                  </Typography.Link>
+                ) : (
+                  t('signUp.privacyNotice.privacyPolicy')
+                ),
+              }}
+            />
+          </Typography.Paragraph>
           <AxisButton role="finish" htmlType="submit" block loading={sending} style={{ marginTop: spacing.lg }}>
             {t('signUp.submit')}
           </AxisButton>

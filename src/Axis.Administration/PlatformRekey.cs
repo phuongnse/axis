@@ -62,6 +62,7 @@ public static class PlatformRekey
                 Plan(steps, versions, row.Id, row.ModelKey, TenantSecretFields.ModelKey, value => row.ModelKey = value);
                 Plan(steps, versions, row.Id, row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
                 Plan(steps, versions, row.Id, row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
+                Plan(steps, versions, row.Id, row.RealmAgentClientSecret, TenantSecretFields.RealmAgentClientSecret, value => row.RealmAgentClientSecret = value);
             }
 
             foreach (var binding in bindings)

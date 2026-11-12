@@ -103,8 +103,12 @@ internal sealed class AnthropicModelAdapter(ModelBinding binding, HttpClient cli
     private static ModelAnswer Answer(string text)
     {
         using var document = JsonDocument.Parse(text);
-        var root = document.RootElement;
+        return Answer(document.RootElement);
+    }
 
+    /// <summary>Reads one answer in the shape of a Messages API response.</summary>
+    internal static ModelAnswer Answer(JsonElement root)
+    {
         var content = new List<ModelContent>();
         foreach (var block in root.GetProperty("content").EnumerateArray())
         {

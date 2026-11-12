@@ -61,7 +61,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
             }
 
             AddRealmProblems(section.GetSection(id), id, settings.PreviewOf, problems);
-            AddRealmUsersProblems(section.GetSection(id), id, settings.PreviewOf, problems);
+            AddRealmClientProblems(section.GetSection(id), id, settings.PreviewOf, "UsersClientSecret", problems);
+            AddRealmClientProblems(section.GetSection(id), id, settings.PreviewOf, "AgentClientSecret", problems);
             AddLegalProblems(section.GetSection(id), id, settings.PreviewOf, problems);
         }
 
@@ -109,17 +110,18 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         }
     }
 
-    // A blank UsersClientSecret means the tenant has no users client. With a secret, the Oidc authority must end in
-    // /realms/<realm>. A preview tenant's own Oidc block is rejected already. A message names a setting and never holds a value.
-    private static void AddRealmUsersProblems(IConfigurationSection tenant, string id, string? previewOf, List<string> problems)
+    // A blank UsersClientSecret or AgentClientSecret means the tenant has no such client. With a secret, the Oidc authority
+    // must end in /realms/<realm>. A preview tenant's own Oidc block is rejected already. A message names a setting and
+    // never holds a value.
+    private static void AddRealmClientProblems(IConfigurationSection tenant, string id, string? previewOf, string setting, List<string> problems)
     {
-        if (!string.IsNullOrWhiteSpace(previewOf) || Blank(tenant["Oidc:UsersClientSecret"]) is null || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not null)
+        if (!string.IsNullOrWhiteSpace(previewOf) || Blank(tenant[$"Oidc:{setting}"]) is null || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not null)
         {
             return;
         }
 
         var prefix = $"{TenantOptions.SectionName}:{id}";
-        problems.Add($"Tenant '{id}' sets {prefix}:Oidc:UsersClientSecret, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/<realm>.");
+        problems.Add($"Tenant '{id}' sets {prefix}:Oidc:{setting}, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/<realm>.");
     }
 
     // The same checks as `tenant legal set`, so a tenant can move between the sources. A preview tenant takes its main
@@ -195,14 +197,26 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
             : new TenantLegal(privacyUrl, termsUrl, termsVersion, sites);
     }
 
-    private static TenantRealmUsers? RealmUsers(IConfigurationSection tenant, bool preview)
+    private static TenantRealmUsers? RealmUsers(IConfigurationSection tenant, bool preview) =>
+        RealmClient(tenant, preview, "UsersClientSecret") is { } client
+            ? new TenantRealmUsers(client.BaseAddress, client.Realm, client.Secret)
+            : null;
+
+    private static TenantRealmAgent? RealmAgent(IConfigurationSection tenant, bool preview) =>
+        RealmClient(tenant, preview, "AgentClientSecret") is { } client
+            ? new TenantRealmAgent(client.BaseAddress, client.Realm, client.Secret)
+            : null;
+
+    // The address, realm and secret of one of the realm's own clients, or null when the tenant has none: a preview tenant,
+    // a blank secret or an authority that does not end in /realms/<realm>.
+    private static (Uri BaseAddress, string Realm, SecretValue Secret)? RealmClient(IConfigurationSection tenant, bool preview, string setting)
     {
-        if (preview || Secret(tenant["Oidc:UsersClientSecret"]) is not { } secret || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not { } address)
+        if (preview || Secret(tenant[$"Oidc:{setting}"]) is not { } secret || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not { } address)
         {
             return null;
         }
 
-        return new TenantRealmUsers(address.BaseAddress, address.Realm, secret);
+        return (address.BaseAddress, address.Realm, secret);
     }
 
     private static TenantRealmAccess? Realm(IConfigurationSection tenant, bool preview)
@@ -264,7 +278,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 HostSites: settings.SiteHosts.Count == 0
                     ? null
                     : new Dictionary<string, string>(settings.SiteHosts.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.ToLowerInvariant())), StringComparer.OrdinalIgnoreCase),
-                Legal: tenantSection is null ? null : Legal(main is null ? tenantSection : section!.GetSection(main)));
+                Legal: tenantSection is null ? null : Legal(main is null ? tenantSection : section!.GetSection(main)),
+                RealmAgent: tenantSection is null ? null : RealmAgent(tenantSection, main is not null));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

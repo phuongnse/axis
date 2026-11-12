@@ -2,6 +2,9 @@
 # Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
 # The integration tests also run the test scenarios of every application under samples/apps/.
 # The Keycloak theme is built first, because the tests' Keycloak loads it.
+# Before that, scripts/lib/docker-images.mjs loads the container images that setup saved in ~/.cache/axis-docker, so the
+# tests pull none that the cache holds, see docs/development.md#integration-tests. Testcontainers' cleanup helper is
+# pinned here, because it is one of those images.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
 # in the `unaffected_by` lists of .nexkit/config.json, which scripts/lib/affected.mjs reads. The smoke
@@ -21,15 +24,19 @@
 # is unset, and AXIS_INTEGRATION_SHARD wins when both are set. scripts/lib/integration-shard.mjs gives each shard its
 # test classes by their durations in tests/Axis.Integration.Tests/class-durations.json. A shard expects
 # the scenario suites only when it holds the class that writes them: ScenarioRunnerTests. Shard 1 also
-# runs the control plane suite. The shard cannot be combined with arguments.
+# runs the control plane suite, and runs only that suite when the split gives it no class, since that
+# suite alone outweighs a shard's share. The shard cannot be combined with arguments.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
+
+export TESTCONTAINERS_RYUK_CONTAINER_IMAGE=testcontainers/ryuk:0.14.0
 
 # A shard runs its own classes; without one, every class but the performance tests runs.
 filter=(--filter-not-class '*PerformanceTests')
 shard_classes=
 control_plane=true
+integration_suite=true
 shard_variable=AXIS_INTEGRATION_SHARD
 shard="${AXIS_INTEGRATION_SHARD:-}"
 if [ -z "$shard" ] && [ -n "${NEXKIT_SHARD:-}" ]; then
@@ -47,8 +54,12 @@ if [ -n "$shard" ]; then
     exit 2
   fi
   shard_classes="$(node scripts/lib/integration-shard.mjs --classes "$shard")"
-  shard_filter="$(node scripts/lib/integration-shard.mjs "$shard")"
-  mapfile -t filter <<<"$shard_filter"
+  if [ -z "$shard_classes" ] && [ "$shard_index" = 1 ]; then
+    integration_suite=false
+  else
+    shard_filter="$(node scripts/lib/integration-shard.mjs "$shard")"
+    mapfile -t filter <<<"$shard_filter"
+  fi
   [ "$shard_index" = 1 ] || control_plane=false
 fi
 
@@ -67,6 +78,7 @@ fi
 build_theme() { npm run build:keycloak-theme --prefix web; }
 
 if [ "$#" -gt 0 ]; then
+  node scripts/lib/docker-images.mjs load
   build_theme
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "$@"
@@ -74,6 +86,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 if affected integration; then
+  node scripts/lib/docker-images.mjs load
   build_theme
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   if [ "$control_plane" = true ]; then
@@ -87,8 +100,10 @@ if affected integration; then
       >"$control_plane_log" 2>&1 &
     control_plane_pid=$!
   fi
-  run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
-    --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "${filter[@]}"
+  if [ "$integration_suite" = true ]; then
+    run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
+      --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "${filter[@]}"
+  fi
   if [ "$control_plane" = true ]; then
     wait "$control_plane_pid" || status=1
     cat "$control_plane_log"
@@ -96,7 +111,7 @@ if affected integration; then
   fi
 else
   for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
-  skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
+  [ "$integration_suite" = false ] || skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
   [ "$control_plane" = false ] || skip_suite Axis.ControlPlane.Integration.Tests controlplane/tests/Axis.ControlPlane.Integration.Tests
 fi
 

@@ -32,26 +32,7 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // A database that an earlier test left behind must not fail this test, so each test starts from none.
-    public async ValueTask InitializeAsync()
-    {
-        await using var connection = new NpgsqlConnection(await PostgreSqlServer.AdminConnectionStringAsync());
-        await connection.OpenAsync(CancellationToken);
-        var names = new List<string>();
-        await using (var list = new NpgsqlCommand("SELECT d.datname FROM pg_database d JOIN pg_roles r ON r.oid = d.datdba WHERE r.rolname = 'axis_scenario'", connection))
-        await using (var reader = await list.ExecuteReaderAsync(CancellationToken))
-        {
-            while (await reader.ReadAsync(CancellationToken))
-            {
-                names.Add(reader.GetString(0));
-            }
-        }
-
-        foreach (var name in names)
-        {
-            await using var drop = new NpgsqlCommand($"""DROP DATABASE IF EXISTS "{name}" WITH (FORCE)""", connection);
-            await drop.ExecuteNonQueryAsync(CancellationToken);
-        }
-    }
+    public async ValueTask InitializeAsync() => await PostgreSqlServer.DropCountedScenarioDatabasesAsync(CancellationToken);
 
     [Fact]
     public async Task An_accept_writes_the_drafts_files_and_adds_one_revision_naming_the_request()
@@ -182,6 +163,64 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         Assert.Equal([secondRequest.ToString("D"), firstRequest.ToString("D")], list.Take(2).Select(revision => revision.Request));
         Assert.True(File.Exists(Path.Combine(folder.Path, "entities/invoice.json")));
         Assert.True(File.Exists(Path.Combine(folder.Path, "entities/payment.json")));
+    }
+
+    [Fact]
+    public async Task A_studio_accept_of_a_ready_requests_draft_moves_the_request_to_accepted_and_erases_its_token_and_audits_it()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        using var folder = Application().With("entities/order.json", Order());
+        using var revisions = new TemporaryFolder();
+        var author = NewAuthor(scenario, folder.Path, revisions.Path, "author");
+        var draft = await NewDraftAsync(author);
+        Written(await author.Drafts.WriteAsync(draft, Entity(Guid.NewGuid(), "Invoice"), CancellationToken));
+        var revisionCount = author.Revisions.List().Count;
+        var authoringRequest = await InsertReadyRequestAsync(scenario, tenant, draft, "author");
+        var request = await QueueAsync(scenario, tenant, draft, "author", client: "studio");
+
+        var result = await RunPublisherAsync(scenario, tenant, revisions.Path, folder.Path, request);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("succeeded", await StatusAsync(scenario, tenant, request));
+        var list = author.Revisions.List();
+        Assert.Equal(revisionCount + 1, list.Count);
+        Assert.Equal("studio", list[0].Client);
+        Assert.Equal("accepted", await ScalarAsync(scenario, tenant, $"SELECT state FROM axis.authoring_requests WHERE id = '{authoringRequest}'"));
+        Assert.True((bool)(await ScalarAsync(scenario, tenant, $"SELECT refresh_token IS NULL AND finished_at IS NOT NULL FROM axis.authoring_requests WHERE id = '{authoringRequest}'"))!);
+        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'authoringRequest.accepted'"));
+        Assert.Equal(
+            $"author|{_applicationId}|{authoringRequest}",
+            await ScalarAsync(
+                scenario,
+                tenant,
+                "SELECT actor || '|' || application_id || '|' || (details->>'requestId') FROM axis.audit_records WHERE action = 'authoringRequest.accepted'"));
+    }
+
+    [Fact]
+    public async Task A_failed_accept_leaves_the_ready_request_ready_with_its_token_and_writes_no_authoring_request_record()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        using var folder = Application().With("entities/order.json", Order());
+        using var revisions = new TemporaryFolder();
+        var author = NewAuthor(scenario, folder.Path, revisions.Path, "author");
+        var draft = await NewDraftAsync(author);
+        Assert.Null((await author.Drafts.ReadAsync(draft, _orderId, CancellationToken)).Refusal);
+        Written(await author.Drafts.WriteAsync(draft, Entity(Guid.NewGuid(), "Invoice"), CancellationToken));
+        folder.With("entities/order.json", Order("remark"));
+        author.Revisions.RecordOutside();
+        var authoringRequest = await InsertReadyRequestAsync(scenario, tenant, draft, "author");
+        var request = await QueueAsync(scenario, tenant, draft, "author", client: "studio");
+
+        await RunPublisherAsync(scenario, tenant, revisions.Path, folder.Path, request);
+
+        Assert.Equal("failed", await StatusAsync(scenario, tenant, request));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.AcceptConflict, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("ready", await ScalarAsync(scenario, tenant, $"SELECT state FROM axis.authoring_requests WHERE id = '{authoringRequest}'"));
+        Assert.True((bool)(await ScalarAsync(scenario, tenant, $"SELECT refresh_token IS NOT NULL AND finished_at IS NULL FROM axis.authoring_requests WHERE id = '{authoringRequest}'"))!);
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'authoringRequest.accepted'"));
     }
 
     [Fact]
@@ -344,7 +383,7 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
     }
 
     // Stores the request over the runtime role, as the server does.
-    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string draft, string requestedBy)
+    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string draft, string requestedBy, string client = "agent")
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
@@ -354,15 +393,30 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, status, draft_id, folder, client, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, 'accept', 'queued', @draft, @folder, 'agent', @by, 'Requester', clock_timestamp())
+            VALUES (@id, @application, 'accept', 'queued', @draft, @folder, @client, @by, 'Requester', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", _applicationId);
         command.Parameters.AddWithValue("draft", Guid.Parse(draft));
         command.Parameters.AddWithValue("folder", _name);
+        command.Parameters.AddWithValue("client", client);
         command.Parameters.AddWithValue("by", requestedBy);
         await command.ExecuteNonQueryAsync(CancellationToken);
+        return id;
+    }
+
+    // A ready authoring request of the draft, with a refresh token, as the agent host leaves it.
+    private async Task<Guid> InsertReadyRequestAsync(AdminScenario scenario, string tenant, string draft, string author)
+    {
+        var id = Guid.CreateVersion7();
+        await ScalarAsync(
+            scenario,
+            tenant,
+            $"""
+            INSERT INTO axis.authoring_requests (id, application_id, author, text, state, draft_id, refresh_token)
+            VALUES ('{id}', '{_applicationId}', '{author}', 'Add an invoice.', 'ready', '{draft}', '\x01'::bytea)
+            """);
         return id;
     }
 
@@ -381,7 +435,7 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
             ["Studio:RevisionsPath"] = revisionsPath,
             ["ConnectionStrings:Platform"] = scenario.Platform,
             ["Modules:Path"] = modules,
-            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync() : null,
+            ["Scenarios:ServerConnectionString"] = withScenarioServer ? await PostgreSqlServer.ScenarioConnectionStringAsync(PostgreSqlServer.CountedScenarioRole) : null,
         };
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
