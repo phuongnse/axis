@@ -1,0 +1,6 @@
+{
+  "$schema": "../case.schema.json",
+  "start": { "from": "application", "name": "approvals" },
+  "request": "Let the requester change the amount of a request after they submit it, in case they made a mistake.",
+  "outcome": { "kind": "refusal", "module": "approvals", "point": "Request/validations/frozenAfterSubmit" }
+}
