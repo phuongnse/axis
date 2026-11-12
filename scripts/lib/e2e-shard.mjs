@@ -68,14 +68,14 @@ export function split(specs, total, workers) {
   return shards.map((shard) => shard.map((spec) => spec.path).sort())
 }
 
+/** The estimated seconds of the longest of `shards`, each a list of spec paths, with `setup` added to each shard. */
+export function longestShard(shards, specs, setup, workers) {
+  return Math.max(...shards.map((paths) => setup + estimate(specs.filter((s) => paths.includes(s.path)), workers)))
+}
+
 /** The fewest shards that fit the budget, and an `Over budget:` line for each spec that alone does not. */
 export function count(specs, workers, budget = budgetSeconds, max = maxShards.e2e, setup = 0) {
-  const longest = (total) =>
-    Math.max(
-      ...split(specs, total, workers).map(
-        (paths) => setup + estimate(specs.filter((s) => paths.includes(s.path)), workers),
-      ),
-    )
+  const longestOf = (total) => longestShard(split(specs, total, workers), specs, setup, workers)
   const overBudget = []
   for (const spec of specs) {
     const seconds = Math.round(setup + estimate([spec], workers))
@@ -83,7 +83,7 @@ export function count(specs, workers, budget = budgetSeconds, max = maxShards.e2
       overBudget.push(`Over budget: ${spec.path} takes about ${seconds} s, longer than the budget of ${budget} s.`)
     }
   }
-  return { total: shardCount(longest, budget, max), overBudget }
+  return { total: shardCount(longestOf, budget, max), overBudget }
 }
 
 /** The seconds a shard pays besides its specs, or 0 when the durations do not measure it. */
@@ -91,9 +91,11 @@ export function readSetup(dir = e2e) {
   return JSON.parse(readFileSync(path.join(dir, 'spec-durations.json'), 'utf8'))[setupKey] ?? 0
 }
 
-/** Reads the specs of tests/e2e/specs with their weights. */
-export function readSpecs(dir = e2e) {
-  const durations = JSON.parse(readFileSync(path.join(dir, 'spec-durations.json'), 'utf8'))
+/** Reads the specs of tests/e2e/specs with their weights from `durations`, by default spec-durations.json. */
+export function readSpecs(
+  dir = e2e,
+  durations = JSON.parse(readFileSync(path.join(dir, 'spec-durations.json'), 'utf8')),
+) {
   const specSeconds = Object.entries(durations)
     .filter(([name]) => name !== setupKey)
     .map(([, seconds]) => seconds)
@@ -105,6 +107,13 @@ export function readSpecs(dir = e2e) {
       const source = readFileSync(path.join(dir, specPath), 'utf8')
       return { path: specPath, seconds: durations[specPath] ?? fallback, serial: isSerial(source) }
     })
+}
+
+/** The longest estimated shard, weighed with `weighBy`, of the split that `splitBy` gives at its own count. */
+export function longest(splitBy, weighBy, dir = e2e) {
+  const specs = readSpecs(dir, splitBy)
+  const { total } = count(specs, workers, budgetSeconds, maxShards.e2e, splitBy[setupKey] ?? 0)
+  return longestShard(split(specs, total, workers), readSpecs(dir, weighBy), weighBy[setupKey] ?? 0, workers)
 }
 
 /** The seconds of each chromium spec in Playwright JUnit texts, by spec path. A suite's name is its

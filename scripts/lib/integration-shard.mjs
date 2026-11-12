@@ -112,12 +112,42 @@ export function estimate(seconds, heaviest, parallelism) {
   return Math.max(heaviest, seconds / parallelism)
 }
 
+/**
+ * The estimated seconds of the longest of `shards`, each a list of class names, weighed by `classes`. Shard 1
+ * also pays `firstShardSeconds`.
+ */
+export function longestShard(shards, classes, firstShardSeconds, parallelism) {
+  const all = units(classes)
+  const heaviest = all[0]?.seconds ?? 0
+  return Math.max(
+    ...shards.map((names, index) => {
+      const start = index === 0 ? firstShardSeconds : 0
+      const seconds = all.reduce((sum, unit) => (names.includes(unit.names[0]) ? sum + unit.seconds : sum), start)
+      return estimate(seconds, heaviest, parallelism)
+    }),
+  )
+}
+
+/** The longest estimated shard, weighed with `weighBy`, of the split that `splitBy` gives at its own count. */
+export function longest(splitBy, weighBy, dir = project) {
+  const found = readClasses(dir)
+  const classes = weigh(found, splitBy)
+  const firstShardSeconds = splitBy[controlPlane] ?? 0
+  const parallelism = splitBy[parallelismKey] ?? 1
+  const { total } = count(classes, firstShardSeconds, budgetSeconds, maxShards.integration, parallelism)
+  return longestShard(
+    split(classes, total, firstShardSeconds),
+    weigh(found, weighBy),
+    weighBy[controlPlane] ?? 0,
+    weighBy[parallelismKey] ?? 1,
+  )
+}
+
 /** The fewest shards that fit the budget, and an `Over budget:` line for each unit that alone does not. */
 export function count(classes, firstShardSeconds, budget = budgetSeconds, max = maxShards.integration, parallelism = 1) {
   const all = units(classes)
-  const heaviest = all[0]?.seconds ?? 0
-  const longest = (total) =>
-    Math.max(...packLightest(all, total, firstShardSeconds).map((shard) => estimate(shard.seconds, heaviest, parallelism)))
+  const longestOf = (total) =>
+    longestShard(split(classes, total, firstShardSeconds), classes, firstShardSeconds, parallelism)
   const line = (name, seconds) =>
     `Over budget: ${name} takes about ${Math.round(seconds)} s, longer than the budget of ${budget} s.`
   const overBudget = []
@@ -127,7 +157,7 @@ export function count(classes, firstShardSeconds, budget = budgetSeconds, max = 
     const members = [...unit.names].sort().join(', ')
     overBudget.push(line(unit.collection ? `collection ${unit.collection} (${members})` : members, unit.seconds))
   }
-  return { total: shardCount(longest, budget, max), overBudget }
+  return { total: shardCount(longestOf, budget, max), overBudget }
 }
 
 /** The dotnet test filter arguments of shard `index` (1-based) of `shards`. */

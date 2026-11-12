@@ -182,9 +182,9 @@ that holds it.
   changes CI with it.
 - **A CI run on `main` keeps the shard durations true.** When all its check jobs pass, a job that runs
   no model refreshes the durations from the results of that run and the latest runs dispatched on `main`
-  before it, each entry the median of its measures. It opens or updates one `process` issue when they
-  drift, and opens one for each test that alone passes the shard budget, as
-  [the shards section](development.md#shards) says.
+  before it, each entry the median of its measures. It opens or updates one `process` issue when the current
+  split of a durations file would run a shard past the shard budget and the new durations split it better, and opens
+  one for each test that alone passes the shard budget, as [the shards section](development.md#shards) says.
 
 ### NexKit's checks
 
