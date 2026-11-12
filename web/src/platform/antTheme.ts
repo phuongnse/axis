@@ -98,12 +98,12 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       TreeSelect: fieldBorder,
       // A selected item draws in primaryText on the selected tint, see docs/reference/actions-and-controls.md#menus.
       // Every dropdown menu keeps spacing-xs round its items, see docs/reference/shell.md#app-switcher-and-preferences.
-      // Proposed: a menu's item spans its menu's width with square corners, see the review on #3263.
+      // Proposed: a menu's item, in a dropdown, a select or the sidebar, has `radius-base` corners, see the review on #3263.
       Dropdown: {
         colorError: colour.dangerText,
         colorPrimary: colour.primaryText,
         paddingXXS: spacing.xs,
-        borderRadiusSM: 0,
+        borderRadiusSM: radius.base,
       },
       Modal: { contentBg: colour.surface, headerBg: colour.surface, footerBg: colour.surface },
       // A tab's label starts at the top of its bar, so the padding above it is removed and the one below is kept.
@@ -116,9 +116,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         horizontalItemPaddingLG: `0 0 ${spacing.md}px`,
       },
       Menu: {
-        itemBorderRadius: 0,
-        itemMarginInline: 0,
-        itemMarginBlock: 0,
+        itemBorderRadius: radius.base,
+        itemMarginInline: spacing.xs,
         itemSelectedColor: colour.primaryText,
         horizontalItemSelectedColor: colour.primaryText,
         collapsedWidth: 64,
@@ -194,9 +193,7 @@ export function antConfigFor(mode: ThemeMode, page?: PageTokenValues, reducedMot
  * would give them one colour.
  */
 export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
-  const { colour, type, spacing, size } = designTokensFor(mode, page)
-  // A select's list keeps Ant Design's inset round its options, so its headings and grouped options count from it.
-  const selectListInset = theme.getDesignToken(antThemeFor(mode)).paddingXXS
+  const { colour, type, spacing, radius, size } = designTokensFor(mode, page)
   return [
     // A message sits 4px under its control. The item keeps its own bottom margin under the message.
     `.ant-form-item .ant-form-item-explain { margin-top: 4px; font-size: ${type.fontSize}px; line-height: 20px; }`,
@@ -208,19 +205,20 @@ export function fieldRules(mode: ThemeMode, page?: PageTokenValues): string {
     `.ant-alert.ant-alert-success .ant-alert-icon { color: ${colour.successText}; }`,
     `.ant-alert.ant-alert-warning .ant-alert-icon { color: ${colour.warningText}; }`,
     `.ant-alert.ant-alert-error .ant-alert-icon { color: ${colour.dangerText}; }`,
-    // Proposed: a dropdown menu keeps its space above and below its items, and its items span its width, see the
-    // review on #3263.
-    '.ant-dropdown .ant-dropdown-menu { padding-inline: 0; }',
     // Proposed: every dropdown menu is at least `menu` wide, see the review on #3263.
     `.ant-dropdown .ant-dropdown-menu { min-width: ${size.menu}px; }`,
+    // Proposed: a select's list keeps spacing-xs round its options, which have radius-base corners, as a dropdown
+    // menu's items do, see the review on #3263.
+    `.ant-select-dropdown.ant-select-dropdown { padding: ${spacing.xs}px; }`,
+    `.ant-select-dropdown .ant-select-item-option { border-radius: ${radius.base}px; }`,
+    // Proposed: every list with group headings draws them as the sidebar does, the heading's words at spacing-md from
+    // the list's edge and its items' words at spacing-lg, and a menu's items stay there with no heading too, see the
+    // review on #3263. A select with no groups keeps its options in line with its field's text.
     '.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-list { margin-inline: 0; }',
-    // Proposed: every list with group headings draws them as the sidebar does, the heading at spacing-md from the
-    // list's edge and its items at spacing-lg, and a menu's items stay at spacing-lg with no heading too, see the review
-    // on #3263. A select with no groups keeps its options in line with its field's text.
-    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item { padding-inline: ${spacing.lg}px; }`,
-    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-title { padding-inline: ${spacing.md}px; }`,
-    `.ant-select-dropdown .ant-select-item-group { padding-inline: ${spacing.md - selectListInset}px; font-size: ${type.fontSize}px; color: ${colour.textMuted}; }`,
-    `.ant-select-dropdown .ant-select-item-option-grouped { padding-inline-start: ${spacing.lg - selectListInset}px; }`,
+    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item { padding-inline: ${spacing.lg - spacing.xs}px; }`,
+    `.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-group-title { padding-inline: ${spacing.md - spacing.xs}px; }`,
+    `.ant-select-dropdown .ant-select-item-group { padding-inline: ${spacing.md - spacing.xs}px; font-size: ${type.fontSize}px; color: ${colour.textMuted}; }`,
+    `.ant-select-dropdown .ant-select-item-option-grouped { padding-inline-start: ${spacing.lg - spacing.xs}px; }`,
   ].join('\n')
 }
 

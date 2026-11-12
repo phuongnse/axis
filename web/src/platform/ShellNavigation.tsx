@@ -1,6 +1,7 @@
 import { Menu, type MenuProps } from 'antd'
 import { Link } from 'react-router'
 import { navigationIcon } from './navigationIcons'
+import { useDesignTokens } from './themeMode'
 
 /** One entry of the shell's navigation. The label is the text the person reads. */
 export interface ShellNavigationEntry {
@@ -46,6 +47,7 @@ export function ShellNavigation({
       ),
     }
   }
+  const { spacing } = useDesignTokens()
   const items = entries.flatMap((entry): NonNullable<MenuProps['items']> => {
     if (!('entries' in entry)) return [item(entry)]
     if (collapsed) return [{ key: `${entry.key}-divider`, type: 'divider' as const }, ...entry.entries.map(item)]
@@ -54,6 +56,9 @@ export function ShellNavigation({
   return (
     <Menu
       mode="inline"
+      // Proposed: an entry's words sit at spacing-lg from the sidebar's edge, inside its spacing-xs inset, and a group's
+      // heading at spacing-md, as in every list with group headings, see the review on #3263.
+      inlineIndent={spacing.lg - spacing.xs}
       inlineCollapsed={collapsed}
       style={{ borderInlineEnd: 'none' }}
       selectedKeys={activeKey ? [activeKey] : []}
