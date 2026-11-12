@@ -14,6 +14,7 @@ import {
 } from './test-report.mjs'
 
 const script = fileURLToPath(new URL('./test-report.mjs', import.meta.url))
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 const fixtures = fileURLToPath(new URL('./fixtures/test-report/', import.meta.url))
 const root = path.join(fixtures, 'tree')
 const suites = ['passing:tests/Sample.Tests', 'failing:web', 'absent:web']
@@ -26,6 +27,11 @@ before(() => {
   copyFileSync(path.join(fixtures, 'results/passing.xml'), path.join(resultsDir, 'passing.xml'))
   const failing = readFileSync(path.join(fixtures, 'results/failing.xml'), 'utf8')
   writeFileSync(path.join(resultsDir, 'failing.xml'), failing.replaceAll('__ROOT__', root))
+  // A suite whose JUnit time (1,297.8 s) is longer than the time measured for its command (462 s).
+  writeFileSync(
+    path.join(resultsDir, 'measured.xml'),
+    '<testsuites time="1297.8"><testsuite><testcase name="t"/></testsuite></testsuites>',
+  )
 })
 
 after(() => rmSync(resultsDir, { recursive: true, force: true }))
@@ -149,6 +155,13 @@ describe('buildReport', () => {
     assert.equal(report.suites[0].missing, true)
     assert.match(formatSummary(report), /^\| absent \(missing: no results file\) \| - \| - \| - \| - \|$/m)
   })
+
+  test('shows the measured duration of a suite in place of its JUnit time', () => {
+    const report = buildReport({ suites: ['measured:web'], resultsDir, root, durations: { measured: 462 } })
+
+    assert.equal(report.suites[0].duration, 462)
+    assert.match(formatSummary(report), /^\| measured \| 1 \| 0 \| 0 \| 7m 42s \|$/m)
+  })
 })
 
 describe('command line', () => {
@@ -183,6 +196,13 @@ describe('command line', () => {
     assert.ok(result.stdout.split('\n').includes(notice), result.stdout)
 
     assert.doesNotMatch(runCli(['--skipped', 'absent', 'passing:tests/Sample.Tests', 'absent:web']).stdout, /::notice/)
+  })
+
+  test('shows a --duration in place of the JUnit time of its suite', () => {
+    const result = runCli(['--duration', 'measured=462', 'measured:web'])
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /^\| measured \| 1 \| 0 \| 0 \| 7m 42s \|$/m)
   })
 
   test('exits 1 when a suite failed or is missing', () => {
@@ -227,5 +247,58 @@ describe('command line', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.doesNotMatch(result.stdout, /Failed tests/)
     assert.equal(result.stdout.trim(), '')
+  })
+})
+
+describe('scripts/lib/test-results.sh', () => {
+  // Sources the library in bash with a clock that the test sets, so no test asserts on real time. The
+  // suite web-2 moves the fake clock on by 462 s while its command fails. scenarios-x is registered with
+  // expect_suite and writes its JUnit file, which says 100 s, after that.
+  function runLibrary(clock) {
+    const { GITHUB_ACTIONS, GITHUB_STEP_SUMMARY, ...inherited } = process.env
+    const dir = mkdtempSync(path.join(tmpdir(), 'test-results-'))
+    try {
+      const script = `set -euo pipefail
+source scripts/lib/test-results.sh
+now=1000000000000000
+${clock}
+slow() {
+  now=$((now + 462000000))
+  echo '<testsuites time="1297.8"><testsuite><testcase name="t"/></testsuite></testsuites>' > "$results_dir/web-2.xml"
+  return 1
+}
+run_suite web-2 web slow
+expect_suite scenarios-x .
+echo '<testsuites time="100"><testsuite><testcase name="s"/></testsuite></testsuites>' > "$results_dir/scenarios-x.xml"
+finish_report
+`
+      return spawnSync('bash', ['-c', script], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: { ...inherited, AXIS_TEST_RESULTS_DIR: dir },
+      })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('shows the time that a failing suite command took, and exits 1', () => {
+    const result = runLibrary('suite_clock() { echo "$now"; }')
+
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stdout, /^\| web-2 \| 1 \| 0 \| 0 \| 7m 42s \|$/m)
+  })
+
+  test('shows the JUnit time of a suite registered with expect_suite', () => {
+    const result = runLibrary('suite_clock() { echo "$now"; }')
+
+    assert.match(result.stdout, /^\| scenarios-x \| 1 \| 0 \| 0 \| 1m 40s \|$/m)
+  })
+
+  test('shows the JUnit time of a suite when bash gives no clock', () => {
+    const result = runLibrary('suite_clock() { :; }')
+
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stdout, /^\| web-2 \| 1 \| 0 \| 0 \| 21m 38s \|$/m)
   })
 })
