@@ -38,7 +38,7 @@ const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnl
 
 /**
  * Draws the unsaved draft of a form with the site's own form widget. It posts the draft to the draft page metadata
- * route 300 ms after the last edit, or of its module with `module`, and redraws from the answer. While it is mounted, the widget's `/api/apps/` calls
+ * route 300 ms after the last edit or after a save, or of its module with `module`, and redraws from the answer. While it is mounted, the widget's `/api/apps/` calls
  * get placeholder data in the browser and none goes to the server, and the form opens the placeholder record, so every
  * field holds a placeholder value. A submit on the canvas does nothing, and a click only selects. A form with steps gets a step switch
  * that picks the step the canvas shows. No condition is evaluated, so every field and section shows. An element with
@@ -54,6 +54,7 @@ export function StudioFormCanvas({
   module,
   resourceId,
   draft,
+  version,
   selected,
   onSelect,
   onChange,
@@ -65,6 +66,8 @@ export function StudioFormCanvas({
   module?: string
   resourceId: string
   draft: Record<string, unknown>
+  /** The version of the saved file. A save changes it, and the canvas then posts the draft again. */
+  version?: string
   /** The pointer of the selected field, section or step, or null. */
   selected: string | null
   onSelect: (path: string | null) => void
@@ -116,7 +119,7 @@ export function StudioFormCanvas({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, module, resourceId, draft, generation, lost])
+  }, [application, module, resourceId, draft, version, generation, lost])
 
   // A layout effect, because the widget fetches in passive effects. A child's effect runs before its parent's, so a
   // passive effect here would let the widget's first requests reach the server. Layout effects run before any of them.

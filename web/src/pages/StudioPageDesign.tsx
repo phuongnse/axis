@@ -79,6 +79,7 @@ export default function StudioPageDesign({
   resourceId,
   module,
   draft,
+  version,
   selected,
   onSelect,
   onChange,
@@ -89,6 +90,8 @@ export default function StudioPageDesign({
   /** The module that owns the page, when it is a module page. */
   module?: string
   draft: Record<string, unknown>
+  /** The version of the saved file, which the canvas redraws on after a save. */
+  version?: string
   /** The pointer of the selected widget. */
   selected: string
   onSelect: (pointer: string) => void
@@ -299,6 +302,7 @@ export default function StudioPageDesign({
             module={module}
             resourceId={resourceId}
             draft={draft}
+            version={version}
             selected={selected}
             onSelect={onSelect}
             onMove={keyMove}

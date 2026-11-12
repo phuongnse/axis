@@ -627,6 +627,84 @@ describe('the Design tab of a page', () => {
         vi.useRealTimers()
       }
     })
+
+    it('posts the draft again after a save, so a label whose text the save wrote is no longer marked', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        // The route compiles with the texts it holds: it names the label's key as missing until the text write lands.
+        let written = false
+        let holdAnswers = false
+        const heldAnswers: (() => void)[] = []
+        const missing = {
+          ...diagnosticAt('/widgets/1/title'),
+          code: 'AXC0028',
+          message: 'No locale file holds the key.',
+        }
+        const answer = (draft: Draft): Response | Promise<Response> => {
+          const response = () => respond(metadataOf(draft), written ? [] : [missing])
+          return holdAnswers
+            ? new Promise<Response>((resolve) => heldAnswers.push(() => resolve(response())))
+            : response()
+        }
+        const { fetchMock, posts } = stub(content([{ type: 'kpi' }, { type: 'chart', title: { textKey: '' } }]), answer)
+        const base = fetchMock.getMockImplementation()!
+        let releaseText!: () => void
+        const textWritten = new Promise<void>((resolve) => (releaseText = resolve))
+        fetchMock.mockImplementation(async (input: string, init?: RequestInit) => {
+          if (input.startsWith(`${folder}/texts/`) && init?.method === 'PUT') {
+            await textWritten
+            written = true
+            return new Response(JSON.stringify({ resources: [], diagnostics: [] }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          }
+          if (input === `${folder}/resources/${pageId}` && init?.method === 'PATCH') {
+            return new Response(JSON.stringify({ version: 'p2', diagnostics: [] }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            })
+          }
+          return base(input, init)
+        })
+        renderEditor()
+        await openTab('Form')
+        await screen.findByTestId('studio-page-editor', {}, slow)
+        await openTab('Design')
+        const design = await screen.findByTestId('studio-page-design', {}, slow)
+        const canvas = within(design).getByTestId('studio-page-canvas')
+        await within(design).findByTestId('chart-widget', {}, slow)
+
+        await userEvent.click(within(design).getByTestId('chart-widget'))
+        const title = within(design.querySelector('[data-testid="studio-field-/widgets/1/title"]') as HTMLElement)
+        await userEvent.type(title.getByRole('textbox', { name: 'English' }), 'Requests')
+        await act(() => vi.advanceTimersByTimeAsync(300))
+        await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
+        expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toHaveAttribute('data-marked', 'true')
+
+        // Save holds at the text write. The draft is unchanged, so nothing posts and the stale drawing stays.
+        await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+        const before = posts.length
+        await act(() => vi.advanceTimersByTimeAsync(1000))
+        expect(posts).toHaveLength(before)
+        expect(within(canvas).getByRole('group', { name: /has diagnostics$/ })).toHaveAttribute('data-marked', 'true')
+
+        // The text lands, then the patch changes the saved version: the canvas posts again and is busy until it draws.
+        holdAnswers = true
+        releaseText()
+        await screen.findByTestId('studio-saved', {}, slow)
+        expect(canvas).toHaveAttribute('aria-busy', 'true')
+        await act(() => vi.advanceTimersByTimeAsync(300))
+        await waitFor(() => expect(posts).toHaveLength(before + 1))
+        expect(canvas).toHaveAttribute('aria-busy', 'true')
+
+        heldAnswers.shift()!()
+        await waitFor(() => expect(canvas).toHaveAttribute('aria-busy', 'false'))
+        expect(within(canvas).queryByRole('group', { name: /has diagnostics$/ })).not.toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   describe('actions', () => {
