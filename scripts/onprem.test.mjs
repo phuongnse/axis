@@ -22,10 +22,10 @@
 // The identity provider starts with an admin client, which `tenant create` signs in as to create each tenant's realm.
 // A new realm has no accounts, no redirect address and no roles mapper, so the test adds them to realm one through the
 // admin API before the activation, which copies them to the site clients, and before the proxy signs the requester
-// and the author in there.
+// and the author in there. The realm accounts and the sign-in steps are those of scripts/lib/keycloak-sign-in.mjs.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createHash, createHmac, randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -36,6 +36,7 @@ import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
+import { addAccount, cookieHeader, preparePlatformClient, signIn } from './lib/keycloak-sign-in.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -83,19 +84,8 @@ const developmentCredential = (username) => {
   return credential
 }
 
-// developmentCode: the 6-digit time-based one-time password (RFC 6238, SHA-1, 30 seconds) of a development user, from the
-// Base32 secret of the user's otp credential in the realm file. scripts/ cannot import tests/e2e/totp.ts.
-const developmentCode = (username) => {
-  const credential = developmentCredential(username)
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  const bits = [...JSON.parse(credential.secretData).value].map((c) => alphabet.indexOf(c).toString(2).padStart(5, '0')).join('')
-  const key = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)))
-  const counter = Buffer.alloc(8)
-  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)))
-  const hash = createHmac('sha1', key).update(counter).digest()
-  const offset = hash[hash.length - 1] & 0x0f
-  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0')
-}
+// developmentSecret: the Base32 secret of a development user's authenticator, from which the sign-in computes the one-time code.
+const developmentSecret = (username) => JSON.parse(developmentCredential(username).secretData).value
 
 const files = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -576,20 +566,6 @@ describe('the on-premises installation', () => {
       socket.on('error', (error) => resolve({ error }))
     })
 
-  // A cookie jar is a map from a cookie's name to its value.
-  const remember = (jar, response) => {
-    for (const line of response.setCookie) {
-      const [pair] = line.split(';')
-      const at = pair.indexOf('=')
-      const name = pair.slice(0, at).trim()
-      const value = pair.slice(at + 1).trim()
-      if (value === '') jar.delete(name)
-      else jar.set(name, value)
-    }
-  }
-
-  const cookieHeader = (jar) => ({ cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; ') })
-
   const viaProxy = (path, jar, headers = {}) =>
     tlsRequest(httpsPort, hosts.one, path, { headers: { ...cookieHeader(jar), ...headers } })
 
@@ -619,54 +595,19 @@ describe('the on-premises installation', () => {
   }
 
   // signInViaProxy: signs a user of tenant one's realm in through the proxy over HTTPS and returns the cookie jar
-  // with the sign-in and callback responses. Every assertion about the redirect and the cookies stays here.
-  const signInViaProxy = async (username, userPassword, extraHeaders = {}) => {
-    const jar = new Map()
-    let signIn
-    for (let i = 0; i < 15; i++) {
-      if (i > 0) await sleep(1000)
-      signIn = await viaProxy('/api/auth/sign-in?returnUrl=%2Fleave', jar, extraHeaders)
-      if (signIn.status === 302) break
-    }
-    assert.equal(signIn.status, 302, `sign-in through the proxy: ${signIn.body}`)
-    remember(jar, signIn)
-    const authorize = new URL(signIn.headers.location)
-    assert.equal(authorize.pathname, '/realms/one/protocol/openid-connect/auth')
-    assert.equal(authorize.searchParams.get('redirect_uri'), `https://${hosts.one}/api/auth/callback`)
-
-    // Sign the user in at the identity provider: the login page of the Axis theme, then its form. The theme puts
-    // the form's action in the JSON of the axis-sign-in-context script.
-    const keycloakJar = new Map()
-    const loginPage = await keycloak(authorize.href, keycloakJar)
-    assert.equal(loginPage.status, 200, `the Keycloak login page: ${loginPage.body}`)
-    remember(keycloakJar, loginPage)
-    const context = loginPage.body.match(/<script[^>]*id="axis-sign-in-context"[^>]*>([\s\S]*?)<\/script>/)
-    assert.ok(context, 'the sign-in page does not show the Axis theme')
-    const action = JSON.parse(context[1]).loginAction
-    assert.ok(action, 'the sign-in context has no loginAction')
-    const passwordStep = await keycloak(action, keycloakJar, { method: 'POST', form: { username, password: userPassword } })
-    assert.equal(passwordStep.status, 200, `the Keycloak password step: ${passwordStep.body}`)
-    remember(keycloakJar, passwordStep)
-
-    // The password is followed by the two-step page of the Axis theme, which carries the code form's action too.
-    const codeContext = passwordStep.body.match(/<script[^>]*id="axis-sign-in-context"[^>]*>([\s\S]*?)<\/script>/)
-    assert.ok(codeContext, 'the Keycloak password step does not show the Axis theme')
-    const codePage = JSON.parse(codeContext[1])
-    assert.equal(codePage.page, 'twoStep', 'the Keycloak password step is not the two-step page')
-    const login = await keycloak(codePage.loginAction, keycloakJar, {
-      method: 'POST',
-      form: { otp: developmentCode(username), login: 'Sign In' },
+  // with the sign-in and callback responses. The steps are those of scripts/lib/keycloak-sign-in.mjs.
+  const signInViaProxy = (username, userPassword, extraHeaders = {}) =>
+    signIn({
+      app: viaProxy,
+      identity: keycloak,
+      realm: 'one',
+      callbackOrigin: `https://${hosts.one}`,
+      returnUrl: '/leave',
+      username,
+      password: userPassword,
+      secret: developmentSecret(username),
+      startHeaders: extraHeaders,
     })
-    assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
-    const callback = new URL(login.headers.location)
-    assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)
-
-    // The callback creates the session.
-    const done = await viaProxy(`${callback.pathname}${callback.search}`, jar)
-    assert.equal(done.status, 302, `the callback: ${done.body}`)
-    remember(jar, done)
-    return { jar, signIn, done }
-  }
 
   // waitFor: polls until the status is the expected one and returns the last response.
   const waitFor = async (get, status, seconds) => {
@@ -949,7 +890,7 @@ describe('the on-premises installation', () => {
 
       // A new realm has no accounts, no redirect address and no roles mapper. Add them to realm one through the admin
       // API, as the axis-admin client, so that requester and author can sign in there. The authenticators are the ones
-      // of the development users, so developmentCode still works. This comes before the activation, because the
+      // of the development users, so the sign-in still computes their codes. This comes before the activation, because the
       // activation copies the redirect addresses and mappers of the axis client to the client of each site.
       const tokenResponse = await keycloak(`https://${identityHost}/realms/master/protocol/openid-connect/token`, new Map(), {
         method: 'POST',
@@ -963,42 +904,22 @@ describe('the on-premises installation', () => {
         return response
       }
 
-      const listed = await adminCall('GET', '/admin/realms/one/clients?clientId=axis', undefined, 200)
-      const platformClient = JSON.parse(listed.body)[0]
-      assert.ok(platformClient, 'realm one has no axis client')
-      const clientPath = `/admin/realms/one/clients/${platformClient.id}`
-      const update = { ...platformClient, redirectUris: [`https://${hosts.one}/*`] }
-      delete update.secret
-      await adminCall('PUT', clientPath, update, 204)
-      for (const name of ['employee', 'requester', 'author', 'publisher']) {
-        await adminCall('POST', `${clientPath}/roles`, { name }, 201)
-      }
-      const mapper = developmentRealm().clients.find((client) => client.clientId === 'axis').protocolMappers.find((item) => item.name === 'roles')
-      assert.ok(mapper, 'the development realm has no roles mapper on the axis client')
-      await adminCall('POST', `${clientPath}/protocol-mappers/models`, mapper, 201)
+      const platformClient = await preparePlatformClient({
+        admin: adminCall,
+        realm: 'one',
+        redirectUris: [`https://${hosts.one}/*`],
+        roles: ['employee', 'requester', 'author', 'publisher'],
+      })
       for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'] })) {
-        const created = await adminCall(
-          'POST',
-          '/admin/realms/one/users',
-          {
-            username,
-            enabled: true,
-            emailVerified: true,
-            email: `${username}@axis.local`,
-            firstName: username[0].toUpperCase() + username.slice(1),
-            lastName: 'User',
-            requiredActions: [],
-            credentials: [{ type: 'password', value: realmPassword, temporary: false }, developmentCredential(username)],
-          },
-          201,
-        )
-        const userId = created.headers.location.split('/').pop()
-        const representations = []
-        for (const name of roles) {
-          const role = await adminCall('GET', `${clientPath}/roles/${name}`, undefined, 200)
-          representations.push(JSON.parse(role.body))
-        }
-        await adminCall('POST', `/admin/realms/one/users/${userId}/role-mappings/clients/${platformClient.id}`, representations, 204)
+        await addAccount({
+          admin: adminCall,
+          realm: 'one',
+          client: platformClient,
+          username,
+          password: realmPassword,
+          credential: developmentCredential(username),
+          roles,
+        })
       }
 
       // Step 5, activate the leave request sample for every active tenant.

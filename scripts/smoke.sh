@@ -12,6 +12,10 @@
 #   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
 #   and resume, and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.
+# - ai-eval: scripts/ai-eval-stack.test.mjs builds the server, the publisher and the agent host and starts them with
+#   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.
+#   The agent host replays scripted answers. It creates a tenant from the built-in approvals application and reads the
+#   application's authoring requests as the tenant's author, and without the session.
 # This script builds the production images once, before the images suite, when images or onprem runs, each up to three
 # times with a wait of 15 and 30 seconds, and removes them when it exits. Both suites use them. The PostgreSQL tools
 # layer of axis-admin comes from the admin-tools stage, which scripts/lib/smoke-images.mjs saves in
@@ -46,7 +50,7 @@ in_shard() { [ -z "$shard" ] || grep -qx "$1" <<<"$shard_suites"; }
 
 bash scripts/lib/install-modules.sh
 
-for suite in dev-script compose images onprem; do
+for suite in dev-script compose images onprem ai-eval; do
   if in_shard "$suite" && affected "$suite"; then
     node scripts/lib/docker-images.mjs load
     break
@@ -77,6 +81,11 @@ fi
 if in_shard onprem; then
   run_suite_if_affected onprem . node --test --test-reporter=spec --test-reporter-destination=stdout \
     --test-reporter=junit --test-reporter-destination="$results_dir/onprem.xml" scripts/onprem.test.mjs
+fi
+
+if in_shard ai-eval; then
+  run_suite_if_affected ai-eval . node --test --test-reporter=spec --test-reporter-destination=stdout \
+    --test-reporter=junit --test-reporter-destination="$results_dir/ai-eval.xml" scripts/ai-eval-stack.test.mjs
 fi
 
 finish_report

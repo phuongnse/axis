@@ -28,7 +28,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const unreachable = () =>
   assert.fail("The changed paths should not be listed.");
-const smoke = ["dev-script", "compose", "images", "onprem"];
+const smoke = ["dev-script", "compose", "images", "onprem", "ai-eval"];
 
 describe("decideSafe", () => {
   const runs = (name, paths, base = "abc") =>

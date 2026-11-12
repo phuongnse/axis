@@ -198,22 +198,24 @@ in [Testing](testing.md).
 
 ### Smoke tests
 
-`scripts/smoke.sh` runs four smoke tests. It first installs the built-in and sample modules in
-`artifacts/modules`, for the `onprem` test, and then loads the [saved images](#setup).
+`scripts/smoke.sh` runs five smoke tests. It first installs the built-in and sample modules in
+`artifacts/modules`, for the `onprem` and `ai-eval` tests, and then loads the [saved images](#setup).
 
-| Test         | What it does                                                          |
-| ------------ | --------------------------------------------------------------------- |
-| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                   |
-| `compose`    | Runs the Compose stack                                                |
-| `images`     | Runs the production images, from `scripts/images.test.mjs`            |
-| `onprem`     | Installs `deploy/compose/` from the production images for two tenants |
+| Test         | What it does                                                                                      |
+| ------------ | ------------------------------------------------------------------------------------------------- |
+| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                                               |
+| `compose`    | Runs the Compose stack                                                                            |
+| `images`     | Runs the production images, from `scripts/images.test.mjs`                                        |
+| `onprem`     | Installs `deploy/compose/` from the production images for two tenants                             |
+| `ai-eval`    | Starts the authoring eval stack with scripted answers and reads a new tenant's authoring requests |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
 agent host. The test removes the Compose project at the end.
 
 `scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
-and removes them when it exits. A change that skips both tests builds nothing. The PostgreSQL tools layer of
+and removes them when it exits. A change that skips both tests builds nothing. `ai-eval` needs no production image: it builds the server, the publisher and the agent host in Release,
+the Keycloak theme and the templates before it starts them. The PostgreSQL tools layer of
 `axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
 image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
 comments, and loads the file in a later run, so the run does not download the packages again, and pulls the base

@@ -137,7 +137,7 @@ const unitKeys = {
   e2e: (n) => Array.from({ length: n }, (_, i) => `specs/spec-${i}.spec.ts`),
   integration: (n) =>
     Array.from({ length: n }, (_, i) => `Axis.Integration.Tests.Class${String(i).padStart(2, '0')}Tests`),
-  smoke: () => ['dev-script', 'compose', 'images', 'onprem'],
+  smoke: () => ['dev-script', 'compose', 'images', 'onprem', 'ai-eval'],
 }
 
 function writeUnder(root, file, text) {
@@ -194,9 +194,9 @@ const cases = {
     over: { before: [700], after: [720], unit: 'Axis.Integration.Tests.Class00Tests' },
   },
   smoke: {
-    within: { before: fill(4, 150), after: fill(4, 140) },
-    past: { before: fill(4, 150), after: fill(4, 160), held: 640 },
-    over: { before: [700, 10, 10, 10], after: [720, 10, 10, 10], unit: 'dev-script' },
+    within: { before: fill(5, 150), after: fill(5, 140) },
+    past: { before: fill(5, 150), after: fill(5, 210), held: 630 },
+    over: { before: [700, 10, 10, 10, 10], after: [720, 10, 10, 10, 10], unit: 'dev-script' },
   },
 }
 
@@ -279,6 +279,7 @@ describe('junitFiles', () => {
         'test-results-integration-1/Axis.Integration.Tests.xml',
         'test-results-integration-2/Axis.Integration.Tests.xml',
         'test-results-integration-2/scenarios-ServiceDesk.xml',
+        'test-results-smoke/ai-eval.xml',
         'test-results-smoke/dev-script.xml',
         'test-results-smoke/onprem.xml',
         'test-results-smoke/onprem.log',
@@ -296,7 +297,11 @@ describe('junitFiles', () => {
         'test-results-integration-1/Axis.Integration.Tests.xml',
         'test-results-integration-2/Axis.Integration.Tests.xml',
       ])
-      assert.deepEqual(relative(found.smoke), ['test-results-smoke/dev-script.xml', 'test-results-smoke/onprem.xml'])
+      assert.deepEqual(relative(found.smoke), [
+        'test-results-smoke/ai-eval.xml',
+        'test-results-smoke/dev-script.xml',
+        'test-results-smoke/onprem.xml',
+      ])
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -333,7 +338,7 @@ function withRun(run) {
       'root/tests/Axis.Integration.Tests/FooTests.cs',
       'namespace Axis.Integration.Tests;\npublic class FooTests\n{\n    [Fact]\n    public void Works() { }\n}\n',
     )
-    write('root/scripts/smoke-durations.json', JSON.stringify({ 'dev-script': 10, compose: 10, images: 10, onprem: 10 }))
+    write('root/scripts/smoke-durations.json', JSON.stringify({ 'dev-script': 10, compose: 10, images: 10, onprem: 10, 'ai-eval': 10 }))
     write(
       'results/test-results-e2e-1/artifacts/test-results/playwright-1.xml',
       '<testsuites><testsuite name="slow.spec.ts" hostname="chromium" time="2000"></testsuite>' +

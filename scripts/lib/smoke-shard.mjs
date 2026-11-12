@@ -23,7 +23,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const durationsFile = path.join(root, 'scripts/smoke-durations.json')
 
 /** The suites of scripts/smoke.sh, in its order. */
-export const suites = ['dev-script', 'compose', 'images', 'onprem']
+export const suites = ['dev-script', 'compose', 'images', 'onprem', 'ai-eval']
 
 /** The suites with their seconds from `durations`, by default the file's. A suite without an entry weighs the median of the known ones, or 1. */
 export function readSuites(file, durations = JSON.parse(readFileSync(file, 'utf8'))) {
