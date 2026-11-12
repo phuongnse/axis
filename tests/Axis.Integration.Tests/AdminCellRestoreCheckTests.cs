@@ -434,7 +434,7 @@ public sealed class AdminCellRestoreCheckTests(KeycloakFixture keycloak, Postgre
     private static async Task<string> NewBucketAsync(IAmazonS3 s3)
     {
         var bucket = $"backups-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}";
-        await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket, ObjectLockEnabledForBucket = true }, CancellationToken);
+        await MinioFixture.CreateBucketAsync(s3, bucket, CancellationToken, objectLock: true);
         await s3.PutObjectLockConfigurationAsync(
             new PutObjectLockConfigurationRequest
             {
