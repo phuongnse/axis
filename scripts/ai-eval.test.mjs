@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { judgeCase, passBar, writeReport } from './lib/ai-eval.mjs'
-import { agentEnvironment, applicationName, startingTemplate } from './lib/ai-eval-stack.mjs'
+import { agentEnvironment, applicationName, startingTemplate, tenantHost, tunnelTarget } from './lib/ai-eval-stack.mjs'
 
 const refusalCase = {
   name: 'approver-is-requester',
@@ -250,6 +250,19 @@ describe('the settings of the eval stack', () => {
   test('an application or a template starts from the installed template of its name', () => {
     assert.equal(startingTemplate({ from: 'application', name: 'approvals' }), 'approvals')
     assert.equal(startingTemplate({ from: 'template', name: 'blank-crud' }), 'blank-crud')
+  })
+
+  test('a tenant host is under the domain that the stack certificate covers', () => {
+    assert.equal(tenantHost('eval-smoke'), 'eval-smoke.eval.localhost')
+  })
+
+  test('the proxy opens a tenant host on 443 at the https port of the server', () => {
+    assert.deepEqual(tunnelTarget('eval-smoke.eval.localhost:443', 5555), { host: '127.0.0.1', port: 5555 })
+  })
+
+  test('the proxy leaves any other host and port unchanged', () => {
+    assert.deepEqual(tunnelTarget('api.anthropic.com:443', 5555), { host: 'api.anthropic.com', port: 443 })
+    assert.deepEqual(tunnelTarget('eval-smoke.eval.localhost:8443', 5555), { host: 'eval-smoke.eval.localhost', port: 8443 })
   })
 
   test('a sample start throws', () => {

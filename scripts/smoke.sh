@@ -14,8 +14,9 @@
 #   and resume, and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.
 # - ai-eval: scripts/ai-eval-stack.test.mjs builds the server, the publisher and the agent host and starts them with
 #   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.
-#   The agent host replays scripted answers. It creates a tenant from the built-in approvals application and reads the
-#   application's authoring requests as the tenant's author, and without the session.
+#   The agent host replays scripted answers. It creates a tenant from the built-in approvals application, reads the
+#   application's authoring requests as the tenant's author, and without the session, and carries an authoring request
+#   through the agent host and the MCP server, over https, to its plan.
 # This script builds the production images once, before the images suite, when images or onprem runs, each up to three
 # times with a wait of 15 and 30 seconds, and removes them when it exits. Both suites use them. The PostgreSQL tools
 # layer of axis-admin comes from the admin-tools stage, which scripts/lib/smoke-images.mjs saves in

@@ -201,13 +201,13 @@ in [Testing](testing.md).
 `scripts/smoke.sh` runs five smoke tests. It first installs the built-in and sample modules in
 `artifacts/modules`, for the `onprem` and `ai-eval` tests, and then loads the [saved images](#setup).
 
-| Test         | What it does                                                                                      |
-| ------------ | ------------------------------------------------------------------------------------------------- |
-| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                                               |
-| `compose`    | Runs the Compose stack                                                                            |
-| `images`     | Runs the production images, from `scripts/images.test.mjs`                                        |
-| `onprem`     | Installs `deploy/compose/` from the production images for two tenants                             |
-| `ai-eval`    | Starts the authoring eval stack with scripted answers and reads a new tenant's authoring requests |
+| Test         | What it does                                                                                                                                             |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                                                                                                      |
+| `compose`    | Runs the Compose stack                                                                                                                                   |
+| `images`     | Runs the production images, from `scripts/images.test.mjs`                                                                                               |
+| `onprem`     | Installs `deploy/compose/` from the production images for two tenants                                                                                    |
+| `ai-eval`    | Starts the authoring eval stack with scripted answers and carries a new tenant's authoring request through the agent host and the MCP server to its plan |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
