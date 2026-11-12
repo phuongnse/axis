@@ -549,7 +549,7 @@ internal sealed record AuthoringRequestResponse(
     DateTimeOffset? FinishedAt,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<AuthoringRequestStepResponse>? Steps);
 
-/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens, its times and the checks of a <c>check</c> step, null on any other.</summary>
+/// <summary>One step of a request: its kind, the summary of its input, its outcome, its tokens, its times and the checks of a <c>check</c> or <c>review</c> step, null on any other.</summary>
 internal sealed record AuthoringRequestStepResponse(
     string Kind,
     string? Summary,

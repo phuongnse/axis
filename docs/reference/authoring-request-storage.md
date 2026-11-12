@@ -35,3 +35,6 @@ when the author approves, changes the plan or drops it. The agent host writes th
   [checking](authoring-requests.md#states) and [checking time](authoring-requests.md#budgets), and its `checks` holds
   `{ compile, scenarios }`: each has an `outcome` of `passed` or `failed`, and `scenarios` can also be `notRun`. `compile` has its
   `diagnostics`, and `scenarios` has its `request` id, its `diagnostics` and its `items`, the scenario results of the run.
+  A `review` step has the `outcome` `passed`, `findings` or `unfinished`, see [reviewing](authoring-requests.md#states) and
+  [review calls](authoring-requests.md#budgets), and its `checks` holds `{ review: { outcome, findings } }`: the `outcome` is `passed` or
+  `findings`, and `findings` is the text of the review, null when it passed. A review that is `unfinished` stores no `checks`.
