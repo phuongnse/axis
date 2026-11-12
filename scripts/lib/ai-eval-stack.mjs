@@ -4,19 +4,28 @@
 // docs/reference/authoring-requests.md#the-agent-host. The agent host uses a named model binding, or replays an
 // answers file through the scripted adapter, which no model provider sees. Importing this file starts nothing.
 //
+// The stack carries an authoring request from send to plan through the agent host and the MCP server, as Studio does.
+// The server also serves https, with a certificate for `*.eval.localhost` from an authority made for the run. The agent
+// host trusts that authority and reaches each tenant's MCP server at `https://<host>/mcp`, with no port, through a
+// local proxy that opens its tunnels to the server's https port, so the address and the token's audience are the ones
+// the realm writes. The stack's own client keeps plain http, so `createTenant` and its sign-in work on the http address.
+//
 // The hosts run as one self-hosted installation, not as a cell, so every tenant shares one Studio folder. Each case's
-// application gets a name of its own, see applicationName. They run on plain http in the Testing environment, which the
-// scripted adapter needs, and the admin tool and the publisher in Development, as tests/e2e/admin-tool.ts runs them.
+// application gets a name of its own, see applicationName. The server and the agent host run in the Testing
+// environment, which the scripted adapter needs, and the admin tool and the publisher in Development, as
+// tests/e2e/admin-tool.ts runs them.
 import { spawn, spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
+import https from 'node:https'
 import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './docker-images.mjs'
-import { addAccount, cookieHeader, newOtpSecret, otpCredential, preparePlatformClient, signIn } from './keycloak-sign-in.mjs'
+import { addAccount, cookieHeader, newOtpSecret, otpCredential, preparePlatformClient, rolesMapper, signIn } from './keycloak-sign-in.mjs'
+import { issuePostgresCertificate } from './postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -63,6 +72,21 @@ const pascal = (text) =>
 /** The name of the case's application in the Studio folder that all tenants share, such as `ApprovalsEvalSmoke` for the start `approvals` and the tenant `eval-smoke`. */
 export const applicationName = (start, tenantId) => `${pascal(start.name)}${pascal(tenantId)}`
 
+/** The domain of the tenants' hosts. The stack's one certificate is made for `*.eval.localhost`, because OpenSSL refuses a wildcard with one label after it, such as `*.localhost`. */
+export const tenantDomain = 'eval.localhost'
+
+/** The host of the tenant `id`, such as `eval-smoke.eval.localhost`. */
+export const tenantHost = (id) => `${id}.${tenantDomain}`
+
+/** Where the proxy opens a tunnel for `authority` (`host:port` of a CONNECT): a tenant host on 443 goes to the server's https port, anything else to itself. */
+export function tunnelTarget(authority, httpsPort) {
+  const split = authority.lastIndexOf(':')
+  const host = authority.slice(0, split)
+  const port = Number(authority.slice(split + 1))
+  if (host.endsWith(`.${tenantDomain}`) && port === 443) return { host: '127.0.0.1', port: httpsPort }
+  return { host, port }
+}
+
 /** Runs `command` in the repository and throws with its output when it fails. */
 function run(command, args) {
   const result = spawnSync(command, args, { cwd: root, encoding: 'utf8' })
@@ -90,10 +114,14 @@ const freePort = () =>
     })
   })
 
-/** Sends one http request and resolves with `{ status, headers, setCookie, body }`. A failed connection gives status 0 and the error as the body. */
-function send(url, { method = 'GET', headers = {}, body } = {}) {
+/**
+ * Sends one http request, or one https request when the URL starts with `https:`, where `tls` adds TLS options such as `ca`
+ * and `servername`. It resolves with `{ status, headers, setCookie, body }`. A failed connection gives status 0 and the error as the body.
+ */
+function send(url, { method = 'GET', headers = {}, body, tls } = {}) {
   return new Promise((resolve) => {
-    const request = http.request(url, { method, headers }, (response) => {
+    const transport = url.startsWith('https:') ? https : http
+    const request = transport.request(url, { method, headers, ...tls }, (response) => {
       const chunks = []
       response.on('data', (chunk) => chunks.push(chunk))
       response.on('end', () =>
@@ -122,7 +150,7 @@ async function waitUntil(check, seconds, message) {
 }
 
 // The names of the settings that the hosts read, which the caller's environment must not leak into the stack.
-const settingPrefixes = ['Ai__', 'Studio__', 'Tenants__', 'Tenancy__', 'ConnectionStrings__', 'Platform__', 'Admin__', 'IdentityProvider__', 'Scenarios__', 'Health__', 'Modules__', 'Templates__', 'Extensions__', 'Cell__', 'ASPNETCORE_']
+const settingPrefixes = ['Ai__', 'Studio__', 'Tenants__', 'Tenancy__', 'ConnectionStrings__', 'Platform__', 'Admin__', 'IdentityProvider__', 'Scenarios__', 'Health__', 'Modules__', 'Templates__', 'Extensions__', 'Cell__', 'ASPNETCORE_', 'SSL_CERT_', 'HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy', 'NO_PROXY', 'no_proxy']
 
 function hostEnvironment(settings) {
   const base = Object.fromEntries(
@@ -131,9 +159,17 @@ function hostEnvironment(settings) {
   return { ...base, ...settings }
 }
 
+/** The folder of the system's trusted certificates, which `SSL_CERT_DIR` replaces for OpenSSL, so the agent host keeps the public roots. */
+function systemCertDir() {
+  if (process.env.SSL_CERT_DIR) return process.env.SSL_CERT_DIR
+  const directory = /OPENSSLDIR: "(.*)"/.exec(run('openssl', ['version', '-d']))?.[1] ?? '/usr/lib/ssl'
+  return join(directory, 'certs')
+}
+
 /**
- * Starts the stack and returns `{ serverPort, keycloakUrl, agentHealthUrl, request, logs, stop }`. `request(host, path, { method, headers, body })`
+ * Starts the stack and returns `{ serverPort, httpsPort, keycloakUrl, agentHealthUrl, request, secureRequest, logs, stop }`. `request(host, path, { method, headers, body })`
  * sends an http request to the server with the Host header `host:serverPort`, and answers `{ status, headers, setCookie, body }`.
+ * `secureRequest(host, path, { method, headers, body })` does the same over https on `httpsPort`, with the Host header `host` and the run's authority as the only root.
  * `logs()` is the output of the hosts, and `stop()` ends everything and removes the folder, and may be called twice.
  * Give `binding` or `answersFile` for the agent host, see agentEnvironment. The tests of the stack take what createTenant needs from the other fields.
  */
@@ -147,9 +183,14 @@ export async function startStack({ binding, answersFile } = {}) {
   const containers = []
   let stopped = false
 
+  const proxySockets = new Set()
+  let proxy
+
   const stop = async () => {
     if (stopped) return
     stopped = true
+    proxy?.close()
+    for (const socket of proxySockets) socket.destroy()
     await Promise.all(
       children.map(async ({ child, exited }) => {
         if (child.exitCode !== null || child.signalCode !== null) return
@@ -256,7 +297,11 @@ export async function startStack({ binding, answersFile } = {}) {
     )
 
     // 3. The server, which reads tenants from the tenant directory and serves a new tenant after its next refresh.
+    // It also serves https with a certificate for every tenant host, signed by an authority that only this run trusts.
+    const tls = issuePostgresCertificate({ folder, openssl: (...args) => run('openssl', args), name: `*.${tenantDomain}` })
+    run('openssl', ['rehash', tls.trustDir])
     const serverPort = await freePort()
+    const httpsPort = await freePort()
     const studio = join(folder, 'apps')
     mkdirSync(studio)
     const platform = connection('axis_platform', 'axis_platform', passwords.platform)
@@ -276,10 +321,19 @@ export async function startStack({ binding, answersFile } = {}) {
     }
     const server = start('server', 'dotnet', [dll('Axis.Server')], {
       cwd: join(root, 'src/Axis.Server'),
-      settings: { ...hostSettings, ASPNETCORE_ENVIRONMENT: 'Testing', ASPNETCORE_URLS: `http://127.0.0.1:${serverPort}` },
+      settings: {
+        ...hostSettings,
+        ASPNETCORE_ENVIRONMENT: 'Testing',
+        ASPNETCORE_URLS: `http://127.0.0.1:${serverPort};https://127.0.0.1:${httpsPort}`,
+        Kestrel__Certificates__Default__Path: join(tls.serverDir, 'server.crt'),
+        Kestrel__Certificates__Default__KeyPath: join(tls.serverDir, 'server.key'),
+      },
     })
     const request = (host, path, { method = 'GET', headers = {}, body } = {}) =>
       send(`http://127.0.0.1:${serverPort}${path}`, { method, headers: { host: `${host}:${serverPort}`, ...headers }, body })
+    const authority = readFileSync(join(tls.trustDir, 'ca.crt'))
+    const secureRequest = (host, path, { method = 'GET', headers = {}, body } = {}) =>
+      send(`https://127.0.0.1:${httpsPort}${path}`, { method, headers: { host, ...headers }, body, tls: { ca: authority, servername: host } })
     await waitUntil(
       async () => {
         exitedBefore(server, 'The server')
@@ -301,7 +355,30 @@ export async function startStack({ binding, answersFile } = {}) {
     await sleep(2000)
     exitedBefore(publisher, 'The publisher')
 
-    // 5. The agent host.
+    // 5. The agent host. It calls `https://<tenant host>/mcp` through a CONNECT proxy, which opens the tunnel to the
+    // server's https port, and trusts the run's authority next to the system's roots. Plain http, such as Keycloak's, goes direct.
+    const proxyPort = await freePort()
+    proxy = http
+      .createServer((_, response) => {
+        response.writeHead(405)
+        response.end()
+      })
+      .on('connect', (connect, client, head) => {
+        const { host, port } = tunnelTarget(connect.url, httpsPort)
+        const upstream = net.connect(port, host, () => {
+          client.write('HTTP/1.1 200 Connection Established\r\n\r\n')
+          upstream.write(head)
+          upstream.pipe(client)
+          client.pipe(upstream)
+        })
+        proxySockets.add(client).add(upstream)
+        upstream.on('error', () => client.destroy())
+        client.on('error', () => upstream.destroy())
+        upstream.on('close', () => proxySockets.delete(upstream))
+        client.on('close', () => proxySockets.delete(client))
+      })
+    await new Promise((resolve, reject) => proxy.once('error', reject).listen(proxyPort, '127.0.0.1', resolve))
+    const proxyUrl = `http://127.0.0.1:${proxyPort}`
     const agentPort = await freePort()
     const agentHealthUrl = `http://127.0.0.1:${agentPort}`
     const agentHost = start('agent', 'dotnet', [dll('Axis.Agent')], {
@@ -313,6 +390,9 @@ export async function startStack({ binding, answersFile } = {}) {
         Tenancy__RefreshInterval: '00:00:02',
         ConnectionStrings__Platform: platform,
         Platform__SecretKey: secretKey,
+        HTTPS_PROXY: proxyUrl,
+        https_proxy: proxyUrl,
+        SSL_CERT_DIR: `${tls.trustDir}:${systemCertDir()}`,
         ...agent,
       },
     })
@@ -336,7 +416,7 @@ export async function startStack({ binding, answersFile } = {}) {
       IdentityProvider__AdminClientId: 'axis-admin',
       IdentityProvider__AdminClientSecret: adminSecret,
     }
-    return { serverPort, keycloakUrl, agentHealthUrl, request, logs, stop, adminSecret, adminSettings }
+    return { serverPort, httpsPort, keycloakUrl, agentHealthUrl, request, secureRequest, logs, stop, adminSecret, adminSettings }
   } catch (error) {
     const output = logs()
     await stop()
@@ -352,7 +432,7 @@ export async function startStack({ binding, answersFile } = {}) {
  * and the CSRF header and a JSON body on a write. Each step fails with the tool's output or the HTTP status.
  */
 export async function createTenant(stack, { id, start }) {
-  const host = `${id}.localhost`
+  const host = tenantHost(id)
   const origin = `http://${host}:${stack.serverPort}`
 
   const created = spawnSync('dotnet', [dll('Axis.Admin'), 'tenant', 'create', id, '--host', host], {
@@ -386,6 +466,13 @@ export async function createTenant(stack, { id, start }) {
 
   // A new realm has no accounts, no redirect address and no roles mapper.
   const client = await preparePlatformClient({ admin, realm: id, redirectUris: [`${origin}/*`], roles: ['author', 'publisher'] })
+  // The agent host's client has no full scope, so the author's roles reach its exchanged token through a roles mapper and a
+  // scope mapping of the platform client's roles. The send refuses a token without the author role.
+  const agentList = await admin('GET', `/admin/realms/${id}/clients?clientId=axis-agent`, undefined, 200)
+  const agentPath = `/admin/realms/${id}/clients/${JSON.parse(agentList.body)[0].id}`
+  await admin('POST', `${agentPath}/protocol-mappers/models`, rolesMapper(), 201)
+  const platformRoles = await admin('GET', `${client.path}/roles`, undefined, 200)
+  await admin('POST', `${agentPath}/scope-mappings/clients/${client.id}`, JSON.parse(platformRoles.body), 204)
   const username = `author@${id}.test`
   const password = secret()
   const otp = newOtpSecret()
