@@ -313,7 +313,7 @@ internal static class StudioPublishEndpoints
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         var requestedAt = await InsertRequestAsync(
-            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, cancellationToken);
+            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, cancellationToken);
 
         // The name is the one in the user's profile, else the session's, as GET answers it.
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
@@ -338,13 +338,15 @@ internal static class StudioPublishEndpoints
         string requestedBy,
         string? scenarioNames,
         Guid? draftId,
+        string? folder,
+        string? client,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names, draft_id)
-            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios, @draft)
+                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names, draft_id, folder, client)
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios, @draft, @folder, @client)
             RETURNING requested_at
             """,
             connection);
@@ -359,6 +361,8 @@ internal static class StudioPublishEndpoints
         command.Parameters.AddWithValue("user", requestedBy);
         command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioNames ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("draft", NpgsqlDbType.Uuid) { Value = (object?)draftId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("folder", NpgsqlDbType.Text) { Value = (object?)folder ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("client", NpgsqlDbType.Text) { Value = (object?)client ?? DBNull.Value });
         await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
         await inserted.ReadAsync(cancellationToken);
         return inserted.GetFieldValue<DateTimeOffset>(0);
@@ -415,9 +419,18 @@ internal static class StudioPublishEndpoints
 
         var cancellationToken = httpContext.RequestAborted;
         var connection = await database.GetConnectionAsync(cancellationToken);
+        return await ReadResponseAsync(connection, applicationId, requestId, manifest.Name ?? application, cancellationToken) is { } response
+            ? Results.Ok(response)
+            : NoRequestProblem();
+    }
+
+    /// <summary>The request of the application as the API shows it, named <paramref name="name"/>, or null. The one way to show a publish request.</summary>
+    internal static async Task<StudioPublishRequestResponse?> ReadResponseAsync(
+        NpgsqlConnection connection, Guid applicationId, Guid requestId, string name, CancellationToken cancellationToken)
+    {
         if (await FindRequestAsync(connection, applicationId, requestId, cancellationToken) is not { } stored)
         {
-            return NoRequestProblem();
+            return null;
         }
 
         using var diagnostics = JsonDocument.Parse(stored.Diagnostics ?? "[]");
@@ -426,7 +439,7 @@ internal static class StudioPublishEndpoints
             : stored.ScenarioResults is null ? null : JsonDocument.Parse(stored.ScenarioResults);
         var response = new StudioPublishRequestResponse(
             requestId.ToString("D"),
-            manifest.Name ?? application,
+            name,
             stored.Kind,
             stored.Target,
             stored.Status,
@@ -442,7 +455,7 @@ internal static class StudioPublishEndpoints
             scenarios?.RootElement.Clone());
 
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [stored.RequestedBy], cancellationToken);
-        return Results.Ok(response with { RequestedByName = names.GetValueOrDefault(stored.RequestedBy) ?? stored.RequestedByName });
+        return response with { RequestedByName = names.GetValueOrDefault(stored.RequestedBy) ?? stored.RequestedByName };
     }
 
     private static IResult NoRequestProblem() => StudioEndpoints.NotFound(NoRequest);

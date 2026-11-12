@@ -361,6 +361,8 @@ internal static class McpWriteTools
             context.Caller.Id,
             scenarioNames,
             Guid.Parse(draft),
+            folder: null,
+            client: null,
             ct);
         return (new McpScenarioRun(id.ToString("D"), "queued", EmptyList(), EmptyList()), null);
     }

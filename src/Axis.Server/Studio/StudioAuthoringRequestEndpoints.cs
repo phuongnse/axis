@@ -31,7 +31,10 @@ namespace Axis.Server.Studio;
 /// application answers 404. <c>POST .../{id}/approve</c>, <c>.../change-plan</c> and <c>.../drop</c> run those checks, then answer 403
 /// to anyone but the request's author, for <c>change-plan</c> check its body <c>{ comment }</c> of 1 to 2000 characters (415, 400), and
 /// last check the state under a row lock (409). They answer 200 with the request. Problem titles never contain text from the request. The drop erases the stored refresh
-/// token, and no answer carries it.
+/// token, and no answer carries it. <c>POST .../{id}/accept</c> takes no body and runs the same checks, then answers 409 for a request that is not
+/// <c>ready</c> or has no draft, and 409 for a draft that already has an accept queued or running. Otherwise it stores an <c>accept</c> publish request
+/// for the draft with the client <c>studio</c> and answers 202 with that request and a <c>Location</c> for <c>GET .../requests/{id}</c>. It changes no authoring request:
+/// the publisher moves it to <c>accepted</c> when the accept succeeds, see <c>docs/reference/authoring-requests.md#accepting</c>.
 /// </summary>
 internal static class StudioAuthoringRequestEndpoints
 {
@@ -54,6 +57,7 @@ internal static class StudioAuthoringRequestEndpoints
         Approve,
         ChangePlan,
         Drop,
+        Accept,
     }
 
     public static void MapStudioAuthoringRequestEndpoints(this IEndpointRouteBuilder endpoints)
@@ -70,6 +74,9 @@ internal static class StudioAuthoringRequestEndpoints
         endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/drop",
             (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
                 ChangeAsync(Action.Drop, application, id, httpContext, options, database));
+        endpoints.MapPost("/api/studio/apps/{application}/authoring-requests/{id}/accept",
+            (string application, string id, HttpContext httpContext, StudioOptions options, TenantDatabase database) =>
+                ChangeAsync(Action.Accept, application, id, httpContext, options, database));
     }
 
     private static async Task<IResult> SendAsync(
@@ -298,23 +305,35 @@ internal static class StudioAuthoringRequestEndpoints
         }
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        string? state;
+        string? state = null;
+        Guid? draftId = null;
         await using (var lockRow = new NpgsqlCommand(
-            "SELECT state FROM axis.authoring_requests WHERE id = @id FOR UPDATE", connection, transaction))
+            "SELECT state, draft_id FROM axis.authoring_requests WHERE id = @id FOR UPDATE", connection, transaction))
         {
             lockRow.Parameters.AddWithValue("id", requestId);
-            state = await lockRow.ExecuteScalarAsync(cancellationToken) as string;
+            await using var reader = await lockRow.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                state = reader.GetString(0);
+                draftId = reader.IsDBNull(1) ? null : reader.GetGuid(1);
+            }
         }
 
         var allowed = action switch
         {
             Action.Drop => state is not (null or "accepted" or "dropped"),
+            Action.Accept => state == "ready" && draftId is not null,
             _ => state == "awaitingApproval",
         };
         if (!allowed)
         {
             await transaction.RollbackAsync(cancellationToken);
             return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The request is not in a state that allows this.");
+        }
+
+        if (action == Action.Accept)
+        {
+            return await AcceptAsync(application, applicationId, draftId!.Value, name: StudioFolder.ReadManifest(folder)!.Name ?? application, user, connection, transaction, cancellationToken);
         }
 
         switch (action)
@@ -355,6 +374,43 @@ internal static class StudioAuthoringRequestEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Ok(await ReadAsync(connection, requestId, applicationId, application, steps: false, user.DisplayName, cancellationToken));
+    }
+
+    // Queues the accept of the request's draft. It changes no authoring request: the publisher moves the request to accepted when the accept succeeds.
+    private static async Task<IResult> AcceptAsync(
+        string application,
+        Guid applicationId,
+        Guid draftId,
+        string name,
+        CurrentUserResponse user,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        bool pending;
+        await using (var check = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM axis.publish_requests WHERE kind = 'accept' AND draft_id = @draft AND status IN ('queued', 'running'))",
+            connection,
+            transaction))
+        {
+            check.Parameters.AddWithValue("draft", draftId);
+            pending = (bool)(await check.ExecuteScalarAsync(cancellationToken))!;
+        }
+
+        if (pending)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return StudioEndpoints.Problem(StatusCodes.Status409Conflict, "The draft already has an accept that has not finished.");
+        }
+
+        var id = Guid.CreateVersion7();
+        await StudioPublishEndpoints.InsertRequestAsync(
+            connection, id, "accept", applicationId, "tenant", snapshot: null, releaseId: null, label: null, note: null, user.Id, scenarioNames: null, draftId,
+            folder: application, client: "studio", cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        var response = await StudioPublishEndpoints.ReadResponseAsync(connection, applicationId, id, name, cancellationToken);
+        return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
     }
 
     private static async Task ExecuteAsync(
