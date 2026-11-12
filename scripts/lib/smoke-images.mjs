@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildImage, runDocker } from './docker-build.mjs'
-import { cacheDirectory } from './docker-images.mjs'
+import { cacheDirectory, present } from './docker-images.mjs'
 import { productionTargets, stageText } from './images.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
@@ -37,7 +37,7 @@ export async function buildSmokeImages(version, { dir = cacheDirectory() } = {})
     }
   }
   if (!loaded) {
-    if (spawnSync('docker', ['image', 'inspect', base], { stdio: 'ignore' }).status !== 0) await runDocker(['pull', base])
+    if (!present(base)) await runDocker(['pull', base])
     await buildImage({ target: toolsStage, tag, buildArgs: ['BUILDKIT_INLINE_CACHE=1'] })
     mkdirSync(dir, { recursive: true })
     for (const old of readdirSync(dir)) {

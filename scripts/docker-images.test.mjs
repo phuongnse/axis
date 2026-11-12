@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { listedImage, listedImages } from './lib/docker-images.mjs'
+import { listedImage, listedImages, pullTimeoutSeconds } from './lib/docker-images.mjs'
 import { findImageReferences } from './lib/images.mjs'
 
 // Runs scripts/lib/docker-images.mjs with docker replaced by a stub that keeps the images Docker has in a file:
@@ -175,6 +175,21 @@ describe('scripts/lib/docker-images.mjs', () => {
     assert.match(result.stderr, /Attempt 1 of 3 failed with no end in 1 seconds: docker pull /)
     assert.match(result.stderr, /failed after 3 attempts with no end in 1 seconds, so .* is not saved/)
     assert.deepEqual(indexed(), listed.filter((image) => image !== hanging))
+  })
+
+  test('the pull limit is 600 seconds when AXIS_STEP_TIME_LIMIT_SECONDS is unset or empty, as in scripts/setup.sh', () => {
+    const saved = process.env.AXIS_STEP_TIME_LIMIT_SECONDS
+    try {
+      delete process.env.AXIS_STEP_TIME_LIMIT_SECONDS
+      assert.equal(pullTimeoutSeconds(), 600)
+      process.env.AXIS_STEP_TIME_LIMIT_SECONDS = ''
+      assert.equal(pullTimeoutSeconds(), 600)
+      process.env.AXIS_STEP_TIME_LIMIT_SECONDS = '30'
+      assert.equal(pullTimeoutSeconds(), 30)
+    } finally {
+      if (saved === undefined) delete process.env.AXIS_STEP_TIME_LIMIT_SECONDS
+      else process.env.AXIS_STEP_TIME_LIMIT_SECONDS = saved
+    }
   })
 
   test('save pulls every image when an incomplete archive does not load, and writes a new archive', () => {

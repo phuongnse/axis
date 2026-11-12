@@ -16,7 +16,7 @@ const archiveName = 'images.tar'
 const indexName = 'images.json'
 // A pull that runs past this stops and is tried again, as in scripts/setup.sh. The limit is not on the whole save,
 // which would also cut off a long archive write.
-const pullTimeoutSeconds = () => Number(process.env.AXIS_STEP_TIME_LIMIT_SECONDS ?? 600)
+export const pullTimeoutSeconds = () => Number(process.env.AXIS_STEP_TIME_LIMIT_SECONDS || 600)
 
 export const cacheDirectory = () => process.env.AXIS_DOCKER_CACHE_DIR ?? path.join(homedir(), '.cache/axis-docker')
 
@@ -32,7 +32,7 @@ export function listedImage(base, repository) {
   return image
 }
 
-const present = (image) => spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status === 0
+export const present = (image) => spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' }).status === 0
 
 // The images the index names, or undefined when the archive or the index is missing or the index is unreadable.
 function saved(dir) {

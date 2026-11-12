@@ -196,8 +196,8 @@ in [Testing](testing.md).
 
 ### Smoke tests
 
-`scripts/smoke.sh` runs four smoke tests. It first loads the [saved images](#setup) and installs the built-in and sample modules in
-`artifacts/modules`, for the `onprem` test.
+`scripts/smoke.sh` runs four smoke tests. It first installs the built-in and sample modules in
+`artifacts/modules`, for the `onprem` test, and then loads the [saved images](#setup).
 
 | Test         | What it does                                                          |
 | ------------ | --------------------------------------------------------------------- |
