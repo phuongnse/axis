@@ -1,0 +1,10 @@
+{
+  "$schema": "../case.schema.json",
+  "start": { "from": "application", "name": "approvals" },
+  "request": "Add a page for admins that lists only the rejected requests, with each request's type, title and amount, so they can review what was turned down. Admins keep only reading requests.",
+  "outcome": {
+    "kind": "change",
+    "scenarios": ["AccessStaysWithinTheCeilings", "RequestMovesOnlyThroughItsLifecycle"],
+    "unchanged": ["roles/admin.json"]
+  }
+}

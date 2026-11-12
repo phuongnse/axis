@@ -24,7 +24,7 @@ export const modelsSchemaFile = 'supported-models.schema.json'
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'))
 
 /** The problems of one instance against a schema, each as `<name>: <where> <message>`. */
-function validate(ajv, validator, name, instance) {
+function validate(validator, name, instance) {
   if (validator(instance)) {
     return []
   }
@@ -50,7 +50,7 @@ export function checkAiEval(folder, schemaFolder = defaultFolder) {
       problems.push(`${name}: ${error.code === 'ENOENT' ? 'is missing' : `is not JSON: ${error.message}`}`)
       return
     }
-    problems.push(...validate(ajv, validator, name, instance))
+    problems.push(...validate(validator, name, instance))
   }
 
   const casesFolder = path.join(folder, 'cases')

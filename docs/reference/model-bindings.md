@@ -102,15 +102,15 @@ against any model.
   - `tests/ai-eval/case.schema.json` gives the shape of a case and
     `tests/ai-eval/supported-models.schema.json` the shape of the supported models list.
     `scripts/lint.sh` checks the cases and the list against them.
-- **Running.** _(planned for M35)_ `scripts/ai-eval.sh --binding <name>` starts the stack, creates a tenant for each case,
-  sends the request through the agent host and the MCP server as Studio does, approves the plan, and
-  checks the outcome. It writes a report of each case, its tokens and its time to
-  `artifacts/ai-eval/`.
-- **Pass bar.** _(planned for M35)_ A model is supported when it passes every `refusal` case and at least 90% of the
-  `change` cases. `tests/ai-eval/supported-models.json` lists the supported models with the date and
-  the Axis version of their last pass.
-- **When it runs.** _(planned for M35)_ For every supported model before each Axis release, by hand or by a workflow that
-  holds the providers' keys. An operator runs it against their own binding the same way. The SaaS
-  changes its default model only on the eval's numbers.
+- **Running.** _(planned for M35)_ `scripts/ai-eval.sh --binding <name>` starts the stack, creates a
+  tenant for each case, sends the request through the agent host and the MCP server as Studio does,
+  approves the plan, and checks the outcome. It writes a report of each case, its tokens and its time
+  to `artifacts/ai-eval/`.
+- **Pass bar.** _(planned for M35)_ A model is supported when it passes every `refusal` case and at
+  least 90% of the `change` cases. `tests/ai-eval/supported-models.json` lists the supported models
+  with the date and the Axis version of their last pass.
+- **When it runs.** _(planned for M35)_ For every supported model before each Axis release, by hand or
+  by a workflow that holds the providers' keys. An operator runs it against their own binding the same
+  way. The SaaS changes its default model only on the eval's numbers.
 - **Not a CI check.** It calls paid models and takes minutes per case, so it is not one of the checks
   of every pull request.
