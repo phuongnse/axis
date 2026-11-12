@@ -1,0 +1,6 @@
+{
+  "$schema": "../case.schema.json",
+  "start": { "from": "application", "name": "approvals" },
+  "request": "Let a requester approve their own request when the amount is under 100, so that small purchases do not wait for a manager.",
+  "outcome": { "kind": "refusal", "module": "approvals", "point": "Request/transitions/approve" }
+}

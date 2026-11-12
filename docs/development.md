@@ -117,6 +117,8 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
 - that no test outside a `*PerformanceTests` class measures elapsed time;
 - the Markdown link and anchor check and the docs structure check, see
   [writing the docs](writing-docs.md#how-the-docs-stay-correct);
+- that the authoring eval's cases and its supported models list follow their schemas, see
+  [the authoring eval](reference/model-bindings.md#the-authoring-eval);
 - the Helm charts' lint and their check against the Kubernetes schemas.
 
 ### Unit tests
