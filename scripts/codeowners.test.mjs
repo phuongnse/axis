@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { blockAfter, isContent } from './lib/workflow-lines.mjs'
 
 // The owner alone guards the security checks, so every file that CI's dependency and image scans run, through every
-// source and import, and every accepted list, is listed in .github/CODEOWNERS. See
+// file they source, run or import, and every accepted list, is listed in .github/CODEOWNERS. See
 // docs/decisions/d137-authentication-by-default-and-the-owner-guards-the-security-checks-alone.md. The workflow is
 // read line by line with scripts/lib/workflow-lines.mjs.
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -36,18 +36,35 @@ const jobBlocks = (ci) => {
   return blocks
 }
 
-// The files that `path` runs: a shell script's sourced files and the .mjs files it runs with node, and a .mjs
-// file's own imports by a relative path. Package imports such as `node:fs` are not the repository's code.
+// The files that `path` runs. A shell script's sourced files, its `.mjs` files run with node, and its scripts run
+// with `bash` or `sh` or by their path in command position, outside comment lines. A `.mjs` file's own imports by a
+// relative path, and, when it imports `child_process`, the quoted `scripts/` paths of the scripts it runs. Package
+// imports such as `node:fs` are not the repository's code.
 const filesRunBy = (path, text) => {
   if (path.endsWith('.sh')) {
+    const content = text.split('\n').filter(isContent).join('\n')
     return [
       ...[...text.matchAll(/^\s*(?:source|\.)\s+(scripts\/[\w./-]+)/gm)].map((match) => match[1]),
       ...[...text.matchAll(/\bnode\s+(scripts\/[\w./-]+\.mjs)\b/g)].map((match) => match[1]),
+      ...[
+        ...content.matchAll(
+          /(?:^|[;&|(]|\b(?:then|do|else|if|exec|bash|sh)\s)\s*(?:\.\/)?(scripts\/[\w./-]+\.(?:sh|mjs))\b/gm,
+        ),
+      ].map((match) => match[1]),
     ]
   }
-  return [...text.matchAll(/(?:\bfrom\s+|\bimport\s*\(?\s*)['"](\.{1,2}\/[^'"]+)['"]/g)].map((match) =>
+  const imports = [...text.matchAll(/(?:\bfrom\s+|\bimport\s*\(?\s*)['"](\.{1,2}\/[^'"]+)['"]/g)].map((match) =>
     posix.join(posix.dirname(path), match[1]),
   )
+  if (!/['"](?:node:)?child_process['"]/.test(text)) return imports
+  const code = text
+    .split('\n')
+    .filter((line) => !line.trimStart().startsWith('//'))
+    .join('\n')
+  return [
+    ...imports,
+    ...[...code.matchAll(/['"`](?:\.\/)?(scripts\/[\w./-]+\.(?:sh|mjs))['"`]/g)].map((match) => match[1]),
+  ]
 }
 
 // The problems of each file a scan job runs, or an accepted list, that CODEOWNERS does not list. Each entry script
@@ -193,6 +210,78 @@ describe('CODEOWNERS lists every file the dependency and image scans run', () =>
         'scripts/lib/retry.sh runs in a scan but CODEOWNERS does not list it',
         'scripts/scan-images.mjs runs in a scan but CODEOWNERS does not list it',
       ],
+    )
+  })
+
+  test('a script that a scan script runs with bash or sh is reported when CODEOWNERS lacks it', () => {
+    const scripts = {
+      'scripts/scan-images.sh': 'source scripts/lib/trivy.sh\n',
+      'scripts/lib/trivy.sh': 'bash scripts/x.sh\nsh scripts/y.sh\n',
+    }
+
+    assert.deepEqual(
+      scanOwnershipProblems({
+        codeowners: '/scripts/scan-images.sh @owner\n/scripts/lib/trivy.sh @owner\n',
+        ci: fixtureCi(imageScanJob),
+        read: (path) => scripts[path],
+        acceptedLists: [],
+      }),
+      [
+        'ci.yml has no dependency-scan job',
+        'scripts/x.sh runs in a scan but CODEOWNERS does not list it',
+        'scripts/y.sh runs in a scan but CODEOWNERS does not list it',
+      ],
+    )
+  })
+
+  test('a script that a scan script runs by its path is reported, and one named in a comment is not', () => {
+    const scripts = {
+      'scripts/scan-images.sh': 'source scripts/lib/trivy.sh\n',
+      'scripts/lib/trivy.sh': [
+        '# scripts/old.sh is not run',
+        'if [ -n "$X" ]; then',
+        '  scripts/x.sh --flag',
+        'fi',
+        './scripts/y.sh',
+        'cat scripts/data.sh',
+        '',
+      ].join('\n'),
+    }
+
+    assert.deepEqual(
+      scanOwnershipProblems({
+        codeowners: '/scripts/scan-images.sh @owner\n/scripts/lib/trivy.sh @owner\n',
+        ci: fixtureCi(imageScanJob),
+        read: (path) => scripts[path],
+        acceptedLists: [],
+      }),
+      [
+        'ci.yml has no dependency-scan job',
+        'scripts/x.sh runs in a scan but CODEOWNERS does not list it',
+        'scripts/y.sh runs in a scan but CODEOWNERS does not list it',
+      ],
+    )
+  })
+
+  test('a script that a scan .mjs file runs through child_process is reported when CODEOWNERS lacks it', () => {
+    const scripts = {
+      'scripts/scan-images.sh': 'node scripts/scan-images.mjs\n',
+      'scripts/scan-images.mjs': [
+        "import { spawnSync } from 'node:child_process'",
+        "// spawnSync('bash', ['scripts/old.sh'])",
+        "spawnSync('bash', ['scripts/x.sh'])",
+        '',
+      ].join('\n'),
+    }
+
+    assert.deepEqual(
+      scanOwnershipProblems({
+        codeowners: '/scripts/scan-images.sh @owner\n/scripts/scan-images.mjs @owner\n',
+        ci: fixtureCi(imageScanJob),
+        read: (path) => scripts[path],
+        acceptedLists: [],
+      }),
+      ['ci.yml has no dependency-scan job', 'scripts/x.sh runs in a scan but CODEOWNERS does not list it'],
     )
   })
 
