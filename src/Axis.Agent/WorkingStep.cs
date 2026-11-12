@@ -16,28 +16,12 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
     /// <summary>The most model calls one working step makes.</summary>
     internal const int MaxModelCalls = 50;
 
-    private const string NotOffered = "The tool is not offered in working.";
-
     private static readonly HashSet<string> _tools = new(StringComparer.Ordinal)
     {
         "read_reference",
         "list_resources",
         "read_resource",
         "read_module_resource",
-        "read_names",
-        "write_resource",
-        "delete_resource",
-        "write_layer",
-        "check_expression",
-        "validate_draft",
-        "diff_draft",
-    };
-
-    // The tools whose input has a draft. The others have none, and the server refuses an input with a field it does not know.
-    private static readonly HashSet<string> _draftTools = new(StringComparer.Ordinal)
-    {
-        "list_resources",
-        "read_resource",
         "read_names",
         "write_resource",
         "delete_resource",
@@ -75,7 +59,7 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
             FirstMessage(request),
             tools,
             MaxModelCalls,
-            (call, token) => AnswerToolCallAsync(context, application, draft.Value, call, token),
+            (call, token) => DraftToolPolicy.AnswerAsync(context, State, _tools, application, draft.Value, call, token),
             cancellationToken);
 
         // The result is the draft, so the text of the last answer does not matter.
@@ -101,38 +85,6 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
 
         await context.SetDraftAsync(draft, cancellationToken);
         return draft;
-    }
-
-    // A tool that is not offered, a call that names another application or another draft never reaches the MCP server. A call without a draft gets the request's.
-    private static async Task<ModelToolResult> AnswerToolCallAsync(
-        AuthoringStepContext context, string application, Guid draft, ModelToolCall call, CancellationToken cancellationToken)
-    {
-        if (!_tools.Contains(call.Name))
-        {
-            return new ModelToolResult(call.Id, NotOffered, true);
-        }
-
-        var (arguments, error) = ModelLoop.CheckInput(call, application);
-        if (error is not null)
-        {
-            return new ModelToolResult(call.Id, error, true);
-        }
-
-        if (_draftTools.Contains(call.Name))
-        {
-            arguments ??= [];
-            if (!arguments.TryGetPropertyValue("draft", out var named))
-            {
-                arguments["draft"] = draft.ToString("D");
-            }
-            else if (!(named is JsonValue value && value.TryGetValue<string>(out var text) && Guid.TryParse(text, out var parsed) && parsed == draft))
-            {
-                return new ModelToolResult(call.Id, $"The tool may name only the draft '{draft:D}'.", true);
-            }
-        }
-
-        var result = await context.Mcp.CallToolAsync(call.Name, arguments, cancellationToken);
-        return new ModelToolResult(call.Id, result.StructuredContent?.ToJsonString() ?? result.Text, result.IsError);
     }
 
     private static string SystemText(string application, Guid draft) =>

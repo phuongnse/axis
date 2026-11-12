@@ -9,7 +9,8 @@ namespace Axis.Agent;
 
 /// <summary>
 /// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, the
-/// comments of every change of plan, oldest first, and the draft the request works in, once the working step has made it.
+/// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, and the <c>checks</c> of its newest
+/// <c>check</c> step as JSON, once a check has stored them.
 /// </summary>
 public sealed record AuthoringRequestToWork(
     Guid Id,
@@ -20,7 +21,8 @@ public sealed record AuthoringRequestToWork(
     string? Plan,
     string? Binding,
     IReadOnlyList<string> PlanChanges,
-    Guid? DraftId);
+    Guid? DraftId,
+    string? LatestChecks);
 
 /// <summary>
 /// The agent host's reads and writes of <c>axis.authoring_requests</c> and <c>axis.authoring_request_steps</c> in a tenant database, see
@@ -49,7 +51,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             SELECT a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
                    ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
                          WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal),
-                   a.draft_id
+                   a.draft_id,
+                   (SELECT s.checks::text FROM axis.authoring_request_steps s
+                         WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1)
             FROM axis.authoring_requests a
             WHERE a.state = ANY(@states)
             ORDER BY a.sent_at, a.id
@@ -91,7 +95,9 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             RETURNING a.id, a.state, a.sent_at, a.application_id, a.text, a.plan, a.binding,
               ARRAY(SELECT s.input_summary FROM axis.authoring_request_steps s
                     WHERE s.request_id = a.id AND s.kind = 'planChange' AND s.input_summary IS NOT NULL ORDER BY s.ordinal),
-              a.draft_id
+              a.draft_id,
+              (SELECT s.checks::text FROM axis.authoring_request_steps s
+                    WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1)
             """,
             connection);
         command.Parameters.AddWithValue("states", states.ToArray());
@@ -334,7 +340,8 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             reader.IsDBNull(5) ? null : reader.GetString(5),
             reader.IsDBNull(6) ? null : reader.GetString(6),
             reader.GetFieldValue<string?[]>(7).OfType<string>().ToList(),
-            reader.IsDBNull(8) ? null : reader.GetGuid(8));
+            reader.IsDBNull(8) ? null : reader.GetGuid(8),
+            reader.IsDBNull(9) ? null : reader.GetString(9));
 
     // Locks the request's row when the host still holds the claim, so a drop or a claim by another host waits for the transaction.
     private static async Task<bool> LockClaimAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string claimedBy, CancellationToken cancellationToken)

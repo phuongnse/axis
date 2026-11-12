@@ -17,8 +17,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The checking step of the agent host compiles the request's draft and runs every scenario of the application and its modules on it through the
 /// publisher, see <c>docs/reference/authoring-requests.md#states</c>. It stores <c>{ compile, scenarios }</c> on its <c>check</c> step, and the read route of the
-/// request answers them, see <c>docs/reference/authoring-request-storage.md#authoring-requests</c>. The model is the scripted adapter and the publisher runs
-/// beside the host as it does in production.
+/// request answers them, see <c>docs/reference/authoring-request-storage.md#authoring-requests</c>. A request that passes its checks goes on to the review step.
+/// The model is the scripted adapter and the publisher runs beside the host as it does in production.
 /// </summary>
 public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
@@ -30,7 +30,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task An_approved_request_that_passes_every_check_records_them_on_its_check_step_moves_to_reviewing_and_the_read_route_answers_them()
+    public async Task An_approved_request_that_passes_every_check_records_them_is_reviewed_and_a_review_that_answers_PASSED_makes_it_ready_and_the_read_route_answers_both()
     {
         using var client = await _realm.SignInAsync();
         var id = await SendAsync(client);
@@ -45,6 +45,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
                 ModelStopReason.ToolUse,
                 new ModelTokens(100, 20)),
             new ModelAnswer([new ModelText("Done.")], ModelStopReason.EndTurn, new ModelTokens(30, 10)),
+            Plan("PASSED\nThe draft does the request."),
         ]);
         await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
         await host.StartAsync(CancellationToken);
@@ -53,9 +54,12 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         await using var publisher = StudioPublishTests.RunPublisher(Tenant, Host, _realm.SchemaConnection);
         await CheckFinishedAsync(id);
+        await ReviewFinishedAsync(id);
         await host.StopAsync(CancellationToken);
 
-        Assert.True(await StateAsync(id) == "reviewing", await ChecksAsync(id));
+        Assert.True(await StateAsync(id) == "ready", await ChecksAsync(id));
+        Assert.Equal("passed", await ScalarAsync($"SELECT outcome FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'review'"));
+        Assert.Equal("passed", await ScalarAsync($"SELECT checks->'review'->>'outcome' FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'review'"));
 
         Assert.Equal("passed", await ScalarAsync($"SELECT outcome FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check'"));
         Assert.Equal("passed", await ScalarAsync($"SELECT checks->'compile'->>'outcome' FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check'"));
@@ -66,7 +70,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         using var request = await StudioPublishTests.ReadAsync(read);
         var steps = request.RootElement.GetProperty("steps").EnumerateArray().ToList();
-        Assert.Equal(["plan", "work", "check"], steps.Select(step => step.GetProperty("kind").GetString()));
+        Assert.Equal(["plan", "work", "check", "review"], steps.Select(step => step.GetProperty("kind").GetString()));
         Assert.Equal(JsonValueKind.Null, steps[0].GetProperty("checks").ValueKind);
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("checks").ValueKind);
         var checks = steps[2].GetProperty("checks");
@@ -78,6 +82,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
         Assert.Equal("passed", items["FinanceReviewAdded"]);
         Assert.Equal("passed", items["department-budgets/ApprovalRecordsDecision"]);
         Assert.DoesNotContain(items.Values, outcome => outcome == "failed");
+        Assert.Equal("passed", steps[3].GetProperty("checks").GetProperty("review").GetProperty("outcome").GetString());
     }
 
     [Fact]
@@ -160,6 +165,12 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
             async () => await ScalarAsync($"SELECT count(*) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check' AND finished_at IS NOT NULL") == "1",
             "The host did not finish the check step.",
             _runs);
+
+    // The review step's row is finished in the transaction that moves the request on.
+    private Task ReviewFinishedAsync(Guid id) =>
+        WaitUntilAsync(
+            async () => await ScalarAsync($"SELECT count(*) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'review' AND finished_at IS NOT NULL") == "1",
+            "The host did not finish the review step.");
 
     // The stored checks, as the message of an assertion that fails.
     private Task<string> ChecksAsync(Guid id) =>
