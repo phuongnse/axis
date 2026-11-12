@@ -18,7 +18,7 @@ public sealed class FixingStepTests
         """;
 
     private static AuthoringRequestToWork Request(string? checks, string? findings) =>
-        new(Guid.NewGuid(), "fixing", DateTimeOffset.UtcNow, Guid.NewGuid(), "Add a review", "A plan", null, [], Guid.NewGuid(), checks, 1, findings);
+        new(Guid.NewGuid(), "fixing", DateTimeOffset.UtcNow, Guid.NewGuid(), "Add a review", "A plan", null, [], Guid.NewGuid(), checks, 0, null, 1, findings);
 
     [Fact]
     public void The_first_message_holds_the_request_the_plan_the_failures_and_the_findings_and_leaves_out_what_passed()

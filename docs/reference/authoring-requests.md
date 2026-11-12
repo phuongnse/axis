@@ -195,10 +195,13 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Fix rounds.** At most `Ai:FixRounds` rounds, 3 by default. Each move to `fixing` adds 1 to the request's
   `round`. A move to `fixing` when `round` already equals `Ai:FixRounds` stops the request as `failed` instead,
   and its draft is kept. The check or review step that failed keeps its own outcome.
-- **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
-  call of the request, review included, 2,000,000 by default. A call that would pass the budget is not
-  made, and the request stops as `failed`.
-- **Time** _(planned for M35)_. At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default.
+- **Tokens.** At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
+  call of the request, review included, 2,000,000 by default. A call is not made when the tokens used so
+  far, the last call's input in the step and the binding's `MaxOutputTokens` together would pass the
+  budget. The request then stops as `failed` with the outcome `overBudget` and keeps its draft.
+- **Time.** At most `Ai:RequestTimeout` from the plan's approval, 30 minutes by default. A request past
+  it stops as `failed` with the outcome `timedOut` before its next step, and a step still running at that
+  time is cancelled and stops the request the same way. The draft is kept.
 - **Quota.** The request counts toward the tenant's `authoringRequests` quota once, when the author
   sends it. A request past the quota is refused with the quota's `403`, see
   [tenant quotas](tenant-quotas.md#refusals). A request that asks for a new plan or a new fix round

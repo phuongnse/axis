@@ -56,7 +56,8 @@ internal static class DraftWork
         CancellationToken cancellationToken)
     {
         var tools = await ModelLoop.ListToolsAsync(context, _tools, cancellationToken);
-        var model = await adapters.ForAsync(context.TenantId, context.Request.Binding ?? settings.DefaultBinding!, cancellationToken);
+        var binding = context.Request.Binding ?? settings.DefaultBinding!;
+        var model = await adapters.ForAsync(context.TenantId, binding, cancellationToken);
         var loop = await ModelLoop.RunAsync(
             model,
             context,
@@ -64,6 +65,7 @@ internal static class DraftWork
             firstMessage,
             tools,
             MaxModelCalls,
+            settings.MaxOutputTokensOf(binding),
             (call, token) => DraftToolPolicy.AnswerAsync(context, state, _tools, application, draft, call, token),
             cancellationToken);
 

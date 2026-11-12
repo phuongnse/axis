@@ -14,7 +14,7 @@ public sealed class ReviewingStepTests
     };
 
     private static AuthoringRequestToWork Request(string? binding) =>
-        new(Guid.NewGuid(), "reviewing", DateTimeOffset.UtcNow, Guid.NewGuid(), "Add a review", "A plan", binding, [], Guid.NewGuid(), null);
+        new(Guid.NewGuid(), "reviewing", DateTimeOffset.UtcNow, Guid.NewGuid(), "Add a review", "A plan", binding, [], Guid.NewGuid(), null, 0, null);
 
     [Fact]
     public void The_review_binding_is_used_when_it_is_set()

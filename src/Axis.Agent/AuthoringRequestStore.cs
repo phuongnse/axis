@@ -9,9 +9,9 @@ namespace Axis.Agent;
 
 /// <summary>
 /// A request whose state needs work, as the agent host lists it: the application it is about, its text, its current plan and binding, the
-/// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, and the <c>checks</c> of its newest
-/// <c>check</c> step as JSON, once a check has stored them, its <c>round</c>, and the findings of its newest <c>review</c> step after that check, if
-/// the review had any.
+/// comments of every change of plan, oldest first, the draft the request works in, once the working step has made it, the <c>checks</c> of its newest
+/// <c>check</c> step as JSON, once a check has stored them, the tokens its steps have used, when its plan was approved, its <c>round</c>, and the
+/// findings of its newest <c>review</c> step after that check, if the review had any.
 /// </summary>
 public sealed record AuthoringRequestToWork(
     Guid Id,
@@ -24,6 +24,8 @@ public sealed record AuthoringRequestToWork(
     IReadOnlyList<string> PlanChanges,
     Guid? DraftId,
     string? LatestChecks,
+    long Tokens,
+    DateTimeOffset? ApprovedAt,
     int Round = 0,
     string? LatestFindings = null);
 
@@ -51,7 +53,7 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
         a.draft_id,
         (SELECT s.checks::text FROM axis.authoring_request_steps s
               WHERE s.request_id = a.id AND s.kind = 'check' AND s.checks IS NOT NULL ORDER BY s.ordinal DESC LIMIT 1),
-        a.round,
+        a.tokens, a.approved_at, a.round,
         (SELECT r.checks->'review'->>'findings' FROM axis.authoring_request_steps r
               WHERE r.request_id = a.id AND r.kind = 'review' AND r.checks IS NOT NULL
                 AND r.ordinal > coalesce((SELECT max(c.ordinal) FROM axis.authoring_request_steps c
@@ -353,8 +355,10 @@ public sealed class AuthoringRequestStore(TenantConnectionFactory connections)
             reader.GetFieldValue<string?[]>(7).OfType<string>().ToList(),
             reader.IsDBNull(8) ? null : reader.GetGuid(8),
             reader.IsDBNull(9) ? null : reader.GetString(9),
-            reader.GetInt32(10),
-            reader.IsDBNull(11) ? null : reader.GetString(11));
+            reader.GetInt64(10),
+            reader.IsDBNull(11) ? null : reader.GetFieldValue<DateTimeOffset>(11),
+            reader.GetInt32(12),
+            reader.IsDBNull(13) ? null : reader.GetString(13));
 
     // Locks the request's row when the host still holds the claim, so a drop or a claim by another host waits for the transaction.
     private static async Task<bool> LockClaimAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid requestId, string claimedBy, CancellationToken cancellationToken)

@@ -16,7 +16,8 @@ namespace Axis.Integration.Tests;
 /// the author. A call to a tool that is not offered, or one that names another draft or another application, gets a tool error and never reaches the server.
 /// A step whose model does not end its turn within 50 model calls, or whose answer stops at the output limit, stops the request as <c>failed</c> with the
 /// outcome <c>unfinished</c>, see <c>docs/reference/authoring-requests.md#budgets</c>. The checking step of the same host runs right after a working
-/// step, so these tests wait for the working step's row and compare only the tool calls the working step made.
+/// step, so these tests wait for the working step's row and compare only the tool calls the working step made. The first test also waits for the
+/// checking step to start, which shows that the request moved to <c>checking</c>.
 /// </summary>
 public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
@@ -53,13 +54,15 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         using var approved = await StudioPublishTests.SendAsync(client, HttpMethod.Post, $"{Url}/{id}/approve", Host);
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         await WorkFinishedAsync(id);
+        await CheckStartedAsync(id);
         await host.StopAsync(CancellationToken);
 
         var draft = await ScalarAsync($"SELECT coalesce(draft_id::text, '') FROM axis.authoring_requests WHERE id = '{id}'");
         Assert.True(Guid.TryParse(draft, out _), "The request holds no draft.");
         Assert.Matches(@"^\d+:work:-:160:true$", await StepsAsync(id, "work"));
         Assert.Equal(["list_applications", "list_applications", "create_draft", "write_layer", "write_resource"], server.ToolCalls.Take(5));
-        Assert.NotEqual("working", await StateAsync(id));
+        // The steps are plan, work and check in that order, whatever state the check step leaves the request in.
+        Assert.Equal("plan,work,check", await ScalarAsync($"SELECT string_agg(kind, ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}'"));
         foreach (var tool in new[] { "create_draft", "write_layer", "write_resource" })
         {
             Assert.Equal(
@@ -238,6 +241,12 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         WaitUntilAsync(
             async () => await ScalarAsync($"SELECT count(*) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'work' AND finished_at IS NOT NULL") == "1",
             "The host did not finish the working step.");
+
+    // The checking step adds its row when it starts, which shows that the working step moved the request to checking.
+    private Task CheckStartedAsync(Guid id) =>
+        WaitUntilAsync(
+            async () => await ScalarAsync($"SELECT count(*) FROM axis.authoring_request_steps WHERE request_id = '{id}' AND kind = 'check'") == "1",
+            "The host did not start the checking step.");
 
     // The edited process of the module with one step added, as the layer tool takes it.
     internal static string LayerInput(Action<JsonNode>? edit = null)

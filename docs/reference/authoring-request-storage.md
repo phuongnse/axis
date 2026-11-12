@@ -32,7 +32,8 @@ when the author approves, changes the plan or drops it. The agent host writes th
   `outcome` `unfinished`, see [working calls](authoring-requests.md#budgets), and the working step sets
   `draft_id` once it makes the request's draft. A `fix` step works on that draft, see
   [fixing](authoring-requests.md#states). It has no `outcome` when it moves the request to `checking`, and
-  the `outcome` `unfinished` otherwise, and it stores no `checks`. `messages` holds the step's model messages as a JSON
+  the `outcome` `unfinished` otherwise, and it stores no `checks`. A step stopped by the token budget has the `outcome`
+  `overBudget`, and one stopped by the time limit has `timedOut`, see [budgets](authoring-requests.md#budgets). `messages` holds the step's model messages as a JSON
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
   A `check` step has the `outcome` `passed`, `failed` or `unfinished`, see
   [checking](authoring-requests.md#states) and [checking time](authoring-requests.md#budgets), and its `checks` holds

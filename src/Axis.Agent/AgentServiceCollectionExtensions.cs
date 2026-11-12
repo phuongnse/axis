@@ -25,7 +25,8 @@ public static class AgentServiceCollectionExtensions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
-    /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, or <c>Ai:FixRounds</c> is not a whole number of at least 0.
+    /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, <c>Ai:FixRounds</c> is not a whole number of at least 0,
+    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, or <c>Ai:RequestTimeout</c> is not a positive time span.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
     /// <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
