@@ -21,12 +21,13 @@ public static class AgentServiceCollectionExtensions
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
     /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims only a state that has a step.
-    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>, and <see cref="FixingStep"/>, which works on the stored draft again in <c>fixing</c>, and <see cref="AcceptingStep"/>, which asks for the accept of the draft of a <c>ready</c> request that asked for auto-accept. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>, and <see cref="FixingStep"/>, which works on the stored draft again in <c>fixing</c>, and <see cref="AcceptingStep"/>, which asks for the accept of the draft of a <c>ready</c> request that asked for auto-accept. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. With <c>Ai:ScriptedAnswersFile</c> set, every binding replays the answers of that file in order and no provider is called, see <c>docs/reference/model-bindings.md#bindings</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
     /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, <c>Ai:FixRounds</c> is not a whole number of at least 0,
-    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, or <c>Ai:RequestTimeout</c> is not a positive time span.
+    /// <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1, <c>Ai:RequestTimeout</c> is not a positive time span, or <c>Ai:ScriptedAnswersFile</c> is set outside Development and Testing,
+    /// names a file that cannot be read or holds no array of answers.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
     /// <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -42,6 +43,16 @@ public static class AgentServiceCollectionExtensions
         // Read before anything starts, so a bad value stops the start.
         var health = HealthOptions.Load(configuration, "http://127.0.0.1:5209");
         var settings = AiSettings.Load(configuration);
+        IReadOnlyList<ModelAnswer>? scriptedAnswers = null;
+        if (settings.ScriptedAnswersFile is { } scriptedAnswersFile)
+        {
+            if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+            {
+                throw new InvalidOperationException($"'{AiSettings.ScriptedAnswersFileSetting}' is refused outside Development and Testing.");
+            }
+
+            scriptedAnswers = ScriptedModelAdapter.ReadAnswers(scriptedAnswersFile, AiSettings.ScriptedAnswersFileSetting);
+        }
 
         var tenantKeys = settings.DefaultBinding is null ? null : TenantModelKeySettings.Load(configuration);
         (BackgroundTenantCatalog Catalog, DirectoryTenantModelKeys? ModelKeys, TenantUsageStore? Usage, ITenantKeySource KeySource)? tenants =
@@ -94,6 +105,11 @@ public static class AgentServiceCollectionExtensions
         services.AddHttpClient(ModelAdapters.HttpClientName, client => client.Timeout = TimeSpan.FromMinutes(10))
             .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false })
             .RedactLoggedHeaders(["x-api-key", "Authorization"]);
+        if (scriptedAnswers is not null)
+        {
+            services.AddScriptedModelAdapter(environment, scriptedAnswers);
+        }
+
         services.AddSingleton<ModelAdapters>();
         // Both endpoints answer Healthy while the process runs, until the request loop has something to report on.
         services.AddHealthChecks();

@@ -31,7 +31,8 @@ installation chooses either.
 - **Tokens.** Each call reports its input and output tokens and writes one log line with the binding,
   the model and the tokens.
 - **Tests.** A scripted adapter replays recorded answers for every binding, for the request loop's
-  tests and the journey. The host refuses to register it outside Development and Testing.
+  tests and the journey. The host refuses to register it outside Development and Testing. A started
+  agent host uses it when `Ai:ScriptedAnswersFile` names a file of answers.
 
 The agent host reads these settings:
 
@@ -48,11 +49,12 @@ The agent host reads these settings:
 | `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets)                     |
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default, see [budgets](authoring-requests.md#budgets)                 |
 | `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default, see [budgets](authoring-requests.md#budgets) |
+| `Ai:ScriptedAnswersFile`             | A JSON file of recorded answers, each shaped as a Messages API response. With it, every binding replays them in order. Development and Testing only |
 
 - **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
   `MaxOutputTokens` that is not a whole number of at least 1, a default or review binding that names
   no binding, an `Ai:FixRounds` that is not a whole number of at least 0, an `Ai:RequestTokenBudget` that is not a whole number of at least 1, or an
-  `Ai:RequestTimeout` that is not a positive time span stops the agent host's start and names the setting, never a value. An `Ai:AllowTenantKeys`
+  `Ai:RequestTimeout` that is not a positive time span stops the agent host's start and names the setting, never a value. An `Ai:ScriptedAnswersFile` outside Development and Testing, or one that names a file that cannot be read or that holds no array of answers, also stops the start and names the setting, never the path. An `Ai:AllowTenantKeys`
   that is not `true` or `false` stops the server's start in the same way, and the agent host's start
   with AI authoring on.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
