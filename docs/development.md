@@ -43,8 +43,9 @@ On CI, setup also keeps every container image that the integration, E2E and smok
 `scripts/docker-images.json`, in one archive in `~/.cache/axis-docker`, which NexKit's `docker` cache entry restores, as
 [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
 agrees. One archive stores each layer that images share once. Setup pulls only the images the archive lacks and saves
-the whole set again, so every job leaves the full set in the folder. An image that still fails to pull is left out
-with a warning, and the job goes on: the suite that needs it pulls it itself. A test fails when a fixture, a Compose
+the whole set again, so every job leaves the full set in the folder. Each try of a pull has the same time limit as
+a restore step, so a registry that stalls fails the try and the next one starts, while the write of the archive has
+none. An image that still fails to pull is left out with a warning, and the job goes on: the suite that needs it pulls it itself. A test fails when a fixture, a Compose
 file, the `Dockerfile` or a test script names an image that the list lacks.
 
 ### Build

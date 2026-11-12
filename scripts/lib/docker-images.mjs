@@ -14,6 +14,9 @@ import { runDocker } from './docker-build.mjs'
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const archiveName = 'images.tar'
 const indexName = 'images.json'
+// A pull that runs past this stops and is tried again, as in scripts/setup.sh. The limit is not on the whole save,
+// which would also cut off a long archive write.
+const pullTimeoutSeconds = () => Number(process.env.AXIS_STEP_TIME_LIMIT_SECONDS ?? 600)
 
 export const cacheDirectory = () => process.env.AXIS_DOCKER_CACHE_DIR ?? path.join(homedir(), '.cache/axis-docker')
 
@@ -78,7 +81,7 @@ export async function saveImages({ dir = cacheDirectory(), base = root } = {}) {
   if (missing.length > 0 && index && (await loadArchive(dir))) missing = missing.filter((image) => !present(image))
   for (const image of missing) {
     try {
-      await runDocker(['pull', image])
+      await runDocker(['pull', image], { timeoutSeconds: pullTimeoutSeconds() })
     } catch (error) {
       console.error(`Warning: ${error.message}, so ${image} is not saved.`)
     }

@@ -11,7 +11,8 @@ import { findImageReferences } from './lib/images.mjs'
 // Runs scripts/lib/docker-images.mjs with docker replaced by a stub that keeps the images Docker has in a file:
 // `pull X` adds X, `save -o F A B` writes the names to F, `load -i F` adds the names in F, and `image inspect`
 // succeeds only for an image that Docker has. DOCKER_FAIL_PULL names an image whose pull fails, DOCKER_FAIL_LOAD makes
-// every load fail and DOCKER_DOWN makes `docker info` fail. Every call is logged.
+// every load fail and DOCKER_DOWN makes `docker info` fail. DOCKER_HANG_PULL names an image whose pull never ends.
+// Every call is logged.
 const root = fileURLToPath(new URL('..', import.meta.url))
 const listed = listedImages(root)
 
@@ -20,7 +21,7 @@ echo "$*" >> "$DOCKER_LOG"
 case "$1" in
   info) [ -z "$DOCKER_DOWN" ] ;;
   image) grep -qxF "$3" "$DOCKER_STATE" ;;
-  pull) if [ "$2" = "$DOCKER_FAIL_PULL" ]; then exit 1; fi; echo "$2" >> "$DOCKER_STATE" ;;
+  pull) if [ "$2" = "$DOCKER_HANG_PULL" ]; then exec sleep 60; fi; if [ "$2" = "$DOCKER_FAIL_PULL" ]; then exit 1; fi; echo "$2" >> "$DOCKER_STATE" ;;
   save) file="$3"; shift 3; printf '%s\\n' "$@" > "$file" ;;
   load) if [ -n "$DOCKER_FAIL_LOAD" ]; then exit 1; fi; cat "$3" >> "$DOCKER_STATE" ;;
 esac
@@ -163,6 +164,17 @@ describe('scripts/lib/docker-images.mjs', () => {
     const rest = listed.filter((image) => image !== failing)
     assert.deepEqual(indexed(), rest)
     assert.deepEqual(archived(), rest)
+  })
+
+  test('save stops a pull that does not end at the limit, tries it again and leaves the image out', () => {
+    const hanging = listed[5]
+    const result = run('save', { DOCKER_HANG_PULL: hanging, AXIS_STEP_TIME_LIMIT_SECONDS: '1' })
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.pulls.filter((line) => line === `pull ${hanging}`).length, 3)
+    assert.match(result.stderr, /Attempt 1 of 3 failed with no end in 1 seconds: docker pull /)
+    assert.match(result.stderr, /failed after 3 attempts with no end in 1 seconds, so .* is not saved/)
+    assert.deepEqual(indexed(), listed.filter((image) => image !== hanging))
   })
 
   test('save pulls every image when an incomplete archive does not load, and writes a new archive', () => {
