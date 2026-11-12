@@ -7,7 +7,8 @@ database. The other system tables are in [storage](storage.md#system-tables).
 
 `Axis.Configuration` owns the two tables of [authoring requests](authoring-requests.md#durable-requests)
 in the `axis` schema of each tenant database. The server inserts a request and changes its state
-when the author approves, changes the plan or drops it. The agent host writes the rest.
+when the author approves, changes the plan or drops it. The publisher moves a `ready` request to
+`accepted` when the accept of its draft succeeds. The agent host writes the rest.
 
 - **`axis.authoring_requests`.** One row per request: `id` (`uuid`, a version 7 UUID),
   `application_id` (`uuid`, the application `id`), `author` (`text`, a user id), `text`, `state`

@@ -11,7 +11,8 @@ every activation adds a row to the release history, from which a release can be 
 inserts `validate`, `publish`, `activate` and `test` requests through the
 [authoring API](authoring.md#publishing), and a preview is a `publish` request with the target
 `preview`. It also inserts `test` requests through the MCP server's `run_scenarios`, see
-[tools](mcp-server.md#tools).
+[tools](mcp-server.md#tools), and `accept` requests through the accept route of an
+[authoring request](authoring-requests.md#routes).
 
 ### Publish requests
 
@@ -57,7 +58,9 @@ and only the publisher changes a row, over the schema role. An index on
   `AXC0215`.
 - **Accept requests.** An `accept` row shares the queue of `publish`, `validate` and `activate`, so two
   accepts of one application run one after the other. It has the target `tenant`, a null `snapshot`
-  and no audit record, also when it runs out of claims. See
+  and no release audit record, also when it runs out of claims. When it succeeds, the publisher also
+  moves the `ready` authoring request of its draft to `accepted` and writes `authoringRequest.accepted`,
+  in the transaction that ends the row. See
   [accepting a draft](revisions-and-drafts.md#accepting-a-draft).
 - **Test requests.** A `test` row has its own queue for each application: at most one runs at a time,
   oldest first, and it does not wait behind a `publish`, `validate`, `activate` or `accept` row. The claim of

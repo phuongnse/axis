@@ -20,7 +20,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The authoring request routes store a request and its steps in the database of the host's tenant, count each send toward the
-/// <c>authoringRequests</c> quota, and let only the request's author approve, change or drop it. Nothing here moves a
+/// <c>authoringRequests</c> quota, and let only the request's author approve, change, drop or accept it. Nothing here moves a
 /// request out of <c>planning</c> by itself, so the tests set the state in the database, as the agent host will. A send gets the agent
 /// host's token from <see cref="IAuthorTokenExchange"/>. These tests replace it with a stub that gives a fixed token, which the send
 /// stores encrypted on the new row, and the realm's answers are tested with Keycloak in <see cref="AuthoringRequestExchangeTests"/>. A
@@ -180,6 +180,62 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
 
         Assert.Equal(1L, await CountRequestsAsync(connectionString));
         Assert.Equal("awaitingApproval", await StateAsync(connectionString, id));
+    }
+
+    [Fact]
+    public async Task The_authors_accept_of_a_ready_request_queues_an_accept_of_its_draft_and_every_refusal_stores_nothing()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("authoring_requests_accept", CancellationToken);
+        await using var factory = NewFactory(folder.Path, connectionString);
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        var id = await SendRequestAsync(author);
+        var draft = Guid.NewGuid();
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = '{draft}' WHERE id = '{id}'", CancellationToken);
+
+        // Another author learns nothing of the state, and a request that is not ready or has no draft cannot be accepted.
+        using var other = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Forbidden, other.StatusCode);
+        Assert.Equal("Only the author of the request may do this.", (await StudioPublishTests.ReadAsync(other)).RootElement.GetProperty("title").GetString());
+        Assert.Equal(0L, await CountPublishRequestsAsync(connectionString));
+        await SetStateAsync(connectionString, id, "awaitingApproval");
+        using var notReady = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, notReady.StatusCode);
+        Assert.Equal("The request is not in a state that allows this.", (await StudioPublishTests.ReadAsync(notReady)).RootElement.GetProperty("title").GetString());
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET state = 'ready', draft_id = NULL WHERE id = '{id}'", CancellationToken);
+        using var noDraft = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, noDraft.StatusCode);
+        Assert.Equal(0L, await CountPublishRequestsAsync(connectionString));
+
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString, $"UPDATE axis.authoring_requests SET draft_id = '{draft}' WHERE id = '{id}'", CancellationToken);
+        using var accepted = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var body = await StudioPublishTests.ReadAsync(accepted);
+        var requestId = body.RootElement.GetProperty("id").GetString()!;
+        Assert.Equal($"/api/studio/apps/PurchaseRequests/requests/{requestId}", accepted.Headers.Location?.OriginalString);
+        Assert.Equal("accept", body.RootElement.GetProperty("kind").GetString());
+        Assert.Equal("queued", body.RootElement.GetProperty("status").GetString());
+        Assert.Equal(
+            $"accept|queued|{draft}|PurchaseRequests|studio|author|tenant|true",
+            await StringAsync(
+                connectionString,
+                $"SELECT kind || '|' || status || '|' || draft_id || '|' || folder || '|' || client || '|' || requested_by || '|' || target || '|' || (snapshot IS NULL) FROM axis.publish_requests WHERE id = '{requestId}'"));
+        Assert.Equal("ready", await StateAsync(connectionString, id));
+        Assert.Equal(1L, await CountPublishRequestsAsync(connectionString));
+
+        // The accept that has not finished refuses a second one, and it stores nothing.
+        using var again = await StudioPublishTests.SendAsync(author, HttpMethod.Post, $"{Url}/{id}/accept", Host);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+        Assert.Equal(
+            "The draft already has an accept that has not finished.",
+            (await StudioPublishTests.ReadAsync(again)).RootElement.GetProperty("title").GetString());
+        Assert.Equal(1L, await CountPublishRequestsAsync(connectionString));
+        Assert.Equal("ready", await StateAsync(connectionString, id));
     }
 
     [Fact]
@@ -429,6 +485,12 @@ public sealed class AuthoringRequestTests : IAsyncLifetime
 
     private static Task<long> CountAuditAsync(string connectionString, string action) =>
         ScalarAsync(connectionString, $"SELECT count(*) FROM axis.audit_records WHERE action = '{action}'");
+
+    private static Task<long> CountPublishRequestsAsync(string connectionString) =>
+        ScalarAsync(connectionString, "SELECT count(*) FROM axis.publish_requests");
+
+    private static async Task<string?> StringAsync(string connectionString, string sql) =>
+        (string?)await PostgreSqlServer.AdminScalarAsync(connectionString, sql, CancellationToken);
 
     private static async Task<long> ScalarAsync(string connectionString, string sql) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(connectionString, sql, CancellationToken))!;

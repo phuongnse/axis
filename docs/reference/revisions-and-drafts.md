@@ -111,7 +111,9 @@ lock from the first step to the last, so Studio writes to that folder wait.
    [test](authoring.md#test), with its time limit, and a failing one fails the request. With a scenario to
    run and no scenario server, the request fails with `AXC0217`.
 6. On success it writes the changed files to the folder, as the authoring API writes them, and commits
-   them as one revision. It then deletes the draft.
+   them as one revision. It then deletes the draft. The request's final status, the move of the
+   `ready` [authoring request](authoring-requests.md#accepting) of the draft to `accepted`, the
+   erasing of its refresh token and its `authoringRequest.accepted` audit record commit together.
 7. On any failure the folder and `main` are unchanged, and the request ends `failed` with its
    diagnostics.
 

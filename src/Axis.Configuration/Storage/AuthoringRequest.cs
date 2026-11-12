@@ -3,7 +3,8 @@ namespace Axis.Configuration.Storage;
 /// <summary>
 /// A change that an author describes in words, stored by the server and worked on by the agent host. The server
 /// inserts a row in the <c>planning</c> state and changes its state when the author approves, changes the plan or
-/// drops it. The agent host changes everything else.
+/// drops it. The publisher moves a <c>ready</c> row to <c>accepted</c> when the accept of its draft succeeds. The agent host
+/// changes everything else.
 /// </summary>
 public sealed class AuthoringRequest
 {

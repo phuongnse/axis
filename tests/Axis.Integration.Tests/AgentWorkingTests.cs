@@ -48,7 +48,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
             new ModelAnswer([new ModelText("Done.")], ModelStopReason.EndTurn, new ModelTokens(30, 10)),
         ]);
         var server = new RecordingHandler(_realm.Factory.Server.CreateHandler());
-        await using var host = BuildAgent(_realm, script, server);
+        await using var host = BuildAgent(_realm, script, server, fixing: false);
         await host.StartAsync(CancellationToken);
         await WaitUntilAsync(async () => await StateAsync(id) == "awaitingApproval", "The host did not write the plan.");
         using var approved = await StudioPublishTests.SendAsync(client, HttpMethod.Post, $"{Url}/{id}/approve", Host);
@@ -61,7 +61,7 @@ public sealed class AgentWorkingTests(KeycloakFixture keycloak, PostgreSqlFixtur
         Assert.True(Guid.TryParse(draft, out _), "The request holds no draft.");
         Assert.Matches(@"^\d+:work:-:160:true$", await StepsAsync(id, "work"));
         Assert.Equal(["list_applications", "list_applications", "create_draft", "write_layer", "write_resource"], server.ToolCalls.Take(5));
-        // The steps are plan, work and check in that order, whatever state the check step leaves the request in.
+        // The steps are plan, work and check in that order, whatever state the check step leaves the request in. The host has no fixing step, so a failed check cannot add a fix step before it stops.
         Assert.Equal("plan,work,check", await ScalarAsync($"SELECT string_agg(kind, ',' ORDER BY ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}'"));
         foreach (var tool in new[] { "create_draft", "write_layer", "write_resource" })
         {

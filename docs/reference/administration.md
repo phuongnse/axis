@@ -619,15 +619,17 @@ tenant's schema role unless it says otherwise.
    - `accept` writes the changed files to the folder, commits them as one revision and deletes the
      draft. It writes `<tenant> accept ok`, or `<tenant> accept failed: <message>` when a file cannot
      be written or the revision cannot be recorded.
-   - An `accept` has no audit record and no release id. A failure before the `accept` step leaves the
+   - An `accept` has no release audit record and no release id. A failure before the `accept` step leaves the
      folder and `main` as they were.
-9. Write the audit record of a `publish` or an `activate`, with the request's final status, then set
-   the request `succeeded` or `failed` and store its diagnostics and its release id, in one
-   transaction. A `validate` and an `accept` get their final status and diagnostics the same way, with no audit record
-   and no release id. The diagnostics are all of them, warnings included, as in the
-   [authoring API](authoring.md#diagnostics). A request that fails with an exception rather than
-   diagnostics, such as a lost connection, stores only the diagnostics gathered so far, which can be
-   none.
+9. Write the audit record of a `publish` or an `activate`, with the request's final status, then set the
+   request `succeeded` or `failed` and store its diagnostics and its release id, in one transaction. A
+   `validate` and an `accept` get their final status and diagnostics the same way, and neither has a release
+   id. A `validate` has no audit record. When an `accept` succeeds, the same transaction also moves the
+   `ready` authoring request of its draft to `accepted`, erases its refresh token and writes an
+   `authoringRequest.accepted` audit record, see [accepting](authoring-requests.md#accepting). The
+   diagnostics are all of them, warnings included, as in the [authoring API](authoring.md#diagnostics). A
+   request that fails with an exception rather than diagnostics, such as a lost connection, stores only the
+   diagnostics gathered so far, which can be none.
 
 Activating the same content hash twice changes nothing, so a request that runs again does no harm,
 and an activation of the release that is already active adds no history row.

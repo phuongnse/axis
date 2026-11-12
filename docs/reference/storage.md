@@ -778,10 +778,11 @@ Besides the record and process actions, these actions write audit records. A `pu
   the new value. It is written only when the value changes, in the transaction that saves the value.
 
 - **Authoring request actions.** Sending, approving and dropping an
-  [authoring request](authoring-requests.md#routes) write `authoringRequest.sent`,
-  `authoringRequest.approved` and `authoringRequest.dropped`, with the author as `actor`. The
-  `application_id` is set, `details` is `{ "requestId" }`, and the other ids are null. Each commits
-  with the row it changes.
+  [authoring request](authoring-requests.md#routes), and the accept of its draft, write
+  `authoringRequest.sent`, `authoringRequest.approved`, `authoringRequest.dropped` and
+  `authoringRequest.accepted`, with the author as `actor`. The `application_id` is set, `details` is
+  `{ "requestId" }`, and the other ids are null. Each commits with the row it changes. The accepted
+  record commits with the final status of the accept's publish request.
 
 - **MCP tool actions.** A successful `create_draft`, `write_resource`, `write_layer` or `delete_resource` call of the
   [MCP server](mcp-server.md#tools) writes `mcp.toolCalled`, with the person as `actor`. The

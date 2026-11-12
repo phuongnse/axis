@@ -34,9 +34,9 @@ The agent host acts with exactly the grants of the author who sent the request.
   token's subject is the author and its audience is the MCP server. The send refuses with `403` a
   token that does not carry the author role, the check that the MCP server makes on the same token.
 - **Kept with the request.** The refresh token is stored in the request row, encrypted with the
-  tenant's data key. A drop, an accept or a failure erases it: the commit of a step that moves the
-  request to `accepted`, `dropped` or `failed` sets it to null, and a step that moves it to any
-  other state keeps it.
+  tenant's data key. A drop, an accept or a failure erases it: the commit that moves the request to
+  `accepted`, `dropped` or `failed` sets it to null, and a step that moves it to any other state
+  keeps it. The commit that moves it to `accepted` is the publisher's, see [accepting](#accepting).
 - **Ends with the session.** When a step needs the author's access token, the agent host refreshes
   the stored token at the tenant's realm as `axis-agent` and keeps the new refresh token that the
   realm returns. The token ends with the author's realm session, at most 8 hours. A token that the
@@ -80,10 +80,10 @@ loses no work.
 
 ## Routes
 
-An author sends, lists, reads, approves, changes and drops requests through the session routes under
+An author sends, lists, reads, approves, changes, drops and accepts requests through the session routes under
 `/api/studio/apps/{application}/authoring-requests`, with the CSRF header of the other authoring
-routes. The shared answers are in [responses](authoring.md#responses). The routes never accept a
-request, which belongs to [accepting](#accepting).
+routes. The shared answers are in [responses](authoring.md#responses). The accept route only asks for
+an accept, which [accepting](#accepting) describes.
 
 | Route                                                                     | What it does                                                                                            |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -93,6 +93,7 @@ request, which belongs to [accepting](#accepting).
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/approve`     | Moves a request from `awaitingApproval` to `working`                                                    |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/change-plan` | Moves a request from `awaitingApproval` back to `planning` and keeps the comment as a `planChange` step |
 | `POST /api/studio/apps/{application}/authoring-requests/{id}/drop`        | Moves a request to `dropped` from any state but `accepted` and `dropped`                                |
+| `POST /api/studio/apps/{application}/authoring-requests/{id}/accept`      | Stores an `accept` publish request for the draft of a `ready` request and answers `202` with it         |
 
 - **Order of checks.** A send checks the session (`401`), the author role (`403`), in a cell the
   tenant's [`authoringRequests` quota](tenant-quotas.md#refusals) (`403`), the application (`404`),
@@ -103,13 +104,20 @@ request, which belongs to [accepting](#accepting).
   writes a row or an audit record, and a bad body never calls the realm. Just before the insert it
   counts the quota again under a lock, so sends at the same time cannot pass it together. The other
   routes check the session, the author role and the application, then answer `404` for an `id` that is
-  not a UUID of this application. Approve, change plan and drop then answer `403` to anyone but the
-  author of the request, and last answer `409` for a request in a state the action does not accept.
+  not a UUID of this application. Approve, change plan, drop and accept then answer `403` to anyone but
+  the author of the request, and last answer `409` for a request in a state the action does not accept.
+  Accept answers `409` for a request that is not `ready` or has no draft, and for a draft that already
+  has an accept queued or running. A refused accept stores nothing. In a cell, an accept over the
+  [`storage` quota](tenant-quotas.md#refusals) is refused with the quota's `403` before these checks,
+  as a save is, because it writes the draft as a revision. A drop is not, so the author can still end
+  the request.
 - **Who.** Any author lists and reads the requests of an application. Only the author of a request
-  approves its plan, changes it or drops it.
+  approves its plan, changes it, drops it or accepts its draft.
 - **Body.** A send takes `{ text, autoAccept? }` with a `text` of 1 to 4,000 characters. A change of
   plan takes `{ comment }` of 1 to 2,000 characters. The other routes take no body.
-- **Answer.** A request has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
+- **Answer.** Accept answers `202` with the queued publish request, in the shape of
+  `GET /api/studio/apps/{application}/requests/{id}`, and a `Location` for that route. The other
+  routes answer a request, which has its `id`, `application`, `author`, `authorName`, `text`, `state`, `plan`,
   `round`, `tokens`, `autoAccept`, `sentAt`, `approvedAt` and `finishedAt`. The read route adds `steps`,
   each with its `kind`, `summary`, `outcome`, `tokens`, `startedAt`, `finishedAt` and `checks`, which is
   the results of a `check` step or the review of a `review` step, and null on any other step.
@@ -212,8 +220,11 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 Accepting moves a draft's changes into the working folder as one revision. It never puts them live:
 only [publishing](authoring.md#publishing) does.
 
-- **Who.** _(planned for M35)_ The author of the request accepts or drops the draft in Studio. The agent may accept it
-  through `accept_draft` only when all of these hold:
+- **Who.** The author of a `ready` request accepts its draft through the accept route, see
+  [routes](#routes). The route stores an `accept` with the client `studio`, and the request stays
+  `ready` until the accept succeeds.
+- **In Studio and by the agent** _(planned for M35)_. Studio gives the author an Accept button for the
+  route. The agent may accept the draft through `accept_draft` only when all of these hold:
   - the application's auto-accept setting is on, see
     [AI authoring in Studio](ai-authoring-in-studio.md#auto-accept);
   - the request asked for it when it was sent;
@@ -221,7 +232,10 @@ only [publishing](authoring.md#publishing) does.
   - the author still holds the author role.
 - **Through the publisher.** An accept is a [publish request](authoring.md#publishing) of the kind
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
-  interleave.
+  interleave. When an accept succeeds, the publisher moves the `ready` request of that draft to
+  `accepted`, sets its `finishedAt`, erases its refresh token and writes an `authoringRequest.accepted`
+  audit record, in the transaction that ends the publish request. A failed accept, such as a conflict,
+  leaves the request `ready` with its token, and the author can accept again or drop the request.
 - **All or nothing.** The publisher checks that every resource the draft read or changed still has the version
   the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
   contract scenarios and the application's test scenarios on the result, and commits it as a revision, see
@@ -240,11 +254,9 @@ A request keeps the whole story of the change, and its milestones write audit re
 
 - **The request.** Each request keeps who asked, the client, the binding and model, the plan, the diff,
   each check, the review, the tokens and who accepted or dropped it.
-- **Audit records.** Sending a request, approving a plan and dropping it each write an audit record
-  with the author, the request id and the application, see
+- **Audit records.** Sending a request, approving a plan, dropping it and accepting its draft each
+  write an audit record with the author, the request id and the application, see
   [audit actions](storage.md#audit-actions).
-- **Accepting's record** _(planned for M35)_. Accepting a draft writes an audit record too, with the
-  same fields.
 - **Usage.** Every model call, review included, adds its tokens to the tenant's
   [usage](tenant-quotas.md#usage) by binding and model, with a tenant's own key counted apart.
 
