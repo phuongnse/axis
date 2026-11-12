@@ -23,13 +23,18 @@ internal sealed record ModelLoopResult(ModelLoopEnd End, ModelAnswer? Last, stri
 /// <summary>
 /// The one loop of model calls that the steps of the agent host share, see <c>docs/reference/authoring-requests.md#states</c> and
 /// <c>docs/reference/authoring-requests.md#budgets</c>. A step offers the model some tools of the MCP server, and the loop calls the model up to a bound,
-/// answers each tool call through the step and adds the tokens of every call to the request.
+/// answers each tool call through the step and adds the tokens of every call to the request. It makes no call that the request's token budget cannot hold.
 /// </summary>
 internal static class ModelLoop
 {
     /// <summary>Runs the model until it ends its turn, is cut off, or has made <paramref name="maxCalls"/> calls.</summary>
     /// <param name="answer">The step's answer to one tool call. A tool error is a result with <see cref="ModelToolResult.IsError"/>.</param>
+    /// <param name="maxOutputTokens">The binding's output limit, which the estimate before each call counts as the call's output.</param>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim.</exception>
+    /// <exception cref="AuthoringOverBudgetException">
+    /// The tokens used so far, the last call's input in this step and <paramref name="maxOutputTokens"/> together pass the request's token budget,
+    /// see <c>docs/reference/authoring-requests.md#budgets</c>. The loop makes no further call.
+    /// </exception>
     internal static async Task<ModelLoopResult> RunAsync(
         IModelAdapter model,
         AuthoringStepContext context,
@@ -37,6 +42,7 @@ internal static class ModelLoop
         string firstMessage,
         IReadOnlyList<ModelTool> tools,
         int maxCalls,
+        int maxOutputTokens,
         Func<ModelToolCall, CancellationToken, Task<ModelToolResult>> answer,
         CancellationToken cancellationToken)
     {
@@ -44,6 +50,12 @@ internal static class ModelLoop
         ModelAnswer? last = null;
         for (var call = 0; call < maxCalls; call++)
         {
+            var estimate = context.Tokens + (last?.Tokens.Input ?? 0) + maxOutputTokens;
+            if (estimate > context.TokenBudget)
+            {
+                throw new AuthoringOverBudgetException();
+            }
+
             last = await model.CallAsync(new ModelCall(system, [.. messages], tools), cancellationToken);
             await context.AddTokensAsync((long)last.Tokens.Input + last.Tokens.Output, cancellationToken);
             messages.Add(new ModelMessage(ModelRole.Assistant, last.Content));

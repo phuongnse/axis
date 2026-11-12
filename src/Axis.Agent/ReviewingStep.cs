@@ -47,7 +47,8 @@ internal sealed class ReviewingStep(TenantModelAdapters adapters, AiSettings set
         }
 
         var tools = await ModelLoop.ListToolsAsync(context, _tools, cancellationToken);
-        var model = await adapters.ForAsync(context.TenantId, BindingFor(settings, request), cancellationToken);
+        var binding = BindingFor(settings, request);
+        var model = await adapters.ForAsync(context.TenantId, binding, cancellationToken);
         var loop = await ModelLoop.RunAsync(
             model,
             context,
@@ -55,6 +56,7 @@ internal sealed class ReviewingStep(TenantModelAdapters adapters, AiSettings set
             FirstMessage(request),
             tools,
             MaxModelCalls,
+            settings.MaxOutputTokensOf(binding),
             (call, token) => DraftToolPolicy.AnswerAsync(context, State, _tools, application, draft, call, token),
             cancellationToken);
 

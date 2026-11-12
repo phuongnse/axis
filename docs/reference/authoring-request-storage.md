@@ -29,7 +29,8 @@ when the author approves, changes the plan or drops it. The agent host writes th
   A planning step that wrote no plan has the `outcome` `noPlan`, see
   [planning calls](authoring-requests.md#budgets). A working step that did not finish the change has the
   `outcome` `unfinished`, see [working calls](authoring-requests.md#budgets), and the working step sets
-  `draft_id` once it makes the request's draft. `messages` holds the step's model messages as a JSON
+  `draft_id` once it makes the request's draft. A step stopped by the token budget has the `outcome`
+  `overBudget`, and one stopped by the time limit has `timedOut`, see [budgets](authoring-requests.md#budgets). `messages` holds the step's model messages as a JSON
   array of `{ role, content }`, where `content` is a list of `text`, `toolCall` and `toolResult` parts.
   A `check` step has the `outcome` `passed`, `failed` or `unfinished`, see
   [checking](authoring-requests.md#states) and [checking time](authoring-requests.md#budgets), and its `checks` holds

@@ -32,6 +32,10 @@ public sealed class AiSettingsTests : IDisposable
         { "max-output-tokens-zero", "Ai:Bindings:main:MaxOutputTokens" },
         { "max-output-tokens-text", "Ai:Bindings:main:MaxOutputTokens" },
         { "max-output-tokens-fraction", "Ai:Bindings:main:MaxOutputTokens" },
+        { "request-token-budget-zero", "Ai:RequestTokenBudget" },
+        { "request-token-budget-text", "Ai:RequestTokenBudget" },
+        { "request-timeout-zero", "Ai:RequestTimeout" },
+        { "request-timeout-text", "Ai:RequestTimeout" },
     };
 
     [Theory]
@@ -76,6 +80,18 @@ public sealed class AiSettingsTests : IDisposable
             case "max-output-tokens-fraction":
                 values["Ai:Bindings:main:MaxOutputTokens"] = "70707.5";
                 break;
+            case "request-token-budget-zero":
+                values["Ai:RequestTokenBudget"] = "0";
+                break;
+            case "request-token-budget-text":
+                values["Ai:RequestTokenBudget"] = "lots-of-tokens";
+                break;
+            case "request-timeout-zero":
+                values["Ai:RequestTimeout"] = "00:00:00";
+                break;
+            case "request-timeout-text":
+                values["Ai:RequestTimeout"] = "half-an-hour-value";
+                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null);
         }
@@ -84,7 +100,7 @@ public sealed class AiSettingsTests : IDisposable
 
         var text = exception.ToString();
         Assert.Contains($"'{setting}'", text, StringComparison.Ordinal);
-        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, Key, "other-binding-name", "lots-of-tokens", "70707.5" })
+        foreach (var secret in new[] { BadKind, ModelId, keyFile, missingFile, _folder, Key, "other-binding-name", "lots-of-tokens", "70707.5", "half-an-hour-value" })
         {
             Assert.DoesNotContain(secret, text, StringComparison.Ordinal);
         }
@@ -112,6 +128,20 @@ public sealed class AiSettingsTests : IDisposable
         Assert.Equal((ModelBindingKind.OpenAiCompatible, "http://localhost:11434/v1", (string?)null, 4000), (local.Kind, local.Endpoint, local.Key, local.MaxOutputTokens));
         Assert.Equal(("main", "local"), (settings.DefaultBinding, settings.ReviewBinding));
         Assert.DoesNotContain(Key, main.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_request_budgets_have_their_defaults_and_are_read_when_set()
+    {
+        var defaults = AiSettings.Load(Configure([]));
+        Assert.Equal((2_000_000L, TimeSpan.FromMinutes(30)), (defaults.RequestTokenBudget, defaults.RequestTimeout));
+
+        var set = AiSettings.Load(Configure(new Dictionary<string, string?>
+        {
+            ["Ai:RequestTokenBudget"] = "5000",
+            ["Ai:RequestTimeout"] = "00:10:00",
+        }));
+        Assert.Equal((5000L, TimeSpan.FromMinutes(10)), (set.RequestTokenBudget, set.RequestTimeout));
     }
 
     [Fact]

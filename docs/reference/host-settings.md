@@ -476,8 +476,8 @@ minute for one replica. The rules of the limits are in
 
 ## AI settings
 
-The agent host reads the `Ai` settings: the model bindings and the default and review bindings. Their
-table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
+The agent host reads the `Ai` settings: the model bindings, the default and review bindings and the
+[budgets of a request](authoring-requests.md#budgets). Their table is in [model bindings](model-bindings.md#bindings). The server and the agent host read
 `Ai:AllowTenantKeys`, see [a tenant's own key](model-bindings.md#a-tenants-own-key).
 
 With `Ai:DefaultBinding` set, the agent host also reads its tenants, as the worker does under
@@ -505,9 +505,6 @@ idle, reading none of the settings below.
   tenant and the role and never a connection string.
 - **A bad setting** stops the start, and the message names the setting and never a connection value.
   With AI authoring off, a missing platform connection does not stop the agent host.
-
-**The budgets of a request** _(planned for M35)_ are settings of the same section and
-of the same table.
 
 ## Telemetry export
 
