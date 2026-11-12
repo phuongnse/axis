@@ -8,6 +8,10 @@ public sealed class AiSettings
     private const string BindingsSection = "Ai:Bindings";
     private const string DefaultBindingSetting = "Ai:DefaultBinding";
     private const string ReviewBindingSetting = "Ai:ReviewBinding";
+    private const string FixRoundsSetting = "Ai:FixRounds";
+
+    /// <summary>The fix rounds of a request when <c>Ai:FixRounds</c> is not set.</summary>
+    public const int DefaultFixRounds = 3;
 
     /// <summary>The settings this class reads, as the model-bindings page names them.</summary>
     public static IReadOnlyList<string> SettingNames { get; } =
@@ -19,6 +23,7 @@ public sealed class AiSettings
         $"{BindingsSection}:<name>:MaxOutputTokens",
         DefaultBindingSetting,
         ReviewBindingSetting,
+        FixRoundsSetting,
     ];
 
     /// <summary>The bindings by name.</summary>
@@ -30,13 +35,16 @@ public sealed class AiSettings
     /// <summary>The binding of the review session, or <see langword="null"/> to use the request's binding, or else the default binding.</summary>
     public string? ReviewBinding { get; init; }
 
+    /// <summary>The most fix rounds one request gets, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+    public int FixRounds { get; init; } = DefaultFixRounds;
+
     /// <summary>
     /// Reads every value by hand and never binds, because a conversion error of the binder quotes the value.
     /// Each error names its setting and never a value, a path or a key.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A binding has an unknown kind, no model, a key file that cannot be read or a <c>MaxOutputTokens</c> that is not a whole number of at least 1,
-    /// or the default or review binding names no binding.
+    /// the default or review binding names no binding, or <c>Ai:FixRounds</c> is not a whole number of at least 0.
     /// </exception>
     public static AiSettings Load(IConfiguration configuration)
     {
@@ -53,6 +61,7 @@ public sealed class AiSettings
             Bindings = bindings,
             DefaultBinding = NamedBinding(configuration, DefaultBindingSetting, bindings),
             ReviewBinding = NamedBinding(configuration, ReviewBindingSetting, bindings),
+            FixRounds = ReadFixRounds(configuration[FixRoundsSetting]),
         };
     }
 
@@ -111,6 +120,18 @@ public sealed class AiSettings
         return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var tokens) && tokens >= 1
             ? tokens
             : throw new InvalidOperationException($"'{setting}' must be a whole number of at least 1.");
+    }
+
+    private static int ReadFixRounds(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return DefaultFixRounds;
+        }
+
+        return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var rounds)
+            ? rounds
+            : throw new InvalidOperationException($"'{FixRoundsSetting}' must be a whole number of at least 0.");
     }
 
     private static string? NamedBinding(IConfiguration configuration, string setting, Dictionary<string, ModelBinding> bindings)

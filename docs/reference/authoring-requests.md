@@ -126,7 +126,7 @@ the checks, an independent review and fix rounds.
 | `working`                       | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
 | `checking`                      | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
 | `reviewing`                     | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
-| `fixing` _(planned for M35)_    | The agent works on the failures and findings                                                                                            | `checking`                            |
+| `fixing`                        | The agent works on the failures and findings                                                                                            | `checking`                            |
 | `ready`                         | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
 | `accepted`                      | The draft is in the working folder as a revision                                                                                        | none                                  |
 | `dropped`                       | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                  |
@@ -165,6 +165,11 @@ the checks, an independent review and fix rounds.
   `PASSED`, the request moves to `ready` with the outcome `passed`. Any other text moves it to `fixing` with the
   outcome `findings`, and the text is the findings. The step stores `{ review: { outcome, findings } }` in `checks`
   on its `review` step, with `findings` null when the review passed.
+- **Fixing works on the failures.** The step uses the tools and the draft rules of working, on the draft that the
+  working step stored, and never makes a draft. The model sees the request text, the approved plan, what failed
+  in the latest `check` step and the findings of the latest `review` step after it. What failed is the compile
+  diagnostics when the compile failed, and the scenario items whose outcome is not `passed`. When the model ends
+  its turn, the request moves to `checking`.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
@@ -177,18 +182,19 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Planning calls.** At most 25 model calls in one planning step. A step that has no plan by then stops
   the request as `failed` with the outcome `noPlan`, and so does a request whose application the author
   can no longer list.
-- **Working calls.** At most 50 model calls in one working step. A step whose model has not ended its turn
+- **Working calls.** At most 50 model calls in one working or fix step. A step whose model has not ended its turn
   by then, or whose answer stops at the output limit, stops the request as `failed` with the outcome
-  `unfinished`, and so does a request whose application the author can no longer list or whose draft cannot
-  be made.
+  `unfinished`, and so does a request whose application the author can no longer list. So does a working step
+  whose draft cannot be made, and a fix step whose request has no draft.
 - **Checking time.** At most 450 polls of the scenario run, 2 seconds apart, which is about 15 minutes. A
   run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
   never starts does not hold the agent host for ever. The publisher stops a test run after 10 minutes.
 - **Review calls.** At most 25 model calls in one review step. A step whose model has not ended its turn by
   then, whose answer stops at the output limit or has no text, stops the request as `failed` with the outcome
   `unfinished`, and so does a request without a draft or whose application the author can no longer list.
-- **Fix rounds** _(planned for M35)_. At most `Ai:FixRounds` rounds, 3 by default. A request still failing after the last
-  round stops as `failed`.
+- **Fix rounds.** At most `Ai:FixRounds` rounds, 3 by default. Each move to `fixing` adds 1 to the request's
+  `round`. A move to `fixing` when `round` already equals `Ai:FixRounds` stops the request as `failed` instead,
+  and its draft is kept. The check or review step that failed keeps its own outcome.
 - **Tokens** _(planned for M35)_. At most `Ai:RequestTokenBudget` tokens, input and output together, across every model
   call of the request, review included, 2,000,000 by default. A call that would pass the budget is not
   made, and the request stops as `failed`.

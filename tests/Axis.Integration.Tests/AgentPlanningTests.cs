@@ -189,18 +189,36 @@ public sealed class AgentPlanningTests(KeycloakFixture keycloak, PostgreSqlFixtu
         return Guid.Parse(sent.RootElement.GetProperty("id").GetString()!);
     }
 
-    // The client reaches the server of the factory through a handler that records the tools it calls.
-    internal static WebApplication BuildAgent(AuthoringRealm realm, ScriptedModelAdapter script, RecordingHandler server) =>
-        AgentTestHost.Build(
+    // The client reaches the server of the factory through a handler that records the tools it calls. A test that stops a request in fixing and asserts
+    // its exact steps leaves out the fix step, so the host does not claim the request again.
+    internal static WebApplication BuildAgent(
+        AuthoringRealm realm,
+        ScriptedModelAdapter script,
+        RecordingHandler server,
+        IReadOnlyDictionary<string, string?>? settings = null,
+        bool fixing = true)
+    {
+        var values = realm.AgentSettings();
+        foreach (var (name, value) in settings ?? new Dictionary<string, string?>())
+        {
+            values[name] = value;
+        }
+
+        return AgentTestHost.Build(
             aiOn: true,
-            realm.AgentSettings(),
+            values,
             new LogCollector(),
             services =>
             {
                 services.AddSingleton(_options);
                 services.AddSingleton(script);
                 services.AddHttpClient(AuthorMcpClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => server);
+                if (!fixing)
+                {
+                    services.Remove(services.Single(service => service.ServiceType == typeof(IAuthoringStep) && service.ImplementationType?.Name == "FixingStep"));
+                }
             });
+    }
 
     private async Task<string> ScalarAsync(string sql) =>
         Convert.ToString(await PostgreSqlServer.AdminScalarAsync(_realm.SchemaConnection, sql, CancellationToken), System.Globalization.CultureInfo.InvariantCulture) ?? "";

@@ -96,7 +96,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
             ToolUse("layer-1", "write_layer", LayerInput(Reroute), 100, 20),
             new ModelAnswer([new ModelText("Done.")], ModelStopReason.EndTurn, new ModelTokens(30, 10)),
         ]);
-        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        await using var host = BuildAgent(_realm, script, new RecordingHandler(_realm.Factory.Server.CreateHandler()), fixing: false);
         await using var publisher = StudioPublishTests.RunPublisher(Tenant, Host, _realm.SchemaConnection);
         await host.StartAsync(CancellationToken);
         await CheckFinishedAsync(id);
@@ -144,7 +144,7 @@ public sealed class AgentCheckingTests(KeycloakFixture keycloak, PostgreSqlFixtu
     }
 
     // The layer of the working test adds a step that nothing reaches, which does not compile. This one keeps the process as it is and gives the review a due time.
-    private static void DueInThreeDays(JsonNode process)
+    internal static void DueInThreeDays(JsonNode process)
     {
         var steps = (JsonArray)process["steps"]!;
         steps.Remove(steps.Single(step => step!["name"]!.GetValue<string>() == "financeReview"));

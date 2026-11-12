@@ -8,12 +8,15 @@ namespace Axis.Agent;
 /// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A step that needs the author's token and finds it ended
 /// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
+/// A step that moves a request to <c>fixing</c> when its <c>round</c> has reached <c>Ai:FixRounds</c> stops the request as <c>failed</c> instead and keeps its draft,
+/// see <c>docs/reference/authoring-requests.md#budgets</c>.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
     AuthoringSteps steps,
     AuthoringRequestTokenRefresher refresher,
     ITenantCatalog catalog,
+    AiSettings settings,
     IHttpClientFactory httpClients,
     AuthoringLoopOptions options,
     TimeProvider time,
@@ -87,6 +90,12 @@ internal sealed partial class AuthoringRequestRunner(
                 // The commit below is fenced by the claim and erases the token.
                 LogTokenEnded(request.Id);
                 result = new AuthoringStepResult("failed", "tokenEnded");
+            }
+
+            // The step keeps its own outcome. Only the request's state shows that no fix round is left.
+            if (result.NextState == "fixing" && request.Round >= settings.FixRounds)
+            {
+                result = result with { NextState = "failed" };
             }
 
             if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))

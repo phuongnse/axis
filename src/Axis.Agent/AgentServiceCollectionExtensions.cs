@@ -14,18 +14,18 @@ public static class AgentServiceCollectionExtensions
     /// <summary>
     /// Registers the model bindings, the adapters that call them and the health checks that <see cref="HostHealthEndpoints.MapHostHealth"/> serves, and the
     /// background service of the agent host. The host reads <c>Ai:Bindings:&lt;name&gt;</c> with its <c>Kind</c>, <c>Endpoint</c>,
-    /// <c>Model</c>, <c>KeyFile</c> and <c>MaxOutputTokens</c>, which defaults to 16000, and <c>Ai:DefaultBinding</c> and
-    /// <c>Ai:ReviewBinding</c>. With no <c>Ai:DefaultBinding</c> it starts idle, because AI authoring is off: it reads no tenant setting
+    /// <c>Model</c>, <c>KeyFile</c> and <c>MaxOutputTokens</c>, which defaults to 16000, and <c>Ai:DefaultBinding</c>,
+    /// <c>Ai:ReviewBinding</c> and <c>Ai:FixRounds</c>, which defaults to 3. With no <c>Ai:DefaultBinding</c> it starts idle, because AI authoring is off: it reads no tenant setting
     /// and no secret. With one, it reads <c>Ai:AllowTenantKeys</c>, its tenants and their data keys as the worker does, see <c>docs/reference/host-settings.md#ai-settings</c>: from the
     /// <c>Tenants</c> section, or under <c>Tenancy:Source=directory</c> from the tenant directory over <c>ConnectionStrings:Platform</c>,
     /// once the host runs and again every <c>Tenancy:RefreshInterval</c>. With them it gives a step the author's access token through
     /// <see cref="AuthoringStepContext.AccessTokenAsync"/>, refreshed at the tenant's realm as the agent client, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>, and a step calls the tenant's MCP server as the author through <see cref="AuthoringStepContext.Mcp"/>. It also runs every registered <see cref="IAuthoringStep"/> on the
     /// requests it claims with a lease, one step of one request per tenant turn, see <c>docs/reference/authoring-requests.md#durable-requests</c>, and claims only a state that has a step.
-    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
+    /// With AI authoring on it registers <see cref="PlanningStep"/>, which writes the plan of a request in <c>planning</c>, and <see cref="WorkingStep"/>, which makes the approved change in the request's draft in <c>working</c>, and <see cref="CheckingStep"/>, which compiles the draft and runs every scenario on it in <c>checking</c>, and <see cref="ReviewingStep"/>, which reviews the checked draft in a new model session in <c>reviewing</c>, and <see cref="FixingStep"/>, which works on the stored draft again in <c>fixing</c>. <see cref="TenantModelAdapters"/> gives the steps the adapter of a binding for a tenant, and under <c>directory</c> the adapter adds the tokens of each call to the tenant's usage over <c>ConnectionStrings:Platform</c>, see <c>docs/reference/tenant-quotas.md#usage</c>. It has no health check yet, so both endpoints answer Healthy while it runs. <c>Health:Urls</c> defaults to <c>http://127.0.0.1:5209</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// <c>Health:Urls</c> is blank, a binding has an unknown <c>Kind</c>, no <c>Model</c>, a <c>KeyFile</c> that cannot be read or a
-    /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, or <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding.
+    /// <c>MaxOutputTokens</c> that is not a whole number of at least 1, <c>Ai:DefaultBinding</c> or <c>Ai:ReviewBinding</c> names no binding, or <c>Ai:FixRounds</c> is not a whole number of at least 0.
     /// With <c>Ai:DefaultBinding</c> set, also <c>Tenancy:Source</c> is unknown, no tenant is configured under <c>configuration</c>,
     /// <c>Ai:AllowTenantKeys</c> is not <c>true</c> or <c>false</c>,
     /// <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
@@ -74,6 +74,7 @@ public static class AgentServiceCollectionExtensions
             services.TryAddSingleton(CheckingOptions.Default);
             services.AddSingleton<IAuthoringStep, CheckingStep>();
             services.AddSingleton<IAuthoringStep, ReviewingStep>();
+            services.AddSingleton<IAuthoringStep, FixingStep>();
             services.AddSingleton<AuthoringSteps>();
             services.AddSingleton<AuthoringRequestTokenRefresher>();
             services.AddSingleton<AuthoringRequestRunner>();

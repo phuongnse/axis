@@ -45,13 +45,13 @@ The agent host reads these settings:
 | `Ai:DefaultBinding`                  | The binding requests use. With no value, AI authoring is off and Studio shows no request panel         |
 | `Ai:ReviewBinding`                   | The binding of the review session. Empty uses the request's binding, or else the default binding       |
 | `Ai:AllowTenantKeys`                 | Whether a tenant may bring its own key, `false` by default. The server and the agent host read it      |
-| `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets) _(planned for M35)_ |
+| `Ai:FixRounds`                       | Fix rounds per request, 3 by default, see [budgets](authoring-requests.md#budgets)                     |
 | `Ai:RequestTokenBudget`              | Tokens per request, 2,000,000 by default _(planned for M35)_                                           |
 | `Ai:RequestTimeout`                  | Time per request after the plan's approval, 30 minutes by default _(planned for M35)_                  |
 
 - **Bad values.** An unknown kind, a missing model, a key file that cannot be read, a
-  `MaxOutputTokens` that is not a whole number of at least 1, or a default or review binding that names
-  no binding stops the agent host's start and names the setting, never a value. An `Ai:AllowTenantKeys`
+  `MaxOutputTokens` that is not a whole number of at least 1, a default or review binding that names
+  no binding, or an `Ai:FixRounds` that is not a whole number of at least 0 stops the agent host's start and names the setting, never a value. An `Ai:AllowTenantKeys`
   that is not `true` or `false` stops the server's start in the same way, and the agent host's start
   with AI authoring on.
 - **Secrets.** A key is read from its file at start, kept in memory only, and never logged, sent to a
