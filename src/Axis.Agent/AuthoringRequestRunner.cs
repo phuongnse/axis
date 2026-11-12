@@ -6,7 +6,9 @@ namespace Axis.Agent;
 /// <summary>
 /// Claims authoring requests with a lease and runs the step of their state, see <c>docs/reference/authoring-requests.md#durable-requests</c>.
 /// A turn claims one request of a tenant and runs one step, and the commit of the step frees the request. A step that needs the author's token and finds it ended
-/// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>. A host that stops, or a step that throws,
+/// stops the request as <c>failed</c> with the outcome <c>tokenEnded</c>, and so does a step whose MCP server refuses the author, see <c>docs/reference/authoring-requests.md#acting-for-the-author</c>.
+/// A request stops as <c>failed</c> with the outcome <c>overBudget</c> when a model call would pass the token budget, and with <c>timedOut</c> when its step starts after
+/// <c>Ai:RequestTimeout</c> from the approval or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
@@ -16,6 +18,7 @@ internal sealed partial class AuthoringRequestRunner(
     ITenantCatalog catalog,
     IHttpClientFactory httpClients,
     AuthoringLoopOptions options,
+    AiSettings settings,
     TimeProvider time,
     ILogger<AuthoringRequestRunner> logger)
 {
@@ -77,16 +80,32 @@ internal sealed partial class AuthoringRequestRunner(
                 return;
             }
 
+            // The time counts from the approval, so a request that is still planning has no deadline.
+            DateTimeOffset? deadline = request.ApprovedAt + settings.RequestTimeout;
             AuthoringStepResult result;
-            try
+            if (deadline <= time.GetUtcNow())
             {
-                result = await RunStepAsync(step, tenantId, request, stepId.Value, claimedBy, cancellationToken);
+                LogTimedOut(request.Id);
+                result = new AuthoringStepResult("failed", "timedOut");
             }
-            catch (AuthoringTokenEndedException)
+            else
             {
-                // The commit below is fenced by the claim and erases the token.
-                LogTokenEnded(request.Id);
-                result = new AuthoringStepResult("failed", "tokenEnded");
+                try
+                {
+                    result = await RunStepAsync(step, tenantId, request, stepId.Value, claimedBy, deadline, cancellationToken);
+                }
+                catch (AuthoringTokenEndedException)
+                {
+                    // The commit below is fenced by the claim and erases the token.
+                    LogTokenEnded(request.Id);
+                    result = new AuthoringStepResult("failed", "tokenEnded");
+                }
+                catch (AuthoringOverBudgetException)
+                {
+                    // The commit below keeps the draft and the tokens already added.
+                    LogOverBudget(request.Id);
+                    result = new AuthoringStepResult("failed", "overBudget");
+                }
             }
 
             if (!AuthoringRequestStore.States.Contains(result.NextState, StringComparer.Ordinal))
@@ -115,10 +134,12 @@ internal sealed partial class AuthoringRequestRunner(
         }
     }
 
-    // The renewal runs beside the step and cancels the step's token when the claim is gone.
-    private async Task<AuthoringStepResult> RunStepAsync(IAuthoringStep step, string tenantId, AuthoringRequestToWork request, Guid stepId, string claimedBy, CancellationToken cancellationToken)
+    // The renewal runs beside the step and cancels the step's token when the claim is gone. The deadline cancels it too, and that ends the step as timedOut.
+    private async Task<AuthoringStepResult> RunStepAsync(
+        IAuthoringStep step, string tenantId, AuthoringRequestToWork request, Guid stepId, string claimedBy, DateTimeOffset? deadline, CancellationToken cancellationToken)
     {
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        using var timeout = new CancellationTokenSource(DelayUntil(deadline), time);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeout.Token);
         var renewal = RenewAsync(tenantId, request.Id, claimedBy, linked);
         try
         {
@@ -130,14 +151,32 @@ internal sealed partial class AuthoringRequestRunner(
                 (tokens, token) => store.AddTokensAsync(tenantId, request.Id, stepId, claimedBy, tokens, token),
                 accessToken,
                 (draft, token) => store.SetDraftAsync(tenantId, request.Id, claimedBy, draft, token),
-                mcp);
+                mcp,
+                settings.RequestTokenBudget);
             return await step.RunAsync(context, linked.Token);
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+        {
+            LogTimedOut(request.Id);
+            return new AuthoringStepResult("failed", "timedOut");
         }
         finally
         {
             await linked.CancelAsync();
             await renewal;
         }
+    }
+
+    // A source takes a delay of 0 up to about 49 days, so the delay is clamped to that.
+    private TimeSpan DelayUntil(DateTimeOffset? deadline)
+    {
+        if (deadline is not { } at)
+        {
+            return Timeout.InfiniteTimeSpan;
+        }
+
+        var delay = at - time.GetUtcNow();
+        return delay < TimeSpan.Zero ? TimeSpan.Zero : TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds, uint.MaxValue - 1));
     }
 
     private async Task RenewAsync(string tenantId, Guid requestId, string claimedBy, CancellationTokenSource linked)
@@ -175,6 +214,12 @@ internal sealed partial class AuthoringRequestRunner(
 
     [LoggerMessage(LogLevel.Information, "The token of authoring request {RequestId} has ended, so the request stops as failed.")]
     private partial void LogTokenEnded(Guid requestId);
+
+    [LoggerMessage(LogLevel.Information, "Authoring request {RequestId} would pass its token budget, so the request stops as failed.")]
+    private partial void LogOverBudget(Guid requestId);
+
+    [LoggerMessage(LogLevel.Information, "Authoring request {RequestId} has passed its time limit, so the request stops as failed.")]
+    private partial void LogTimedOut(Guid requestId);
 
     [LoggerMessage(LogLevel.Warning, "The agent host no longer holds the claim on authoring request {RequestId}. It writes nothing more to it.")]
     private partial void LogClaimLost(Guid requestId);

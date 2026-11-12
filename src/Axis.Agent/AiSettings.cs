@@ -8,6 +8,14 @@ public sealed class AiSettings
     private const string BindingsSection = "Ai:Bindings";
     private const string DefaultBindingSetting = "Ai:DefaultBinding";
     private const string ReviewBindingSetting = "Ai:ReviewBinding";
+    private const string RequestTokenBudgetSetting = "Ai:RequestTokenBudget";
+    private const string RequestTimeoutSetting = "Ai:RequestTimeout";
+
+    /// <summary>The token budget of a request when <c>Ai:RequestTokenBudget</c> is not set.</summary>
+    public const long DefaultRequestTokenBudget = 2_000_000;
+
+    /// <summary>The time limit of a request when <c>Ai:RequestTimeout</c> is not set.</summary>
+    public static readonly TimeSpan DefaultRequestTimeout = TimeSpan.FromMinutes(30);
 
     /// <summary>The settings this class reads, as the model-bindings page names them.</summary>
     public static IReadOnlyList<string> SettingNames { get; } =
@@ -19,6 +27,8 @@ public sealed class AiSettings
         $"{BindingsSection}:<name>:MaxOutputTokens",
         DefaultBindingSetting,
         ReviewBindingSetting,
+        RequestTokenBudgetSetting,
+        RequestTimeoutSetting,
     ];
 
     /// <summary>The bindings by name.</summary>
@@ -30,13 +40,24 @@ public sealed class AiSettings
     /// <summary>The binding of the review session, or <see langword="null"/> to use the default binding.</summary>
     public string? ReviewBinding { get; init; }
 
+    /// <summary>The tokens one request may use, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+    public long RequestTokenBudget { get; init; } = DefaultRequestTokenBudget;
+
+    /// <summary>How long a request may run after its plan is approved, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+    public TimeSpan RequestTimeout { get; init; } = DefaultRequestTimeout;
+
+    /// <summary>The output limit of the binding. A name that is not configured, which only the scripted adapter of the tests answers for, gets the default.</summary>
+    public int MaxOutputTokensOf(string binding) =>
+        Bindings.TryGetValue(binding, out var found) ? found.MaxOutputTokens : ModelBinding.DefaultMaxOutputTokens;
+
     /// <summary>
     /// Reads every value by hand and never binds, because a conversion error of the binder quotes the value.
     /// Each error names its setting and never a value, a path or a key.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A binding has an unknown kind, no model, a key file that cannot be read or a <c>MaxOutputTokens</c> that is not a whole number of at least 1,
-    /// or the default or review binding names no binding.
+    /// or the default or review binding names no binding, or <c>Ai:RequestTokenBudget</c> is not a whole number of at least 1,
+    /// or <c>Ai:RequestTimeout</c> is not a positive time span.
     /// </exception>
     public static AiSettings Load(IConfiguration configuration)
     {
@@ -53,6 +74,8 @@ public sealed class AiSettings
             Bindings = bindings,
             DefaultBinding = NamedBinding(configuration, DefaultBindingSetting, bindings),
             ReviewBinding = NamedBinding(configuration, ReviewBindingSetting, bindings),
+            RequestTokenBudget = ParseTokenBudget(configuration[RequestTokenBudgetSetting]),
+            RequestTimeout = ParseTimeout(configuration[RequestTimeoutSetting]),
         };
     }
 
@@ -111,6 +134,30 @@ public sealed class AiSettings
         return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var tokens) && tokens >= 1
             ? tokens
             : throw new InvalidOperationException($"'{setting}' must be a whole number of at least 1.");
+    }
+
+    private static long ParseTokenBudget(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return DefaultRequestTokenBudget;
+        }
+
+        return long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var tokens) && tokens >= 1
+            ? tokens
+            : throw new InvalidOperationException($"'{RequestTokenBudgetSetting}' must be a whole number of at least 1.");
+    }
+
+    private static TimeSpan ParseTimeout(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return DefaultRequestTimeout;
+        }
+
+        return TimeSpan.TryParse(text, CultureInfo.InvariantCulture, out var timeout) && timeout > TimeSpan.Zero
+            ? timeout
+            : throw new InvalidOperationException($"'{RequestTimeoutSetting}' must be a positive time span, such as 00:30:00.");
     }
 
     private static string? NamedBinding(IConfiguration configuration, string setting, Dictionary<string, ModelBinding> bindings)

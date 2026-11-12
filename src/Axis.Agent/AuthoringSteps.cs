@@ -32,6 +32,7 @@ public sealed class AuthoringStepContext
     private readonly Func<long, CancellationToken, Task> _addTokens;
     private readonly Func<CancellationToken, Task<string>> _accessToken;
     private readonly Func<Guid, CancellationToken, Task> _setDraft;
+    private long _tokens;
 
     internal AuthoringStepContext(
         string tenantId,
@@ -39,7 +40,8 @@ public sealed class AuthoringStepContext
         Func<long, CancellationToken, Task> addTokens,
         Func<CancellationToken, Task<string>> accessToken,
         Func<Guid, CancellationToken, Task> setDraft,
-        AuthorMcpClient mcp)
+        AuthorMcpClient mcp,
+        long tokenBudget)
     {
         TenantId = tenantId;
         Request = request;
@@ -47,15 +49,27 @@ public sealed class AuthoringStepContext
         _accessToken = accessToken;
         _setDraft = setDraft;
         Mcp = mcp;
+        TokenBudget = tokenBudget;
+        _tokens = request.Tokens;
     }
 
     public string TenantId { get; }
 
     public AuthoringRequestToWork Request { get; }
 
+    /// <summary>The tokens the request has used, this step included. Only the claiming host adds tokens, so the total needs no read.</summary>
+    public long Tokens => Interlocked.Read(ref _tokens);
+
+    /// <summary>The tokens the request may use, see <c>docs/reference/authoring-requests.md#budgets</c>.</summary>
+    public long TokenBudget { get; }
+
     /// <summary>Adds the tokens to the step's row and to the request now, so they count even when the step is interrupted later.</summary>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
-    public Task AddTokensAsync(long tokens, CancellationToken cancellationToken) => _addTokens(tokens, cancellationToken);
+    public async Task AddTokensAsync(long tokens, CancellationToken cancellationToken)
+    {
+        await _addTokens(tokens, cancellationToken);
+        Interlocked.Add(ref _tokens, tokens);
+    }
 
     /// <summary>Stores the id of the request's draft on the request now, so a step that runs again finds it.</summary>
     /// <exception cref="AuthoringClaimLostException">The host no longer holds the claim, or the request was dropped.</exception>
@@ -108,6 +122,15 @@ public sealed class AuthoringTokenEndedException : Exception
 {
     public AuthoringTokenEndedException()
         : base("The author's token for the agent host has ended.")
+    {
+    }
+}
+
+/// <summary>A model call would pass the request's token budget, so the loop made no call. The runner stops the request as <c>failed</c>.</summary>
+public sealed class AuthoringOverBudgetException : Exception
+{
+    public AuthoringOverBudgetException()
+        : base("The authoring request would pass its token budget.")
     {
     }
 }

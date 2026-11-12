@@ -67,7 +67,8 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
         }
 
         var tools = await ModelLoop.ListToolsAsync(context, _tools, cancellationToken);
-        var model = await adapters.ForAsync(context.TenantId, request.Binding ?? settings.DefaultBinding!, cancellationToken);
+        var binding = request.Binding ?? settings.DefaultBinding!;
+        var model = await adapters.ForAsync(context.TenantId, binding, cancellationToken);
         var loop = await ModelLoop.RunAsync(
             model,
             context,
@@ -75,6 +76,7 @@ internal sealed class WorkingStep(TenantModelAdapters adapters, AiSettings setti
             FirstMessage(request),
             tools,
             MaxModelCalls,
+            settings.MaxOutputTokensOf(binding),
             (call, token) => AnswerToolCallAsync(context, application, draft.Value, call, token),
             cancellationToken);
 
