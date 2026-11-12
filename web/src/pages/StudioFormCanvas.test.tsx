@@ -411,6 +411,40 @@ describe('the Design tab of a form', () => {
     )
   })
 
+  it('posts the unchanged draft again after a save that changes the saved version', async () => {
+    const fetchMock = stub()
+    const base = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
+      input === `${folder}/resources/${formId}` && init?.method === 'PATCH'
+        ? new Response(JSON.stringify({ version: 'f2', diagnostics: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        : base(input, init),
+    )
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'resolution' }, slow))
+    const view = await expressionView(screen.getByTestId('studio-design-panel'), 'Visible when')
+    act(() => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "status != 'open'" } }))
+    await waitFor(
+      () =>
+        expect(
+          metadataPosts(fetchMock).some((body) => body.sections[1].fields[1].visibleWhen === "status != 'open'"),
+        ).toBe(true),
+      slow,
+    )
+    const before = metadataPosts(fetchMock)
+
+    await userEvent.click(within(screen.getByTestId('studio-save-bar')).getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved', {}, slow)
+    await waitFor(() => expect(metadataPosts(fetchMock)).toHaveLength(before.length + 1), slow)
+    expect(metadataPosts(fetchMock).at(-1)).toEqual(before.at(-1))
+  })
+
   it('draws the fields side by side in columns of their width and a field without width on the whole row', async () => {
     const form = widget.form!
     const withWidths: EntityWidgetMetadata = {
