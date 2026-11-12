@@ -877,14 +877,15 @@ internal sealed class Publisher(
         await transaction.CommitAsync();
     }
 
-    // A successful accept ends the authoring request of its draft, whatever the client of the accept. See docs/reference/authoring-requests.md#accepting.
+    // A successful accept ends the authoring request of its draft, whatever the client of the accept. It keeps the claim of the agent host, so the commit
+    // of the host's accept step still finds it. See docs/reference/authoring-requests.md#accepting.
     private static async Task MoveAuthoringRequestsAsync(NpgsqlTransaction transaction, Guid applicationId, Guid draftId)
     {
         var moved = new List<(Guid Id, string Author)>();
         await using (var command = new NpgsqlCommand(
             """
             UPDATE axis.authoring_requests
-            SET state = 'accepted', finished_at = now(), refresh_token = NULL, claimed_by = NULL, claimed_until = NULL
+            SET state = 'accepted', finished_at = now(), refresh_token = NULL
             WHERE application_id = @application AND draft_id = @draft AND state = 'ready'
             RETURNING id, author
             """,

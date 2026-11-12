@@ -409,7 +409,7 @@ internal static class McpWriteTools
     /// Without <paramref name="request"/>, stores an <c>accept</c> publish request of the draft with the calling client, only when the
     /// draft belongs to a <c>ready</c> authoring request of the person, the application's auto-accept is on, that request asked for it
     /// and its last check and review passed. It answers the accept already queued or running instead of storing a second one. With
-    /// <paramref name="request"/>, answers that request, only when it is an <c>accept</c> of this draft by this person. A refusal is a
+    /// <paramref name="request"/>, answers that request, only when it is an <c>accept</c> of this draft by this person, and the draft need not exist any more. A refusal is a
     /// fixed text that names the rule and stores nothing. See <c>docs/reference/authoring-requests.md#accepting</c>.
     /// </summary>
     public static async Task<(object? Output, string? Error)> AcceptDraftAsync(
@@ -421,24 +421,28 @@ internal static class McpWriteTools
             return (null, McpReadTools.Title(refusal));
         }
 
+        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
+        {
+            return (null, StudioPublishEndpoints.NoManifestId);
+        }
+
+        var connection = await context.Database.GetConnectionAsync(ct);
+        if (request is not null)
+        {
+            // Reading an accept needs no draft: the publisher holds the folder's write lock while it runs the accept, and a successful accept removes the draft.
+            return Guid.TryParseExact(draft, "D", out var accepted)
+                ? await ReadAcceptAsync(context, connection, applicationId, accepted, request, ct)
+                : (null, StudioRevisionEndpoints.NoDraft);
+        }
+
         var (drafts, draftError) = await McpReadTools.FindDraftAsync(context, folder, draft, ct);
         if (drafts is null)
         {
             return (null, draftError);
         }
 
-        if (StudioFolder.ReadManifest(folder) is not { Id: { } applicationId })
-        {
-            return (null, StudioPublishEndpoints.NoManifestId);
-        }
-
         // A draft id that passed the check is a "D" GUID.
         var draftId = Guid.Parse(draft);
-        var connection = await context.Database.GetConnectionAsync(ct);
-        if (request is not null)
-        {
-            return await ReadAcceptAsync(context, connection, applicationId, draftId, request, ct);
-        }
 
         await using var transaction = await connection.BeginTransactionAsync(ct);
         var (requestId, autoAccept) = await FindReadyRequestAsync(connection, transaction, applicationId, draftId, context.Caller.Id, ct);

@@ -65,9 +65,11 @@ loses no work.
 - **Claimed with a lease.** The agent host claims a request whose state needs work, as the publisher
   claims [publish requests](authoring.md#lifecycle): it sets `claimed_by` and `claimed_until`, renews
   the lease while it works, and lets it lapse when it stops. A host that dies leaves the request
-  claimable after the lease. The host claims only a state whose step it has. Every write after the
-  claim is fenced by `claimed_by`, which is new for each claim, so a host that lost its claim, or
-  whose request was dropped, changes nothing and stops working on that request.
+  claimable after the lease. The host claims only a state whose step it has, and a `ready` request only when it asked
+  for auto-accept, has a draft and no `accept` step has finished since its newest `review` step. An `accept` step
+  that was interrupted does not count, so it runs again. The claim leaves the application's auto-accept setting to
+  `accept_draft`. Every write after the claim is fenced by `claimed_by`, which is new for each claim, so a host that
+  lost its claim, or whose request was dropped, changes nothing and stops working on that request.
 - **Resuming.** Each finished step is committed with the request's next state before the next
   starts. The commit frees the request, and a later turn claims it again. After a restart the next host resumes at the last finished step. It closes the step
   that never finished with the outcome `interrupted`, which keeps its tokens, and runs that step
@@ -127,18 +129,18 @@ an accept, which [accepting](#accepting) describes.
 A request follows the same loop as a change to the platform: a plan the author approves, the change,
 the checks, an independent review and fix rounds.
 
-| State                           | What happens                                                                                                                            | Next                                  |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `planning`                      | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                    |
-| `awaitingApproval`              | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again        |
-| `working`                       | The agent creates the draft and makes the change through the tools                                                                      | `checking`                            |
-| `checking`                      | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure |
-| `reviewing`                     | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings      |
-| `fixing`                        | The agent works on the failures and findings                                                                                            | `checking`                            |
-| `ready`                         | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted` or `dropped`               |
-| `accepted`                      | The draft is in the working folder as a revision                                                                                        | none                                  |
-| `dropped`                       | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                  |
-| `failed`                        | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                    | `dropped`                             |
+| State              | What happens                                                                                                                            | Next                                                        |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                                          |
+| `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again                              |
+| `working`          | The agent creates the draft and makes the change through the tools                                                                      | `checking`                                                  |
+| `checking`         | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure                       |
+| `reviewing`        | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings                            |
+| `fixing`           | The agent works on the failures and findings                                                                                            | `checking`                                                  |
+| `ready`            | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted`, `dropped`, `working` on a conflict, or `failed` |
+| `accepted`         | The draft is in the working folder as a revision                                                                                        | none                                                        |
+| `dropped`          | The author dropped the request at any state before `accepted`, and its draft is deleted                                                 | none                                                        |
+| `failed`           | A budget ran out, the token ended, or a step failed in a way a retry does not help. The draft is kept for the author                    | `dropped`                                                   |
 
 - **Built-in modules first.** When a request matches a built-in module, the plan declares the module
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
@@ -178,6 +180,16 @@ the checks, an independent review and fix rounds.
   in the latest `check` step and the findings of the latest `review` step after it. What failed is the compile
   diagnostics when the compile failed, and the scenario items whose outcome is not `passed`. When the model ends
   its turn, the request moves to `checking`.
+- **Accepting by the agent.** The step makes no model call. It claims a `ready` request that asked for auto-accept,
+  once after each review, and calls `accept_draft` on the request's draft. It asks for the accept's status until it
+  ends. The step ends with one of four outcomes. `accepted` is a success, and the request is `accepted`. `refused` is a
+  refusal of `accept_draft`, such as the application's auto-accept being off: the request stays `ready`, the agent
+  does not ask again, and the author can still accept or drop it. `conflict` is a failure with the `AXC0377`
+  diagnostic: the request moves to `working` and its `draft_id` is cleared, so the working step makes a new draft
+  from the folder as it is now and the checks and the review run again, see [retrying a conflict](#accepting). Any
+  other failure, such as a draft that no longer compiles on the folder, a tool error, an application the author can no longer
+  list or an accept that does not end in time, stops the request as `failed` with the outcome `notAccepted` and keeps
+  its draft. The step stores no `checks`, and the accept's own diagnostics stay on its publish request.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
 - **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
@@ -197,6 +209,9 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
 - **Checking time.** At most 450 polls of the scenario run, 2 seconds apart, which is about 15 minutes. A
   run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
   never starts does not hold the agent host for ever. The publisher stops a test run after 10 minutes.
+- **Accepting time.** At most 450 polls of the accept, 2 seconds apart, the same as checking time, because an
+  accept runs a validate and the application's test scenarios under the same publisher limit. An accept that has not
+  ended by then stops the request as `failed` with the outcome `notAccepted`.
 - **Review calls.** At most 25 model calls in one review step. A step whose model has not ended its turn by
   then, whose answer stops at the output limit or has no text, stops the request as `failed` with the outcome
   `unfinished`, and so does a request without a draft or whose application the author can no longer list.
@@ -240,8 +255,10 @@ only [publishing](authoring.md#publishing) does.
   `accept`. The publisher runs the requests of one application one at a time, so two accepts never
   interleave. When an accept succeeds, the publisher moves the `ready` request of that draft to
   `accepted`, sets its `finishedAt`, erases its refresh token and writes an `authoringRequest.accepted`
-  audit record, in the transaction that ends the publish request. A failed accept, such as a conflict,
-  leaves the request `ready` with its token, and the author can accept again or drop the request.
+  audit record, in the transaction that ends the publish request. It keeps the claim of the agent host, so the
+  host's last step still commits, and no step moves an `accepted` request. A failed accept of the author, such as a
+  conflict, leaves the request `ready` with its token, and the author can accept again or drop the request. The
+  agent's own failed accept ends as [accepting by the agent](#states) says.
 - **All or nothing.** The publisher checks that every resource the draft read or changed still has the version
   the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
   contract scenarios and the application's test scenarios on the result, and commits it as a revision, see
@@ -250,9 +267,12 @@ only [publishing](authoring.md#publishing) does.
 - **Conflicts.** A resource that changed since the draft recorded it is a conflict, and the accept
   answers it with one `AXC0377` diagnostic for each resource, naming the resource, its file and its
   new version.
-- **Retrying a conflict** _(planned for M35)_. The agent then reads the folder again, makes the change
-  on a new draft and runs the checks again, within the request's budgets. Studio shows a conflict to a
-  person, who decides.
+- **Retrying a conflict.** When the agent's accept meets a conflict, the request goes back to `working` with no
+  draft. The agent reads the folder again, makes the change on a new draft and runs the checks and the review
+  again, within the request's budgets: the request keeps its `round`, tokens and time limit. The conflicted draft
+  stays in the revisions repository, because no tool deletes a draft. A folder that keeps changing can conflict
+  again in every round, and the budgets bound it. Studio shows a conflict to a person, who decides, see
+  [AI authoring in Studio](ai-authoring-in-studio.md).
 
 ## Audit
 

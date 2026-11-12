@@ -66,7 +66,7 @@ Auto-accept lets the agent accept its own drafts in an application, as an automa
   value.
 - **Where it is kept.** In the tenant database, with the application, not in a resource file, so no
   tool and no draft can change it, and an agent cannot give itself the right to accept.
-- **What it allows.** _(planned for M35)_ The agent accepts a draft only under the rules of
+- **What it allows.** The agent accepts a draft only under the rules of
   [accepting](authoring-requests.md#accepting). An accepted draft is still not live until a person
   publishes.
 

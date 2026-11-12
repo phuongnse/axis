@@ -11,7 +11,8 @@ namespace Axis.Agent;
 /// <c>Ai:RequestTimeout</c> from the approval or is still running then, see <c>docs/reference/authoring-requests.md#budgets</c>. The draft is kept. A host that stops, or a step that throws,
 /// writes nothing more: the lease lapses and the next claim closes the unfinished step as <c>interrupted</c> and runs it again. Every write is fenced by the claim.
 /// A step that moves a request to <c>fixing</c> when its <c>round</c> has reached <c>Ai:FixRounds</c> stops the request as <c>failed</c> instead and keeps its draft,
-/// see <c>docs/reference/authoring-requests.md#budgets</c>.
+/// see <c>docs/reference/authoring-requests.md#budgets</c>. A <c>ready</c> request is claimed for the accept step only under the rule of <see cref="AuthoringRequestStore.ClaimAsync"/>,
+/// and the publisher keeps the claim when it accepts the draft, so the commit of the accept step still finds it.
 /// </summary>
 internal sealed partial class AuthoringRequestRunner(
     AuthoringRequestStore store,
@@ -121,7 +122,7 @@ internal sealed partial class AuthoringRequestRunner(
                 throw new InvalidOperationException($"The authoring step '{step.Kind}' answered '{result.NextState}', which is not a state of a request.");
             }
 
-            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, result.Checks, cancellationToken))
+            if (!await store.FinishStepAsync(tenantId, request.Id, stepId.Value, claimedBy, result.NextState, result.Outcome, result.InputSummary, result.Plan, result.Messages, result.Checks, result.DropDraft, cancellationToken))
             {
                 LogClaimLost(request.Id);
             }
