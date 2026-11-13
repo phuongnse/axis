@@ -40,7 +40,7 @@ src/
                           to the SPA
   Axis.Tenancy/           tenant resolution, connection factory, platform schema
   Axis.Extensions/        contracts for extension packages: operation interface, operation context
-sdk/                      the runner protocol's JSON Schema
+sdk/                      the runner protocol's JSON Schema, and the Node.js runner and SDK
 web/                      React + TypeScript SPA (Vite), Ant Design, and the Keycloak login theme
 tests/
   Axis.<Module>.Tests/    unit tests per module
@@ -81,13 +81,15 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
   Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
   mode listens for runner protocol connections and starts a runner process for each, and its `runner` mode
   runs one installed C# package version over [the runner protocol](reference/extension-packages.md#the-runner-protocol).
+  For a Node.js package the host starts the runner in `sdk/node/` instead.
 - **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
   `Axis.PackageHost`, Trivy and one runtime, and runs the `build` command, see
   [images](reference/installation.md#images).
 - **Package runner images** _(planned for M21)_. The host images also carry the runner and run the `host` mode, see
   [package runners](reference/extension-packages.md#package-runners).
 - **`sdk/`**. The runner protocol's schema, `package-runner-protocol.schema.json`.
-- **`sdk/node/` and `sdk/python/`** _(planned for M21)_. The Node.js and Python runners and SDKs.
+- **`sdk/node/`**. The Node.js runner and its SDK, which the package host starts for a `node` package.
+- **`sdk/python/`** _(planned for M21)_. The Python runner and SDK.
 
 ## Module rules
 

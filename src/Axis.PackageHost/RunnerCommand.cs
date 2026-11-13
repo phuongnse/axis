@@ -14,4 +14,11 @@ internal sealed record RunnerCommand(string FileName, IReadOnlyList<string> Argu
             ? new RunnerCommand(path, [typeof(PackageHostProgram).Assembly.Location])
             : new RunnerCommand(path, []);
     }
+
+    /// <summary>
+    /// The command that starts the Node.js runner, <c>sdk/node/runner.js</c> beside this program. <c>node</c> is found
+    /// on the PATH of the host, not of the runner, whose environment is cleared.
+    /// </summary>
+    public static RunnerCommand ForNode() =>
+        new("node", [Path.Combine(AppContext.BaseDirectory, "sdk", "node", "runner.js")]);
 }

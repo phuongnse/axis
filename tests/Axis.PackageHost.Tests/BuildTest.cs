@@ -140,7 +140,7 @@ internal sealed class BuildTest : IDisposable
             requirements?.Invoke(hash) ?? $"./wheels/{WheelName} --hash=sha256:{hash}\n");
     }
 
-    private static void CopyFolder(string source, string target)
+    internal static void CopyFolder(string source, string target)
     {
         foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
         {

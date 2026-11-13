@@ -433,6 +433,10 @@ describe('the package host images', () => {
     })
   })
 
+  test('axis-package-host-node holds the Node.js runner beside the package host', { timeout }, () => {
+    run(['run', '--rm', '--entrypoint', 'test', image('axis-package-host-node'), '-f', '/app/sdk/node/runner.js'])
+  })
+
   test('axis-package-host-python builds the Python test package from a read-only source', { timeout }, () => {
     const source = join(work, 'python-source')
     copyReadable(join(root, 'tests/packages/PythonPackage/package'), source)
