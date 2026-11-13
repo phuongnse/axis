@@ -1,13 +1,27 @@
-// Smoke test for the production images axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane, which
-// scripts/smoke.sh builds: checks what they hold, and runs them read-only with their settings in /run/secrets files.
-// The test PostgreSQL serves TLS with a certificate from an authority made for the run, and the connection strings
-// set SSL Mode=VerifyFull, which the production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
+// Smoke test for the production images axis-server, axis-worker, axis-agent, axis-admin, axis-controlplane and
+// axis-package-host-dotnet, -node and -python, which scripts/smoke.sh builds: checks what they hold, and runs the hosts
+// read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a certificate from an authority
+// made for the run, and the connection strings set SSL Mode=VerifyFull, which the production hosts require. Each package
+// host image builds the test package of its language from a read-only source, see
+// docs/reference/extension-packages.md#building-a-package. Requires Docker and openssl. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { after, before, test } from 'node:test'
+import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
@@ -15,7 +29,8 @@ import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, ve
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane']
+const packageHosts = ['axis-package-host-dotnet', 'axis-package-host-node', 'axis-package-host-python']
+const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane', ...packageHosts]
 const network = `axis-images-${process.pid}`
 const postgres = `axis-images-postgres-${process.pid}`
 const secretKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
@@ -142,7 +157,7 @@ test('no image holds samples, development settings or source control metadata', 
       `${target} holds source control metadata`,
     )
     // The control plane is no host of the platform and the agent host loads no package or module: neither has a mount
-    // point for them.
+    // point for them. A package host image writes packages and loads no module, so it has only /extensions.
     if (target !== 'axis-controlplane' && target !== 'axis-agent') {
       assert.deepEqual(
         paths.filter((path) => /^(extensions|modules)\/./.test(path)),
@@ -150,7 +165,7 @@ test('no image holds samples, development settings or source control metadata', 
         `${target} holds a package or module`,
       )
       assert.ok(paths.includes('extensions/'), `${target} has no /extensions`)
-      assert.ok(paths.includes('modules/'), `${target} has no /modules`)
+      assert.equal(paths.includes('modules/'), !packageHosts.includes(target), `${target} has the wrong /modules`)
     }
     if (target === 'axis-server') {
       assert.ok(paths.includes('app/wwwroot/index.html'), 'the server holds no SPA')
@@ -284,4 +299,172 @@ test('the admin tool prints its version and has the PostgreSQL 18 tools', { time
   const dump = run(['run', '--rm', '--read-only', '--entrypoint', 'pg_dump', image('axis-admin'), '--version'])
   assert.match(dump, /\(PostgreSQL\) 18\./)
   assert.notEqual(run(['run', '--rm', '--entrypoint', 'id', image('axis-admin'), '-u']), '0')
+})
+
+// The version that scripts/lib/trivy.sh pins, which each package host image must hold.
+const trivyVersion = readFileSync(join(root, 'scripts/lib/trivy.sh'), 'utf8').match(/^TRIVY_VERSION=(\S+)$/m)[1]
+
+// Copies a folder so that the non-root user of a package host image can read it: mkdtemp makes folders with mode 0700.
+const copyReadable = (from, to, skip = () => false) => {
+  mkdirSync(to, { recursive: true })
+  chmodSync(to, 0o755)
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    if (skip(entry.name)) continue
+    if (entry.isDirectory()) copyReadable(join(from, entry.name), join(to, entry.name), skip)
+    else {
+      copyFileSync(join(from, entry.name), join(to, entry.name))
+      chmodSync(join(to, entry.name), 0o644)
+    }
+  }
+}
+
+// The sorted paths under a folder, to show that a build leaves its read-only source as it was.
+const listing = (dir) =>
+  readdirSync(dir, { recursive: true })
+    .map((entry) => `${entry} ${statSync(join(dir, entry)).isDirectory() ? 'dir' : statSync(join(dir, entry)).size}`)
+    .sort()
+
+describe('the package host images', () => {
+  const packageUid = 1654
+  const wheel = 'axis_fixture_dependency-1.0.0-py3-none-any.whl'
+  let work
+  let cache
+
+  const writable = (dir) => {
+    mkdirSync(dir)
+    chmodSync(dir, 0o777)
+    return dir
+  }
+
+  // The folders of the non-root user are 0777 so that it can write them. Trivy's vulnerability database is
+  // downloaded once, in up to three attempts, because the download is the one step that needs the network and fails at
+  // times. The builds then use it with TRIVY_SKIP_DB_UPDATE, as scripts/scan-images.mjs retries its Trivy runs.
+  before(
+    async () => {
+      work = mkdtempSync(join(tmpdir(), 'axis-package-hosts-'))
+      chmodSync(work, 0o755)
+      cache = writable(join(work, 'trivy-cache'))
+      let result
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        result = docker([
+          'run',
+          '--rm',
+          '--entrypoint',
+          'trivy',
+          '-e',
+          'TRIVY_CACHE_DIR=/trivy-cache',
+          '-v',
+          `${cache}:/trivy-cache`,
+          image('axis-package-host-dotnet'),
+          'fs',
+          '--download-db-only',
+        ])
+        if (result.status === 0) break
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 15_000))
+      }
+      assert.equal(result.status, 0, `trivy could not download its database\n${result.stdout}${result.stderr}`)
+    },
+    { timeout },
+  )
+
+  // The files of the builds are owned by the user of the image, which the host user cannot delete, so the image's
+  // own shell deletes them first.
+  after(() => {
+    if (!work) return
+    docker(
+      ['run', '--rm', '--entrypoint', 'sh', '-v', `${work}:/work`, image('axis-package-host-dotnet'), '-c', 'rm -rf /work/*/*'],
+      { stdio: 'ignore' },
+    )
+    rmSync(work, { recursive: true, force: true })
+  })
+
+  // Builds the source in the image, with the source read-only, and checks the written package.
+  const build = (target, { source, id, marker }) => {
+    const extensions = writable(join(work, `${id}-extensions`))
+    const unchanged = listing(source)
+    const output = run([
+      'run',
+      '--rm',
+      '-e',
+      'TRIVY_CACHE_DIR=/trivy-cache',
+      '-e',
+      'TRIVY_SKIP_DB_UPDATE=true',
+      '-v',
+      `${cache}:/trivy-cache`,
+      '-v',
+      `${source}:/source:ro`,
+      '-v',
+      `${extensions}:/extensions`,
+      image(target),
+      'build',
+      '/source',
+    ])
+    assert.match(output, new RegExp(`Built ${id} 1\\.0\\.0 in ${id}/1\\.0\\.0/\\.`))
+    const manifest = join(extensions, id, '1.0.0', 'axis-package.json')
+    assert.ok(existsSync(manifest), `${manifest} was not written`)
+    assert.equal(statSync(manifest).uid, packageUid, 'the package is not owned by the image user')
+    if (marker) assert.ok(existsSync(join(extensions, id, '1.0.0', marker)), `${marker} was not written`)
+    assert.deepEqual(listing(source), unchanged, 'the build changed its source')
+  }
+
+  for (const target of packageHosts) {
+    test(`${target} runs as UID ${packageUid} and holds Trivy ${trivyVersion}`, { timeout }, () => {
+      assert.equal(run(['run', '--rm', '--entrypoint', 'id', image(target), '-u']), String(packageUid))
+      assert.match(run(['run', '--rm', '--entrypoint', 'trivy', image(target), '--version']), new RegExp(`^Version: ${trivyVersion.replaceAll('.', '\\.')}$`, 'm'))
+    })
+  }
+
+  test('axis-package-host-dotnet builds the C# test package from a read-only source', { timeout }, () => {
+    const project = 'tests/packages/TestPackage.V1/TestPackage.V1.csproj'
+    const built = spawnSync('dotnet', ['build', project, '-c', 'Release'], { cwd: root, encoding: 'utf8' })
+    assert.equal(built.status, 0, `${built.stdout}${built.stderr}`)
+    const source = join(work, 'dotnet-source')
+    copyReadable(join(root, 'tests/packages/TestPackage.V1/bin/Release/net10.0'), source)
+    build('axis-package-host-dotnet', { source, id: 'test-package' })
+  })
+
+  test('axis-package-host-node builds the TypeScript test package from a read-only source', { timeout }, () => {
+    const source = join(work, 'node-source')
+    copyReadable(join(root, 'tests/packages/node-test-package'), source, (name) => name === 'node_modules')
+    build('axis-package-host-node', {
+      source,
+      id: 'node-test-package',
+      marker: 'node_modules/axis-test-dependency/package.json',
+    })
+  })
+
+  test('axis-package-host-python builds the Python test package from a read-only source', { timeout }, () => {
+    const source = join(work, 'python-source')
+    copyReadable(join(root, 'tests/packages/PythonPackage/package'), source)
+    const dependency = join(work, 'python-dependency')
+    copyReadable(join(root, 'tests/packages/PythonPackage/dependency'), dependency)
+    const wheels = writable(join(source, 'wheels'))
+    // The wheel is a zip of the dependency, written with the image's own Python as ZipFile.CreateFromDirectory does it
+    // in tests/Axis.PackageHost.Tests: each file at its path relative to the folder.
+    run([
+      'run',
+      '--rm',
+      '--entrypoint',
+      'python3',
+      '-v',
+      `${dependency}:/dependency:ro`,
+      '-v',
+      `${wheels}:/wheels`,
+      image('axis-package-host-python'),
+      '-c',
+      [
+        'import os, sys, zipfile',
+        'with zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED) as archive:',
+        '    for folder, _, names in os.walk("/dependency"):',
+        '        for name in sorted(names):',
+        '            path = os.path.join(folder, name)',
+        '            archive.write(path, os.path.relpath(path, "/dependency"))',
+      ].join('\n'),
+      `/wheels/${wheel}`,
+    ])
+    const hash = createHash('sha256').update(readFileSync(join(wheels, wheel))).digest('hex')
+    writeFileSync(join(source, 'requirements.txt'), `./wheels/${wheel} --hash=sha256:${hash}\n`)
+    chmodSync(join(source, 'requirements.txt'), 0o644)
+    build('axis-package-host-python', { source, id: 'python-test-package', marker: 'axis_fixture_dependency/__init__.py' })
+  })
 })

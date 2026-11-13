@@ -206,7 +206,7 @@ in [Testing](testing.md).
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `dev-script` | Starts `scripts/dev.sh` in a copy of the repository                                                                                                      |
 | `compose`    | Runs the Compose stack                                                                                                                                   |
-| `images`     | Runs the production images, from `scripts/images.test.mjs`                                                                                               |
+| `images`     | Runs the production images and builds a package in each package host image, from `scripts/images.test.mjs`                                               |
 | `onprem`     | Installs `deploy/compose/` from the production images for two tenants                                                                                    |
 | `ai-eval`    | Carries an authoring request to its plan on the eval stack with scripted answers, and runs `scripts/ai-eval.sh` against a stand-in model                 |
 

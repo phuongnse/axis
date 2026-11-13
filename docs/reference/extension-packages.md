@@ -207,7 +207,7 @@ folder that the developer published in locked mode. For `node` it holds the comp
 `package-lock.json`. For Python it is the folder of the adapter and `requirements.txt`. The build writes the folder
 that `Extensions:Path` names and compiles nothing.
 
-- **In the host image** _(planned for M21)_. The build runs in the package's own host image,
+- **In the host image.** The build runs in the package's own host image,
   `axis-package-host-<language>`, because dependencies, native modules included, install with the runtime
   and system libraries that run them, and install-time code never runs in the admin host.
 
@@ -215,6 +215,12 @@ that `Extensions:Path` names and compiles nothing.
   docker run --rm -v <source>:/source:ro -v <extensions>:/extensions \
     axis-package-host-<language> build /source
   ```
+
+  Each image holds `Axis.PackageHost`, Trivy at the version that `scripts/lib/trivy.sh` pins, and one runtime:
+  .NET for `dotnet`, Node.js 24 with npm for `node`, and Python 3 with pip for `python`. The image sets
+  `Extensions__Path=/extensions`, so the command needs no other setting, and runs as UID 1654, so the
+  `<extensions>` folder must be writable by that user. The build needs a writable root file system, see
+  [images](installation.md#images).
 
 - **Checks, in this order.** The first refusal stops the build, so a later step never runs after it.
   1. The manifest, as [Loading](#loading) checks it, with `AXC0132` to `AXC0138`. Each problem is printed

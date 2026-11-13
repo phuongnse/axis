@@ -95,7 +95,18 @@ describe('scripts/scan-images.sh', () => {
     const stages = [...dockerfile.matchAll(/^FROM\s+\S+\s+AS\s+(axis-[\w-]+)\s*$/gim)].map((match) => match[1])
     const fixture = readFileSync(path.join(root, 'tests/Axis.Integration.Tests/KeycloakFixture.cs'), 'utf8')
     const keycloak = fixture.match(/public const string Image = "([^"]+)";/)[1]
-    for (const target of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-controlplane']) assert.ok(stages.includes(target), target)
+    for (const target of [
+      'axis-server',
+      'axis-worker',
+      'axis-agent',
+      'axis-admin',
+      'axis-controlplane',
+      'axis-package-host-dotnet',
+      'axis-package-host-node',
+      'axis-package-host-python',
+    ]) {
+      assert.ok(stages.includes(target), target)
+    }
     assert.match(keycloak, /keycloak/)
 
     const result = scan()
@@ -132,6 +143,14 @@ describe('scripts/scan-images.sh', () => {
     assert.match(result.stdout, /axis-worker:scan\s+high\s+libc6 2\.36-9\+deb12u1\s+CVE-2023-4911/)
     assert.match(result.stdout, /1 known vulnerabilities, 1 high or critical/, 'a repeated finding counts once')
   })
+
+  for (const language of ['dotnet', 'node', 'python']) {
+    test(`fails on a high finding in the package host image for ${language}`, () => {
+      const result = scan({ [`TRIVY_FIXTURE_axis_package_host_${language}`]: `${fixtures}trivy-high.json` })
+      assert.equal(result.status, 1)
+      assert.match(result.stdout, new RegExp(`axis-package-host-${language}:scan\\s+high\\s+libc6 2\\.36-9\\+deb12u1\\s+CVE-2023-4911`))
+    })
+  }
 
   test('fails on a critical finding in the identity provider image', () => {
     const result = scan({ TRIVY_FIXTURE_keycloak: `${fixtures}trivy-critical.json` })
