@@ -180,6 +180,21 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
 
+### Application packages
+
+_(planned for M37)_
+
+Where `Extensions:ApplicationPackages` is on, the People tab has an "Application packages" section below Model key, where
+an administrator turns the tenant's application packages on or off, see
+[application packages](user-administration.md#application-packages). The section is a component of its own, like Model
+key. It loads `GET /api/tenant/application-packages` and renders nothing unless the route answers `200`, so a user who is
+not an administrator, an installation with the setting off and a preview tenant do not see it.
+
+- **State.** The section shows whether application packages are on.
+- **Change.** One button opens a confirmation. Only the confirmation's button sends the `PUT`, and the section then
+  reads `GET /api/tenant/application-packages` again, so it shows what the server stored.
+- **A refusal.** A quota `403` shows the problem's title, see [refusals](tenant-quotas.md#refusals).
+
 ### Connected apps
 
 The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, sees the
