@@ -38,7 +38,7 @@ function renderPanel(connection: StudioAiConnection) {
   )
 }
 
-// Proposed: the tenant's own AI connection and no count of requests, see the review on #3263.
+// Proposed: each author's own Claude account and no count of requests, see the review on #3263.
 describe('StudioAskAi', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -46,26 +46,18 @@ describe('StudioAskAi', () => {
   })
 
   it('shows the form with Send and no count of requests once the tenant has connected its AI', async () => {
-    renderPanel({ connected: true, canConnect: false })
+    renderPanel({ connected: true })
 
     expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled()
     expect(screen.queryByText(/left this month/)).toBeNull()
     expect(screen.queryByTestId('studio-ai-not-connected')).toBeNull()
   })
 
-  it('tells an author that their administrator connects AI, with no form and no link', async () => {
-    renderPanel({ connected: false, canConnect: false })
+  it('leads an author with no key of their own to add one on their account page, with no form', async () => {
+    renderPanel({ connected: false })
 
-    expect(await screen.findByText('AI is not connected yet')).toBeInTheDocument()
-    expect(screen.getByText(/Your administrator connects it/)).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Connect Claude' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
-  })
-
-  it('leads an administrator to connect Claude', async () => {
-    renderPanel({ connected: false, canConnect: true })
-
-    expect(await screen.findByRole('link', { name: 'Connect Claude' })).toHaveAttribute('href', '/users')
+    expect(await screen.findByText('Connect your Claude account to ask AI')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Add your key' })).toHaveAttribute('href', '/account')
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
   })
 })

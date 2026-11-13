@@ -817,7 +817,7 @@ const reviews: Record<string, string[]> = {
 
 const failures: Record<string, string> = {
   [aiRequests[4].id]:
-    "Anthropic refused the request: the workspace's Anthropic account has no credit left. Your administrator adds credit in the Anthropic Console, then you send the request again.",
+    'Anthropic refused the request: the Anthropic account of your key has no credit left. Add credit in the Anthropic Console, or set another key on your account page, then send the request again.',
 }
 
 // The accepts the preview asked for, each running for two seconds. The email request meets a conflict the first time.
@@ -1024,7 +1024,7 @@ function askAiRoutes(
     ...workspaceRoutes(typicalFolder),
     ...noticeRoutes(() => all().map(asNow)),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
-    '/api/studio/ai': () => ({ connected, canConnect: true }) satisfies StudioAiConnection,
+    '/api/studio/ai': () => ({ connected }) satisfies StudioAiConnection,
     [`${folderPath}/authoring-requests`]: (init) => {
       if (init?.method !== 'POST') {
         return { items: all().map(asNow) } satisfies StudioAuthoringRequestList
@@ -1081,6 +1081,6 @@ export const studioFixtures = {
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
   askAi: askAiRoutes({ items: aiRequests }, true),
   askAiFirst: askAiRoutes({ items: [] }, false),
-  // Proposed: a tenant that has not connected its AI, seen by an administrator, see the review on #3263.
+  // Proposed: an author who has not connected their own Claude account, see the review on #3263.
   askAiNotConnected: askAiRoutes({ items: [] }, false, false),
 } satisfies Record<string, Record<string, FixtureRoute>>

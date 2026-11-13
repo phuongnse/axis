@@ -20,10 +20,10 @@ import { StudioSidePanel } from './StudioSidePanel'
 export const askAiPanelId = 'studio-ask-ai-panel'
 
 /**
- * Proposed: where an administrator connects the tenant's AI. Today the Users page holds the model key; the held design
- * issue #3926 decides the settings' place.
+ * Proposed: where a person connects their own Claude account, their account page, which the held design issue #3926
+ * designs.
  */
-const aiSettingsAddress = '/users'
+const aiSettingsAddress = '/account'
 
 /** The longest request text the send route takes, see docs/reference/authoring-requests.md#routes. */
 const maxText = 4000
@@ -31,9 +31,9 @@ const maxText = 4000
 /**
  * Proposed: the request panel of the open application, in the shared `StudioSidePanel`. On top an author writes a
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept.
- * Axis counts no requests: the tenant's own AI connection pays for them, and its provider's limits answer as a
- * request's failure. Until the tenant has connected its AI, the panel says so in place of the form, with a link to
- * the settings for an administrator. A sent request opens its page, where its plan shows
+ * Axis counts no requests: each author's own Claude account runs the requests they send, and its provider's limits
+ * answer as a request's failure. Until the author has connected theirs, the panel says so in place of the form, with a
+ * link to their account page. A sent request opens its page, where its plan shows
  * when AI has written it, and the panel stays open and empty for the next one. Under a line comes the MCP server's
  * address on the tenant's host, with a copy button, for an AI app of the author's own. The panel lists no requests:
  * the sidebar leads to AI requests, and the notification bell tells the author when one waits for them or ends. The
@@ -96,9 +96,9 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
           <Flex vertical gap={spacing.xs} data-testid="studio-ai-not-connected">
             <Typography.Text strong>{t('shell.studio.ai.notConnected')}</Typography.Text>
             <Typography.Text style={{ color: colour.textMuted }}>
-              {t(connection.canConnect ? 'shell.studio.ai.notConnected.admin' : 'shell.studio.ai.notConnected.author')}
+              {t('shell.studio.ai.notConnected.help')}
             </Typography.Text>
-            {connection.canConnect && <Link to={aiSettingsAddress}>{t('shell.studio.ai.connect')}</Link>}
+            <Link to={aiSettingsAddress}>{t('shell.studio.ai.connect')}</Link>
           </Flex>
         ) : (
           <Form

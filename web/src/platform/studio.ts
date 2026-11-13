@@ -1702,16 +1702,14 @@ export interface StudioAuthoringRequestList {
 }
 
 /**
- * Proposed: whether the tenant has connected its own AI, which every request uses, and whether the reader may connect
- * it, see the review on #3263. Axis counts no requests: the provider's own limits answer as a failure.
+ * Proposed: whether the reader has connected their own Claude account, whose key runs every request they send, see the
+ * review on #3263. Axis counts no requests: the provider's own limits answer as a failure.
  */
 export interface StudioAiConnection {
   connected: boolean
-  /** Whether the reader may set the connection: a tenant administrator. */
-  canConnect: boolean
 }
 
-/** Proposed: loads the tenant's AI connection, see {@link StudioAiConnection}. */
+/** Proposed: loads the reader's AI connection, see {@link StudioAiConnection}. */
 export async function fetchAiConnection(signal?: AbortSignal): Promise<StudioAiConnection> {
   const response = await studioFetch('/api/studio/ai', { signal })
   if (!response.ok) {
