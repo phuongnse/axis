@@ -10,7 +10,7 @@ public sealed class InstalledPackage
 {
     private readonly Dictionary<string, Type> _operationTypes;
 
-    internal InstalledPackage(PackageManifest manifest, PackageLoadContext loadContext, Dictionary<string, Type> operationTypes)
+    internal InstalledPackage(PackageManifest manifest, PackageLoadContext? loadContext, Dictionary<string, Type> operationTypes)
     {
         Manifest = manifest;
         LoadContext = loadContext;
@@ -26,17 +26,23 @@ public sealed class InstalledPackage
 
     public PackageManifest Manifest { get; }
 
-    /// <summary>The load context that runs the package, or null when the package was read as metadata only.</summary>
+    /// <summary>
+    /// The context the assembly is loaded in, or null for a <c>node</c> or <c>python</c> package, which has no
+    /// assembly, and for a package that was read as metadata only.
+    /// </summary>
     public PackageLoadContext? LoadContext { get; }
 
     /// <summary>Creates a new instance of the operation named <paramref name="operationName"/>, ignoring letter case.</summary>
     /// <exception cref="ArgumentException">The package has no such operation.</exception>
-    /// <exception cref="InvalidOperationException">The package was read as metadata only and cannot run.</exception>
+    /// <exception cref="InvalidOperationException">The package is a <c>node</c> or <c>python</c> package, or was read as metadata only.</exception>
     public IOperation CreateOperation(string operationName)
     {
         if (LoadContext is null)
         {
-            throw new InvalidOperationException($"Package '{Manifest.Id}' {Manifest.Version} was read as metadata only and cannot run.");
+            throw new InvalidOperationException(
+                Manifest.Language == PackageLanguage.CSharp
+                    ? $"Package '{Manifest.Id}' {Manifest.Version} was read as metadata only and cannot run."
+                    : $"Package '{Manifest.Id}' {Manifest.Version} is a '{Manifest.Language.ToString().ToLowerInvariant()}' package, whose code runs only in a package runner.");
         }
 
         return _operationTypes.TryGetValue(operationName, out var type)

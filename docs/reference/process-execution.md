@@ -573,9 +573,19 @@ operation in place of the HTTP request:
 - **Run in a package runner** _(planned for M21)_. Outside Development, the worker sends the attempt
   to a [package runner](extension-packages.md#package-runners) instead of loading the version itself,
   and kills the runner at the `timeout`.
-- **Run in a customer-hosted runner** _(planned for M37)_. The worker sends the attempt to a
-  [customer-hosted runner](extension-packages.md#customer-hosted-runners), which receives no binding
-  value.
+- **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a package
+  that the application [declares](extension-packages.md#declaring-packages-in-an-application) with
+  `runner: customer`. The call waits `pending`, its retry due, until a
+  [customer-hosted runner](extension-packages.md#customer-hosted-runners) that registers the package and
+  version takes it, and the runner receives no binding value.
+  - **The take is the Mark step.** It marks the call `sending`, counts the attempt and gives a lease that
+    lasts the operation's `timeout`.
+  - **The posted result is the Record step.** `succeeded` is checked against the manifest as an output that
+    fits, `retryable` counts as a `RetryableException`, and `failed` counts as any other exception, keeping
+    only the exception type.
+  - **A lease that ends with no result is a timeout.** The worker records an unknown outcome, as
+    [package call outcomes](#package-call-outcomes) says.
+  - **A call that no runner takes** stays `pending`, and the instance stays `waiting`.
 - **Record.** An outcome transaction records the result, as for a connector call. On success it
   writes the output fields with the record update rules, sets the instance to `running` on `next`,
   writes the history row and the audit records, and queues the next step.

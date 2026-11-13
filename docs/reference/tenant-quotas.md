@@ -2,8 +2,8 @@
 
 A quota limits what one tenant of a [cell](cells.md) uses in total or at once, so that one tenant
 cannot take what the others need. This page covers the quotas, how a request past one is refused, how
-work past a concurrency quota waits, the daily email count, and the usage that Axis measures for each
-tenant. Quotas are on only when `Cell:Id` is set, so a self-hosted installation has none: its server
+work past a concurrency quota waits, the daily email and package run time counts, and the usage that
+Axis measures for each tenant. Quotas are on only when `Cell:Id` is set, so a self-hosted installation has none: its server
 and worker answer no limit for every quota.
 
 A quota is not a [rate limit](headers-and-rate-limits.md), and the query timeouts are apart from both.
@@ -20,6 +20,7 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
 | `users`                    | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50      | Exact   |
 | `applications`             | The applications of the tenant: folders in its Studio folder and applications with a release          | 10      | Exact   |
 | `emailsPerDay`             | Emails sent for the tenant since 00:00 UTC                                                            | 1,000   | Exact   |
+| `packageCpuSecondsPerDay` _(planned for M37)_ | CPU seconds that the runners of the tenant's application packages used since 00:00 UTC | 0       | Exact   |
 | `concurrentImports`        | Imports and exports that run at once                                                                  | 2       | Lease   |
 | `concurrentConnectorCalls` | Connector and package calls in flight at once                                                         | 10      | Lease   |
 | `concurrentQueries`        | Data source queries and record list reads that run at once                                            | 10      | Lease   |
@@ -189,6 +190,28 @@ In a cell the worker counts each email it sends for a tenant, and holds an email
   the tenant's `emailsPerDay`. The administrators read it on the
   [notification routes](notifications.md#in-app-notifications), and the bell of the platform site
   shows it.
+
+## Package run time a day
+
+_(planned for M37)_
+
+In a cell the worker counts the CPU seconds that the runners of a tenant's
+[application packages](extension-packages.md#an-applications-packages) use, and holds a call past the
+tenant's `packageCpuSecondsPerDay` until the next day. Outside a cell nothing is counted or held.
+
+- **Counting.** After each call the worker adds the runner's CPU seconds for that call, rounded up, to
+  the counter `packageCpuSeconds` in `platform.tenant_daily_counters`, see [emails a day](#emails-a-day).
+  A runner's start and idle time count for no tenant.
+- **Held calls.** At or past the quota, a call is held, not failed. Its work item is due at the next
+  00:00 UTC, as a held email is. Calls in flight finish and count. A quota of 0 holds every call.
+- **Refused.** While the quota is 0, turning the tenant's
+  [switch](user-administration.md#application-packages) on and a publish of an application that holds an
+  application's package answer the quota's `403`, see [refusals](#refusals).
+- **The notice.** The tenant's administrators get one in-app notice a day, the first time a call is
+  held. It uses the counter `packageHeldNotice` and the platform texts `notices.packagesHeld.*`, as the
+  [emails' notice](#emails-a-day) does.
+- **Usage.** `used` in [the usage route](#usage) is the day's count, and the daily row holds the day's
+  CPU seconds.
 
 ## Usage
 

@@ -6,6 +6,7 @@
     <RootNamespace>TestPackage</RootNamespace>
     <Version>1.1.0</Version>
     <IsPackable>false</IsPackable>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +20,7 @@
 
   <ItemGroup>
     <None Include="axis-package.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="packages.lock.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

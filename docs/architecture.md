@@ -77,12 +77,13 @@ flowchart LR
   same modules as the server. It also loads and runs the installed
   [extension packages](reference/extension-packages.md), which the server only reads as metadata, and
   serves its own [health checks](#health-checks).
-- **Axis.PackageHost** _(planned for M21)_. It runs package operations in package runners for each
-  runtime, outside the worker, in its own `package-host` container. The worker sends each attempt to a
-  runner, and loads package code itself only in Development. An installation's package runs in runners
+- **Axis.PackageHost** _(planned for M21)_. It runs package operations in package runners, outside the
+  worker, in a container for each runtime, see [images](reference/installation.md#images). The worker
+  sends each attempt to a runner, and loads package code itself only in Development. An installation's package runs in runners
   that every tenant shares. See [package runners](reference/extension-packages.md#package-runners).
 - **Application runners and customer-hosted runners** _(planned for M37)_. An application's package runs
-  in runners that serve only its tenant, and a customer can host a runner in its own network. See
+  in runners that serve only its tenant, in their own `application-package-host` container under gVisor,
+  and a customer can host a runner in its own network. See
   [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 - **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
   With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads

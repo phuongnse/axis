@@ -24,8 +24,113 @@ public sealed class PackageCatalogTests
         Assert.Equal(("test-package", "1.0.0", "Axis.TestPackage.dll"), (package.Manifest.Id, package.Manifest.Version, package.Manifest.Assembly));
         Assert.Equal("Test package", package.Manifest.Label);
         Assert.Equal(["describe", "sum", "fail", "flaky", "slow", "probe"], package.Manifest.Operations.Select(operation => operation.Name));
+        Assert.Equal(PackageLanguage.CSharp, package.Manifest.Language);
+        Assert.Equal("packages.lock.json", package.Manifest.Lock);
         Assert.Equal("test-package/1.0.0", package.LoadContext?.Name);
     }
+
+    [Fact]
+    public void Node_and_python_packages_load_from_their_manifest_without_an_assembly()
+    {
+        using var root = new TemporaryFolder()
+            .With("node-tools/1.0.0/axis-package.json", Manifest("node-tools", """ "language": "node", "adapter": "index.js", "lock": "package-lock.json" """))
+            .With("node-tools/1.0.0/index.js", "")
+            .With("python-tools/1.0.0/axis-package.json", Manifest("python-tools", """ "language": "python", "adapter": "adapter.py", "lock": "requirements.txt" """))
+            .With("python-tools/1.0.0/adapter.py", "");
+
+        var catalog = PackageCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Diagnostics);
+        Assert.Equal(
+            [("node-tools", PackageLanguage.Node, "index.js"), ("python-tools", PackageLanguage.Python, "adapter.py")],
+            catalog.Packages.Select(package => (package.Manifest.Id, package.Manifest.Language, package.Manifest.Adapter)));
+        Assert.All(catalog.Packages, package =>
+        {
+            Assert.Null(package.Manifest.Assembly);
+            Assert.Null(package.LoadContext);
+        });
+        Assert.Equal(["node-tools", "python-tools"], catalog.Versions.Select(version => version.Id));
+        var exception = Assert.Throws<InvalidOperationException>(() => catalog.Packages[0].CreateOperation("run"));
+        Assert.Contains("package runner", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_node_package_without_its_adapter_file_is_left_out()
+    {
+        using var root = new TemporaryFolder()
+            .With("node-tools/1.0.0/axis-package.json", Manifest("node-tools", """ "language": "node", "adapter": "index.js", "lock": "package-lock.json" """));
+
+        var catalog = PackageCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageAssemblyMissing, "node-tools/1.0.0/axis-package.json", "/adapter"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.DoesNotContain(root.Path, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_manifest_without_a_lock_is_refused()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0")
+            .EditManifest("1.0.0", manifest => manifest.Remove("lock"));
+
+        AssertRefused(PackageCatalog.Load(root.Path), ManifestFile, "", "lock");
+    }
+
+    [Fact]
+    public void A_csharp_manifest_with_an_adapter_is_refused()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0")
+            .EditManifest("1.0.0", manifest => manifest["adapter"] = "index.js");
+
+        AssertRefused(PackageCatalog.Load(root.Path), ManifestFile, "/adapter", "adapter");
+    }
+
+    [Fact]
+    public void A_node_manifest_without_an_adapter_is_refused()
+    {
+        using var root = new TemporaryFolder()
+            .With("node-tools/1.0.0/axis-package.json", Manifest("node-tools", """ "language": "node", "lock": "package-lock.json" """));
+
+        AssertRefused(PackageCatalog.Load(root.Path), "node-tools/1.0.0/axis-package.json", "", "adapter");
+    }
+
+    [Fact]
+    public void A_node_manifest_with_an_assembly_is_refused()
+    {
+        using var root = new TemporaryFolder()
+            .With("node-tools/1.0.0/axis-package.json", Manifest("node-tools", """ "language": "node", "adapter": "index.js", "assembly": "Tools.dll", "lock": "package-lock.json" """));
+
+        AssertRefused(PackageCatalog.Load(root.Path), "node-tools/1.0.0/axis-package.json", "/assembly", "assembly");
+    }
+
+    [Fact]
+    public void A_node_manifest_with_the_lock_of_another_language_is_refused()
+    {
+        using var root = new TemporaryFolder()
+            .With("node-tools/1.0.0/axis-package.json", Manifest("node-tools", """ "language": "node", "adapter": "index.js", "lock": "packages.lock.json" """));
+
+        AssertRefused(PackageCatalog.Load(root.Path), "node-tools/1.0.0/axis-package.json", "/lock", "lock");
+    }
+
+    private static void AssertRefused(PackageCatalog catalog, string file, string path, string messagePart)
+    {
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, file, path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains(messagePart, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    private static string Manifest(string id, string fields) =>
+        $$"""
+        {
+          "id": "{{id}}",
+          "version": "1.0.0",
+          "label": "Tools",
+          {{fields}},
+          "operations": [{ "name": "run", "type": "run", "idempotent": true }]
+        }
+        """;
 
     [Fact]
     public void A_manifest_that_fails_its_schema_is_a_diagnostic_and_the_package_is_not_listed()

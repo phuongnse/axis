@@ -180,6 +180,40 @@ with no directory row or a preview tenant. A `403` or `404` is not logged, and a
   "Remove" button sends `DELETE /api/tenant/model-key`. A failed remove shows "The key was not removed."
 - **After a change.** The section reads `GET /api/tenant/model-key` again, so it shows what the server stored.
 
+### Application packages
+
+_(planned for M37)_
+
+Where `Extensions:ApplicationPackages` is on, the People tab has an "Application packages" section below Model key, where
+an administrator turns the tenant's application packages on or off, see
+[application packages](user-administration.md#application-packages). The section is a component of its own, like Model
+key. It loads `GET /api/tenant/application-packages` and renders nothing unless the route answers `200`, so a user who is
+not an administrator, an installation with the setting off and a preview tenant do not see it.
+
+- **State.** The section shows whether application packages are on.
+- **Change.** One button opens a confirmation. Only the confirmation's button sends the `PUT`, and the section then
+  reads `GET /api/tenant/application-packages` again, so it shows what the server stored.
+- **A refusal.** A quota `403` shows the problem's title, see [refusals](tenant-quotas.md#refusals).
+
+### Package runners
+
+_(planned for M37)_
+
+The People tab has a "Package runners" section below Application packages, where an administrator adds a
+[customer-hosted runner](extension-packages.md#customer-hosted-runners), sees the tenant's runners and revokes one, see
+[package runners](user-administration.md#package-runners). The section is a component of its own, like Model key. It
+loads `GET /api/tenant/package-runners` and renders nothing unless the route answers `200`, so a user who is not an
+administrator and a preview tenant do not see it. Its texts are `shell.users.packageRunners.*`.
+
+- **The list.** Each runner shows its name, its packages as id and version, and its last call. A runner that never
+  took a call shows "Never".
+- **Add.** The "Add runner…" button opens a dialog with a name field. Only its "Create" button sends
+  `POST /api/tenant/package-runners`. The dialog then shows the client ID and the secret, with "Copy the secret now.
+  It is not shown again." The section reads `GET /api/tenant/package-runners` again, so it shows what the server stored.
+- **Revoke.** Each row has a "Revoke…" button that opens a confirmation titled "Revoke this runner?". Only its
+  "Revoke" button sends `POST /api/tenant/package-runners/{id}/revoke`. The section then reads
+  `GET /api/tenant/package-runners` again, so the runner drops out.
+
 ### Connected apps
 
 The users page has a "Connected apps" tab where an administrator chooses which outside MCP clients may connect, sees the

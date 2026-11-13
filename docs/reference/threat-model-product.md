@@ -200,7 +200,8 @@ _(planned for M37)_
 
 An application's package is written by the tenant's author and is not trusted. Its runners serve only its
 tenant, in a sandbox stronger than a container. A customer may host a runner in its own network, which
-connects out with its own credential. The flow below shows where these threats sit.
+connects out with its own credential. Its calls to outside systems go through the customer's own
+network, with no egress proxy of Axis. The flow below shows where these threats sit.
 
 ```mermaid
 flowchart LR
@@ -213,6 +214,7 @@ flowchart LR
     end
     subgraph customer [Customer network]
         CRun[Customer-hosted runner, with its own secrets]
+        CSys[Systems the customer's network reaches]
     end
     subgraph outside [Outside systems]
         Ext[Hosts the package declares]
@@ -220,16 +222,24 @@ flowchart LR
     Steps -->|operation call for one tenant| Run
     Run -->|egress proxy, declared hosts only| Ext
     Run -. no route .-> OtherData
-    CRun -->|connects out, own credential| Steps
-    CRun -->|declared hosts only| Ext
+    CRun -->|connects out, own credential, takes calls under a lease| Steps
+    CRun -->|own network, no egress proxy| CSys
 ```
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| P145 | An application's package reaches the data or the runner of another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator, which provides the sandbox stronger than a container. An installation without that sandbox refuses an application's package, see [An application's packages](extension-packages.md#an-applications-packages). |
+| P145 | An application's package reaches the data or the runner of another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator, who installs gVisor (`runsc`). The chart's `runtimeClassName` and Compose's `runtime` put `application-package-host` under it, the worker does not start without it when `Extensions:ApplicationPackages` is on, and the installation refuses an application's package when the setting is off, see [An application's packages](extension-packages.md#an-applications-packages). |
 | P146 | An application's package calls a host that its manifest does not declare. | Package runner and application's package | Information disclosure | Medium | **Delegated** | The operator, whose runners hold one network route through an egress proxy that admits only the declared hosts, see [package runners](extension-packages.md#package-runners). |
-| P147 | A customer-hosted runner's credential is stolen, or kept after the customer stops using it. | Package runner and customer network | Spoofing | High | **Delegated** | The customer, which owns the machine of its runner, and the tenant's administrator, who can revoke its credential. The runner takes only its tenant's calls, see [customer-hosted runners](extension-packages.md#customer-hosted-runners). |
-| P148 | A dependency of a package has a known vulnerability, or is malicious. | Package runner and application's package | Tampering | Medium | **Delegated** | The tenant's author, who chooses the dependencies. The package's lock file fixes them, and its build scans them for known vulnerabilities, see [extension packages](extension-packages.md#what-a-package-is). _(planned for M21)_ |
+| P147 | A customer-hosted runner's credential is stolen, or kept after the customer stops using it. | Package runner and customer network | Spoofing | High | **Delegated** | The customer, which owns the machine of its runner, and the tenant's administrator, who can revoke its credential. The planned controls are the runner's own client credential, which Axis shows once and does not store, the lease that ties each result to the runner that took the call, and the revoke, which refuses the runner's next request. The runner takes only its tenant's calls, see [customer-hosted runners](extension-packages.md#customer-hosted-runners) and [staging a package call](process-execution.md#staging-a-package-call). |
+| P148 | A dependency of a package has a known vulnerability, or is malicious. | Package runner and application's package | Tampering | Medium | **Delegated** | The tenant's author, who chooses the dependencies. The package's lock file fixes them, and the scan when a package is installed and when its application is published checks them for known vulnerabilities, see [extension packages](extension-packages.md#what-a-package-is) and [an application's packages](extension-packages.md#an-applications-packages). _(planned for M21)_ |
+| P149 | A dependency's install script, run by the build of an application's package, reaches the publisher, its secrets or another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator's sandbox, because the build runs in the tenant's sandbox and never in the publisher, see [an application's packages](extension-packages.md#an-applications-packages). |
+| P150 | A tenant's package uses so much CPU that other tenants' work waits. | Package runner and application's package | Denial of service | Medium | **Delegated** | The operator's CPU limits on runners and the `packageCpuSecondsPerDay` quota, see [package run time a day](tenant-quotas.md#package-run-time-a-day). |
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- (Tampering, Medium) a runner posts a result for a call that it did not take, or after its lease ended. The planned
+  control is the lease id that the result route needs, see
+  [customer-hosted runners](extension-packages.md#customer-hosted-runners).
 
 ### Worker and webhook receiver
 
