@@ -15,8 +15,9 @@ and never skip.
   ([D23](d23-sign-in-through-oidc-and-the-bff-session.md)). `GET /api/me` answers the session's user,
   or `401`.
 - **Append-only audit records.** Each action that changes data writes one in the same transaction,
-  with the actor: a user id, or `system` for the worker. The database refuses any change or removal.
-  A record's audit records, newest first, are its history.
+  with the actor: a user id, `system` for the worker, or `anonymous` when nobody was signed in
+  ([D50](d50-sign-in-audit-records-and-security-scanning-in-ci.md)). The database refuses any change
+  or removal. A record's audit records, newest first, are its history.
 - **Sequences.** A field that names a `sequence` gets the next number of its format on create, in the
   create's transaction, and clients cannot write it. The counter restarts each year only when the
   format holds the year.
