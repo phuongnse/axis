@@ -160,3 +160,4 @@ the files agree, title and status included.
 | [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) | CI runs on main every few merges, and NexKit checks every branch | **Agreed** |
 | [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) | A run downloads only what the caches miss, and a transient stop runs again after a wait | **Agreed** |
 | [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) | Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts | **Agreed** |
+| [D149](decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md) | A person's secrets are sealed for the host that uses them, and every secret rests on a key service | **Agreed** |
