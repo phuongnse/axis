@@ -19,8 +19,8 @@ namespace Axis.PackageHost;
 /// <c>start</c> for an installed version whose id and version are well formed. Any other first line, or a
 /// version that is not installed, or whose <c>proxy</c> is not a <c>host:port</c>, closes the connection and starts
 /// no runner. So does a version whose language has no runner, or whose runner's program is missing from the image.
-/// The host starts the runner of the manifest's language, the C# runner or the Node.js runner, with the same
-/// arguments. The runner's environment holds only the proxy variables that name the worker's egress proxy, and
+/// The host starts the runner of the manifest's language: the C# runner, the Node.js runner or the Python runner. The
+/// runner's environment holds only the proxy variables that name the worker's egress proxy, and
 /// <c>NODE_USE_ENV_PROXY=1</c> for a Node.js runner, so that its own HTTP calls use them. Its
 /// standard input is fed from the connection and its standard output goes to the connection. Closing the connection
 /// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
@@ -187,6 +187,7 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
         {
             PackageLanguage.CSharp => commands.CSharp,
             PackageLanguage.Node => commands.Node,
+            PackageLanguage.Python => commands.Python,
             _ => null,
         };
         if (command is null)
@@ -196,7 +197,7 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
 
         try
         {
-            return StartRunner(command, start, language == PackageLanguage.Node);
+            return StartRunner(command, start, language);
         }
         catch (Win32Exception)
         {
@@ -204,7 +205,7 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
         }
     }
 
-    private Process StartRunner(RunnerCommand command, StartMessage start, bool nodeProxy)
+    private Process StartRunner(RunnerCommand command, StartMessage start, PackageLanguage language)
     {
         var info = new ProcessStartInfo(command.FileName)
         {
@@ -218,10 +219,18 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
             info.ArgumentList.Add(argument);
         }
 
-        info.ArgumentList.Add("runner");
-        info.ArgumentList.Add(extensionsRoot);
-        info.ArgumentList.Add(start.Package);
-        info.ArgumentList.Add(start.Version);
+        if (language == PackageLanguage.Python)
+        {
+            info.ArgumentList.Add(Path.Combine(extensionsRoot, start.Package, start.Version));
+        }
+        else
+        {
+            info.ArgumentList.Add("runner");
+            info.ArgumentList.Add(extensionsRoot);
+            info.ArgumentList.Add(start.Package);
+            info.ArgumentList.Add(start.Version);
+        }
+
         info.Environment.Clear();
 
         // The runner's one route to the network is the worker's egress proxy, whose credentials are the runner's token.
@@ -233,7 +242,7 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands c
         }
 
         // Node.js makes its own HTTP calls through these variables only when it is told to.
-        if (nodeProxy)
+        if (language == PackageLanguage.Node)
         {
             info.Environment["NODE_USE_ENV_PROXY"] = "1";
         }

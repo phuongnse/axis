@@ -33,6 +33,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\..\sdk\python\**\*" Exclude="..\..\sdk\python\**\__pycache__\**" LinkBase="sdk/python" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\sdk\package-runner-protocol.schema.json" Link="package-runner-protocol.schema.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

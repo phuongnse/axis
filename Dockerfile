@@ -257,12 +257,14 @@ RUN mkdir /extensions
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 
-# Production package host for Python packages: the same as axis-package-host-dotnet, with Python 3 and pip.
+# Production package host for Python packages: the same as axis-package-host-dotnet, with Python 3 and pip, and the Python
+# runner and SDK in /app/sdk/python, see docs/reference/extension-packages.md#package-runners.
 FROM package-host-python AS axis-package-host-python
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
 ENV DOTNET_ENVIRONMENT=Production Extensions__Path=/extensions
 WORKDIR /app
+COPY sdk/python/ ./sdk/python/
 COPY --from=trivy /trivy /usr/local/bin/trivy
 COPY --from=production-build /out/package-host .
 RUN mkdir /extensions
