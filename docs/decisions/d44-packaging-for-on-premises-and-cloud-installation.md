@@ -27,8 +27,11 @@ installation that ran them.
   [D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) says.
 - **A release workflow publishes the images** _(planned for M32)_, each signed, as D107 says.
 
-Several replicas are [D49](d49-several-server-replicas-behind-a-tls-proxy.md). The steps and every
-setting are in [installation](../reference/installation.md).
+Several replicas are [D49](d49-several-server-replicas-behind-a-tls-proxy.md). The fifth production
+image, `axis-controlplane`, is the image of the [control plane](../reference/control-plane.md#image-and-chart),
+which each region runs on a cluster of its own. It is not part of an installation, as
+[D126](d126-sign-up-trials-and-the-control-plane.md) says. The steps and every setting are in
+[installation](../reference/installation.md).
 
 ## Consequences
 
