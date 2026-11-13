@@ -304,7 +304,7 @@ internal sealed partial class PackageCallHandler(
     {
         var capabilities = target.Operation.Capabilities;
         var urls = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
-        var secrets = new Dictionary<string, SecretValue>(StringComparer.OrdinalIgnoreCase);
+        var secrets = new Dictionary<string, Func<string>>(StringComparer.OrdinalIgnoreCase);
         context = null;
         try
         {
@@ -322,7 +322,7 @@ internal sealed partial class PackageCallHandler(
 
             foreach (var name in capabilities.Secrets)
             {
-                secrets[name] = bindings.ResolveSecret(name);
+                secrets[name] = bindings.ResolveSecret(name).Reveal;
             }
         }
         catch (InvalidOperationException exception)

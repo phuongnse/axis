@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
 
   <ItemGroup>
@@ -14,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
+    <ProjectReference Include="..\Axis.Extensions\Axis.Extensions.csproj" />
   </ItemGroup>
 
 </Project>

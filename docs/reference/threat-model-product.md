@@ -191,8 +191,9 @@ flowchart LR
 | P33 | A package version is swapped after a release pins another one. | Worker and extension package | Tampering | Medium | **Mitigated** | `PackagePinningTests` (an instance keeps the version its release pins), `PackageCatalogTests` (an assembly that differs from its manifest version is a diagnostic). |
 | P34 | A package call runs with no record of its operation. | Worker and extension package | Repudiation | Low | **Mitigated** | `PackageCallTests` (a settled call writes exactly one called audit record and records the operation identity). |
 | P35 | A package operation never returns and holds a worker thread. | Worker and extension package | Denial of service | Medium | **Delegated** | The operator, see [Not a sandbox](extension-packages.md#not-a-sandbox). The timeout stops the wait, but the code keeps running in the worker. |
+| P151 | A caller other than the worker connects to a package host and runs an operation with bindings of its own choosing. | Worker and package host | Spoofing | High | **Delegated** | The operator's runner network, which lets only the worker reach the host's port, because the host does not authenticate a connection, see [package runners](extension-packages.md#package-runners). _(planned for M21)_ |
 
-Spoofing does not apply. The operator installs each package, and a caller does not send a package an identity.
+Spoofing does not apply to a package in the worker's process. The operator installs each package, and a caller does not send a package an identity. A package in a runner is reached over the network, see P151.
 
 ### Package runner and an application's package
 
