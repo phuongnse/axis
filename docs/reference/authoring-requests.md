@@ -156,6 +156,12 @@ the checks, an independent review and fix rounds.
   `validate_draft` and `diff_draft`, and only for the request's application and its draft. A call without a
   draft gets the request's draft. Any other call gets a tool error from the agent host and never reaches the
   MCP server. When the model ends its turn, the request moves to `checking`.
+- **Packages** _(planned for M37)_. Planning is also offered `list_package_files` and `read_package_file`.
+  Working and fixing are also offered `write_package_file`, `delete_package_file` and `test_package`. When
+  the draft changes a file under `packages/<id>/`, checking calls `test_package` after the compile, stores
+  the result in `checks` as `packages` and moves the request to `fixing` on a failure. The author who sends
+  the request needs the developer role, because the tools act for the author, see
+  [roles](user-administration.md#roles).
 - **Checking runs every scenario.** The step makes no model call. It calls `validate_draft` on the request's
   draft. When no diagnostic is an `error`, it calls `run_scenarios` with no names, so the run covers the
   application's scenarios and every module scenario, contract scenarios included, and asks for the run's

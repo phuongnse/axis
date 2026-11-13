@@ -490,28 +490,51 @@ _(planned for M37)_
 An application's package sits in the application's folder, and the tenant's author brings it. It is not
 trusted code, so the platform gives it more limits than an installation's package gets.
 
-- **Its own runners.** Its runners serve only its tenant, in a sandbox stronger than a container.
-- **Quotas.** Its runners count against the tenant's [quotas](tenant-quotas.md).
-- **Plans.** In Axis SaaS only a [paid plan](plans.md) allows an application's packages.
-- **Switched on by the tenant.** The tenant's administrator turns them on and gives each author the
-  permission to write a package.
-- **Refused without the sandbox.** An installation without the sandbox refuses an application's
-  package, and runs its own packages as before.
+- **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
+  `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
+  Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
+  gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
+  virtualization.
+- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
+  With `true`, the worker checks at start that `application-package-host` runs under gVisor, and does
+  not start otherwise. With `false`, an application's package is a compile error at its
+  `packages/<id>/axis-package.json`, and the tenant's switch answers `403`. So an installation without
+  gVisor refuses an application's package and runs its own packages as before.
+- **Its own runners.** One set for each tenant and package version, with the limits of
+  [package runners](#package-runners). The package host starts a set when a call comes and stops it
+  once it is idle, so a tenant that calls nothing holds no runner.
+- **Quotas.** The CPU seconds of its runners count against the tenant's
+  [package run time a day](tenant-quotas.md#package-run-time-a-day). A call also holds a
+  `concurrentConnectorCalls` lease, as any package call does.
+- **Plans.** In Axis SaaS only a paid plan allows an application's packages, see
+  [the catalogue](plans.md#the-catalogue).
+- **Switched on by the tenant.** The tenant's administrator turns them on, see
+  [application packages](user-administration.md#application-packages), and gives each author the
+  `developer` role, see [roles](user-administration.md#roles).
+- **In the folder.** `packages/<id>/` holds the package's manifest, adapter, lock file and tests. `<id>`
+  is the folder's name, and an id that an installation's package also uses is a compile error. The
+  application's `packages` list does not name it. Steps call it as `<id>/<operation>`.
+- **Built and scanned on publish.** The publisher builds and scans each package as
+  [built once](#what-a-package-is) says, but in the tenant's sandbox, because a dependency's install
+  script is the tenant's code. A failed build or scan fails the publish with diagnostics. A publish
+  needs the publisher role only.
 - **In the release.** The release holds the built package, see
   [versions and pinning](#versions-and-pinning).
+- **Writing.** A write to a package's files needs the author role, the developer role and the tenant's
+  switch on, see [packages in Studio](studio-packages.md).
 - **No change to a module's code.** A customization layer cannot change a module's code. An
   application that needs other code adds a package of its own and calls it, or
   [ejects](modules-and-templates.md#upgrades-with-module-migrations) the module.
-- **Built and scanned on publish.** Publishing the application builds and scans the package.
 
 ### How a package is written
 
 - **By hand.** An author edits the package's files in Studio, or in their own tools through the
   authoring API.
 - **By an agent.** An agent writes the package's adapter, manifest and tests over a library that the
-  author names. It does so only through an [authoring request](authoring-requests.md), under the plan,
-  review and accept of [D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md),
-  and it never publishes.
+  author names. It does so only through an [authoring request](authoring-requests.md#states) and the
+  [MCP server's tools](mcp-server.md#tools), under the plan, review and accept of
+  [D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md), and it never
+  publishes.
 
 ## Sample and test packages
 
