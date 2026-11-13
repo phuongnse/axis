@@ -74,7 +74,11 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
 
 - **`src/Axis.PackageHost/`** _(planned for M21)_. The package runner host, which runs extension
   package operations out of process, see
-  [package runners](reference/extension-packages.md#package-runners).
+  [package runners](reference/extension-packages.md#package-runners). The C# runner is
+  `Axis.PackageHost` in runner mode, over `Axis.Extensions`, and each host image also carries the
+  `build` command.
+- **`sdk/`** _(planned for M21)_. The runner protocol's schema, `package-runner-protocol.schema.json`,
+  and the folders `sdk/node/` and `sdk/python/`, which hold those runners and SDKs.
 
 ## Module rules
 
