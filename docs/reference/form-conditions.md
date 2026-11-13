@@ -95,8 +95,8 @@ A service desk ticket needs a resolution only when it is resolved. The `TicketUp
         { "field": "status" },
         {
           "field": "resolution",
-          "visibleWhen": "status == \"resolved\"",
-          "requiredWhen": "status == \"resolved\""
+          "visibleWhen": "status == 'resolved'",
+          "requiredWhen": "status == 'resolved'"
         }
       ]
     }
