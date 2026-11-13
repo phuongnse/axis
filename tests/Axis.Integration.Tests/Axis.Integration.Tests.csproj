@@ -77,6 +77,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\packages\node-test-package\**\*" Exclude="..\packages\node-test-package\node_modules\**" LinkBase="NodeTestPackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\packages\node-probe-package\**\*" LinkBase="NodeProbePackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\sdk\node\**\*" LinkBase="sdk/node" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\sdk\python\**\*" Exclude="..\..\sdk\python\**\__pycache__\**" LinkBase="sdk/python" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

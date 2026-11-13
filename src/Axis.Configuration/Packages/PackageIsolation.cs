@@ -5,24 +5,29 @@ using Microsoft.Extensions.Hosting;
 namespace Axis.Configuration.Packages;
 
 /// <summary>
-/// Where the worker runs the operations of a C# or Python package, see
-/// docs/reference/extension-packages.md#package-runners. <see cref="InProcess"/> loads each package into
-/// the worker. Otherwise the worker sends each attempt to a runner of the package host at
-/// <see cref="DotnetHost"/> and <see cref="DotnetPort"/> for a C# package, and at <see cref="PythonHost"/> and
-/// <see cref="PythonPort"/> for a Python package. A host is <see langword="null"/> and its port 0 when
-/// <c>Extensions:Runners:Dotnet</c> or <c>Extensions:Runners:Python</c> is not set.
-/// <see cref="ProxyPort"/> is the port of the worker's egress proxy.
+/// Where the worker runs the operations of a package, see
+/// docs/reference/extension-packages.md#package-runners. <see cref="InProcess"/> loads each C# package into
+/// the worker. Otherwise the worker sends each attempt of a C# package to a runner of the package host at
+/// <see cref="DotnetHost"/> and <see cref="DotnetPort"/>, which are <see langword="null"/> and 0 when
+/// <c>Extensions:Runners:Dotnet</c> is not set. A <c>node</c> package always goes to a runner of the package host at
+/// <see cref="NodeHost"/> and <see cref="NodePort"/>, which are <see langword="null"/> and 0 when
+/// <c>Extensions:Runners:Node</c> is not set. A <c>python</c> package goes to a runner of the package host at
+/// <see cref="PythonHost"/> and <see cref="PythonPort"/>, which are <see langword="null"/> and 0 when
+/// <c>Extensions:Runners:Python</c> is not set. <see cref="ProxyPort"/> is the port of the worker's egress proxy.
 /// </summary>
 public sealed record PackageIsolation(
     bool InProcess,
     string? DotnetHost,
     int DotnetPort,
+    string? NodeHost,
+    int NodePort,
     int ProxyPort = RunnerProtocol.ProxyPort,
     string? PythonHost = null,
     int PythonPort = 0)
 {
     public const string IsolationSetting = "Extensions:Isolation";
     public const string DotnetRunnerSetting = "Extensions:Runners:Dotnet";
+    public const string NodeRunnerSetting = "Extensions:Runners:Node";
     public const string PythonRunnerSetting = "Extensions:Runners:Python";
     public const string ProxySetting = "Extensions:Runners:ProxyPort";
 
@@ -31,7 +36,8 @@ public sealed record PackageIsolation(
 
     /// <summary>
     /// Reads <c>Extensions:Isolation</c>, <c>process</c> or <c>inProcess</c> and <c>process</c> when unset, and
-    /// <c>Extensions:Runners:Dotnet</c> and <c>Extensions:Runners:Python</c>, each a <c>host:port</c> or <c>[ipv6]:port</c> with a port from 1 to 65535.
+    /// <c>Extensions:Runners:Dotnet</c>, <c>Extensions:Runners:Node</c> and <c>Extensions:Runners:Python</c>, each a
+    /// <c>host:port</c> or <c>[ipv6]:port</c> with a port from 1 to 65535.
     /// <c>Extensions:Runners:ProxyPort</c> is a whole number from 0 to 65535 and defaults to <see cref="RunnerProtocol.ProxyPort"/>.
     /// Only Development allows <c>inProcess</c>, see docs/reference/extension-packages.md#loading.
     /// </summary>
@@ -47,8 +53,9 @@ public sealed record PackageIsolation(
         var proxyPort = ReadProxyPort(configuration);
 
         var (dotnetHost, dotnetPort) = ReadRunner(configuration, DotnetRunnerSetting);
+        var (nodeHost, nodePort) = ReadRunner(configuration, NodeRunnerSetting);
         var (pythonHost, pythonPort) = ReadRunner(configuration, PythonRunnerSetting);
-        return new PackageIsolation(inProcess, dotnetHost, dotnetPort, proxyPort, pythonHost, pythonPort);
+        return new PackageIsolation(inProcess, dotnetHost, dotnetPort, nodeHost, nodePort, proxyPort, pythonHost, pythonPort);
     }
 
     /// <summary>
@@ -95,12 +102,9 @@ public sealed record PackageIsolation(
             return (null, 0);
         }
 
-        if (!TryParseHostPort(runner, out var host, out var port))
-        {
-            throw new InvalidOperationException($"'{setting}' must be a host and a port from 1 to 65535, as in 'host:port'.");
-        }
-
-        return (host, port);
+        return TryParseHostPort(runner, out var host, out var port)
+            ? (host, port)
+            : throw new InvalidOperationException($"'{setting}' must be a host and a port from 1 to 65535, as in 'host:port'.");
     }
 
     private static int ReadProxyPort(IConfiguration configuration) =>

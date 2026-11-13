@@ -58,7 +58,7 @@ public sealed class PythonPackageRunnerTests(PackageCallFixture fixture) : IClas
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(Process(host.Address, null), CancellationToken));
 
-        var error = PackageCallHandler.RunnerNotSet(PackageLanguage.Python);
+        var error = PackageCallHandler.RunnerNotSet(PackageIsolation.PythonRunnerSetting);
         await AssertCallAsync(callId, PackageCalls.Pending, error, "retryable");
         Assert.Contains(PackageIsolation.PythonRunnerSetting, error, StringComparison.Ordinal);
         Assert.Empty(host.RunnerIds(TestPackages.PythonId, "1.0.0"));
@@ -74,7 +74,7 @@ public sealed class PythonPackageRunnerTests(PackageCallFixture fixture) : IClas
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(Process(host.Address, TestPackageHost.ClosedAddress()), CancellationToken));
 
-        var error = PackageCallHandler.RunnerUnreachable(PackageLanguage.Python);
+        var error = PackageCallHandler.RunnerUnreachable(PackageIsolation.PythonRunnerSetting);
         await AssertCallAsync(callId, PackageCalls.Pending, error, "retryable");
         Assert.Contains(PackageIsolation.PythonRunnerSetting, error, StringComparison.Ordinal);
         Assert.Empty(host.RunnerIds(TestPackages.PythonId, "1.0.0"));

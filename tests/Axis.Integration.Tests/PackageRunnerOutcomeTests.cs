@@ -116,38 +116,78 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
     }
 
     [Fact]
-    public async Task A_package_host_that_cannot_be_reached_makes_the_attempt_retryable_and_names_the_setting()
+    public async Task A_node_call_goes_to_a_runner_of_the_node_host_with_inProcess_and_its_output_lands_on_the_record()
     {
-        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken);
-        var callId = await CallIdAsync(instanceId);
+        await using var host = await TestPackageHost.StartAsync(fixture.PackagesPath);
+        var (subjectId, _) = await fixture.StageAsync("PackageNodeGreet", CancellationToken);
 
-        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(Process(TestPackageHost.ClosedAddress()), CancellationToken));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallOnAsync(Process(null, host.Address, "inProcess"), CancellationToken));
 
-        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerUnreachable(PackageLanguage.CSharp), "retryable");
-        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerUnreachable(PackageLanguage.CSharp), StringComparison.Ordinal);
-        Assert.Equal(ProcessStarts.Waiting, (await fixture.Tenant.InstanceAsync(instanceId)).State);
+        var request = await fixture.RequestAsync(subjectId);
+        Assert.Contains(request.Values["title"]!.GetValue<string>(), request.Values["greeting"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Single(host.RunnerIds("node-test-package", "1.0.0"));
     }
 
     [Fact]
-    public async Task No_package_host_makes_the_attempt_retryable_and_names_the_setting()
+    public async Task A_node_call_goes_to_a_runner_of_the_node_host_with_process_and_its_output_lands_on_the_record()
     {
-        var (_, instanceId) = await fixture.StageAsync("PackageSum", CancellationToken);
+        await using var host = await TestPackageHost.StartAsync(fixture.PackagesPath);
+        var (subjectId, _) = await fixture.StageAsync("PackageNodeSum", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallOnAsync(Process(null, host.Address, "process"), CancellationToken));
+
+        Assert.Equal(5L, (await fixture.RequestAsync(subjectId)).Values["total"]!.GetValue<long>());
+        Assert.Single(host.RunnerIds("node-probe-package", "1.0.0"));
+    }
+
+    [Theory]
+    [InlineData("PackageSum", PackageIsolation.DotnetRunnerSetting)]
+    [InlineData("PackageNodeSum", PackageIsolation.NodeRunnerSetting)]
+    public async Task A_package_host_that_cannot_be_reached_makes_the_attempt_retryable_and_names_the_setting(string process, string setting)
+    {
+        var (_, instanceId) = await fixture.StageAsync(process, CancellationToken);
         var callId = await CallIdAsync(instanceId);
+        var values = Process(null, null, "process");
+        values[setting] = TestPackageHost.ClosedAddress();
 
-        Assert.Equal(
-            WorkItemOutcome.Rescheduled,
-            await fixture.RunCallOnAsync(new Dictionary<string, string?> { [PackageIsolation.IsolationSetting] = "process" }, CancellationToken));
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(values, CancellationToken));
 
-        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerNotSet(PackageLanguage.CSharp), "retryable");
-        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerNotSet(PackageLanguage.CSharp), StringComparison.Ordinal);
+        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerUnreachable(setting), "retryable");
+        Assert.Contains(setting, PackageCallHandler.RunnerUnreachable(setting), StringComparison.Ordinal);
         Assert.Equal(ProcessStarts.Waiting, (await fixture.Tenant.InstanceAsync(instanceId)).State);
     }
 
-    private static Dictionary<string, string?> Process(string address) =>
+    [Theory]
+    [InlineData("PackageSum", PackageIsolation.DotnetRunnerSetting)]
+    [InlineData("PackageNodeSum", PackageIsolation.NodeRunnerSetting)]
+    public async Task No_package_host_makes_the_attempt_retryable_and_names_the_setting(string process, string setting)
+    {
+        await using var host = await TestPackageHost.StartAsync(fixture.PackagesPath);
+        var (_, instanceId) = await fixture.StageAsync(process, CancellationToken);
+        var callId = await CallIdAsync(instanceId);
+
+        // The host of the other runtime is live, so only the setting of the call's runtime is missing.
+        var values = Process(null, null, "process");
+        values[setting == PackageIsolation.DotnetRunnerSetting ? PackageIsolation.NodeRunnerSetting : PackageIsolation.DotnetRunnerSetting] = host.Address;
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(values, CancellationToken));
+
+        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerNotSet(setting), "retryable");
+        Assert.Contains(setting, PackageCallHandler.RunnerNotSet(setting), StringComparison.Ordinal);
+        Assert.Equal(ProcessStarts.Waiting, (await fixture.Tenant.InstanceAsync(instanceId)).State);
+        Assert.Empty(host.RunnerIds(TestPackages.Id, "1.0.0"));
+        Assert.Empty(host.RunnerIds("node-probe-package", "1.0.0"));
+    }
+
+    private static Dictionary<string, string?> Process(string address) => Process(address, null, "process");
+
+    /// <summary>The settings of a worker with <paramref name="isolation"/> that sends C# attempts to <paramref name="dotnet"/> and <c>node</c> attempts to <paramref name="node"/>, each unset when <see langword="null"/>.</summary>
+    private static Dictionary<string, string?> Process(string? dotnet, string? node, string isolation) =>
         new()
         {
-            [PackageIsolation.IsolationSetting] = "process",
-            [PackageIsolation.DotnetRunnerSetting] = address,
+            [PackageIsolation.IsolationSetting] = isolation,
+            [PackageIsolation.DotnetRunnerSetting] = dotnet,
+            [PackageIsolation.NodeRunnerSetting] = node,
             [PackageIsolation.ProxySetting] = "0",
         };
 

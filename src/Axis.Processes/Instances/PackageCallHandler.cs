@@ -39,11 +39,13 @@ namespace Axis.Processes.Instances;
 /// operation only those bindings. An operation that asks for another binding, or sends a request
 /// to a host no declared <c>url</c> binding names, fails the call at once, even if it catches the
 /// exception. The error names the operation, the package and the binding, never a value.
-/// With <see cref="PackageRunners"/>, a C# or Python package runs in a runner of the package host instead of in the worker,
+/// With <see cref="PackageRunnerPools"/>, a C# package runs in a runner of the C# package host instead of in the worker,
+/// and a <c>node</c> package always runs in a runner of the Node.js package host, because the worker cannot load
+/// JavaScript, and a <c>python</c> package always runs in a runner of the Python package host, because it cannot load Python,
 /// see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
 /// outcomes follow: a runner's <c>retryable</c> and <c>failure</c> answers are the exceptions above, a timeout and a
 /// runner that closes its connection are unknown outcomes, and a host that cannot be reached, is not set or starts no
-/// runner is a retryable error. A request that a runner sends to a host no declared <c>url</c> binding names is
+/// runner is a retryable error that names the setting of the call's runtime. A request that a runner sends to a host no declared <c>url</c> binding names is
 /// refused by the worker's egress proxy and fails the call at once like the same request from a context. The error
 /// names the operation and the package, but no binding and no host.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
@@ -62,7 +64,7 @@ internal sealed partial class PackageCallHandler(
     SensitiveValues? sensitive,
     ILogger<PackageCallHandler> logger,
     Func<InstalledPackage, string, IOperation>? createOperation = null,
-    PackageRunners? runners = null) : IExternalWorkItemHandler
+    PackageRunnerPools? runners = null) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
@@ -73,12 +75,11 @@ internal sealed partial class PackageCallHandler(
     /// <summary>The error of a call whose runner closed its connection during the attempt.</summary>
     internal const string RunnerExited = "The package runner closed its connection during the attempt.";
 
-    /// <summary>The error of an attempt whose package host could not be reached or started no runner.</summary>
-    internal static string RunnerUnreachable(PackageLanguage language) =>
-        $"The package host set by '{PackageRunners.Setting(language)}' could not be reached or did not start a runner.";
+    /// <summary>The error of an attempt whose package host, set by <paramref name="setting"/>, could not be reached or started no runner.</summary>
+    internal static string RunnerUnreachable(string setting) => $"The package host set by '{setting}' could not be reached or did not start a runner.";
 
-    /// <summary>The error of an attempt when no package host is set.</summary>
-    internal static string RunnerNotSet(PackageLanguage language) => $"No package host is set in '{PackageRunners.Setting(language)}'.";
+    /// <summary>The error of an attempt when no package host is set in <paramref name="setting"/>.</summary>
+    internal static string RunnerNotSet(string setting) => $"No package host is set in '{setting}'.";
 
     public string Kind => ProcessStarts.PackageCallWorkItemKind;
 
@@ -155,7 +156,7 @@ internal sealed partial class PackageCallHandler(
                     attempt = attempt with { Attempts = attempts };
 
                     // No other worker claims the item while the operation runs, and a runner starts.
-                    var starting = InRunner(target) ? PackageRunners.StartTimeout : TimeSpan.Zero;
+                    var starting = runners?.For(target.Package.Manifest.Language) is not null ? PackageRunners.StartTimeout : TimeSpan.Zero;
                     if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, starting + target.Step.Timeout + item.Lease, cancellationToken))
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -206,9 +207,6 @@ internal sealed partial class PackageCallHandler(
         }
     }
 
-    /// <summary>Whether the call of <paramref name="target"/> goes to a runner of a package host and not to the worker.</summary>
-    private bool InRunner(Target target) => runners is not null && PackageRunners.Runs(target.Package.Manifest.Language);
-
     /// <summary>Resolves the bindings, runs the operation and settles the call by its result.</summary>
     private async Task<WorkItemOutcome> RunCallAsync(
         ClaimedWorkItem item,
@@ -224,10 +222,10 @@ internal sealed partial class PackageCallHandler(
             return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, cancellationToken);
         }
 
-        // With package runners, a C# or Python package never loads in the worker, see
+        // A package that has a runner pool never loads in the worker, see
         // docs/reference/extension-packages.md#package-runners.
-        var run = InRunner(target)
-            ? await RunInRunnerAsync(runners!, target, attempt.Call, input, urls, secrets, cancellationToken)
+        var run = runners?.For(target.Package.Manifest.Language) is { } pool
+            ? await RunInRunnerAsync(pool, target, attempt.Call, input, urls, secrets, cancellationToken)
             : await RunAsync(target, attempt.Call, input, urls, secrets, cancellationToken);
         if (run.Violation is { } violation)
         {
@@ -421,10 +419,9 @@ internal sealed partial class PackageCallHandler(
         Dictionary<string, Func<string>> secrets,
         CancellationToken cancellationToken)
     {
-        var language = target.Package.Manifest.Language;
-        if (!pool.IsSet(language))
+        if (!pool.IsSet)
         {
-            return new Run(null, null, Error: RunnerNotSet(language), Retryable: true);
+            return new Run(null, null, Error: RunnerNotSet(pool.Setting), Retryable: true);
         }
 
         RunMessage message;
@@ -449,12 +446,12 @@ internal sealed partial class PackageCallHandler(
             starting.CancelAfter(PackageRunners.StartTimeout);
             try
             {
-                runner = await pool.RentAsync(language, call.Package, call.Version, starting.Token);
+                runner = await pool.RentAsync(call.Package, call.Version, starting.Token);
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
                 // A host that cannot be reached, or starts no runner, and a start that takes too long.
-                return new Run(null, null, Error: RunnerUnreachable(language), Retryable: true);
+                return new Run(null, null, Error: RunnerUnreachable(pool.Setting), Retryable: true);
             }
         }
 

@@ -8,16 +8,17 @@ using Axis.Configuration.Packages;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// The worker's connections to the runners of the C# and Python package hosts, see
+/// The worker's connections to the runners of one package host, the C# one, the Node.js one or the Python one, see
 /// docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
 /// exits, times out or fails is dropped, and closing its connection makes the host kill the process. Runners
-/// start when an attempt needs one, so a version never has more of them than calls in flight. The pool owns the
-/// worker's <see cref="EgressProxy"/>, which starts with the first runner. Each runner gets its own proxy token in
-/// <c>start</c>, together with the address of the proxy as the host reaches it.
+/// start when an attempt needs one, so a version never has more of them than calls in flight. The pool uses the
+/// worker's <see cref="EgressProxy"/>, which starts with the first runner and which <see cref="PackageRunnerPools"/>
+/// owns. Each runner gets its own proxy token in <c>start</c>, together with the address of the proxy as the host
+/// reaches it. <paramref name="setting"/> is the name of the setting that holds the host's address.
 /// </summary>
-internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp) : IAsyncDisposable
+internal sealed class PackageRunners(string setting, string? host, int port, EgressProxy proxy) : IAsyncDisposable
 {
     /// <summary>
     /// The longest <see cref="RentAsync"/> may take to connect and get <c>ready</c>. It is not part of an operation's
@@ -26,34 +27,22 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<(string Package, string Version), ConcurrentBag<RunnerConnection>> _idle = new();
-    private readonly EgressProxy _proxy = new(isolation.ProxyPort, allowHttp);
     private volatile bool _disposed;
 
-    /// <summary>Whether a call of a package in <paramref name="language"/> goes to a runner. A Node.js call does not yet.</summary>
-    public static bool Runs(PackageLanguage language) => language is PackageLanguage.CSharp or PackageLanguage.Python;
+    /// <summary>The name of the setting that holds the address of the package host, for the errors of an attempt.</summary>
+    public string Setting => setting;
 
-    /// <summary>The setting that names the package host of <paramref name="language"/>.</summary>
-    /// <exception cref="ArgumentOutOfRangeException">No package host runs <paramref name="language"/>.</exception>
-    public static string Setting(PackageLanguage language) =>
-        language switch
-        {
-            PackageLanguage.CSharp => PackageIsolation.DotnetRunnerSetting,
-            PackageLanguage.Python => PackageIsolation.PythonRunnerSetting,
-            _ => throw new ArgumentOutOfRangeException(nameof(language), language, "No package host runs this language."),
-        };
-
-    /// <summary>Whether the setting of <paramref name="language"/> names a host.</summary>
-    public bool IsSet(PackageLanguage language) => HostOf(language).Host is not null;
+    /// <summary>Whether <see cref="Setting"/> names a host.</summary>
+    public bool IsSet => host is not null;
 
     /// <summary>
-    /// Takes an idle runner of the version whose connection is still open, or connects to the host of
-    /// <paramref name="language"/>, sends <c>start</c> and waits for <c>ready</c>.
+    /// Takes an idle runner of the version whose connection is still open, or connects to the host, sends
+    /// <c>start</c> and waits for <c>ready</c>.
     /// </summary>
     /// <exception cref="IOException">The host did not start a runner, so no <c>ready</c> came.</exception>
     /// <exception cref="SocketException">The host cannot be reached.</exception>
-    public async Task<RunnerConnection> RentAsync(PackageLanguage language, string package, string version, CancellationToken cancellationToken)
+    public async Task<RunnerConnection> RentAsync(string package, string version, CancellationToken cancellationToken)
     {
-        var (host, port) = HostOf(language);
         if (host is null)
         {
             throw new InvalidOperationException("No package host is set.");
@@ -75,9 +64,9 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
         var client = new TcpClient { NoDelay = true };
         try
         {
-            _proxy.EnsureStarted();
+            proxy.EnsureStarted();
             await client.ConnectAsync(host, port, cancellationToken);
-            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), _proxy.Register(), _proxy);
+            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), proxy.Register(), proxy);
             try
             {
                 await runner.StartAsync(cancellationToken);
@@ -96,14 +85,6 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
         }
     }
 
-    private (string? Host, int Port) HostOf(PackageLanguage language) =>
-        language switch
-        {
-            PackageLanguage.CSharp => (isolation.DotnetHost, isolation.DotnetPort),
-            PackageLanguage.Python => (isolation.PythonHost, isolation.PythonPort),
-            _ => throw new ArgumentOutOfRangeException(nameof(language), language, "No package host runs this language."),
-        };
-
     /// <summary>The <c>host:port</c> that a runner started by the host on the other end of <paramref name="client"/> reaches this worker at.</summary>
     private string ProxyAddress(TcpClient client)
     {
@@ -113,7 +94,7 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
             address = address.MapToIPv4();
         }
 
-        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{_proxy.Port}" : $"{address}:{_proxy.Port}";
+        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{proxy.Port}" : $"{address}:{proxy.Port}";
     }
 
     /// <summary>Keeps <paramref name="runner"/>, which finished its attempt, for the next one of its version.</summary>
@@ -128,7 +109,7 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
         _idle.GetOrAdd((runner.Package, runner.Version), _ => []).Add(runner);
     }
 
-    /// <summary>Sends <c>stop</c> to each idle runner and closes it.</summary>
+    /// <summary>Sends <c>stop</c> to each idle runner and closes it. The proxy stays, because the other pool uses it.</summary>
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
@@ -140,7 +121,54 @@ internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp)
                 runner.Dispose();
             }
         }
+    }
+}
 
+/// <summary>
+/// The worker's package runner pools, one for each runtime, which share the worker's one <see cref="EgressProxy"/>, see
+/// docs/reference/extension-packages.md#package-runners. The C# pool exists unless <c>Extensions:Isolation</c> is
+/// <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists, because the worker cannot
+/// load JavaScript, and so does the Python pool, because the worker cannot load Python.
+/// </summary>
+internal sealed class PackageRunnerPools : IAsyncDisposable
+{
+    private readonly EgressProxy _proxy;
+    private readonly PackageRunners? _dotnet;
+    private readonly PackageRunners _node;
+    private readonly PackageRunners _python;
+
+    public PackageRunnerPools(PackageIsolation isolation, bool allowHttp)
+    {
+        ArgumentNullException.ThrowIfNull(isolation);
+
+        _proxy = new EgressProxy(isolation.ProxyPort, allowHttp);
+        _dotnet = isolation.InProcess
+            ? null
+            : new PackageRunners(PackageIsolation.DotnetRunnerSetting, isolation.DotnetHost, isolation.DotnetPort, _proxy);
+        _node = new PackageRunners(PackageIsolation.NodeRunnerSetting, isolation.NodeHost, isolation.NodePort, _proxy);
+        _python = new PackageRunners(PackageIsolation.PythonRunnerSetting, isolation.PythonHost, isolation.PythonPort, _proxy);
+    }
+
+    /// <summary>The pool that runs the packages of <paramref name="language"/>, or <see langword="null"/> when the worker runs them itself or cannot run them.</summary>
+    public PackageRunners? For(PackageLanguage language) =>
+        language switch
+        {
+            PackageLanguage.CSharp => _dotnet,
+            PackageLanguage.Node => _node,
+            PackageLanguage.Python => _python,
+            _ => null,
+        };
+
+    /// <summary>Stops the idle runners of each pool, then the proxy.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotnet is not null)
+        {
+            await _dotnet.DisposeAsync();
+        }
+
+        await _node.DisposeAsync();
+        await _python.DisposeAsync();
         await _proxy.DisposeAsync();
     }
 }
