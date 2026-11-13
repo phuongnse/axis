@@ -8,7 +8,7 @@ using Axis.Configuration.Packages;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// The worker's connections to the runners of one package host, the C# one or the Node.js one, see
+/// The worker's connections to the runners of one package host, the C# one, the Node.js one or the Python one, see
 /// docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
@@ -128,13 +128,14 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
 /// The worker's package runner pools, one for each runtime, which share the worker's one <see cref="EgressProxy"/>, see
 /// docs/reference/extension-packages.md#package-runners. The C# pool exists unless <c>Extensions:Isolation</c> is
 /// <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists, because the worker cannot
-/// load JavaScript.
+/// load JavaScript, and so does the Python pool, because the worker cannot load Python.
 /// </summary>
 internal sealed class PackageRunnerPools : IAsyncDisposable
 {
     private readonly EgressProxy _proxy;
     private readonly PackageRunners? _dotnet;
     private readonly PackageRunners _node;
+    private readonly PackageRunners _python;
 
     public PackageRunnerPools(PackageIsolation isolation, bool allowHttp)
     {
@@ -145,6 +146,7 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
             ? null
             : new PackageRunners(PackageIsolation.DotnetRunnerSetting, isolation.DotnetHost, isolation.DotnetPort, _proxy);
         _node = new PackageRunners(PackageIsolation.NodeRunnerSetting, isolation.NodeHost, isolation.NodePort, _proxy);
+        _python = new PackageRunners(PackageIsolation.PythonRunnerSetting, isolation.PythonHost, isolation.PythonPort, _proxy);
     }
 
     /// <summary>The pool that runs the packages of <paramref name="language"/>, or <see langword="null"/> when the worker runs them itself or cannot run them.</summary>
@@ -153,10 +155,11 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
         {
             PackageLanguage.CSharp => _dotnet,
             PackageLanguage.Node => _node,
+            PackageLanguage.Python => _python,
             _ => null,
         };
 
-    /// <summary>Stops the idle runners of both pools, then the proxy.</summary>
+    /// <summary>Stops the idle runners of each pool, then the proxy.</summary>
     public async ValueTask DisposeAsync()
     {
         if (_dotnet is not null)
@@ -165,6 +168,7 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
         }
 
         await _node.DisposeAsync();
+        await _python.DisposeAsync();
         await _proxy.DisposeAsync();
     }
 }

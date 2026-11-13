@@ -11,7 +11,9 @@ namespace Axis.Configuration.Packages;
 /// <see cref="DotnetHost"/> and <see cref="DotnetPort"/>, which are <see langword="null"/> and 0 when
 /// <c>Extensions:Runners:Dotnet</c> is not set. A <c>node</c> package always goes to a runner of the package host at
 /// <see cref="NodeHost"/> and <see cref="NodePort"/>, which are <see langword="null"/> and 0 when
-/// <c>Extensions:Runners:Node</c> is not set. <see cref="ProxyPort"/> is the port of the worker's egress proxy.
+/// <c>Extensions:Runners:Node</c> is not set. A <c>python</c> package goes to a runner of the package host at
+/// <see cref="PythonHost"/> and <see cref="PythonPort"/>, which are <see langword="null"/> and 0 when
+/// <c>Extensions:Runners:Python</c> is not set. <see cref="ProxyPort"/> is the port of the worker's egress proxy.
 /// </summary>
 public sealed record PackageIsolation(
     bool InProcess,
@@ -19,11 +21,14 @@ public sealed record PackageIsolation(
     int DotnetPort,
     string? NodeHost,
     int NodePort,
-    int ProxyPort = RunnerProtocol.ProxyPort)
+    int ProxyPort = RunnerProtocol.ProxyPort,
+    string? PythonHost = null,
+    int PythonPort = 0)
 {
     public const string IsolationSetting = "Extensions:Isolation";
     public const string DotnetRunnerSetting = "Extensions:Runners:Dotnet";
     public const string NodeRunnerSetting = "Extensions:Runners:Node";
+    public const string PythonRunnerSetting = "Extensions:Runners:Python";
     public const string ProxySetting = "Extensions:Runners:ProxyPort";
 
     private const string ProcessValue = "process";
@@ -31,8 +36,8 @@ public sealed record PackageIsolation(
 
     /// <summary>
     /// Reads <c>Extensions:Isolation</c>, <c>process</c> or <c>inProcess</c> and <c>process</c> when unset, and
-    /// <c>Extensions:Runners:Dotnet</c> and <c>Extensions:Runners:Node</c>, each a <c>host:port</c> or <c>[ipv6]:port</c>
-    /// with a port from 1 to 65535.
+    /// <c>Extensions:Runners:Dotnet</c>, <c>Extensions:Runners:Node</c> and <c>Extensions:Runners:Python</c>, each a
+    /// <c>host:port</c> or <c>[ipv6]:port</c> with a port from 1 to 65535.
     /// <c>Extensions:Runners:ProxyPort</c> is a whole number from 0 to 65535 and defaults to <see cref="RunnerProtocol.ProxyPort"/>.
     /// Only Development allows <c>inProcess</c>, see docs/reference/extension-packages.md#loading.
     /// </summary>
@@ -49,7 +54,8 @@ public sealed record PackageIsolation(
 
         var (dotnetHost, dotnetPort) = ReadRunner(configuration, DotnetRunnerSetting);
         var (nodeHost, nodePort) = ReadRunner(configuration, NodeRunnerSetting);
-        return new PackageIsolation(inProcess, dotnetHost, dotnetPort, nodeHost, nodePort, proxyPort);
+        var (pythonHost, pythonPort) = ReadRunner(configuration, PythonRunnerSetting);
+        return new PackageIsolation(inProcess, dotnetHost, dotnetPort, nodeHost, nodePort, proxyPort, pythonHost, pythonPort);
     }
 
     /// <summary>

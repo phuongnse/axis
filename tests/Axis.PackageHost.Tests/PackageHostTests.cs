@@ -26,7 +26,6 @@ namespace Axis.PackageHost.Tests;
 [Collection(BuildTest.Collection)]
 public sealed class PackageHostTests : IAsyncLifetime
 {
-    private const string PythonId = "python-test-package";
     private const string PythonOnWindows = "The Python runner tests need python3 on the path.";
     private const string NodeProbe = "node-probe-package";
 
@@ -53,7 +52,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         _extensions.Install("1.0.0");
-        InstallPython();
+        _extensions.InstallPython();
         if (!OperatingSystem.IsWindows())
         {
             BuildTest.CopyFolder(Path.Combine(AppContext.BaseDirectory, "NodeProbePackage"), Path.Combine(_extensions.Path, NodeProbe, "1.0.0"));
@@ -174,7 +173,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task A_python_operation_runs_and_returns_typed_values_even_when_the_adapter_prints_at_import()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
 
         // The adapter prints at import, and the first line is still the ready.
         Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
@@ -205,7 +204,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task A_python_retryable_error_gives_retryable_with_the_type_name_and_no_message()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
         await connection.ReceiveAsync();
 
         var flaky = await connection.RunAsync("flaky", new JsonObject { ["a"] = "x" }, withBindings: false);
@@ -218,7 +217,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task Another_python_exception_gives_failure_with_the_type_name_and_no_message()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
         await connection.ReceiveAsync();
 
         var fail = await connection.RunAsync("fail", new JsonObject { ["a"] = "4242424242" }, withBindings: false);
@@ -233,7 +232,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task A_python_unknown_operation_or_an_unreadable_input_gives_failure_with_the_type_name(string operation, string error)
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
         await connection.ReceiveAsync();
 
         var run = await connection.RunAsync(operation, new JsonObject { ["integer"] = "not a number" }, withBindings: false);
@@ -247,7 +246,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task A_python_undeclared_secret_fails_the_run_with_its_binding_even_when_the_operation_catches_it(string mode)
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
         await connection.ReceiveAsync();
 
         var probe = await connection.RunAsync("probe", new JsonObject { ["mode"] = mode }, withBindings: true);
@@ -261,7 +260,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     public async Task A_python_request_to_a_host_that_no_url_binding_declares_fails_the_run_with_the_url_binding()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
-        using var connection = await StartAsync(PythonId, "1.0.0");
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0");
         await connection.ReceiveAsync();
 
         var probe = await connection.RunAsync("probe", new JsonObject { ["mode"] = "otherHost" }, withBindings: true);
@@ -348,22 +347,6 @@ public sealed class PackageHostTests : IAsyncLifetime
         using var next = await StartAsync(TestPackages.Id, "1.0.0");
         Assert.IsType<ReadyMessage>(await next.ReceiveAsync());
         Assert.Single(_log.StartedRunners);
-    }
-
-    /// <summary>Copies the Python test package and its dependency folder into one version folder, as a build leaves it, without pip.</summary>
-    private void InstallPython()
-    {
-        var source = Path.Combine(AppContext.BaseDirectory, "PythonPackage");
-        var target = Path.Combine(_extensions.Path, PythonId, "1.0.0");
-        foreach (var folder in new[] { "package", "dependency" })
-        {
-            foreach (var file in Directory.GetFiles(Path.Combine(source, folder), "*", SearchOption.AllDirectories))
-            {
-                var destination = Path.Combine(target, Path.GetRelativePath(Path.Combine(source, folder), file));
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                File.Copy(file, destination);
-            }
-        }
     }
 
     [Fact]
@@ -564,7 +547,7 @@ public sealed class PackageHostTests : IAsyncLifetime
         await using var host = new RunnerHost(_extensions.Path, commands, _log);
         var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
 
-        using var connection = await StartAsync(PythonId, "1.0.0", endpoint: endpoint);
+        using var connection = await StartAsync(TestPackages.PythonId, "1.0.0", endpoint: endpoint);
 
         Assert.Null(await connection.ReceiveAsync());
         Assert.Empty(_log.StartedRunners);

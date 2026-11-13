@@ -76,7 +76,7 @@ public static class ProcessesServiceCollectionExtensions
 
     /// <summary>
     /// Makes the handler that runs package operation calls send each attempt of a C# package, unless it is
-    /// <c>inProcess</c>, and each attempt of a <c>node</c> package, always, to a runner of the package host that
+    /// <c>inProcess</c>, and each attempt of a <c>node</c> or <c>python</c> package, always, to a runner of the package host that
     /// <paramref name="isolation"/> names for its runtime, see
     /// docs/reference/extension-packages.md#package-runners. Call it after <see cref="AddProcesses"/>. The runners
     /// are closed when the host stops.
