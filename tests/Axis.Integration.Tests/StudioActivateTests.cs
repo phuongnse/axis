@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 /// The activate route of the authoring API stores an <c>activate</c> request for a release of the history, and the publisher
 /// activates that release again. The server and the publisher run together here.
 /// </summary>
-public sealed class StudioRollbackTests : IAsyncLifetime
+public sealed class StudioActivateTests : IAsyncLifetime
 {
     private const string ApplicationUrl = "/api/studio/apps/PurchaseRequests";
 
@@ -24,10 +24,10 @@ public sealed class StudioRollbackTests : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _database.DisposeAsync();
 
     [Fact]
-    public async Task A_rollback_makes_the_older_release_live_again_while_instances_stay_on_their_release()
+    public async Task An_activate_makes_the_older_release_live_again_while_instances_stay_on_their_release()
     {
         using var folder = NewFolder();
-        var connectionString = await _database.CreateDatabaseAsync("studio_rollback", CancellationToken);
+        var connectionString = await _database.CreateDatabaseAsync("studio_activate", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
@@ -87,21 +87,21 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         var newInstance = await SampleAppFixture.StartAsync(requester, other);
         Assert.Equal(first, await InstanceReleaseAsync(connectionString, newInstance));
 
-        Assert.Equal(1L, await CountAuditAsync(connectionString, "release.rolledBack"));
-        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.rollbackFailed"));
+        Assert.Equal(1L, await CountAuditAsync(connectionString, "release.activated"));
+        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.activateFailed"));
         var details = JsonDocument.Parse((string)(await PostgreSqlServer.AdminScalarAsync(
-            connectionString, "SELECT details::text FROM axis.audit_records WHERE action = 'release.rolledBack'", CancellationToken))!);
+            connectionString, "SELECT details::text FROM axis.audit_records WHERE action = 'release.activated'", CancellationToken))!);
         Assert.Equal(
             (requestId.ToString("D"), first.ToString("D"), 1),
             (details.RootElement.GetProperty("requestId").GetString(), details.RootElement.GetProperty("releaseId").GetString(), details.RootElement.GetProperty("number").GetInt32()));
-        Assert.Equal("author", await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT actor FROM axis.audit_records WHERE action = 'release.rolledBack'", CancellationToken));
+        Assert.Equal("author", await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT actor FROM axis.audit_records WHERE action = 'release.activated'", CancellationToken));
     }
 
     [Fact]
-    public async Task A_rollback_that_the_activation_refuses_ends_failed_with_one_audit_record_and_keeps_the_active_release()
+    public async Task An_activate_that_the_activation_refuses_ends_failed_with_one_audit_record_and_keeps_the_active_release()
     {
         using var folder = NewFolder();
-        var connectionString = await _database.CreateDatabaseAsync("studio_rollback_refused", CancellationToken);
+        var connectionString = await _database.CreateDatabaseAsync("studio_activate_refused", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var author = factory.CreateClient().SignedInAs("author");
         await using var publisher = RunPublisher("a", HostA, connectionString);
@@ -121,15 +121,15 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var history = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         Assert.Equal(second, history.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid());
         Assert.Equal(2, history.RootElement.GetProperty("items").GetArrayLength());
-        Assert.Equal(1L, await CountAuditAsync(connectionString, "release.rollbackFailed"));
-        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.rolledBack"));
+        Assert.Equal(1L, await CountAuditAsync(connectionString, "release.activateFailed"));
+        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.activated"));
     }
 
     [Fact]
-    public async Task A_rollback_needs_the_publisher_role_and_a_release_of_the_history()
+    public async Task An_activate_needs_the_publisher_role_and_a_release_of_the_history()
     {
         using var folder = NewFolder();
-        var connectionString = await _database.CreateDatabaseAsync("studio_rollback_roles", CancellationToken);
+        var connectionString = await _database.CreateDatabaseAsync("studio_activate_roles", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var author = factory.CreateClient().SignedInAs("author");
         using var employee = factory.CreateClient().SignedInAs("employee");

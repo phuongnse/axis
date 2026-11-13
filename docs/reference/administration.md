@@ -508,7 +508,7 @@ way.
   its tenant database connection is claimed again in the next round, without waiting for the lease. A
   request that has been claimed three times and whose lease runs out again ends `failed` with
   `AXC0215`, see the [lifecycle](authoring.md#lifecycle). A `publish` gets a
-  `release.publishFailed` audit record with it, an `activate` gets a `release.rollbackFailed` one, and
+  `release.publishFailed` audit record with it, an `activate` gets a `release.activateFailed` one, and
   a `validate` and an `accept` get none.
 - **Fencing.** The `claims` count is the fencing token. Renewal and the final update change the
   request only while its status is `running` and `claims` is still the value this publisher claimed.
@@ -557,10 +557,10 @@ tenant's schema role unless it says otherwise.
    so a clean `validate` means an activation with the same input would pass its checks, apart from
    the seed. A snapshot that cannot be read fails at `validate`. The transaction holds the schema
    lock until it rolls back, so other activations of the tenant wait for it.
-6. For `activate`: the steps are `version`, `rollback`, `activate`, `seed` and `indexes`, and none of
-   them runs a contract scenario. The `rollback` step is the one that loads the stored release, and
+6. For `activate`: the steps are `version`, `load`, `activate`, `seed` and `indexes`, and none of
+   them runs a contract scenario. The `load` step is the one that loads the stored release, and
    the `activate` step is the one that activates it.
-   - The `rollback` step reads the stored release the request names and rebuilds its model from the
+   - The `load` step reads the stored release the request names and rebuilds its model from the
      stored files, as the server does when it serves a release. It reads no folder, compiles nothing
      and stores no new release. It refuses a release that pins a package version that is not
      installed under `Extensions:Path`, with `AXC0146`. A release that is missing, or that belongs to

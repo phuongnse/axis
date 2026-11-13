@@ -143,8 +143,11 @@ publisher the preview tenant's release history records.
 | ------------------------ | ----------------------- |
 | `release.published`      | A `publish` succeeded   |
 | `release.publishFailed`  | A `publish` failed      |
-| `release.rolledBack`     | An `activate` succeeded |
-| `release.rollbackFailed` | An `activate` failed    |
+| `release.activated`      | An `activate` succeeded |
+| `release.activateFailed` | An `activate` failed    |
+
+Records written before [D130](../decisions/d130-activate-a-release-replaces-roll-back.md) renamed the
+actions carry `release.rolledBack` and `release.rollbackFailed` for an `activate`, and nothing rewrites them.
 
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are null when the request
 failed before a release was known. `number` is the release's number in the
