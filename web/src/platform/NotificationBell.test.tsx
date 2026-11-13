@@ -96,10 +96,10 @@ describe('NotificationBell', () => {
     stubServer(() => json(page([withPage], 2)))
     renderBell()
 
-    const bell = await screen.findByRole('button', { name: 'Notifications, 2 unread' })
-    expect(bell).toHaveTextContent('2')
+    const bell = await screen.findByRole('button', { name: 'Notifications (2 unread)' })
+    expect(bell.closest('.ant-badge')).toHaveTextContent('2')
     expect(within(bell).queryByRole('img')).toBeNull()
-    expect(screen.getByRole('status')).toHaveTextContent('Notifications, 2 unread')
+    expect(screen.getByRole('status')).toHaveTextContent('Notifications (2 unread)')
   })
 
   it('names the bell without a count when nothing is unread', async () => {
@@ -126,7 +126,7 @@ describe('NotificationBell', () => {
     renderBell()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
 
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Note ready')).toBeInTheDocument()
@@ -149,7 +149,7 @@ describe('NotificationBell', () => {
     renderBell()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Notifications, 2 unread' }))
+    await user.click(await screen.findByRole('button', { name: 'Notifications (2 unread)' }))
     await user.click(await screen.findByRole('button', { name: 'Mark all read' }))
 
     const bell = await screen.findByRole('button', { name: 'Notifications' })
@@ -165,7 +165,7 @@ describe('NotificationBell', () => {
       renderBell()
       const user = userEvent.setup()
 
-      await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
+      await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
       await user.click(await screen.findByRole('button', { name: /Note ready/ }))
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
@@ -196,7 +196,7 @@ describe('NotificationBell', () => {
     renderBell()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
     await user.click(await screen.findByRole('button', { name: /Note ready/ }))
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
@@ -207,7 +207,7 @@ describe('NotificationBell', () => {
     renderBell()
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }))
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
     await user.click(await screen.findByTitle('2'))
 
     await waitFor(() => expect(fetchMock.mock.calls.map(([url]) => url)).toContain(`${path}?page=2&pageSize=10`))

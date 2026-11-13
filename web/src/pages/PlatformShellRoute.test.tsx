@@ -100,7 +100,7 @@ describe('PlatformShellRoute', () => {
     stubApi(user)
     renderShell()
 
-    expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Notifications (1 unread)' })).toBeInTheDocument()
   })
 
   // Proposed: the bell tells an author about their own AI requests, see the review on #3263.
@@ -108,7 +108,7 @@ describe('PlatformShellRoute', () => {
     stubApi({ ...user, users: false })
     renderShell()
 
-    expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Notifications (1 unread)' })).toBeInTheDocument()
   })
 
   it('shows no bell and never asks for notices for a visitor who is not signed in', async () => {

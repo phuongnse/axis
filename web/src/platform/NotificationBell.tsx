@@ -1,6 +1,7 @@
 import { BellOutlined } from '@ant-design/icons'
-import { Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
+import { Badge, Drawer, Flex, Pagination, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
+import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
@@ -79,7 +80,8 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   const unread = data.unreadCount
   const label = t('shell.notifications.label')
-  const named = unread > 0 ? `${label}, ${unread} ${t('shell.notifications.unread')}` : label
+  const count = unread > 0 ? `(${unread} ${t('shell.notifications.unread')})` : undefined
+  const named = count === undefined ? label : `${label} ${count}`
 
   function openPanel() {
     setMarkFailed(false)
@@ -119,21 +121,31 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   return (
     <>
-      {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-      <Button type="text" aria-label={named} aria-haspopup="dialog" onClick={openPanel}>
-        <Badge count={unread} size="small" offset={[2, -2]}>
-          <BellOutlined aria-hidden />
-        </Badge>
-      </Button>
+      {/* Proposed: the bell is an icon button as the app switcher's is, with its name as its tooltip and the count on
+          a badge, as the table's filter shows its count, see the review on #3263. */}
+      <Badge count={unread} size="small" offset={[-4, 4]}>
+        <AxisButton
+          role="icon"
+          nameKey="shell.notifications.label"
+          nameSuffix={count}
+          icon={<BellOutlined />}
+          aria-haspopup="dialog"
+          onClick={openPanel}
+        />
+      </Badge>
       <Announcement>{named}</Announcement>
       <Drawer title={label} open={open} onClose={() => setOpen(false)} size="default">
         <Flex vertical gap={spacing.md}>
           {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
           {markFailed && <AxisAlert kind="error" message={t('shell.notifications.markFailed')} />}
-          {/* oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role. */}
-          <Button disabled={unread === 0} onClick={markAllRead} style={{ alignSelf: 'flex-start' }}>
+          <AxisButton
+            role="secondary"
+            disabled={unread === 0}
+            onClick={markAllRead}
+            style={{ alignSelf: 'flex-start' }}
+          >
             {t('shell.notifications.markAllRead')}
-          </Button>
+          </AxisButton>
           {data.items.length === 0 ? (
             !failed && <Typography.Text type="secondary">{t('shell.notifications.empty')}</Typography.Text>
           ) : (
