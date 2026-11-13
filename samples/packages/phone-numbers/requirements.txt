@@ -1,0 +1,1 @@
+phonenumbers==9.0.43 --hash=sha256:349bc799f15e010e35bd2c7d28149950ae74479cb1e11fb054ed9a95ecb4b437

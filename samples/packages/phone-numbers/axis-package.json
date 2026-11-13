@@ -1,0 +1,20 @@
+{
+  "id": "phone-numbers",
+  "version": "1.0.0",
+  "label": "Phone numbers",
+  "language": "python",
+  "adapter": "adapter.py",
+  "lock": "requirements.txt",
+  "operations": [
+    {
+      "name": "normalize",
+      "type": "normalize",
+      "idempotent": true,
+      "input": [
+        { "name": "number", "type": "text", "required": true },
+        { "name": "region", "type": "text" }
+      ],
+      "output": [{ "name": "number", "type": "text", "required": true }]
+    }
+  ]
+}

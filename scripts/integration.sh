@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
 # The integration tests also run the test scenarios of every application under samples/apps/.
-# The Keycloak theme is built first, because the tests' Keycloak loads it.
+# The Keycloak theme is built first, because the tests' Keycloak loads it. The Python sample package is installed first too,
+# because the tests copy it from artifacts/extensions.
 # Before that, scripts/lib/docker-images.mjs loads the container images that setup saved in ~/.cache/axis-docker, so the
 # tests pull none that the cache holds, see docs/development.md#integration-tests. Testcontainers' cleanup helper is
 # pinned here, because it is one of those images.
@@ -76,10 +77,12 @@ fi
 
 # The integration tests' Keycloak loads the Axis theme from the test output, which copies artifacts/keycloak-theme.
 build_theme() { npm run build:keycloak-theme --prefix web; }
+install_sample_packages() { bash scripts/lib/install-sample-packages.sh; }
 
 if [ "$#" -gt 0 ]; then
   node scripts/lib/docker-images.mjs load
   build_theme
+  install_sample_packages
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "$@"
   finish_report
@@ -88,6 +91,7 @@ fi
 if affected integration; then
   node scripts/lib/docker-images.mjs load
   build_theme
+  install_sample_packages
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   if [ "$control_plane" = true ]; then
     # Build the control plane suite first, so the two dotnet test runs never build the shared projects at once.

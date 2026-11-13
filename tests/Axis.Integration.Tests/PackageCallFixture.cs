@@ -38,7 +38,10 @@ namespace Axis.Integration.Tests;
 /// title to <c>comment</c>, and <c>PythonFlaky</c> fails with a retryable error and has 2 attempts. Versions 1.0.0 and 1.1.0 of
 /// <c>test-package</c> are installed, and version 1.0.0 of the two Node.js packages, with the dependencies of
 /// <c>node-test-package</c> installed by <c>npm ci</c>, so <c>npm</c> must be on the PATH, and version 1.0.0 of
-/// <c>python-test-package</c>. The
+/// <c>python-test-package</c>. The copy also pins the sample package <c>phone-numbers</c> 1.0.0, installed from the folder
+/// <c>SamplePythonPackage</c> of the test output, which links <c>artifacts/extensions/phone-numbers/1.0.0</c>. It adds a
+/// <c>phone</c> field to <c>Request</c> and the processes <c>SamplePhoneNumber</c> and <c>SamplePhoneNumberUnparsed</c>, which run
+/// <c>phone-numbers/normalize</c> on a US number and on a text that is no number and write the result to <c>phone</c>. The
 /// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
 /// so a test runs the work items itself. A second worker has no package installed. With <c>throughPgBouncer</c>, the
 /// workers connect to the tenant database as the runtime role through <see cref="PgBouncerServer"/>, and the fixture claims
@@ -277,8 +280,32 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string PhoneNumberProcessTemplate = """
+        {
+          "id": "{id}",
+          "kind": "process",
+          "name": "{name}",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "normalize",
+          "steps": [
+            {
+              "name": "normalize",
+              "type": "operation",
+              "operation": "phone-numbers/normalize",
+              "input": { "number": "'{number}'", "region": "'US'" },
+              "output": { "number": "phone" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private static readonly ActivationBindings _bindings =
         ProcessStepFixture.PackageBindings(ProcessStepFixture.TenantId, new Uri("https://test.example.test"), allowHttp: false);
+
+    private const string SamplePhoneNumbersId = "phone-numbers";
 
     private readonly ProcessStepFixture _tenant = new();
     private readonly TemporaryFolder _packages = new TemporaryFolder().Install("1.0.0", "1.1.0").InstallPython();
@@ -332,6 +359,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         Edit("application.json", application => application["packages"] = new JsonArray(
             new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" },
             new JsonObject { ["id"] = TestPackages.PythonId, ["version"] = "1.0.0" },
+            new JsonObject { ["id"] = SamplePhoneNumbersId, ["version"] = "1.0.0" },
             new JsonObject { ["id"] = "node-probe-package", ["version"] = "1.0.0" },
             new JsonObject { ["id"] = "node-test-package", ["version"] = "1.0.0" }));
         Edit("entities/request.json", request =>
@@ -340,6 +368,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
             fields.Add(new JsonObject { ["name"] = "total", ["type"] = "integer" });
             fields.Add(new JsonObject { ["name"] = "packageVersion", ["type"] = "text" });
             fields.Add(new JsonObject { ["name"] = "greeting", ["type"] = "text" });
+            fields.Add(new JsonObject { ["name"] = "phone", ["type"] = "text" });
         });
         _application
             .With("processes/package-sum.json", SumProcess)
@@ -354,7 +383,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .With("processes/package-node-sum.json", NodeSumProcess)
             .With("processes/package-node-greet.json", NodeGreetProcess)
             .With("processes/python-greet.json", PythonGreetProcess)
-            .With("processes/python-flaky.json", PythonFlakyProcess);
+            .With("processes/python-flaky.json", PythonFlakyProcess)
+            .With("processes/sample-phone-number.json", PhoneNumberProcess("SamplePhoneNumber", "8c4e1a97-3d60-4b2f-a5e8-92f7c0d13b64", "(650) 253-0000"))
+            .With("processes/sample-phone-number-unparsed.json", PhoneNumberProcess("SamplePhoneNumberUnparsed", "e17b5d38-0a94-4c62-8f3d-6b2c9a4e7d01", "not a number"));
 
         var nodeProbe = Path.Combine(_packages.Path, "node-probe-package", "1.0.0");
         PackageBuildCommand.Copy(Path.Combine(AppContext.BaseDirectory, "NodeProbePackage"), nodeProbe);
@@ -363,6 +394,14 @@ public sealed class PackageCallFixture : IAsyncLifetime
             Path.Combine(_packages.Path, "node-test-package", "1.0.0"),
             CancellationToken.None);
         Assert.Null(installed.Failure);
+
+        var samplePhoneNumbers = Path.Combine(AppContext.BaseDirectory, "SamplePythonPackage");
+        if (!File.Exists(Path.Combine(samplePhoneNumbers, "axis-package.json")))
+        {
+            throw new InvalidOperationException("The sample package phone-numbers is not installed in artifacts/extensions. Run scripts/build.sh or scripts/integration.sh.");
+        }
+
+        PackageBuildCommand.Copy(samplePhoneNumbers, Path.Combine(_packages.Path, SamplePhoneNumbersId, "1.0.0"));
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
@@ -410,7 +449,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
     /// <summary>Runs the next due package call item.</summary>
     public Task<WorkItemOutcome?> RunCallAsync(CancellationToken cancellationToken) => RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken);
 
-    /// <summary>The folder that acts as <c>Extensions:Path</c>, with versions 1.0.0 and 1.1.0 of the test package and version 1.0.0 of the Python test package.</summary>
+    /// <summary>The folder that acts as <c>Extensions:Path</c>, with versions 1.0.0 and 1.1.0 of the test package and version 1.0.0 of the Python test package and of the sample package <c>phone-numbers</c>.</summary>
     internal string PackagesPath => _packages.Path;
 
     /// <summary>
@@ -587,6 +626,12 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .Replace("{id}", id, StringComparison.Ordinal)
             .Replace("{name}", name, StringComparison.Ordinal)
             .Replace("{operation}", operation, StringComparison.Ordinal);
+
+    private static string PhoneNumberProcess(string name, string id, string number) =>
+        PhoneNumberProcessTemplate
+            .Replace("{id}", id, StringComparison.Ordinal)
+            .Replace("{name}", name, StringComparison.Ordinal)
+            .Replace("{number}", number, StringComparison.Ordinal);
 
     private static JsonObject ManifestOperation(string name, string type, bool idempotent, string? timeout = null)
     {

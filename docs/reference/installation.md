@@ -4,7 +4,7 @@ This page says how a platform operator installs and upgrades Axis, on one machin
 and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
 and, in [upgrade](upgrade.md), the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-An installation runs four hosts, from four production images. The Compose example and the Helm chart also run two package hosts, the C# one and the Node.js one, from two more images, see [on premises](#on-premises) and [in the cloud](#in-the-cloud):
+An installation runs four hosts, from four production images. The Compose example runs a fifth, a sixth and a seventh container, the C#, the Python and the Node.js package hosts, each from its own image, and the Helm chart runs the C#, the Python and the Node.js package hosts from their own images, see [on premises](#on-premises) and [in the cloud](#in-the-cloud):
 
 | Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,10 +55,8 @@ Build an image from the repository root with `docker build --target axis-server 
   at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
   writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
   needs that root: the `host` command runs on a read-only root.
-- **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, the `node` image holds the Node.js runner in `/app/sdk/node/`, and the `python` image holds the Python runner in `/app/sdk/python/`.
-  Compose's `package-host-dotnet` and `package-host-node` and the chart's `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
-- **The Compose Python host** _(planned for M21)_. The Compose container `package-host-python`
-  runs the same way, limited as [package runners](extension-packages.md#package-runners) says.
+- **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, the `node` image holds the Node.js runner in `/app/sdk/node/` and the `python` image holds the Python runner in `/app/sdk/python/`.
+  Compose's `package-host-dotnet`, `package-host-python` and `package-host-node` and the chart's `<release>-package-host-dotnet`, `<release>-package-host-python` and `<release>-package-host-node` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
@@ -114,7 +112,7 @@ PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server w
 on that PostgreSQL server.
 
 The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
-the TLS proxy, the C# and the Node.js package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
+the TLS proxy, the C#, the Python and the Node.js package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
 under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
 client secret or key.
 
@@ -127,14 +125,14 @@ client secret or key.
   than the five-minute lease, so a stop lets the running request finish.
 - **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
   `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
-- **The package hosts** are `package-host-dotnet` and `package-host-node`. They run the `axis-package-host-dotnet` and `axis-package-host-node`
-  images with the command `host`, and run the C# and the `node` package operations of the worker, see [package runners](extension-packages.md#package-runners).
+- **The package hosts** are `package-host-dotnet`, `package-host-python` and `package-host-node`. They run the `axis-package-host-dotnet`, `axis-package-host-python` and `axis-package-host-node`
+  images with the command `host`, and run the C#, the `python` and the `node` package operations of the worker, see [package runners](extension-packages.md#package-runners).
   Each has a read-only root file system apart from a `/tmp` tmpfs, no environment, secret or published port, and `/extensions` read-only and
-  nothing else. Its limits are 1 CPU and 1g of memory. `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change those of the C# host and `AXIS_PACKAGE_HOST_NODE_CPUS` and `AXIS_PACKAGE_HOST_NODE_MEMORY` those of the Node.js host.
-  A host sits only on the internal network `runners`, which no other service but the worker shares, so only the worker reaches its port 5310, which
+  nothing else. Its limits are 1 CPU and 1g of memory. `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change those of the C# host, `AXIS_PACKAGE_HOST_PYTHON_CPUS` and `AXIS_PACKAGE_HOST_PYTHON_MEMORY` those of the Python host, and `AXIS_PACKAGE_HOST_NODE_CPUS` and `AXIS_PACKAGE_HOST_NODE_MEMORY` those of the Node.js host.
+  A host sits only on the internal network `runners`, which no other service but the worker and the other package hosts share, so only the worker reaches its port 5310, which
   does not authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
-  `package-host-dotnet:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
-- **The images.** Set `AXIS_VERSION` to the tag of the six images. `AXIS_IMAGE_PREFIX` adds a
+  `package-host-dotnet:5310`, `Extensions__Runners__Python` to `package-host-python:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
+- **The images.** Set `AXIS_VERSION` to the tag of the seven images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
 The diagram shows the services of the example and the PostgreSQL server that they connect to. The
@@ -153,7 +151,7 @@ flowchart LR
         worker["worker"]
         agent["agent"]
         publisher["publisher"]
-        packagehost["package-host-dotnet, package-host-node"]
+        packagehost["package-host-dotnet, package-host-python, package-host-node"]
         admin["admin, only when asked"]
     end
     subgraph pg ["PostgreSQL, runs elsewhere"]
@@ -334,8 +332,8 @@ Install in this order:
    with code 0.
 3. Start the identity provider and the proxy with `docker compose up -d identity proxy`, and wait until
    `https://<AXIS_IDENTITY_HOST>/realms/master/.well-known/openid-configuration` answers `200`. Then
-   start the server, the worker, the agent host and the package hosts with
-   `docker compose up -d server worker agent package-host-dotnet package-host-node`, and
+   start the server, the worker, the agent host and the three package hosts with
+   `docker compose up -d server worker agent package-host-dotnet package-host-python package-host-node`, and
    wait until `/health/ready` answers `200` on the server and the worker, because the server creates the `platform` tables at start
    and `tenant create` needs them. Then start the publisher with `docker compose up -d publisher`. It
    exits with code 1 until the server has created those tables, so start it only after
@@ -406,7 +404,7 @@ configured like `server`.
   headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
   `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
   `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
-- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the two package hosts
+- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the three package hosts
   join it, and the worker also stays on the default network. It has no fixed subnet.
 - **The address range.** Docker hands out addresses without a fixed one only from
   `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
@@ -431,7 +429,7 @@ configured like `server`.
 
 Two kinds of test keep the example as this section describes it.
 
-- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the six
+- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the seven
   production images and installs the example in the order above, against a test PostgreSQL over TLS
   and the example's own identity provider, with a certificate authority that it makes for the run. Its
   additions, such as the scenario role and the modules from `artifacts/modules`, sit in an override
@@ -441,7 +439,7 @@ Two kinds of test keep the example as this section describes it.
   answers `503` while the other serves, that the installed publisher runs a publish request of each
   tenant to `succeeded`, that a session works on both replicas and survives a restart, that the
   proxy's TLS versions and ciphers are the ones of [TLS](#tls), and that a Studio save on one replica
-  is read on the other and a stale save there answers `409`. It checks each running package host: its root refuses a write
+  is read on the other and a stale save there answers `409`. It checks each running package host, the C#, the Python and the Node.js one: its root refuses a write
   and `/tmp` takes one, its limits are set, its environment is the one of its image, it reaches the worker but not the
   proxy, PostgreSQL or an outside address, and the worker reaches it on 5310. It runs no `test` request against the
   installed images.
@@ -450,7 +448,7 @@ Two kinds of test keep the example as this section describes it.
   `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
   that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
   published port of both servers is on `127.0.0.1`, that each package host has a read-only root, its limits, no environment,
-  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker, and that the Caddyfile and the Kestrel settings
+  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker and the other package hosts, and that the Caddyfile and the Kestrel settings
   match [what the Compose example sets](#tls).
 
 ## In the cloud
@@ -668,7 +666,7 @@ values schema rejects any field in a reference other than `name` and `key`.
 | Server | `platformConnection`, `platformSchemaConnection` and `platformSecretKey`, and `serverCertificate` read-only at `/server-tls`, which no other pod mounts |
 | Worker | `platformConnection` and `platformSecretKey` |
 | Agent host | `platformConnection` and `platformSecretKey`, and no other secret |
-| C# and Node.js package hosts | None, and no env entry |
+| C#, Node.js and Python package hosts | None, and no env entry |
 | Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
 | Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set, and `platformConnection` when `studio.folders` is set. In a cell also `platformConnection`, `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |

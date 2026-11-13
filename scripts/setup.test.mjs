@@ -7,7 +7,7 @@ import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { listedImages } from './lib/docker-images.mjs'
 
-// Runs scripts/setup.sh with dotnet, npm and npx replaced by stubs. The stubs fail the first
+// Runs scripts/setup.sh with dotnet, npm, npx and python3 replaced by stubs. The stubs fail the first
 // STUB_FAIL_TIMES calls of each command line. STUB_HANG names one command line whose first call
 // sleeps past the step limit. The home cache is filled in, so no tool downloads.
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -99,7 +99,7 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = fal
     const home = join(dir, 'home')
     mkdirSync(bin)
     mkdirSync(counts)
-    for (const name of ['dotnet', 'npm', 'npx']) {
+    for (const name of ['dotnet', 'npm', 'npx', 'python3']) {
       writeFileSync(join(bin, name), stub, { mode: 0o755 })
     }
 
@@ -135,13 +135,21 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false, savedImages = fal
         STUB_HANG: hang,
       },
     })
-    const ran = existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : []
+    const all = existsSync(log) ? readFileSync(log, 'utf8').trimEnd().split('\n') : []
+    // The wheel downloads have tests of their own, so ran keeps the other tools' lines.
+    const ran = all.filter((line) => !line.startsWith('python3 '))
+    const wheels = all.filter((line) => line.startsWith('python3 '))
     const docker = existsSync(dockerLog) ? readFileSync(dockerLog, 'utf8').trimEnd().split('\n') : []
-    return { ...result, ran, docker }
+    return { ...result, ran, wheels, docker }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 }
+
+// One requirements file for each Python sample package, whose wheel setup fetches.
+const requirementsFiles = readdirSync(join(root, 'samples/packages')).filter((name) =>
+  existsSync(join(root, 'samples/packages', name, 'requirements.txt')),
+)
 
 describe('scripts/setup.sh retries its network steps', () => {
   test('each step that fails once succeeds on its second try', () => {
@@ -175,6 +183,29 @@ describe('scripts/setup.sh retries its network steps', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(result.ran, commands)
     assert.doesNotMatch(result.stderr, /Attempt/)
+  })
+
+  test('setup fetches the wheel of each Python sample package once, offline, when the cache holds it', () => {
+    const result = runSetup()
+    assert.equal(result.status, 0, result.stderr)
+    assert.ok(requirementsFiles.length > 0)
+    assert.equal(result.wheels.length, requirementsFiles.length)
+    for (const [index, name] of requirementsFiles.entries()) {
+      assert.match(result.wheels[index], /^python3 -m pip download --require-hashes --no-deps --only-binary=:all: /)
+      assert.match(result.wheels[index], / --no-index --find-links \S+\/\.cache\/axis-tools\/wheels /)
+      assert.match(result.wheels[index], new RegExp(` -r samples/packages/${name}/requirements\\.txt$`))
+    }
+  })
+
+  test('setup downloads the wheel with retries when the cache lacks it', () => {
+    const result = runSetup({ failTimes: 1 })
+    assert.equal(result.status, 0, result.stderr)
+    const offline = result.wheels.filter((line) => line.includes(' --no-index '))
+    const online = result.wheels.filter((line) => !line.includes(' --no-index '))
+    assert.equal(offline.length, requirementsFiles.length)
+    assert.equal(online.length, requirementsFiles.length * 2)
+    assert.match(online[0], / --timeout 30 /)
+    assert.match(result.stderr, /Attempt 1 of 4 failed with status 1: python3 -m pip download /)
   })
 
   test('on CI setup runs the same steps as elsewhere', () => {

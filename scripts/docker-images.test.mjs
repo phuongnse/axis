@@ -315,7 +315,7 @@ describe('findImageReferences', () => {
 })
 
 describe('scripts/integration.sh with arguments', () => {
-  // Runs the script in a temporary copy, with docker, dotnet and npm replaced by stubs that log to one file. Docker
+  // Runs the script in a temporary copy, with docker, dotnet, npm and python3 replaced by stubs that log to one file. Docker
   // lacks every image until `docker load` runs.
   function runIntegration() {
     const dir = mkdtempSync(path.join(tmpdir(), 'axis-integration-'))
@@ -326,6 +326,9 @@ describe('scripts/integration.sh with arguments', () => {
         'scripts/lib/docker-images.mjs',
         'scripts/lib/docker-build.mjs',
         'scripts/lib/affected.mjs',
+        'scripts/lib/install-sample-packages.sh',
+        'scripts/lib/python-wheels.sh',
+        'scripts/lib/retry.sh',
         'scripts/docker-images.json',
         'scripts/test-report.mjs',
         '.nexkit/config.json',
@@ -335,6 +338,9 @@ describe('scripts/integration.sh with arguments', () => {
       }
       mkdirSync(path.join(dir, 'samples/apps/x'), { recursive: true })
       writeFileSync(path.join(dir, 'samples/apps/x/application.json'), '{"name":"x"}')
+      mkdirSync(path.join(dir, 'samples/packages/p'), { recursive: true })
+      writeFileSync(path.join(dir, 'samples/packages/p/axis-package.json'), '{"id":"p","version":"1.0.0","language":"python"}')
+      writeFileSync(path.join(dir, 'samples/packages/p/requirements.txt'), 'x==1 --hash=sha256:aa\n')
       const cache = path.join(dir, 'cache')
       mkdirSync(cache)
       writeFileSync(path.join(cache, 'images.tar'), 'archive')
@@ -348,13 +354,14 @@ describe('scripts/integration.sh with arguments', () => {
         `if [ "$1" = load ]; then touch "${dir}/loaded"; fi\nif [ "$1 $2" = "image inspect" ] && [ ! -e "${dir}/loaded" ]; then exit 1; fi\nexit 0\n`,
       )
       stub('npm', 'exit 0\n')
+      stub('python3', 'exit 0\n')
       stub(
         'dotnet',
         `while [ $# -gt 0 ]; do if [ "$1" = --results-directory ]; then dir="$2"; fi; shift; done
 echo '<testsuites><testsuite name="s" tests="1"><testcase name="t" time="0"/></testsuite></testsuites>' > "$dir/Axis.Integration.Tests.xml"\n`,
       )
 
-      const env = { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, AXIS_DOCKER_CACHE_DIR: cache }
+      const env = { ...process.env, PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`, HOME: dir, AXIS_DOCKER_CACHE_DIR: cache }
       for (const name of ['NODE_TEST_CONTEXT', 'NEXKIT_BASE_SHA', 'NEXKIT_CHECK_VERIFIED_SHA', 'GITHUB_ACTIONS', 'GITHUB_STEP_SUMMARY', 'AXIS_TEST_RESULTS_DIR', 'AXIS_INTEGRATION_SHARD', 'NEXKIT_SHARD']) {
         delete env[name]
       }
@@ -365,6 +372,17 @@ echo '<testsuites><testsuite name="s" tests="1"><testcase name="t" time="0"/></t
       rmSync(dir, { recursive: true, force: true })
     }
   }
+
+  test('installs the Python sample packages after the theme build and before dotnet test', () => {
+    const run = runIntegration()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const theme = run.calls.findIndex((call) => call.startsWith('npm run build:keycloak-theme'))
+    const install = run.calls.findIndex((call) => call.startsWith('python3 -m pip install '))
+    const test = run.calls.findIndex((call) => call.startsWith('dotnet test '))
+    assert.ok(install > theme, run.calls.join('\n'))
+    assert.ok(test > install, run.calls.join('\n'))
+  })
 
   test('loads the saved images before the theme build and dotnet test, and pulls no image', () => {
     const run = runIntegration()

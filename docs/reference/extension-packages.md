@@ -218,11 +218,9 @@ every host reads. An installation's package is trusted code that the operator re
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-- **The package hosts.** The Compose example's containers `package-host-dotnet` and `package-host-node` and the Helm chart's pods
-  `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python` mount the same folder read-only, and
+- **The package hosts.** The Compose example's containers `package-host-dotnet`, `package-host-python` and `package-host-node` and the Helm chart's pods
+  `<release>-package-host-dotnet`, `<release>-package-host-python` and `<release>-package-host-node` mount the same folder read-only, and
   each runner runs the packages of its language, see [Package runners](#package-runners).
-- **The Compose Python host** _(planned for M21)_. The Compose container `package-host-python` does the same
-  for Python.
 - **The Python host image.** The image `axis-package-host-python` holds the Python runner, see
   [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
@@ -457,7 +455,7 @@ package reaches nothing of the host and no binding of another call.
 - **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
-- **The hosts in Compose.** The Compose example runs `package-host-dotnet` and `package-host-node` on an internal network `runners` that only they and
+- **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
   the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
 - **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
@@ -726,8 +724,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ## Sample and test packages
 
-One sample package shows a package in use, and five test packages cover installation, loading, the
-capability limits, the server's metadata-only load and the Node.js runner.
+Two sample packages show a package in use, a C# one and a Python one, and five test packages cover
+installation, loading, the capability limits, the server's metadata-only load and the Node.js runner.
 
 - **Sample package.** `samples/packages/` holds one C# package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
@@ -739,6 +737,20 @@ capability limits, the server's metadata-only load and the Node.js runner.
   test package. The package project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
   `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
   `/extensions`. In every run mode `Extensions:Path` names that folder.
+- **Python sample package.** `samples/packages/phone-numbers/` holds `phone-numbers` 1.0.0 as plain
+  files. Its adapter wraps the PyPI library `phonenumbers` and leaves it unchanged. Its one
+  operation, `normalize`, is pure and has no capabilities. It takes a `number` and an optional
+  `region` and returns the `number` in E.164 form, such as `+16502530000`. A national number such as
+  `(650) 253-0000` needs a `region` such as `US`. A text that is no number fails the call with
+  `phonenumbers.phonenumberutil.NumberParseException` and no message, see [the runner protocol](#the-runner-protocol).
+  Its `requirements.txt` pins one `phonenumbers` wheel with its SHA-256 hash.
+  `scripts/setup.sh` downloads that wheel into `~/.cache/axis-tools/wheels`, checked against the hash, and
+  `scripts/build.sh` and `scripts/integration.sh` install the package offline from there into
+  `artifacts/extensions/phone-numbers/1.0.0/` with the library beside the adapter, using the pip flags of the
+  [build](#building-a-package). They skip the scan that the build runs, as the project build of the C#
+  sample does, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `adapter.py` and
+  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host
+  yet. The integration tests run it from a process step through a Python package host.
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation

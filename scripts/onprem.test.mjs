@@ -1,11 +1,11 @@
-// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the six
+// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the seven
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and the example's own identity provider, creates two tenants and their realms there, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica, signs requester in
 // through the TLS proxy on the Axis theme, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
-// reads it back through the other, and checks that a stale save answers 409. It checks each package host's read-only root, limits, environment
+// reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C#, Python and Node.js) read-only root, limits, environment
 // and network: it reaches the worker only, and the worker reaches it on 5310. Each start of a service that publishes a port picks that
 // port right before it, and Docker's bind error starts it again on new ports. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
@@ -46,13 +46,14 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
 const scenariosFile = join(root, 'deploy/compose/compose.scenarios.yaml')
 const timeout = 30 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-node']
+const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-python', 'axis-package-host-node']
 const identityHost = 'id.axis.test'
 const identityAuthority = `https://${identityHost}/realms/axis`
 const passThrough = ['AXIS_OIDC_CLIENT_SECRET']
 // The package hosts of the example: the image of each service and the worker setting that points at it.
 const packageHosts = {
   'package-host-dotnet': { image: 'axis-package-host-dotnet', setting: 'Extensions__Runners__Dotnet' },
+  'package-host-python': { image: 'axis-package-host-python', setting: 'Extensions__Runners__Python' },
   'package-host-node': { image: 'axis-package-host-node', setting: 'Extensions__Runners__Node' },
 }
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
@@ -65,6 +66,7 @@ const secretFiles = {
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   agent: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   'package-host-dotnet': [],
+  'package-host-python': [],
   'package-host-node': [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
@@ -130,7 +132,7 @@ describe('the example holds no secret', () => {
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
     const config = render()
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'package-host-dotnet', 'package-host-node', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -453,7 +455,7 @@ describe('the package hosts', () => {
       assert.equal(services.worker.environment[host.setting], `${name}:5310`, `${host.setting}`)
     }
     const members = Object.keys(services).filter((name) => Object.hasOwn(services[name].networks ?? {}, 'runners'))
-    assert.deepEqual(members.sort(), ['package-host-dotnet', 'package-host-node', 'worker'])
+    assert.deepEqual(members.sort(), ['package-host-dotnet', 'package-host-node', 'package-host-python', 'worker'])
     assert.ok(Object.hasOwn(services.worker.networks, 'default'), 'the worker left the default network')
   })
 })
@@ -527,7 +529,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -674,7 +676,7 @@ describe('the on-premises installation', () => {
       const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
       assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
 
-      // Step 1, the images. scripts/smoke.sh built the six targets with the version that compose.yaml requires.
+      // Step 1, the images. scripts/smoke.sh built the seven targets with the version that compose.yaml requires.
       version = smokeImages(targets)
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
@@ -912,7 +914,7 @@ describe('the on-premises installation', () => {
       assert.equal(migrate.status, 0, `migrate\n${migrate.stdout}${migrate.stderr}`)
 
       // Step 3, start the server, the worker, the agent host and the package hosts, and wait until the server is ready.
-      await up(['server', 'worker', 'agent', 'package-host-dotnet', 'package-host-node'], async () => {
+      await up(['server', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python'], async () => {
         serverPort = await freePort()
         workerPort = await freePort()
         agentPort = await freePort()
