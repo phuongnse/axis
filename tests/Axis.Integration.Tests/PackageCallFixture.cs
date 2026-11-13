@@ -222,13 +222,16 @@ public sealed class PackageCallFixture : IAsyncLifetime
             _application.With(Path.GetRelativePath(_appFolder, file), await File.ReadAllTextAsync(file));
         }
 
-        _packages.EditManifest("1.0.0", manifest =>
+        foreach (var version in new[] { "1.0.0", "1.1.0" })
         {
-            var operations = manifest["operations"]!.AsArray();
-            operations.Add(ManifestOperation("slowIdempotent", "TestPackage.SlowOperation", true, "PT1S"));
-            operations.Add(ManifestOperation("exit", "TestPackage.ExitOperation", false));
-            operations.Add(ManifestOperation("exitIdempotent", "TestPackage.ExitOperation", true));
-        });
+            _packages.EditManifest(version, manifest =>
+            {
+                var operations = manifest["operations"]!.AsArray();
+                operations.Add(ManifestOperation("slowIdempotent", "TestPackage.SlowOperation", true, "PT1S"));
+                operations.Add(ManifestOperation("exit", "TestPackage.ExitOperation", false));
+                operations.Add(ManifestOperation("exitIdempotent", "TestPackage.ExitOperation", true));
+            });
+        }
 
         Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" }));
         Edit("entities/request.json", request =>
