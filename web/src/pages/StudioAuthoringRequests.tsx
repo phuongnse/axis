@@ -198,7 +198,6 @@ export function StudioAuthoringRequestPage({
   requestId,
   userId,
   resources,
-  onChanged,
   onOpen,
 }: {
   application: string
@@ -206,8 +205,6 @@ export function StudioAuthoringRequestPage({
   userId: string | null
   /** The application's resources, which name the files of the draft's diff. */
   resources: StudioResourceItem[]
-  /** Runs when the request's state changes, so the request panel shows what waits now. */
-  onChanged: () => void
   /** Opens a resource at a path, from a problem or a failed scenario of the checks. */
   onOpen: (resourceId: string, path: string) => void
 }) {
@@ -268,7 +265,6 @@ export function StudioAuthoringRequestPage({
       setAccepting({ id: requestId, accept: next })
       const reread = await fetchAuthoringRequest(application, requestId, signal)
       setLoaded({ id: requestId, request: reread })
-      onChanged()
     },
     onError: (error) => {
       if (error instanceof ServerUnreachableError) {
@@ -305,7 +301,6 @@ export function StudioAuthoringRequestPage({
     onAnswer: (next) => setLoaded({ id: requestId, request: next }),
     onEnd: (next) => {
       setLoaded({ id: requestId, request: next })
-      onChanged()
     },
     onError: (error) => {
       if (error instanceof ServerUnreachableError) {
@@ -337,7 +332,6 @@ export function StudioAuthoringRequestPage({
       const next = await actOnAuthoringRequest(application, request.id, action, comment)
       setLoaded({ id: requestId, request: { ...request, ...next } })
       setAccepting(undefined)
-      onChanged()
       setFollow((value) => value + 1)
       setChangeOpen(false)
       setDropOpen(false)

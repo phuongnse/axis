@@ -2,6 +2,7 @@ import type {
   StudioApplication,
   StudioAuthoringRequest,
   StudioAuthoringRequestDetail,
+  StudioAiConnection,
   StudioAuthoringRequestList,
   StudioAuthoringRequestStep,
   StudioLiveChange,
@@ -816,7 +817,7 @@ const reviews: Record<string, string[]> = {
 
 const failures: Record<string, string> = {
   [aiRequests[4].id]:
-    "The checks still failed after 3 fix rounds: the purchasing system did not answer at its test address. Ask your administrator for the connector's test address, then send the request again.",
+    "Anthropic refused the request: the workspace's Anthropic account has no credit left. Your administrator adds credit in the Anthropic Console, then you send the request again.",
 }
 
 // The accepts the preview asked for, each running for two seconds. The email request meets a conflict the first time.
@@ -998,8 +999,12 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
   }
 }
 
-/** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
-function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, FixtureRoute> {
+/** The routes of the open application with Ask AI on, its requests, whether it allows auto-accept and whether AI is connected. */
+function askAiRoutes(
+  list: StudioAuthoringRequestList,
+  autoAccept: boolean,
+  connected = true,
+): Record<string, FixtureRoute> {
   const all = () => [...sentRequests.map((item) => item.request), ...list.items]
   const one = (id: string) => (): unknown => {
     const request = all().find((item) => item.id === id)
@@ -1019,9 +1024,10 @@ function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Rec
     ...workspaceRoutes(typicalFolder),
     ...noticeRoutes(() => all().map(asNow)),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
+    '/api/studio/ai': () => ({ connected, canConnect: true }) satisfies StudioAiConnection,
     [`${folderPath}/authoring-requests`]: (init) => {
       if (init?.method !== 'POST') {
-        return { items: all().map(asNow), left: list.left } satisfies StudioAuthoringRequestList
+        return { items: all().map(asNow) } satisfies StudioAuthoringRequestList
       }
       const body = JSON.parse(String(init.body)) as { text: string; autoAccept?: boolean }
       const request = {
@@ -1073,7 +1079,8 @@ export const studioFixtures = {
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
-  askAi: askAiRoutes({ items: aiRequests, left: 12 }, true),
-  askAiFirst: askAiRoutes({ items: [], left: null }, false),
-  askAiNoneLeft: askAiRoutes({ items: aiRequests.slice(0, 3), left: 0 }, false),
+  askAi: askAiRoutes({ items: aiRequests }, true),
+  askAiFirst: askAiRoutes({ items: [] }, false),
+  // Proposed: a tenant that has not connected its AI, seen by an administrator, see the review on #3263.
+  askAiNotConnected: askAiRoutes({ items: [] }, false, false),
 } satisfies Record<string, Record<string, FixtureRoute>>

@@ -1699,10 +1699,28 @@ export interface StudioAuthoringRequest {
  */
 export interface StudioAuthoringRequestList {
   items: StudioAuthoringRequest[]
-  left: number | null
 }
 
-/** Lists the newest requests of an application, newest first, with the requests left this month. */
+/**
+ * Proposed: whether the tenant has connected its own AI, which every request uses, and whether the reader may connect
+ * it, see the review on #3263. Axis counts no requests: the provider's own limits answer as a failure.
+ */
+export interface StudioAiConnection {
+  connected: boolean
+  /** Whether the reader may set the connection: a tenant administrator. */
+  canConnect: boolean
+}
+
+/** Proposed: loads the tenant's AI connection, see {@link StudioAiConnection}. */
+export async function fetchAiConnection(signal?: AbortSignal): Promise<StudioAiConnection> {
+  const response = await studioFetch('/api/studio/ai', { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '/api/studio/ai' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioAiConnection
+}
+
+/** Lists the newest requests of an application, newest first. */
 export async function fetchAuthoringRequests(
   application: string,
   signal?: AbortSignal,
@@ -1715,7 +1733,7 @@ export async function fetchAuthoringRequests(
   return (await response.json()) as StudioAuthoringRequestList
 }
 
-/** Sends a request, which starts in `planning`. A quota refusal throws a {@link QuotaRefusedError}. */
+/** Sends a request, which starts in `planning`. Proposed: no quota counts requests, see the review on #3263. */
 export async function sendAuthoringRequest(
   application: string,
   text: string,
@@ -1727,10 +1745,6 @@ export async function sendAuthoringRequest(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(autoAccept ? { text, autoAccept } : { text }),
   })
-  const title = await quotaRefusalTitle(response)
-  if (title !== null) {
-    throw new QuotaRefusedError(title)
-  }
   if (!response.ok) {
     throw new Error(`Sending '${path}' failed with status ${response.status}.`)
   }

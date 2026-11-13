@@ -296,7 +296,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       [
         { caption: 'Ask AI', fixtures: studioFixtures.askAi },
         { caption: 'Ask AI, first request', fixtures: studioFixtures.askAiFirst },
-        { caption: 'Ask AI, none left', fixtures: studioFixtures.askAiNoneLeft },
+        { caption: 'Ask AI, not connected', fixtures: studioFixtures.askAiNotConnected },
       ].map((state) => ({
         ...state,
         entry: `/studio?app=${application}`,

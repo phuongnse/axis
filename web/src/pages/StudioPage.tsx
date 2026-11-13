@@ -270,7 +270,6 @@ function StudioWorkspace() {
   const [userId, setUserId] = useState<string | null>(null)
   const [requestBusy, setRequestBusy] = useState(false)
   // Proposed: counts the changes to the AI requests, so the request panel shows what waits now.
-  const [requestsRevision, setRequestsRevision] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -589,11 +588,7 @@ function StudioWorkspace() {
             }
             sidePanel={
               sidePanel === 'askAi' ? (
-                <StudioAskAi
-                  application={application!}
-                  revision={requestsRevision}
-                  onClose={() => setSidePanel(null)}
-                />
+                <StudioAskAi application={application!} onClose={() => setSidePanel(null)} />
               ) : (
                 sidePanel === 'problems' && (
                   <StudioProblems
@@ -645,7 +640,6 @@ function StudioWorkspace() {
                     requestId={params.get('request')!}
                     userId={userId}
                     resources={resources}
-                    onChanged={() => setRequestsRevision((value) => value + 1)}
                     onOpen={selectDiagnostic}
                   />
                 ) : (
