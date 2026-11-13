@@ -2098,6 +2098,7 @@
   "shell.studio.ai.notConnected": "Connect your AI to ask for changes",
   "shell.studio.ai.notConnected.help": "AI here runs on your own AI account, such as Claude. Your account pays for what you ask, and your provider shows what you used.",
   "shell.studio.ai.connect": "Connect your AI",
+  "shell.studio.ai.notConnected.app": "Already pay for an AI app such as Claude Code? It can work on your applications with your own subscription: give it the address below.",
   "shell.studio.ai.listFailed": "The requests did not load.",
   "shell.studio.ai.someone": "a former user",
   "shell.studio.ai.state.planning": "Writing a plan",

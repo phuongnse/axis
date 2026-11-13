@@ -33,7 +33,8 @@ const maxText = 4000
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept.
  * Axis counts no requests: each author's own AI account, such as Claude, runs the requests they send, and its
  * provider's limits answer as a request's failure. Until the author has connected theirs, the panel says so in place of the form, with a
- * link to their account page. A sent request opens its page, where its plan shows
+ * link to their account page, and a sentence that an AI app they already pay for, such as Claude Code, can work through
+ * the MCP address under it. A sent request opens its page, where its plan shows
  * when AI has written it, and the panel stays open and empty for the next one. Under a line comes the MCP server's
  * address on the tenant's host, with a copy button, for an AI app of the author's own. The panel lists no requests:
  * the sidebar leads to AI requests, and the notification bell tells the author when one waits for them or ends. The
@@ -99,6 +100,11 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
               {t('shell.studio.ai.notConnected.help')}
             </Typography.Text>
             <Link to={aiSettingsAddress}>{t('shell.studio.ai.connect')}</Link>
+            {/* Proposed: a person with an AI app's subscription uses it through the MCP server instead, as Axis's own
+                agent takes an API key only, see the review on #3263. */}
+            <Typography.Text style={{ color: colour.textMuted, marginTop: spacing.xs }}>
+              {t('shell.studio.ai.notConnected.app')}
+            </Typography.Text>
           </Flex>
         ) : (
           <Form

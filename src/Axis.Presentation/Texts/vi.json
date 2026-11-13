@@ -2098,6 +2098,7 @@
   "shell.studio.ai.notConnected": "Kết nối AI của bạn để nhờ thay đổi",
   "shell.studio.ai.notConnected.help": "AI ở đây chạy bằng tài khoản AI của chính bạn, ví dụ Claude. Tài khoản của bạn trả cho những gì bạn nhờ, và nhà cung cấp cho bạn xem mức đã dùng.",
   "shell.studio.ai.connect": "Kết nối AI của bạn",
+  "shell.studio.ai.notConnected.app": "Bạn đã trả phí cho một app AI như Claude Code? App đó có thể làm việc trên ứng dụng của bạn bằng gói của chính bạn: hãy đưa cho nó địa chỉ bên dưới.",
   "shell.studio.ai.listFailed": "Không tải được các yêu cầu.",
   "shell.studio.ai.someone": "một người dùng cũ",
   "shell.studio.ai.state.planning": "Đang lập kế hoạch",
