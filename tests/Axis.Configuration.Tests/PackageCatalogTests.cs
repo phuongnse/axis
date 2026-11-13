@@ -26,7 +26,7 @@ public sealed class PackageCatalogTests
         Assert.Equal(["describe", "sum", "fail", "flaky", "slow", "probe"], package.Manifest.Operations.Select(operation => operation.Name));
         Assert.Equal(PackageLanguage.CSharp, package.Manifest.Language);
         Assert.Equal("packages.lock.json", package.Manifest.Lock);
-        Assert.Equal("test-package/1.0.0", package.LoadContext!.Name);
+        Assert.Equal("test-package/1.0.0", package.LoadContext?.Name);
     }
 
     [Fact]
@@ -312,13 +312,14 @@ public sealed class PackageCatalogTests
         using var root = new TemporaryFolder().Install("1.0.0");
 
         var package = Assert.Single(PackageCatalog.Load(root.Path).Packages);
+        var loadContext = Assert.IsType<PackageLoadContext>(package.LoadContext);
         var operation = package.CreateOperation("describe");
 
         var operationType = operation.GetType();
-        Assert.Same(package.LoadContext, AssemblyLoadContext.GetLoadContext(operationType.Assembly));
+        Assert.Same(loadContext, AssemblyLoadContext.GetLoadContext(operationType.Assembly));
         Assert.Same(typeof(IOperation), operationType.GetInterfaces().Single());
-        Assert.Equal(["Axis.TestPackage"], package.LoadContext!.Assemblies.Select(assembly => assembly.GetName().Name));
-        Assert.ThrowsAny<FileNotFoundException>(() => package.LoadContext!.LoadFromAssemblyName(new AssemblyName("Axis.Core")));
+        Assert.Equal(["Axis.TestPackage"], loadContext.Assemblies.Select(assembly => assembly.GetName().Name));
+        Assert.ThrowsAny<FileNotFoundException>(() => loadContext.LoadFromAssemblyName(new AssemblyName("Axis.Core")));
     }
 
     [Fact]

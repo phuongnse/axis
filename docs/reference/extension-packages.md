@@ -323,14 +323,19 @@ that its release was compiled against.
 
 ## Loading
 
-Each host loads the installed C# packages into its own process at startup and checks every manifest.
+Each host checks every installed manifest at startup. The worker loads the installed C# packages into
+its own process, and the server reads only their metadata.
 
-- **Development only** _(planned for M21)_. In-process loading is used only in Development.
-  Elsewhere the worker loads no package code and the server only reads its metadata, see
+- **The server runs no package code.** For a C# package, the server reads the assembly through a
+  metadata-only load context, to run the manifest checks and to compile against the package. It
+  finds assemblies by the rules of the shared contracts below. It runs no static constructor, module
+  initializer or other package code, and it keeps no load context that can run the package.
+- **Development only** _(planned for M21)_. In-process loading in the worker is used only in
+  Development. Elsewhere the worker loads no package code, see
   [Package runners](#package-runners).
 - **Node and Python.** A host reads only the manifest of a `node` or `python` package and checks that
   its `adapter` file exists. It loads none of the package's code.
-- **Own load context.** Each C# package version loads in its own
+- **Own load context.** In the worker, each C# package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
 - **Shared contracts.** The load context of a C# package shares only
@@ -450,9 +455,6 @@ package reaches nothing of the host and no binding of another call.
   [package call outcomes](process-execution.md#package-call-outcomes).
 - **Crash.** A runner that exits during an attempt gives an unknown outcome
   too. It is retried only when the operation declares `idempotent: true`.
-- **The server.** The server never executes package code. For a C# package
-  it reads the assembly through a metadata-only load context to run the
-  [manifest checks](#loading).
 - **`Extensions:Isolation`.** A server and worker setting. `process`, the
   default, uses the runners. `inProcess` keeps the in-process
   [loading](#loading), and is allowed only in Development. Elsewhere the host
@@ -630,8 +632,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ## Sample and test packages
 
-One sample package shows a package in use, and one test package covers installation, loading and the
-capability limits.
+One sample package shows a package in use, and four test packages cover installation, loading, the
+capability limits and the server's metadata-only load.
 
 - **Sample package.** `samples/packages/` holds one C# package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
@@ -649,6 +651,10 @@ capability limits.
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
   it does not declare.
+- **Initializer package.** A test-only package, `initializer-package` 1.0.0, lives under
+  `tests/packages/`. Its module initializer and its operation's static constructor each write a
+  marker file beside the assembly, so a test can tell whether a host ran the package's code. The
+  server must leave no marker, see [Loading](#loading).
 - **Node.js test package.** A test-only `node` package, `node-test-package`, lives under
   `tests/packages/node-test-package/`. Its adapter is TypeScript, `index.ts`, with its compiled
   `index.js` committed. Its one dependency, `axis-test-dependency`, installs from the committed tarball

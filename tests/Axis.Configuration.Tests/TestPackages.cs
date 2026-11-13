@@ -10,7 +10,10 @@ internal static class TestPackages
 {
     public const string Id = "test-package";
 
-    /// <summary>Copies the given versions, such as <c>1.0.0</c>, <c>1.1.0</c> and <c>2.0.0</c>, to <paramref name="root"/>.</summary>
+    /// <summary>The build of the initializer package, whose code writes marker files when it runs. Pass it to <see cref="Install"/>.</summary>
+    public const string InitializerBuild = "initializer";
+
+    /// <summary>Copies the given builds, such as the versions <c>1.0.0</c>, <c>1.1.0</c> and <c>2.0.0</c> of the test package or <see cref="InitializerBuild"/>, to <paramref name="root"/>.</summary>
     public static TemporaryFolder Install(this TemporaryFolder root, params string[] versions)
     {
         foreach (var version in versions)

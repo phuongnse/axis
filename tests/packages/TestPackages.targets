@@ -2,13 +2,15 @@
 
   <!--
     Builds the versions 1.0.0, 1.1.0 and 2.0.0 of the test-only extension package and copies each build to
-    $(OutDir)TestPackages/{version}/test-package/{version}/. Tests copy the version folders they need to a
-    temporary folder that acts as Extensions:Path.
+    $(OutDir)TestPackages/{version}/test-package/{version}/. It also builds the initializer package, whose
+    code writes marker files when it runs, and copies it to $(OutDir)TestPackages/initializer/initializer-package/1.0.0/.
+    Tests copy the folders they need to a temporary folder that acts as Extensions:Path.
   -->
   <ItemGroup>
     <ProjectReference Include="$(MSBuildThisFileDirectory)TestPackage.V1\TestPackage.V1.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)TestPackage.V1_1\TestPackage.V1_1.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)TestPackage.V2\TestPackage.V2.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)InitializerPackage\InitializerPackage.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <Target Name="CopyTestPackages" AfterTargets="Build">
@@ -16,11 +18,13 @@
       <TestPackageV1File Include="$(MSBuildThisFileDirectory)TestPackage.V1\bin\$(Configuration)\$(TargetFramework)\**\*" />
       <TestPackageV1_1File Include="$(MSBuildThisFileDirectory)TestPackage.V1_1\bin\$(Configuration)\$(TargetFramework)\**\*" />
       <TestPackageV2File Include="$(MSBuildThisFileDirectory)TestPackage.V2\bin\$(Configuration)\$(TargetFramework)\**\*" />
+      <InitializerPackageFile Include="$(MSBuildThisFileDirectory)InitializerPackage\bin\$(Configuration)\$(TargetFramework)\**\*" />
     </ItemGroup>
-    <Error Condition="'@(TestPackageV1File)' == '' Or '@(TestPackageV1_1File)' == '' Or '@(TestPackageV2File)' == ''" Text="The test package builds were not found under $(MSBuildThisFileDirectory)." />
+    <Error Condition="'@(TestPackageV1File)' == '' Or '@(TestPackageV1_1File)' == '' Or '@(TestPackageV2File)' == '' Or '@(InitializerPackageFile)' == ''" Text="The test package builds were not found under $(MSBuildThisFileDirectory)." />
     <Copy SourceFiles="@(TestPackageV1File)" DestinationFiles="@(TestPackageV1File->'$(OutDir)TestPackages\1.0.0\test-package\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(TestPackageV1_1File)" DestinationFiles="@(TestPackageV1_1File->'$(OutDir)TestPackages\1.1.0\test-package\1.1.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(TestPackageV2File)" DestinationFiles="@(TestPackageV2File->'$(OutDir)TestPackages\2.0.0\test-package\2.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(InitializerPackageFile)" DestinationFiles="@(InitializerPackageFile->'$(OutDir)TestPackages\initializer\initializer-package\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

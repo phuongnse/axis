@@ -26,23 +26,14 @@ public sealed class PackageLoadContext : AssemblyLoadContext
     {
         ArgumentNullException.ThrowIfNull(assemblyName);
 
-        if (string.Equals(assemblyName.Name, _contracts.GetName().Name, StringComparison.Ordinal))
+        var assembly = PackageAssemblies.Resolve(_resolver, assemblyName);
+        return assembly.Source switch
         {
-            return _contracts;
-        }
-
-        if (_resolver.ResolveAssemblyToPath(assemblyName) is { } path)
-        {
-            return LoadFromAssemblyPath(path);
-        }
-
-        // Returning null would fall back to the host's context, which holds the host's Axis assemblies.
-        if (assemblyName.Name?.StartsWith("Axis.", StringComparison.Ordinal) == true)
-        {
-            throw new FileNotFoundException($"Assembly '{assemblyName.Name}' is not shared with extension packages.");
-        }
-
-        return null;
+            PackageAssemblySource.Contracts => _contracts,
+            PackageAssemblySource.Package => LoadFromAssemblyPath(assembly.Path!),
+            PackageAssemblySource.Refused => throw new FileNotFoundException($"Assembly '{assemblyName.Name}' is not shared with extension packages."),
+            _ => null,
+        };
     }
 
     protected override IntPtr LoadUnmanagedDll(string unmanagedDllName)

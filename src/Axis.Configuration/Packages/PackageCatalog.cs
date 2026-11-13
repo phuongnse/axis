@@ -12,10 +12,11 @@ namespace Axis.Configuration.Packages;
 /// <summary>
 /// The extension packages installed under <c>Extensions:Path</c>, one folder per package id and
 /// version: <c>&lt;id&gt;/&lt;version&gt;/axis-package.json</c>. Each version whose manifest matches
-/// its folder and its assembly is loaded in its own <see cref="PackageLoadContext"/>. A <c>node</c> or
-/// <c>python</c> version is listed from its manifest and adapter file alone, without loading code. A
-/// package with any problem is left out and each problem is a diagnostic, whose file is relative to the package
-/// root. Loading never stops at the first broken package.
+/// its folder and its assembly is loaded in its own <see cref="PackageLoadContext"/>, or only read as
+/// metadata, see <see cref="PackageLoadMode"/>. A <c>node</c> or <c>python</c> version is listed from
+/// its manifest and adapter file alone, without loading code. A package with any problem is left out
+/// and each problem is a diagnostic, whose file is relative to the package root. Loading never stops
+/// at the first broken package.
 /// </summary>
 public sealed class PackageCatalog
 {
@@ -54,10 +55,11 @@ public sealed class PackageCatalog
 
     /// <summary>
     /// Finds and loads the packages under <paramref name="root"/>. A null or empty root gives an
-    /// empty catalog.
+    /// empty catalog. With <see cref="PackageLoadMode.MetadataOnly"/> no package code runs and the
+    /// packages cannot create operations.
     /// </summary>
     /// <exception cref="InvalidOperationException">The root folder does not exist or cannot be listed.</exception>
-    public static PackageCatalog Load(string? root)
+    public static PackageCatalog Load(string? root, PackageLoadMode mode = PackageLoadMode.Run)
     {
         if (string.IsNullOrEmpty(root))
         {
@@ -89,7 +91,7 @@ public sealed class PackageCatalog
             foreach (var versionFolder in versionFolders)
             {
                 var versionName = Path.GetFileName(versionFolder);
-                if (LoadPackage(versionFolder, idName, versionName, $"{idName}/{versionName}/{ManifestFileName}", $"Package '{idName}' {versionName}", diagnostics) is { } package)
+                if (LoadPackage(versionFolder, idName, versionName, $"{idName}/{versionName}/{ManifestFileName}", $"Package '{idName}' {versionName}", mode, diagnostics) is { } package)
                 {
                     packages.Add(package);
                 }
@@ -111,13 +113,13 @@ public sealed class PackageCatalog
     public static PackageFolderCheck CheckFolder(string folder)
     {
         var diagnostics = new List<Diagnostic>();
-        var package = LoadPackage(folder, null, null, ManifestFileName, "Package source", diagnostics);
+        var package = LoadPackage(folder, null, null, ManifestFileName, "Package source", PackageLoadMode.Run, diagnostics);
         return new PackageFolderCheck(package, DiagnosticOrder.Sort(diagnostics));
     }
 
     /// <summary>Loads the package in <paramref name="versionFolder"/>. The folder names are checked against the manifest only when <paramref name="idName"/> and <paramref name="versionName"/> are given.</summary>
     private static InstalledPackage? LoadPackage(
-        string versionFolder, string? idName, string? versionName, string file, string label, List<Diagnostic> diagnostics)
+        string versionFolder, string? idName, string? versionName, string file, string label, PackageLoadMode mode, List<Diagnostic> diagnostics)
     {
         var problems = new List<Diagnostic>();
         void Report(string code, string message, string path) =>
@@ -161,17 +163,86 @@ public sealed class PackageCatalog
         }
 
         var assemblyPath = Path.Combine(versionFolder, manifest.Assembly!);
-        if (LoadAssembly($"{manifest.Id}/{manifest.Version}", assemblyPath) is not var (loadContext, assembly))
+        var installed = mode == PackageLoadMode.Run
+            ? LoadToRun(manifest, assemblyPath, Report)
+            : ReadMetadata(manifest, assemblyPath, Report);
+        if (problems.Count > 0)
         {
-            Report(DiagnosticCodes.PackageAssemblyMissing, $"The assembly '{manifest.Assembly}' is missing or cannot be loaded.", "/assembly");
             diagnostics.AddRange(problems);
             return null;
         }
 
-        var informationalVersion = InformationalVersion(assembly);
+        return installed;
+    }
+
+    /// <summary>Loads the main assembly in its own load context, which can run its code.</summary>
+    private static InstalledPackage? LoadToRun(PackageManifest manifest, string assemblyPath, Action<string, string, string> report)
+    {
+        if (LoadAssembly($"{manifest.Id}/{manifest.Version}", assemblyPath) is not var (loadContext, assembly))
+        {
+            ReportAssemblyMissing(manifest, report);
+            return null;
+        }
+
+        var operationTypes = manifest.Operations.Select(operation => FindOperationType(assembly, operation.Type)).ToList();
+        if (!CheckAssembly(manifest, InformationalVersion(assembly), operationTypes.Select(type => type is not null).ToList(), report))
+        {
+            return null;
+        }
+
+        return new InstalledPackage(
+            manifest,
+            loadContext,
+            manifest.Operations.Zip(operationTypes).ToDictionary(pair => pair.First.Name, pair => pair.Second!, StringComparer.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Reads the main assembly as metadata, so no static constructor, module initializer or other
+    /// package code runs in this process, see <c>docs/reference/extension-packages.md#loading</c>. The
+    /// context is disposed before this returns, so the package keeps no types or file handles.
+    /// </summary>
+    private static InstalledPackage? ReadMetadata(PackageManifest manifest, string assemblyPath, Action<string, string, string> report)
+    {
+        string? informationalVersion;
+        List<bool> operationTypes;
+        MetadataLoadContext? context = null;
+        try
+        {
+            // The dependency resolver throws InvalidOperationException for a .deps.json it cannot read.
+            context = new MetadataLoadContext(new PackageMetadataResolver(assemblyPath), typeof(object).Assembly.GetName().Name);
+            var assembly = context.LoadFromAssemblyPath(assemblyPath);
+            var contract = context.LoadFromAssemblyName(typeof(IOperation).Assembly.GetName()).GetType(typeof(IOperation).FullName!);
+            informationalVersion = InformationalVersion(assembly.GetCustomAttributesData());
+            operationTypes = [.. manifest.Operations.Select(operation => IsOperationType(assembly, contract, operation.Type))];
+        }
+        catch (Exception exception) when (exception is IOException or BadImageFormatException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // The exception message names the absolute path, so it is never passed on.
+            ReportAssemblyMissing(manifest, report);
+            return null;
+        }
+        finally
+        {
+            context?.Dispose();
+        }
+
+        return CheckAssembly(manifest, informationalVersion, operationTypes, report)
+            ? new InstalledPackage(manifest)
+            : null;
+    }
+
+    private static void ReportAssemblyMissing(PackageManifest manifest, Action<string, string, string> report) =>
+        report(DiagnosticCodes.PackageAssemblyMissing, $"The assembly '{manifest.Assembly}' is missing or cannot be loaded.", "/assembly");
+
+    /// <summary>Reports the version and the operation types that do not match the manifest. Returns whether all match.</summary>
+    private static bool CheckAssembly(
+        PackageManifest manifest, string? informationalVersion, List<bool> operationTypeFound, Action<string, string, string> report)
+    {
+        var matches = true;
         if (!string.Equals(informationalVersion, manifest.Version, StringComparison.Ordinal))
         {
-            Report(
+            matches = false;
+            report(
                 DiagnosticCodes.PackageVersionMismatch,
                 informationalVersion is null
                     ? $"The assembly '{manifest.Assembly}' has no informational version, but the manifest says '{manifest.Version}'."
@@ -179,30 +250,20 @@ public sealed class PackageCatalog
                 "/version");
         }
 
-        var operationTypes = new Dictionary<string, Type>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < manifest.Operations.Count; index++)
         {
-            var operation = manifest.Operations[index];
-            if (FindOperationType(assembly, operation.Type) is { } type)
+            if (!operationTypeFound[index])
             {
-                operationTypes[operation.Name] = type;
-            }
-            else
-            {
-                Report(
+                matches = false;
+                var operation = manifest.Operations[index];
+                report(
                     DiagnosticCodes.InvalidPackageOperationType,
                     $"The type '{operation.Type}' of operation '{operation.Name}' is not a class in '{manifest.Assembly}' that implements '{nameof(IOperation)}' and has a public parameterless constructor.",
                     $"/operations/{index}/type");
             }
         }
 
-        if (problems.Count > 0)
-        {
-            diagnostics.AddRange(problems);
-            return null;
-        }
-
-        return new InstalledPackage(manifest, loadContext, operationTypes);
+        return matches;
     }
 
     private static PackageManifest? ReadManifest(string manifestPath, string file, string label, List<Diagnostic> problems)
@@ -388,6 +449,30 @@ public sealed class PackageCatalog
                 ? type
                 : null;
     }
+
+    /// <summary>Whether the class named <paramref name="typeName"/> in the metadata of <paramref name="assembly"/> is one the host could create as an operation.</summary>
+    private static bool IsOperationType(Assembly assembly, Type? contract, string typeName)
+    {
+        try
+        {
+            return contract is not null
+                && assembly.GetType(typeName, throwOnError: false) is { IsClass: true, IsAbstract: false, ContainsGenericParameters: false } type
+                && contract.IsAssignableFrom(type)
+                && type.GetConstructor(Type.EmptyTypes) is not null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or IOException or BadImageFormatException or TypeLoadException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The informational version in the attribute data of a metadata-only assembly, without the build metadata after <c>+</c>.</summary>
+    private static string? InformationalVersion(IList<CustomAttributeData> attributes) =>
+        attributes
+            .FirstOrDefault(attribute => attribute.AttributeType.FullName == typeof(AssemblyInformationalVersionAttribute).FullName)
+            ?.ConstructorArguments[0].Value is string version
+                ? version.Split('+')[0]
+                : null;
 
     /// <summary>The informational version of <paramref name="assembly"/> without the build metadata after <c>+</c>.</summary>
     private static string? InformationalVersion(Assembly assembly)

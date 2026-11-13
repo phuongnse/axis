@@ -212,7 +212,8 @@ builder.Services.AddTenantKeys(directorySource
     ? new DirectoryTenantKeySource(platformConnectionString, cipher)
     : new ConfigurationTenantKeySource(builder.Configuration));
 builder.Services.AddSingleton<SensitiveValues>();
-builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
+// The server checks and compiles against packages and never runs their code, see docs/reference/extension-packages.md#loading.
+builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment, PackageLoadMode.MetadataOnly);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 builder.Services.AddTemplates(builder.Configuration, builder.Environment);
 

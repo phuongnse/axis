@@ -1,3 +1,4 @@
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
@@ -95,6 +96,26 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
             entry.StartsWith("Warning: ", StringComparison.Ordinal)
             && entry.Contains(DiagnosticCodes.InvalidPackageOperationType, StringComparison.Ordinal)
             && entry.Contains("test-package/2.0.0/axis-package.json /operations/0/type", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Server_reads_a_package_without_running_its_code()
+    {
+        using var root = new TemporaryFolder().Install(TestPackages.InitializerBuild);
+        using var application = new TemporaryFolder().With("application.json", """
+            { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1,
+              "packages": [{ "id": "initializer-package", "version": "1.0.0" }] }
+            """);
+
+        await using var server = CreateServer(await database.CreateDatabaseAsync("packages", CancellationToken), root.Path, new LogCollector());
+        server.CreateClient().Dispose();
+
+        var catalog = server.Services.GetRequiredService<PackageCatalog>();
+        Assert.Empty(catalog.Diagnostics);
+        var package = Assert.Single(catalog.Packages);
+        Assert.Equal(("initializer-package", "1.0.0"), (package.Manifest.Id, package.Manifest.Version));
+        Assert.Empty(ApplicationCompiler.Compile(application.Path, catalog.Versions).Diagnostics);
+        Assert.Empty(Directory.EnumerateFiles(root.Path, "*.marker", SearchOption.AllDirectories));
     }
 
     [Fact]

@@ -47,8 +47,9 @@ tests/
   Axis.OpenApiDocument/   console that writes the server's OpenAPI document with the unit tests' host settings
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
   packages/               test-only extension packages: a C# package built as three versions, which
-                          covers the capability limits, a Node.js package with a local dependency, and
-                          a Python test package of plain files
+                          covers the capability limits, a C# package whose code writes marker files
+                          when it runs, a Node.js package with a local dependency, and a Python test
+                          package of plain files
   load/                   the k6 scenarios of the load tests
   e2e/                    Playwright journeys against the running server, and their fixtures
 controlplane/

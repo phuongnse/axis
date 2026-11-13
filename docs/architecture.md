@@ -74,7 +74,8 @@ flowchart LR
   [process execution](reference/process-execution.md), [process flow](reference/process-flow.md),
   [events and triggers](reference/process-events.md) and
   [recomputing computed fields](reference/migrations.md#recomputing-computed-fields). It loads the
-  same modules and installed [extension packages](reference/extension-packages.md) as the server, and
+  same modules as the server. It also loads and runs the installed
+  [extension packages](reference/extension-packages.md), which the server only reads as metadata, and
   serves its own [health checks](#health-checks).
 - **Axis.PackageHost** builds an extension package: its `build` command checks, scans and writes a C#, Node.js or
   Python package to the extensions folder, see [building a package](reference/extension-packages.md#building-a-package).

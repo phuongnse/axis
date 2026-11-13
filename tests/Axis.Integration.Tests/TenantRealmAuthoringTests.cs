@@ -396,7 +396,8 @@ public sealed class TenantRealmAuthoringTests(KeycloakFixture keycloak, PostgreS
         Assert.InRange(tokens.GetProperty("expires_in").GetInt32(), TenantRealm.AccessTokenLifespanSeconds - 1, TenantRealm.AccessTokenLifespanSeconds);
         using (var claims = Claims(access))
         {
-            Assert.Equal(TenantRealm.AccessTokenLifespanSeconds, claims.RootElement.GetProperty("exp").GetInt64() - claims.RootElement.GetProperty("iat").GetInt64());
+            // Keycloak rounds iat and exp to whole seconds on their own, so the gap can be a second more than the lifespan.
+            Assert.InRange(claims.RootElement.GetProperty("exp").GetInt64() - claims.RootElement.GetProperty("iat").GetInt64(), TenantRealm.AccessTokenLifespanSeconds, TenantRealm.AccessTokenLifespanSeconds + 1);
         }
         Assert.Contains(McpUrl, Audiences(access));
 
