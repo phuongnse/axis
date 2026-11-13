@@ -89,6 +89,7 @@ public sealed class StudioActivateTests : IAsyncLifetime
 
         Assert.Equal(1L, await CountAuditAsync(connectionString, "release.activated"));
         Assert.Equal(0L, await CountAuditAsync(connectionString, "release.activateFailed"));
+        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.rolledBack"));
         var details = JsonDocument.Parse((string)(await PostgreSqlServer.AdminScalarAsync(
             connectionString, "SELECT details::text FROM axis.audit_records WHERE action = 'release.activated'", CancellationToken))!);
         Assert.Equal(
@@ -123,6 +124,7 @@ public sealed class StudioActivateTests : IAsyncLifetime
         Assert.Equal(2, history.RootElement.GetProperty("items").GetArrayLength());
         Assert.Equal(1L, await CountAuditAsync(connectionString, "release.activateFailed"));
         Assert.Equal(0L, await CountAuditAsync(connectionString, "release.activated"));
+        Assert.Equal(0L, await CountAuditAsync(connectionString, "release.rollbackFailed"));
     }
 
     [Fact]
