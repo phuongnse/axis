@@ -55,6 +55,13 @@ public sealed class PackageCatalogMetadataTests
 
     public static TheoryData<string> BrokenPackageCodes => [.. _brokenPackages.Keys];
 
+    public static TheoryData<string> NonOperationTypes =>
+    [
+        "InitializerPackage.NotAnOperation",
+        "InitializerPackage.AbstractOperation",
+        "InitializerPackage.Initializer",
+    ];
+
     [Fact]
     public void A_package_whose_code_writes_markers_is_listed_and_compiled_against_and_never_runs()
     {
@@ -122,6 +129,28 @@ public sealed class PackageCatalogMetadataTests
         var diagnostic = Assert.Single(catalog.Diagnostics.Where(diagnostic => diagnostic.Code == code), diagnostic => diagnostic.Path == path);
         Assert.Equal(file, diagnostic.File);
         Assert.DoesNotContain(root.Path, diagnostic.Message, StringComparison.Ordinal);
+        Assert.Equal(
+            PackageCatalog.Load(root.Path).Diagnostics.Select(expected => (expected.Code, expected.File, expected.Path)),
+            catalog.Diagnostics.Select(actual => (actual.Code, actual.File, actual.Path)));
+    }
+
+    [Theory]
+    [MemberData(nameof(NonOperationTypes))]
+    public void An_operation_type_that_cannot_run_as_an_operation_reports_the_same_code_file_and_pointer_as_when_the_package_runs(string type)
+    {
+        using var root = new TemporaryFolder().Install(TestPackages.InitializerBuild);
+        var manifestPath = Path.Combine(root.Path, "initializer-package", "1.0.0", "axis-package.json");
+        var manifest = JsonNode.Parse(File.ReadAllText(manifestPath))!.AsObject();
+        manifest["operations"]![0]!["type"] = type;
+        File.WriteAllText(manifestPath, manifest.ToJsonString());
+
+        var catalog = PackageCatalog.Load(root.Path, PackageLoadMode.MetadataOnly);
+
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidPackageOperationType, diagnostic.Code);
+        Assert.Equal("initializer-package/1.0.0/axis-package.json", diagnostic.File);
+        Assert.Equal("/operations/0/type", diagnostic.Path);
         Assert.Equal(
             PackageCatalog.Load(root.Path).Diagnostics.Select(expected => (expected.Code, expected.File, expected.Path)),
             catalog.Diagnostics.Select(actual => (actual.Code, actual.File, actual.Path)));
