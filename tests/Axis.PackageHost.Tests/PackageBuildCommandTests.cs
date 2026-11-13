@@ -10,6 +10,7 @@ namespace Axis.PackageHost.Tests;
 
 // The stub scanner is a shell script, so the tests are skipped on Windows before any Unix-only call is made.
 [UnsupportedOSPlatform("windows")]
+[Collection(BuildTest.Collection)]
 public sealed class PackageBuildCommandTests
 {
     private const string NoFindings = """{ "Results": [] }""";

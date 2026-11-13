@@ -16,6 +16,9 @@ namespace Axis.PackageHost.Tests;
 [UnsupportedOSPlatform("windows")]
 internal sealed class BuildTest : IDisposable
 {
+    /// <summary>The xUnit collection of the classes that build packages, which run one after the other.</summary>
+    public const string Collection = "Package build";
+
     public const string NodeId = "node-test-package";
 
     public const string WheelName = "axis_fixture_dependency-1.0.0-py3-none-any.whl";

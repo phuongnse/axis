@@ -6,7 +6,7 @@ namespace Axis.PackageHost;
 /// <summary>
 /// The <c>build</c> command: it checks a published C# package folder or a Node.js or Python package source and writes
 /// it to <c>&lt;Extensions:Path&gt;/&lt;id&gt;/&lt;version&gt;/</c>, see docs/reference/extension-packages.md#building-a-package.
-/// The checks run in a fixed order and the first refusal stops the build: the manifest, the language, the lock file,
+/// The checks run in a fixed order and the first refusal stops the build: the manifest, the lock file,
 /// an existing target folder, then, for Node.js, the install from its lock file and, for Python, the install of the
 /// hashed requirements, each into a temporary copy of the source, then the dependency scan. Only then is the package
 /// written and the extensions folder loaded as the hosts load it, and a version that does not load is deleted again.

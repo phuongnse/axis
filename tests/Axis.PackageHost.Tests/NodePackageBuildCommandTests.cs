@@ -5,7 +5,10 @@ using Axis.Configuration.Packages;
 namespace Axis.PackageHost.Tests;
 
 // npm and the stub scanner need a Unix shell, so the tests are skipped on Windows before any Unix-only call is made.
+// Every build writes and deletes folders named axis-package-build-* in the temporary folder, and these tests list them,
+// so the classes that build packages run one after the other.
 [UnsupportedOSPlatform("windows")]
+[Collection(BuildTest.Collection)]
 public sealed class NodePackageBuildCommandTests
 {
     private const string NoFindings = """{ "Results": [] }""";
