@@ -195,6 +195,12 @@ that its release was compiled against.
 
 - **Ranges.** An application's `packages` entry gives a version range: an exact version, a `^`
   range or a `~` range, as [declaring packages](#declaring-packages-in-an-application) says.
+- **`runner`** _(planned for M37)_. An entry of `application.json`'s `packages` may say where the package
+  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, but it
+  resolves no bindings for the package's operations and starts no Axis runner for it, see
+  [customer-hosted runners](#customer-hosted-runners). A module's entry has no `runner`, and the
+  application's entry decides for every process of the release, because the release holds one pin per
+  package id. A wrong value is `AXC0004`.
 - **Pinning.** Compilation picks the highest installed version in each range
   and pins that exact version in the release. The pin is part of the
   release's content hash. So once a newer version in range is installed,
@@ -309,6 +315,9 @@ see [Contracts](#contracts).
   tenant, or of the wrong kind, fails activation with `AXC0100`, and an `http`
   `url` binding outside Development fails it with `AXC0101`, see
   [Deployment bindings](integration-resources.md#deployment-bindings).
+- **A customer-hosted package** _(planned for M37)_. Neither the binding resolution nor the activation
+  check applies to a package that the application runs in a customer-hosted runner, because the runner
+  keeps its own bindings, see [declaring packages in an application](#declaring-packages-in-an-application).
 - **Secret values stay hidden.** A secret value never appears in history,
   audit records or logs. History and audit records hold only the type of an
   exception, never its message, because a message can hold input values or
@@ -363,10 +372,43 @@ package reaches nothing of the host and no binding of another call.
 _(planned for M37)_
 
 A customer-hosted runner runs in the customer's own network and connects out to the installation with
-a credential of its own. The tenant's administrator can revoke that credential. The runner takes only
-its tenant's calls to the packages it registers, and it keeps its own secrets, so the worker sends it
-no binding value. It keeps the staging, retries and history of the engine, but none of the runner
+a credential of its own. It keeps the staging, retries and history of the engine, but none of the runner
 limits above, because the customer owns the machine.
+
+- **Created by the administrator.** The tenant's administrator creates and revokes a runner, see
+  [package runners](user-administration.md#package-runners).
+- **Its credential.** A confidential client of the tenant's realm that uses the client credentials grant,
+  like a service account. Its access token's audience is `axis-package-runner`, so it reaches only the
+  runner's routes, and a service account route refuses it because it lacks `Oidc:ServiceAudience`. Axis
+  keeps no copy of the secret.
+- **Declared by the application.** An application says that a package runs in a customer-hosted runner, see
+  [declaring packages in an application](#declaring-packages-in-an-application).
+- **Registering.** The runner names the package ids and versions it runs. It takes only calls of its
+  tenant to a registered id and to the exact version the release pins.
+- **Calls out only.** The runner connects to the tenant's host over HTTPS. No connection goes from Axis
+  into the customer's network.
+- **Taking a call and posting its result.** The runner takes a call under a lease and posts the result, see
+  [staging a package call](process-execution.md#staging-a-package-call) for the lease and the outcomes.
+- **Its own secrets.** The take carries no binding value. The SDK answers `GetHttpClient` and `GetSecret`
+  from the runner's own settings, by the binding names that the manifest declares.
+- **Revoked.** Every runner request reads the runner's row, so the next request of a revoked runner answers
+  `401`, even with a token that has not expired.
+
+#### Routes
+
+_(planned for M37)_
+
+| Route | Body | Answer |
+| --- | --- | --- |
+| `PUT /api/package-runner/packages` _(planned for M37)_ | `{ "packages": [{ "id": "purchasing-tools", "version": "1.0.0" }] }` | `204`. It replaces the registered list |
+| `POST /api/package-runner/calls/take` _(planned for M37)_ | None | `200` with `{ "leaseId", "package", "version", "operation", "operationId", "input", "leaseUntil" }`, or `204` when no call waits |
+| `POST /api/package-runner/leases/{leaseId}/result` _(planned for M37)_ | `{ "outcome": "succeeded", "output": {...} }`, `{ "outcome": "retryable" }` or `{ "outcome": "failed", "error": "<exception type>" }` | `204` |
+
+- **The order of the checks.** A request is checked in this order: the tenant of the host, then the token
+  (`401` for the signature, the issuer, the expiry, the audience, or a runner row that is missing or
+  revoked, with DPoP under `fapi2` as for service accounts), then the body (`400`). A result is then
+  checked for its lease: a lease of another runner or an unknown one answers `404`, and a lease that has
+  ended or already holds a result answers `409`.
 
 ## Not a sandbox
 
@@ -516,6 +558,12 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
     `0.9.0` but not `1.0.0`.
   - `~1.0.0` is any version from `1.0.0` with the same minor version, so
     `1.0.3` but not `1.1.0`.
+- **`runner`** _(planned for M37)_. An entry of `application.json`'s `packages` may say where the package
+  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, but it
+  resolves no bindings for the package's operations and starts no Axis runner for it, see
+  [customer-hosted runners](#customer-hosted-runners). A module's entry has no `runner`, and the
+  application's entry decides for every process of the release, because the release holds one pin per
+  package id. A wrong value is `AXC0004`.
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
   release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
   [versions and pinning](#versions-and-pinning) says. A module's `packages` share

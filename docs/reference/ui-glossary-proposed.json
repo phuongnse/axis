@@ -138,11 +138,18 @@
       "note": "The users page tab where an administrator chooses which outside MCP clients may connect."
     },
     {
+      "concept": "Package runner",
+      "en": "package runner",
+      "vi": "trình chạy gói mở rộng",
+      "status": "proposed",
+      "note": "A process that runs a package's operations. A customer-hosted one is created on the users page."
+    },
+    {
       "concept": "Action: Revoke (consent)",
       "en": "Revoke",
       "vi": "Thu hồi",
       "status": "proposed",
-      "note": "Removes every person's consent to an MCP client."
+      "note": "Removes every person's consent to an MCP client, or a package runner's credential."
     }
   ]
 }
