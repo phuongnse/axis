@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
@@ -168,7 +170,7 @@ public sealed class PackageBuildCommandTests
     }
 
     [Fact]
-    public async Task A_node_package_is_refused_because_only_csharp_packages_are_built()
+    public async Task A_node_package_is_refused_because_only_csharp_and_python_packages_are_built()
     {
         using var test = new BuildTest(NoFindings);
         File.Delete(Path.Combine(test.Source, "Axis.TestPackage.dll"));
@@ -184,7 +186,66 @@ public sealed class PackageBuildCommandTests
         var (exitCode, output) = await test.RunAsync();
 
         Assert.Equal(PackageBuildCommand.Refused, exitCode);
-        Assert.Contains("Only C# packages can be built", output);
+        Assert.Contains("Only C# and Python packages can be built", output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
+    public async Task A_python_package_is_installed_from_hashed_requirements_and_loads_without_diagnostics()
+    {
+        using var test = BuildTest.Python(NoFindings);
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Built, exitCode);
+        Assert.Contains("Built python-test-package 1.0.0 in python-test-package/1.0.0/.", output);
+        Assert.True(test.ScannerRan);
+        var written = Path.Combine(test.Extensions.Path, "python-test-package", "1.0.0");
+        Assert.True(File.Exists(Path.Combine(written, "adapter.py")));
+        Assert.True(File.Exists(Path.Combine(written, "axis_fixture_dependency", "__init__.py")));
+        Assert.True(Directory.Exists(Path.Combine(written, "axis_fixture_dependency-1.0.0.dist-info")));
+        var catalog = PackageCatalog.Load(test.Extensions.Path);
+        Assert.Empty(catalog.Diagnostics);
+        Assert.NotNull(catalog.Find("python-test-package", "1.0.0"));
+    }
+
+    [Fact]
+    public async Task A_requirement_without_a_hash_is_refused_before_the_install()
+    {
+        using var test = BuildTest.Python(NoFindings, _ => "axis-fixture-dependency==1.0.0\n");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Refused, exitCode);
+        Assert.Contains("'requirements.txt' line 1 has no --hash: axis-fixture-dependency==1.0.0.", output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
+    public async Task A_wheel_whose_hash_differs_is_refused_and_writes_nothing()
+    {
+        var other = Convert.ToHexStringLower(SHA256.HashData("other"u8));
+        using var test = BuildTest.Python(NoFindings, _ => $"./wheels/{BuildTest.WheelName} --hash=sha256:{other}\n");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Refused, exitCode);
+        Assert.Contains("'requirements.txt'", output);
+        Assert.DoesNotContain(test.Source, output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
+    public async Task A_python_command_that_cannot_start_is_a_setup_error()
+    {
+        using var test = BuildTest.Python(NoFindings);
+        test.PythonCommand = Path.Combine(test.Scripts.Path, "missing-python");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.SetupError, exitCode);
+        Assert.Contains("PackageBuild:Python", output);
+        Assert.DoesNotContain(test.Scripts.Path, output);
         test.AssertNothingWrittenAndNoScan();
     }
 
@@ -217,17 +278,27 @@ public sealed class PackageBuildCommandTests
         [.. Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Select(file => Path.GetRelativePath(folder, file).Replace('\\', '/')).Order(StringComparer.Ordinal)];
 
     /// <summary>
-    /// A copy of the test package 1.0.0 build as the source, an empty extensions folder, and a stub in place of
-    /// Trivy that leaves a marker file when it runs and prints a given report.
+    /// A copy of the test package 1.0.0 build as the source, or the Python test package with a wheel that the test
+    /// builds and hashes, an empty extensions folder, and a stub in place of Trivy that leaves a marker file when it
+    /// runs and prints a given report.
     /// </summary>
     [UnsupportedOSPlatform("windows")]
     private sealed class BuildTest : IDisposable
     {
-        private readonly TemporaryFolder _sources = new TemporaryFolder().Install("1.0.0");
+        public const string WheelName = "axis_fixture_dependency-1.0.0-py3-none-any.whl";
+
+        private readonly TemporaryFolder _sources;
         private readonly string _stub;
 
         public BuildTest(string report)
+            : this(report, new TemporaryFolder().Install("1.0.0"), Path.Combine(TestPackages.Id, "1.0.0"))
         {
+        }
+
+        private BuildTest(string report, TemporaryFolder sources, string sourcePath)
+        {
+            _sources = sources;
+            Source = Path.Combine(_sources.Path, sourcePath);
             Assert.SkipWhen(OperatingSystem.IsWindows(), "The stub scanner is a shell script.");
             _stub = Path.Combine(Scripts.Path, "trivy");
             File.WriteAllText(_stub, $"#!/bin/sh\ntouch \"$0.ran\"\ncat <<'JSON'\n{report}\nJSON\n");
@@ -240,7 +311,39 @@ public sealed class PackageBuildCommandTests
 
         public TemporaryFolder Scripts { get; } = new();
 
-        public string Source => Path.Combine(_sources.Path, TestPackages.Id, "1.0.0");
+        public string Source { get; }
+
+        public string? PythonCommand { get; set; }
+
+        /// <summary>
+        /// The Python test package, with its dependency zipped into a wheel in <c>wheels/</c>. <paramref name="requirements"/>
+        /// turns the wheel's SHA-256 hash into the text of <c>requirements.txt</c>, and by default locks the wheel with it.
+        /// </summary>
+        public static BuildTest Python(string report, Func<string, string>? requirements = null)
+        {
+            var root = Path.Combine(AppContext.BaseDirectory, "PythonPackage");
+            var sources = new TemporaryFolder();
+            var source = Path.Combine(sources.Path, "source");
+            CopyFolder(Path.Combine(root, "package"), source);
+            Directory.CreateDirectory(Path.Combine(source, "wheels"));
+            var wheel = Path.Combine(source, "wheels", WheelName);
+            ZipFile.CreateFromDirectory(Path.Combine(root, "dependency"), wheel);
+            var hash = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(wheel)));
+            File.WriteAllText(
+                Path.Combine(source, "requirements.txt"),
+                requirements?.Invoke(hash) ?? $"./wheels/{WheelName} --hash=sha256:{hash}\n");
+            return new BuildTest(report, sources, "source");
+        }
+
+        private static void CopyFolder(string from, string to)
+        {
+            foreach (var file in Directory.GetFiles(from, "*", SearchOption.AllDirectories))
+            {
+                var destination = Path.Combine(to, Path.GetRelativePath(from, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(file, destination);
+            }
+        }
 
         public string TrivyCommand { get; set; }
 
@@ -254,6 +357,7 @@ public sealed class PackageBuildCommandTests
                 {
                     [PackageCatalog.PathSetting] = ExtensionsPath,
                     ["PackageBuild:Trivy"] = TrivyCommand,
+                    ["PackageBuild:Python"] = PythonCommand,
                 })
                 .Build();
 

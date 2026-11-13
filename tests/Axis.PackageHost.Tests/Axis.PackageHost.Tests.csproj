@@ -24,6 +24,10 @@
     <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Import Project="..\packages\TestPackages.targets" />
 
 </Project>
