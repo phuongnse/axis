@@ -21,7 +21,7 @@ namespace Axis.Integration.Tests;
 /// The accept step of the agent host asks for the accept of the draft of a <c>ready</c> request that asked for auto-accept, and waits until the accept ends,
 /// see <c>docs/reference/authoring-requests.md#accepting</c>. A success ends the request <c>accepted</c>, a refusal of <c>accept_draft</c> leaves it <c>ready</c>
 /// and it is not claimed again, a conflict sends it back to <c>working</c> with no draft, and any other failure stops it <c>failed</c> with the outcome
-/// <c>notAccepted</c>. The model is the scripted adapter and the publisher runs beside the host as it does in production. Each test first makes a real draft of
+/// <c>notAccepted</c>. A request that waits for its author's approval is never claimed. The model is the scripted adapter and the publisher runs beside the host as it does in production. Each accept test first makes a real draft of
 /// the author with a host that has no checking step, and then moves the request to <c>ready</c> with a passed check and review.
 /// </summary>
 public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -178,6 +178,33 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(redone, (await store.ClaimAsync(Tenant, ["ready"], "probe", _lease, CancellationToken))?.Id);
     }
 
+    [Fact]
+    public async Task An_awaitingApproval_request_that_asked_for_auto_accept_is_never_claimed_and_only_the_authors_approve_sends_it_to_working()
+    {
+        using var client = await _realm.SignInAsync();
+        using var sent = await StudioPublishTests.SendAsync(client, HttpMethod.Post, Url, Host, SendWithAutoAccept);
+        Assert.Equal(HttpStatusCode.Accepted, sent.StatusCode);
+        using var body = await StudioPublishTests.ReadAsync(sent);
+        var id = Guid.Parse(body.RootElement.GetProperty("id").GetString()!);
+        await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'awaitingApproval', plan = 'A plan.' WHERE id = '{id}' RETURNING 1");
+        await AllowAutoAcceptAsync(id);
+        await using var host = BuildAgent(_realm, new ScriptedModelAdapter([]), new RecordingHandler(_realm.Factory.Server.CreateHandler()));
+        var store = StoreOf(host);
+
+        // The request and its application both allow auto-accept, so only the state decides whether the host may claim it.
+        Assert.Null(await store.ClaimAsync(Tenant, AuthoringRequestStore.StatesNeedingWork.ToArray(), "probe", _lease, CancellationToken));
+        Assert.Empty(await store.ListNeedingWorkAsync(Tenant, CancellationToken));
+        Assert.Equal("awaitingApproval", await StateAsync(id));
+
+        using var approve = await StudioPublishTests.SendAsync(client, HttpMethod.Post, $"{Url}/{id}/approve", Host);
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+        Assert.Equal("working", await StateAsync(id));
+
+        var claimed = await store.ClaimAsync(Tenant, AuthoringRequestStore.StatesNeedingWork.ToArray(), "probe", _lease, CancellationToken);
+        Assert.Equal(id, claimed?.Id);
+        Assert.Equal("working", claimed?.State);
+    }
+
     public async ValueTask InitializeAsync()
     {
         _realm = new AuthoringRealm(keycloak, database, configure: Configure);
@@ -244,11 +271,14 @@ public sealed class AgentAcceptingTests(KeycloakFixture keycloak, PostgreSqlFixt
             + $"SELECT gen_random_uuid(), '{id}', (SELECT max(ordinal) FROM axis.authoring_request_steps WHERE request_id = '{id}') + n, kind, 'passed', now(), now() "
             + "FROM (VALUES (1, 'check'), (2, 'review')) AS rounds (n, kind) RETURNING 1");
         await ScalarAsync($"UPDATE axis.authoring_requests SET state = 'ready' WHERE id = '{id}' RETURNING 1");
-        await ScalarAsync(
-            $"INSERT INTO axis.application_settings (application_id, auto_accept) SELECT application_id, true FROM axis.authoring_requests WHERE id = '{id}' "
-            + "ON CONFLICT (application_id) DO UPDATE SET auto_accept = true");
+        await AllowAutoAcceptAsync(id);
         return (id, draft);
     }
+
+    // Turns on the auto-accept of the application of the request, which the accept of a request that asked for auto-accept needs.
+    private async Task AllowAutoAcceptAsync(Guid id) => await ScalarAsync(
+        $"INSERT INTO axis.application_settings (application_id, auto_accept) SELECT application_id, true FROM axis.authoring_requests WHERE id = '{id}' "
+        + "ON CONFLICT (application_id) DO UPDATE SET auto_accept = true");
 
     // A ready request of its own, with a passed check and review and then the extra steps in order. An outcome of null is no outcome.
     private async Task<Guid> InsertReadyAsync(bool autoAccept = true, bool draft = true, (string Kind, string? Outcome)[]? extraSteps = null)

@@ -192,7 +192,7 @@ the checks, an independent review and fix rounds.
   its draft. The step stores no `checks`, and the accept's own diagnostics stay on its publish request.
 - **A new plan.** After a change of plan, the next planning step sees the request text, the earlier plan
   and every comment of the request, oldest first. Its plan replaces the earlier one.
-- **Plans need approval** _(planned for M35)_. No request leaves `awaitingApproval` without the author, also when the
+- **Plans need approval**. No request leaves `awaitingApproval` without the author, also when the
   application allows auto-accept.
 
 ## Budgets
