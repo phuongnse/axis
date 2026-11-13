@@ -9,9 +9,9 @@ source scripts/lib/retry.sh
 # Trivy scans the images. Aqua withdrew the releases of its March 2026 supply chain incident, so the
 # pin is a later release, and its archives' checksums are pinned here rather than read from the
 # release itself.
-TRIVY_VERSION=0.76.1
-TRIVY_SHA256_LINUX_64BIT=c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
-TRIVY_SHA256_LINUX_ARM64=e174dff2a6dba5e3ae41f8d0537a6324405bd08132497340304c6b20e0f16a1f
+TRIVY_VERSION=0.76.2
+TRIVY_SHA256_LINUX_64BIT=bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf
+TRIVY_SHA256_LINUX_ARM64=ab9d51f86e6a5fb936f605faff6b593ac51bc378fff4d3e8b9d58358b9c367c3
 
 tools_dir="$HOME/.cache/axis-tools"
 trivy="$tools_dir/trivy-$TRIVY_VERSION/trivy"
