@@ -16,7 +16,10 @@
 #   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.
 #   The agent host replays scripted answers. It creates a tenant from the built-in approvals application, reads the
 #   application's authoring requests as the tenant's author, and without the session, and carries an authoring request
-#   through the agent host and the MCP server, over https, to its plan.
+#   through the agent host and the MCP server, over https, to its plan. scripts/ai-eval-run.test.mjs then runs
+#   scripts/ai-eval.sh --binding against a stand-in Messages API server that the test runs, twice: once with a model that
+#   passes every case, and once with a model that relaxes a contract point. Each run starts the stack, so the two test files
+#   run one at a time.
 # This script builds the production images once, before the images suite, when images or onprem runs, each up to three
 # times with a wait of 15 and 30 seconds, and removes them when it exits. Both suites use them. The PostgreSQL tools
 # layer of axis-admin comes from the admin-tools stage, which scripts/lib/smoke-images.mjs saves in
@@ -86,7 +89,8 @@ fi
 
 if in_shard ai-eval; then
   run_suite_if_affected ai-eval . node --test --test-reporter=spec --test-reporter-destination=stdout \
-    --test-reporter=junit --test-reporter-destination="$results_dir/ai-eval.xml" scripts/ai-eval-stack.test.mjs
+    --test-reporter=junit --test-reporter-destination="$results_dir/ai-eval.xml" --test-concurrency=1 \
+    scripts/ai-eval-stack.test.mjs scripts/ai-eval-run.test.mjs
 fi
 
 finish_report

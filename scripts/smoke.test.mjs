@@ -14,7 +14,14 @@ import { productionTargets, stageText } from './lib/images.mjs'
 // `docker save -o`. `saved` names files to put in the cache folder before the run, with the placeholder HASH for
 // the hash of the admin-tools stage.
 const root = fileURLToPath(new URL('..', import.meta.url))
-const suites = { 'dev-script': 'dev', compose: 'compose', images: 'images', onprem: 'onprem', 'ai-eval': 'ai-eval-stack' }
+// The test files of each suite: ai-eval runs two, one at a time.
+const suites = {
+  'dev-script': ['dev'],
+  compose: ['compose'],
+  images: ['images'],
+  onprem: ['onprem'],
+  'ai-eval': ['ai-eval-stack', 'ai-eval-run'],
+}
 const hash = createHash('sha256').update(stageText(root, 'admin-tools')).digest('hex').slice(0, 12)
 
 function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: extra = {}, images = false } = {}) {
@@ -45,12 +52,14 @@ function runSmoke({ changed, failing = [], saved = [], dockerFails = '', env: ex
     )
     mkdirSync(join(dir, 'samples/modules/department-budgets'), { recursive: true })
     writeFileSync(join(dir, 'samples/modules/department-budgets/module.json'), '{"id":"department-budgets","version":"1.2.0"}')
-    for (const [suite, file] of Object.entries(suites)) {
+    for (const [suite, files] of Object.entries(suites)) {
       const body = failing.includes(suite) ? 'assert.fail()' : ''
-      writeFileSync(
-        join(dir, `scripts/${file}.test.mjs`),
-        `import assert from 'node:assert'\nimport { test } from 'node:test'\ntest('${suite}', () => {${body}})\n`,
-      )
+      for (const file of files) {
+        writeFileSync(
+          join(dir, `scripts/${file}.test.mjs`),
+          `import assert from 'node:assert'\nimport { test } from 'node:test'\ntest('${suite}', () => {${body}})\n`,
+        )
+      }
     }
     const bin = join(dir, 'bin')
     mkdirSync(bin)
@@ -130,7 +139,9 @@ describe('scripts/smoke.sh', () => {
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.deepEqual(run.written, Object.keys(suites))
     assert.ok(run.modules)
-    for (const suite of Object.keys(suites)) assert.match(run.stdout, new RegExp(`^\\| ${suite} \\| 1 \\| 0 \\| 0 \\| `, 'm'))
+    for (const [suite, files] of Object.entries(suites)) {
+      assert.match(run.stdout, new RegExp(`^\\| ${suite} \\| ${files.length} \\| 0 \\| 0 \\| `, 'm'))
+    }
   })
 
   test('loads the saved container images once, before the first suite, and pulls no image', () => {

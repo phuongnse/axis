@@ -224,7 +224,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
 
     /// <summary>
     /// The message of a revision: the summary and the trailers <c>Axis-User-Id</c> and <c>Axis-Client</c>, and
-    /// <c>Axis-Request</c> when the revision names an authoring request.
+    /// <c>Axis-Request</c> when the revision names the accept request that made it.
     /// </summary>
     internal static string Message(string summary, string userId, string client, Guid? request) =>
         $"{summary}\n\nAxis-User-Id: {userId}\nAxis-Client: {client}\n" + (request is { } id ? $"Axis-Request: {id:D}\n" : "");
@@ -327,7 +327,7 @@ internal sealed partial class StudioRevisions(string repository, string folder, 
     private static partial void Failed(ILogger logger, string repository, string exception);
 }
 
-/// <summary>One revision: its commit id, summary, author name, the user id and client of its trailers, the authoring request of its <c>Axis-Request</c> trailer, or null, and its time.</summary>
+/// <summary>One revision: its commit id, summary, author name, the user id and client of its trailers, the accept request of its <c>Axis-Request</c> trailer, or null, and its time.</summary>
 internal sealed record StudioRevision(string Id, string Summary, string Author, string? UserId, string? Client, string? Request, DateTimeOffset Time);
 
 /// <summary>

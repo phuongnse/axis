@@ -492,7 +492,8 @@ marks some of them as contract scenarios, which test the contract's points on ev
   `{ name, file, outcome: "skipped", point }`, with the first relaxed point in its `covers`, and the
   publisher writes a `<tenant> scenario <name> skipped: …` line. The
   [request](authoring.md#the-request) returns the skipped item in its `scenarios`, and Studio's results
-  list shows it with its point.
+  list shows it with its point. A [`test` request](authoring.md#test) skips them the same way, so a
+  draft that relaxes the point passes the agent's checking step and an author's test run.
 
 ## In Studio
 

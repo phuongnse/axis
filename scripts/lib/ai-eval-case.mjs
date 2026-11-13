@@ -3,7 +3,9 @@
 //
 // It sends the case's request, approves the plan and waits for the request to end. It accepts a `ready` request and reads
 // the accepted draft back. It returns the RUN that judgeCase in scripts/lib/ai-eval.mjs takes. The session is the server's
-// address and the value of the `Cookie` header of a signed-in author, and signing in is the caller's.
+// address and the value of the `Cookie` header of a signed-in author, and signing in is the caller's. Every call goes through
+// `fetch`, which a caller replaces when the server's address does not resolve, such as a tenant host on a machine that does not
+// map `*.eval.localhost` to the loopback address.
 const planning = 'planning'
 const awaitingApproval = 'awaitingApproval'
 const ended = ['ready', 'failed', 'dropped', 'accepted']
@@ -13,7 +15,7 @@ export async function runCase(
   { server, cookie },
   application,
   text,
-  { pollMs = 2000, timeoutMs = 3_600_000, now = Date.now } = {},
+  { pollMs = 2000, timeoutMs = 3_600_000, now = Date.now, fetch = globalThis.fetch } = {},
 ) {
   const base = server.replace(/\/+$/, '')
   const apps = `/api/studio/apps/${encodeURIComponent(application)}`
@@ -69,10 +71,10 @@ export async function runCase(
     outcome,
   }))
 
-  // The accept wrote one revision that names the request, and its files are what the accepted draft changed.
+  // The accept wrote one revision that names the accept's request, and its files are what the accepted draft changed.
   const revisions = await call('GET', '/revisions')
-  const revision = revisions.items.find((item) => item.request === sent.id)
-  if (revision === undefined) throw new Error(`GET ${apps}/revisions has no revision of authoring request ${sent.id}`)
+  const revision = revisions.items.find((item) => item.request === accept.id)
+  if (revision === undefined) throw new Error(`GET ${apps}/revisions has no revision of accept request ${accept.id}`)
   const changed = (await call('GET', `/revisions/${revision.id}`)).resources.map((resource) => resource.file)
 
   // After the accept the working folder is the accepted draft.

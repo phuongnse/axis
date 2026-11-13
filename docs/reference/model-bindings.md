@@ -97,20 +97,28 @@ against any model.
 - **Cases.** `tests/ai-eval/cases/` holds one JSON file per case: a starting application, from a
   sample, a template or a built-in application, the request text, and the expected outcome.
   - An outcome of the kind `change` names scenarios that must pass on the accepted draft, and may name
-    resources that must not change.
+    resources that must not change. A scenario of a module is named as the publish request reports it,
+    `<module>/<name>`, such as `approvals/AccessStaysWithinTheCeilings`.
   - An outcome of the kind `refusal` names a contract point that must stop the change, such as a
     requester who decides their own request. The case passes when the request ends with no accepted
     draft that breaks the point.
   - `tests/ai-eval/case.schema.json` gives the shape of a case and
     `tests/ai-eval/supported-models.schema.json` the shape of the supported models list.
     `scripts/lint.sh` checks the cases and the list against them.
-- **Running.** _(planned for M35)_ `scripts/ai-eval.sh --binding <name>` starts the stack, creates a
-  tenant for each case, sends the request through the agent host and the MCP server as Studio does,
-  approves the plan, and checks the outcome. It writes a report of each case, its tokens and its time
-  to `artifacts/ai-eval/`.
-- **Pass bar.** _(planned for M35)_ A model is supported when it passes every `refusal` case and at
-  least 90% of the `change` cases. `tests/ai-eval/supported-models.json` lists the supported models
-  with the date and the Axis version of their last pass.
+- **Running.** `scripts/ai-eval.sh --binding <name>` runs every case against one binding. The binding's
+  settings come from the `Ai__Bindings__<name>__*` environment variables, and no other binding reaches
+  the agent host. The script starts the eval stack and works through the cases one at a time. For each
+  case it creates a tenant, sends the request through the agent host and the MCP server as Studio does,
+  approves the plan, accepts a `ready` draft and judges the outcome. A case that cannot run is reported
+  as `not run`, and its error goes to stderr. The script writes `artifacts/ai-eval/report.json`, or
+  `report.json` in the folder that `AXIS_AI_EVAL_REPORT_DIR` names. The report holds the pass bar result
+  and, for each case, whether it passed, the reasons, its tokens and its `durationMs`. The smoke test
+  runs the script against a stand-in model, so no paid model is called.
+- **Pass bar.** A model is supported when it passes every `refusal` case and at least 90% of the
+  `change` cases. The script exits with 0 at or above the bar and 1 below it, and with 1 when the
+  stack does not start. It exits with 2 for a wrong argument or a binding with no settings, and then
+  starts nothing and writes no report. `tests/ai-eval/supported-models.json` lists the supported
+  models with the date and the Axis version of their last pass.
 - **When it runs.** _(planned for M35)_ For every supported model before each Axis release, by hand or
   by a workflow that holds the providers' keys. An operator runs it against their own binding the same
   way. The SaaS changes its default model only on the eval's numbers.
