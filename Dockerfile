@@ -7,7 +7,8 @@
 # applications in /templates, each at the id and version of its template.json.
 # For local use: the Development environment and the sample credentials are not for production.
 #
-# The targets axis-server, axis-worker, axis-agent, axis-admin and axis-controlplane are the production images. They run the
+# The targets axis-server, axis-worker, axis-agent, axis-admin, axis-controlplane and axis-package-host-dotnet, -node and
+# -python are the production images. They run the
 # Production environment and hold no sample, sample package, sample module, development realm or
 # credential. Build one with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`.
 # AXIS_VERSION is the Axis version, which the images carry as the OCI label
@@ -126,6 +127,7 @@ RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -p:InformationalV
 RUN dotnet publish controlplane/src/Axis.ControlPlane/Axis.ControlPlane.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane \
     && test -f /out/controlplane/wwwroot/sign-up.html
 RUN dotnet publish controlplane/src/Axis.ControlPlane.Admin/Axis.ControlPlane.Admin.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/controlplane-admin
+RUN dotnet publish src/Axis.PackageHost/Axis.PackageHost.csproj -c Release -p:InformationalVersion=$AXIS_VERSION -o /out/package-host
 RUN rm -f /out/*/appsettings.Development.json
 
 # Production server. It runs as the non-root user of the base image and can run on a read-only root file
@@ -200,6 +202,69 @@ COPY --from=production-build /out/controlplane-admin ./admin
 USER $APP_UID
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "Axis.ControlPlane.dll"]
+
+# Trivy at the version that scripts/lib/trivy.sh pins, downloaded and checked against the pinned checksum by the same
+# function that scripts/scan-images.sh uses. The stage takes no build argument, so its layer is the same for every Axis version.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS trivy
+WORKDIR /src
+COPY scripts/lib/retry.sh scripts/lib/trivy.sh scripts/lib/
+RUN bash -c 'source scripts/lib/trivy.sh && install_trivy && cp "$trivy" /trivy'
+
+# The Node.js 24 runtime and npm of the package host image, copied from the Node.js image onto the .NET runtime base. The
+# stage takes no build argument, so its layer is the same for every Axis version.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS package-host-node
+COPY --from=node:24-slim /usr/local/bin/node /usr/local/bin/
+COPY --from=node:24-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && node --version \
+    && npm --version
+
+# The Python 3 runtime and pip of the package host image. The stage takes no build argument, so its layer is the same for
+# every Axis version.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS package-host-python
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pip \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -m pip --version
+
+# Production package host for C# packages: Axis.PackageHost and Trivy, with the .NET runtime of the base image. A platform
+# operator builds a package with `docker run --rm -v <source>:/source:ro -v <extensions>:/extensions <image> build /source`,
+# see docs/reference/extension-packages.md#building-a-package. It runs as the non-root user of the base image. It needs a
+# writable root file system, because the build writes a temporary copy to /tmp and Trivy writes its database to its cache.
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS axis-package-host-dotnet
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
+ENV DOTNET_ENVIRONMENT=Production Extensions__Path=/extensions
+WORKDIR /app
+COPY --from=trivy /trivy /usr/local/bin/trivy
+COPY --from=production-build /out/package-host .
+RUN mkdir /extensions
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
+
+# Production package host for Node.js packages: the same as axis-package-host-dotnet, with Node.js and npm.
+FROM package-host-node AS axis-package-host-node
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
+ENV DOTNET_ENVIRONMENT=Production Extensions__Path=/extensions
+WORKDIR /app
+COPY --from=trivy /trivy /usr/local/bin/trivy
+COPY --from=production-build /out/package-host .
+RUN mkdir /extensions
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
+
+# Production package host for Python packages: the same as axis-package-host-dotnet, with Python 3 and pip.
+FROM package-host-python AS axis-package-host-python
+ARG AXIS_VERSION
+LABEL org.opencontainers.image.version=$AXIS_VERSION
+ENV DOTNET_ENVIRONMENT=Production Extensions__Path=/extensions
+WORKDIR /app
+COPY --from=trivy /trivy /usr/local/bin/trivy
+COPY --from=production-build /out/package-host .
+RUN mkdir /extensions
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 # The runtime image has no HTTP client, and Compose uses curl for the server health check.

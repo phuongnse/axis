@@ -76,10 +76,12 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
 
 - **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
   Python package, see [building a package](reference/extension-packages.md#building-a-package).
-- **Package runner mode and the host images** _(planned for M21)_. `Axis.PackageHost` in runner mode, over
+- **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
+  `Axis.PackageHost`, Trivy and one runtime, and runs the `build` command, see
+  [images](reference/installation.md#images).
+- **Package runner mode** _(planned for M21)_. `Axis.PackageHost` in runner mode, over
   `Axis.Extensions`, runs extension package operations out of process, see
-  [package runners](reference/extension-packages.md#package-runners). Each host image also carries the
-  `build` command.
+  [package runners](reference/extension-packages.md#package-runners). The host images also carry the runner.
 - **`sdk/`** _(planned for M21)_. The runner protocol's schema, `package-runner-protocol.schema.json`,
   and the folders `sdk/node/` and `sdk/python/`, which hold those runners and SDKs.
 

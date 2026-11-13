@@ -26,17 +26,15 @@ extensions.
 
 ## Images
 
-Axis ships four production images, `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`. They hold no
-sample, no sample extension package, no sample module, no development realm, no credential and no
-source control metadata such as `.git`. The default target of the `Dockerfile` and the `compose.yaml`
-at the repository root build the development images instead, which hold the samples and development
-credentials and are not for production, see [development](../development.md#docker-compose).
-`axis-controlplane` is the image of the Axis SaaS control plane and not part of an installation, see
-[control plane](control-plane.md#image-and-chart).
+Axis ships four production images, `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`, and the package host images
+below. They hold no sample, no sample extension package, no sample module, no development realm, no credential and no source
+control metadata such as `.git`. The default target of the `Dockerfile` and the `compose.yaml` at the repository root build the
+development images instead, which hold the samples and development credentials and are not for production, see
+[development](../development.md#docker-compose). `axis-controlplane` is the image of the Axis SaaS control plane and not part of
+an installation, see [control plane](control-plane.md#image-and-chart).
 
-Build an image from the repository root with
-`docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use `axis-worker`,
-`axis-agent` or `axis-admin` as the target for another. `AXIS_VERSION` defaults to `0.0.0-dev`.
+Build an image from the repository root with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use
+`axis-worker`, `axis-agent`, `axis-admin` or a package host image as the target for another. `AXIS_VERSION` defaults to `0.0.0-dev`.
 
 - **Environment.** The images run the `Production` environment.
 - **User.** They run as a non-root user, UID 1654, and work with a read-only root file system.
@@ -52,11 +50,13 @@ Build an image from the repository root with
   backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`, and `axis-admin version` prints it.
-- **The package host images** _(planned for M21)_. `axis-package-host-dotnet`,
-  `axis-package-host-node` and `axis-package-host-python` each hold `Axis.PackageHost` and one runtime
-  with its runner. They run as the containers `package-host-dotnet`, `package-host-node` and
-  `package-host-python` beside the worker, with `/extensions` mounted read-only, and Compose and the
-  Helm chart limit them as [package runners](extension-packages.md#package-runners) says.
+- **The package host images.** `axis-package-host-dotnet`, `axis-package-host-node` and `axis-package-host-python`
+  build extension packages, see [building a package](extension-packages.md#building-a-package). Each holds
+  `Axis.PackageHost`, Trivy at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. They
+  run as UID 1654 and, unlike the other images, need a writable root file system: the build, Trivy and npm write to it.
+- **The package runners** _(planned for M21)_. The package host images also hold their runtime's runner. They run as the containers
+  `package-host-dotnet`, `package-host-node` and `package-host-python` beside the worker, with `/extensions` mounted read-only, and
+  Compose and the Helm chart limit them as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
