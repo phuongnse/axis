@@ -163,8 +163,9 @@ flowchart LR
 
 ### Worker and extension package
 
-Extension package code runs inside the worker process, with the secrets and data of every tenant in
-reach, see [Not a sandbox](extension-packages.md#not-a-sandbox).
+Extension package code runs inside the worker process only with `Extensions:Isolation` `inProcess`, which
+only Development allows. There it has the secrets and data of every tenant in reach, see
+[Not a sandbox](extension-packages.md#not-a-sandbox).
 
 ```mermaid
 flowchart LR
@@ -185,7 +186,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| P30 | Package code reads the secrets or data of other tenants inside the worker. | Worker and extension package | Information disclosure | High | **Delegated** | The operator. Packages are trusted code that the operator installs and reviews, see [Not a sandbox](extension-packages.md#not-a-sandbox). In a runner, `PackageCapabilityTests` (a call's `run` holds only the declared bindings of its own tenant, and a runner serves both tenants one after the other). |
+| P30 | Package code reads the secrets or data of other tenants inside the worker. | Worker and extension package | Information disclosure | High | **Delegated** | The operator. Packages are trusted code that the operator installs and reviews, see [Not a sandbox](extension-packages.md#not-a-sandbox). In a runner, `PackageCapabilityTests` (a call's `run` holds only the declared bindings of its own tenant, and a runner serves both tenants one after the other), `WorkerOptionsTests` (a worker outside Development with `inProcess` does not start) and `PackageIsolationStartTests` (nor does a server). |
 | P31 | Package code goes around its capability limits inside the worker. | Worker and extension package | Elevation of privilege | High | **Delegated** | The operator, see [Not a sandbox](extension-packages.md#not-a-sandbox). The server runs no package code. It reads each assembly through a metadata-only load context, `PackageCatalogMetadataTests` (a package whose initializers write a marker loads and compiles, and leaves no marker). Outside Development, the runner's empty environment, read-only file system, resource limits and one network route stop it, see [package runners](extension-packages.md#package-runners). _(planned for M21)_ |
 | P32 | A package by mistake reads an undeclared secret or calls an undeclared host. | Worker and extension package | Elevation of privilege | Medium | **Mitigated** | `PackageCapabilityTests` (an undeclared secret fails the instance, and a call to another host fails the call, and through a runner an undeclared secret fails the call after one attempt). It stops mistakes, not attacks, see [Not a sandbox](extension-packages.md#not-a-sandbox). |
 | P33 | A package version is swapped after a release pins another one. | Worker and extension package | Tampering | Medium | **Mitigated** | `PackagePinningTests` (an instance keeps the version its release pins), `PackageCatalogTests` (an assembly that differs from its manifest version is a diagnostic). |

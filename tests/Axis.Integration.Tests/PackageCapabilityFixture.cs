@@ -22,8 +22,9 @@ namespace Axis.Integration.Tests;
 /// run <c>test-package/probe</c> in the mode <c>declared</c>, <c>otherHost</c>, <c>undeclaredSecret</c>
 /// and <c>swallow</c>. Each tenant's <c>TestUrl</c> binding points at its own path on the stub,
 /// <c>/tenant-a</c> or <c>/tenant-b</c>, and its <c>TestToken</c> secret holds its own token. One worker
-/// runs in Development for both tenants and a second one with the same bindings runs as Production, so
-/// it refuses the stub's <c>http</c> URL. Both load the package themselves, with <c>Extensions:Isolation</c> <c>inProcess</c>.
+/// runs in Development for both tenants and loads the package itself, with <c>Extensions:Isolation</c> <c>inProcess</c>.
+/// A second one with the same bindings runs as Production, so it refuses the stub's <c>http</c> URL. It has
+/// <c>Extensions:Isolation</c> <c>process</c> and no runner address, because it refuses the URL before it would use a runner.
 /// Each tenant also has an <c>OtherToken</c> secret that no operation declares. The process <c>PackageFlakyOnce</c>
 /// runs <c>test-package/flaky</c> with one failure and three attempts. A third worker runs in Development with
 /// <c>Extensions:Isolation</c> <c>process</c>. It sends each call to a package host that runs the installed package in real
@@ -137,7 +138,10 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
 
         var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         _development = Worker(settings, "Development");
-        _production = Worker(settings, "Production");
+
+        // The Production worker sends calls to runners and has none set. It refuses the http URL before it would use one.
+        var productionValues = new Dictionary<string, string?>(values) { [PackageIsolation.IsolationSetting] = "process" };
+        _production = Worker(new ConfigurationBuilder().AddInMemoryCollection(productionValues).Build(), "Production");
 
         _host = await TestPackageHost.StartAsync(_packages.Path);
         _relay = new RecordingRelay(_host.Endpoint);

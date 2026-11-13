@@ -440,7 +440,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         return new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing", ContentRootPath = AppContext.BaseDirectory })
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory })
             .BuildServiceProvider();
     }
 
