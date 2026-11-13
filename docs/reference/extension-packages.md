@@ -155,7 +155,7 @@ public class RetryableException : Exception { }
 - **One protocol and an SDK for each language.** The
   worker and every runner speak one protocol that no language owns, see
   [The runner protocol](#the-runner-protocol). A small SDK for each language
-  implements the operation context over it. The Python SDK is built, in `sdk/python/`.
+  implements the operation context over it. The Python SDK is in `sdk/python/`.
 - **The Node.js SDK** _(planned for M21)_. It implements the same context for a `node` package.
 - **A Python package.** The SDK module is `axis_sdk`, and it uses only the Python standard library. An operation's
   `type` names a synchronous function of the adapter. It gets the input and the context, and returns the output,
@@ -216,7 +216,8 @@ every host reads. An installation's package is trusted code that the operator re
   `<release>-package-host-dotnet` mount the same folder read-only, and
   its runner runs the C# packages, see [Package runners](#package-runners).
 - **The other package hosts** _(planned for M21)_. The containers `package-host-node` and `package-host-python` do the same
-  for the other languages. The image `axis-package-host-python` already holds the Python runner, see
+  for the other languages.
+- **The Python host image.** The image `axis-package-host-python` holds the Python runner, see
   [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
@@ -465,7 +466,9 @@ package reaches nothing of the host and no binding of another call.
   image `axis-package-host-python` holds the SDK at `/app/sdk/python`. The runner moves
   file descriptor 1 aside for the protocol and points it at standard error, so a `print` at import or while an
   operation runs, and a library that writes to the descriptor, never reach the protocol stream. The first line
-  after `start` is `ready`. The worker does not route to a Python host yet.
+  after `start` is `ready`.
+- **A worker route to a Python host** _(planned for M21)_. The worker sends the calls of a `python` version to the
+  Python host.
 - **No package code in the worker.** With `Extensions:Isolation` `process`, the worker reads the
   manifests and metadata of the installed C# packages, as the server does, and loads no package
   code. It sends each attempt of a C# call to a runner.
