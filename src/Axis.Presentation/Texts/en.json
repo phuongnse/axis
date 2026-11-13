@@ -2135,7 +2135,7 @@
   "shell.studio.aiRequest.planning": "AI is reading the application and writing a plan. Nothing changes until the plan is approved.",
   "shell.studio.aiRequest.plan": "Plan",
   "shell.studio.aiRequest.notYours": "Only the person who sent the request approves its plan.",
-  "shell.studio.aiRequest.round": ", fix round {round}",
+  "shell.studio.aiRequest.round": "Fix round {round}",
   "shell.studio.aiRequest.approve": "Approve plan",
   "shell.studio.aiRequest.changePlan": "Change plan…",
   "shell.studio.aiRequest.changePlan.title": "Change the plan",

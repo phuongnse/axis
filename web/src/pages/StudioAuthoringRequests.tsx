@@ -30,7 +30,8 @@ import { useDesignTokens } from '../platform/themeMode'
 import { StepsBar } from '../platform/StepsBar'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
-import { authoringRequestAddress, settled, useRequestStateColour, useRequestStateWords } from './authoringRequests'
+import { authoringRequestAddress, requestStateTone, settled, useRequestStateWords } from './authoringRequests'
+import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
 import { kindSingular } from '../platform/studioKinds'
 import { SectionPart, SectionParts } from './ResourceFormSection'
@@ -85,7 +86,6 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
   const t = useText()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
-  const stateColour = useRequestStateColour()
   const { generation, lost } = useStudioConnection()
   const [requests, setRequests] = useState<StudioAuthoringRequest[] | 'failed'>()
 
@@ -123,9 +123,10 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
     },
     {
       key: 'state',
-      kind: 'freeText',
+      // A status column is as wide as its tag, see docs/reference/actions-and-controls.md#tables.
+      kind: 'fixed',
       title: t('shell.studio.aiRequests.state'),
-      render: (_, row) => <span style={{ color: stateColour(row.state) }}>{stateWords(row)}</span>,
+      render: (_, row) => <StatusTag tone={requestStateTone(row.state)}>{stateWords(row)}</StatusTag>,
     },
     {
       key: 'who',
@@ -197,7 +198,6 @@ export function StudioAuthoringRequestPage({
   const { colour, size, spacing } = useDesignTokens()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
-  const stateColour = useRequestStateColour()
   const { generation, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<{ id: string; request: StudioAuthoringRequestDetail | null }>()
   const [follow, setFollow] = useState(0)
@@ -636,14 +636,12 @@ export function StudioAuthoringRequestPage({
         {stage !== null && working && <StepsBar titles={stageTitles} current={stage} />}
         <Flex align="center" gap={spacing.sm}>
           {following && !waitsForApp && <Spin size="small" />}
-          <Typography.Text style={{ color: stateColour(request.state) }}>
-            {stateWords(request)}
-            {request.round > 1 && request.state !== 'planning' && (
-              <span style={{ color: colour.textMuted }}>
-                {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
-              </span>
-            )}
-          </Typography.Text>
+          <StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>
+          {request.round > 1 && request.state !== 'planning' && (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
+            </Typography.Text>
+          )}
         </Flex>
         {running !== undefined && following && !waitsForApp && (
           <Typography.Text style={{ color: colour.textMuted }}>

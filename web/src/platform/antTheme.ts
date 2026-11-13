@@ -228,6 +228,23 @@ export function selectedItemTint(mode: ThemeMode): string {
 }
 
 /**
+ * Proposed: the background and border of each status tone, from Ant Design's tints of the seed colours, as a diff reads
+ * its tints, see `StatusTag` and the review on #3263.
+ */
+export function statusTints(
+  mode: ThemeMode,
+): Record<'neutral' | 'attention' | 'success' | 'danger' | 'muted', { background: string; border: string }> {
+  const token = theme.getDesignToken(antThemeFor(mode))
+  return {
+    neutral: { background: token.colorFillTertiary, border: token.colorBorderSecondary },
+    attention: { background: token.colorWarningBg, border: token.colorWarningBorder },
+    success: { background: token.colorSuccessBg, border: token.colorSuccessBorder },
+    danger: { background: token.colorErrorBg, border: token.colorErrorBorder },
+    muted: { background: 'transparent', border: token.colorBorderSecondary },
+  }
+}
+
+/**
  * Proposed: the tints of a diff, from Ant Design's success and error backgrounds: a line added or removed, and the
  * deeper tint of the words that changed in it. See the review on #3263.
  */

@@ -2135,7 +2135,7 @@
   "shell.studio.aiRequest.planning": "AI đang đọc ứng dụng và lập kế hoạch. Chưa có gì thay đổi cho đến khi kế hoạch được duyệt.",
   "shell.studio.aiRequest.plan": "Kế hoạch",
   "shell.studio.aiRequest.notYours": "Chỉ người gửi yêu cầu mới duyệt được kế hoạch.",
-  "shell.studio.aiRequest.round": ", lượt sửa thứ {round}",
+  "shell.studio.aiRequest.round": "Vòng sửa {round}",
   "shell.studio.aiRequest.approve": "Duyệt kế hoạch",
   "shell.studio.aiRequest.changePlan": "Đổi kế hoạch…",
   "shell.studio.aiRequest.changePlan.title": "Đổi kế hoạch",

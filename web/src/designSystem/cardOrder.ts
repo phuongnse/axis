@@ -33,7 +33,7 @@ export const cardGroups: readonly { name: string; previews: readonly string[] }[
   { name: 'Charts and KPIs', previews: ['chart-bar', 'chart-line', 'chart-pie', 'kpi'] },
   { name: 'Process widgets', previews: ['taskInbox', 'processInspector'] },
   { name: 'Containers', previews: ['columns', 'tabs', 'section'] },
-  { name: 'Shared states', previews: ['states'] },
+  { name: 'Shared states', previews: ['states', 'statusTag'] },
   { name: 'Shell', previews: ['shell', 'signIn', 'identitySignIn'] },
   { name: 'Studio', previews: ['studio'] },
   { name: 'Sign-up', previews: ['signUp'] },

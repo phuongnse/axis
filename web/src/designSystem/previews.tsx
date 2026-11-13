@@ -1,3 +1,4 @@
+import { Flex } from 'antd'
 import type { ReactNode } from 'react'
 import type { InitialEntry } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -10,6 +11,7 @@ import { NarrowWidthOverride } from '../platform/useNarrowWidth'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
 import { SignInPromptDialog } from '../platform/SignInPrompt'
+import { StatusTag } from '../platform/StatusTag'
 import type { EntityWidgetMetadata, WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
@@ -219,6 +221,21 @@ export const previews: Record<string, readonly PreviewState[]> = {
   states: [
     { caption: 'Loading', draw: () => requestTable(loadingTableWidget), routes: loadingRoutes },
     { caption: 'Load error', draw: () => requestTable(failingTableWidget), routes: failingRoutes },
+  ],
+  // Proposed: a status as a tag, in each tone, see the review on #3263.
+  statusTag: [
+    {
+      caption: 'Every tone',
+      draw: () => (
+        <Flex gap="small" wrap>
+          <StatusTag tone="neutral">Working</StatusTag>
+          <StatusTag tone="attention">Awaiting approval</StatusTag>
+          <StatusTag tone="success">Accepted</StatusTag>
+          <StatusTag tone="danger">Failed</StatusTag>
+          <StatusTag tone="muted">Dropped</StatusTag>
+        </Flex>
+      ),
+    },
   ],
   ...Object.fromEntries(
     fieldTypes.map((type) => [

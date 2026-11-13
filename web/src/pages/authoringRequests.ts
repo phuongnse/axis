@@ -1,6 +1,6 @@
 import type { StudioAuthoringRequest, StudioAuthoringRequestState } from '../platform/studio'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
+import type { StatusTone } from '../platform/StatusTag'
 
 /** The states that wait for the author of the request. */
 export const waitingForAuthor: readonly StudioAuthoringRequestState[] = ['awaitingApproval', 'ready']
@@ -20,13 +20,19 @@ export function useRequestStateWords(): (request: StudioAuthoringRequest) => str
   return (request) => t(`shell.studio.ai.state.${request.state === 'fixing' ? 'working' : request.state}`)
 }
 
-/** The colour of a state's words: muted once it is over, the danger text when it failed. */
-export function useRequestStateColour(): (state: StudioAuthoringRequestState) => string {
-  const { colour } = useDesignTokens()
-  return (state) =>
-    state === 'failed'
-      ? colour.dangerText
-      : state === 'accepted' || state === 'dropped'
-        ? colour.textMuted
-        : colour.text
+/** Proposed: the tone of a request's state, see `StatusTag` and the review on #3263. */
+export function requestStateTone(state: StudioAuthoringRequestState): StatusTone {
+  switch (state) {
+    case 'awaitingApproval':
+    case 'ready':
+      return 'attention'
+    case 'accepted':
+      return 'success'
+    case 'failed':
+      return 'danger'
+    case 'dropped':
+      return 'muted'
+    default:
+      return 'neutral'
+  }
 }
