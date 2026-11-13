@@ -121,7 +121,7 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
         await using var host = await TestPackageHost.StartAsync(fixture.PackagesPath);
         var (subjectId, _) = await fixture.StageAsync("PackageNodeGreet", CancellationToken);
 
-        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallOnAsync(Process(null, host.Address), CancellationToken));
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallOnAsync(Process(null, host.Address, "inProcess"), CancellationToken));
 
         var request = await fixture.RequestAsync(subjectId);
         Assert.Contains(request.Values["title"]!.GetValue<string>(), request.Values["greeting"]!.GetValue<string>(), StringComparison.Ordinal);
@@ -147,7 +147,7 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
     {
         var (_, instanceId) = await fixture.StageAsync(process, CancellationToken);
         var callId = await CallIdAsync(instanceId);
-        var values = Process(null, null);
+        var values = Process(null, null, "process");
         values[setting] = TestPackageHost.ClosedAddress();
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(values, CancellationToken));
@@ -167,7 +167,7 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
         var callId = await CallIdAsync(instanceId);
 
         // The host of the other runtime is live, so only the setting of the call's runtime is missing.
-        var values = Process(null, null);
+        var values = Process(null, null, "process");
         values[setting == PackageIsolation.DotnetRunnerSetting ? PackageIsolation.NodeRunnerSetting : PackageIsolation.DotnetRunnerSetting] = host.Address;
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(values, CancellationToken));
@@ -182,7 +182,7 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
     private static Dictionary<string, string?> Process(string address) => Process(address, null, "process");
 
     /// <summary>The settings of a worker with <paramref name="isolation"/> that sends C# attempts to <paramref name="dotnet"/> and <c>node</c> attempts to <paramref name="node"/>, each unset when <see langword="null"/>.</summary>
-    private static Dictionary<string, string?> Process(string? dotnet, string? node, string isolation = "process") =>
+    private static Dictionary<string, string?> Process(string? dotnet, string? node, string isolation) =>
         new()
         {
             [PackageIsolation.IsolationSetting] = isolation,
