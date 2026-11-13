@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "label": "Payment references",
   "assembly": "PaymentReferences.dll",
+  "lock": "packages.lock.json",
   "operations": [
     {
       "name": "creditorReference",

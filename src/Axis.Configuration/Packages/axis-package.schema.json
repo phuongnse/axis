@@ -3,7 +3,7 @@
   "title": "Axis extension package manifest",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "version", "label", "assembly", "operations"],
+  "required": ["id", "version", "label", "lock", "operations"],
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
     "version": {
@@ -11,13 +11,47 @@
       "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
     },
     "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "language": { "enum": ["csharp", "node", "python"] },
     "assembly": { "type": "string", "pattern": "^[^/\\\\]+\\.dll$" },
+    "adapter": { "type": "string", "pattern": "^[^/\\\\]+$" },
+    "lock": { "type": "string" },
     "operations": {
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/operation" }
     }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "language": { "const": "node" } }, "required": ["language"] },
+      "then": {
+        "required": ["adapter"],
+        "properties": {
+          "assembly": false,
+          "adapter": { "pattern": "\\.(js|mjs|cjs)$" },
+          "lock": { "const": "package-lock.json" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "language": { "const": "python" } }, "required": ["language"] },
+      "then": {
+        "required": ["adapter"],
+        "properties": {
+          "assembly": false,
+          "adapter": { "pattern": "\\.py$" },
+          "lock": { "const": "requirements.txt" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "language": { "enum": ["node", "python"] } }, "required": ["language"] },
+      "else": {
+        "required": ["assembly"],
+        "properties": { "adapter": false, "lock": { "const": "packages.lock.json" } }
+      }
+    }
+  ],
   "$defs": {
     "name": {
       "type": "string",
