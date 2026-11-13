@@ -1,3 +1,4 @@
+using Axis.Configuration.Packages;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
@@ -167,6 +168,45 @@ public sealed class WorkerOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
 
         Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Testing")]
+    public void An_in_process_isolation_outside_development_stops_the_worker_at_startup_naming_the_setting(string environment)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = environment, DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Extensions:Isolation"] = "inProcess",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Extensions:Isolation", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_in_process_isolation_in_development_builds_the_worker()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Development", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Extensions:Isolation"] = "inProcess",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+        using var host = builder.Build();
+
+        Assert.True(host.Services.GetRequiredService<PackageIsolation>().InProcess);
     }
 
     [Theory]

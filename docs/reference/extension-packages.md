@@ -331,8 +331,9 @@ to `inProcess`, see [Package runners](#package-runners).
   metadata-only load context, to run the manifest checks and to compile against the package. It
   finds assemblies by the rules of the shared contracts below. It runs no static constructor, module
   initializer or other package code, and it keeps no load context that can run the package.
-- **Development only** _(planned for M21)_. `inProcess` is allowed only in
-  Development. Elsewhere the worker does not start with it, see [Package runners](#package-runners).
+- **Development only.** `inProcess` is allowed only in Development. Outside Development neither the
+  server nor the worker starts with it, and the error names `Extensions:Isolation`, see
+  [Package runners](#package-runners).
 - **Node and Python.** A host reads only the manifest of a `node` or `python` package and checks that
   its `adapter` file exists. It loads none of the package's code.
 - **Own load context.** In a worker with `inProcess`, each C# package version loads in its own
@@ -465,11 +466,11 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran.
 
-The worker reads these settings:
+The server reads `Extensions:Isolation`, and the worker reads both settings:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
-| `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` uses the runners. `inProcess` keeps the in-process [loading](#loading). Any other value stops the worker at start |
+| `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` uses the runners. `inProcess` keeps the in-process [loading](#loading) and is allowed only in Development. Outside Development `inProcess`, or any other value, stops the server and the worker at start |
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 
 ### The runner protocol

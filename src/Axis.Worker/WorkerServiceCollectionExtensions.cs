@@ -38,7 +38,7 @@ public static class WorkerServiceCollectionExtensions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker, health or cell configuration is invalid, <c>Worker:StatementTimeout</c> is not a duration of at least one millisecond, <c>Worker:IdlePollCeiling</c> is below <c>Worker:PollInterval</c>, <c>Worker:Concurrency</c> or <c>Worker:Quantum</c> is below 1, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Data:TenantPoolMaxSize</c>, <c>Data:TenantPoolMinSize</c> or <c>Data:TenantPoolIdleLifetime</c> is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
-    /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Isolation</c> is not <c>process</c> or <c>inProcess</c>, <c>Extensions:Runners:Dotnet</c> is not a <c>host:port</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
+    /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Isolation</c> is not <c>process</c> or <c>inProcess</c> or is <c>inProcess</c> outside Development, <c>Extensions:Runners:Dotnet</c> is not a <c>host:port</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -87,7 +87,7 @@ public static class WorkerServiceCollectionExtensions
         var health = HealthOptions.Load(configuration, "http://127.0.0.1:5208");
 
         // Read before any database work too, so a bad value stops the start.
-        var isolation = PackageIsolation.Load(configuration);
+        var isolation = PackageIsolation.Load(configuration, environment);
         services.AddSingleton(isolation);
 
         var cell = CellOptions.Load(configuration);

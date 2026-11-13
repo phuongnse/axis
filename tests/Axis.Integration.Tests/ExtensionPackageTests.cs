@@ -1,6 +1,7 @@
 using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Extensions;
@@ -147,12 +148,15 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
 
     private static IHost BuildWorker(string connectionString, string? packagePath)
     {
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Development" });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenants:a:Hosts:0"] = TenantHost,
             ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             [PackageCatalog.PathSetting] = packagePath,
+
+            // Development reads the repository's module folder, which the test project does not have.
+            [ModuleCatalog.PathSetting] = SampleModules.Path,
             [PackageIsolation.IsolationSetting] = "inProcess",
         });
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);

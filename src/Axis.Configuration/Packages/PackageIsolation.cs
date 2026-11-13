@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace Axis.Configuration.Packages;
 
@@ -21,18 +22,17 @@ public sealed record PackageIsolation(bool InProcess, string? DotnetHost, int Do
     /// <summary>
     /// Reads <c>Extensions:Isolation</c>, <c>process</c> or <c>inProcess</c> and <c>process</c> when unset, and
     /// <c>Extensions:Runners:Dotnet</c>, a <c>host:port</c> or <c>[ipv6]:port</c> with a port from 1 to 65535.
+    /// Only Development allows <c>inProcess</c>, see docs/reference/extension-packages.md#loading.
     /// </summary>
-    /// <exception cref="InvalidOperationException">A setting has another value. The message names the setting.</exception>
-    public static PackageIsolation Load(IConfiguration configuration)
+    /// <exception cref="InvalidOperationException">
+    /// A setting has another value, or <c>Extensions:Isolation</c> is <c>inProcess</c> outside Development. The message names the setting.
+    /// </exception>
+    public static PackageIsolation Load(IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
 
-        var inProcess = configuration[IsolationSetting] switch
-        {
-            null or "" or ProcessValue => false,
-            InProcessValue => true,
-            _ => throw new InvalidOperationException($"'{IsolationSetting}' must be '{ProcessValue}' or '{InProcessValue}'."),
-        };
+        var inProcess = ReadInProcess(configuration, environment);
 
         if (configuration[DotnetRunnerSetting] is not { Length: > 0 } runner)
         {
@@ -55,5 +55,37 @@ public sealed record PackageIsolation(bool InProcess, string? DotnetHost, int Do
         }
 
         return new PackageIsolation(inProcess, host, port);
+    }
+
+    /// <summary>
+    /// Reads only <c>Extensions:Isolation</c>, for a host that never talks to a package host, so that it stops at
+    /// start on the same values as the worker.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// <c>Extensions:Isolation</c> is not <c>process</c> or <c>inProcess</c>, or is <c>inProcess</c> outside Development.
+    /// </exception>
+    public static void Check(IConfiguration configuration, IHostEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+
+        _ = ReadInProcess(configuration, environment);
+    }
+
+    private static bool ReadInProcess(IConfiguration configuration, IHostEnvironment environment)
+    {
+        var inProcess = configuration[IsolationSetting] switch
+        {
+            null or "" or ProcessValue => false,
+            InProcessValue => true,
+            _ => throw new InvalidOperationException($"'{IsolationSetting}' must be '{ProcessValue}' or '{InProcessValue}'."),
+        };
+
+        if (inProcess && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException($"'{IsolationSetting}' may be '{InProcessValue}' only in Development. Use '{ProcessValue}'.");
+        }
+
+        return inProcess;
     }
 }

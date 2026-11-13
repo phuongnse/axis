@@ -57,6 +57,9 @@ builder.Services.AddSingleton<RateLimitRefusals>();
 builder.Services.AddRateLimiter(_ => { });
 builder.Services.AddOptions<RateLimiterOptions>().Configure<RateLimitSettings, RateLimitRefusals>(RateLimits.Configure);
 
+// Read before any database work too, so a bad value stops the start. Only Development may run packages in the worker, see docs/reference/extension-packages.md#loading.
+PackageIsolation.Check(builder.Configuration, builder.Environment);
+
 // Read before any database work too, so a bad value stops the start.
 var cell = CellOptions.Load(builder.Configuration);
 
