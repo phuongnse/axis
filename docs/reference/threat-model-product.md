@@ -200,7 +200,8 @@ _(planned for M37)_
 
 An application's package is written by the tenant's author and is not trusted. Its runners serve only its
 tenant, in a sandbox stronger than a container. A customer may host a runner in its own network, which
-connects out with its own credential. The flow below shows where these threats sit.
+connects out with its own credential. Its calls to outside systems go through the customer's own
+network, with no egress proxy of Axis. The flow below shows where these threats sit.
 
 ```mermaid
 flowchart LR
@@ -213,6 +214,7 @@ flowchart LR
     end
     subgraph customer [Customer network]
         CRun[Customer-hosted runner, with its own secrets]
+        CSys[Systems the customer's network reaches]
     end
     subgraph outside [Outside systems]
         Ext[Hosts the package declares]
@@ -221,7 +223,7 @@ flowchart LR
     Run -->|egress proxy, declared hosts only| Ext
     Run -. no route .-> OtherData
     CRun -->|connects out, own credential, takes calls under a lease| Steps
-    CRun -->|declared hosts only| Ext
+    CRun -->|own network, no egress proxy| CSys
 ```
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
