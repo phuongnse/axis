@@ -12,9 +12,9 @@ and what each diagnostic code means is in [diagnostic codes](diagnostic-codes.md
 A layer is a resource of the kind `layer`. One file changes one module resource, and lives at
 `customizations/<module id>/<resource name>.json` in the application folder.
 
-This layer adds a director's approval above a threshold to the `RequestApproval` process of the
-`approvals` module. It sends the manager's approval to a new decision step, which leads to the
-director's step above the threshold:
+This layer adds a second approval for large requests to the `RequestApproval` process of the
+`approvals` module. An approver's approval goes to a new decision step. For an amount of 10 000 or
+more, the step leads to a task for the module's `admin` slot. A smaller amount is recorded as before:
 
 ```json
 {
@@ -25,27 +25,27 @@ director's step above the threshold:
   "changes": {
     "steps": [
       {
-        "name": "managerApproval",
-        "outcomes": [{ "name": "approve", "next": "directorCheck" }]
+        "name": "decide",
+        "outcomes": [{ "name": "approve", "next": "amountCheck" }]
       },
       {
-        "name": "directorCheck",
-        "after": "managerApproval",
+        "name": "amountCheck",
+        "after": "decide",
         "type": "decision",
-        "branches": [{ "name": "aboveThreshold", "when": "amount >= DirectorThreshold()", "next": "directorApproval" }],
-        "otherwise": "markApproved"
+        "branches": [{ "name": "large", "when": "amount >= 10000", "next": "secondApproval" }],
+        "otherwise": "recordApproval"
       },
       {
-        "name": "directorApproval",
-        "after": "directorCheck",
+        "name": "secondApproval",
+        "after": "amountCheck",
         "type": "task",
-        "label": { "textKey": "acme.directorApproval" },
-        "assignee": { "role": "director" },
-        "form": "approvals/RequestReview",
+        "label": { "textKey": "approvals.requestApproval.decide" },
+        "assignee": { "role": "admin" },
+        "form": "RequestReview",
         "dueIn": "P3D",
         "outcomes": [
-          { "name": "approve", "label": { "textKey": "task.approve" }, "next": "markApproved" },
-          { "name": "reject", "label": { "textKey": "task.reject" }, "next": "markRejected" }
+          { "name": "approve", "label": { "textKey": "approvals.requestApproval.approve" }, "next": "recordApproval" },
+          { "name": "reject", "label": { "textKey": "approvals.requestApproval.reject" }, "next": "logRejection" }
         ]
       }
     ]
