@@ -119,15 +119,12 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       kind: 'freeText',
       title: t('shell.studio.aiRequests.request'),
       render: (_, row) => (
-        <>
-          <Link
-            to={authoringRequestAddress(application, row.id)}
-            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-          >
-            {row.text}
-          </Link>
-          {row.app !== null && <CoAuthored app={row.app} />}
-        </>
+        <Link
+          to={authoringRequestAddress(application, row.id)}
+          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        >
+          {row.text}
+        </Link>
       ),
     },
     {
@@ -391,7 +388,10 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
-  const line = (mine ? t('shell.studio.aiRequest.lineMine') : t('shell.studio.aiRequest.line'))
+  // Proposed: an outside app is named as git names a co-author, in the sender's line, see the review on #3263.
+  const lineKey = `shell.studio.aiRequest.${mine ? 'lineMine' : 'line'}${request.app !== null ? 'CoAuthored' : ''}`
+  const line = t(lineKey)
+    .replace('{app}', request.app ?? '')
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
     .replace('{time}', sentTime(request.sentAt))
   // The page reads as one document on the content's `surface`, its parts a rule apart.
@@ -562,14 +562,7 @@ export function StudioAuthoringRequestPage({
             ))}
           </ul>,
         )}
-      {section(
-        'ai-request',
-        t('shell.studio.aiRequest.asked'),
-        <>
-          {quoted(request.text)}
-          {request.app !== null && <CoAuthored app={request.app} />}
-        </>,
-      )}
+      {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
       {request.plan !== null &&
         section(
           'ai-plan',
@@ -802,20 +795,6 @@ export function StudioAuthoringRequestPage({
         {t('shell.studio.aiRequest.dropHelp')}
       </Modal>
     </Flex>
-  )
-}
-
-/**
- * Proposed: the outside AI app that made a request's change with its person, as git names a co-author, see the review
- * on #3263.
- */
-function CoAuthored({ app }: { app: string }) {
-  const t = useText()
-  const { colour } = useDesignTokens()
-  return (
-    <Typography.Text style={{ display: 'block', color: colour.textMuted }}>
-      {t('shell.studio.aiRequest.coAuthored').replace('{app}', app)}
-    </Typography.Text>
   )
 }
 

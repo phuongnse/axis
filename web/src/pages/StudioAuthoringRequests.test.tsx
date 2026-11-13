@@ -81,12 +81,12 @@ describe('an outside AI app’s request', () => {
     vi.unstubAllGlobals()
   })
 
-  it('names the app as its co-author under its words in the list of AI requests', async () => {
+  it('lists it as any request, with no word of the app', async () => {
     stub({ items: [fromApp] })
     renderIn(<StudioAuthoringRequests application={application} userId={userId} />)
 
-    expect(await screen.findByText('Co-authored with Claude Code')).toBeInTheDocument()
-    expect(screen.getByText('You')).toBeInTheDocument()
+    expect(await screen.findByText('You')).toBeInTheDocument()
+    expect(screen.queryByText(/Claude Code/)).toBeNull()
   })
 
   it('names its co-author, shows its plan and Accept, and says that no second AI reviewed it', async () => {
@@ -101,8 +101,7 @@ describe('an outside AI app’s request', () => {
       />,
     )
 
-    expect(await screen.findByText(/^Sent by you on /)).toBeInTheDocument()
-    expect(screen.getByText('Co-authored with Claude Code')).toBeInTheDocument()
+    expect(await screen.findByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
     expect(within(screen.getByTestId('studio-ai-progress')).getByText('Ready for you to accept')).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
