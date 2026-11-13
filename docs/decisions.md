@@ -159,4 +159,4 @@ the files agree, title and status included.
 | [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) | Docs stay true, and an audit reads them every few merges | **Agreed** |
 | [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) | CI runs on main every few merges, and NexKit checks every branch | **Agreed** |
 | [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) | A run downloads only what the caches miss, and a transient stop runs again after a wait | **Agreed** |
-| [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) | Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts | **Proposed** |
+| [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) | Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts | **Agreed** |

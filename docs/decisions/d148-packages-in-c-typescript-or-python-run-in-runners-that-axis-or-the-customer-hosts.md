@@ -1,6 +1,6 @@
 # D148. Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts
 
-Status: **Proposed**
+Status: **Agreed**
 
 ## Context
 
@@ -24,8 +24,8 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
 
 - **Custom code lives in extension packages,** never in configuration, as D7 said. A package adds typed
   operations that process steps call, and it cannot read or write entities.
-- **A package is written in C#, TypeScript or Python.** It is a folder with a manifest, a thin adapter
-  in one of those languages and a lock file of its dependencies. The manifest declares each
+- **A package is written in C#, TypeScript or JavaScript on Node.js, or Python.** It is a folder with a
+  manifest, a thin adapter in one of those languages and a lock file of its dependencies. The manifest declares each
   operation's typed input and output, whether it is idempotent, its timeout and its capabilities: the
   `url` bindings it may call and the `secret` bindings it may read. The package has a SemVer version.
 - **A package reuses the code a business already has.** Its dependencies may be the business's own
@@ -46,29 +46,35 @@ This decision replaces D7, D28 and D90, and restates what still holds from them.
     for the installation, such as a built-in module or a partner's module. It is trusted code that the
     operator reviews, and its runners are shared by every tenant, one set for each package version, as
     D90 said.
-  - **An application's package** sits in the application's folder, and the tenant's author brings it
-    through Studio, through an agent or through the authoring API. It is not trusted. Its runners serve
-    only its tenant, run in a sandbox stronger than a container, and their use counts against the
-    tenant's quotas, which its plan sets. Writing a package is a permission of its own.
+  - **An application's package** sits in the application's folder, and the tenant's author brings it.
+    It is not trusted. Its runners serve only its tenant, run in a sandbox stronger than a container,
+    and their use counts against the tenant's quotas. In Axis SaaS only a paid plan allows it, and the
+    tenant's administrator turns it on and gives the permission to write a package to each author. An
+    installation without that sandbox refuses an application's package, and runs its own packages as
+    before.
 - **Axis or the customer hosts a runner.** A runner that Axis hosts starts with an empty environment, a
   read-only file system apart from a temporary folder, CPU and memory limits, and one network route,
   through a proxy that admits only the hosts of the declared `url` bindings, and it is killed at the
   operation's timeout with an unknown outcome, as D90 said. A library's own HTTP calls go through that
   proxy, so it needs no change. A runner that the customer hosts runs in the customer's own network,
-  connects out to the installation as one of the tenant's clients, and takes only that tenant's calls
-  to the packages it registers, so the code and the systems it reaches never leave the customer.
+  connects out to the installation with a credential of its own that the tenant's administrator can
+  revoke, and takes only that tenant's calls to the packages it registers. It keeps its own secrets,
+  and the worker sends it no binding value, so the code, its secrets and the systems it reaches never
+  leave the customer.
 - **A release pins the code it runs.** It pins the exact version of each installation's package, the
   highest installed one in each declared range, as D28 said, and it holds the built application's
   packages, so running work keeps the code it started with.
-- **An agent may write a package's adapter, manifest and tests** over a library the author names,
-  through the MCP server and under the plan, review and accept of
-  [D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md). It never publishes.
+- **An author writes a package by hand or asks an agent for it.** By hand, the author edits its files
+  in Studio, or in their own tools through the authoring API. An agent writes a package's adapter,
+  manifest and tests over a library the author names only through an authoring request, the one place
+  in Axis where an agent works, under the plan, review and accept of
+  [D125](d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md), and it never publishes.
 
 ## Consequences
 
 - A business runs the logic it already has without rewriting it, and without running a service of its
   own for it.
-- Axis maintains a runner and an SDK for each of three languages, and each runner image carries its
+- Axis maintains a runner and an SDK for each of three runtimes, and each runner image carries its
   language's runtime. Another language is a new runner and SDK, not a new design.
 - An installation's packages keep D90's limits and its one gap: static state in a shared runner can
   still mix tenants' data, so they stay code the operator reviews.
