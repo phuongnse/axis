@@ -7,19 +7,19 @@ using Npgsql;
 
 namespace Axis.Integration.Tests;
 
-public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class PublisherActivateTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string NoteOrder = """{ "name": "note", "type": "text" }""";
     private const string RemarkOrder = """{ "name": "remark", "type": "text" }""";
 
     private readonly Guid _applicationId = Guid.NewGuid();
     private readonly Guid _orderId = Guid.NewGuid();
-    private readonly string _name = $"Rollback{Guid.NewGuid():N}";
+    private readonly string _name = $"Activate{Guid.NewGuid():N}";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task A_rollback_across_a_rename_migration_fails_with_AXC0174_and_changes_nothing()
+    public async Task An_activate_across_a_rename_migration_fails_with_AXC0174_and_changes_nothing()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await CreateTenantAsync(scenario);
@@ -33,25 +33,26 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
         var second = await ReleaseOfNumberAsync(scenario, tenant, 2);
         Assert.Equal(second, await ActiveReleaseAsync(scenario, tenant));
         var activations = await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations");
-        var request = await QueueRollbackAsync(scenario, tenant, first);
+        var request = await QueueActivateAsync(scenario, tenant, first);
 
         var result = await RunPublisherAsync(scenario, tenant, request);
 
         Assert.Equal(0, result.Exit);
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
-        Assert.Equal([$"{tenant} claim ok", $"{tenant} version ok", $"{tenant} rollback ok"], result.Output.Take(3));
+        Assert.Equal([$"{tenant} claim ok", $"{tenant} version ok", $"{tenant} load ok"], result.Output.Take(3));
+        Assert.DoesNotContain(result.Output, line => line.Contains(" rollback ", StringComparison.Ordinal));
         Assert.StartsWith($"{tenant} activate failed: {DiagnosticCodes.ChangedMigrationHistory} application.json : ", Assert.Single(result.Output.Skip(3)), StringComparison.Ordinal);
         var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
         Assert.Contains(diagnostics, item => item!["code"]!.GetValue<string>() == DiagnosticCodes.ChangedMigrationHistory);
         Assert.Equal(first, await ScalarAsync(scenario, tenant, $"SELECT release_id FROM axis.publish_requests WHERE id = '{request}'"));
         Assert.Equal(second, await ActiveReleaseAsync(scenario, tenant));
         Assert.Equal(activations, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
-        await AssertOneAuditRecordAsync(scenario, tenant, "release.rollbackFailed", request, first, 1);
+        await AssertOneAuditRecordAsync(scenario, tenant, "release.activateFailed", request, first, 1);
         await scenario.AssertNoSecretsAsync();
     }
 
     [Fact]
-    public async Task A_rollback_to_a_release_that_pins_a_package_version_that_is_not_installed_fails_with_AXC0146()
+    public async Task An_activate_to_a_release_that_pins_a_package_version_that_is_not_installed_fails_with_AXC0146()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await CreateTenantAsync(scenario);
@@ -65,40 +66,40 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
         var first = await ReleaseOfNumberAsync(scenario, tenant, 1);
         var second = await ReleaseOfNumberAsync(scenario, tenant, 2);
         var activations = await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations");
-        var request = await QueueRollbackAsync(scenario, tenant, first);
+        var request = await QueueActivateAsync(scenario, tenant, first);
 
         var result = await RunPublisherAsync(scenario, tenant, request, new Dictionary<string, string?> { ["Extensions:Path"] = older.Path });
 
         Assert.Equal(0, result.Exit);
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
-        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} rollback failed: {DiagnosticCodes.PinnedPackageVersionMissing} application.json /packages/0/version: ", StringComparison.Ordinal));
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} load failed: {DiagnosticCodes.PinnedPackageVersionMissing} application.json /packages/0/version: ", StringComparison.Ordinal));
         var diagnostics = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
         var diagnostic = Assert.Single(diagnostics)!;
         Assert.Equal(DiagnosticCodes.PinnedPackageVersionMissing, diagnostic["code"]!.GetValue<string>());
         Assert.Equal(second, await ActiveReleaseAsync(scenario, tenant));
         Assert.Equal(activations, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.release_activations"));
-        await AssertOneAuditRecordAsync(scenario, tenant, "release.rollbackFailed", request, first, 1);
+        await AssertOneAuditRecordAsync(scenario, tenant, "release.activateFailed", request, first, 1);
         await scenario.AssertNoSecretsAsync();
     }
 
     [Fact]
-    public async Task A_rollback_to_a_release_that_is_not_stored_fails_without_changing_the_active_release()
+    public async Task An_activate_to_a_release_that_is_not_stored_fails_without_changing_the_active_release()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var tenant = await CreateTenantAsync(scenario);
         using var folder = Application().With("entities/order.json", Order(NoteOrder));
         await ActivateAsync(scenario, tenant, folder.Path);
         var active = await ActiveReleaseAsync(scenario, tenant);
-        var request = await QueueRollbackAsync(scenario, tenant, Guid.NewGuid());
+        var request = await QueueActivateAsync(scenario, tenant, Guid.NewGuid());
 
         var result = await RunPublisherAsync(scenario, tenant, request);
 
         Assert.Equal(0, result.Exit);
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
-        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} rollback failed: ", StringComparison.Ordinal));
+        Assert.Contains(result.Output, line => line == $"{tenant} load failed: The release to activate is not stored for this application.");
         Assert.Equal(active, await ActiveReleaseAsync(scenario, tenant));
-        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.rollbackFailed'"));
-        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.rolledBack'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.activateFailed'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.activated'"));
     }
 
     private static async Task AssertOneAuditRecordAsync(AdminScenario scenario, string tenant, string action, Guid request, Guid release, int number)
@@ -129,7 +130,7 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
         await ScalarAsync(scenario, tenant, "SELECT release_id FROM axis.active_releases");
 
     // Stores the request over the runtime role, as the server does.
-    private async Task<Guid> QueueRollbackAsync(AdminScenario scenario, string tenant, Guid release)
+    private async Task<Guid> QueueActivateAsync(AdminScenario scenario, string tenant, Guid release)
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();

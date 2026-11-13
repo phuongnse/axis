@@ -547,7 +547,7 @@ internal sealed class Publisher(
                 configuration => LoadStoredAsync(configuration, request, tenant.Id),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, null, null, request.Id),
-                loadStep: "rollback",
+                loadStep: "load",
                 syncRealm: tenant.SyncRealm);
             await WakeAsync(tenant.Id, activateSignals);
             await StopRenewalAsync(renewing, renewal);
@@ -735,7 +735,7 @@ internal sealed class Publisher(
             : null;
         if (release is null || release.ApplicationId != request.ApplicationId)
         {
-            throw new InvalidOperationException("The release to roll back to is not stored for this application.");
+            throw new InvalidOperationException("The release to activate is not stored for this application.");
         }
 
         var missing = PinnedReleaseCheck.MissingPins(release, tenantId, settings.Packages.Versions);
@@ -941,7 +941,7 @@ internal sealed class Publisher(
             new AuditEntry(
                 requestedBy,
                 kind == "activate"
-                    ? succeeded ? "release.rolledBack" : "release.rollbackFailed"
+                    ? succeeded ? "release.activated" : "release.activateFailed"
                     : succeeded ? "release.published" : "release.publishFailed",
                 applicationId,
                 null,

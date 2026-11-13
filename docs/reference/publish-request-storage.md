@@ -143,8 +143,11 @@ publisher the preview tenant's release history records.
 | ------------------------ | ----------------------- |
 | `release.published`      | A `publish` succeeded   |
 | `release.publishFailed`  | A `publish` failed      |
-| `release.rolledBack`     | An `activate` succeeded |
-| `release.rollbackFailed` | An `activate` failed    |
+| `release.activated`      | An `activate` succeeded |
+| `release.activateFailed` | An `activate` failed    |
+
+An older `activate` record can carry `release.rolledBack` or `release.rollbackFailed` instead. Nothing
+rewrites an audit record.
 
 `details` is `{ requestId, releaseId, number }`. `releaseId` and `number` are null when the request
 failed before a release was known. `number` is the release's number in the

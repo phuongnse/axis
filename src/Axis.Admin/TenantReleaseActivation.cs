@@ -57,7 +57,7 @@ internal sealed class TenantReleaseActivation(
     /// <summary>
     /// Runs the steps for the tenant <paramref name="id"/>, whose directory entry or build records <paramref name="schemaVersion"/>. Every diagnostic of compile, activate and seed, warnings included, is added
     /// to <paramref name="diagnostics"/>. The release history records <paramref name="actor"/> for the activation.
-    /// <paramref name="loadStep"/> names the second step, which loads the release: <c>compile</c>, or <c>rollback</c> for a stored release.
+    /// <paramref name="loadStep"/> names the second step, which loads the release: <c>compile</c>, or <c>load</c> for a stored release.
     /// <paramref name="syncRealm"/> applies the realm plan of the activation to the tenant's realm, or is <c>null</c> when the tenant has no realm to update.
     /// </summary>
     public async Task<ReleaseRun> RunAsync(
