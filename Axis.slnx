@@ -45,6 +45,7 @@
     <Project Path="tests/Axis.Tenancy.Tests/Axis.Tenancy.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/packages/">
+    <Project Path="tests/packages/InitializerPackage/InitializerPackage.csproj" />
     <Project Path="tests/packages/TestPackage.V1/TestPackage.V1.csproj" />
     <Project Path="tests/packages/TestPackage.V1_1/TestPackage.V1_1.csproj" />
     <Project Path="tests/packages/TestPackage.V2/TestPackage.V2.csproj" />

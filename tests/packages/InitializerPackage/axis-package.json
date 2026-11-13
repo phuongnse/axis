@@ -1,0 +1,13 @@
+{
+  "id": "initializer-package",
+  "version": "1.0.0",
+  "label": "Initializer package",
+  "assembly": "Axis.InitializerPackage.dll",
+  "operations": [
+    {
+      "name": "touch",
+      "type": "InitializerPackage.TouchOperation",
+      "idempotent": true
+    }
+  ]
+}

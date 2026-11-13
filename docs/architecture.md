@@ -74,7 +74,8 @@ flowchart LR
   [process execution](reference/process-execution.md), [process flow](reference/process-flow.md),
   [events and triggers](reference/process-events.md) and
   [recomputing computed fields](reference/migrations.md#recomputing-computed-fields). It loads the
-  same modules and installed [extension packages](reference/extension-packages.md) as the server, and
+  same modules as the server. It also loads and runs the installed
+  [extension packages](reference/extension-packages.md), which the server only reads as metadata, and
   serves its own [health checks](#health-checks).
 - **Axis.PackageHost** _(planned for M21)_. It runs package operations in package runners for each
   runtime, outside the worker, in its own `package-host` container. The worker sends each attempt to a

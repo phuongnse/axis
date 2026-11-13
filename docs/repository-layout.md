@@ -45,8 +45,8 @@ tests/
   Axis.LoadData/          generator of the load test's typical-size application with seeds
   Axis.OpenApiDocument/   console that writes the server's OpenAPI document with the unit tests' host settings
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension package, built as three versions; covers the
-                          capability limits
+  packages/               test-only extension packages: one built as three versions, which covers the
+                          capability limits, and one whose code writes marker files when it runs
   load/                   the k6 scenarios of the load tests
   e2e/                    Playwright journeys against the running server, and their fixtures
 controlplane/
