@@ -1689,6 +1689,11 @@ export interface StudioAuthoringRequest {
    * the review on #3263.
    */
   app: string | null
+  /**
+   * Proposed: the AIs that made the change with its person, in the order they first worked on it: an outside app by
+   * the name it registered with, and Axis's agent by the model the author's AI used, see the review on #3263.
+   */
+  coAuthors: string[]
   state: StudioAuthoringRequestState
   plan: string | null
   round: number

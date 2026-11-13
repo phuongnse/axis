@@ -18,6 +18,7 @@ const fromApp: StudioAuthoringRequestDetail = {
   authorName: 'Alex Morgan',
   text: 'Add a Cost centre field to the purchase request.',
   app: 'Claude Code',
+  coAuthors: ['Claude Code'],
   state: 'ready',
   plan: 'Add a Cost centre field to the purchase request.',
   aiConnected: false,
@@ -348,5 +349,30 @@ describe('a ready request’s page', () => {
 
     expect(await screen.findByRole('tab', { name: 'Changes (1)', selected: true })).toBeInTheDocument()
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+  })
+})
+
+// Proposed: every request names the AIs that made its change, see the review on #3263.
+describe('a request’s co-authors', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it.each([
+    [['Claude Sonnet 5.5'], 'co-authored with Claude Sonnet 5.5'],
+    [['Claude Code', 'Claude Sonnet 5.5'], 'co-authored with Claude Code and Claude Sonnet 5.5'],
+  ])('names %j in the sender line', async (coAuthors, words) => {
+    stub({ ...fromApp, coAuthors })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    expect(await screen.findByText(new RegExp(`^Sent by you on .*, ${words}$`))).toBeInTheDocument()
   })
 })

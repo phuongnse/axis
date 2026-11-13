@@ -460,6 +460,9 @@ const longFolder: Folder = {
 // Proposed: the request panel's answers. The signed-in author is `currentUser`; another author sent some requests.
 const otherAuthor = '8a2b0c1d-4e5f-4a6b-9c7d-0e1f2a3b4c5d'
 
+/** The model of the preview's AI, which makes the changes asked for in Studio. */
+const workingModel = 'Claude Sonnet 5.5'
+
 function authoringRequest(
   number: number,
   state: StudioAuthoringRequest['state'],
@@ -474,6 +477,8 @@ function authoringRequest(
     authorName: mine ? currentUser.displayName : 'Linh Tran',
     text,
     app: null,
+    // Proposed: the model the author's AI used, see the review on #3263.
+    coAuthors: [workingModel],
     state,
     plan: null,
     round: state === 'fixing' ? 2 : 1,
@@ -495,6 +500,7 @@ const appRequest: StudioAuthoringRequest = {
     true,
   ),
   app: 'Claude Code',
+  coAuthors: ['Claude Code'],
 }
 
 const aiRequests: StudioAuthoringRequest[] = [
@@ -731,6 +737,11 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
   const diff = draftChanges[request.id] ?? genericChanges(request)
   return {
     ...request,
+    // Axis's agent joins an outside app's request as its co-author once the author asks for changes here.
+    coAuthors:
+      changeRequests.has(request.id) && !request.coAuthors.includes(workingModel)
+        ? [...request.coAuthors, workingModel]
+        : request.coAuthors,
     state,
     round,
     plan,

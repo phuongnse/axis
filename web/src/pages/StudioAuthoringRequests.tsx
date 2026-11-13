@@ -211,6 +211,7 @@ export function StudioAuthoringRequestPage({
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const { colour, size, spacing } = useDesignTokens()
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
@@ -388,10 +389,11 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
-  // Proposed: an outside app is named as git names a co-author, in the sender's line, see the review on #3263.
-  const lineKey = `shell.studio.aiRequest.${mine ? 'lineMine' : 'line'}${request.app !== null ? 'CoAuthored' : ''}`
+  // Proposed: the AIs that made the change are named as git names co-authors, in the sender's line, see the review
+  // on #3263.
+  const lineKey = `shell.studio.aiRequest.${mine ? 'lineMine' : 'line'}${request.coAuthors.length > 0 ? 'CoAuthored' : ''}`
   const line = t(lineKey)
-    .replace('{app}', request.app ?? '')
+    .replace('{coAuthors}', new Intl.ListFormat(locale, { type: 'conjunction' }).format(request.coAuthors))
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
     .replace('{time}', sentTime(request.sentAt))
   // The page reads as one document on the content's `surface`, its parts a rule apart.
