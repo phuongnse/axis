@@ -565,14 +565,14 @@ operation in place of the HTTP request:
   `staged_revision` and 0 attempts, and clears the last error and the settled time.
 - **Mark.** Before each attempt, a short transaction marks the call `sending`, counts the attempt and
   extends the item's lease past the operation's `timeout`.
-- **Run.** The worker loads the pinned package version, resolves the `url` and `secret` bindings the
-  operation declares for the tenant, and runs the operation with the stored input, outside any
-  transaction. The context's `OperationId` is the operation identity, the same on every attempt. The
-  context hands out only the declared bindings, see [Capabilities](extension-packages.md#capabilities).
-  The worker passes a cancellation token that is cancelled at the `timeout`.
-- **Run in a package runner** _(planned for M21)_. Outside Development, the worker sends the attempt
-  to a [package runner](extension-packages.md#package-runners) instead of loading the version itself,
-  and kills the runner at the `timeout`.
+- **Run.** The worker resolves the `url` and `secret` bindings the operation declares for the tenant,
+  and runs the operation with the stored input, outside any transaction. The context's `OperationId` is the
+  operation identity, the same on every attempt. The context hands out only the declared bindings, see
+  [Capabilities](extension-packages.md#capabilities). With `inProcess`, the worker loads the pinned package
+  version and passes the operation a cancellation token that is cancelled at the `timeout`.
+- **Run in a package runner.** With `process`, the default, a C# attempt goes to a
+  [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
+  resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner.
 - **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a package
   that the application [declares](extension-packages.md#declaring-packages-in-an-application) with
   `runner: customer`. The call waits `pending`, its retry due, until a
@@ -607,12 +607,17 @@ input under the same operation identity.
 | A `RetryableException`                                                        | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | Any other exception, or a request to the context for an undeclared capability | Failed    | No                                                                        | The instance becomes `failed` at once |
 | The pinned version is missing on the worker                                   | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
+| A package host that cannot be reached, is not set, or starts no runner        | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | A declared binding the tenant lacks, or an `http` url outside Development     | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | The release lacks the step, or the installed manifest lacks the operation     | Failed    | No                                                                        | The instance becomes `failed` at once |
-| A timeout, or a call found still `sending`                                    | Unknown   | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown`              |
+| A timeout, a runner that exits, or a call found still `sending`               | Unknown   | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown`              |
 
 - **Fits.** An output fits when it has a value of the right [.NET type](extension-packages.md#contracts)
   for each output, and a value for each required output.
+- **A runner.** A runner that closes its connection after the `run` was sent has exited, and the operation
+  may have acted. A host that is unreachable, is not set or starts no runner means that no `run` was sent,
+  so the operation never ran. A `retryable` answer counts as a `RetryableException`, and a `failure` as any
+  other exception, or as an undeclared capability when it names a binding.
 - **Undeclared capability.** The attempt fails even if the operation catches the exception that the
   context throws. The error names the operation, the package and the binding, and holds no value.
 - **A retry.** It sets the call back to `pending` and keeps the item. The item is due after the step's
@@ -624,7 +629,7 @@ input under the same operation identity.
   unknown outcome, stays `unknown`, and the instance stays `waiting`. The operation may have acted, so
   the platform neither runs it again nor fails the instance. A history row with output
   `{ "operationId", "outcome": "unknown" }` makes it visible. Its error is a fixed sentence, one for a
-  timeout and one for a call found `sending`. The call keeps its stored input, and it writes no
+  timeout, one for a runner that exited and one for a call found `sending`. The call keeps its stored input, and it writes no
   `operation.called` audit record and no `process.failed`, because it has not settled. Packages have
   no lookup, so an operator resolves it, see [Resolve](process-inspection.md#resolve).
 - **Audit.** Each settled call writes one audit record `operation.called`, with actor `system` and

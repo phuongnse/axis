@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\Axis.Agent\Axis.Agent.csproj" />
     <ProjectReference Include="..\..\src\Axis.Configuration\Axis.Configuration.csproj" />
     <ProjectReference Include="..\..\src\Axis.Data\Axis.Data.csproj" />
+    <ProjectReference Include="..\..\src\Axis.PackageHost\Axis.PackageHost.csproj" />
     <ProjectReference Include="..\..\src\Axis.Processes\Axis.Processes.csproj" />
     <ProjectReference Include="..\..\src\Axis.Scenarios\Axis.Scenarios.csproj" />
     <ProjectReference Include="..\..\src\Axis.Scenarios.Runner\Axis.Scenarios.Runner.csproj" />
@@ -41,6 +42,7 @@
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
     <Compile Include="..\Axis.Configuration.Tests\SamplePackages.cs" Link="SamplePackages.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
+    <Compile Include="..\Axis.PackageHost.Tests\TestRunnerCommand.cs" Link="TestRunnerCommand.cs" />
     <Compile Include="..\Axis.Data.Tests\ImportFuzzInputs.cs" Link="ImportFuzzInputs.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
     <Compile Include="..\Axis.Data.Tests\XlsxFiles.cs" Link="XlsxFiles.cs" />

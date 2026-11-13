@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Data.Audit;
 using Axis.Processes.Instances;
@@ -90,6 +91,75 @@ public sealed class PackageCapabilityTests(PackageCapabilityFixture fixture) : I
         Assert.Equal(("/tenant-a/probe", $"Bearer {fixture.Token("a")}"), (requestA.Path, requestA.Authorization));
         Assert.Equal(("/tenant-b/probe", $"Bearer {fixture.Token("b")}"), (requestB.Path, requestB.Authorization));
         Assert.NotEqual(fixture.Token("a"), fixture.Token("b"));
+    }
+
+    [Fact]
+    public async Task A_runner_gets_only_the_declared_bindings_of_the_calls_tenant_and_one_runner_serves_both_tenants()
+    {
+        var (_, _, callA) = await fixture.StageAsync("a", "PackageProbeDeclared", CancellationToken);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+        var connections = fixture.Relay.Connections;
+        Assert.True(connections >= 1);
+        var (_, _, callB) = await fixture.StageAsync("b", "PackageProbeDeclared", CancellationToken);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallInRunnerAsync("b", CancellationToken));
+
+        // The second call found the runner of the first one in the pool.
+        Assert.Equal(connections, fixture.Relay.Connections);
+        foreach (var (tenant, call, other) in new[] { ("a", callA, "b"), ("b", callB, "a") })
+        {
+            var request = Assert.Single(fixture.Stub.RequestsWithKey(call));
+            Assert.Equal(($"/tenant-{tenant}/probe", $"Bearer {fixture.Token(tenant)}"), (request.Path, request.Authorization));
+
+            var line = Assert.Single(fixture.Relay.LinesOf("run"), candidate => candidate.Contains(call.ToString("D"), StringComparison.Ordinal));
+            var bindings = JsonNode.Parse(line)!["bindings"]!.AsObject();
+            Assert.Equal(["TestUrl"], bindings["urls"]!.AsObject().Select(pair => pair.Key));
+            Assert.Equal(["TestToken"], bindings["secrets"]!.AsObject().Select(pair => pair.Key));
+            Assert.Equal(fixture.Token(tenant), bindings["secrets"]!["TestToken"]!.GetValue<string>());
+            Assert.EndsWith($"/tenant-{tenant}", bindings["urls"]!["TestUrl"]!.GetValue<string>(), StringComparison.Ordinal);
+            Assert.DoesNotContain("OtherToken", line, StringComparison.Ordinal);
+            Assert.DoesNotContain(fixture.OtherToken(tenant), line, StringComparison.Ordinal);
+            Assert.DoesNotContain(fixture.Token(other), line, StringComparison.Ordinal);
+            Assert.DoesNotContain($"tenant-{other}", line, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task A_runner_that_is_asked_for_an_undeclared_secret_fails_the_call_after_one_attempt_and_names_the_binding()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId, callId) = await fixture.StageAsync("a", "PackageProbeUndeclaredSecret", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+
+        Assert.Equal(ProcessStarts.Failed, (await tenant.InstanceAsync(instanceId)).State);
+        var call = await CallAsync("a", callId);
+        Assert.Equal(PackageCalls.Failed, call.State);
+        Assert.Equal(1, await tenant.ScalarAsync("SELECT attempts FROM axis.package_calls WHERE id = @id", ("id", callId)));
+        Assert.Equal(
+            "failed",
+            await tenant.ScalarAsync("SELECT outcome FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package'", ("id", callId)));
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(*) FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package'", ("id", callId)));
+        Assert.Contains("'OtherToken'", call.LastError, StringComparison.Ordinal);
+        Assert.Contains("'probe'", call.LastError, StringComparison.Ordinal);
+        Assert.Contains("'test-package'", call.LastError, StringComparison.Ordinal);
+        Assert.Equal(call.LastError, (await tenant.HistoryAsync(instanceId))[1].Error);
+        Assert.DoesNotContain(fixture.OtherToken("a"), call.LastError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_runner_that_throws_a_retryable_exception_leaves_the_call_pending_with_a_retryable_attempt()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId, callId) = await fixture.StageAsync("a", "PackageFlakyOnce", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+
+        var call = await CallAsync("a", callId);
+        Assert.Equal((PackageCalls.Pending, "Axis.Extensions.RetryableException"), (call.State, call.LastError));
+        Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(instanceId)).State);
+        Assert.Equal(
+            "retryable",
+            await tenant.ScalarAsync("SELECT outcome FROM axis.process_call_attempts WHERE call_id = @id AND call_kind = 'package'", ("id", callId)));
     }
 
     [Fact]

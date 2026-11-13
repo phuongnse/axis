@@ -795,7 +795,7 @@ Docker, .NET and Node, and works on a fresh clone.
 5. It builds the sample extension package, `samples/packages/PaymentReferences`, into
    `artifacts/extensions`, where the Development settings of the server and the worker point
    `Extensions:Path`. The purchase request sample declares the package, so it does not activate
-   without it. In Development the worker loads the sample C# package into its own process.
+   without it. The worker runs with `Extensions:Isolation` `inProcess`, so it loads the package itself.
 6. It installs the built-in modules, `modules/*`, and the sample modules, `samples/modules/*`, into
    `artifacts/modules/<id>/<version>/`, where the Development settings of the server and the worker
    point `Modules:Path`.

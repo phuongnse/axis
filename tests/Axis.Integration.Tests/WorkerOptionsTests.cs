@@ -146,6 +146,30 @@ public sealed class WorkerOptionsTests
     }
 
     [Theory]
+    [InlineData("Extensions:Isolation", "sandbox")]
+    [InlineData("Extensions:Isolation", "inprocess")]
+    [InlineData("Extensions:Runners:Dotnet", "localhost")]
+    [InlineData("Extensions:Runners:Dotnet", "localhost:0")]
+    [InlineData("Extensions:Runners:Dotnet", "localhost:65536")]
+    [InlineData("Extensions:Runners:Dotnet", ":5310")]
+    public void An_isolation_or_package_host_setting_that_cannot_work_stops_the_worker_at_startup_naming_the_setting(string setting, string value)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [setting] = value,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("0")]
     [InlineData("-5")]
     [InlineData("many")]

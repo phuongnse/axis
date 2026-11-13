@@ -313,9 +313,10 @@ while :; do
   # is not restarted with the server, because it needs only the migrated databases.
   if [ -z "$worker" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the worker."
-    # The mail settings are for this process only. An exported Email__* setting wins.
+    # The mail settings are for this process only. An exported Email__* setting wins. The worker loads the
+    # sample packages itself, because no package host runs here.
     (cd src/Axis.Worker && DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true \
-      exec env ${worker_env[@]+"${worker_env[@]}"} \
+      exec env ${worker_env[@]+"${worker_env[@]}"} Extensions__Isolation=inProcess \
       Email__Smtp__Host="${Email__Smtp__Host:-localhost}" Email__Smtp__Port="${Email__Smtp__Port:-$mailpit_smtp_port}" \
       Email__Smtp__UseTls="${Email__Smtp__UseTls:-false}" Email__From="${Email__From:-axis@localhost}" \
       dotnet watch --non-interactive) \

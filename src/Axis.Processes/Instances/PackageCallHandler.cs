@@ -39,6 +39,11 @@ namespace Axis.Processes.Instances;
 /// operation only those bindings. An operation that asks for another binding, or sends a request
 /// to a host no declared <c>url</c> binding names, fails the call at once, even if it catches the
 /// exception. The error names the operation, the package and the binding, never a value.
+/// With <see cref="PackageRunners"/>, a C# package runs in a runner of the package host instead of in the worker,
+/// see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
+/// outcomes follow: a runner's <c>retryable</c> and <c>failure</c> answers are the exceptions above, a timeout and a
+/// runner that closes its connection are unknown outcomes, and a host that cannot be reached, is not set or starts no
+/// runner is a retryable error.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
@@ -54,13 +59,23 @@ internal sealed partial class PackageCallHandler(
     PackageHttpTransport transport,
     SensitiveValues? sensitive,
     ILogger<PackageCallHandler> logger,
-    Func<InstalledPackage, string, IOperation>? createOperation = null) : IExternalWorkItemHandler
+    Func<InstalledPackage, string, IOperation>? createOperation = null,
+    PackageRunners? runners = null) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
     internal const string UnknownOutcome = "The earlier attempt of the call has an unknown outcome.";
 
     /// <summary>The error of a call whose operation did not finish within its timeout.</summary>
     internal const string TimedOut = "The operation did not finish within its timeout.";
+
+    /// <summary>The error of a call whose runner closed its connection during the attempt.</summary>
+    internal const string RunnerExited = "The package runner closed its connection during the attempt.";
+
+    /// <summary>The error of an attempt whose package host could not be reached or started no runner.</summary>
+    internal const string RunnerUnreachable = "The package host set by 'Extensions:Runners:Dotnet' could not be reached or did not start a runner.";
+
+    /// <summary>The error of an attempt when no package host is set.</summary>
+    internal const string RunnerNotSet = "No package host is set in 'Extensions:Runners:Dotnet'.";
 
     public string Kind => ProcessStarts.PackageCallWorkItemKind;
 
@@ -136,8 +151,9 @@ internal sealed partial class PackageCallHandler(
                         ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
                     attempt = attempt with { Attempts = attempts };
 
-                    // No other worker claims the item while the operation runs.
-                    if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Step.Timeout + item.Lease, cancellationToken))
+                    // No other worker claims the item while the operation runs, and a runner starts.
+                    var starting = runners is not null && target.Package.Manifest.Language == PackageLanguage.CSharp ? PackageRunners.StartTimeout : TimeSpan.Zero;
+                    if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, starting + target.Step.Timeout + item.Lease, cancellationToken))
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         LogLostClaim(item.Id, item.PackageCallId);
@@ -197,13 +213,17 @@ internal sealed partial class PackageCallHandler(
         CancellationToken cancellationToken)
     {
         // The bindings are resolved before the operation runs, so a missing one leaves nothing run.
-        if (!TryCreateContext(item, target, attempt.Call, out var context, out var bindingError))
+        if (!TryResolveBindings(item, target, out var urls, out var secrets, out var bindingError))
         {
             return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Retryable, bindingError, true, cancellationToken);
         }
 
-        var run = await RunAsync(target, attempt.Call, input, context, cancellationToken);
-        if (context.Violation is { } violation)
+        // With package runners, a C# package never loads in the worker, see
+        // docs/reference/extension-packages.md#package-runners.
+        var run = runners is not null && target.Package.Manifest.Language == PackageLanguage.CSharp
+            ? await RunInRunnerAsync(runners, target, attempt.Call, input, urls, secrets, cancellationToken)
+            : await RunAsync(target, attempt.Call, input, urls, secrets, cancellationToken);
+        if (run.Violation is { } violation)
         {
             // The operation asked for more than it declares. A retry cannot fix that, and the
             // operation may have swallowed the exception, so this holds whatever it returned.
@@ -214,6 +234,12 @@ internal sealed partial class PackageCallHandler(
         {
             // The operation may have acted.
             return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, TimedOut, true, cancellationToken);
+        }
+
+        if (run.Exited)
+        {
+            // The runner may have acted before it exited.
+            return await SettleAttemptAsync(item, connection, attempt, ErrorClass.Unknown, RunnerExited, true, cancellationToken);
         }
 
         if (run.Error is { } runError)
@@ -291,21 +317,20 @@ internal sealed partial class PackageCallHandler(
 
     /// <summary>
     /// Resolves the <c>url</c> and <c>secret</c> bindings the operation declares for the current
-    /// tenant into its context. Returns <see langword="false"/> with the error when a binding is
+    /// tenant. Returns <see langword="false"/> with the error when a binding is
     /// missing or of the wrong kind, or when a URL is not <c>https</c> and the host does not allow
     /// <c>http</c>. The error never holds a binding's value.
     /// </summary>
-    private bool TryCreateContext(
+    private bool TryResolveBindings(
         ClaimedWorkItem item,
         Target target,
-        LoadedPackageCall call,
-        [NotNullWhen(true)] out PackageOperationContext? context,
+        out Dictionary<string, Uri> urls,
+        out Dictionary<string, Func<string>> secrets,
         [NotNullWhen(false)] out string? error)
     {
         var capabilities = target.Operation.Capabilities;
-        var urls = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
-        var secrets = new Dictionary<string, Func<string>>(StringComparer.OrdinalIgnoreCase);
-        context = null;
+        urls = new Dictionary<string, Uri>(StringComparer.OrdinalIgnoreCase);
+        secrets = new Dictionary<string, Func<string>>(StringComparer.OrdinalIgnoreCase);
         try
         {
             foreach (var name in capabilities.Urls)
@@ -332,22 +357,24 @@ internal sealed partial class PackageCallHandler(
         }
 
         error = null;
-        context = new PackageOperationContext(call.Id, target.Package.Manifest.Id, target.Operation.Name, urls, secrets, transport.Handler);
         return true;
     }
 
     /// <summary>
-    /// Creates the operation and runs it, with no transaction open, under a token that is cancelled
-    /// at the step's timeout. The result holds the output, or the error of an exception as its type
-    /// name and whether it is retryable, or says that the run timed out. Worker shutdown is not caught.
+    /// Creates the operation and runs it in the worker, with no transaction open, under a token that is
+    /// cancelled at the step's timeout. The result holds the output, or the error of an exception as its type
+    /// name and whether it is retryable, or says that the run timed out, and the violation of the declared
+    /// capabilities that the context kept. Worker shutdown is not caught.
     /// </summary>
     private async Task<Run> RunAsync(
         Target target,
         LoadedPackageCall call,
         Dictionary<string, object?> input,
-        PackageOperationContext context,
+        Dictionary<string, Uri> urls,
+        Dictionary<string, Func<string>> secrets,
         CancellationToken cancellationToken)
     {
+        var context = new PackageOperationContext(call.Id, target.Package.Manifest.Id, target.Operation.Name, urls, secrets, transport.Handler);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(target.Step.Timeout);
         try
@@ -356,16 +383,127 @@ internal sealed partial class PackageCallHandler(
 
             // An operation that ignores its token keeps running, but the worker stops waiting for it.
             var output = await operation.RunAsync(input, context, timeout.Token).WaitAsync(timeout.Token);
-            return new Run(output, null, false, false);
+            return new Run(output, context.Violation);
         }
         catch (Exception) when (timeout.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
         {
-            return new Run(null, null, false, true);
+            return new Run(null, context.Violation, Timeout: true);
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             // The message can hold input values or secrets, so only the type is kept.
-            return new Run(null, ErrorOf(exception), exception is RetryableException, false);
+            return new Run(null, context.Violation, Error: ErrorOf(exception), Retryable: exception is RetryableException);
+        }
+    }
+
+    /// <summary>
+    /// Sends the attempt to a runner of the package host, see docs/reference/extension-packages.md#package-runners. The
+    /// step's timeout starts when the <c>run</c> is sent, and the start of a runner has its own bound. The <c>run</c> holds the stored input and
+    /// the declared bindings of the call's tenant, nothing else. An attempt that fails before the
+    /// <c>run</c> is sent is retryable, because the operation never ran. After it, a timeout closes the
+    /// connection, which makes the host kill the runner, and a runner that closes its connection exited. Both
+    /// are unknown outcomes. A runner that answered goes back to the pool. Worker shutdown is not caught.
+    /// </summary>
+    private async Task<Run> RunInRunnerAsync(
+        PackageRunners pool,
+        Target target,
+        LoadedPackageCall call,
+        Dictionary<string, object?> input,
+        Dictionary<string, Uri> urls,
+        Dictionary<string, Func<string>> secrets,
+        CancellationToken cancellationToken)
+    {
+        if (!pool.IsSet)
+        {
+            return new Run(null, null, Error: RunnerNotSet, Retryable: true);
+        }
+
+        RunMessage message;
+        try
+        {
+            message = new RunMessage(
+                target.Operation.Name,
+                call.Id,
+                RunnerValues.Encode(target.Operation.Input, input),
+                new RunBindings(
+                    urls.ToDictionary(pair => pair.Key, pair => pair.Value.AbsoluteUri),
+                    secrets.ToDictionary(pair => pair.Key, pair => pair.Value())));
+        }
+        catch (InvalidCastException exception)
+        {
+            return new Run(null, null, Error: ErrorOf(exception));
+        }
+
+        RunnerConnection runner;
+        using (var starting = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        {
+            starting.CancelAfter(PackageRunners.StartTimeout);
+            try
+            {
+                runner = await pool.RentAsync(call.Package, call.Version, starting.Token);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // A host that cannot be reached, or starts no runner, and a start that takes too long.
+                return new Run(null, null, Error: RunnerUnreachable, Retryable: true);
+            }
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(target.Step.Timeout);
+        RunnerMessage? answer;
+        try
+        {
+            answer = await runner.RunAsync(message, timeout.Token);
+        }
+        catch (Exception)
+        {
+            // The timeout or the shutdown. Closing the connection makes the host kill the runner.
+            runner.Dispose();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            return new Run(null, null, Timeout: true);
+        }
+
+        if (answer is null)
+        {
+            runner.Dispose();
+            return new Run(null, null, Exited: true);
+        }
+
+        pool.Return(runner);
+        switch (answer)
+        {
+            case ResultMessage result:
+                try
+                {
+                    // Decode gives null for an output the result lacks, which Fit would write as an explicit null.
+                    var output = RunnerValues.Decode(target.Operation.Output, result.Output);
+                    foreach (var field in target.Operation.Output.Where(field => !result.Output.ContainsKey(field.Name)))
+                    {
+                        output.Remove(field.Name);
+                    }
+
+                    return new Run(output, null);
+                }
+                catch (FormatException)
+                {
+                    return new Run(null, null);
+                }
+
+            case RetryableMessage retryable:
+                return new Run(null, null, Error: retryable.Error, Retryable: true);
+            case FailureMessage { Binding: { } binding }:
+                return new Run(
+                    null,
+                    PackageOperationContext.RefusedMessage(target.Operation.Name, target.Package.Manifest.Id, $"went beyond its declared capabilities with the binding '{binding}'."));
+            case FailureMessage failure:
+                return new Run(null, null, Error: failure.Error ?? nameof(FailureMessage));
+            default:
+                throw new UnreachableException();
         }
     }
 
@@ -891,8 +1029,17 @@ internal sealed partial class PackageCallHandler(
         InstalledPackage Package,
         PackageOperation Operation);
 
-    /// <summary>The result of a run: the output, the error of an exception and whether it is retryable, or that it timed out.</summary>
-    private sealed record Run(IReadOnlyDictionary<string, object?>? Output, string? Error, bool Retryable, bool Timeout);
+    /// <summary>
+    /// The result of a run: the output, the violation of the declared capabilities, the error of an exception and
+    /// whether it is retryable, that it timed out, or that its runner exited.
+    /// </summary>
+    private sealed record Run(
+        IReadOnlyDictionary<string, object?>? Output,
+        string? Violation,
+        string? Error = null,
+        bool Retryable = false,
+        bool Timeout = false,
+        bool Exited = false);
 
     /// <summary>How an attempt that did not succeed is handled.</summary>
     private enum ErrorClass

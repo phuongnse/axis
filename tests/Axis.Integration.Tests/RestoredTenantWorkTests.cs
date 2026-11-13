@@ -183,6 +183,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             ["ConnectionStrings:Platform"] = PostgreSqlServer.RuntimeConnectionString(platform),
             ["Platform:SecretKey"] = AdminScenario.TestSecretKey,
             ["Extensions:Path"] = SamplePackages.Path,
+            ["Extensions:Isolation"] = "inProcess",
             ["Modules:Path"] = SampleModules.Path,
             ["Health:Urls"] = "http://127.0.0.1:0",
             ["Worker:PollInterval"] = (pollInterval ?? TimeSpan.FromMilliseconds(50)).ToString("c", CultureInfo.InvariantCulture),

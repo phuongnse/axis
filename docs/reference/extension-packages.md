@@ -323,19 +323,19 @@ that its release was compiled against.
 
 ## Loading
 
-Each host checks every installed manifest at startup. The worker loads the installed C# packages into
-its own process, and the server reads only their metadata.
+Each host checks every installed manifest at startup. The server reads only the metadata of the installed
+C# packages. The worker does too, and loads them into its own process only with `Extensions:Isolation` set
+to `inProcess`, see [Package runners](#package-runners).
 
 - **The server runs no package code.** For a C# package, the server reads the assembly through a
   metadata-only load context, to run the manifest checks and to compile against the package. It
   finds assemblies by the rules of the shared contracts below. It runs no static constructor, module
   initializer or other package code, and it keeps no load context that can run the package.
-- **Development only** _(planned for M21)_. In-process loading in the worker is used only in
-  Development. Elsewhere the worker loads no package code, see
-  [Package runners](#package-runners).
+- **Development only** _(planned for M21)_. `inProcess` is allowed only in
+  Development. Elsewhere the worker does not start with it, see [Package runners](#package-runners).
 - **Node and Python.** A host reads only the manifest of a `node` or `python` package and checks that
   its `adapter` file exists. It loads none of the package's code.
-- **Own load context.** In the worker, each C# package version loads in its own
+- **Own load context.** In a worker with `inProcess`, each C# package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
 - **Shared contracts.** The load context of a C# package shares only
@@ -416,29 +416,36 @@ see [Contracts](#contracts).
 
 ## Package runners
 
-_(planned for M21)_
-
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runners.** Each runtime has its own container, whose host,
+- **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
-  it when told. The worker loads no package code. The images and containers
-  are in [images](installation.md#images).
+  it when told. The images and containers are in [images](installation.md#images).
+- **No package code in the worker.** With `Extensions:Isolation` `process`, the worker reads the
+  manifests and metadata of the installed C# packages, as the server does, and loads no package
+  code. It sends each attempt of a C# call to a runner.
 - **One set for each version.** An installation's packages share runners
   across tenants, one set for each installed package version. Each runner
-  process runs one call at a time. The worker keeps a small pool for each
-  version, and starts a new runner when one exits.
+  process runs one call at a time. The worker keeps the runners of a version that it has started, and
+  starts a runner only when an attempt needs one. A runner that exits, times out or fails is dropped, and
+  the next attempt starts a new one. A runner that the worker finds closed before it uses it is dropped
+  too, so an attempt that never ran is not an unknown outcome.
 - **The request.** For each attempt the worker sends a runner one `run`
-  message, see [The runner protocol](#the-runner-protocol). Package code and
-  manifests do not change with the language.
-- **Environment, for a runner that Axis hosts.** The environment is empty
+  message, see [The runner protocol](#the-runner-protocol). It holds the stored input and only the
+  `url` and `secret` bindings that the operation declares, with the values of the call's tenant. Package
+  code and manifests do not change with the language.
+- **The answer.** A `result`, a `retryable` and a `failure` give the same outcomes as an operation
+  that runs in the worker, see [package call outcomes](process-execution.md#package-call-outcomes).
+  A `failure` that names a binding fails the call at once, and its error names the operation, the
+  package and the binding.
+- **Environment, for a runner that Axis hosts.** _(planned for M21)_ The environment is empty
   apart from `HTTP_PROXY` and `HTTPS_PROXY`, their lower-case forms, and
   `NODE_USE_ENV_PROXY=1` for Node.js. The container gets no tenant or
   installation settings, a read-only root file system apart from a temporary
   folder, and CPU and memory limits. It sees no tenant's secrets except the
   bindings of the call it runs.
-- **Network, for a runner that Axis hosts.** The proxy variables name the
+- **Network, for a runner that Axis hosts.** _(planned for M21)_ The proxy variables name the
   egress proxy in the worker, with a token for each runner that the worker
   sends in `start`. So the context's HTTP client sends through the proxy, and
   so does a library's own HTTP call, and the library needs no change. The
@@ -450,19 +457,22 @@ package reaches nothing of the host and no binding of another call.
   them reach only the proxy port. Every other route is closed, DNS included,
   because the proxy resolves hosts. A library that ignores the proxy variables
   reaches nothing.
-- **Timeout.** At the operation's `timeout` the worker kills the runner
-  process. The attempt's outcome is unknown, see
-  [package call outcomes](process-execution.md#package-call-outcomes).
-- **Crash.** A runner that exits during an attempt gives an unknown outcome
+- **Timeout.** The operation's `timeout` starts when the worker sends the `run`. At the `timeout` the
+  worker closes the connection, which makes the host kill the runner process. The attempt's outcome is
+  unknown, see [package call outcomes](process-execution.md#package-call-outcomes).
+- **Crash.** A runner that closes its connection during an attempt gives an unknown outcome
   too. It is retried only when the operation declares `idempotent: true`.
-- **`Extensions:Isolation`.** A server and worker setting. `process`, the
-  default, uses the runners. `inProcess` keeps the in-process
-  [loading](#loading), and is allowed only in Development. Elsewhere the host
-  does not start.
+- **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
+  attempt retryable, because the operation never ran.
+
+The worker reads these settings:
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` uses the runners. `inProcess` keeps the in-process [loading](#loading). Any other value stops the worker at start |
+| `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 
 ### The runner protocol
-
-_(planned for M21)_
 
 The worker and every runner speak one protocol that no language owns. A small SDK for each language
 implements the operation context over it.
@@ -477,9 +487,10 @@ implements the operation context over it.
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
 | `stop` | The worker | None |
 
-- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The host
-  listens on port 5310 and reads the installed versions from `Extensions:Path`. It does not start
-  without that setting, or when the folder does not exist.
+- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
+  is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
+  runner network protects it. The host listens on port 5310 and reads the installed versions from
+  `Extensions:Path`. It does not start without that setting, or when the folder does not exist.
 - **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
   host starts the runner and pipes the connection to the runner's standard input and output.
 - **Start.** A `start` for a version that is not installed, or whose `package` or `version` is not
