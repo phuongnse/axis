@@ -33,4 +33,4 @@ The release that each endpoint and command uses, the texts endpoint and a walkth
   new threshold goes live.
 - Removing or renaming a policy can lock a user out of an old task's fields.
 - An installation must keep every package version that a running instance pins, because
-  [D28](d28-extension-packages.md) pins package versions in the release.
+  [D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) pins package versions in the release.

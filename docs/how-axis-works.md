@@ -209,7 +209,8 @@ customization layer, which records only the differences. A module contract keeps
 rules in place on every change.
 
 When configuration cannot express what a business needs, a developer adds an extension package. An
-extension package is C# code with operations that a process can call. Each operation declares the
+extension package is code, in C#, TypeScript, JavaScript or Python, with operations that a process can
+call. It can reuse the libraries that the business already has. Each operation declares the
 capabilities it needs, so it gets only what it declares.
 
 For example, an application uses the approvals module and adds one extra check on its requests. The
@@ -222,7 +223,7 @@ flowchart LR
     Layer -. "changes" .-> Module
     Module --> Contract["Module contract: core rules"]
     App --> Package["Extension package"]
-    Package --> Ops["C# operations"]
+    Package --> Ops["Operations in C#, TypeScript, JavaScript or Python"]
     Ops --> Caps["Declared capabilities"]
 ```
 
@@ -234,8 +235,8 @@ The detail is in [modules and templates](reference/modules-and-templates.md#modu
 [module contracts](reference/module-contracts.md) and
 [extension packages](reference/extension-packages.md).
 [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) sets the rules for
-modules, and [D7](decisions/d7-custom-code-lives-in-extension-packages.md) puts custom code in
-extension packages.
+modules, and [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md)
+sets the rules for extension packages.
 
 ## Where to go next
 

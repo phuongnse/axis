@@ -335,7 +335,8 @@ Axis keeps its third-party packages current, and sets how fast a vulnerable one 
 
 **Sources.** Packages come from nuget.org and the npm registry, `registry.npmjs.org`, and nowhere
 else. The repository has no `nuget.config` and no `.npmrc`, so no other source is set. A change
-that adds a source changes this section too.
+that adds a source changes this section too. A package's own dependencies belong to that package, and
+[extension packages](reference/extension-packages.md) says how they are built and scanned.
 
 **Time frames.** The time starts on the day the scan first finds the vulnerability.
 
@@ -633,13 +634,12 @@ The `axis` realm is imported from `samples/keycloak/axis-realm.json`.
 - **Roles.** The roles are client roles of the confidential client `axis`. A client-role mapper writes
   them to the `roles` claim, so the claim holds only the sample roles.
 - **Password and code.** The development password is `axis` for every user. After the password, the
-  sign-in asks for a 6-digit code, as
-  [D99](decisions/d99-axis-ships-its-own-identity-provider.md) requires of every account. Each user has
-  a fixed secret in the realm file, the `secretData` value of the user's `otp` credential. It is Base32
-  and test data like the password. To get a code, add the secret to an authenticator app as a
-  time-based account (SHA-1, 6 digits, 30 seconds), or run `oathtool --totp -b <secret>`. The realm
-  accepts a code more than once, so tests can sign in the same user several times within 30 seconds.
-  Service accounts need no code.
+  sign-in asks for a 6-digit code, as [D99](decisions/d99-axis-ships-its-own-identity-provider.md)
+  requires of every account. Each user has a fixed secret in the realm file, the `secretData` value
+  of the user's `otp` credential. It is Base32 and test data like the password. To get a code, add
+  the secret to an authenticator app as a time-based account (SHA-1, 6 digits, 30 seconds), or run
+  `oathtool --totp -b <secret>`. The realm accepts a code more than once, so tests can sign in the
+  same user several times within 30 seconds. Service accounts need no code.
 - **Theme.** The password, code, forgot-password and set-password pages are the Axis sign-in theme,
   built into `artifacts/keycloak-theme` and set as the realm's `loginTheme`. The realm allows "Forgot
   password?".
@@ -795,7 +795,7 @@ Docker, .NET and Node, and works on a fresh clone.
 5. It builds the sample extension package, `samples/packages/PaymentReferences`, into
    `artifacts/extensions`, where the Development settings of the server and the worker point
    `Extensions:Path`. The purchase request sample declares the package, so it does not activate
-   without it.
+   without it. In Development the worker loads the sample C# package into its own process.
 6. It installs the built-in modules, `modules/*`, and the sample modules, `samples/modules/*`, into
    `artifacts/modules/<id>/<version>/`, where the Development settings of the server and the worker
    point `Modules:Path`.

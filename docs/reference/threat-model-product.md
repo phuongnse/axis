@@ -24,7 +24,7 @@ flowchart LR
         Steps[Process steps]
     end
     subgraph package [Extension package]
-        Code[Custom C# code]
+        Code[Custom code]
     end
     subgraph connector [Connector]
         External[External system]
@@ -186,13 +186,50 @@ flowchart LR
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | P30 | Package code reads the secrets or data of other tenants inside the worker. | Worker and extension package | Information disclosure | High | **Delegated** | The operator. Packages are trusted code that the operator installs and reviews, see [Not a sandbox](extension-packages.md#not-a-sandbox). |
-| P31 | Package code goes around its capability limits inside the worker. | Worker and extension package | Elevation of privilege | High | **Delegated** | The operator, see [Not a sandbox](extension-packages.md#not-a-sandbox). The package runners of M21 are not built yet. |
+| P31 | Package code goes around its capability limits inside the worker. | Worker and extension package | Elevation of privilege | High | **Delegated** | The operator, see [Not a sandbox](extension-packages.md#not-a-sandbox). Outside Development, the runner's empty environment, read-only file system, resource limits and one network route stop it, see [package runners](extension-packages.md#package-runners). _(planned for M21)_ |
 | P32 | A package by mistake reads an undeclared secret or calls an undeclared host. | Worker and extension package | Elevation of privilege | Medium | **Mitigated** | `PackageCapabilityTests` (an undeclared secret fails the instance, and a call to another host fails the call). It stops mistakes, not attacks, see [Not a sandbox](extension-packages.md#not-a-sandbox). |
 | P33 | A package version is swapped after a release pins another one. | Worker and extension package | Tampering | Medium | **Mitigated** | `PackagePinningTests` (an instance keeps the version its release pins), `PackageCatalogTests` (an assembly that differs from its manifest version is a diagnostic). |
 | P34 | A package call runs with no record of its operation. | Worker and extension package | Repudiation | Low | **Mitigated** | `PackageCallTests` (a settled call writes exactly one called audit record and records the operation identity). |
 | P35 | A package operation never returns and holds a worker thread. | Worker and extension package | Denial of service | Medium | **Delegated** | The operator, see [Not a sandbox](extension-packages.md#not-a-sandbox). The timeout stops the wait, but the code keeps running in the worker. |
 
 Spoofing does not apply. The operator installs each package, and a caller does not send a package an identity.
+
+### Package runner and an application's package
+
+_(planned for M37)_
+
+An application's package is written by the tenant's author and is not trusted. Its runners serve only its
+tenant, in a sandbox stronger than a container. A customer may host a runner in its own network, which
+connects out with its own credential. The flow below shows where these threats sit.
+
+```mermaid
+flowchart LR
+    subgraph axis [Axis installation]
+        Steps[Process steps]
+        Run[Runner of one tenant, in a sandbox]
+    end
+    subgraph other [Other tenants]
+        OtherData[Their data and secrets]
+    end
+    subgraph customer [Customer network]
+        CRun[Customer-hosted runner, with its own secrets]
+    end
+    subgraph outside [Outside systems]
+        Ext[Hosts the package declares]
+    end
+    Steps -->|operation call for one tenant| Run
+    Run -->|egress proxy, declared hosts only| Ext
+    Run -. no route .-> OtherData
+    CRun -->|connects out, own credential| Steps
+    CRun -->|declared hosts only| Ext
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| P145 | An application's package reaches the data or the runner of another tenant. | Package runner and application's package | Elevation of privilege | High | **Delegated** | The operator, which provides the sandbox stronger than a container. An installation without that sandbox refuses an application's package, see [An application's packages](extension-packages.md#an-applications-packages). |
+| P146 | An application's package calls a host that its manifest does not declare. | Package runner and application's package | Information disclosure | Medium | **Delegated** | The operator, whose runners hold one network route through an egress proxy that admits only the declared hosts, see [package runners](extension-packages.md#package-runners). |
+| P147 | A customer-hosted runner's credential is stolen, or kept after the customer stops using it. | Package runner and customer network | Spoofing | High | **Delegated** | The customer, which owns the machine of its runner, and the tenant's administrator, who can revoke its credential. The runner takes only its tenant's calls, see [customer-hosted runners](extension-packages.md#customer-hosted-runners). |
+| P148 | A dependency of a package has a known vulnerability, or is malicious. | Package runner and application's package | Tampering | Medium | **Delegated** | The tenant's author, who chooses the dependencies. The package's lock file fixes them, and its build scans them for known vulnerabilities, see [extension packages](extension-packages.md#what-a-package-is). _(planned for M21)_ |
 
 ### Worker and webhook receiver
 

@@ -88,8 +88,9 @@ lines of such code. The result is:
 - Reusable logic is a named rule with typed parameters, not copied code.
 - Anything with side effects or real algorithmic content is an operation.
   Built-in operations cover common needs. Everything else is written in an
-  extension package as tested C# with declared capabilities, see
-  [D7](../decisions/d7-custom-code-lives-in-extension-packages.md).
+  extension package, in C#, TypeScript or JavaScript, or Python, that reuses
+  the business's libraries and declares its capabilities, see
+  [D148](../decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 - Large seed data is a seed data resource, not code.
 
 ## Execution

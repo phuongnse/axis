@@ -43,6 +43,6 @@ These rules keep every destination in the hands of the operator:
   [call outcomes](process-execution.md#call-outcomes).
 - **No network rule in the examples.** The Compose example and the Helm chart set no egress rule. An
   operator may add one that allows only the destinations of this page.
-- **Extension packages are trusted code.** A package runs in the worker's process, so installing one
-  means trusting its code. The `url` binding limits the client that Axis hands to it, not the
-  package's own code.
+- **An installation's packages are trusted code.** Installing one means trusting its code. The `url`
+  binding limits the client that Axis hands to it, not the package's own code, see
+  [not a sandbox](extension-packages.md#not-a-sandbox).

@@ -1,27 +1,43 @@
 # Extension packages
 
-An extension package holds custom C# code that an application calls where configuration is not
-enough. This page covers what a package is, its manifest, the contracts it builds on, how it is
-installed, versioned, pinned and loaded, what its operations may reach, and what those limits do not
-protect against. How a process calls a package operation is in
-[package operations](process-execution.md#package-operations), and how an application declares its
-packages is in [declaring packages](#declaring-packages-in-an-application). The reason for keeping
-custom code out of configuration is in [knowledge](../domain/knowledge.md#logic-in-configuration).
+An extension package holds custom code that an application calls where configuration is not
+enough. The code may be written in C#, TypeScript or JavaScript on Node.js, or Python. This page
+covers what a package is, its manifest, the contracts it builds on, how it is installed, versioned,
+pinned and loaded, what its operations may reach, and what those limits do not protect against. An
+application's own packages are in [An application's packages](#an-applications-packages). How a
+process calls a package operation is in [package operations](process-execution.md#package-operations),
+and how an application declares its packages is in
+[declaring packages](#declaring-packages-in-an-application). The reason for keeping custom code out of
+configuration is in [knowledge](../domain/knowledge.md#logic-in-configuration).
 
 ## What a package is
 
-A package is a versioned .NET class library that adds typed operations, and it is built and installed
-apart from any application.
+A package is a versioned unit of code that adds typed operations. An installation's package is built
+and installed apart from any application, see [Installation](#installation).
 
-- **Custom C# code.** A package holds logic that does not fit expressions,
+- **Custom code.** A package holds logic that does not fit expressions,
   such as file parsing or a complex calculation. It adds typed operations
   that a process step calls.
-- **A class library.** A package is a .NET class library with its own unit
-  tests and a SemVer version.
-- **One reference.** It references only `Axis.Extensions`, the contracts
-  assembly described in [Contracts](#contracts).
-- **Build artifact.** Its build gives a folder with the package's assemblies
+- **A C# package is a class library.** It is built as a .NET class library,
+  with its own unit tests and a SemVer version.
+- **One reference.** A C# package references only `Axis.Extensions`, the
+  contracts assembly described in [Contracts](#contracts).
+- **Build artifact.** A C# package's build gives a folder with its assemblies
   and a manifest, `axis-package.json`.
+- **Three languages** _(planned for M21)_. A package is written in C#,
+  TypeScript or JavaScript on Node.js, or Python.
+- **A folder with a lock file** _(planned for M21)_. A package of any of
+  these languages is a folder with a manifest, a thin adapter in that
+  language and a lock file of its dependencies.
+- **Reuses a library** _(planned for M21)_. The dependencies of a package may
+  be the business's own libraries, from a public or private registry, as
+  built files or as a commit of a git repository. The adapter maps an
+  operation to a function of the library, and the library's code does not
+  change.
+- **Built once** _(planned for M21)_. A package is built once, when it is
+  installed or published. Its dependencies are installed from the lock file
+  and scanned for known vulnerabilities. A runner downloads nothing at run
+  time.
 - **No data access.** A package cannot read or write entities.
 - **Widgets** _(planned for M22)_. A package may also hold custom widgets,
   React components that a page names, which build on Axis widgets and Axis tokens, never on Ant
@@ -30,7 +46,7 @@ apart from any application.
 ## Manifest
 
 The manifest, `axis-package.json`, sits at the root of the package folder and declares the package's
-identity, its main assembly and its operations. This example uses an illustrative package,
+identity, its operations and, for a C# package, its main assembly. This example uses an illustrative package,
 `purchasing-tools`. The [sample package](#sample-and-test-packages),
 `payment-references`, has a manifest of the same shape.
 
@@ -63,8 +79,10 @@ identity, its main assembly and its operations. This example uses an illustrativ
   required, as a module's is, so Studio never names a package by its id. A
   manifest without one is refused with `PackageManifestInvalid`, and the package
   is not loaded.
-- **`assembly`.** The file name of the package's main assembly, in the
-  package folder.
+- **`assembly`.** For a C# package, the file name of its main assembly, in
+  the package folder.
+- **Language, adapter and lock file** _(planned for M21)_. The manifest names
+  the package's language, its adapter and its lock file.
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
   `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
@@ -72,8 +90,8 @@ identity, its main assembly and its operations. This example uses an illustrativ
   See [widgets in a package manifest](custom-widgets.md#widgets-in-a-package-manifest).
 - **`operations`.** The operations the package offers. Each has these:
   - `name` is the operation's name, unique in the package.
-  - `type` is the full name of a class in the main assembly that implements
-    `IOperation`. The class is not abstract and has a public parameterless
+  - `type` is, for a C# package, the full name of a class in the main assembly
+    that implements `IOperation`. The class is not abstract and has a public parameterless
     constructor, because the host creates each instance itself.
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
@@ -93,7 +111,8 @@ identity, its main assembly and its operations. This example uses an illustrativ
 
 ## Contracts
 
-`Axis.Extensions` is the only assembly a package references, and it holds only these types:
+For a C# package, `Axis.Extensions` is the only assembly the package references, and it holds only
+these types:
 
 ```csharp
 public interface IOperation
@@ -122,7 +141,10 @@ public class RetryableException : Exception { }
 - **`RetryableException`.** Thrown by an operation to say that the attempt
   may succeed later. Any other exception fails the call, see
   [Call outcomes](process-execution.md#package-call-outcomes).
-- **Value types.** Input and output values use these .NET types:
+- **One protocol and an SDK for each language** _(planned for M21)_. The
+  worker and every runner speak one protocol that no language owns. A small
+  SDK for each language implements the operation context over it.
+- **Value types.** For a C# package, input and output values use these .NET types:
 
   | Field type | .NET type |
   | --- | --- |
@@ -140,22 +162,26 @@ public class RetryableException : Exception { }
 
 ## Installation
 
-The operator installs packages once for the whole installation, in a folder that every host reads.
+The operator installs an installation's packages once for the whole installation, in a folder that
+every host reads. An installation's package is trusted code that the operator reviews.
 
+- **Inside a module** _(planned for M21)_. A module installed for the installation can ship a package,
+  such as a built-in module or a partner's module, and the operator reviews that package too.
 - **Per installation.** Packages are installed once for the installation,
   not per tenant. Every tenant sees the same installed packages. An
   application uses only the packages it declares.
 - **Where.** The server and the worker both read the setting
   `Extensions:Path`. Each package version is installed in
-  `<Path>/<id>/<version>/`, which holds `axis-package.json` and the
-  assemblies. A relative path is resolved from the host's content root.
+  `<Path>/<id>/<version>/`, which holds `axis-package.json` and the package's
+  built files, such as the assemblies of a C# package. A relative path is
+  resolved from the host's content root.
 - **No setting, no packages.** Without `Extensions:Path`, a host has no
   packages. If the setting names a folder that does not exist, the host does
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
 - **The package host** _(planned for M21)_. The `package-host` container holds the same packages,
-  and its runners run them, see [Package runners](#package-runners).
+  and its runners for each runtime run them, see [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
@@ -202,19 +228,22 @@ that its release was compiled against.
   policy, and the instance fails when attempts run out. The call stores the
   policy when it is staged, because the worker cannot rebuild the release
   without the version.
+- **An application's packages** _(planned for M37)_. The release holds the
+  built packages of the application, so running work keeps the code it
+  started with, see [An application's packages](#an-applications-packages).
 
 ## Loading
 
-Each host loads the installed packages into its own process at startup and checks every manifest.
+Each host loads the installed C# packages into its own process at startup and checks every manifest.
 
 - **Development only** _(planned for M21)_. In-process loading is used only in Development.
   Elsewhere the worker loads no package code and the server only reads its metadata, see
   [Package runners](#package-runners).
-- **Own load context.** Each package version loads in its own
+- **Own load context.** Each C# package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
-- **Shared contracts.** The load context shares only `Axis.Extensions` with
-  the host. Every other assembly the package needs must ship in its folder.
+- **Shared contracts.** The load context of a C# package shares only
+  `Axis.Extensions` with the host. Every other assembly the package needs must ship in its folder.
   The .NET framework assemblies come from the host. No other Axis assembly
   of the host can be loaded into the package's context.
 - **Manifest check.** Each host checks every installed manifest when it
@@ -247,7 +276,8 @@ Each host loads the installed packages into its own process at startup and check
 ## Capabilities
 
 An operation gets resources only through its context, and the context hands out only what the
-operation's manifest declares, for the tenant of the call.
+operation's manifest declares, for the tenant of the call. The member names below are the C# contract's,
+see [Contracts](#contracts).
 
 - **Resolved before the run.** The worker resolves every declared binding for
   the current tenant before it runs the operation. A declared binding that the
@@ -291,44 +321,58 @@ _(planned for M21)_
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runner host.** `Axis.PackageHost` runs package operations, and the worker loads no package
-  code. The runners run in their own container,
-  `package-host`, beside the worker, in Compose and in the Helm chart.
-- **One runner per version.** Each installed package version gets its own
-  runner processes, shared by every tenant. Each runner process runs one call
-  at a time. The worker keeps a small pool for each version, and starts a new
-  runner when one exits.
+- **The runners.** Each runtime has its own runner, in a runner image that
+  carries that runtime. `Axis.PackageHost` runs them, and the worker loads no
+  package code. The runners run in their own container, `package-host`,
+  beside the worker, in Compose and in the Helm chart.
+- **One set for each version.** An installation's packages share runners
+  across tenants, one set for each installed package version. Each runner
+  process runs one call at a time. The worker keeps a small pool for each
+  version, and starts a new runner when one exits.
 - **The request.** For each attempt the worker sends a runner one request
   over a local socket: the operation name, the operation identity, the input,
   and the values of the bindings the operation declares, for the call's
-  tenant. The runner implements the same `IOperationContext`, so package code
-  and manifests do not change.
-- **Environment.** A runner starts with an empty environment, a read-only
-  file system apart from a temporary folder, and CPU and memory limits. It
-  sees no tenant's secrets except the bindings of the call it runs.
-- **Network.** A runner's only network route is an egress proxy in the
-  worker. The proxy lets through only the scheme, host and port of the `url`
-  bindings the operation declares, and follows no redirects. The context's
-  HTTP client sends through it. A socket the package opens itself reaches
-  nothing else.
+  tenant. The worker and every runner speak one protocol that no language
+  owns, and each language's SDK implements the operation context over it, so
+  package code and manifests do not change.
+- **Environment, for a runner that Axis hosts.** It starts with an empty
+  environment, a read-only file system apart from a temporary folder, and CPU
+  and memory limits. It sees no tenant's secrets except the bindings of the
+  call it runs.
+- **Network, for a runner that Axis hosts.** Its only network route is an
+  egress proxy in the worker. The proxy lets through only the scheme, host and
+  port of the `url` bindings the operation declares, and follows no redirects.
+  The context's HTTP client sends through it, and so does a library's own HTTP
+  call, so the library needs no change. A socket the package opens itself
+  reaches nothing else.
 - **Timeout.** At the operation's `timeout` the worker kills the runner
   process. The attempt's outcome is unknown, see
   [package call outcomes](process-execution.md#package-call-outcomes).
 - **Crash.** A runner that exits during an attempt gives an unknown outcome
   too. It is retried only when the operation declares `idempotent: true`.
-- **The server.** The server reads package assemblies through a
-  metadata-only load context to run the [manifest checks](#loading), and
-  never executes them.
+- **The server.** The server never executes package code. For a C# package
+  it reads the assembly through a metadata-only load context to run the
+  [manifest checks](#loading).
 - **`Extensions:Isolation`.** A server and worker setting. `process`, the
   default, uses the runners. `inProcess` keeps the in-process
   [loading](#loading), and is allowed only in Development. Elsewhere the host
   does not start.
 
+### Customer-hosted runners
+
+_(planned for M37)_
+
+A customer-hosted runner runs in the customer's own network and connects out to the installation with
+a credential of its own. The tenant's administrator can revoke that credential. The runner takes only
+its tenant's calls to the packages it registers, and it keeps its own secrets, so the worker sends it
+no binding value. It keeps the staging, retries and history of the engine, but none of the runner
+limits above, because the customer owns the machine.
+
 ## Not a sandbox
 
-A package loads in the host's process, so loading it is not isolation. The capability limits stop
-mistakes, but they do not stop a package that sets out to get around them. Packages are trusted code
-that the operator installs and reviews.
+A package loaded in the host's process is not isolated, because it shares that process. The capability
+limits stop mistakes, but they do not stop a package that sets out to get around them. An
+installation's packages are trusted code that the operator installs and reviews.
 
 ### Limits that hold
 
@@ -343,7 +387,7 @@ These limits hold for every package:
 
 ### Limits that do not hold
 
-A package that loads in the host's process and uses .NET APIs directly can do all of these:
+A C# package that loads in the host's process and uses .NET APIs directly can do all of these:
 
 - create its own `HttpClient`, or open sockets, and reach any host;
 - read environment variables, including every tenant's secrets;
@@ -358,17 +402,51 @@ A package that loads in the host's process and uses .NET APIs directly can do al
 
 _(planned for M21)_
 
-Outside Development, packages run in [package runners](#package-runners). There, the runner's network
-route, empty environment, read-only file system, resource limits and kill at the timeout stop the
-items in the list above, and the runner holds nothing of the host to reach by reflection. Static state
-shared across tenants is the one item still possible, because one runner serves every tenant.
+Outside Development, an installation's packages run in [package runners](#package-runners). There, the
+runner's network route, empty environment, read-only file system, resource limits and kill at the
+timeout stop the items in the list above, and the runner holds nothing of the host to reach by
+reflection. Static state shared across tenants is the one item still possible, because one set of
+runners serves every tenant.
+
+- **Runners for each tenant** _(planned for M37)_. An application's packages run in runners that serve
+  only their tenant, which closes that gap, see [An application's packages](#an-applications-packages).
+
+## An application's packages
+
+_(planned for M37)_
+
+An application's package sits in the application's folder, and the tenant's author brings it. It is not
+trusted code, so the platform gives it more limits than an installation's package gets.
+
+- **Its own runners.** Its runners serve only its tenant, in a sandbox stronger than a container.
+- **Quotas.** Its runners count against the tenant's [quotas](tenant-quotas.md).
+- **Plans.** In Axis SaaS only a [paid plan](plans.md) allows an application's packages.
+- **Switched on by the tenant.** The tenant's administrator turns them on and gives each author the
+  permission to write a package.
+- **Refused without the sandbox.** An installation without the sandbox refuses an application's
+  package, and runs its own packages as before.
+- **In the release.** The release holds the built package, see
+  [versions and pinning](#versions-and-pinning).
+- **No change to a module's code.** A customization layer cannot change a module's code. An
+  application that needs other code adds a package of its own and calls it, or
+  [ejects](customization-layers.md) the module.
+- **Built and scanned on publish.** Publishing the application builds and scans the package.
+
+### How a package is written
+
+- **By hand.** An author edits the package's files in Studio, or in their own tools through the
+  authoring API.
+- **By an agent.** An agent writes the package's adapter, manifest and tests over a library that the
+  author names. It does so only through an [authoring request](authoring-requests.md), under the plan,
+  review and accept of [D125](../decisions/d125-how-ai-authoring-connects-runs-and-keeps-its-changes.md),
+  and it never publishes.
 
 ## Sample and test packages
 
 One sample package shows a package in use, and one test package covers installation, loading and the
 capability limits.
 
-- **Sample package.** `samples/packages/` holds one package, `payment-references`
+- **Sample package.** `samples/packages/` holds one C# package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
   has no capabilities. It turns a request number into an ISO 11649 creditor reference:
   `RF`, two mod-97 check digits, then the number without separators. The purchase

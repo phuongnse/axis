@@ -18,7 +18,7 @@ the files agree, title and status included.
 | [D4](decisions/d4-modular-monolith.md) | Modular monolith | **Agreed** |
 | [D5](decisions/d5-configuration-is-authored-as-files-first.md) | Configuration is authored as files first | **Agreed** |
 | [D6](decisions/d6-in-configuration-logic-uses-a-typed-expression-language.md) | In-configuration logic uses a typed expression language | **Agreed** |
-| [D7](decisions/d7-custom-code-lives-in-extension-packages.md) | Custom code lives in extension packages | **Agreed** |
+| D7 | Custom code lives in extension packages | Superseded by [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md), [last text](https://github.com/phuongnse/axis/blob/bce8153e05dd8e5bc81b846a4bad04714759bc58/docs/decisions/d7-custom-code-lives-in-extension-packages.md) |
 | [D8](decisions/d8-custom-ui-widgets-are-packaged-react-components.md) | Custom UI widgets are packaged React components | **Agreed, deferred** |
 | [D9](decisions/d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md) | Authentication: OIDC through a BFF, ready for FAPI 2.0 | **Agreed** |
 | [D10](decisions/d10-tenant-aware-from-day-one-full-tenancy-later.md) | Tenant-aware from day one, full tenancy later | **Agreed** |
@@ -39,7 +39,7 @@ the files agree, title and status included.
 | [D25](decisions/d25-connectors-deployment-bindings-and-secrets.md) | Connectors, deployment bindings and secrets | **Agreed** |
 | [D26](decisions/d26-events-and-triggers.md) | Events and triggers | **Agreed** |
 | [D27](decisions/d27-inbound-endpoints.md) | Inbound endpoints | **Agreed** |
-| [D28](decisions/d28-extension-packages.md) | Extension packages | **Agreed** |
+| D28 | Extension packages | Superseded by [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md), [last text](https://github.com/phuongnse/axis/blob/bce8153e05dd8e5bc81b846a4bad04714759bc58/docs/decisions/d28-extension-packages.md) |
 | [D29](decisions/d29-release-pinning-and-text-resources.md) | Release pinning and text resources | **Agreed** |
 | [D30](decisions/d30-schema-migrations.md) | Schema migrations | **Agreed** |
 | [D31](decisions/d31-separate-database-roles.md) | Separate database roles | **Agreed** |
@@ -101,7 +101,7 @@ the files agree, title and status included.
 | [D87](decisions/d87-tenant-setting-commands-and-key-rotation.md) | Tenant setting commands and key rotation | **Agreed** |
 | [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md) | Custom widgets in the designer palette and a published SDK | **Agreed** |
 | [D89](decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md) | Modules that hold processes, pages and policies and depend on other modules | **Agreed** |
-| [D90](decisions/d90-extension-packages-run-out-of-process.md) | Extension packages run out of process | **Agreed** |
+| D90 | Extension packages run out of process | Superseded by [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md), [last text](https://github.com/phuongnse/axis/blob/bce8153e05dd8e5bc81b846a4bad04714759bc58/docs/decisions/d90-extension-packages-run-out-of-process.md) |
 | [D91](decisions/d91-connector-oauth2-and-structured-payloads.md) | Connector OAuth2 and structured payloads | **Agreed** |
 | [D92](decisions/d92-outbound-webhooks.md) | Outbound webhooks | **Agreed** |
 | [D93](decisions/d93-an-operator-web-console.md) | An operator web console | **Agreed** |
@@ -159,3 +159,4 @@ the files agree, title and status included.
 | [D145](decisions/d145-docs-stay-true-and-an-audit-reads-them-every-few-merges.md) | Docs stay true, and an audit reads them every few merges | **Agreed** |
 | [D146](decisions/d146-ci-runs-on-main-every-few-merges-and-nexkit-checks-every-branch.md) | CI runs on main every few merges, and NexKit checks every branch | **Agreed** |
 | [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md) | A run downloads only what the caches miss, and a transient stop runs again after a wait | **Agreed** |
+| [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) | Packages in C#, TypeScript or Python run in runners that Axis or the customer hosts | **Agreed** |
