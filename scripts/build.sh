@@ -4,7 +4,8 @@
 # licences.json with versions) from the SPA's lock file and the NuGet project assets, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
 # files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the sign-up page into the
 # control plane's web root and checks it and its fonts, then builds the .NET solution,
-# which installs the sample extension package in artifacts/extensions. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
+# which installs the C# sample extension package in artifacts/extensions. Before that build it installs the Python sample
+# extension package there with its library, offline from the wheels that scripts/setup.sh keeps, and checks its files. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
 # applications in artifacts/templates. Then writes the server's OpenAPI document to artifacts/openapi.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -49,6 +50,12 @@ test -f "$email/messages/messages_vi.properties"
 npm run build:sign-up --prefix web
 test -f controlplane/src/Axis.ControlPlane/wwwroot/sign-up.html
 node scripts/check-fonts.mjs controlplane/src/Axis.ControlPlane/wwwroot
+# Before the build, because the integration tests' project copies these files to its output.
+bash scripts/lib/install-sample-packages.sh
+phone_numbers=artifacts/extensions/phone-numbers/1.0.0
+test -f "$phone_numbers/axis-package.json"
+test -f "$phone_numbers/adapter.py"
+test -f "$phone_numbers/phonenumbers/__init__.py"
 dotnet build Axis.slnx -c Release --no-restore
 bash scripts/lib/install-modules.sh
 test -f artifacts/modules/department-budgets/1.2.0/module.json
