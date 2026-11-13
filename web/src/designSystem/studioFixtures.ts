@@ -16,7 +16,7 @@ import type {
   StudioResource,
   StudioResourceItem,
 } from '../platform/studio'
-import type { NotificationItem, NotificationPage } from '../platform/notifications'
+import type { NotificationItem, NotificationKind, NotificationPage } from '../platform/notifications'
 import type { FixtureRoute } from './fixtureFetch'
 import { application, currentUser, locale } from './fixtures'
 
@@ -859,15 +859,38 @@ function acceptOf(request: StudioAuthoringRequest): StudioRequest | null {
  * Proposed: what the bell tells an author about their own AI request, see the review on #3263: its plan waits for
  * them, its change is ready, AI could not finish it, or its change was accepted by itself.
  */
-const noticeSubjects: Partial<Record<StudioAuthoringRequest['state'], string>> = {
-  awaitingApproval: 'A plan waits for your approval',
-  ready: 'A change is ready for you to accept',
-  failed: 'AI could not finish your request',
-  accepted: 'Your change was accepted',
+const noticeSubjects: Partial<Record<StudioAuthoringRequest['state'], [string, NotificationKind]>> = {
+  awaitingApproval: ['A plan waits for your approval', 'action'],
+  ready: ['A change is ready for you to accept', 'action'],
+  failed: ['AI could not finish your request', 'problem'],
+  accepted: ['Your change was accepted', 'info'],
 }
 
-/** The bell's notices, one for each request and state that told its author, kept as the server keeps them. */
-const notices = new Map<string, NotificationItem & { request: string; state: StudioAuthoringRequest['state'] }>()
+/**
+ * The bell's notices, one for each request and state that told its author, kept as the server keeps them, after a
+ * tenant notice of the workspace's own.
+ */
+const notices = new Map<
+  string,
+  NotificationItem & { request: string | null; state: StudioAuthoringRequest['state'] | null }
+>([
+  [
+    'storage',
+    {
+      id: 'storage',
+      releaseId: null,
+      source: 'Workspace',
+      kind: 'problem',
+      subject: 'Storage is almost full',
+      body: 'The workspace uses 9.2 GB of its 10 GB. Uploads stop when it is full.',
+      open: null,
+      read: true,
+      createdAt: '2026-10-12T08:00:00Z',
+      request: null,
+      state: null,
+    },
+  ],
+])
 
 /**
  * Proposed: the bell's routes over the author's requests. A request of theirs that reaches a state the bell tells
@@ -877,21 +900,21 @@ const notices = new Map<string, NotificationItem & { request: string; state: Stu
 function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<string, FixtureRoute> {
   const page = (): NotificationPage => {
     for (const request of requests()) {
-      const subject = noticeSubjects[request.state]
-      const told = request.state !== 'accepted' || request.autoAccept
+      const told = noticeSubjects[request.state]
       const key = `${request.id}-${request.state}`
-      if (request.author !== currentUser.id || subject === undefined || !told || notices.has(key)) {
+      const byItself = request.state !== 'accepted' || request.autoAccept
+      if (request.author !== currentUser.id || told === undefined || !byItself || notices.has(key)) {
         continue
       }
+      const [subject, kind] = told
       const sent = Date.parse(request.sentAt)
       notices.set(key, {
         id: key,
         releaseId: null,
+        source: 'Purchase requests',
+        kind,
         subject,
-        body:
-          request.state === 'accepted'
-            ? `Purchase requests: “${request.text}” It goes live when someone publishes.`
-            : `Purchase requests: “${request.text}”`,
+        body: request.text,
         open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
         read: sent < Date.parse('2026-11-08T00:00:00Z'),
         createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + 20 * 60_000).toISOString(),
@@ -901,7 +924,10 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
     }
     const states = new Map(requests().map((request) => [request.id, request.state]))
     const items = [...notices.values()]
-      .map((notice) => ({ ...notice, read: notice.read || states.get(notice.request) !== notice.state }))
+      .map((notice) => ({
+        ...notice,
+        read: notice.read || (notice.request !== null && states.get(notice.request) !== notice.state),
+      }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     const shown = items.map(({ request: _request, state: _state, ...item }) => item)
     return {
@@ -930,7 +956,7 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
       notices.forEach((notice) => (notice.read = true))
       return new Response(null, { status: 204 })
     },
-    ...Object.fromEntries(ids.map((id) => [`/api/notifications/${id}/read`, markRead(id)])),
+    ...Object.fromEntries(['storage', ...ids].map((id) => [`/api/notifications/${id}/read`, markRead(id)])),
   }
 }
 

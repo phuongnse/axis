@@ -7,9 +7,19 @@ export interface NotificationOpen {
   parameters: Record<string, unknown>
 }
 
+/**
+ * Proposed: what a notification asks of its reader: to do something, only to know something, or to know that something
+ * failed. See the review on #3263.
+ */
+export type NotificationKind = 'action' | 'info' | 'problem'
+
 /** One notification as the list route serves it, with its texts rendered. */
 export interface NotificationItem {
   id: string
+  /** Proposed: where it comes from, the application's title or the workspace's, in the reader's locale. */
+  source: string
+  /** Proposed: what it asks of its reader. */
+  kind: NotificationKind
   /** The release that sent the notification, or `null` for a tenant notice. */
   releaseId: string | null
   subject: string

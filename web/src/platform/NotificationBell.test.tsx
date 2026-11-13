@@ -17,6 +17,8 @@ const noteId = '5b0f6c3e-83f1-4b0e-9d6c-0a0e1f9a7a11'
 const withPage: NotificationItem = {
   id: '11111111-1111-4111-8111-111111111111',
   releaseId: '22222222-2222-4222-8222-222222222222',
+  source: 'E2E app',
+  kind: 'info',
   subject: 'Note ready',
   body: 'The note is ready.',
   open: { page: 'NoteDetail', parameters: { note: noteId } },
@@ -131,7 +133,7 @@ describe('NotificationBell', () => {
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Note ready')).toBeInTheDocument()
     expect(within(dialog).getByText('The note is ready.')).toBeInTheDocument()
-    expect(within(dialog).getByText('Unread')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: /, Unread, Note ready,/ })).toBeInTheDocument()
     const lists = fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith(path))
     expect(lists).toEqual([`${path}?page=1&pageSize=10`, `${path}?page=1&pageSize=10`])
   })
@@ -225,10 +227,62 @@ describe('NotificationBell', () => {
 
   it('has Vietnamese texts for every key it uses', () => {
     const keys = Object.keys(platformEnglish).filter((key) => key.startsWith('shell.notifications.'))
-    expect(keys).toHaveLength(7)
+    expect(keys).toHaveLength(10)
     for (const key of keys) {
       expect(platformVietnamese).toHaveProperty([key])
     }
+  })
+})
+
+// Proposed: the bell's list under the bell, its rows and its count, see the review on #3263.
+describe('NotificationBell list', () => {
+  it('shows nine and more as 9+ on the bell', async () => {
+    stubServer(() => json(page([withPage], 12)))
+    renderBell()
+
+    const bell = await screen.findByRole('button', { name: 'Notifications (12 unread)' })
+    expect(bell.closest('.ant-badge')).toHaveTextContent('9+')
+  })
+
+  it('leads each row with its kind in words, its source and how long ago it came', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-10-26T10:30:00Z') })
+    stubServer(() =>
+      json(
+        page(
+          [
+            { ...withPage, kind: 'action' },
+            { ...withoutPage, kind: 'problem' },
+          ],
+          1,
+        ),
+      ),
+    )
+    renderBell()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    const [first, second] = within(dialog).getAllByRole('button', { name: /E2E app/ })
+    expect(first).toHaveAccessibleName(
+      'Needs your action, E2E app, 2 hours ago, Unread, Note ready, The note is ready.',
+    )
+    expect(second).toHaveAccessibleName('Problem, E2E app, 2 hours ago, Heads up, Nothing to open.')
+    vi.useRealTimers()
+  })
+
+  it('closes on Escape and gives the focus back to the bell', async () => {
+    stubServer(() => json(page([withPage], 1)))
+    renderBell()
+    const user = userEvent.setup()
+
+    const bell = await screen.findByRole('button', { name: 'Notifications (1 unread)' })
+    await user.click(bell)
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    await waitFor(() => expect(dialog).toHaveFocus())
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => expect(bell).toHaveFocus())
+    expect(bell).toHaveAttribute('aria-expanded', 'false')
   })
 })
 
