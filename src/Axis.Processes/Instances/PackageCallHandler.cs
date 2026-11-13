@@ -41,7 +41,8 @@ namespace Axis.Processes.Instances;
 /// exception. The error names the operation, the package and the binding, never a value.
 /// With <see cref="PackageRunnerPools"/>, a C# package runs in a runner of the C# package host instead of in the worker,
 /// and a <c>node</c> package always runs in a runner of the Node.js package host, because the worker cannot load
-/// JavaScript, see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
+/// JavaScript, and a <c>python</c> package always runs in a runner of the Python package host, because it cannot load Python,
+/// see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
 /// outcomes follow: a runner's <c>retryable</c> and <c>failure</c> answers are the exceptions above, a timeout and a
 /// runner that closes its connection are unknown outcomes, and a host that cannot be reached, is not set or starts no
 /// runner is a retryable error that names the setting of the call's runtime. A request that a runner sends to a host no declared <c>url</c> binding names is

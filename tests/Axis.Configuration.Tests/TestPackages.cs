@@ -10,6 +10,9 @@ internal static class TestPackages
 {
     public const string Id = "test-package";
 
+    /// <summary>The id of the Python test package, which <see cref="InstallPython"/> installs.</summary>
+    public const string PythonId = "python-test-package";
+
     /// <summary>The build of the initializer package, whose code writes marker files when it runs. Pass it to <see cref="Install"/>.</summary>
     public const string InitializerBuild = "initializer";
 
@@ -24,6 +27,27 @@ internal static class TestPackages
                 var target = Path.Combine(root.Path, Path.GetRelativePath(source, file));
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 File.Copy(file, target);
+            }
+        }
+
+        return root;
+    }
+
+    /// <summary>
+    /// Copies the Python test package and its dependency folder into one version folder, <c>1.0.0</c> of
+    /// <see cref="PythonId"/>, as a build leaves it, without pip. The test project must copy <c>PythonPackage</c> to its output.
+    /// </summary>
+    public static TemporaryFolder InstallPython(this TemporaryFolder root)
+    {
+        var source = Path.Combine(AppContext.BaseDirectory, "PythonPackage");
+        var target = Path.Combine(root.Path, PythonId, "1.0.0");
+        foreach (var folder in new[] { "package", "dependency" })
+        {
+            foreach (var file in Directory.GetFiles(Path.Combine(source, folder), "*", SearchOption.AllDirectories))
+            {
+                var destination = Path.Combine(target, Path.GetRelativePath(Path.Combine(source, folder), file));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(file, destination);
             }
         }
 

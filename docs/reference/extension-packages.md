@@ -473,13 +473,15 @@ package reaches nothing of the host and no binding of another call.
   file descriptor 1 aside for the protocol and points it at standard error, so a `print` at import or while an
   operation runs, and a library that writes to the descriptor, never reach the protocol stream. The first line
   after `start` is `ready`.
-- **A worker route to a Python host** _(planned for M21)_. The worker sends the calls of a `python` version to the
-  Python host.
+- **A worker route to a Python host.** With `Extensions:Isolation` `process`, the worker sends each attempt of a
+  `python` version to the host that `Extensions:Runners:Python` names. It uses the same runner pool, egress proxy,
+  timeouts and outcomes as for C#.
 - **No package code in the worker.** With `Extensions:Isolation` `process`, the worker reads the
   manifests and metadata of the installed C# packages, as the server does, and loads no package
   code. It sends each attempt of a C# call to a runner of the host at `Extensions:Runners:Dotnet`. It sends
-  each attempt of a `node` call to a runner of the host at `Extensions:Runners:Node`, with `inProcess` too,
-  because the worker cannot load JavaScript. The two runtimes share the worker's one egress proxy.
+  each attempt of a `node` call to a runner of the host at `Extensions:Runners:Node`, and each attempt of a
+  `python` call to a runner of the host at `Extensions:Runners:Python`, with `inProcess` too, because the worker
+  cannot load JavaScript or Python. The three runtimes share the worker's one egress proxy.
 - **One set for each version.** An installation's packages share runners
   across tenants, one set for each installed package version. Each runner
   process runs one call at a time. The worker keeps the runners of a version that it has started, and
@@ -527,13 +529,14 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran. The error names the setting of the call's runtime.
 
-The server reads `Extensions:Isolation`, and the worker reads all four settings:
+The server reads `Extensions:Isolation`, and the worker reads all five settings:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
-| `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` sends C# attempts to the runners. `inProcess` keeps the in-process [loading](#loading) of C# packages and is allowed only in Development. A `node` attempt goes to a runner either way. Outside Development `inProcess`, or any other value, stops the server and the worker at start |
+| `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` sends C# attempts to the runners. `inProcess` keeps the in-process [loading](#loading) of C# packages and is allowed only in Development. A `node` or `python` attempt goes to a runner either way. Outside Development `inProcess`, or any other value, stops the server and the worker at start |
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Node` | `Extensions__Runners__Node` | none | The `host:port` of the Node.js package host, with the same forms. Unset, every `node` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
+| `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
 ### The runner protocol
