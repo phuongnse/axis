@@ -33,8 +33,8 @@ const maxText = 4000
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept.
  * Axis counts no requests: each author's own AI account, such as Claude, runs the requests they send, and its
  * provider's limits answer as a request's failure. Until the author has connected theirs, the panel says so in place of the form, with a
- * link to their account page, and a sentence that an AI app they already pay for, such as Claude Code, can work through
- * the MCP address under it. A sent request opens its page, where its plan shows
+ * offers two ways to ask AI: their own API key, with a link to their account page, or an AI app they already pay for,
+ * through the MCP address under it, which then heads that part. A sent request opens its page, where its plan shows
  * when AI has written it, and the panel stays open and empty for the next one. Under a line comes the MCP server's
  * address on the tenant's host, with a copy button, for an AI app of the author's own. The panel lists no requests:
  * the sidebar leads to AI requests, and the notification bell tells the author when one waits for them or ends. The
@@ -69,6 +69,8 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
     return () => controller.abort()
   }, [application])
 
+  const notConnected = connection !== undefined && connection !== 'failed' && !connection.connected
+
   const send = async (values: { text: string; autoAccept: boolean }) => {
     setSending(true)
     setSendError(null)
@@ -92,19 +94,20 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
       onClose={onClose}
       testId="studio-ask-ai"
       top={
-        connection === undefined ? null : connection !== 'failed' && !connection.connected ? (
-          // Proposed: the panel before the tenant has connected its AI, see the review on #3263.
+        connection === undefined ? null : notConnected ? (
+          // Proposed: before an author has connected their AI, the panel offers the two ways to ask it: their own API
+          // key, or an AI app they already pay for through the MCP address under it, see the review on #3263.
           <Flex vertical gap={spacing.xs} data-testid="studio-ai-not-connected">
-            <Typography.Text strong>{t('shell.studio.ai.notConnected')}</Typography.Text>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              {t('shell.studio.ai.notConnected')}
+            </Typography.Title>
+            <Typography.Text strong style={{ marginTop: spacing.xs }}>
+              {t('shell.studio.ai.notConnected.key')}
+            </Typography.Text>
             <Typography.Text style={{ color: colour.textMuted }}>
-              {t('shell.studio.ai.notConnected.help')}
+              {t('shell.studio.ai.notConnected.key.help')}
             </Typography.Text>
             <Link to={aiSettingsAddress}>{t('shell.studio.ai.connect')}</Link>
-            {/* Proposed: a person with an AI app's subscription uses it through the MCP server instead, as Axis's own
-                agent takes an API key only, see the review on #3263. */}
-            <Typography.Text style={{ color: colour.textMuted, marginTop: spacing.xs }}>
-              {t('shell.studio.ai.notConnected.app')}
-            </Typography.Text>
           </Flex>
         ) : (
           <Form
@@ -150,8 +153,12 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
         data-testid="studio-ai-mcp"
         style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colour.borderSubtle}` }}
       >
-        <Typography.Text strong>{t('shell.studio.ai.mcp')}</Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.ai.mcp.help')}</Typography.Text>
+        <Typography.Text strong>
+          {t(notConnected ? 'shell.studio.ai.notConnected.app' : 'shell.studio.ai.mcp')}
+        </Typography.Text>
+        <Typography.Text style={{ color: colour.textMuted }}>
+          {t(notConnected ? 'shell.studio.ai.notConnected.app.help' : 'shell.studio.ai.mcp.help')}
+        </Typography.Text>
         <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
       </Flex>
     </StudioSidePanel>

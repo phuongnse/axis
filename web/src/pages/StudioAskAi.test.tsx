@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -51,15 +51,19 @@ describe('StudioAskAi', () => {
     expect(await screen.findByRole('button', { name: 'Send' })).toBeEnabled()
     expect(screen.queryByText(/left this month/)).toBeNull()
     expect(screen.queryByTestId('studio-ai-not-connected')).toBeNull()
+    expect(within(screen.getByTestId('studio-ai-mcp')).getByText('Use your own AI app')).toBeInTheDocument()
   })
 
   it('leads an author with no AI of their own to connect one on their account page or to use an AI app through MCP, with no form', async () => {
     renderPanel({ connected: false })
 
-    expect(await screen.findByText('Connect your AI to ask for changes')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ask AI in one of two ways' })).toBeInTheDocument()
+    expect(screen.getByText('With your own API key')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Connect your AI' })).toHaveAttribute('href', '/account')
-    expect(screen.getByText(/Already pay for an AI app/)).toBeInTheDocument()
-    expect(screen.getByTestId('studio-ai-mcp')).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('studio-ai-mcp')).getByText('With an AI app you already pay for'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Use your own AI app')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
   })
 })
