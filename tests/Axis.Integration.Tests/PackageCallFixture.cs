@@ -25,8 +25,11 @@ namespace Axis.Integration.Tests;
 /// <c>test-package/sum</c> on the divisor and the divisor plus one and writes the result to
 /// <c>total</c>, <c>PackageFail</c>, which runs <c>test-package/fail</c>, <c>PackageFlaky</c> and
 /// <c>PackageFlakyShort</c>, which run <c>test-package/flaky</c> with the divisor as the number of
-/// failures and 3 or 2 attempts, <c>PackageSlow</c>, which runs <c>test-package/slow</c>, and
-/// <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
+/// failures and 3 or 2 attempts, <c>PackageSlow</c>, which runs <c>test-package/slow</c>,
+/// <c>PackageSlowIdempotent</c>, <c>PackageExit</c> and <c>PackageExitIdempotent</c>, which run the
+/// operations <c>slowIdempotent</c>, <c>exit</c> and <c>exitIdempotent</c> that the copy of the package adds
+/// to its manifest (a slow operation that is idempotent and an operation that ends its own runner process,
+/// idempotent or not), and <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
 /// <c>version</c> to <c>packageVersion</c>. Versions 1.0.0 and 1.1.0 of the package are installed. The
 /// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
 /// so a test runs the work items itself. A second worker has no package installed. With <c>throughPgBouncer</c>, the
@@ -126,6 +129,28 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string OperationProcessTemplate = """
+        {
+          "id": "{id}",
+          "kind": "process",
+          "name": "{name}",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "{operation}",
+          "steps": [
+            {
+              "name": "{operation}",
+              "type": "operation",
+              "operation": "test-package/{operation}",
+              "input": { "a": "divisor" },
+              "retry": { "attempts": 2, "backoff": "PT10S" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private const string DescribeProcess = """
         {
           "id": "7e3a9c14-5b02-4d68-8f71-0a6d2c9e4b35",
@@ -197,6 +222,14 @@ public sealed class PackageCallFixture : IAsyncLifetime
             _application.With(Path.GetRelativePath(_appFolder, file), await File.ReadAllTextAsync(file));
         }
 
+        _packages.EditManifest("1.0.0", manifest =>
+        {
+            var operations = manifest["operations"]!.AsArray();
+            operations.Add(ManifestOperation("slowIdempotent", "TestPackage.SlowOperation", true, "PT1S"));
+            operations.Add(ManifestOperation("exit", "TestPackage.ExitOperation", false));
+            operations.Add(ManifestOperation("exitIdempotent", "TestPackage.ExitOperation", true));
+        });
+
         Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" }));
         Edit("entities/request.json", request =>
         {
@@ -210,6 +243,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .With("processes/package-flaky.json", Flaky("PackageFlaky", "b3f8a2c1-7d46-4e09-8a15-6c0d9e2f4b78", 3))
             .With("processes/package-flaky-short.json", Flaky("PackageFlakyShort", "a91c4e7d-2b58-4f36-9d80-5e3a7b1c6f24", 2))
             .With("processes/package-slow.json", SlowProcess)
+            .With("processes/package-slow-idempotent.json", OperationProcess("PackageSlowIdempotent", "slowIdempotent", "2f6b9d03-4a1e-4c78-b5d2-8e07a3c91f46"))
+            .With("processes/package-exit.json", OperationProcess("PackageExit", "exit", "9c14e8a7-0d35-4b62-a1f9-3b7d5e208c14"))
+            .With("processes/package-exit-idempotent.json", OperationProcess("PackageExitIdempotent", "exitIdempotent", "d70a3f5e-8b19-4e26-9c43-1f5a8b6e2d97"))
             .With("processes/package-describe.json", DescribeProcess);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
@@ -267,9 +303,20 @@ public sealed class PackageCallFixture : IAsyncLifetime
     /// </summary>
     internal async Task<WorkItemOutcome?> RunCallOnAsync(IReadOnlyDictionary<string, string?> extra, CancellationToken cancellationToken)
     {
-        await using var worker = BuildWorker(_packages.Path, _runtime ?? throw new InvalidOperationException("The fixture is not initialized."), extra);
-        return await RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken, worker);
+        await using var worker = BuildWorkerWith(extra);
+        return await RunCallOnAsync(worker, cancellationToken);
     }
+
+    /// <summary>
+    /// A worker that has the installed packages and the settings in <paramref name="extra"/>, which add to or replace the
+    /// fixture worker's. The caller disposes it, so a test can run several calls on one worker.
+    /// </summary>
+    internal ServiceProvider BuildWorkerWith(IReadOnlyDictionary<string, string?> extra) =>
+        BuildWorker(_packages.Path, _runtime ?? throw new InvalidOperationException("The fixture is not initialized."), extra);
+
+    /// <summary>Runs the next due package call item on <paramref name="worker"/>, which <see cref="BuildWorkerWith"/> built.</summary>
+    internal Task<WorkItemOutcome?> RunCallOnAsync(ServiceProvider worker, CancellationToken cancellationToken) =>
+        RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken, worker);
 
     /// <summary>Runs the next due package call item on a worker that holds no package version.</summary>
     public Task<WorkItemOutcome?> RunCallWithoutPackagesAsync(CancellationToken cancellationToken) =>
@@ -418,6 +465,29 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .Replace("{id}", id, StringComparison.Ordinal)
             .Replace("{name}", name, StringComparison.Ordinal)
             .Replace("{attempts}", attempts.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+
+    private static string OperationProcess(string name, string operation, string id) =>
+        OperationProcessTemplate
+            .Replace("{id}", id, StringComparison.Ordinal)
+            .Replace("{name}", name, StringComparison.Ordinal)
+            .Replace("{operation}", operation, StringComparison.Ordinal);
+
+    private static JsonObject ManifestOperation(string name, string type, bool idempotent, string? timeout = null)
+    {
+        var operation = new JsonObject
+        {
+            ["name"] = name,
+            ["type"] = type,
+            ["idempotent"] = idempotent,
+        };
+        if (timeout is not null)
+        {
+            operation["timeout"] = timeout;
+        }
+
+        operation["input"] = new JsonArray(new JsonObject { ["name"] = "a", ["type"] = "integer", ["required"] = true });
+        return operation;
+    }
 
     private ServiceProvider BuildWorker(string packagesPath, string runtimeConnectionString, IReadOnlyDictionary<string, string?>? extra = null)
     {

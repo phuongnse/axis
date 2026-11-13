@@ -672,7 +672,8 @@ capability limits and the server's metadata-only load.
   tests install it to cover installation and loading. Its `probe` operation
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
-  it does not declare.
+  it does not declare. Its `ExitOperation` type ends its own process only when it runs in a
+  package runner and throws anywhere else, so tests can stand in for a runner that crashes.
 - **Initializer package.** A test-only package, `initializer-package` 1.0.0, lives under
   `tests/packages/`. Its module initializer and its operation's static constructor each write a
   marker file beside the assembly, so a test can tell whether a host ran the package's code. The
