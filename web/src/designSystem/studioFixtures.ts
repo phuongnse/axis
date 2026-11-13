@@ -540,6 +540,7 @@ const appLoop: [string, string, string][] = [
   ['write_resource', 'Wrote Requests (pages/requests.json)', 'Saved, no problems'],
   ['validate_draft', 'Checked the draft', 'No problems'],
   ['run_scenarios', "Ran the application's 8 scenarios", 'All 8 scenarios passed'],
+  ['review', 'A second AI read the draft against the request', 'No findings'],
 ]
 
 /** How many steps of the loop a state has started, and whether the last one still runs. */
@@ -651,7 +652,8 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       steps: appSteps,
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
-      review: null,
+      // Its author has their own AI here, so a second AI reviewed it.
+      review: appState === 'ready' ? (reviews[request.id] ?? []) : null,
       changes: appDiff.map(({ file, summary }) => ({ file, summary })),
       failure: null,
       accept: appAccept,
@@ -997,21 +999,17 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
       const told = noticeSubjects[request.state]
       const key = `${request.id}-${request.state}`
       const byItself = request.state !== 'accepted' || request.autoAccept
-      // An outside app's request tells only of a change that has waited an hour to be accepted, as its author was at
-      // the app while it worked.
-      const fromApp = request.app !== null
+      // An outside app's request tells nothing, as its person is at the app, which hands them the request's page.
       if (
         request.author !== currentUser.id ||
         told === undefined ||
         !byItself ||
         notices.has(key) ||
-        (fromApp && request.state !== 'ready')
+        request.app !== null
       ) {
         continue
       }
-      const [subject, kind] = fromApp
-        ? [`A change from ${request.app} waits for you to accept`, 'action' as const]
-        : told
+      const [subject, kind] = told
       const sent = Date.parse(request.sentAt)
       notices.set(key, {
         id: key,
@@ -1023,7 +1021,7 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
         open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
         read: sent < Date.parse('2026-11-09T00:00:00Z'),
         done: false,
-        createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + (fromApp ? 90 : 20) * 60_000).toISOString(),
+        createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + 20 * 60_000).toISOString(),
         request: request.id,
         state: request.state,
       })

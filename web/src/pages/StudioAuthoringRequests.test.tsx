@@ -36,7 +36,18 @@ const fromApp: StudioAuthoringRequestDetail = {
     },
   ],
   draft: null,
-  checks: null,
+  checks: {
+    id: 'acc00000-0000-4000-8000-000000000007',
+    application,
+    kind: 'test',
+    target: 'tenant',
+    status: 'succeeded',
+    label: null,
+    note: null,
+    releaseId: null,
+    diagnostics: [],
+    scenarios: [],
+  },
   review: null,
   changes: [],
   failure: null,
@@ -69,14 +80,15 @@ describe('an outside AI app’s request', () => {
     vi.unstubAllGlobals()
   })
 
-  it('names the app after the person in the list of AI requests', async () => {
+  it('names the app as its co-author under its words in the list of AI requests', async () => {
     stub({ items: [fromApp] })
     renderIn(<StudioAuthoringRequests application={application} userId={userId} />)
 
-    expect(await screen.findByText('You, from Claude Code')).toBeInTheDocument()
+    expect(await screen.findByText('Co-authored with Claude Code')).toBeInTheDocument()
+    expect(screen.getByText('You')).toBeInTheDocument()
   })
 
-  it('shows who sent it from which app, the stages of its own and Accept, with no plan and no review', async () => {
+  it('names its co-author, shows the stages of its own and Accept, and says that no second AI reviewed it', async () => {
     stub(fromApp)
     renderIn(
       <StudioAuthoringRequestPage
@@ -88,13 +100,17 @@ describe('an outside AI app’s request', () => {
       />,
     )
 
-    expect(await screen.findByText(/^Sent by you from Claude Code on /)).toBeInTheDocument()
+    expect(await screen.findByText(/^Sent by you on /)).toBeInTheDocument()
+    expect(screen.getByText('Co-authored with Claude Code')).toBeInTheDocument()
     const progress = screen.getByTestId('studio-ai-progress')
-    expect(within(progress).getByText('Change')).toBeInTheDocument()
-    expect(within(progress).getByText('Ready')).toBeInTheDocument()
+    for (const stage of ['Change', 'Checks', 'Review', 'Ready']) {
+      expect(within(progress).getByText(stage)).toBeInTheDocument()
+    }
     expect(within(progress).queryByText('Plan')).toBeNull()
-    expect(within(progress).queryByText('Review')).toBeNull()
     expect(screen.queryByTestId('studio-ai-plan')).toBeNull()
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
+    expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
+      'No second AI reviewed this change, as you have not connected your AI.',
+    )
   })
 })

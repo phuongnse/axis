@@ -48,18 +48,15 @@ import { StudioTestResults } from './StudioTestResults'
 const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
 
 /**
- * Proposed: the stages of an outside AI app's request, which planned with its person in the app and has no review in
- * Axis, see the review on #3263.
+ * Proposed: the stages of an outside AI app's request, which planned with its person in the app, see the review on
+ * #3263. Its review runs on its author's own AI, and is skipped when they have none.
  */
-const appStageKeys = ['change', 'checks', 'ready'] as const
+const appStageKeys = ['change', 'checks', 'review', 'ready'] as const
 
-/** The stage of an outside app's request: its own three, or all of them once accepted. */
+/** The stage of an outside app's request: its own four, after the two of planning that it skips. */
 function appStageOf(state: StudioAuthoringRequestState): number | null {
   const stage = stageOf(state)
-  if (stage === null) {
-    return null
-  }
-  return state === 'accepted' ? appStageKeys.length : state === 'ready' ? 2 : stage >= 3 ? 1 : 0
+  return stage === null ? null : Math.max(0, stage - 2)
 }
 
 /**
@@ -132,12 +129,15 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       kind: 'freeText',
       title: t('shell.studio.aiRequests.request'),
       render: (_, row) => (
-        <Link
-          to={authoringRequestAddress(application, row.id)}
-          style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-        >
-          {row.text}
-        </Link>
+        <>
+          <Link
+            to={authoringRequestAddress(application, row.id)}
+            style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+          >
+            {row.text}
+          </Link>
+          {row.app !== null && <CoAuthored app={row.app} />}
+        </>
       ),
     },
     {
@@ -162,14 +162,8 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       key: 'who',
       kind: 'freeText',
       title: t('shell.studio.aiRequests.who'),
-      // Proposed: an outside app's request names the app after the person, see the review on #3263.
-      render: (_, row) => {
-        const who =
-          row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone'))
-        return row.app === null
-          ? who
-          : t('shell.studio.aiRequests.fromApp').replace('{who}', who).replace('{app}', row.app)
-      },
+      render: (_, row) =>
+        row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone')),
     },
     {
       key: 'when',
@@ -366,10 +360,8 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
-  const lineKey = request.app !== null ? (mine ? 'lineMineApp' : 'lineApp') : mine ? 'lineMine' : 'line'
-  const line = t(`shell.studio.aiRequest.${lineKey}`)
+  const line = (mine ? t('shell.studio.aiRequest.lineMine') : t('shell.studio.aiRequest.line'))
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
-    .replace('{app}', request.app ?? '')
     .replace('{time}', sentTime(request.sentAt))
   // The page reads as one document on the content's `surface`, its parts a rule apart.
   const section = (testName: string, title: string, body: ReactNode) => (
@@ -453,7 +445,14 @@ export function StudioAuthoringRequestPage({
         }
       />
       <SectionParts>
-        {section('ai-request', t('shell.studio.aiRequest.asked'), quoted(request.text))}
+        {section(
+          'ai-request',
+          t('shell.studio.aiRequest.asked'),
+          <>
+            {quoted(request.text)}
+            {request.app !== null && <CoAuthored app={request.app} />}
+          </>,
+        )}
         {section(
           'ai-progress',
           t('shell.studio.aiRequest.progress'),
@@ -546,7 +545,7 @@ export function StudioAuthoringRequestPage({
           request.checks !== null &&
           section(
             'ai-checks',
-            t(request.app !== null ? 'shell.studio.aiRequest.checksOnly' : 'shell.studio.aiRequest.checks'),
+            t('shell.studio.aiRequest.checks'),
             <Flex vertical gap="small" data-testid="studio-ai-checks">
               {problems.length > 0 && (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
@@ -558,6 +557,12 @@ export function StudioAuthoringRequestPage({
                 </ul>
               )}
               <StudioTestResults request={request.checks} onSelect={onOpen} nested />
+              {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
+              {request.review === null && request.app !== null && request.state === 'ready' && (
+                <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-not-reviewed">
+                  {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
+                </Typography.Text>
+              )}
               {/* The review runs only once the checks pass, so a request that failed before it has no notes. */}
               {request.review !== null && (
                 <>
@@ -672,5 +677,19 @@ export function StudioAuthoringRequestPage({
         {t('shell.studio.aiRequest.dropHelp')}
       </Modal>
     </Flex>
+  )
+}
+
+/**
+ * Proposed: the outside AI app that made a request's change with its person, as git names a co-author, see the review
+ * on #3263.
+ */
+function CoAuthored({ app }: { app: string }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  return (
+    <Typography.Text style={{ display: 'block', color: colour.textMuted }}>
+      {t('shell.studio.aiRequest.coAuthored').replace('{app}', app)}
+    </Typography.Text>
   )
 }
