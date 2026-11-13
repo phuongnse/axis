@@ -231,12 +231,6 @@ that its release was compiled against.
 
 - **Ranges.** An application's `packages` entry gives a version range: an exact version, a `^`
   range or a `~` range, as [declaring packages](#declaring-packages-in-an-application) says.
-- **`runner`** _(planned for M37)_. An entry of `application.json`'s `packages` may say where the package
-  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, but it
-  resolves no bindings for the package's operations and starts no Axis runner for it, see
-  [customer-hosted runners](#customer-hosted-runners). A module's entry has no `runner`, and the
-  application's entry decides for every process of the release, because the release holds one pin per
-  package id. A wrong value is `AXC0004`.
 - **Pinning.** Compilation picks the highest installed version in each range
   and pins that exact version in the release. The pin is part of the
   release's content hash. So once a newer version in range is installed,
