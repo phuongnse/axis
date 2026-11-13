@@ -8,7 +8,7 @@ using Axis.Configuration.Packages;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// The worker's connections to the runners of the C# package host, see
+/// The worker's connections to the runners of the C# and Python package hosts, see
 /// docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
@@ -17,7 +17,7 @@ namespace Axis.Processes.Instances;
 /// worker's <see cref="EgressProxy"/>, which starts with the first runner. Each runner gets its own proxy token in
 /// <c>start</c>, together with the address of the proxy as the host reaches it.
 /// </summary>
-internal sealed class PackageRunners(string? host, int port, int proxyPort, bool allowHttp) : IAsyncDisposable
+internal sealed class PackageRunners(PackageIsolation isolation, bool allowHttp) : IAsyncDisposable
 {
     /// <summary>
     /// The longest <see cref="RentAsync"/> may take to connect and get <c>ready</c>. It is not part of an operation's
@@ -26,20 +26,34 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<(string Package, string Version), ConcurrentBag<RunnerConnection>> _idle = new();
-    private readonly EgressProxy _proxy = new(proxyPort, allowHttp);
+    private readonly EgressProxy _proxy = new(isolation.ProxyPort, allowHttp);
     private volatile bool _disposed;
 
-    /// <summary>Whether <c>Extensions:Runners:Dotnet</c> names a host.</summary>
-    public bool IsSet => host is not null;
+    /// <summary>Whether a call of a package in <paramref name="language"/> goes to a runner. A Node.js call does not yet.</summary>
+    public static bool Runs(PackageLanguage language) => language is PackageLanguage.CSharp or PackageLanguage.Python;
+
+    /// <summary>The setting that names the package host of <paramref name="language"/>.</summary>
+    /// <exception cref="ArgumentOutOfRangeException">No package host runs <paramref name="language"/>.</exception>
+    public static string Setting(PackageLanguage language) =>
+        language switch
+        {
+            PackageLanguage.CSharp => PackageIsolation.DotnetRunnerSetting,
+            PackageLanguage.Python => PackageIsolation.PythonRunnerSetting,
+            _ => throw new ArgumentOutOfRangeException(nameof(language), language, "No package host runs this language."),
+        };
+
+    /// <summary>Whether the setting of <paramref name="language"/> names a host.</summary>
+    public bool IsSet(PackageLanguage language) => HostOf(language).Host is not null;
 
     /// <summary>
-    /// Takes an idle runner of the version whose connection is still open, or connects to the host, sends
-    /// <c>start</c> and waits for <c>ready</c>.
+    /// Takes an idle runner of the version whose connection is still open, or connects to the host of
+    /// <paramref name="language"/>, sends <c>start</c> and waits for <c>ready</c>.
     /// </summary>
     /// <exception cref="IOException">The host did not start a runner, so no <c>ready</c> came.</exception>
     /// <exception cref="SocketException">The host cannot be reached.</exception>
-    public async Task<RunnerConnection> RentAsync(string package, string version, CancellationToken cancellationToken)
+    public async Task<RunnerConnection> RentAsync(PackageLanguage language, string package, string version, CancellationToken cancellationToken)
     {
+        var (host, port) = HostOf(language);
         if (host is null)
         {
             throw new InvalidOperationException("No package host is set.");
@@ -81,6 +95,14 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
             throw;
         }
     }
+
+    private (string? Host, int Port) HostOf(PackageLanguage language) =>
+        language switch
+        {
+            PackageLanguage.CSharp => (isolation.DotnetHost, isolation.DotnetPort),
+            PackageLanguage.Python => (isolation.PythonHost, isolation.PythonPort),
+            _ => throw new ArgumentOutOfRangeException(nameof(language), language, "No package host runs this language."),
+        };
 
     /// <summary>The <c>host:port</c> that a runner started by the host on the other end of <paramref name="client"/> reaches this worker at.</summary>
     private string ProxyAddress(TcpClient client)

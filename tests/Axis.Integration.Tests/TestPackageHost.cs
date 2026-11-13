@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The C# package host of <c>Axis.PackageHost</c> in this process, on a loopback port, with real runner processes
+/// The package host of <c>Axis.PackageHost</c> in this process, on a loopback port, with real runner processes
 /// that run the versions installed under <c>extensionsRoot</c>. It logs to <see cref="Logs"/>, which hold the process
 /// id of each runner it started.
 /// </summary>
@@ -29,7 +29,7 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
     /// <summary>The address the host listens on.</summary>
     public IPEndPoint Endpoint { get; }
 
-    /// <summary>The address as <c>host:port</c>, the form of <c>Extensions:Runners:Dotnet</c>.</summary>
+    /// <summary>The address as <c>host:port</c>, the form of <c>Extensions:Runners:Dotnet</c> and <c>Extensions:Runners:Python</c>.</summary>
     public string Address => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"127.0.0.1:{Endpoint.Port}");
 
     /// <summary>The log entries of the host.</summary>

@@ -30,7 +30,10 @@ namespace Axis.Integration.Tests;
 /// operations <c>slowIdempotent</c>, <c>exit</c> and <c>exitIdempotent</c> that the copy of the package adds
 /// to its manifest (a slow operation that is idempotent and an operation that ends its own runner process,
 /// idempotent or not), and <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
-/// <c>version</c> to <c>packageVersion</c>. Versions 1.0.0 and 1.1.0 of the package are installed. The
+/// <c>version</c> to <c>packageVersion</c>. The copy also pins <c>python-test-package</c> 1.0.0, whose <c>greet</c> and
+/// <c>flaky</c> operations the processes <c>PythonGreet</c> and <c>PythonFlaky</c> run: <c>PythonGreet</c> writes the greeting for the
+/// title to <c>comment</c>, and <c>PythonFlaky</c> fails with a retryable error and has 2 attempts. Versions 1.0.0 and 1.1.0 of
+/// <c>test-package</c> and version 1.0.0 of <c>python-test-package</c> are installed. The
 /// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
 /// so a test runs the work items itself. A second worker has no package installed. With <c>throughPgBouncer</c>, the
 /// workers connect to the tenant database as the runtime role through <see cref="PgBouncerServer"/>, and the fixture claims
@@ -181,11 +184,55 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string PythonGreetProcess = """
+        {
+          "id": "0b8e5d27-91c4-4a3f-b6e0-7d2a4c9f1e58",
+          "kind": "process",
+          "name": "PythonGreet",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "greet",
+          "steps": [
+            {
+              "name": "greet",
+              "type": "operation",
+              "operation": "python-test-package/greet",
+              "input": { "name": "title" },
+              "output": { "greeting": "comment" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    private const string PythonFlakyProcess = """
+        {
+          "id": "6f3c9a81-d5e2-4b70-8a14-c0e7b2d96a35",
+          "kind": "process",
+          "name": "PythonFlaky",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "flaky",
+          "steps": [
+            {
+              "name": "flaky",
+              "type": "operation",
+              "operation": "python-test-package/flaky",
+              "input": { "a": "title" },
+              "retry": { "attempts": 2, "backoff": "PT10S" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private static readonly ActivationBindings _bindings =
         ProcessStepFixture.PackageBindings(ProcessStepFixture.TenantId, new Uri("https://test.example.test"), allowHttp: false);
 
     private readonly ProcessStepFixture _tenant = new();
-    private readonly TemporaryFolder _packages = new TemporaryFolder().Install("1.0.0", "1.1.0");
+    private readonly TemporaryFolder _packages = new TemporaryFolder().Install("1.0.0", "1.1.0").InstallPython();
     private readonly TemporaryFolder _application = new();
     private readonly TemporaryFolder _noPackages = new();
     private PackageCatalog? _catalog;
@@ -233,7 +280,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
             });
         }
 
-        Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" }));
+        Edit("application.json", application => application["packages"] = new JsonArray(
+            new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" },
+            new JsonObject { ["id"] = TestPackages.PythonId, ["version"] = "1.0.0" }));
         Edit("entities/request.json", request =>
         {
             var fields = request["fields"]!.AsArray();
@@ -249,7 +298,9 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .With("processes/package-slow-idempotent.json", OperationProcess("PackageSlowIdempotent", "slowIdempotent", "2f6b9d03-4a1e-4c78-b5d2-8e07a3c91f46"))
             .With("processes/package-exit.json", OperationProcess("PackageExit", "exit", "9c14e8a7-0d35-4b62-a1f9-3b7d5e208c14"))
             .With("processes/package-exit-idempotent.json", OperationProcess("PackageExitIdempotent", "exitIdempotent", "d70a3f5e-8b19-4e26-9c43-1f5a8b6e2d97"))
-            .With("processes/package-describe.json", DescribeProcess);
+            .With("processes/package-describe.json", DescribeProcess)
+            .With("processes/python-greet.json", PythonGreetProcess)
+            .With("processes/python-flaky.json", PythonFlakyProcess);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);
@@ -297,7 +348,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
     /// <summary>Runs the next due package call item.</summary>
     public Task<WorkItemOutcome?> RunCallAsync(CancellationToken cancellationToken) => RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken);
 
-    /// <summary>The folder that acts as <c>Extensions:Path</c>, with versions 1.0.0 and 1.1.0 of the test package.</summary>
+    /// <summary>The folder that acts as <c>Extensions:Path</c>, with versions 1.0.0 and 1.1.0 of the test package and version 1.0.0 of the Python test package.</summary>
     internal string PackagesPath => _packages.Path;
 
     /// <summary>

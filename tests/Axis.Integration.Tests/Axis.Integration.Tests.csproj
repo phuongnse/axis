@@ -76,6 +76,11 @@
     <None Include="..\..\artifacts\keycloak-theme\**\*" Link="KeycloakTheme\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\sdk\python\**\*" Exclude="..\..\sdk\python\**\__pycache__\**" LinkBase="sdk/python" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Import Project="..\packages\TestPackages.targets" />
   <Import Project="..\..\samples\packages\SamplePackages.targets" />
 

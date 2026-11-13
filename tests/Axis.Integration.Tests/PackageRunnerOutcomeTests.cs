@@ -123,8 +123,8 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallOnAsync(Process(TestPackageHost.ClosedAddress()), CancellationToken));
 
-        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerUnreachable, "retryable");
-        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerUnreachable, StringComparison.Ordinal);
+        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerUnreachable(PackageLanguage.CSharp), "retryable");
+        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerUnreachable(PackageLanguage.CSharp), StringComparison.Ordinal);
         Assert.Equal(ProcessStarts.Waiting, (await fixture.Tenant.InstanceAsync(instanceId)).State);
     }
 
@@ -138,8 +138,8 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
             WorkItemOutcome.Rescheduled,
             await fixture.RunCallOnAsync(new Dictionary<string, string?> { [PackageIsolation.IsolationSetting] = "process" }, CancellationToken));
 
-        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerNotSet, "retryable");
-        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerNotSet, StringComparison.Ordinal);
+        await AssertCallAsync(callId, PackageCalls.Pending, PackageCallHandler.RunnerNotSet(PackageLanguage.CSharp), "retryable");
+        Assert.Contains(PackageIsolation.DotnetRunnerSetting, PackageCallHandler.RunnerNotSet(PackageLanguage.CSharp), StringComparison.Ordinal);
         Assert.Equal(ProcessStarts.Waiting, (await fixture.Tenant.InstanceAsync(instanceId)).State);
     }
 
