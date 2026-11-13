@@ -510,12 +510,20 @@ const supplierPlan = [
   'Add two scenarios: a request saves with its supplier, and a request without one is refused.',
 ].join('\n')
 
-const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan }
+// Proposed: the plan an outside AI app proposed from its conversation with its person, see the review on #3263.
+const appPlan = [
+  'Add a Cost centre entity with a name and a code.',
+  'Add a Cost centre field to the purchase request, chosen from the cost centres.',
+  'Show the cost centre as a column of the request list.',
+].join('\n')
+
+const plans: Record<string, string> = { [aiRequests[0].id]: supplierPlan, [appRequest.id]: appPlan }
 
 // What the preview's own sends and actions changed, so the list and each request's page follow them.
 const sentRequests: { request: StudioAuthoringRequest; at: number }[] = []
 const actedOn = new Map<string, { state: StudioAuthoringRequest['state']; at: number }>()
 const planComments = new Map<string, string[]>()
+const changeRequests = new Map<string, { comment: string; at: number }[]>()
 
 // Proposed: the steps of a request's loop, each with its kind, its summary and its outcome. A fix round adds a fix and a
 // second check, see docs/reference/authoring-requests.md#states.
@@ -532,9 +540,12 @@ const loop: [string, string, string][] = [
   ['review', 'A second AI read the draft against the request and the plan', 'No findings'],
 ]
 
-/** Proposed: the tool calls an outside app made for its request, each with its summary and outcome. */
+/**
+ * Proposed: the tool calls an outside app made for its request, each with its summary and outcome: its plan, which its
+ * author approved in Studio, the writes it could make only then, the checks and the review.
+ */
 const appLoop: [string, string, string][] = [
-  ['create_draft', 'Created a draft', 'Draft created'],
+  ['propose_plan', 'Proposed a plan from its conversation with you', 'Plan written'],
   ['write_resource', 'Wrote CostCentre (entities/cost-centre.json)', 'Saved, no problems'],
   ['write_resource', 'Wrote PurchaseRequest (entities/purchase-request.json)', 'Saved, no problems'],
   ['write_resource', 'Wrote Requests (pages/requests.json)', 'Saved, no problems'],
@@ -631,25 +642,48 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
           })),
           ...loopSteps(1, state === 'planning', start, gap),
         ]
-      : loopSteps(count, running, start, gap)
-  // An outside app's request records its tool calls as its steps, with no plan and no review.
-  if (request.app !== null && sent === undefined && acted === undefined) {
+      : changeRequests.has(request.id)
+        ? [
+            // An ask for changes follows the ready request's loop, and the loop runs again from the work.
+            ...loopSteps(6, false, Date.parse(request.sentAt), 60_000),
+            ...changeRequests.get(request.id)!.map(({ comment, at }) => ({
+              kind: 'changeRequest',
+              summary: comment,
+              outcome: null,
+              tokens: 0,
+              startedAt: new Date(at).toISOString(),
+              finishedAt: new Date(at).toISOString(),
+            })),
+            ...loopSteps(count, running, start, gap).slice(1),
+          ]
+        : loopSteps(count, running, start, gap)
+  // An outside app's request records its tool calls as its steps, from the plan it proposed to the review.
+  // The app, not Axis, works on: after an ask for changes it waits for the app, and a drop ends it.
+  if (request.app !== null && sent === undefined && acted?.state !== 'dropped') {
     const appSteps = appLoop.map(([kind, summary, outcome], index) => ({
       kind,
       summary,
       outcome,
       tokens: 0,
-      startedAt: new Date(start + index * gap).toISOString(),
-      finishedAt: new Date(start + (index + 1) * gap).toISOString(),
+      startedAt: new Date(Date.parse(request.sentAt) + index * 60_000).toISOString(),
+      finishedAt: new Date(Date.parse(request.sentAt) + (index + 1) * 60_000).toISOString(),
     }))
-    const appAccept = acceptOf(request)
-    const appState = appAccept?.status === 'succeeded' ? 'accepted' : state
+    const asked = (changeRequests.get(request.id) ?? []).map(({ comment, at }) => ({
+      kind: 'changeRequest',
+      summary: comment,
+      outcome: null,
+      tokens: 0,
+      startedAt: new Date(at).toISOString(),
+      finishedAt: new Date(at).toISOString(),
+    }))
+    const appAccept = acted === undefined ? acceptOf(request) : null
+    const appState = acted !== undefined ? 'working' : appAccept?.status === 'succeeded' ? 'accepted' : state
     const appDiff = draftChanges[request.id] ?? genericChanges(request)
     return {
       ...request,
       state: appState,
-      plan: null,
-      steps: appSteps,
+      plan: appPlan,
+      steps: [...appSteps, ...asked],
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
       // Its author has their own AI here, so a second AI reviewed it.
@@ -1099,12 +1133,17 @@ function askAiRoutes(
     return request === undefined ? new Response(null, { status: 404 }) : asNow(request)
   }
   const act =
-    (id: string, state: StudioAuthoringRequest['state']) =>
+    (id: string, state: StudioAuthoringRequest['state'], asks: 'plan' | 'changes' = 'plan') =>
     (init?: RequestInit): unknown => {
-      actedOn.set(id, { state, at: Date.now() })
+      const at = Date.now()
+      actedOn.set(id, { state, at })
       if (typeof init?.body === 'string') {
         const { comment } = JSON.parse(init.body) as { comment: string }
-        planComments.set(id, [...(planComments.get(id) ?? []), comment])
+        if (asks === 'changes') {
+          changeRequests.set(id, [...(changeRequests.get(id) ?? []), { comment, at }])
+        } else {
+          planComments.set(id, [...(planComments.get(id) ?? []), comment])
+        }
       }
       return asNow(all().find((item) => item.id === id)!)
     }
@@ -1153,6 +1192,7 @@ function askAiRoutes(
     [`${folderPath}/authoring-requests/${id}`, one(id)],
     [`${folderPath}/authoring-requests/${id}/approve`, act(id, 'working')],
     [`${folderPath}/authoring-requests/${id}/change-plan`, act(id, 'planning')],
+    [`${folderPath}/authoring-requests/${id}/request-changes`, act(id, 'working', 'changes')],
     [`${folderPath}/authoring-requests/${id}/drop`, act(id, 'dropped')],
   ])
   return { ...routes, ...(Object.fromEntries(requestRoutes) as Record<string, FixtureRoute>) }

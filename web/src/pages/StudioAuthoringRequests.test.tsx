@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -18,7 +19,7 @@ const fromApp: StudioAuthoringRequestDetail = {
   text: 'Add a Cost centre field to the purchase request.',
   app: 'Claude Code',
   state: 'ready',
-  plan: null,
+  plan: 'Add a Cost centre field to the purchase request.',
   round: 1,
   tokens: 0,
   autoAccept: false,
@@ -59,10 +60,9 @@ function json(body: unknown) {
 }
 
 function stub(answer: unknown) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => json(answer)),
-  )
+  const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => json(answer))
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
 }
 
 function renderIn(children: React.ReactNode) {
@@ -88,7 +88,7 @@ describe('an outside AI app’s request', () => {
     expect(screen.getByText('You')).toBeInTheDocument()
   })
 
-  it('names its co-author, shows the stages of its own and Accept, and says that no second AI reviewed it', async () => {
+  it('names its co-author, goes through the same stages and plan as any request, and says that no second AI reviewed it', async () => {
     stub(fromApp)
     renderIn(
       <StudioAuthoringRequestPage
@@ -103,14 +103,73 @@ describe('an outside AI app’s request', () => {
     expect(await screen.findByText(/^Sent by you on /)).toBeInTheDocument()
     expect(screen.getByText('Co-authored with Claude Code')).toBeInTheDocument()
     const progress = screen.getByTestId('studio-ai-progress')
-    for (const stage of ['Change', 'Checks', 'Review', 'Ready']) {
+    for (const stage of ['Plan', 'Approval', 'Change', 'Checks', 'Review', 'Ready']) {
       expect(within(progress).getByText(stage)).toBeInTheDocument()
     }
-    expect(within(progress).queryByText('Plan')).toBeNull()
-    expect(screen.queryByTestId('studio-ai-plan')).toBeNull()
+    expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
       'No second AI reviewed this change, as you have not connected your AI.',
     )
+  })
+})
+
+describe('an outside AI app’s request while it works', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('says that the app makes the change and waits for its author to go on with it, with no spinner', async () => {
+    stub({ ...fromApp, state: 'working', checks: null })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    expect(await screen.findByTestId('studio-ai-app-works')).toHaveTextContent(
+      'Claude Code makes this change. Go on in Claude Code, and it reads what you asked here.',
+    )
+    expect(screen.getByTestId('studio-ai-progress').querySelector('.ant-spin')).toBeNull()
+  })
+})
+
+// Proposed: the author asks AI to change a ready draft, see the review on #3263.
+describe('a ready request', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('asks AI for changes with the author’s comment', async () => {
+    const fetchMock = stub(fromApp)
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Ask for changes…' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Ask for changes' })
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'What should AI change?' }),
+      'Make the cost centre optional.',
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Ask AI to change it' }))
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        ([url, init]) => init?.method === 'POST' && url.endsWith('/request-changes'),
+      )
+      expect(post?.[1]?.body).toBe(JSON.stringify({ comment: 'Make the cost centre optional.' }))
+    })
   })
 })

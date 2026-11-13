@@ -48,18 +48,6 @@ import { StudioTestResults } from './StudioTestResults'
 const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
 
 /**
- * Proposed: the stages of an outside AI app's request, which planned with its person in the app, see the review on
- * #3263. Its review runs on its author's own AI, and is skipped when they have none.
- */
-const appStageKeys = ['change', 'checks', 'review', 'ready'] as const
-
-/** The stage of an outside app's request: its own four, after the two of planning that it skips. */
-function appStageOf(state: StudioAuthoringRequestState): number | null {
-  const stage = stageOf(state)
-  return stage === null ? null : Math.max(0, stage - 2)
-}
-
-/**
  * The stage a state is in: fixing goes back to the checks, and an accepted request has finished every stage. A dropped
  * or failed request shows no stages.
  */
@@ -233,7 +221,8 @@ export function StudioAuthoringRequestPage({
   const [follow, setFollow] = useState(0)
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState(false)
-  const [changeOpen, setChangeOpen] = useState(false)
+  // Which comment the dialog asks for: another plan, or changes to a ready draft.
+  const [changeOpen, setChangeOpen] = useState<false | 'change-plan' | 'request-changes'>(false)
   const [dropOpen, setDropOpen] = useState(false)
   const [changeForm] = Form.useForm<{ comment: string }>()
   const [diff, setDiff] = useState<{ draft: string; changes: StudioRevisionChange[] | 'failed' }>()
@@ -339,7 +328,7 @@ export function StudioAuthoringRequestPage({
   }
 
   const mine = request.author === userId
-  const act = async (action: 'approve' | 'change-plan' | 'drop' | 'retry', comment?: string) => {
+  const act = async (action: 'approve' | 'change-plan' | 'request-changes' | 'drop' | 'retry', comment?: string) => {
     setActing(true)
     setActionError(false)
     try {
@@ -370,21 +359,22 @@ export function StudioAuthoringRequestPage({
     </SectionPart>
   )
   const quoted = (text: string) => <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
-  const stage = request.app !== null ? appStageOf(request.state) : stageOf(request.state)
-  const stageTitles = (request.app !== null ? appStageKeys : stageKeys).map((key) =>
-    t(`shell.studio.aiRequest.stage.${key}`),
-  )
+  // Proposed: one frame for every request, sent from Studio or made by an outside AI app, see the review on #3263.
+  const stage = stageOf(request.state)
+  const stageTitles = stageKeys.map((key) => t(`shell.studio.aiRequest.stage.${key}`))
   const running = request.steps.findLast((step) => step.finishedAt === null)
   const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
     {
       key: 'step',
       kind: 'freeText',
       title: t('shell.studio.aiRequest.step'),
-      // A change of plan keeps the author's comment as its summary.
+      // A change of plan, and an ask for changes to a ready draft, keep the author's comment as their summary.
       render: (_, step) =>
         step.kind === 'planChange'
           ? t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary)
-          : step.summary,
+          : step.kind === 'changeRequest'
+            ? t('shell.studio.aiRequest.changeRequest').replace('{comment}', step.summary)
+            : step.summary,
     },
     {
       key: 'result',
@@ -428,6 +418,7 @@ export function StudioAuthoringRequestPage({
       ? accept.diagnostics.filter((diagnostic) => diagnostic.code === 'AXC0377')
       : []
   const changes = diff?.draft === draft ? diff?.changes : undefined
+  const askingChanges = changeOpen === 'request-changes'
   const summaries = new Map(request.changes.map((change) => [change.file, change.summary]))
   const problems = request.checks?.diagnostics ?? []
 
@@ -459,7 +450,7 @@ export function StudioAuthoringRequestPage({
           <Flex vertical gap="small" data-testid="studio-ai-progress">
             {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
             <Flex align="center" gap={spacing.sm}>
-              {following && <Spin size="small" />}
+              {following && request.app === null && <Spin size="small" />}
               <Typography.Text style={{ color: stateColour(request.state) }}>
                 {stateWords(request, mine)}
                 {request.round > 1 && request.state !== 'planning' && (
@@ -469,14 +460,23 @@ export function StudioAuthoringRequestPage({
                 )}
               </Typography.Text>
             </Flex>
-            {running !== undefined && following && (
+            {running !== undefined && following && request.app === null && (
               <Typography.Text style={{ color: colour.textMuted }}>
                 {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
               </Typography.Text>
             )}
-            {request.state === 'planning' && (
+            {request.state === 'planning' && request.app === null && (
               <Typography.Text style={{ color: colour.textMuted }}>
                 {t('shell.studio.aiRequest.planning')}
+              </Typography.Text>
+            )}
+            {/* Proposed: an outside app works only while its person goes on with it, see the review on #3263. */}
+            {request.app !== null && ['planning', 'working', 'fixing'].includes(request.state) && (
+              <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
+                {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
+                  '{app}',
+                  request.app,
+                )}
               </Typography.Text>
             )}
           </Flex>,
@@ -507,7 +507,7 @@ export function StudioAuthoringRequestPage({
             <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
               {t('shell.studio.aiRequest.approve')}
             </AxisButton>
-            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen(true)}>
+            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('change-plan')}>
               {t('shell.studio.aiRequest.changePlan')}
             </AxisButton>
             <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
@@ -620,6 +620,10 @@ export function StudioAuthoringRequestPage({
             <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
               {t('shell.studio.aiRequest.drop')}
             </AxisButton>
+            {/* Proposed: the author asks AI to change the ready draft and it works on again, see the review on #3263. */}
+            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('request-changes')}>
+              {t('shell.studio.aiRequest.requestChanges')}
+            </AxisButton>
             {conflicts.length > 0 ? (
               <AxisButton role="finish" disabled={acting} onClick={() => void act('retry')}>
                 {t('shell.studio.aiRequest.retry')}
@@ -634,10 +638,18 @@ export function StudioAuthoringRequestPage({
       )}
       <Modal
         forceRender
-        open={changeOpen}
+        open={changeOpen !== false}
         width={size.dialog.medium}
-        title={t('shell.studio.aiRequest.changePlan.title')}
-        okText={t('shell.studio.aiRequest.changePlan.ok')}
+        title={t(
+          changeOpen === 'request-changes'
+            ? 'shell.studio.aiRequest.requestChanges.title'
+            : 'shell.studio.aiRequest.changePlan.title',
+        )}
+        okText={t(
+          changeOpen === 'request-changes'
+            ? 'shell.studio.aiRequest.requestChanges.ok'
+            : 'shell.studio.aiRequest.changePlan.ok',
+        )}
         cancelText={t('shell.studio.cancel')}
         confirmLoading={acting}
         onOk={() => changeForm.submit()}
@@ -647,16 +659,22 @@ export function StudioAuthoringRequestPage({
           form={changeForm}
           layout="vertical"
           requiredMark={requiredMark}
-          onFinish={(values) => void act('change-plan', values.comment.trim())}
+          onFinish={(values) => void act(changeOpen || 'change-plan', values.comment.trim())}
         >
           <AxisField
             name="comment"
-            label={t('shell.studio.aiRequest.comment')}
-            help={t('shell.studio.aiRequest.comment.help')}
-            requiredMessage={t('shell.studio.aiRequest.commentRequired')}
+            label={t(askingChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
+            help={t(
+              askingChanges ? 'shell.studio.aiRequest.changesComment.help' : 'shell.studio.aiRequest.comment.help',
+            )}
+            requiredMessage={t(
+              askingChanges
+                ? 'shell.studio.aiRequest.changesCommentRequired'
+                : 'shell.studio.aiRequest.commentRequired',
+            )}
           >
             <Input.TextArea
-              aria-label={t('shell.studio.aiRequest.comment')}
+              aria-label={t(askingChanges ? 'shell.studio.aiRequest.changesComment' : 'shell.studio.aiRequest.comment')}
               autoSize={{ minRows: 3, maxRows: 8 }}
               maxLength={2000}
             />

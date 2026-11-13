@@ -1847,7 +1847,7 @@ export async function fetchAuthoringRequest(
 export async function actOnAuthoringRequest(
   application: string,
   id: string,
-  action: 'approve' | 'change-plan' | 'drop' | 'retry',
+  action: 'approve' | 'change-plan' | 'request-changes' | 'drop' | 'retry',
   comment?: string,
 ): Promise<StudioAuthoringRequest> {
   const path = authoringRequestsPath(application, id, action)
