@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="JsonSchema.Net" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>
 
@@ -27,6 +28,10 @@
   <ItemGroup>
     <None Include="..\packages\node-test-package\**\*" Exclude="..\packages\node-test-package\node_modules\**" LinkBase="NodeTestPackage" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\sdk\package-runner-protocol.schema.json" Link="package-runner-protocol.schema.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="..\packages\TestPackages.targets" />

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis package runner protocol message",
+  "description": "One line of the runner protocol. See docs/reference/extension-packages.md#the-runner-protocol.",
+  "oneOf": [
+    { "$ref": "#/$defs/start" },
+    { "$ref": "#/$defs/ready" },
+    { "$ref": "#/$defs/run" },
+    { "$ref": "#/$defs/result" },
+    { "$ref": "#/$defs/retryable" },
+    { "$ref": "#/$defs/failure" },
+    { "$ref": "#/$defs/stop" }
+  ],
+  "$defs": {
+    "values": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "boolean", "null"] }
+    },
+    "bindingValues": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "start": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "package", "version", "proxyToken"],
+      "properties": {
+        "type": { "const": "start" },
+        "package": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+        },
+        "proxyToken": { "type": "string" }
+      }
+    },
+    "ready": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "ready" } }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "operation", "operationId", "input", "bindings"],
+      "properties": {
+        "type": { "const": "run" },
+        "operation": { "type": "string" },
+        "operationId": { "type": "string", "format": "uuid" },
+        "input": { "$ref": "#/$defs/values" },
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["urls", "secrets"],
+          "properties": {
+            "urls": { "$ref": "#/$defs/bindingValues" },
+            "secrets": { "$ref": "#/$defs/bindingValues" }
+          }
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "output"],
+      "properties": {
+        "type": { "const": "result" },
+        "output": { "$ref": "#/$defs/values" }
+      }
+    },
+    "retryable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "error"],
+      "properties": {
+        "type": { "const": "retryable" },
+        "error": { "type": "string" }
+      }
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "failure" },
+        "error": { "type": "string" },
+        "binding": { "type": "string" }
+      },
+      "oneOf": [{ "required": ["error"] }, { "required": ["binding"] }]
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "stop" } }
+    }
+  }
+}

@@ -477,9 +477,19 @@ implements the operation context over it.
 | `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
 | `stop` | The worker | None |
 
-- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network.
+- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The host
+  listens on port 5310 and reads the installed versions from `Extensions:Path`. It does not start
+  without that setting, or when the folder does not exist.
 - **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
   host starts the runner and pipes the connection to the runner's standard input and output.
+- **Start.** A `start` for a version that is not installed, or whose `package` or `version` is not
+  well formed, closes the connection and starts no runner. The runner answers `ready` once it has
+  loaded the version.
+- **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
+  the console goes to standard error.
+- **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
+  types, and an output whose .NET type does not fit its field are each a `failure` with the name of
+  the error's type.
 - **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host
   kills that runner. A runner that exits closes its connection, and the worker takes that as an
   unknown outcome.

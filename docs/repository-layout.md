@@ -25,7 +25,8 @@ src/
   Axis.Scenarios.Runner/  library that runs an application's test scenarios, from a folder or from
                           files in memory; used by Axis.Scenarios and the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner
-  Axis.PackageHost/       console host of the package build: checks, scans and writes a C#, Node.js or Python package
+  Axis.PackageHost/       console host of the package build: checks, scans and writes a C#, Node.js or Python package,
+                          and of the package runners: the host that starts them and the C# runner
   Axis.Core/              shared primitives: the tenant context and telemetry
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases,
                           extension package catalog
@@ -39,6 +40,7 @@ src/
                           to the SPA
   Axis.Tenancy/           tenant resolution, connection factory, platform schema
   Axis.Extensions/        contracts for extension packages: operation interface, operation context
+sdk/                      the runner protocol's JSON Schema
 web/                      React + TypeScript SPA (Vite), Ant Design, and the Keycloak login theme
 tests/
   Axis.<Module>.Tests/    unit tests per module
@@ -76,15 +78,16 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
 ```
 
 - **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
-  Python package, see [building a package](reference/extension-packages.md#building-a-package).
+  Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
+  mode listens for runner protocol connections and starts a runner process for each, and its `runner` mode
+  runs one installed C# package version over [the runner protocol](reference/extension-packages.md#the-runner-protocol).
 - **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
   `Axis.PackageHost`, Trivy and one runtime, and runs the `build` command, see
   [images](reference/installation.md#images).
-- **Package runner mode** _(planned for M21)_. `Axis.PackageHost` in runner mode, over
-  `Axis.Extensions`, runs extension package operations out of process, see
-  [package runners](reference/extension-packages.md#package-runners). The host images also carry the runner.
-- **`sdk/`** _(planned for M21)_. The runner protocol's schema, `package-runner-protocol.schema.json`,
-  and the folders `sdk/node/` and `sdk/python/`, which hold those runners and SDKs.
+- **Package runner images** _(planned for M21)_. The host images also carry the runner and run the `host` mode, see
+  [package runners](reference/extension-packages.md#package-runners).
+- **`sdk/`**. The runner protocol's schema, `package-runner-protocol.schema.json`.
+- **`sdk/node/` and `sdk/python/`** _(planned for M21)_. The Node.js and Python runners and SDKs.
 
 ## Module rules
 

@@ -117,6 +117,22 @@ public sealed class PackageCatalog
         return new PackageFolderCheck(package, DiagnosticOrder.Sort(diagnostics));
     }
 
+    /// <summary>
+    /// Loads the one version <c>&lt;root&gt;/&lt;id&gt;/&lt;version&gt;</c> with the checks of <see cref="Load"/>, so a package runner
+    /// loads only the version it runs. The package is null when the version has any problem, and each problem is a diagnostic.
+    /// </summary>
+    public static (InstalledPackage? Package, IReadOnlyList<Diagnostic> Diagnostics) LoadVersion(string root, string id, string version)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(root);
+        ArgumentException.ThrowIfNullOrEmpty(id);
+        ArgumentException.ThrowIfNullOrEmpty(version);
+
+        var diagnostics = new List<Diagnostic>();
+        var package = LoadPackage(
+            Path.Combine(root, id, version), id, version, $"{id}/{version}/{ManifestFileName}", $"Package '{id}' {version}", PackageLoadMode.Run, diagnostics);
+        return (package, DiagnosticOrder.Sort(diagnostics));
+    }
+
     /// <summary>Loads the package in <paramref name="versionFolder"/>. The folder names are checked against the manifest only when <paramref name="idName"/> and <paramref name="versionName"/> are given.</summary>
     private static InstalledPackage? LoadPackage(
         string versionFolder, string? idName, string? versionName, string file, string label, PackageLoadMode mode, List<Diagnostic> diagnostics)
