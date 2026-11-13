@@ -2107,7 +2107,6 @@
   "shell.studio.ai.state.working": "Working",
   "shell.studio.ai.state.checking": "Checking",
   "shell.studio.ai.state.reviewing": "Reviewing",
-  "shell.studio.ai.state.fixing": "Fixing",
   "shell.studio.ai.state.ready": "Ready",
   "shell.studio.ai.state.accepted": "Accepted",
   "shell.studio.ai.state.dropped": "Dropped",

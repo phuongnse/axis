@@ -2107,7 +2107,6 @@
   "shell.studio.ai.state.working": "Đang làm",
   "shell.studio.ai.state.checking": "Đang kiểm tra",
   "shell.studio.ai.state.reviewing": "Đang xem lại",
-  "shell.studio.ai.state.fixing": "Đang sửa",
   "shell.studio.ai.state.ready": "Sẵn sàng",
   "shell.studio.ai.state.accepted": "Đã chấp nhận",
   "shell.studio.ai.state.dropped": "Đã huỷ",

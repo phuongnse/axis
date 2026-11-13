@@ -16,7 +16,8 @@ export function authoringRequestAddress(application: string, id?: string): strin
 /** Proposed: a request's state in one word, the same for every reader, see docs/reference/authoring-requests.md#states and the review on #3263. */
 export function useRequestStateWords(): (request: StudioAuthoringRequest) => string {
   const t = useText()
-  return (request) => t(`shell.studio.ai.state.${request.state}`)
+  // A fix round is AI working on what the checks or the review found, so it reads as working.
+  return (request) => t(`shell.studio.ai.state.${request.state === 'fixing' ? 'working' : request.state}`)
 }
 
 /** The colour of a state's words: muted once it is over, the danger text when it failed. */

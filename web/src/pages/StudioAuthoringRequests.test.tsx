@@ -376,3 +376,27 @@ describe('a request’s co-authors', () => {
     expect(await screen.findByText(new RegExp(`^Sent by you on .*, ${words}$`))).toBeInTheDocument()
   })
 })
+
+// Proposed: a fix round reads as working, at the Change stage, see the review on #3263.
+describe('a request in a fix round', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('reads as Working', async () => {
+    stub({ ...fromApp, state: 'fixing', round: 2, checks: null, aiConnected: true })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    const progress = await screen.findByTestId('studio-ai-progress')
+    expect(await within(progress).findByText('Working')).toBeInTheDocument()
+    expect(within(progress).queryByText('Fixing')).toBeNull()
+  })
+})

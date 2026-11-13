@@ -50,7 +50,7 @@ import { StudioTestResults } from './StudioTestResults'
 const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
 
 /**
- * The stage a state is in: fixing goes back to the checks, and an accepted request has finished every stage. A dropped
+ * The stage a state is in: fixing is AI working again, and an accepted request has finished every stage. A dropped
  * or failed request shows no stages.
  */
 function stageOf(state: StudioAuthoringRequestState): number | null {
@@ -60,9 +60,9 @@ function stageOf(state: StudioAuthoringRequestState): number | null {
     case 'awaitingApproval':
       return 1
     case 'working':
+    case 'fixing':
       return 2
     case 'checking':
-    case 'fixing':
       return 3
     case 'reviewing':
       return 4
