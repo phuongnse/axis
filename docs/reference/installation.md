@@ -2,9 +2,9 @@
 
 This page says how a platform operator installs and upgrades Axis, on one machine with Docker Compose
 and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
-and the upgrade order. In this page, "database role" always means the PostgreSQL role.
+and, in [upgrade](upgrade.md), the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-An installation runs four hosts, from four production images:
+An installation runs four hosts, from four production images. The Compose example also runs a fifth container, the C# package host, from a fifth image, see [on premises](#on-premises):
 
 | Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -53,10 +53,12 @@ Build an image from the repository root with `docker build --target axis-server 
 - **The package host images.** `axis-package-host-dotnet`, `axis-package-host-node` and `axis-package-host-python` build
   extension packages, see [building a package](extension-packages.md#building-a-package). Each holds `Axis.PackageHost`, Trivy
   at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
-  writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`.
-- **The package runners** _(planned for M21)_. The package host images also hold their runtime's runner. They run as the containers
-  `package-host-dotnet`, `package-host-node` and `package-host-python` beside the worker, with `/extensions` mounted read-only, and
-  Compose and the Helm chart limit them as [package runners](extension-packages.md#package-runners) says.
+  writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
+  needs that root: the `host` command runs on a read-only root.
+- **The package runners.** The package host images also hold their runtime's runner. The Compose example runs `package-host-dotnet`
+  with the command `host` on a read-only root, with `/extensions` mounted read-only, as [on premises](#on-premises) says.
+- **The other package runners** _(planned for M21)_. The containers `package-host-node` and `package-host-python`, and the Helm
+  chart's hosts, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
@@ -112,7 +114,7 @@ PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server w
 on that PostgreSQL server.
 
 The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
-the TLS proxy and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
+the TLS proxy, the C# package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
 under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
 client secret or key.
 
@@ -125,7 +127,14 @@ client secret or key.
   than the five-minute lease, so a stop lets the running request finish.
 - **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
   `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
-- **The images.** Set `AXIS_VERSION` to the tag of the four images. `AXIS_IMAGE_PREFIX` adds a
+- **The C# package host** runs the `axis-package-host-dotnet` image with the command `host`. It runs the C# package operations
+  of the worker, see [package runners](extension-packages.md#package-runners). It has a read-only root file system apart from a
+  `/tmp` tmpfs, 1 CPU and 1g of memory, and `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change the limits. It gets
+  no environment, secret or published port, and mounts `/extensions` read-only and nothing else. It sits only on the internal
+  network `runners`, which no other service but the worker shares, so only the worker reaches its port 5310, which does not
+  authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
+  `package-host-dotnet:5310`.
+- **The images.** Set `AXIS_VERSION` to the tag of the five images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
 The diagram shows the services of the example and the PostgreSQL server that they connect to. The
@@ -144,6 +153,7 @@ flowchart LR
         worker["worker"]
         agent["agent"]
         publisher["publisher"]
+        packagehost["package-host-dotnet"]
         admin["admin, only when asked"]
     end
     subgraph pg ["PostgreSQL, runs elsewhere"]
@@ -164,6 +174,7 @@ flowchart LR
     worker -->|"tenant runtime connections"| tenantdb
     agent -->|"platform connection"| platformdb
     agent -->|"tenant runtime connections"| tenantdb
+    worker -->|"runner protocol, 5310"| packagehost
     publisher -->|"schema connection"| platformdb
     publisher -->|"schema role"| tenantdb
     identity -->|"KC_DB_URL"| identitydb
@@ -323,7 +334,8 @@ Install in this order:
    with code 0.
 3. Start the identity provider and the proxy with `docker compose up -d identity proxy`, and wait until
    `https://<AXIS_IDENTITY_HOST>/realms/master/.well-known/openid-configuration` answers `200`. Then
-   start the server, the worker and the agent host with `docker compose up -d server worker agent`, and
+   start the server, the worker, the agent host and the C# package host with
+   `docker compose up -d server worker agent package-host-dotnet`, and
    wait until `/health/ready` answers `200` on the server and the worker, because the server creates the `platform` tables at start
    and `tenant create` needs them. Then start the publisher with `docker compose up -d publisher`. It
    exits with code 1 until the server has created those tables, so start it only after
@@ -394,6 +406,8 @@ configured like `server`.
   headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
   `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
   `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
+- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the C# package host
+  join it, and the worker also stays on the default network. It has no fixed subnet.
 - **The address range.** Docker hands out addresses without a fixed one only from
   `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
   the proxy's address. If the default subnet overlaps a network of the machine, `docker compose up`
@@ -417,7 +431,7 @@ configured like `server`.
 
 Two kinds of test keep the example as this section describes it.
 
-- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the four
+- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the five
   production images and installs the example in the order above, against a test PostgreSQL over TLS
   and the example's own identity provider, with a certificate authority that it makes for the run. Its
   additions, such as the scenario role and the modules from `artifacts/modules`, sit in an override
@@ -427,13 +441,16 @@ Two kinds of test keep the example as this section describes it.
   answers `503` while the other serves, that the installed publisher runs a publish request of each
   tenant to `succeeded`, that a session works on both replicas and survives a restart, that the
   proxy's TLS versions and ciphers are the ones of [TLS](#tls), and that a Studio save on one replica
-  is read on the other and a stale save there answers `409`. It runs no `test` request against the
+  is read on the other and a stale save there answers `409`. It checks the running C# package host: its root refuses a write
+  and `/tmp` takes one, its limits are set, its environment is the one of its image, it reaches the worker but not the
+  proxy, PostgreSQL or an outside address, and the worker reaches it on 5310. It runs no `test` request against the
   installed images.
 - **The static checks.** Other tests read the rendered configuration and check the rules of this
   section: that nothing under `deploy/compose/` holds a secret, that every secret comes only from
   `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
   that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
-  published port of both servers is on `127.0.0.1`, and that the Caddyfile and the Kestrel settings
+  published port of both servers is on `127.0.0.1`, that the C# package host has a read-only root, its limits, no environment,
+  secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker, and that the Caddyfile and the Kestrel settings
   match [what the Compose example sets](#tls).
 
 ## In the cloud
@@ -869,26 +886,6 @@ The checklist lists every control that the [ASVS](asvs.md) tracking or the
 [threat model](threat-model.md) delegates to the operator, such as disk encryption, malware scanning
 of uploads and access to the logs, with how to meet each one and how to check it. Outside
 Development, the server and the worker warn at start about each item they can see is missing.
-
-## Upgrade
-
-An upgrade has a fixed order, because a host serves only the tenants on its own schema version. So
-migrate first and roll out the hosts second. Only the latest version of Axis gets security fixes, so
-an operator upgrades to get one, see [D108](../decisions/d108-reporting-a-vulnerability-and-security-fixes.md).
-
-1. Back up the platform database and every tenant database. For example, run `pg_dump` from the admin
-   image. Back up each tenant with [`tenant backup`](tenant-backup-and-restore.md#tenant-backup).
-2. Run `migrate` with the new admin image.
-3. Roll out the new server, the new worker, the new agent host and the new publisher.
-
-Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration failed keeps its old
-version. See [migrate](administration.md#migrate) for the window and for failed tenants.
-
-The admin image checks the same connection strings as the hosts, see [TLS](#tls), so `migrate` in
-step 2 needs them in their final form too.
-
-**No downgrade.** Migrations are not reversed. To roll back, restore the backup from step 1 and run
-the old images.
 
 ## Open points
 

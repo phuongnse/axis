@@ -5,7 +5,7 @@
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
 # compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
-# AXIS_VERSION          Required. The tag of the four images.
+# AXIS_VERSION          Required. The tag of the five images.
 # AXIS_IMAGE_PREFIX     Optional. A registry prefix for the image names, such as registry.example.com/axis/.
 # AXIS_SECRETS_DIR      The folder with the secret files. Default ./secrets.
 # AXIS_EXTENSIONS_DIR   The extension packages, mounted at /extensions. Default ./extensions.
@@ -36,6 +36,8 @@
 # AXIS_PASSWORD_BLACKLISTS_DIR  The breached-password list that every realm checks, mounted read-only at
 #                       /opt/keycloak/data/password-blacklists. Default ../keycloak/password-blacklists.
 # AXIS_SERVER_2_PORT    The host port of the second server replica, on 127.0.0.1 only. Default 8081.
+# AXIS_PACKAGE_HOST_CPUS   The CPU limit of the C# package host. Default 1.
+# AXIS_PACKAGE_HOST_MEMORY The memory limit of the C# package host. Default 1g.
 # AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
 #                       network of the machine.
 # AXIS_NETWORK_IP_RANGE The part of the subnet that Docker hands out to containers without a fixed address.
@@ -176,15 +178,39 @@ services:
       <<: *host-environment
       # All interfaces inside the container. The published port stays on 127.0.0.1.
       Health__Urls: http://0.0.0.0:5208
+      # The C# package host, on the internal network `runners`.
+      Extensions__Runners__Dotnet: package-host-dotnet:5310
     ports:
       - "127.0.0.1:${AXIS_WORKER_HEALTH_PORT:-5208}:5208"
     volumes:
       - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
       - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
+    networks:
+      - default
+      - runners
     # The worker never gets the schema connection string.
     secrets:
       - ConnectionStrings__Platform
       - Platform__SecretKey
+
+  # The C# package host, the container that runs the C# package operations of the worker. Its port 5310 has no
+  # authentication, so it sits only on the internal network `runners`, which only the worker shares. It gets no
+  # environment, secret, port or module folder, only the packages, read-only. See
+  # docs/reference/extension-packages.md#package-runners and the threats P151 and P152 in
+  # docs/reference/threat-model-product.md.
+  package-host-dotnet:
+    image: ${AXIS_IMAGE_PREFIX:-}axis-package-host-dotnet:${AXIS_VERSION:?Set AXIS_VERSION}
+    command: ["host"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cpus: ${AXIS_PACKAGE_HOST_CPUS:-1}
+    mem_limit: ${AXIS_PACKAGE_HOST_MEMORY:-1g}
+    volumes:
+      - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
+    networks:
+      - runners
 
   # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on. It reads
   # a tenant's own model key from the platform database only with Ai__AllowTenantKeys on.
@@ -264,6 +290,9 @@ networks:
       config:
         - subnet: ${AXIS_NETWORK_SUBNET:-172.31.250.0/24}
           ip_range: ${AXIS_NETWORK_IP_RANGE:-172.31.250.128/25}
+  # No route out and no other service: only the worker and the C# package host are on it.
+  runners:
+    internal: true
 
 # One file per setting, named like the setting. Compose mounts each at /run/secrets/<name>.
 secrets:
