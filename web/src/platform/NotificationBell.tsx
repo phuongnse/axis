@@ -267,6 +267,7 @@ const kindIcons: Record<NotificationKind, ReactNode> = {
  * row opens its page, `spacing-xs` in from the list's edges with `radius-base` corners, on the hover tint under the
  * pointer. A dot and a bold title mark it unread. Its kind's icon leads it, in `primaryText` when it asks for an
  * action, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
+ * The dot and the icon sit at the row's middle, and a problem's title is in `dangerText` too.
  * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. See
  * the review on #3263.
  */
@@ -311,14 +312,14 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
           cursor: 'pointer',
         }}
       >
-        <span aria-hidden style={{ paddingTop: 7 }}>
+        <span aria-hidden style={{ alignSelf: 'center' }}>
           {!item.read && (
             <span
               style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', background: colour.primaryText }}
             />
           )}
         </span>
-        <span aria-hidden style={{ color: kindColour, paddingTop: 1 }}>
+        <span aria-hidden style={{ alignSelf: 'center', display: 'flex', color: kindColour }}>
           {kindIcons[kind]}
         </span>
         <span style={{ minWidth: 0 }}>
@@ -330,7 +331,15 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
               </time>
             </Tooltip>
           </Flex>
-          <span style={{ display: 'block', fontWeight: item.read ? undefined : 600 }}>{item.subject}</span>
+          <span
+            style={{
+              display: 'block',
+              fontWeight: item.read ? undefined : 600,
+              color: kind === 'problem' ? colour.dangerText : undefined,
+            }}
+          >
+            {item.subject}
+          </span>
           <span
             style={{
               display: '-webkit-box',

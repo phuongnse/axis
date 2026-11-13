@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
+import { designTokensFor } from './designTokens'
 import { NotificationBell } from './NotificationBell'
 import { notificationAddress, type NotificationItem, type NotificationPage } from './notifications'
 import { TextProvider } from './TextProvider'
@@ -267,6 +268,8 @@ describe('NotificationBell list', () => {
       'Needs your action, E2E app, 2 hours ago, Unread, Note ready, The note is ready.',
     )
     expect(second).toHaveAccessibleName('Problem, E2E app, 2 hours ago, Heads up, Nothing to open.')
+    expect(within(second).getByText('Heads up')).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
+    expect(within(first).getByText('Note ready')).not.toHaveStyle({ color: designTokensFor('light').colour.dangerText })
     vi.useRealTimers()
   })
 
