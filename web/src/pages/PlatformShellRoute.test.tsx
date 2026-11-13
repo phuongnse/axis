@@ -44,6 +44,7 @@ const notices: NotificationPage = {
       releaseId: null,
       source: 'Workspace',
       kind: 'info',
+      done: false,
       subject: 'Emails are held until tomorrow',
       body: 'This tenant has sent its 100 emails for today.',
       open: null,

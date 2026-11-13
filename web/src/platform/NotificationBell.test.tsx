@@ -20,6 +20,7 @@ const withPage: NotificationItem = {
   releaseId: '22222222-2222-4222-8222-222222222222',
   source: 'E2E app',
   kind: 'info',
+  done: false,
   subject: 'Note ready',
   body: 'The note is ready.',
   open: { page: 'NoteDetail', parameters: { note: noteId } },
@@ -228,7 +229,7 @@ describe('NotificationBell', () => {
 
   it('has Vietnamese texts for every key it uses', () => {
     const keys = Object.keys(platformEnglish).filter((key) => key.startsWith('shell.notifications.'))
-    expect(keys).toHaveLength(10)
+    expect(keys).toHaveLength(15)
     for (const key of keys) {
       expect(platformVietnamese).toHaveProperty([key])
     }
@@ -271,6 +272,53 @@ describe('NotificationBell list', () => {
     expect(within(second).getByText('Heads up')).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
     expect(within(first).getByText('Note ready')).not.toHaveStyle({ color: designTokensFor('light').colour.dangerText })
     vi.useRealTimers()
+  })
+
+  it('filters the list to the unread or the waiting actions, and starts at All each time it opens', async () => {
+    const fetchMock = stubServer(() => json(page([], 1)))
+    renderBell()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    expect(within(dialog).getByText('No notifications yet.')).toBeInTheDocument()
+    await user.click(within(dialog).getByText('Unread'))
+    expect(await within(dialog).findByText('Nothing unread.')).toBeInTheDocument()
+    await user.click(within(dialog).getByText('Needs action'))
+    expect(await within(dialog).findByText('Nothing needs you now.')).toBeInTheDocument()
+
+    const lists = fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith(path))
+    expect(lists).toContain(`${path}?page=1&pageSize=10&unread=true`)
+    expect(lists.at(-1)).toBe(`${path}?page=1&pageSize=10&needsAction=true`)
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Notifications (1 unread)' }))
+    expect(
+      await within(await screen.findByRole('dialog', { name: 'Notifications' })).findByText('No notifications yet.'),
+    ).toBeInTheDocument()
+  })
+
+  it('mutes the icon of an action that has been dealt with', async () => {
+    stubServer(() =>
+      json(
+        page(
+          [
+            { ...withPage, kind: 'action' },
+            { ...withoutPage, kind: 'action', done: true },
+          ],
+          1,
+        ),
+      ),
+    )
+    renderBell()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    const [waiting, done] = within(dialog).getAllByRole('button', { name: /^Needs your action/ })
+    const icon = (row: HTMLElement) => row.querySelector('[aria-hidden]')!
+    const { colour } = designTokensFor('light')
+    expect(icon(waiting)).toHaveStyle({ color: colour.primaryText })
+    expect(icon(done)).toHaveStyle({ color: colour.textMuted })
   })
 
   it('closes on Escape and gives the focus back to the bell', async () => {

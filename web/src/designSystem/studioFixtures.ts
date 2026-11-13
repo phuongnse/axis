@@ -16,7 +16,12 @@ import type {
   StudioResource,
   StudioResourceItem,
 } from '../platform/studio'
-import type { NotificationItem, NotificationKind, NotificationPage } from '../platform/notifications'
+import type {
+  NotificationFilter,
+  NotificationItem,
+  NotificationKind,
+  NotificationPage,
+} from '../platform/notifications'
 import type { FixtureRoute } from './fixtureFetch'
 import { application, currentUser, locale } from './fixtures'
 
@@ -885,6 +890,7 @@ const notices = new Map<
       body: 'The workspace uses 9.2 GB of its 10 GB. Uploads stop when it is full.',
       open: null,
       read: true,
+      done: false,
       createdAt: '2026-10-12T08:00:00Z',
       request: null,
       state: null,
@@ -895,10 +901,11 @@ const notices = new Map<
 /**
  * Proposed: the bell's routes over the author's requests. A request of theirs that reaches a state the bell tells
  * adds a notice that opens its page, an auto-accepted one only when it was accepted by itself, and a notice is read
- * once its request has moved on, see the review on #3263. The notices of requests sent before November 8 start read.
+ * once its request has moved on, which also makes an `action` notice done, see the review on #3263. The notices of
+ * requests sent before November 9 start read, so the ready request's notice is read but still needs its author.
  */
 function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<string, FixtureRoute> {
-  const page = (): NotificationPage => {
+  const page = (filter: NotificationFilter) => (): NotificationPage => {
     for (const request of requests()) {
       const told = noticeSubjects[request.state]
       const key = `${request.id}-${request.state}`
@@ -916,7 +923,8 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
         subject,
         body: request.text,
         open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
-        read: sent < Date.parse('2026-11-08T00:00:00Z'),
+        read: sent < Date.parse('2026-11-09T00:00:00Z'),
+        done: false,
         createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + 20 * 60_000).toISOString(),
         request: request.id,
         state: request.state,
@@ -924,18 +932,20 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
     }
     const states = new Map(requests().map((request) => [request.id, request.state]))
     const items = [...notices.values()]
-      .map((notice) => ({
-        ...notice,
-        read: notice.read || (notice.request !== null && states.get(notice.request) !== notice.state),
-      }))
+      .map(({ request, state, ...notice }) => {
+        const movedOn = request !== null && states.get(request) !== state
+        return { ...notice, read: notice.read || movedOn, done: notice.kind === 'action' && movedOn }
+      })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    const shown = items.map(({ request: _request, state: _state, ...item }) => item)
+    const shown = items.filter((item) =>
+      filter === 'unread' ? !item.read : filter === 'needsAction' ? item.kind === 'action' && !item.done : true,
+    )
     return {
       items: shown,
       page: 1,
       pageSize: 10,
       totalCount: shown.length,
-      unreadCount: shown.filter((item) => !item.read).length,
+      unreadCount: items.filter((item) => !item.read).length,
     }
   }
   const markRead = (id: string) => () => {
@@ -948,11 +958,13 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
   const ids = [...aiRequests, ...[0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true))].flatMap(
     (request) => Object.keys(noticeSubjects).map((state) => `${request.id}-${state}`),
   )
-  // The bell asks for its first page, which this answers in place of the shared empty one.
+  // The bell asks for its first page under each filter, which this answers in place of the shared empty one.
   return {
-    '/api/notifications?page=1&pageSize=10': page,
+    '/api/notifications?page=1&pageSize=10': page('all'),
+    '/api/notifications?page=1&pageSize=10&unread=true': page('unread'),
+    '/api/notifications?page=1&pageSize=10&needsAction=true': page('needsAction'),
     '/api/notifications/read-all': () => {
-      page()
+      page('all')()
       notices.forEach((notice) => (notice.read = true))
       return new Response(null, { status: 204 })
     },

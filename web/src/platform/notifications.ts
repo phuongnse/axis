@@ -13,6 +13,12 @@ export interface NotificationOpen {
  */
 export type NotificationKind = 'action' | 'info' | 'problem'
 
+/**
+ * Proposed: which notifications the bell's list shows: all of them, the unread ones, or the `action` ones whose thing
+ * still waits. See the review on #3263.
+ */
+export type NotificationFilter = 'all' | 'unread' | 'needsAction'
+
 /** One notification as the list route serves it, with its texts rendered. */
 export interface NotificationItem {
   id: string
@@ -20,6 +26,11 @@ export interface NotificationItem {
   source: string
   /** Proposed: what it asks of its reader. */
   kind: NotificationKind
+  /**
+   * Proposed: whether the thing an `action` notification asks for has been dealt with, which reading it does not do.
+   * Always false for another kind.
+   */
+  done: boolean
   /** The release that sent the notification, or `null` for a tenant notice. */
   releaseId: string | null
   subject: string
@@ -47,8 +58,10 @@ export async function fetchNotifications(
   page: number,
   pageSize: number,
   signal?: AbortSignal,
+  filter: NotificationFilter = 'all',
 ): Promise<NotificationPage> {
-  const response = await apiFetch(`${path}?page=${page}&pageSize=${pageSize}`, { signal }, quiet)
+  const only = filter === 'unread' ? '&unread=true' : filter === 'needsAction' ? '&needsAction=true' : ''
+  const response = await apiFetch(`${path}?page=${page}&pageSize=${pageSize}${only}`, { signal }, quiet)
   if (!response.ok) {
     throw new Error(`Loading the notifications failed with ${response.status}`)
   }

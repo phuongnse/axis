@@ -5,7 +5,7 @@ import {
   CloseCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons'
-import { Badge, Flex, Pagination, Popover, Tooltip, Typography } from 'antd'
+import { Badge, Flex, Pagination, Popover, Segmented, Tooltip, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
@@ -18,6 +18,7 @@ import {
   markNotificationRead,
   notificationAddress,
   type NotificationItem,
+  type NotificationFilter,
   type NotificationKind,
   type NotificationPage,
 } from './notifications'
@@ -56,6 +57,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
   const [failed, setFailed] = useState(false)
   const [open, setOpen] = useState(false)
   const [markFailed, setMarkFailed] = useState(false)
+  const [filter, setFilter] = useState<NotificationFilter>('all')
   const request = useRef<AbortController | null>(null)
   const panel = useRef<HTMLDivElement>(null)
   const bell = useRef<HTMLButtonElement>(null)
@@ -69,11 +71,11 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   // A newer load drops the answer of an older one.
   const load = useCallback(
-    (page: number) => {
+    (page: number, which: NotificationFilter) => {
       request.current?.abort()
       const controller = new AbortController()
       request.current = controller
-      return fetchNotifications(path, page, pageSize, controller.signal).then(
+      return fetchNotifications(path, page, pageSize, controller.signal, which).then(
         (loaded) => {
           setData(loaded)
           setFailed(false)
@@ -90,7 +92,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
   )
 
   useEffect(() => {
-    void load(1)
+    void load(1, 'all')
     return () => request.current?.abort()
   }, [load, pathname])
 
@@ -110,8 +112,14 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   function openPanel() {
     setMarkFailed(false)
+    setFilter('all')
     setOpen(true)
-    void load(1)
+    void load(1, 'all')
+  }
+
+  function choose(next: NotificationFilter) {
+    setFilter(next)
+    void load(1, next)
   }
 
   async function openRow(item: NotificationItem) {
@@ -130,7 +138,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
     } else if (!marked) {
       setMarkFailed(true)
     }
-    await load(data?.page ?? 1)
+    await load(data?.page ?? 1, filter)
   }
 
   async function markAllRead() {
@@ -141,7 +149,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
       console.warn('Marking the notifications read failed', error)
       setMarkFailed(true)
     }
-    await load(data?.page ?? 1)
+    await load(data?.page ?? 1, filter)
   }
 
   const list = (
@@ -174,6 +182,18 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
           onClick={() => void markAllRead()}
         />
       </Flex>
+      {/* Proposed: the list's filter, which starts at All each time the list opens, see the review on #3263. */}
+      <div style={{ padding: `0 ${spacing.md}px ${spacing.xs}px` }}>
+        <Segmented<NotificationFilter>
+          block
+          value={filter}
+          onChange={choose}
+          options={(['all', 'unread', 'needsAction'] as const).map((value) => ({
+            value,
+            label: t(`shell.notifications.filter.${value}`),
+          }))}
+        />
+      </div>
       {(failed || markFailed) && (
         <div style={{ paddingInline: spacing.md, paddingBottom: spacing.xs }}>
           {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
@@ -183,7 +203,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
       {data.items.length === 0 ? (
         !failed && (
           <Typography.Paragraph type="secondary" style={{ margin: 0, padding: `${spacing.sm}px ${spacing.md}px` }}>
-            {t('shell.notifications.empty')}
+            {t(emptyKeys[filter])}
           </Typography.Paragraph>
         )
       ) : (
@@ -212,7 +232,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
             showSizeChanger={false}
             hideOnSinglePage
             itemRender={markCurrentPage(data.page)}
-            onChange={(next) => void load(next)}
+            onChange={(next) => void load(next, filter)}
           />
         </Flex>
       )}
@@ -259,6 +279,13 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 /** The icon's box: one line of text high, at the row's top, with the icon at its middle. */
 const firstLine: CSSProperties = { alignSelf: 'start', display: 'flex', alignItems: 'center', height: '1lh' }
 
+/** What the list says when its filter leaves nothing. */
+const emptyKeys: Record<NotificationFilter, string> = {
+  all: 'shell.notifications.empty',
+  unread: 'shell.notifications.emptyUnread',
+  needsAction: 'shell.notifications.emptyNeedsAction',
+}
+
 const kindIcons: Record<NotificationKind, ReactNode> = {
   action: <ClockCircleOutlined />,
   info: <InfoCircleOutlined />,
@@ -269,7 +296,7 @@ const kindIcons: Record<NotificationKind, ReactNode> = {
  * Proposed: one notification, drawn as a menu's item is, see docs/reference/actions-and-controls.md#menus: the whole
  * row opens its page, `spacing-xs` in from the list's edges with `radius-base` corners, on the hover tint under the
  * pointer. A dot and a bold title mark it unread. Its kind's icon leads it, in `primaryText` when it asks for an
- * action, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
+ * action that waits, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
  * The icon sits in the middle of the row's first line, the unread dot after how long ago, and a problem's title is in
  * `dangerText` too.
  * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. See
@@ -281,7 +308,9 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
   const { mode } = useThemeMode()
   const [hovered, setHovered] = useState(false)
   const kind = item.kind ?? 'info'
-  const kindColour = kind === 'action' ? colour.primaryText : kind === 'problem' ? colour.dangerText : colour.textMuted
+  // An action that has been dealt with asks nothing more, so its icon is muted as information's is.
+  const kindColour =
+    kind === 'action' && !item.done ? colour.primaryText : kind === 'problem' ? colour.dangerText : colour.textMuted
   const exact = formatValue({ name: 'createdAt', type: 'date-time' }, item.createdAt, {}, { locale, text: t })
   const ago = formatTimeAgo(item.createdAt, locale)
   // Its parts in the order they show, each a phrase of its own for assistive technology.
