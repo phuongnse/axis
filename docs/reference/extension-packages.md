@@ -191,9 +191,10 @@ every host reads. An installation's package is trusted code that the operator re
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-- **The package hosts** _(planned for M21)_. The containers `package-host-dotnet`, `package-host-node`
-  and `package-host-python` mount the same folder read-only, and their runners run the packages, see
-  [Package runners](#package-runners).
+- **The package hosts.** The Compose example's container `package-host-dotnet` mounts the same folder read-only, and
+  its runner runs the C# packages, see [Package runners](#package-runners).
+- **The other package hosts** _(planned for M21)_. The containers `package-host-node` and `package-host-python` do the same
+  for the other languages.
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
@@ -425,6 +426,9 @@ package reaches nothing of the host and no binding of another call.
 - **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
+- **The C# host in Compose.** The Compose example runs `package-host-dotnet` on an internal network `runners` that only it and
+  the worker share. It gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
+  CPU and memory limits, see [on premises](installation.md#on-premises).
 - **No package code in the worker.** With `Extensions:Isolation` `process`, the worker reads the
   manifests and metadata of the installed C# packages, as the server does, and loads no package
   code. It sends each attempt of a C# call to a runner.
