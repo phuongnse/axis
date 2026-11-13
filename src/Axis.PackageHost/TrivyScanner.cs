@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
@@ -22,52 +21,24 @@ internal static class TrivyScanner
     public static async Task<ScanResult> ScanAsync(IConfiguration configuration, string source, CancellationToken cancellationToken)
     {
         var command = configuration[CommandSetting] is { Length: > 0 } configured ? configured : DefaultCommand;
-        var start = new ProcessStartInfo(command)
+        var result = await ExternalCommand.RunAsync(
+            command,
+            ["fs", "--scanners", "vuln", "--format", "json", "--quiet", "--exit-code", "0", source],
+            workingDirectory: null,
+            cancellationToken);
+        if (result is null)
         {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        foreach (var argument in new[] { "fs", "--scanners", "vuln", "--format", "json", "--quiet", "--exit-code", "0", source })
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        string output;
-        int exitCode;
-        try
-        {
-            using var process = Process.Start(start) ?? throw new InvalidOperationException("The process did not start.");
-            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            try
-            {
-                await process.WaitForExitAsync(cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                process.Kill(entireProcessTree: true);
-                throw;
-            }
-
-            output = await outputTask;
-            await errorTask;
-            exitCode = process.ExitCode;
-        }
-        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            // The exception message names the command, so it is never passed on.
             return new ScanResult([], $"The scan could not start. Set '{CommandSetting}' to the Trivy command.");
         }
 
-        if (exitCode != 0)
+        if (result.ExitCode != 0)
         {
-            return new ScanResult([], $"The scan failed: Trivy exited with code {exitCode}.");
+            return new ScanResult([], $"The scan failed: Trivy exited with code {result.ExitCode}.");
         }
 
         try
         {
-            return new ScanResult(Findings(output), null);
+            return new ScanResult(Findings(result.Output), null);
         }
         catch (Exception exception) when (exception is JsonException or InvalidOperationException or KeyNotFoundException)
         {
