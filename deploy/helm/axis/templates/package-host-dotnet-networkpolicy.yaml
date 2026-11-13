@@ -1,0 +1,30 @@
+# Threats P151 and P152 of docs/reference/threat-model-product.md, see
+# docs/reference/extension-packages.md#package-runners. The package host takes calls from worker pods only and
+# sends traffic to worker pods only, with no DNS. It holds only where the network plugin enforces NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-package-host-dotnet
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: package-host-dotnet
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" . "component" "package-host-dotnet") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "axis.selectorLabels" (dict "root" . "component" "worker") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 5310
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "axis.selectorLabels" (dict "root" . "component" "worker") | nindent 14 }}

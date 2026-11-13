@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-package-host-dotnet
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: package-host-dotnet
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "axis.selectorLabels" (dict "root" . "component" "package-host-dotnet") | nindent 4 }}
+  ports:
+    - name: runner
+      port: 5310
+      targetPort: runner

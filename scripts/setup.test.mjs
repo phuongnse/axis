@@ -257,7 +257,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         },
       })
       assert.equal(result.status, 0, result.stderr)
-      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 40)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 44)
       assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
       const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
       assert.deepEqual(readdirSync(schemas).sort(), [
@@ -265,6 +265,7 @@ describe('scripts/lib/tools.sh retries a download that the host refuses once', (
         'cronjob-batch-v1.json',
         'deployment-apps-v1.json',
         'job-batch-v1.json',
+        'networkpolicy-networking-v1.json',
         'role-rbac-v1.json',
         'rolebinding-rbac-v1.json',
         'service-v1.json',
@@ -325,6 +326,7 @@ describe('scripts/lib/tools.sh fetches the schema files that a cached folder lac
       'cronjob-batch-v1.json',
       'deployment-apps-v1.json',
       'job-batch-v1.json',
+      'networkpolicy-networking-v1.json',
       'role-rbac-v1.json',
       'rolebinding-rbac-v1.json',
       'service-v1.json',

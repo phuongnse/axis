@@ -2,10 +2,10 @@
 # PostgreSQL and the source of secrets are external. The chart runs Axis's identity provider.
 
 image:
-  # Registry prefix of the four images, such as "registry.example.com/axis".
+  # Registry prefix of the Axis images, such as "registry.example.com/axis".
   # Empty uses the repository names as they are.
   registry: ""
-  # The tag of all four images. Empty uses the chart's appVersion.
+  # The tag of all Axis images. Empty uses the chart's appVersion.
   tag: ""
   pullPolicy: IfNotPresent
   # Names of image pull Secrets, as a list of strings.
@@ -35,6 +35,18 @@ agent:
   repository: axis-agent
   replicas: 1
   resources: {}
+
+# The C# package host runs the C# extension packages for the worker, see
+# docs/reference/extension-packages.md#package-runners. It gets no env entry and no Secret. Both limits are
+# required, and rendering fails without either.
+packageHost:
+  dotnet:
+    repository: axis-package-host-dotnet
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 # The publisher runs "axis-admin publisher", which runs the publish requests that
 # Studio stores. It uses the image of migrate.repository and always runs one replica.
