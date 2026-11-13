@@ -20,6 +20,7 @@ const fromApp: StudioAuthoringRequestDetail = {
   app: 'Claude Code',
   state: 'ready',
   plan: 'Add a Cost centre field to the purchase request.',
+  aiConnected: false,
   round: 1,
   tokens: 0,
   autoAccept: false,
@@ -115,11 +116,28 @@ describe('an outside AI app’s request', () => {
 })
 
 describe('an outside AI app’s request while it works', () => {
+  it('runs here as any request once its author has connected their AI, with no word of the app', async () => {
+    stub({ ...fromApp, state: 'working', checks: null, aiConnected: true })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    expect(await screen.findByText('Making the change')).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-ai-app-works')).toBeNull()
+    vi.unstubAllGlobals()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  it('says that the app makes the change and waits for its author to go on with it, with no spinner', async () => {
+  it('waits for the app, with no spinner, while its author has no AI here', async () => {
     stub({ ...fromApp, state: 'working', checks: null })
     renderIn(
       <StudioAuthoringRequestPage
@@ -132,7 +150,7 @@ describe('an outside AI app’s request while it works', () => {
     )
 
     expect(await screen.findByTestId('studio-ai-app-works')).toHaveTextContent(
-      'Claude Code makes this change. Go on in Claude Code, and it reads what you asked here.',
+      'Connect your AI to have AI go on here, or go on in Claude Code, and it reads what you asked here.',
     )
     expect(screen.getByTestId('studio-ai-progress').querySelector('.ant-spin')).toBeNull()
   })

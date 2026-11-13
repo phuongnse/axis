@@ -1772,6 +1772,11 @@ export interface StudioAuthoringRequestStep {
  * until there is one.
  */
 export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
+  /**
+   * Proposed: whether the request's author has connected their own AI, so Axis can do the AI's part of it here; without
+   * it only an outside app goes on with it, see the review on #3263.
+   */
+  aiConnected: boolean
   steps: StudioAuthoringRequestStep[]
   draft: string | null
   checks: StudioRequest | null

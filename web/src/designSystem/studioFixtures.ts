@@ -554,6 +554,18 @@ const appLoop: [string, string, string][] = [
   ['review', 'A second AI read the draft against the request', 'No findings'],
 ]
 
+/** The steps of an outside app's request, a minute apart from its sending. */
+function appSteps(request: StudioAuthoringRequest): StudioAuthoringRequestStep[] {
+  return appLoop.map(([kind, summary, outcome], index) => ({
+    kind,
+    summary,
+    outcome,
+    tokens: 0,
+    startedAt: new Date(Date.parse(request.sentAt) + index * 60_000).toISOString(),
+    finishedAt: new Date(Date.parse(request.sentAt) + (index + 1) * 60_000).toISOString(),
+  }))
+}
+
 /** How many steps of the loop a state has started, and whether the last one still runs. */
 const progress: Record<StudioAuthoringRequest['state'], [number, boolean]> = {
   planning: [1, true],
@@ -644,8 +656,8 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
         ]
       : changeRequests.has(request.id)
         ? [
-            // An ask for changes follows the ready request's loop, and the loop runs again from the work.
-            ...loopSteps(6, false, Date.parse(request.sentAt), 60_000),
+            // An ask for changes follows the ready request's steps, and the loop runs again from the work.
+            ...(request.app !== null ? appSteps(request) : loopSteps(6, false, Date.parse(request.sentAt), 60_000)),
             ...changeRequests.get(request.id)!.map(({ comment, at }) => ({
               kind: 'changeRequest',
               summary: comment,
@@ -659,31 +671,16 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
         : loopSteps(count, running, start, gap)
   // An outside app's request records its tool calls as its steps, from the plan it proposed to the review.
   // The app, not Axis, works on: after an ask for changes it waits for the app, and a drop ends it.
-  if (request.app !== null && sent === undefined && acted?.state !== 'dropped') {
-    const appSteps = appLoop.map(([kind, summary, outcome], index) => ({
-      kind,
-      summary,
-      outcome,
-      tokens: 0,
-      startedAt: new Date(Date.parse(request.sentAt) + index * 60_000).toISOString(),
-      finishedAt: new Date(Date.parse(request.sentAt) + (index + 1) * 60_000).toISOString(),
-    }))
-    const asked = (changeRequests.get(request.id) ?? []).map(({ comment, at }) => ({
-      kind: 'changeRequest',
-      summary: comment,
-      outcome: null,
-      tokens: 0,
-      startedAt: new Date(at).toISOString(),
-      finishedAt: new Date(at).toISOString(),
-    }))
-    const appAccept = acted === undefined ? acceptOf(request) : null
-    const appState = acted !== undefined ? 'working' : appAccept?.status === 'succeeded' ? 'accepted' : state
+  if (request.app !== null && sent === undefined && acted === undefined) {
+    const appAccept = acceptOf(request)
+    const appState = appAccept?.status === 'succeeded' ? 'accepted' : state
     const appDiff = draftChanges[request.id] ?? genericChanges(request)
     return {
       ...request,
       state: appState,
       plan: appPlan,
-      steps: [...appSteps, ...asked],
+      aiConnected: true,
+      steps: appSteps(request),
       draft: appState === 'accepted' ? null : draftOf(request.id),
       checks: checksOf(request, appState),
       // Its author has their own AI here, so a second AI reviewed it.
@@ -705,6 +702,8 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
     round,
     plan,
     steps,
+    // The preview's author has connected their own AI.
+    aiConnected: true,
     draft: hasDraft ? draftOf(request.id) : null,
     checks: checksOf(request, state),
     review: state === 'ready' ? (reviews[request.id] ?? []) : null,

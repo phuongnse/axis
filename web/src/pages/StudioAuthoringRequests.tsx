@@ -361,6 +361,9 @@ export function StudioAuthoringRequestPage({
   const quoted = (text: string) => <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
   // Proposed: one frame for every request, sent from Studio or made by an outside AI app, see the review on #3263.
   const stage = stageOf(request.state)
+  // Axis does the AI's part of any request whose author has connected their AI, whichever way it began.
+  const waitsForApp =
+    request.app !== null && !request.aiConnected && ['planning', 'working', 'fixing'].includes(request.state)
   const stageTitles = stageKeys.map((key) => t(`shell.studio.aiRequest.stage.${key}`))
   const running = request.steps.findLast((step) => step.finishedAt === null)
   const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
@@ -450,7 +453,7 @@ export function StudioAuthoringRequestPage({
           <Flex vertical gap="small" data-testid="studio-ai-progress">
             {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
             <Flex align="center" gap={spacing.sm}>
-              {following && request.app === null && <Spin size="small" />}
+              {following && !waitsForApp && <Spin size="small" />}
               <Typography.Text style={{ color: stateColour(request.state) }}>
                 {stateWords(request, mine)}
                 {request.round > 1 && request.state !== 'planning' && (
@@ -460,22 +463,22 @@ export function StudioAuthoringRequestPage({
                 )}
               </Typography.Text>
             </Flex>
-            {running !== undefined && following && request.app === null && (
+            {running !== undefined && following && !waitsForApp && (
               <Typography.Text style={{ color: colour.textMuted }}>
                 {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
               </Typography.Text>
             )}
-            {request.state === 'planning' && request.app === null && (
+            {request.state === 'planning' && !waitsForApp && (
               <Typography.Text style={{ color: colour.textMuted }}>
                 {t('shell.studio.aiRequest.planning')}
               </Typography.Text>
             )}
-            {/* Proposed: an outside app works only while its person goes on with it, see the review on #3263. */}
-            {request.app !== null && ['planning', 'working', 'fixing'].includes(request.state) && (
+            {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
+            {waitsForApp && (
               <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
                 {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
                   '{app}',
-                  request.app,
+                  request.app ?? '',
                 )}
               </Typography.Text>
             )}
