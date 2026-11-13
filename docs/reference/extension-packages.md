@@ -219,9 +219,11 @@ compiles nothing.
   1. The manifest, as [Loading](#loading) checks it, with `AXC0132` to `AXC0138`. Each problem is printed
      with its code, file and JSON Pointer. The folder name check is left out, because the build names the
      folder from the manifest.
-  2. The lock file, which the manifest's `lock` names, `packages.lock.json` for C#.
-  3. An existing `<id>/<version>/` folder.
-  4. The scan.
+  2. The language. A `node` or `python` package is refused, because the build installs only C# packages
+     yet.
+  3. The lock file, which the manifest's `lock` names, `packages.lock.json` for C#.
+  4. An existing `<id>/<version>/` folder.
+  5. The scan.
 - **Lock file.** A missing lock file is refused. A lock file is stale when the runtime dependency list,
   the `.deps.json` beside the assembly, names a NuGet package whose version the lock file does not
   resolve, and a stale lock file is refused. A lock file entry that has no runtime asset, such as an
@@ -236,12 +238,18 @@ compiles nothing.
   that load rejects the new version it deletes the version again and refuses.
 - **Exit code.** `0` when the package is built, `1` when it is refused and `2` for a setup error: a wrong
   argument, a missing source or extensions folder, or a scan that did not complete.
-- **Other languages** _(planned for M21)_. A `node` or `python` package is refused until its install
-  steps exist. For `node` the build runs `npm ci --ignore-scripts`. For `python` it runs
-  `pip install --require-hashes --no-deps`.
+- **Other languages** _(planned for M21)_. For `node` the build runs `npm ci --ignore-scripts`. For
+  `python` it runs `pip install --require-hashes --no-deps`.
 - **Python hashes** _(planned for M21)_. A Python dependency without a hash is refused.
 - **Registry credentials** _(planned for M21)_. They are mounted for the build alone, and the runners
   never see them.
+
+The build reads these settings:
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `Extensions:Path` | `Extensions__Path` | none | The existing folder that the build writes the package to |
+| `PackageBuild:Trivy` | `PackageBuild__Trivy` | `trivy` | The Trivy command that scans the dependencies |
 
 ## Versions and pinning
 
