@@ -8,7 +8,7 @@ import {
 import { Badge, Flex, Pagination, Popover, Tooltip, Typography } from 'antd'
 import { AxisAlert } from './AxisAlert'
 import { AxisButton } from './AxisButton'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
 import { formatValue } from './formatValue'
@@ -256,6 +256,9 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
   )
 }
 
+/** The dot's and the icon's box: one line of text high, at the row's top, with them at its middle. */
+const firstLine: CSSProperties = { alignSelf: 'start', display: 'flex', alignItems: 'center', height: '1lh' }
+
 const kindIcons: Record<NotificationKind, ReactNode> = {
   action: <ClockCircleOutlined />,
   info: <InfoCircleOutlined />,
@@ -267,7 +270,7 @@ const kindIcons: Record<NotificationKind, ReactNode> = {
  * row opens its page, `spacing-xs` in from the list's edges with `radius-base` corners, on the hover tint under the
  * pointer. A dot and a bold title mark it unread. Its kind's icon leads it, in `primaryText` when it asks for an
  * action, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
- * The dot and the icon sit at the row's middle, and a problem's title is in `dangerText` too.
+ * The dot and the icon sit in the middle of the row's first line, and a problem's title is in `dangerText` too.
  * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. See
  * the review on #3263.
  */
@@ -312,14 +315,14 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
           cursor: 'pointer',
         }}
       >
-        <span aria-hidden style={{ alignSelf: 'center' }}>
+        <span aria-hidden style={firstLine}>
           {!item.read && (
             <span
               style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', background: colour.primaryText }}
             />
           )}
         </span>
-        <span aria-hidden style={{ alignSelf: 'center', display: 'flex', color: kindColour }}>
+        <span aria-hidden style={{ ...firstLine, color: kindColour }}>
           {kindIcons[kind]}
         </span>
         <span style={{ minWidth: 0 }}>
