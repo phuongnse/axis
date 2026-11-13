@@ -59,10 +59,12 @@ form and texts below.
   field is marked `userId`, so the form shows a [user picker](form-widget.md) in place of a text
   box. The picker lists only people who have signed in at least once. An invited person appears
   after their first sign-in.
-- **Data sources.** `Departments` lists the department fields. `Employees` lists the employee
-  fields except `phone`, so a list carries no personal data. A form can still show the phone.
-  `OutOfOffice` lists `fullName`, `delegate`, `delegateFrom` and `delegateUntil` of the employees
-  whose `user` is the person who reads, so it holds at most their own record.
+- **Data sources.** `Departments` lists the department fields. `Employees` lists `fullName`,
+  `workEmail`, `jobTitle`, `department`, `manager`, `user` and `active`. It leaves out `phone`, so a
+  list carries no personal data. It also leaves out the absence fields `delegate`, `delegateFrom`
+  and `delegateUntil`. A form can still show the phone. `OutOfOffice` lists `fullName`, `delegate`,
+  `delegateFrom` and `delegateUntil` of the employees whose `user` is the person who reads, so it
+  holds at most their own record.
 - **Rules.** `IsDelegating(from, until)` is true when today, in the application's time zone, is
   between the two dates, both days included, and false when either date is empty. Other modules
   call it as `organization:IsDelegating(…)`.
