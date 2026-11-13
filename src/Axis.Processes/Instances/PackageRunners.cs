@@ -8,16 +8,17 @@ using Axis.Configuration.Packages;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// The worker's connections to the runners of the C# package host, see
+/// The worker's connections to the runners of one package host, the C# one or the Node.js one, see
 /// docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
 /// exits, times out or fails is dropped, and closing its connection makes the host kill the process. Runners
-/// start when an attempt needs one, so a version never has more of them than calls in flight. The pool owns the
-/// worker's <see cref="EgressProxy"/>, which starts with the first runner. Each runner gets its own proxy token in
-/// <c>start</c>, together with the address of the proxy as the host reaches it.
+/// start when an attempt needs one, so a version never has more of them than calls in flight. The pool uses the
+/// worker's <see cref="EgressProxy"/>, which starts with the first runner and which <see cref="PackageRunnerPools"/>
+/// owns. Each runner gets its own proxy token in <c>start</c>, together with the address of the proxy as the host
+/// reaches it. <paramref name="setting"/> is the name of the setting that holds the host's address.
 /// </summary>
-internal sealed class PackageRunners(string? host, int port, int proxyPort, bool allowHttp) : IAsyncDisposable
+internal sealed class PackageRunners(string setting, string? host, int port, EgressProxy proxy) : IAsyncDisposable
 {
     /// <summary>
     /// The longest <see cref="RentAsync"/> may take to connect and get <c>ready</c>. It is not part of an operation's
@@ -26,10 +27,12 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<(string Package, string Version), ConcurrentBag<RunnerConnection>> _idle = new();
-    private readonly EgressProxy _proxy = new(proxyPort, allowHttp);
     private volatile bool _disposed;
 
-    /// <summary>Whether <c>Extensions:Runners:Dotnet</c> names a host.</summary>
+    /// <summary>The name of the setting that holds the address of the package host, for the errors of an attempt.</summary>
+    public string Setting => setting;
+
+    /// <summary>Whether <see cref="Setting"/> names a host.</summary>
     public bool IsSet => host is not null;
 
     /// <summary>
@@ -61,9 +64,9 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
         var client = new TcpClient { NoDelay = true };
         try
         {
-            _proxy.EnsureStarted();
+            proxy.EnsureStarted();
             await client.ConnectAsync(host, port, cancellationToken);
-            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), _proxy.Register(), _proxy);
+            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), proxy.Register(), proxy);
             try
             {
                 await runner.StartAsync(cancellationToken);
@@ -91,7 +94,7 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
             address = address.MapToIPv4();
         }
 
-        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{_proxy.Port}" : $"{address}:{_proxy.Port}";
+        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{proxy.Port}" : $"{address}:{proxy.Port}";
     }
 
     /// <summary>Keeps <paramref name="runner"/>, which finished its attempt, for the next one of its version.</summary>
@@ -106,7 +109,7 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
         _idle.GetOrAdd((runner.Package, runner.Version), _ => []).Add(runner);
     }
 
-    /// <summary>Sends <c>stop</c> to each idle runner and closes it.</summary>
+    /// <summary>Sends <c>stop</c> to each idle runner and closes it. The proxy stays, because the other pool uses it.</summary>
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
@@ -118,7 +121,50 @@ internal sealed class PackageRunners(string? host, int port, int proxyPort, bool
                 runner.Dispose();
             }
         }
+    }
+}
 
+/// <summary>
+/// The worker's package runner pools, one for each runtime, which share the worker's one <see cref="EgressProxy"/>, see
+/// docs/reference/extension-packages.md#package-runners. The C# pool exists unless <c>Extensions:Isolation</c> is
+/// <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists, because the worker cannot
+/// load JavaScript.
+/// </summary>
+internal sealed class PackageRunnerPools : IAsyncDisposable
+{
+    private readonly EgressProxy _proxy;
+    private readonly PackageRunners? _dotnet;
+    private readonly PackageRunners _node;
+
+    public PackageRunnerPools(PackageIsolation isolation, bool allowHttp)
+    {
+        ArgumentNullException.ThrowIfNull(isolation);
+
+        _proxy = new EgressProxy(isolation.ProxyPort, allowHttp);
+        _dotnet = isolation.InProcess
+            ? null
+            : new PackageRunners(PackageIsolation.DotnetRunnerSetting, isolation.DotnetHost, isolation.DotnetPort, _proxy);
+        _node = new PackageRunners(PackageIsolation.NodeRunnerSetting, isolation.NodeHost, isolation.NodePort, _proxy);
+    }
+
+    /// <summary>The pool that runs the packages of <paramref name="language"/>, or <see langword="null"/> when the worker runs them itself or cannot run them.</summary>
+    public PackageRunners? For(PackageLanguage language) =>
+        language switch
+        {
+            PackageLanguage.CSharp => _dotnet,
+            PackageLanguage.Node => _node,
+            _ => null,
+        };
+
+    /// <summary>Stops the idle runners of both pools, then the proxy.</summary>
+    public async ValueTask DisposeAsync()
+    {
+        if (_dotnet is not null)
+        {
+            await _dotnet.DisposeAsync();
+        }
+
+        await _node.DisposeAsync();
         await _proxy.DisposeAsync();
     }
 }

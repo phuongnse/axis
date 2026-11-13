@@ -4,6 +4,7 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Records;
+using Axis.PackageHost;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -30,7 +31,11 @@ namespace Axis.Integration.Tests;
 /// operations <c>slowIdempotent</c>, <c>exit</c> and <c>exitIdempotent</c> that the copy of the package adds
 /// to its manifest (a slow operation that is idempotent and an operation that ends its own runner process,
 /// idempotent or not), and <c>PackageDescribe</c>, which waits on a task, then runs <c>test-package/describe</c> and writes its
-/// <c>version</c> to <c>packageVersion</c>. Versions 1.0.0 and 1.1.0 of the package are installed. The
+/// <c>version</c> to <c>packageVersion</c>. <c>PackageNodeSum</c> and <c>PackageNodeGreet</c> run <c>node-probe-package/sum</c> on the
+/// same inputs as <c>PackageSum</c> and write its result to <c>total</c>, and <c>node-test-package/greet</c> on the title and write its
+/// greeting to <c>greeting</c>. Versions 1.0.0 and 1.1.0 of <c>test-package</c> are installed, and version 1.0.0 of
+/// the two Node.js packages, with the dependencies of <c>node-test-package</c> installed by <c>npm ci</c>, so
+/// <c>npm</c> must be on the PATH. The
 /// worker has them installed, its log entries go to <see cref="Logs"/>, and its host is never started,
 /// so a test runs the work items itself. A second worker has no package installed. With <c>throughPgBouncer</c>, the
 /// workers connect to the tenant database as the runtime role through <see cref="PgBouncerServer"/>, and the fixture claims
@@ -181,6 +186,50 @@ public sealed class PackageCallFixture : IAsyncLifetime
         }
         """;
 
+    private const string NodeSumProcess = """
+        {
+          "id": "3a8e5c91-d204-4b7f-86e3-9f1c7d02a5b8",
+          "kind": "process",
+          "name": "PackageNodeSum",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "sum",
+          "steps": [
+            {
+              "name": "sum",
+              "type": "operation",
+              "operation": "node-probe-package/sum",
+              "input": { "a": "divisor", "b": "divisor + 1" },
+              "output": { "total": "total" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
+    private const string NodeGreetProcess = """
+        {
+          "id": "b6d27f40-1e93-4a58-9c0b-5e8a3d7f1c26",
+          "kind": "process",
+          "name": "PackageNodeGreet",
+          "formatVersion": 1,
+          "entity": "Request",
+          "start": "greet",
+          "steps": [
+            {
+              "name": "greet",
+              "type": "operation",
+              "operation": "node-test-package/greet",
+              "input": { "name": "title" },
+              "output": { "greeting": "greeting" },
+              "next": "done"
+            },
+            { "name": "done", "type": "end" }
+          ]
+        }
+        """;
+
     private static readonly ActivationBindings _bindings =
         ProcessStepFixture.PackageBindings(ProcessStepFixture.TenantId, new Uri("https://test.example.test"), allowHttp: false);
 
@@ -233,12 +282,16 @@ public sealed class PackageCallFixture : IAsyncLifetime
             });
         }
 
-        Edit("application.json", application => application["packages"] = new JsonArray(new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" }));
+        Edit("application.json", application => application["packages"] = new JsonArray(
+            new JsonObject { ["id"] = TestPackages.Id, ["version"] = "1.0.0" },
+            new JsonObject { ["id"] = "node-probe-package", ["version"] = "1.0.0" },
+            new JsonObject { ["id"] = "node-test-package", ["version"] = "1.0.0" }));
         Edit("entities/request.json", request =>
         {
             var fields = request["fields"]!.AsArray();
             fields.Add(new JsonObject { ["name"] = "total", ["type"] = "integer" });
             fields.Add(new JsonObject { ["name"] = "packageVersion", ["type"] = "text" });
+            fields.Add(new JsonObject { ["name"] = "greeting", ["type"] = "text" });
         });
         _application
             .With("processes/package-sum.json", SumProcess)
@@ -249,7 +302,17 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .With("processes/package-slow-idempotent.json", OperationProcess("PackageSlowIdempotent", "slowIdempotent", "2f6b9d03-4a1e-4c78-b5d2-8e07a3c91f46"))
             .With("processes/package-exit.json", OperationProcess("PackageExit", "exit", "9c14e8a7-0d35-4b62-a1f9-3b7d5e208c14"))
             .With("processes/package-exit-idempotent.json", OperationProcess("PackageExitIdempotent", "exitIdempotent", "d70a3f5e-8b19-4e26-9c43-1f5a8b6e2d97"))
-            .With("processes/package-describe.json", DescribeProcess);
+            .With("processes/package-describe.json", DescribeProcess)
+            .With("processes/package-node-sum.json", NodeSumProcess)
+            .With("processes/package-node-greet.json", NodeGreetProcess);
+
+        var nodeProbe = Path.Combine(_packages.Path, "node-probe-package", "1.0.0");
+        PackageBuildCommand.Copy(Path.Combine(AppContext.BaseDirectory, "NodeProbePackage"), nodeProbe);
+        var installed = await NodeInstall.InstallAsync(
+            Path.Combine(AppContext.BaseDirectory, "NodeTestPackage"),
+            Path.Combine(_packages.Path, "node-test-package", "1.0.0"),
+            CancellationToken.None);
+        Assert.Null(installed.Failure);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
         Assert.Empty(catalog.Diagnostics);

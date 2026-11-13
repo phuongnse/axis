@@ -572,7 +572,8 @@ operation in place of the HTTP request:
   version and passes the operation a cancellation token that is cancelled at the `timeout`.
 - **Run in a package runner.** With `process`, the default, a C# attempt goes to a
   [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
-  resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner.
+  resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner. A `node`
+  attempt always goes to a package runner, with `inProcess` too.
 - **Run in a customer-hosted runner** _(planned for M37)_. The worker runs no attempt of a call to a package
   that the application [declares](extension-packages.md#declaring-packages-in-an-application) with
   `runner: customer`. The call waits `pending`, its retry due, until a
