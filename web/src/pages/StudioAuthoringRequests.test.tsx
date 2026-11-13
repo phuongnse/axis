@@ -89,7 +89,7 @@ describe('an outside AI app’s request', () => {
     expect(screen.getByText('You')).toBeInTheDocument()
   })
 
-  it('names its co-author, goes through the same stages and plan as any request, and says that no second AI reviewed it', async () => {
+  it('names its co-author, shows its plan and Accept, and says that no second AI reviewed it', async () => {
     stub(fromApp)
     renderIn(
       <StudioAuthoringRequestPage
@@ -103,10 +103,7 @@ describe('an outside AI app’s request', () => {
 
     expect(await screen.findByText(/^Sent by you on /)).toBeInTheDocument()
     expect(screen.getByText('Co-authored with Claude Code')).toBeInTheDocument()
-    const progress = screen.getByTestId('studio-ai-progress')
-    for (const stage of ['Plan', 'Approval', 'Change', 'Checks', 'Review', 'Ready']) {
-      expect(within(progress).getByText(stage)).toBeInTheDocument()
-    }
+    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Ready for you to accept')).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
@@ -116,7 +113,7 @@ describe('an outside AI app’s request', () => {
 })
 
 describe('an outside AI app’s request while it works', () => {
-  it('runs here as any request once its author has connected their AI, with no word of the app', async () => {
+  it('runs here through the same stages as any request once its author has connected their AI', async () => {
     stub({ ...fromApp, state: 'working', checks: null, aiConnected: true })
     renderIn(
       <StudioAuthoringRequestPage
@@ -130,6 +127,11 @@ describe('an outside AI app’s request while it works', () => {
 
     expect(await screen.findByText('Making the change')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-app-works')).toBeNull()
+    // Every request goes through the same frame, whichever way it began.
+    const progress = screen.getByTestId('studio-ai-progress')
+    for (const stage of ['Plan', 'Approval', 'Change', 'Checks', 'Review', 'Ready']) {
+      expect(within(progress).getByText(stage)).toBeInTheDocument()
+    }
     vi.unstubAllGlobals()
   })
 
@@ -273,5 +275,79 @@ describe('a ready request’s review', () => {
     expect(
       within(review).getByText('A review is no guarantee. Read the changes before you accept.'),
     ).toBeInTheDocument()
+  })
+})
+
+// Proposed: a ready request's page puts what its author decides on first, and the detail in tabs, see the review on #3263.
+describe('a ready request’s page', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('leads with its checks and review, lists what changes, and opens a change in the Changes tab', async () => {
+    const fetchMock = vi.fn(async (input: string) =>
+      input.includes('/drafts/')
+        ? json({
+            start: 'a',
+            tip: 'b',
+            cursor: null,
+            resources: [
+              {
+                file: 'entities/cost-centre.json',
+                change: 'added',
+                id: null,
+                kind: 'entity',
+                name: 'CostCentre',
+                before: null,
+                after: '{}',
+              },
+            ],
+          })
+        : json({
+            ...fromApp,
+            aiConnected: true,
+            draft: 'd-1',
+            review: [],
+            changes: [{ file: 'entities/cost-centre.json', summary: 'A cost centre with a name and a code.' }],
+            checks: {
+              ...fromApp.checks!,
+              scenarios: [
+                {
+                  name: 's',
+                  resourceId: 'r',
+                  file: 'f',
+                  outcome: 'passed',
+                  durationMs: 1,
+                  step: null,
+                  path: null,
+                  message: null,
+                },
+              ],
+            },
+          }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    const checks = await screen.findByTestId('studio-ai-checks')
+    expect(within(checks).getByText('It compiles, and 1 of 1 scenarios pass.')).toBeInTheDocument()
+    expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
+    const changeList = await screen.findByTestId('studio-ai-what-changes')
+    expect(within(changeList).getByText('A cost centre with a name and a code.')).toBeInTheDocument()
+
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    await userEvent.setup().click(within(changeList).getByRole('button', { name: 'CostCentre' }))
+
+    expect(await screen.findByRole('tab', { name: 'Changes (1)', selected: true })).toBeInTheDocument()
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
   })
 })

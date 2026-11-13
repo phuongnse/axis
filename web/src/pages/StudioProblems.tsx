@@ -89,7 +89,7 @@ export function StudioDiagnosticRow({
     // oxlint-disable-next-line axis/no-antd-button -- Predates AxisButton; move it to AxisButton with a role.
     <Button
       type="text"
-      style={{ height: 'auto', textAlign: 'left', width: '100%' }}
+      style={{ height: 'auto', textAlign: 'left', width: '100%', justifyContent: 'flex-start' }}
       onClick={() => onSelect(resourceId, diagnostic.path)}
     >
       {content}

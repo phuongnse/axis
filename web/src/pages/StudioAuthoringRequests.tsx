@@ -1,4 +1,4 @@
-import { Flex, Form, Input, Modal, Spin, Typography } from 'antd'
+import { Flex, Form, Input, Modal, Spin, Tabs, Typography } from 'antd'
 import { useContext, useEffect, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
@@ -38,6 +38,7 @@ import {
   waitingForAuthor,
 } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
+import { kindSingular } from '../platform/studioKinds'
 import { SectionPart, SectionParts } from './ResourceFormSection'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -224,6 +225,46 @@ export function StudioAuthoringRequestPage({
   const [actionError, setActionError] = useState(false)
   // Which comment the dialog asks for: another plan, or changes to a ready draft.
   const [changeOpen, setChangeOpen] = useState<false | 'change-plan' | 'request-changes'>(false)
+  // Proposed: the page's tabs, the overview first, and the file a change in the overview opens, see the review on #3263.
+  const [tab, setTab] = useState<{ id: string; key: RequestTab; file?: string }>()
+  useEffect(() => {
+    const file = tab?.key === 'changes' ? tab.file : undefined
+    if (file === undefined) {
+      return
+    }
+    // The diffs above the file draw late and push it down, so it is brought back into view each time the page grows,
+    // until the person scrolls or two seconds pass.
+    const target = () => document.querySelector(`[data-file="${CSS.escape(file)}"]`)
+    // It stops below the header and the band, which stay at the top of the window.
+    const bring = () => {
+      const element = target()
+      if (element instanceof HTMLElement) {
+        element.style.scrollMarginTop = `${2 * size.bar + spacing.md}px`
+        element.scrollIntoView({ block: 'start' })
+      }
+    }
+    const frame = requestAnimationFrame(bring)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(bring)
+    const page = document.querySelector('[data-testid="studio-ai-request"]')
+    if (observer !== null && page !== null) {
+      observer.observe(page)
+    }
+    const stop = () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+      window.removeEventListener('wheel', stop, true)
+      window.removeEventListener('touchmove', stop, true)
+      window.removeEventListener('keydown', stop, true)
+    }
+    window.addEventListener('wheel', stop, true)
+    window.addEventListener('touchmove', stop, true)
+    window.addEventListener('keydown', stop, true)
+    const timer = window.setTimeout(stop, 2000)
+    return () => {
+      window.clearTimeout(timer)
+      stop()
+    }
+  }, [tab, size.bar, spacing.md])
   const [dropOpen, setDropOpen] = useState(false)
   const [changeForm] = Form.useForm<{ comment: string }>()
   const [diff, setDiff] = useState<{ draft: string; changes: StudioRevisionChange[] | 'failed' }>()
@@ -426,6 +467,180 @@ export function StudioAuthoringRequestPage({
   const summaries = new Map(request.changes.map((change) => [change.file, change.summary]))
   const problems = request.checks?.diagnostics ?? []
 
+  // Proposed: the page in tabs, as a pull request is: what a person needs to decide first, then the detail.
+  const hasDiff = showsDiff && draft !== null
+  const hasChecks = showsDiff && request.checks !== null
+  const working = !['ready', 'accepted', 'failed', 'dropped'].includes(request.state)
+  const activeTab: RequestTab =
+    tab?.id === requestId &&
+    ((tab.key === 'changes' && hasDiff) ||
+      (tab.key === 'checks' && hasChecks) ||
+      tab.key === 'overview' ||
+      (tab.key === 'activity' && request.steps.length > 0))
+      ? tab.key
+      : 'overview'
+  const openFile = (file: string) => setTab({ id: requestId, key: 'changes', file })
+  const changeList = Array.isArray(changes)
+    ? changes.map((change) => ({
+        file: change.file,
+        name: change.name ?? change.file,
+        detail: `${kindSingular(change.kind ?? '', t)}, ${t(`shell.studio.overview.change.${change.change}`).toLowerCase()}`,
+        summary: summaries.get(change.file),
+      }))
+    : request.changes.map((change) => ({ file: change.file, name: change.file, detail: '', summary: change.summary }))
+  const checksLine = request.checks !== null ? checksSummary(request.checks, t) : null
+  const overview = (
+    <SectionParts>
+      {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
+      {request.state === 'failed' && (
+        <AxisAlert
+          kind="error"
+          message={t('shell.studio.aiRequest.failed')}
+          description={request.failure ?? undefined}
+          data-testid="studio-ai-failure"
+        />
+      )}
+      {conflicts.length > 0 ? (
+        <AxisAlert
+          kind="warning"
+          data-testid="studio-ai-conflict"
+          message={t('shell.studio.aiRequest.conflict')}
+          description={
+            <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
+              {conflicts.map((conflict, index) => (
+                <li key={index}>{conflict.message}</li>
+              ))}
+            </ul>
+          }
+        />
+      ) : (
+        accept !== null && <StudioRequestStatus request={accept} releaseNumber={null} />
+      )}
+      {hasChecks &&
+        section(
+          'ai-checks',
+          t('shell.studio.aiRequest.checks'),
+          <Flex vertical gap="small" data-testid="studio-ai-checks">
+            {checksLine !== null && (
+              <Flex align="center" gap={spacing.sm} wrap>
+                <Typography.Text style={{ color: checksLine.passed ? colour.successText : colour.dangerText }}>
+                  {checksLine.text}
+                </Typography.Text>
+                <AxisButton role="link" onClick={() => setTab({ id: requestId, key: 'checks' })}>
+                  {t('shell.studio.aiRequest.seeChecks')}
+                </AxisButton>
+              </Flex>
+            )}
+            {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
+            {request.review === null && request.app !== null && request.state === 'ready' && (
+              <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-not-reviewed">
+                {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
+              </Typography.Text>
+            )}
+            {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
+            {request.review !== null && (
+              <ReviewFindings findings={request.review} ready={request.state === 'ready'} onOpen={onOpen} />
+            )}
+          </Flex>,
+        )}
+      {hasDiff &&
+        changeList.length > 0 &&
+        section(
+          'ai-what-changes',
+          t('shell.studio.aiRequest.whatChanges'),
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid="studio-ai-what-changes">
+            {changeList.map((change) => (
+              <li key={change.file} style={{ paddingBlock: spacing.xs / 2 }}>
+                <AxisButton role="link" onClick={() => openFile(change.file)}>
+                  {change.name}
+                </AxisButton>
+                {change.detail !== '' && (
+                  <Typography.Text style={{ color: colour.textMuted }}>{` ${change.detail}`}</Typography.Text>
+                )}
+                {change.summary !== undefined && <div>{change.summary}</div>}
+              </li>
+            ))}
+          </ul>,
+        )}
+      {section(
+        'ai-request',
+        t('shell.studio.aiRequest.asked'),
+        <>
+          {quoted(request.text)}
+          {request.app !== null && <CoAuthored app={request.app} />}
+        </>,
+      )}
+      {request.plan !== null &&
+        section(
+          'ai-plan',
+          t('shell.studio.aiRequest.plan'),
+          <Flex vertical gap="small">
+            <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
+              {request.plan
+                .split('\n')
+                .filter((step) => step.trim() !== '')
+                .map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+            </ul>
+            {awaiting && !mine && (
+              <Typography.Text style={{ color: colour.textMuted }}>
+                {t('shell.studio.aiRequest.notYours')}
+              </Typography.Text>
+            )}
+          </Flex>,
+        )}
+      {awaiting && mine && (
+        <AxisActionRow>
+          <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
+            {t('shell.studio.aiRequest.approve')}
+          </AxisButton>
+          <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('change-plan')}>
+            {t('shell.studio.aiRequest.changePlan')}
+          </AxisButton>
+          <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
+            {t('shell.studio.aiRequest.drop')}
+          </AxisButton>
+        </AxisActionRow>
+      )}
+    </SectionParts>
+  )
+  const changesView =
+    changes === undefined ? (
+      <Spin />
+    ) : changes === 'failed' ? (
+      <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
+    ) : (
+      <div data-testid="studio-ai-changes" style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+        <StudioChanges changes={changes} resources={resources} summaries={summaries} />
+      </div>
+    )
+  const checksView = (
+    <Flex vertical gap="small" data-testid="studio-ai-check-details">
+      {problems.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+          {problems.map((diagnostic, index) => (
+            <li key={index}>
+              <StudioDiagnosticRow diagnostic={diagnostic} onSelect={onOpen} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {request.checks !== null && <StudioTestResults request={request.checks} onSelect={onOpen} nested />}
+    </Flex>
+  )
+  const activityView = (
+    <AxisTable<StudioAuthoringRequestStep>
+      columns={stepColumns}
+      rowKey={(step) => `${step.startedAt}/${step.kind}`}
+      dataSource={request.steps}
+      pagination={false}
+      toolbar={{}}
+      emptyText=""
+    />
+  )
+  const openBlocking = (request.review ?? []).filter((finding) => finding.blocking).length
+
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
       <StudioPageHeading
@@ -439,174 +654,75 @@ export function StudioAuthoringRequestPage({
           ) : undefined
         }
       />
-      <SectionParts>
-        {section(
-          'ai-request',
-          t('shell.studio.aiRequest.asked'),
-          <>
-            {quoted(request.text)}
-            {request.app !== null && <CoAuthored app={request.app} />}
-          </>,
-        )}
-        {section(
-          'ai-progress',
-          t('shell.studio.aiRequest.progress'),
-          <Flex vertical gap="small" data-testid="studio-ai-progress">
-            {stage !== null && <StepsBar titles={stageTitles} current={stage} />}
-            <Flex align="center" gap={spacing.sm}>
-              {following && !waitsForApp && <Spin size="small" />}
-              <Typography.Text style={{ color: stateColour(request.state) }}>
-                {stateWords(request, mine)}
-                {request.round > 1 && request.state !== 'planning' && (
-                  <span style={{ color: colour.textMuted }}>
-                    {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
-                  </span>
-                )}
-              </Typography.Text>
-            </Flex>
-            {running !== undefined && following && !waitsForApp && (
-              <Typography.Text style={{ color: colour.textMuted }}>
-                {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
-              </Typography.Text>
+      {/* Proposed: where the request is, in one line under the heading, and its stages only while AI works. */}
+      <Flex vertical gap="small" data-testid="studio-ai-progress">
+        {stage !== null && working && <StepsBar titles={stageTitles} current={stage} />}
+        <Flex align="center" gap={spacing.sm}>
+          {following && !waitsForApp && <Spin size="small" />}
+          <Typography.Text strong style={{ color: stateColour(request.state) }}>
+            {stateWords(request, mine)}
+            {request.round > 1 && request.state !== 'planning' && (
+              <span style={{ color: colour.textMuted, fontWeight: 400 }}>
+                {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
+              </span>
             )}
-            {request.state === 'planning' && !waitsForApp && (
-              <Typography.Text style={{ color: colour.textMuted }}>
-                {t('shell.studio.aiRequest.planning')}
-              </Typography.Text>
+          </Typography.Text>
+        </Flex>
+        {running !== undefined && following && !waitsForApp && (
+          <Typography.Text style={{ color: colour.textMuted }}>
+            {t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
+          </Typography.Text>
+        )}
+        {request.state === 'planning' && !waitsForApp && (
+          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.planning')}</Typography.Text>
+        )}
+        {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
+        {waitsForApp && (
+          <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
+            {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
+              '{app}',
+              request.app ?? '',
             )}
-            {/* Proposed: with no AI of its author's here, only an outside app goes on with it, see the review on #3263. */}
-            {waitsForApp && (
-              <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-app-works">
-                {t(mine ? 'shell.studio.aiRequest.appWorksMine' : 'shell.studio.aiRequest.appWorks').replaceAll(
-                  '{app}',
-                  request.app ?? '',
-                )}
-              </Typography.Text>
-            )}
-          </Flex>,
+          </Typography.Text>
         )}
-        {request.plan !== null &&
-          section(
-            'ai-plan',
-            t('shell.studio.aiRequest.plan'),
-            <Flex vertical gap="small">
-              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
-                {request.plan
-                  .split('\n')
-                  .filter((step) => step.trim() !== '')
-                  .map((step, index) => (
-                    <li key={index}>{step}</li>
-                  ))}
-              </ul>
-              {awaiting && !mine && (
-                <Typography.Text style={{ color: colour.textMuted }}>
-                  {t('shell.studio.aiRequest.notYours')}
-                </Typography.Text>
-              )}
-            </Flex>,
-          )}
-        {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
-        {awaiting && mine && (
-          <AxisActionRow>
-            <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
-              {t('shell.studio.aiRequest.approve')}
-            </AxisButton>
-            <AxisButton role="secondary" disabled={acting} onClick={() => setChangeOpen('change-plan')}>
-              {t('shell.studio.aiRequest.changePlan')}
-            </AxisButton>
-            <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
-              {t('shell.studio.aiRequest.drop')}
-            </AxisButton>
-          </AxisActionRow>
-        )}
-        {request.state === 'failed' && (
-          <AxisAlert
-            kind="error"
-            message={t('shell.studio.aiRequest.failed')}
-            description={request.failure ?? undefined}
-            data-testid="studio-ai-failure"
-          />
-        )}
-        {showsDiff &&
-          draft !== null &&
-          section(
-            'ai-changes',
-            t('shell.studio.aiRequest.changes'),
-            changes === undefined ? (
-              <Spin />
-            ) : changes === 'failed' ? (
-              <AxisAlert kind="error" message={t('shell.studio.aiRequest.diffFailed')} />
-            ) : (
-              <div
-                data-testid="studio-ai-changes"
-                style={{ display: 'flex', flexDirection: 'column', gap: spacing.md }}
-              >
-                <StudioChanges changes={changes} resources={resources} summaries={summaries} />
-              </div>
-            ),
-          )}
-        {showsDiff &&
-          request.checks !== null &&
-          section(
-            'ai-checks',
-            t('shell.studio.aiRequest.checks'),
-            <Flex vertical gap="small" data-testid="studio-ai-checks">
-              {problems.length > 0 && (
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                  {problems.map((diagnostic, index) => (
-                    <li key={index}>
-                      <StudioDiagnosticRow diagnostic={diagnostic} onSelect={onOpen} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <StudioTestResults request={request.checks} onSelect={onOpen} nested />
-              {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
-              {request.review === null && request.app !== null && request.state === 'ready' && (
-                <Typography.Text style={{ color: colour.textMuted }} data-testid="studio-ai-not-reviewed">
-                  {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
-                </Typography.Text>
-              )}
-              {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
-              {request.review !== null && (
-                <ReviewFindings findings={request.review} ready={request.state === 'ready'} onOpen={onOpen} />
-              )}
-            </Flex>,
-          )}
-        {conflicts.length > 0 ? (
-          <AxisAlert
-            kind="warning"
-            data-testid="studio-ai-conflict"
-            message={t('shell.studio.aiRequest.conflict')}
-            description={
-              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
-                {conflicts.map((conflict, index) => (
-                  <li key={index}>{conflict.message}</li>
-                ))}
-              </ul>
-            }
-          />
-        ) : (
-          accept !== null && <StudioRequestStatus request={accept} releaseNumber={null} />
-        )}
-        {request.steps.length > 0 &&
-          section(
-            'ai-steps',
-            t('shell.studio.aiRequest.steps'),
-            <AxisTable<StudioAuthoringRequestStep>
-              columns={stepColumns}
-              rowKey={(step) => `${step.startedAt}/${step.kind}`}
-              dataSource={request.steps}
-              pagination={false}
-              toolbar={{}}
-              emptyText=""
-            />,
-          )}
-      </SectionParts>
+      </Flex>
+      <Tabs
+        activeKey={activeTab}
+        onChange={(key) => setTab({ id: requestId, key: key as RequestTab })}
+        items={[
+          { key: 'overview', label: t('shell.studio.aiRequest.tab.overview'), children: overview },
+          ...(hasDiff
+            ? [
+                {
+                  key: 'changes',
+                  label: t('shell.studio.aiRequest.tab.changes').replace(
+                    '{count}',
+                    String(Array.isArray(changes) ? changes.length : request.changes.length),
+                  ),
+                  children: changesView,
+                },
+              ]
+            : []),
+          ...(hasChecks
+            ? [{ key: 'checks', label: t('shell.studio.aiRequest.tab.checks'), children: checksView }]
+            : []),
+          ...(request.steps.length > 0
+            ? [{ key: 'activity', label: t('shell.studio.aiRequest.steps'), children: activityView }]
+            : []),
+        ]}
+      />
       {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
       {ready && mine && !acceptPending && (
         <ActionBar testId="studio-ai-request-bar">
-          <span>{stateWords(request, mine)}</span>
+          <span>
+            {openBlocking > 0
+              ? t(
+                  openBlocking === 1
+                    ? 'shell.studio.aiRequest.bar.oneMustChange'
+                    : 'shell.studio.aiRequest.bar.mustChange',
+                ).replace('{count}', String(openBlocking))
+              : t('shell.studio.aiRequest.bar.passed')}
+          </span>
           <AxisActionRow align="center">
             <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
               {t('shell.studio.aiRequest.drop')}
@@ -765,4 +881,33 @@ function ReviewFindings({
       )}
     </Flex>
   )
+}
+
+/** Proposed: the tabs of a request's page, see the review on #3263. */
+type RequestTab = 'overview' | 'changes' | 'checks' | 'activity'
+
+/** Proposed: the checks of a request in one line, and whether they passed, see the review on #3263. */
+function checksSummary(checks: StudioRequest, t: (key: string) => string): { text: string; passed: boolean } {
+  const errors = checks.diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
+  if (errors > 0) {
+    return {
+      text: t(
+        errors === 1 ? 'shell.studio.aiRequest.checks.oneProblem' : 'shell.studio.aiRequest.checks.problems',
+      ).replace('{count}', String(errors)),
+      passed: false,
+    }
+  }
+  const scenarios = (checks.scenarios ?? []).filter(
+    (scenario) => 'outcome' in scenario && scenario.outcome !== undefined,
+  )
+  const passed = scenarios.filter((scenario) => scenario.outcome === 'passed').length
+  if (scenarios.length === 0) {
+    return { text: t('shell.studio.aiRequest.checks.noScenarios'), passed: true }
+  }
+  return {
+    text: t('shell.studio.aiRequest.checks.scenarios')
+      .replace('{passed}', String(passed))
+      .replace('{total}', String(scenarios.length)),
+    passed: passed === scenarios.length,
+  }
 }
