@@ -1780,10 +1780,24 @@ export interface StudioAuthoringRequestDetail extends StudioAuthoringRequest {
   steps: StudioAuthoringRequestStep[]
   draft: string | null
   checks: StudioRequest | null
-  review: string[] | null
+  /** Proposed: the findings of the latest review, or `null` before one ran, see {@link StudioReviewFinding}. */
+  review: StudioReviewFinding[] | null
   changes: { file: string; summary: string }[]
   failure: string | null
   accept: StudioRequest | null
+}
+
+/**
+ * Proposed: one finding of a request's review, see the review on #3263. A blocking finding sends the draft to a fix
+ * round, and one still open on a ready request is one the fix rounds did not resolve; a note only informs. Each names
+ * the resource and the path it is about, with the evidence the reviewer found there.
+ */
+export interface StudioReviewFinding {
+  blocking: boolean
+  text: string
+  file: string
+  path: string
+  resourceId: string | null
 }
 
 /** Reads the whole diff of the signed-in user's draft, page after page, see docs/reference/authoring-revisions.md#draft-diff. */

@@ -16,6 +16,7 @@ import type {
   StudioReleases,
   StudioResource,
   StudioResourceItem,
+  StudioReviewFinding,
 } from '../platform/studio'
 import type {
   NotificationFilter,
@@ -920,10 +921,23 @@ function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest
   }
 }
 
-const reviews: Record<string, string[]> = {
+// Proposed: a review's findings, see the review on #3263. The email request's fix rounds left one blocking finding open.
+const reviews: Record<string, StudioReviewFinding[]> = {
   [aiRequests[2].id]: [
-    'The email names the approver, as the request asked.',
-    'The rejection email could also say why. The request did not ask for it, so the draft leaves it out.',
+    {
+      blocking: true,
+      text: 'The rejection email goes to the approver as well as the requester, while the request asked for the requester only: the step lists both under "to".',
+      file: 'processes/purchase-approval.json',
+      path: '/steps/4/to/1',
+      resourceId: null,
+    },
+    {
+      blocking: false,
+      text: 'The rejection email could also say why. The request did not ask for it, so the draft leaves it out.',
+      file: 'processes/purchase-approval.json',
+      path: '/steps/5/message/body',
+      resourceId: null,
+    },
   ],
 }
 

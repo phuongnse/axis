@@ -19,6 +19,7 @@ import {
   type StudioAuthoringRequestDetail,
   type StudioAuthoringRequestState,
   type StudioAuthoringRequestStep,
+  type StudioReviewFinding,
   type StudioRequest,
   type StudioResourceItem,
   type StudioRevisionChange,
@@ -566,22 +567,9 @@ export function StudioAuthoringRequestPage({
                   {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
                 </Typography.Text>
               )}
-              {/* The review runs only once the checks pass, so a request that failed before it has no notes. */}
+              {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
               {request.review !== null && (
-                <>
-                  <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
-                  {request.review.length === 0 ? (
-                    <Typography.Text style={{ color: colour.textMuted }}>
-                      {t('shell.studio.aiRequest.noFindings')}
-                    </Typography.Text>
-                  ) : (
-                    <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
-                      {request.review.map((note, index) => (
-                        <li key={index}>{note}</li>
-                      ))}
-                    </ul>
-                  )}
-                </>
+                <ReviewFindings findings={request.review} ready={request.state === 'ready'} onOpen={onOpen} />
               )}
             </Flex>,
           )}
@@ -712,5 +700,69 @@ function CoAuthored({ app }: { app: string }) {
     <Typography.Text style={{ display: 'block', color: colour.textMuted }}>
       {t('shell.studio.aiRequest.coAuthored').replace('{app}', app)}
     </Typography.Text>
+  )
+}
+
+/**
+ * Proposed: a request's review, see the review on #3263. Blocking findings that its fix rounds did not resolve come
+ * first, under a warning, then its notes, each as the Problems panel draws a problem at its resource and path. With
+ * none, it says the review found nothing that must change, and on a ready request that a review is no guarantee.
+ */
+function ReviewFindings({
+  findings,
+  ready,
+  onOpen,
+}: {
+  findings: StudioReviewFinding[]
+  ready: boolean
+  onOpen: (resourceId: string, path: string) => void
+}) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const blocking = findings.filter((finding) => finding.blocking)
+  const notes = findings.filter((finding) => !finding.blocking)
+  const rows = (items: StudioReviewFinding[]) => (
+    <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+      {items.map((finding, index) => (
+        <li key={index}>
+          <StudioDiagnosticRow
+            diagnostic={{
+              code: '',
+              severity: finding.blocking ? 'error' : 'warning',
+              message: finding.text,
+              file: finding.file,
+              path: finding.path,
+              resourceId: finding.resourceId,
+            }}
+            onSelect={onOpen}
+            bare
+          />
+        </li>
+      ))}
+    </ul>
+  )
+  return (
+    <Flex vertical gap="small" data-testid="studio-ai-review">
+      <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
+      {blocking.length > 0 && (
+        <>
+          <AxisAlert kind="warning" message={t('shell.studio.aiRequest.openFindings')} />
+          <Typography.Text strong>{t('shell.studio.aiRequest.mustChange')}</Typography.Text>
+          {rows(blocking)}
+        </>
+      )}
+      {notes.length > 0 && (
+        <>
+          <Typography.Text strong>{t('shell.studio.aiRequest.notes')}</Typography.Text>
+          {rows(notes)}
+        </>
+      )}
+      {findings.length === 0 && (
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.noFindings')}</Typography.Text>
+      )}
+      {ready && (
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.noGuarantee')}</Typography.Text>
+      )}
+    </Flex>
   )
 }

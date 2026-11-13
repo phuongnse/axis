@@ -57,18 +57,25 @@ export function StudioProblems({
 export function StudioDiagnosticRow({
   diagnostic,
   onSelect,
+  bare = false,
 }: {
   diagnostic: StudioDiagnostic
   onSelect: (resourceId: string, path: string) => void
+  /** Proposed: draws the message with no severity tag and no code, for a group whose heading says what its items are. */
+  bare?: boolean
 }) {
   const t = useText()
   const content = (
     <Flex vertical align="flex-start" style={{ minWidth: 0, whiteSpace: 'normal' }}>
-      <span>
-        {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
-        <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
-        <strong>{diagnostic.code}</strong> {diagnostic.message}
-      </span>
+      {bare ? (
+        <span>{diagnostic.message}</span>
+      ) : (
+        <span>
+          {/* oxlint-disable-next-line axis/no-preset-tag-colour -- Predates the colour tokens; colour it with a token. */}
+          <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
+          <strong>{diagnostic.code}</strong> {diagnostic.message}
+        </span>
+      )}
       <Typography.Text type="secondary">
         {diagnostic.file}
         {diagnostic.path !== '' && `, ${t('shell.studio.path')}: ${diagnostic.path}`}

@@ -191,3 +191,63 @@ describe('a ready request', () => {
     })
   })
 })
+
+// Proposed: a review's must-change findings and notes, see the review on #3263.
+describe('a ready request’s review', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function renderPage() {
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+  }
+
+  it('warns of blocking findings its fix rounds left open, then lists its notes, each at its file and path', async () => {
+    stub({
+      ...fromApp,
+      aiConnected: true,
+      review: [
+        {
+          blocking: true,
+          text: 'Mails the approver too.',
+          file: 'processes/p.json',
+          path: '/steps/4/to/1',
+          resourceId: null,
+        },
+        { blocking: false, text: 'Could say why.', file: 'processes/p.json', path: '/steps/5', resourceId: null },
+      ],
+    })
+    renderPage()
+
+    const review = await screen.findByTestId('studio-ai-review')
+    expect(within(review).getByRole('alert')).toHaveTextContent('so it will not accept the change by itself')
+    expect(within(review).getByText('Must change')).toBeInTheDocument()
+    expect(within(review).getByText('Mails the approver too.')).toBeInTheDocument()
+    expect(within(review).queryByText('error')).toBeNull()
+    expect(within(review).getByText('Notes')).toBeInTheDocument()
+    expect(within(review).getByText(/processes\/p\.json, .*\/steps\/5/)).toBeInTheDocument()
+    expect(
+      within(review).getByText('A review is no guarantee. Read the changes before you accept.'),
+    ).toBeInTheDocument()
+  })
+
+  it('says it found nothing that must change, and that a review is no guarantee', async () => {
+    stub({ ...fromApp, aiConnected: true, review: [] })
+    renderPage()
+
+    const review = await screen.findByTestId('studio-ai-review')
+    expect(within(review).getByText('The review found nothing that must change.')).toBeInTheDocument()
+    expect(within(review).queryByRole('alert')).toBeNull()
+    expect(
+      within(review).getByText('A review is no guarantee. Read the changes before you accept.'),
+    ).toBeInTheDocument()
+  })
+})
