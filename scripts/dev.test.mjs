@@ -495,7 +495,9 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     const run = await startDev({ Worker__PollInterval: '00:00:00' })
     const code = await exitsWithin(run, 300_000)
     assert.notEqual(code, 0)
-    assert.match(run.stdout, /\[dev\] The worker exited/)
+    // The output can run to hundreds of thousands of characters, and the default message shows only its start.
+    // The end holds the line that names the process which exited.
+    assert.match(run.stdout, /\[dev\] The worker exited/, `dev.sh did not report the worker's exit. The end of its output:\n${run.stdout.slice(-4000)}`)
     assert.match(run.stdout, /Now listening on/)
     await sleep(500)
     assert.deepEqual(leftoverProcs(), [])

@@ -75,15 +75,31 @@ mountPath: /run/secrets
 readOnly: true
 {{- end }}
 
-{{/* The volumes of /tmp, extension packages and modules. Call with a dict of "root" and "entries". */}}
-{{- define "axis.volumes" -}}
-- {{ include "axis.secretsVolume" (dict "root" .root "entries" .entries) | nindent 2 | trim }}
+{{/* The volumes of /tmp and, when set, the extension packages. Call with the root context. */}}
+{{- define "axis.tmpAndExtensionsVolumes" -}}
 - name: tmp
   emptyDir: {}
-{{- with .root.Values.extensions.volume }}
+{{- with .Values.extensions.volume }}
 - name: extensions
   {{- toYaml . | nindent 2 }}
 {{- end }}
+{{- end }}
+
+{{/* The mounts of /tmp and, when set, the extension packages, read-only. Call with the root context. */}}
+{{- define "axis.tmpAndExtensionsVolumeMounts" -}}
+- name: tmp
+  mountPath: /tmp
+{{- if .Values.extensions.volume }}
+- name: extensions
+  mountPath: /extensions
+  readOnly: true
+{{- end }}
+{{- end }}
+
+{{/* The volumes of /tmp, extension packages and modules. Call with a dict of "root" and "entries". */}}
+{{- define "axis.volumes" -}}
+- {{ include "axis.secretsVolume" (dict "root" .root "entries" .entries) | nindent 2 | trim }}
+{{ include "axis.tmpAndExtensionsVolumes" .root }}
 {{- with .root.Values.modules.volume }}
 - name: modules
   {{- toYaml . | nindent 2 }}
@@ -93,13 +109,7 @@ readOnly: true
 {{/* The volume mounts of a host. Call with the root context. */}}
 {{- define "axis.volumeMounts" -}}
 - {{ include "axis.secretsVolumeMount" . | nindent 2 | trim }}
-- name: tmp
-  mountPath: /tmp
-{{- if .Values.extensions.volume }}
-- name: extensions
-  mountPath: /extensions
-  readOnly: true
-{{- end }}
+{{ include "axis.tmpAndExtensionsVolumeMounts" . }}
 {{- if .Values.modules.volume }}
 - name: modules
   mountPath: /modules
