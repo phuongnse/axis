@@ -153,6 +153,10 @@ public sealed class WorkerOptionsTests
     [InlineData("Extensions:Runners:Dotnet", "localhost:0")]
     [InlineData("Extensions:Runners:Dotnet", "localhost:65536")]
     [InlineData("Extensions:Runners:Dotnet", ":5310")]
+    [InlineData("Extensions:Runners:ProxyPort", "-1")]
+    [InlineData("Extensions:Runners:ProxyPort", "65536")]
+    [InlineData("Extensions:Runners:ProxyPort", "1.5")]
+    [InlineData("Extensions:Runners:ProxyPort", "abc")]
     public void An_isolation_or_package_host_setting_that_cannot_work_stops_the_worker_at_startup_naming_the_setting(string setting, string value)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });

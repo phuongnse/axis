@@ -81,6 +81,7 @@ public sealed class PackageRunnerOutcomeTests(PackageCallFixture fixture) : ICla
         {
             [PackageIsolation.IsolationSetting] = "process",
             [PackageIsolation.DotnetRunnerSetting] = address,
+            [PackageIsolation.ProxySetting] = "0",
         };
 
     private async Task<Guid> CallIdAsync(Guid instanceId) =>

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
@@ -12,9 +13,11 @@ namespace Axis.Processes.Instances;
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
 /// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
 /// exits, times out or fails is dropped, and closing its connection makes the host kill the process. Runners
-/// start when an attempt needs one, so a version never has more of them than calls in flight.
+/// start when an attempt needs one, so a version never has more of them than calls in flight. The pool owns the
+/// worker's <see cref="EgressProxy"/>, which starts with the first runner. Each runner gets its own proxy token in
+/// <c>start</c>, together with the address of the proxy as the host reaches it.
 /// </summary>
-internal sealed class PackageRunners(string? host, int port) : IAsyncDisposable
+internal sealed class PackageRunners(string? host, int port, int proxyPort, bool allowHttp) : IAsyncDisposable
 {
     /// <summary>
     /// The longest <see cref="RentAsync"/> may take to connect and get <c>ready</c>. It is not part of an operation's
@@ -23,6 +26,7 @@ internal sealed class PackageRunners(string? host, int port) : IAsyncDisposable
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
     private readonly ConcurrentDictionary<(string Package, string Version), ConcurrentBag<RunnerConnection>> _idle = new();
+    private readonly EgressProxy _proxy = new(proxyPort, allowHttp);
     private volatile bool _disposed;
 
     /// <summary>Whether <c>Extensions:Runners:Dotnet</c> names a host.</summary>
@@ -57,8 +61,9 @@ internal sealed class PackageRunners(string? host, int port) : IAsyncDisposable
         var client = new TcpClient { NoDelay = true };
         try
         {
+            _proxy.EnsureStarted();
             await client.ConnectAsync(host, port, cancellationToken);
-            var runner = new RunnerConnection(client, package, version);
+            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), _proxy.Register(), _proxy);
             try
             {
                 await runner.StartAsync(cancellationToken);
@@ -75,6 +80,18 @@ internal sealed class PackageRunners(string? host, int port) : IAsyncDisposable
             client.Dispose();
             throw;
         }
+    }
+
+    /// <summary>The <c>host:port</c> that a runner started by the host on the other end of <paramref name="client"/> reaches this worker at.</summary>
+    private string ProxyAddress(TcpClient client)
+    {
+        var address = ((IPEndPoint)client.Client.LocalEndPoint!).Address;
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        return address.AddressFamily == AddressFamily.InterNetworkV6 ? $"[{address}]:{_proxy.Port}" : $"{address}:{_proxy.Port}";
     }
 
     /// <summary>Keeps <paramref name="runner"/>, which finished its attempt, for the next one of its version.</summary>
@@ -101,6 +118,8 @@ internal sealed class PackageRunners(string? host, int port) : IAsyncDisposable
                 runner.Dispose();
             }
         }
+
+        await _proxy.DisposeAsync();
     }
 }
 
@@ -110,11 +129,17 @@ internal sealed class RunnerConnection : IDisposable
     private readonly TcpClient _client;
     private readonly StreamReader _reader;
     private readonly StreamWriter _writer;
+    private readonly string _proxy;
+    private readonly string _token;
+    private readonly EgressProxy _egress;
 
-    public RunnerConnection(TcpClient client, string package, string version)
+    public RunnerConnection(TcpClient client, string package, string version, string proxy, string token, EgressProxy egress)
     {
         Package = package;
         Version = version;
+        _proxy = proxy;
+        _token = token;
+        _egress = egress;
         var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
         var stream = client.GetStream();
         _client = client;
@@ -149,7 +174,7 @@ internal sealed class RunnerConnection : IDisposable
     /// <exception cref="IOException">The host closed the connection or answered something else.</exception>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await _writer.WriteLineAsync(RunnerProtocol.Write(new StartMessage(Package, Version, Guid.NewGuid().ToString("N"))).AsMemory(), cancellationToken);
+        await _writer.WriteLineAsync(RunnerProtocol.Write(new StartMessage(Package, Version, _proxy, _token)).AsMemory(), cancellationToken);
         if (await ReadAsync(cancellationToken) is not ReadyMessage)
         {
             throw new IOException("The package host did not start a runner.");
@@ -189,8 +214,15 @@ internal sealed class RunnerConnection : IDisposable
         }
     }
 
+    /// <summary>Lets the runner's egress proxy admit the hosts of <paramref name="urls"/>, the <c>url</c> bindings of the call about to run.</summary>
+    public void Admit(IEnumerable<Uri> urls) => _egress.Admit(_token, urls);
+
+    /// <summary>Lets the proxy admit nothing for the runner. Returns whether it refused a request since <see cref="Admit"/>.</summary>
+    public bool EndCall() => _egress.EndCall(_token);
+
     public void Dispose()
     {
+        _egress.Remove(_token);
         _reader.Dispose();
         _writer.Dispose();
         _client.Dispose();
