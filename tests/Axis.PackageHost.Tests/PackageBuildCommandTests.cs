@@ -136,7 +136,7 @@ public sealed class PackageBuildCommandTests
 
         Assert.Equal(PackageBuildCommand.Refused, exitCode);
         Assert.Contains("test-package/1.0.0", output);
-        Assert.Equal(["test-package/1.0.0/earlier.txt"], Files(test.Extensions.Path));
+        Assert.Equal(["test-package/1.0.0/earlier.txt"], BuildTest.Files(test.Extensions.Path));
         Assert.Equal("earlier", File.ReadAllText(Path.Combine(test.Extensions.Path, "test-package/1.0.0/earlier.txt")));
         Assert.False(test.ScannerRan);
     }
@@ -168,23 +168,23 @@ public sealed class PackageBuildCommandTests
     }
 
     [Fact]
-    public async Task A_node_package_is_refused_because_only_csharp_packages_are_built()
+    public async Task A_python_package_is_refused_because_only_csharp_and_node_packages_are_built()
     {
         using var test = new BuildTest(NoFindings);
         File.Delete(Path.Combine(test.Source, "Axis.TestPackage.dll"));
         test.EditSourceManifest(manifest =>
         {
             manifest.Remove("assembly");
-            manifest["language"] = "node";
-            manifest["adapter"] = "index.js";
-            manifest["lock"] = "package-lock.json";
+            manifest["language"] = "python";
+            manifest["adapter"] = "adapter.py";
+            manifest["lock"] = "requirements.txt";
         });
-        File.WriteAllText(Path.Combine(test.Source, "index.js"), "");
+        File.WriteAllText(Path.Combine(test.Source, "adapter.py"), "");
 
         var (exitCode, output) = await test.RunAsync();
 
         Assert.Equal(PackageBuildCommand.Refused, exitCode);
-        Assert.Contains("Only C# packages can be built", output);
+        Assert.Contains("Only C# and Node.js packages can be built", output);
         test.AssertNothingWrittenAndNoScan();
     }
 
@@ -211,79 +211,5 @@ public sealed class PackageBuildCommandTests
 
         Assert.Equal(PackageBuildCommand.SetupError, exitCode);
         Assert.Contains("Usage: Axis.PackageHost build <source>", writer.ToString());
-    }
-
-    private static string[] Files(string folder) =>
-        [.. Directory.GetFiles(folder, "*", SearchOption.AllDirectories).Select(file => Path.GetRelativePath(folder, file).Replace('\\', '/')).Order(StringComparer.Ordinal)];
-
-    /// <summary>
-    /// A copy of the test package 1.0.0 build as the source, an empty extensions folder, and a stub in place of
-    /// Trivy that leaves a marker file when it runs and prints a given report.
-    /// </summary>
-    [UnsupportedOSPlatform("windows")]
-    private sealed class BuildTest : IDisposable
-    {
-        private readonly TemporaryFolder _sources = new TemporaryFolder().Install("1.0.0");
-        private readonly string _stub;
-
-        public BuildTest(string report)
-        {
-            Assert.SkipWhen(OperatingSystem.IsWindows(), "The stub scanner is a shell script.");
-            _stub = Path.Combine(Scripts.Path, "trivy");
-            File.WriteAllText(_stub, $"#!/bin/sh\ntouch \"$0.ran\"\ncat <<'JSON'\n{report}\nJSON\n");
-            File.SetUnixFileMode(_stub, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-            TrivyCommand = _stub;
-            ExtensionsPath = Extensions.Path;
-        }
-
-        public TemporaryFolder Extensions { get; } = new();
-
-        public TemporaryFolder Scripts { get; } = new();
-
-        public string Source => Path.Combine(_sources.Path, TestPackages.Id, "1.0.0");
-
-        public string TrivyCommand { get; set; }
-
-        public string ExtensionsPath { get; set; }
-
-        public bool ScannerRan => File.Exists($"{_stub}.ran");
-
-        public IConfiguration Configuration() =>
-            new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    [PackageCatalog.PathSetting] = ExtensionsPath,
-                    ["PackageBuild:Trivy"] = TrivyCommand,
-                })
-                .Build();
-
-        public async Task<(int ExitCode, string Output)> RunAsync()
-        {
-            var writer = new StringWriter();
-            var exitCode = await PackageBuildCommand.RunAsync(["build", Source], Configuration(), writer, TestContext.Current.CancellationToken);
-            return (exitCode, writer.ToString());
-        }
-
-        public void EditSourceManifest(Action<System.Text.Json.Nodes.JsonObject> edit)
-        {
-            var path = Path.Combine(Source, PackageCatalog.ManifestFileName);
-            var manifest = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
-            edit(manifest);
-            File.WriteAllText(path, manifest.ToJsonString());
-        }
-
-        /// <summary>A refusal before the scan writes no folder and never runs the scanner.</summary>
-        public void AssertNothingWrittenAndNoScan()
-        {
-            Assert.Empty(Files(Extensions.Path));
-            Assert.False(ScannerRan);
-        }
-
-        public void Dispose()
-        {
-            _sources.Dispose();
-            Extensions.Dispose();
-            Scripts.Dispose();
-        }
     }
 }

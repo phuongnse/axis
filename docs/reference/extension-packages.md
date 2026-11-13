@@ -202,8 +202,9 @@ every host reads. An installation's package is trusted code that the operator re
 
 ### Building a package
 
-The operator builds a C# package once, with `Axis.PackageHost build <source>`. The source is the folder
-that the developer published in locked mode. The build writes the folder that `Extensions:Path` names and
+The operator builds a C# or Node.js package once, with `Axis.PackageHost build <source>`. The source is the folder
+that the developer published in locked mode. For `node` it holds the compiled adapter, `package.json` and
+`package-lock.json`. The build writes the folder that `Extensions:Path` names and
 compiles nothing.
 
 - **In the host image** _(planned for M21)_. The build runs in the package's own host image,
@@ -219,27 +220,36 @@ compiles nothing.
   1. The manifest, as [Loading](#loading) checks it, with `AXC0132` to `AXC0138`. Each problem is printed
      with its code, file and JSON Pointer. The folder name check is left out, because the build names the
      folder from the manifest.
-  2. The language. A `node` or `python` package is refused, because the build installs only C# packages
-     yet.
-  3. The lock file, which the manifest's `lock` names, `packages.lock.json` for C#.
+  2. The language. A `python` package is refused, because the build installs only C# and Node.js
+     packages yet.
+  3. The lock file, which the manifest's `lock` names: `packages.lock.json` for C# and
+     `package-lock.json` for `node`.
   4. An existing `<id>/<version>/` folder.
-  5. The scan.
+  5. For `node`, the install.
+  6. The scan.
 - **Lock file.** A missing lock file is refused. A lock file is stale when the runtime dependency list,
   the `.deps.json` beside the assembly, names a NuGet package whose version the lock file does not
   resolve, and a stale lock file is refused. A lock file entry that has no runtime asset, such as an
   analyzer, is allowed. A missing `.deps.json` is refused too, because the lock file cannot be checked
-  without it.
+  without it. For `node`, a missing `package.json` or `package-lock.json` is refused, and so is a
+  `package-lock.json` that does not list the dependencies of `package.json` at the same ranges. The
+  check compares `dependencies`, `devDependencies`, `optionalDependencies` and `peerDependencies`
+  with the lock file's root entry, in both directions, before npm runs.
+- **Install.** For `node`, it copies the source to a temporary folder and runs `npm ci --ignore-scripts` there,
+  with `npm` from the `PATH`. The install reads the lock file alone, and no install script of a
+  dependency ever runs. The temporary folder is deleted afterwards, so the source never changes. A
+  failed install is refused and prints npm's error output.
 - **Scan.** It scans the dependencies with Trivy and refuses a vulnerability of high or critical
-  severity, naming the dependency. The setting `PackageBuild:Trivy` names the Trivy command, which
+  severity, naming the dependency. For `node` it scans the installed folder. The setting `PackageBuild:Trivy` names the Trivy command, which
   defaults to `trivy`. A scan that cannot run or prints no valid report is a setup error and never a
   pass.
 - **Writes.** After every check passes, it copies the package to `<Extensions:Path>/<id>/<version>/`.
   It never overwrites an existing folder. Then it loads the extensions folder as the hosts do, and if
   that load rejects the new version it deletes the version again and refuses.
 - **Exit code.** `0` when the package is built, `1` when it is refused and `2` for a setup error: a wrong
-  argument, a missing source or extensions folder, or a scan that did not complete.
-- **Other languages** _(planned for M21)_. For `node` the build runs `npm ci --ignore-scripts`. For
-  `python` it runs `pip install --require-hashes --no-deps`.
+  argument, a missing source or extensions folder, an install that cannot start or a scan that did
+  not complete.
+- **Python** _(planned for M21)_. For `python` the build runs `pip install --require-hashes --no-deps`.
 - **Python hashes** _(planned for M21)_. A Python dependency without a hash is refused.
 - **Registry credentials** _(planned for M21)_. They are mounted for the build alone, and the runners
   never see them.
@@ -623,6 +633,11 @@ capability limits.
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
   it does not declare.
+- **Node.js test package.** A test-only `node` package, `node-test-package`, lives under
+  `tests/packages/node-test-package/`. Its adapter is TypeScript, `index.ts`, with its compiled
+  `index.js` committed. Its one dependency, `axis-test-dependency`, installs from the committed tarball
+  `vendor/axis-test-dependency-1.0.0.tgz`, so a build reaches no registry. The dependency declares a
+  `postinstall` script, and the tests use it to show that the build never runs install scripts.
 
 ## Declaring packages in an application
 

@@ -4,13 +4,15 @@ using Microsoft.Extensions.Configuration;
 namespace Axis.PackageHost;
 
 /// <summary>
-/// The <c>build</c> command: it checks a published C# package folder and writes it to
+/// The <c>build</c> command: it checks a C# or Node.js package folder and writes it to
 /// <c>&lt;Extensions:Path&gt;/&lt;id&gt;/&lt;version&gt;/</c>, see docs/reference/extension-packages.md#building-a-package.
-/// The checks run in a fixed order and the first refusal stops the build: the manifest, the lock file, an existing
-/// target folder, then the dependency scan. Only then is the package written and the extensions folder loaded
-/// as the hosts load it, and a version that does not load is deleted again. The exit code is 0 when the package
-/// is built, 1 when it is refused and 2 for a setup error: a wrong argument, a missing extensions folder, or a
-/// scan that did not complete.
+/// The checks run in a fixed order and the first refusal stops the build: the manifest, the language, the lock file,
+/// an existing target folder, the install of a Node.js package, then the dependency scan. Only then is the package
+/// written and the extensions folder loaded as the hosts load it, and a version that does not load is deleted again.
+/// The scan and the write read the installed folder of a Node.js package, which is a temporary copy of the source
+/// that is deleted afterwards. The exit code is 0 when the package is built, 1 when it is refused, including an
+/// install that fails, and 2 for a setup error: a wrong argument, a missing extensions folder, an install that
+/// cannot start or a scan that did not complete.
 /// </summary>
 public static class PackageBuildCommand
 {
@@ -53,9 +55,9 @@ public static class PackageBuildCommand
         }
 
         var manifest = package.Manifest;
-        if (manifest.Language != PackageLanguage.CSharp)
+        if (manifest.Language == PackageLanguage.Python)
         {
-            await output.WriteLineAsync($"Only C# packages can be built, not '{manifest.Language.ToString().ToLowerInvariant()}'.");
+            await output.WriteLineAsync($"Only C# and Node.js packages can be built, not '{manifest.Language.ToString().ToLowerInvariant()}'.");
             return Refused;
         }
 
@@ -78,7 +80,38 @@ public static class PackageBuildCommand
             return Refused;
         }
 
-        var scan = await TrivyScanner.ScanAsync(configuration, source, cancellationToken);
+        var staging = manifest.Language == PackageLanguage.Node ? NodeInstall.NewStagingFolder() : null;
+        try
+        {
+            var folder = source;
+            if (staging is not null)
+            {
+                var install = await NodeInstall.InstallAsync(source, staging, cancellationToken);
+                if (install.Folder is null)
+                {
+                    await output.WriteLineAsync(install.Failure);
+                    return install.SetupError ? SetupError : Refused;
+                }
+
+                folder = install.Folder;
+            }
+
+            return await ScanAndWriteAsync(configuration, folder, extensions, manifest, relative, target, output, cancellationToken);
+        }
+        finally
+        {
+            if (staging is not null)
+            {
+                NodeInstall.Delete(staging);
+            }
+        }
+    }
+
+    /// <summary>The scan, the write and the final load, which read the <paramref name="folder"/> that holds the package as it is installed.</summary>
+    private static async Task<int> ScanAndWriteAsync(
+        IConfiguration configuration, string folder, string extensions, PackageManifest manifest, string relative, string target, TextWriter output, CancellationToken cancellationToken)
+    {
+        var scan = await TrivyScanner.ScanAsync(configuration, folder, cancellationToken);
         if (scan.Failure is not null)
         {
             await output.WriteLineAsync(scan.Failure);
@@ -97,7 +130,7 @@ public static class PackageBuildCommand
 
         try
         {
-            Copy(source, target);
+            Copy(folder, target);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -136,11 +169,18 @@ public static class PackageBuildCommand
         return Built;
     }
 
-    private static void Copy(string source, string target)
+    /// <summary>Copies a folder with its files and subfolders, without the top-level folder <paramref name="skipTopLevel"/> when it is given.</summary>
+    internal static void Copy(string source, string target, string? skipTopLevel = null)
     {
         Directory.CreateDirectory(target);
+        var skipped = skipTopLevel is null ? null : Path.Combine(source, skipTopLevel) + Path.DirectorySeparatorChar;
         foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
         {
+            if (skipped is not null && file.StartsWith(skipped, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var destination = Path.Combine(target, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.Copy(file, destination);
