@@ -10,8 +10,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The <c>contracts</c> step of a publish and a validate request: the contract scenarios of the pinned module run in their own
-/// databases before the compile. The <c>requests</c> test module is copied to a temporary folder with one contract scenario that
-/// covers its <c>submit</c> transition, because the shared fixture is used by other tests. The built-in <c>organization</c> module,
+/// databases before the compile. A test request runs them with the application's own scenarios and skips them the same way.
+/// The <c>requests</c> test module is copied to a temporary folder with one contract scenario that covers its <c>submit</c> transition,
+/// because the shared fixture is used by other tests. The built-in <c>organization</c> module,
 /// which the test project copies to <c>BuiltInModules</c>, runs its own five contract scenarios, and the built-in <c>approvals</c>
 /// module runs its seven. A copy of the built-in modules whose approval process approves right after the submit makes the publish fail.
 /// </summary>
@@ -177,6 +178,63 @@ public sealed class PublisherContractScenarioTests(PostgreSqlFixture database) :
         Assert.True(status is "succeeded", string.Join('\n', result.Output));
         var item = Assert.Single(await ResultsAsync(scenario, tenant, request))!;
         Assert.Equal("skipped", item["outcome"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_test_request_skips_a_contract_scenario_that_covers_a_relaxed_point_and_runs_the_others()
+    {
+        // Without the relax entry the scenario fails, because the module's copy expects the wrong status after the submit.
+        using var modules = ModulesWithScenario("approved");
+        File.WriteAllText(
+            System.IO.Path.Combine(modules.Path, "requests", "1.0.0", "scenarios", "create-draft.json"),
+            """
+            {
+              "id": "9c3f5e17-2a64-4d8b-b0e9-6f1a8c4d2b73",
+              "kind": "scenario",
+              "name": "CreateDraft",
+              "formatVersion": 1,
+              "users": { "requester": ["requester"] },
+              "steps": [
+                { "type": "createRecord", "entity": "Request", "as": "requester", "save": "request", "values": { "title": "Chairs", "amount": 5, "status": "draft" } },
+                { "type": "expectRecord", "record": "request", "values": { "status": "draft" } }
+              ]
+            }
+            """);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var relax = new JsonArray(new JsonObject { ["point"] = "Request/transitions/submit", ["reason"] = "Tests skip it." });
+        var request = await QueueAsync(scenario, tenant, "test", _app, relax);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules.Path, withScenarioServer: true);
+
+        var status = await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'");
+        Assert.True(status is "succeeded", string.Join('\n', result.Output));
+        var items = await ResultsAsync(scenario, tenant, request);
+        var skipped = Assert.Single(items, item => item!["name"]!.GetValue<string>() == "requests/SubmitRequest")!;
+        Assert.Equal("skipped", skipped["outcome"]!.GetValue<string>());
+        Assert.Equal("Request/transitions/submit", skipped["point"]!.GetValue<string>());
+        Assert.Equal(ScenarioFile, skipped["file"]!.GetValue<string>());
+        var ran = Assert.Single(items, item => item!["name"]!.GetValue<string>() == "requests/CreateDraft")!;
+        Assert.Equal("passed", ran["outcome"]!.GetValue<string>());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} scenario requests/SubmitRequest skipped:", StringComparison.Ordinal));
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_test_request_runs_a_contract_scenario_that_covers_no_relaxed_point_and_fails_with_it()
+    {
+        using var modules = ModulesWithScenario("approved");
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, "test", _app);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, modules.Path, withScenarioServer: true);
+
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var failed = Assert.Single(await ResultsAsync(scenario, tenant, request), item => item!["name"]!.GetValue<string>() == "requests/SubmitRequest")!;
+        Assert.Equal("failed", failed["outcome"]!.GetValue<string>());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} scenario requests/SubmitRequest failed:", StringComparison.Ordinal));
+        Assert.Equal(0L, await PostgreSqlServer.CountedScenarioDatabasesAsync(CancellationToken));
     }
 
     [Fact]

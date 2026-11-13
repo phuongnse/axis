@@ -299,10 +299,13 @@ internal sealed class TenantReleaseActivation(
                 scenarios = scenarios.Where(scenario => names.Contains(scenario.Name, StringComparer.Ordinal)).ToList();
             }
 
-            var failed = await RunScenariosAsync(id, files, scenarios, scenarioServer, packages, modules, diagnostics, results, limit, "test request", stopping);
+            // A contract scenario that covers a relaxed point does not run, as in the contracts step. Its result comes first.
+            var (run, skipped) = SplitRelaxed(compiled, scenarios);
+            ReportSkipped(id, skipped, results);
+            var failed = await RunScenariosAsync(id, files, run, scenarioServer, packages, modules, diagnostics, results, limit, "test request", stopping);
             if (failed > 0)
             {
-                throw new ScenariosFailure($"{failed} of {scenarios.Count} scenarios failed.");
+                throw new ScenariosFailure($"{failed} of {run.Count} scenarios failed.");
             }
         });
 
@@ -345,36 +348,11 @@ internal sealed class TenantReleaseActivation(
             return true;
         }
 
-        // A name is <module id>/<name>. The point named is the first of the scenario's covers that its module relaxed.
-        var relaxed = compiled.ModulePins.ToDictionary(
-            pin => pin.Id, pin => pin.Relaxed.Select(entry => entry.Point).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
-        var skipped = new List<(ScenarioResource Scenario, string Point)>();
-        var scenarios = new List<ScenarioResource>();
-        foreach (var scenario in contractScenarios)
-        {
-            var slash = scenario.Name.IndexOf('/');
-            var module = slash < 0 ? "" : scenario.Name[..slash];
-            var point = relaxed.TryGetValue(module, out var points)
-                ? scenario.Contract!.Covers.FirstOrDefault(points.Contains)
-                : null;
-            if (point is null)
-            {
-                scenarios.Add(scenario);
-            }
-            else
-            {
-                skipped.Add((scenario, point));
-            }
-        }
+        var (scenarios, skipped) = SplitRelaxed(compiled, contractScenarios);
 
         return await Step(id, "contracts", async () =>
         {
-            foreach (var (scenario, point) in skipped)
-            {
-                results.Add(new JsonObject { ["name"] = scenario.Name, ["file"] = scenario.File, ["outcome"] = "skipped", ["point"] = point });
-                output.WriteLine($"{id} scenario {scenario.Name} skipped: it covers the relaxed point {point}");
-            }
-
+            ReportSkipped(id, skipped, results);
             if (scenarios.Count == 0)
             {
                 return;
@@ -417,6 +395,47 @@ internal sealed class TenantReleaseActivation(
                 throw new DiagnosticsFailure(failures);
             }
         });
+    }
+
+    // Splits SCENARIOS into those that run and the contract scenarios that cover a point their module's entry relaxed, see
+    // docs/reference/module-contracts.md#contract-scenarios. A name is <module id>/<name>. The point named is the first of the
+    // scenario's covers that its module relaxed.
+    private static (List<ScenarioResource> Run, List<(ScenarioResource Scenario, string Point)> Skipped) SplitRelaxed(
+        CompilationResult compiled,
+        IEnumerable<ScenarioResource> scenarios)
+    {
+        var relaxed = compiled.ModulePins.ToDictionary(
+            pin => pin.Id, pin => pin.Relaxed.Select(entry => entry.Point).ToHashSet(StringComparer.Ordinal), StringComparer.Ordinal);
+        var run = new List<ScenarioResource>();
+        var skipped = new List<(ScenarioResource Scenario, string Point)>();
+        foreach (var scenario in scenarios)
+        {
+            var slash = scenario.Name.IndexOf('/');
+            var module = slash < 0 ? "" : scenario.Name[..slash];
+            var point = scenario.Contract is not null && relaxed.TryGetValue(module, out var points)
+                ? scenario.Contract.Covers.FirstOrDefault(points.Contains)
+                : null;
+            if (point is null)
+            {
+                run.Add(scenario);
+            }
+            else
+            {
+                skipped.Add((scenario, point));
+            }
+        }
+
+        return (run, skipped);
+    }
+
+    // Adds the skipped result and the output line of each scenario that SplitRelaxed skipped.
+    private void ReportSkipped(string id, IEnumerable<(ScenarioResource Scenario, string Point)> skipped, JsonArray results)
+    {
+        foreach (var (scenario, point) in skipped)
+        {
+            results.Add(new JsonObject { ["name"] = scenario.Name, ["file"] = scenario.File, ["outcome"] = "skipped", ["point"] = point });
+            output.WriteLine($"{id} scenario {scenario.Name} skipped: it covers the relaxed point {point}");
+        }
     }
 
     // Runs the scenarios one at a time, in their own databases, and adds each outcome to results and one line to the output.

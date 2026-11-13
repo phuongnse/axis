@@ -28,6 +28,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 | `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue                                                           | Network         |
 | `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker          |
 | `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network |
+| `scripts/ai-eval.sh`            | On demand only: the authoring eval against one model binding, see [the authoring eval](reference/model-bindings.md#the-authoring-eval)                            | Docker, network |
 | `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker          |
 
 ### Setup
@@ -207,7 +208,7 @@ in [Testing](testing.md).
 | `compose`    | Runs the Compose stack                                                                                                                                   |
 | `images`     | Runs the production images, from `scripts/images.test.mjs`                                                                                               |
 | `onprem`     | Installs `deploy/compose/` from the production images for two tenants                                                                                    |
-| `ai-eval`    | Starts the authoring eval stack with scripted answers and carries a new tenant's authoring request through the agent host and the MCP server to its plan |
+| `ai-eval`    | Carries an authoring request to its plan on the eval stack with scripted answers, and runs `scripts/ai-eval.sh` against a stand-in model                 |
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
@@ -215,14 +216,13 @@ agent host. The test removes the Compose project at the end.
 
 `scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
 and removes them when it exits. A change that skips both tests builds nothing. `ai-eval` needs no production image: it builds the server, the publisher and the agent host in Release,
-the Keycloak theme and the templates before it starts them. The PostgreSQL tools layer of
+the Keycloak theme and the templates before it starts them. It starts the eval stack three times, once for its stack test and once for each run of `scripts/ai-eval.sh`, and the two test files run one at a time. The PostgreSQL tools layer of
 `axis-admin` comes from the `admin-tools` stage of the `Dockerfile`. The build saves that stage and its base
 image in `~/.cache/axis-docker/admin-tools-<hash>.tar`, where the hash is of the stage text without its
 comments, and loads the file in a later run, so the run does not download the packages again, and pulls the base
 image only when Docker lacks it. NexKit's `docker` cache entry restores the folder, and CI on `main` saves it. The
 layer is built again when the stage changes, when the entry's key changes, or when GitHub drops the cache after 7 days
-without use. The saved layer can be
-weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
+without use. The saved layer can be weeks old while the stage stays the same, so the smoke tests may run older client packages than an install gets.
 The [image scan](#workflows-outside-nexkits-checks) never uses the saved layer: it builds from scratch and sees
 each new package release.
 

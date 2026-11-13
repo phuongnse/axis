@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { judgeCase, passBar, writeReport } from './lib/ai-eval.mjs'
+import { casesFolder, parseArguments, readCases } from './lib/ai-eval-run.mjs'
 import { agentEnvironment, applicationName, startingTemplate, tenantHost, tunnelTarget } from './lib/ai-eval-stack.mjs'
 
 const refusalCase = {
@@ -273,4 +275,64 @@ describe('the settings of the eval stack', () => {
     assert.equal(applicationName({ from: 'application', name: 'approvals' }, 'eval-smoke'), 'ApprovalsEvalSmoke')
     assert.equal(applicationName({ from: 'template', name: 'purchase-requests' }, 'case1'), 'PurchaseRequestsCase1')
   })
+})
+
+describe('the arguments of the eval run', () => {
+  const settings = { Ai__Bindings__opus__Kind: 'anthropic', Ai__Bindings__opus__Model: 'claude-opus-5-5', PATH: '/usr/bin' }
+
+  test('a binding with a setting is the one to run', () => {
+    assert.deepEqual(parseArguments(['--binding', 'opus'], settings), { binding: 'opus' })
+  })
+
+  test('no arguments, an unknown flag, a missing name and extra arguments are errors', () => {
+    for (const argv of [[], ['--verbose'], ['--binding'], ['--binding', ''], ['--binding', 'opus', '--verbose'], ['opus']]) {
+      assert.match(parseArguments(argv, settings).error, /--binding <name>/, argv.join(' '))
+    }
+  })
+
+  test('a binding with no settings is an error, also when the name only starts like another binding', () => {
+    assert.match(parseArguments(['--binding', 'absent'], settings).error, /absent has no settings/)
+    assert.match(parseArguments(['--binding', 'opu'], settings).error, /opu has no settings/)
+    assert.match(parseArguments(['--binding', 'opus'], { Ai__Bindings__opus2__Kind: 'anthropic' }).error, /opus has no settings/)
+  })
+
+  test('the cases are the files of tests/ai-eval/cases in the order of their names, named without .json', () => {
+    const files = readdirSync(casesFolder).filter((entry) => entry.endsWith('.json')).sort()
+    const cases = readCases()
+    assert.deepEqual(cases.map(({ name }) => name), files.map((file) => file.replace(/\.json$/, '')))
+    assert.ok(cases.every(({ request, outcome }) => request && outcome))
+  })
+})
+
+describe('scripts/ai-eval.sh arguments', () => {
+  let folder
+
+  beforeEach(() => {
+    folder = mkdtempSync(path.join(tmpdir(), 'axis-ai-eval-arguments-'))
+  })
+  afterEach(() => rmSync(folder, { recursive: true, force: true }))
+
+  // The script runs from the repository root with no `Ai__` setting, so no binding has settings.
+  const run = (...args) =>
+    spawnSync('bash', ['scripts/ai-eval.sh', ...args], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      encoding: 'utf8',
+      env: {
+        ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('Ai__'))),
+        AXIS_AI_EVAL_REPORT_DIR: folder,
+      },
+    })
+
+  for (const [what, args] of [
+    ['no arguments', []],
+    ['an unknown flag', ['--verbose']],
+    ['a binding with no settings', ['--binding', 'absent']],
+  ]) {
+    test(`${what} gives exit code 2 and writes no report`, () => {
+      const result = run(...args)
+      assert.equal(result.status, 2, result.stdout + result.stderr)
+      assert.match(result.stderr, /Usage: scripts\/ai-eval\.sh --binding <name>/)
+      assert.equal(existsSync(path.join(folder, 'report.json')), false)
+    })
+  }
 })

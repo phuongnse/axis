@@ -62,7 +62,7 @@ const startAxis = async ({ endState, sendStatus = 202, publishStatus = 'succeede
         return reply(200, {
           items: [
             { id: 'b'.repeat(40), request: null },
-            { id: sha, request: 'r1' },
+            { id: sha, request: 'p1' },
           ],
         })
       }
@@ -146,6 +146,34 @@ describe('runCase', () => {
       tokens: 1540,
       durationMs: 5000,
     })
+  })
+
+  test('sends every call through the given fetch with the cookie and the CSRF header', async () => {
+    const { calls, session } = await axis({ endState: 'ready' })
+    const sent = []
+    // The address of the session does not resolve. The fetch sends each call to the local server instead.
+    const fetch = (url, init) => {
+      sent.push({ url, ...init })
+      return globalThis.fetch(url.replace('http://tenant.invalid', session.server), init)
+    }
+
+    const run = await runCase({ ...session, server: 'http://tenant.invalid/' }, 'leave requests', 'Add a cost centre.', {
+      ...options,
+      now: clock(),
+      fetch,
+    })
+
+    assert.equal(run.accepted.length, 1)
+    assert.equal(sent.length, calls.length)
+    for (const call of sent) {
+      assert.ok(call.url.startsWith(`http://tenant.invalid${apps}/`), call.url)
+      assert.equal(call.headers.Cookie, cookie)
+    }
+    for (const call of sent.filter(({ method }) => method === 'POST')) assert.equal(call.headers['X-Axis-Csrf'], '1')
+    assert.deepEqual(
+      sent.map(({ method, url }) => `${method} ${new URL(url).pathname}`),
+      calls.map(({ method, url }) => `${method} ${url}`),
+    )
   })
 
   test('returns no accepted draft and makes no accept call for a request that fails', async () => {

@@ -775,12 +775,13 @@ What each kind does:
 Studio. The request has the kind `test` and the target `tenant`. Studio's Run tests and Run controls
 send it, and its Test results list shows the outcome, see [Studio](studio.md).
 
-- **Who may.** The author role is enough. It needs no publisher role, because a test changes no
-  tenant. It costs database time, so the limits below apply.
+- **Who may.** The author role is enough, because a test changes no tenant. It costs database time,
+  so the limits below apply.
 - **The body.** The optional `scenarios` list names the scenarios to run, by their `name`. With no
   body, no list or an empty list, every scenario runs, a pinned module's after the application's own,
   as `<module id>/<name>`. An unknown name is accepted with `202`, and the request then ends `failed`
-  with `AXC0218`, as for a folder with errors.
+  with `AXC0218`, as for a folder with errors. A [contract scenario](module-contracts.md#contract-scenarios)
+  that covers a relaxed point of its module does not run. Its `skipped` item comes first, see [the request](#the-request).
 - **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
   the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
@@ -799,8 +800,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   publisher (`SIGTERM`) does the same at once, with `AXC0220`. The scenarios that finished keep their
   outcomes, and the one that was cut is stored as `failed` with no `step` and no `path`.
 - **Order.** At most one `test` request per application runs at a time, oldest first. Its queue is
-  separate from the one of `validate`, `publish` and `activate`, so a `test` does not wait behind a
-  `publish`.
+  separate from `validate`, `publish` and `activate`, so a `test` never waits behind a `publish`.
 - **Audit.** A `test` writes no audit record.
 - **A request that runs again.** A request claimed again after a lost lease runs every scenario again.
 
