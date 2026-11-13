@@ -129,8 +129,10 @@ services:
         condition: service_healthy
     environment:
       DOTNET_ENVIRONMENT: Development
-      # The sample extension package payment-references, which the image holds.
+      # The sample extension package payment-references, which the image holds. This worker loads it itself,
+      # because no package host runs in this stack.
       Extensions__Path: /extensions
+      Extensions__Isolation: inProcess
       # The built-in and sample modules, which the image holds.
       Modules__Path: /modules
       # The worker sends its emails to Mailpit. Development is the only environment that sends without TLS.

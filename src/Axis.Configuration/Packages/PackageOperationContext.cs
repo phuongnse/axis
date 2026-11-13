@@ -60,10 +60,17 @@ public sealed class PackageOperationContext(
             : throw Refuse(secretBinding, $"asked for the secret binding '{secretBinding}', which it does not declare.");
     }
 
+    /// <summary>
+    /// The sentence of a violation, one shape for a context and for the worker that gets a runner's <c>failure</c>:
+    /// the operation and the package, then <paramref name="what"/> it did. It never holds a value.
+    /// </summary>
+    public static string RefusedMessage(string operation, string package, string what) =>
+        string.Create(CultureInfo.InvariantCulture, $"The operation '{operation}' of the package '{package}' {what}");
+
     /// <summary>Keeps the first violation and returns the exception that refuses it.</summary>
     private InvalidOperationException Refuse(string binding, string what)
     {
-        var message = string.Create(CultureInfo.InvariantCulture, $"The operation '{operation}' of the package '{package}' {what}");
+        var message = RefusedMessage(operation, package, what);
         Interlocked.CompareExchange(ref _violation, new Refusal(message, binding), null);
         return new InvalidOperationException(message);
     }

@@ -167,6 +167,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
     private readonly bool _throughPgBouncer;
     private NpgsqlDataSource? _claimDataSource;
     private ServiceProvider? _worker;
+    private string? _runtime;
     private ServiceProvider? _workerWithoutPackages;
     private ApplicationModel? _model;
 
@@ -223,6 +224,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
             _claimDataSource = NpgsqlDataSource.Create(TenantPoolSettings.Default.Apply(runtime));
         }
 
+        _runtime = runtime;
         _worker = BuildWorker(_packages.Path, runtime);
         _workerWithoutPackages = BuildWorker(_noPackages.Path, runtime);
     }
@@ -255,6 +257,19 @@ public sealed class PackageCallFixture : IAsyncLifetime
 
     /// <summary>Runs the next due package call item.</summary>
     public Task<WorkItemOutcome?> RunCallAsync(CancellationToken cancellationToken) => RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken);
+
+    /// <summary>The folder that acts as <c>Extensions:Path</c>, with versions 1.0.0 and 1.1.0 of the test package.</summary>
+    internal string PackagesPath => _packages.Path;
+
+    /// <summary>
+    /// Runs the next due package call item on a worker that has the installed packages and the settings in
+    /// <paramref name="extra"/>, which add to or replace the fixture worker's. The worker is disposed afterwards.
+    /// </summary>
+    internal async Task<WorkItemOutcome?> RunCallOnAsync(IReadOnlyDictionary<string, string?> extra, CancellationToken cancellationToken)
+    {
+        await using var worker = BuildWorker(_packages.Path, _runtime ?? throw new InvalidOperationException("The fixture is not initialized."), extra);
+        return await RunAsync(ProcessStarts.PackageCallWorkItemKind, cancellationToken, worker);
+    }
 
     /// <summary>Runs the next due package call item on a worker that holds no package version.</summary>
     public Task<WorkItemOutcome?> RunCallWithoutPackagesAsync(CancellationToken cancellationToken) =>
@@ -404,20 +419,25 @@ public sealed class PackageCallFixture : IAsyncLifetime
             .Replace("{name}", name, StringComparison.Ordinal)
             .Replace("{attempts}", attempts.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
 
-    private ServiceProvider BuildWorker(string packagesPath, string runtimeConnectionString)
+    private ServiceProvider BuildWorker(string packagesPath, string runtimeConnectionString, IReadOnlyDictionary<string, string?>? extra = null)
     {
-        var settings = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
-                [$"Tenants:{_tenant.Tenant}:ConnectionString"] = runtimeConnectionString,
-                [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Kind"] = "url",
-                [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Value"] = "https://test.example.test",
-                [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Kind"] = "secret",
-                [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Value"] = "test-token",
-                [PackageCatalog.PathSetting] = packagesPath,
-            })
-            .Build();
+        var values = new Dictionary<string, string?>
+        {
+            [$"Tenants:{_tenant.Tenant}:Hosts:0"] = $"{_tenant.Tenant}.example.test",
+            [$"Tenants:{_tenant.Tenant}:ConnectionString"] = runtimeConnectionString,
+            [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Kind"] = "url",
+            [$"Tenants:{_tenant.Tenant}:Bindings:TestUrl:Value"] = "https://test.example.test",
+            [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Kind"] = "secret",
+            [$"Tenants:{_tenant.Tenant}:Bindings:TestToken:Value"] = "test-token",
+            [PackageCatalog.PathSetting] = packagesPath,
+            [PackageIsolation.IsolationSetting] = "inProcess",
+        };
+        foreach (var (key, value) in extra ?? new Dictionary<string, string?>())
+        {
+            values[key] = value;
+        }
+
+        var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         return new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
             .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing", ContentRootPath = AppContext.BaseDirectory })

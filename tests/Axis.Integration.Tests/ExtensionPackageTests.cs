@@ -153,6 +153,7 @@ public sealed class ExtensionPackageTests(PostgreSqlFixture database) : IClassFi
             ["Tenants:a:Hosts:0"] = TenantHost,
             ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),
             [PackageCatalog.PathSetting] = packagePath,
+            [PackageIsolation.IsolationSetting] = "inProcess",
         });
         builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
         return builder.Build();

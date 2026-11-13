@@ -73,4 +73,19 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, WebhookDeliveryHandler>();
         return services;
     }
+
+    /// <summary>
+    /// Makes the handler that runs package operation calls send each attempt of a C# package to a runner of the
+    /// package host that <paramref name="isolation"/> names, see
+    /// docs/reference/extension-packages.md#package-runners. Call it after <see cref="AddProcesses"/>. The runners
+    /// are closed when the host stops.
+    /// </summary>
+    public static IServiceCollection AddPackageRunners(this IServiceCollection services, PackageIsolation isolation)
+    {
+        ArgumentNullException.ThrowIfNull(isolation);
+
+        // A factory, so that the container disposes the runners when the host stops.
+        services.AddSingleton(_ => new PackageRunners(isolation.DotnetHost, isolation.DotnetPort));
+        return services;
+    }
 }

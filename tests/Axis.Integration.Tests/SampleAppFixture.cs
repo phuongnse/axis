@@ -119,8 +119,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
         // Creating a client starts the server, which migrates the database and activates the sample first.
         _factory.CreateClient().Dispose();
 
-        var settings = new ConfigurationBuilder().AddInMemoryCollection(WorkerTenantSettings()).Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory }).BuildServiceProvider();
+        _services = BuildWorker(new Dictionary<string, string?>());
     }
 
     public async ValueTask DisposeAsync()
@@ -184,9 +183,15 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// Claims and runs the tenant's due work items of the given <paramref name="kinds"/> until none is left, and
     /// returns how many it ran. Work items of other kinds, such as a staged package call, are left due.
     /// </summary>
-    public async Task<int> RunKindsUntilIdleAsync(CancellationToken cancellationToken, params string[] kinds)
+    public Task<int> RunKindsUntilIdleAsync(CancellationToken cancellationToken, params string[] kinds) =>
+        RunKindsUntilIdleAsync((_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>(), cancellationToken, kinds);
+
+    /// <summary>
+    /// Claims and runs the tenant's due work items of the given <paramref name="kinds"/> on <paramref name="runner"/>,
+    /// the runner of a worker that <see cref="BuildWorker"/> built, until none is left, and returns how many it ran.
+    /// </summary>
+    internal async Task<int> RunKindsUntilIdleAsync(WorkItemRunner runner, CancellationToken cancellationToken, params string[] kinds)
     {
-        var runner = (_services ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
         await using var connection = await OpenConnectionAsync();
         var ran = 0;
         while (await WorkItemQueue.ClaimAsync(connection, Tenant, kinds, _lease, cancellationToken) is { } item)
@@ -222,12 +227,30 @@ public sealed class SampleAppFixture : IAsyncLifetime
         return host;
     }
 
+    /// <summary>
+    /// Builds a worker's services for the tenant, in Development and with its host never started. Its
+    /// settings are those of <see cref="WorkerTenantSettings"/>, which <paramref name="extra"/> adds to or replaces.
+    /// The caller disposes it.
+    /// </summary>
+    internal ServiceProvider BuildWorker(IReadOnlyDictionary<string, string?> extra)
+    {
+        var values = WorkerTenantSettings();
+        foreach (var (key, value) in extra)
+        {
+            values[key] = value;
+        }
+
+        var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        return new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory }).BuildServiceProvider();
+    }
+
     /// <summary>The worker's settings for the tenant, with its purchasing bindings pointing at the stub.</summary>
     private Dictionary<string, string?> WorkerTenantSettings()
     {
         var settings = new Dictionary<string, string?>
         {
             ["Extensions:Path"] = SamplePackages.Path,
+            ["Extensions:Isolation"] = "inProcess",
             [$"Tenants:{Tenant}:Hosts:0"] = Host,
             [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(ConnectionString),
             [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",

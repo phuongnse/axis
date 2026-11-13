@@ -44,11 +44,7 @@ public sealed class PackageHostTests : IAsyncLifetime
         _stub.Start();
         _stubLoop = AnswerStubAsync();
 
-        var assembly = Path.Combine(AppContext.BaseDirectory, "Axis.PackageHost.dll");
-        var muxer = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path ? path : "dotnet";
-        var runtimeConfig = Path.Combine(AppContext.BaseDirectory, "Axis.PackageHost.runtimeconfig.json");
-        string[] arguments = File.Exists(runtimeConfig) ? ["exec", assembly] : ["exec", "--runtimeconfig", runtimeConfig, assembly];
-        _host = new RunnerHost(_extensions.Path, new RunnerCommand(muxer, arguments), _log);
+        _host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log);
         _endpoint = await _host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
     }
 
