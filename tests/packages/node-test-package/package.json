@@ -1,0 +1,8 @@
+{
+  "name": "node-test-package",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "axis-test-dependency": "file:vendor/axis-test-dependency-1.0.0.tgz"
+  }
+}

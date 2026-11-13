@@ -4,14 +4,15 @@ using Microsoft.Extensions.Configuration;
 namespace Axis.PackageHost;
 
 /// <summary>
-/// The <c>build</c> command: it checks a published C# package folder or a Python package source and writes it to
-/// <c>&lt;Extensions:Path&gt;/&lt;id&gt;/&lt;version&gt;/</c>, see docs/reference/extension-packages.md#building-a-package.
-/// The checks run in a fixed order and the first refusal stops the build: the manifest, the language, the lock file,
-/// an existing target folder, then, for Python, the install of the hashed requirements into a temporary copy of the
-/// source, then the dependency scan. Only then is the package written and the extensions folder loaded
-/// as the hosts load it, and a version that does not load is deleted again. The exit code is 0 when the package
-/// is built, 1 when it is refused and 2 for a setup error: a wrong argument, a missing extensions folder, or a
-/// scan that did not complete.
+/// The <c>build</c> command: it checks a published C# package folder or a Node.js or Python package source and writes
+/// it to <c>&lt;Extensions:Path&gt;/&lt;id&gt;/&lt;version&gt;/</c>, see docs/reference/extension-packages.md#building-a-package.
+/// The checks run in a fixed order and the first refusal stops the build: the manifest, the lock file,
+/// an existing target folder, then, for Node.js, the install from its lock file and, for Python, the install of the
+/// hashed requirements, each into a temporary copy of the source, then the dependency scan. Only then is the package
+/// written and the extensions folder loaded as the hosts load it, and a version that does not load is deleted again.
+/// The scan and the write read the installed copy, which is deleted afterwards. The exit code is 0 when the package
+/// is built, 1 when it is refused, including an install that fails, and 2 for a setup error: a wrong argument, a
+/// missing extensions folder, an install that cannot start or a scan that did not complete.
 /// </summary>
 public static class PackageBuildCommand
 {
@@ -54,12 +55,6 @@ public static class PackageBuildCommand
         }
 
         var manifest = package.Manifest;
-        if (manifest.Language == PackageLanguage.Node)
-        {
-            await output.WriteLineAsync("Only C# and Python packages can be built, not 'node'.");
-            return Refused;
-        }
-
         var lockProblems = manifest.Language == PackageLanguage.Python
             ? RequirementsCheck.Check(source, manifest)
             : PackageLockCheck.Check(source, manifest);
@@ -84,7 +79,17 @@ public static class PackageBuildCommand
         var built = source;
         try
         {
-            if (manifest.Language == PackageLanguage.Python)
+            if (manifest.Language == PackageLanguage.Node)
+            {
+                built = Directory.CreateTempSubdirectory("axis-package-build-").FullName;
+                var install = await NodeInstall.InstallAsync(source, built, cancellationToken);
+                if (install.Failure is not null)
+                {
+                    await output.WriteLineAsync(install.Failure);
+                    return install.SetupError ? SetupError : Refused;
+                }
+            }
+            else if (manifest.Language == PackageLanguage.Python)
             {
                 // The source may be mounted read-only, and a copy outside the extensions folder keeps a half-installed
                 // folder out of reach of a host that starts during the build.
@@ -191,11 +196,18 @@ public static class PackageBuildCommand
         return Built;
     }
 
-    private static void Copy(string source, string target)
+    /// <summary>Copies a folder with its files and subfolders, without the top-level folder <paramref name="skipTopLevel"/> when it is given.</summary>
+    internal static void Copy(string source, string target, string? skipTopLevel = null)
     {
         Directory.CreateDirectory(target);
+        var skipped = skipTopLevel is null ? null : Path.Combine(source, skipTopLevel) + Path.DirectorySeparatorChar;
         foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
         {
+            if (skipped is not null && file.StartsWith(skipped, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var destination = Path.Combine(target, Path.GetRelativePath(source, file));
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             File.Copy(file, destination);

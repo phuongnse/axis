@@ -1,0 +1,17 @@
+{
+  "id": "node-test-package",
+  "version": "1.0.0",
+  "label": "Node test package",
+  "language": "node",
+  "adapter": "index.js",
+  "lock": "package-lock.json",
+  "operations": [
+    {
+      "name": "greet",
+      "type": "greet",
+      "idempotent": true,
+      "input": [{ "name": "name", "type": "text", "required": true }],
+      "output": [{ "name": "greeting", "type": "text", "required": true }]
+    }
+  ]
+}

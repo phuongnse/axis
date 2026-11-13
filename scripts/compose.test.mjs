@@ -4,13 +4,13 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { describeNotReady, parsePs } from './lib/compose-status.mjs'
 import { runDocker } from './lib/docker-build.mjs'
+import { freePort, startOnFreePorts } from './lib/free-ports.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const project = 'axis-smoke'
@@ -22,16 +22,6 @@ let keycloakUrl
 let purchasingUrl
 let mailpitUrl
 let studioApps
-
-const freePort = () =>
-  new Promise((resolve, reject) => {
-    const server = net.createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address()
-      server.close(() => resolve(port))
-    })
-  })
 
 // tail: the last characters of a command's output, for an assertion message.
 const tail = (text, length = 8000) => (text.length > length ? `…${text.slice(-length)}` : text)
@@ -89,16 +79,16 @@ test('the stack runs from source', { timeout }, async () => {
   // The build runs on its own, so a failed build is not reported as a failed start.
   await runDocker(['compose', '-p', project, 'build'], { env })
 
-  // A port that was free when it was picked can be taken before Docker binds it. Docker then fails the start with a
-  // bind error, so the start is tried again on new ports. Any other failure is reported at once.
-  let up
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    await pickPorts()
-    up = compose(['up', '-d', '--wait'])
-    process.stdout.write(`${up.stdout ?? ''}${up.stderr ?? ''}`)
-    if (up.status === 0 || !/port is already allocated|address already in use|ports are not available/i.test(up.stderr ?? '')) break
-    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore' })
-  }
+  // The ports are picked right before each attempt, see startOnFreePorts. The output of every attempt is printed.
+  const up = await startOnFreePorts({
+    pick: pickPorts,
+    start: () => {
+      const result = compose(['up', '-d', '--wait'])
+      process.stdout.write(`${result.stdout ?? ''}${result.stderr ?? ''}`)
+      return result
+    },
+    cleanUp: () => compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore' }),
+  })
   if (up.status !== 0) {
     const ps = compose(['ps', '--all', '--format', 'json'])
     const containers = parsePs(ps.stdout ?? '')

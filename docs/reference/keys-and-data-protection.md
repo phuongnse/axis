@@ -8,7 +8,9 @@ The policy follows the lifecycle terms of NIST SP 800-57. It covers each key fro
 
 - **Generation.** The operator makes the installation key from 32 random bytes, for example with `openssl rand -base64 32`. Axis makes database passwords the same way. The operator makes each client key as an EC P-256 key in PEM form.
 - **Storage.** A secret comes from a file in `/run/secrets` or from the platform's secret store, never from a committed file. Axis keeps each tenant secret encrypted in the platform tables. It keeps no key in code, images or logs.
-- **Holders.** The server, the worker and the admin tool of one installation share its installation key, and every replica holds the same value. A client key's private half stays with Axis. Only its public half goes to the identity provider. A webhook secret is shared by exactly two parties.
+- **Holders.** The server, the worker, the admin tool and the agent host of one installation share its installation key, and every replica holds the same value. A client key's private half stays with Axis. Only its public half goes to the identity provider. A webhook secret is shared by exactly two parties.
+- **Key service.** _(planned for M35)_ In SaaS the cloud's key service (AWS KMS, Azure Key Vault, Google Cloud KMS or HashiCorp Vault) wraps the private key of each host that opens a sealed secret and the installation key. Its policy lets only each host's own identity unwrap its key, and it logs every unwrap. On premises the customer chooses a key file or their own key service.
+- **Sealed secrets.** _(planned for M35)_ A secret that a person gives is sealed in the browser for the host that uses it, with a data key of its own, and only that host opens it, in memory, for the call that needs it, see [D149](../decisions/d149-a-persons-secrets-are-sealed-for-the-host-that-uses-them-and-every-secret-rests-on-a-key-service.md).
 - **Use.** Each key has one purpose. The installation key only encrypts stored secrets and data protection keys. A client key only signs client assertions. The [cryptographic inventory](#cryptographic-inventory) lists where each key may and may not be used.
 - **Cryptoperiod.** Axis rotates the installation key at least once a year, and at once when it may have leaked. The framework makes a new data protection key every 90 days. No other key has a set period.
 - **Rotation.** Each key rotates on its own path.
@@ -49,6 +51,9 @@ The inventory lists every key, algorithm and certificate that Axis uses, one to 
 | **Tenant data key** and **lookup key** | AES-256-GCM for the data key, HMAC-SHA256 for the lookup key, 32 bytes each | Encrypting the values of `sensitive` fields, bound to the tenant, entity, record and field. The lookup key makes the exact lookup of a field that declares one, see [exact lookup](data-encryption.md#exact-lookup). Also the refresh token of an [authoring request](authoring-requests.md#acting-for-the-author), bound to the tenant and the request | Secrets other than that token, files and any other value | Made with the tenant and stored encrypted by the installation key. `tenant data-key rotate` adds a numbered data key and lookup key, re-encrypts the tenant's values and recomputes their lookup hashes, and `tenant data-key retire` deletes the old keys. See [tenant keys](data-encryption.md#tenant-keys). |
 | **Backup key** | AES-256-GCM, in chunks of 1 MiB | Encrypting a tenant backup archive, see [encrypted backups](data-encryption.md#encrypted-backups) | Anything else. It is never the installation key | Outside a cell: given to the admin tool by the operator in a file, `--backup-key-file`, and kept outside the installation. In a cell: one 32-byte key for each tenant, made by `tenant create` and stored in `platform.tenant_backup_keys`, wrapped by the cell's backup key and bound to the tenant id; `tenant backup` and `tenant restore` read it and refuse `--backup-key-file`; a restore makes a new key for the restored tenant. A lost key loses its archives. |
 | **Cell backup key** | AES-256-GCM, 32 bytes | Wrapping the backup keys of the tenants of a cell in `platform.tenant_backup_keys` | Anything else. It is never the installation key and never wraps another secret. `platform rekey` does not touch what it wraps | A file that `Cell:BackupKeyFile` names, which comes from the cloud provider's key service. It is never in the database or in an archive. `tenant create`, `tenant backup` and `tenant restore` read it in a cell and stop with exit code `2` when it is missing. A lost key loses every tenant key of the cell and so every archive. No command rotates it. |
+| **Host key pair** of the agent host _(planned for M35)_ | HPKE (RFC 9180) with DHKEM(P-256, HKDF-SHA256), HKDF-SHA256 and AES-256-GCM | Opening the secrets that people seal for the agent host, see [which host opens which secret](#which-host-opens-which-secret) | Anything the installation key encrypts | The private half is wrapped by the cloud's or the customer's key service and never leaves the agent host unwrapped. A lost private key means people set their keys again. |
+| **A person's AI key** _(planned for M35)_ | Sealed in the browser for the agent host, with a data key of its own | Calling the model provider for the person's own requests | Anything else. It goes only to its provider's API host, is never in a prompt, a log, a trace, problem details or a backup in clear, and is never answered except its last four characters | Added, changed and removed by the person. Removing it destroys its data key. |
+| **Key service key** _(planned for M35)_ | Held by the cloud's or the customer's key service | Wrapping the host private keys and the installation key | Anything else. It never leaves the key service | The key service owns it, and logs every unwrap. |
 | **Image signatures** _(planned for M32)_ | cosign keyless signing through the release workflow's GitHub identity | Signing Axis's images and their SBOMs | Anything else | One short-lived certificate per signing, recorded in the public transparency log. |
 | **Random values** | The system's random generator, `RandomNumberGenerator`, for nonces, session ids, key bytes, passwords and client secrets, the backup name suffix, the verification token of a [tenant host request](tenant-lifecycle.md#hosts) and the [weekly restore check](tenant-backup-and-restore.md#weekly-restore-check)'s pick of a tenant | Values that must not be guessed | None beyond the uses listed | No key. |
 
@@ -61,6 +66,19 @@ The inventory lists every key, algorithm and certificate that Axis uses, one to 
 - **Token algorithms are lists.** The token checks take their algorithms from one list each in the server code. `BearerCallerOptions.Algorithms` serves the bearer token checks of machine callers and of the cell operator, and `DpopProof.Algorithms` serves DPoP proofs. Changing a list is a code change.
 - **Passwords and secrets change through commands.** `tenant rotate-passwords`, `tenant email set` and `tenant binding set` replace them. See [tenant setting commands](tenant-setting-commands.md).
 - **No post-quantum algorithm.** Axis uses no post-quantum algorithm. Adopting one would be a code change to the cipher and to the token checks.
+
+## Which host opens which secret
+
+_(planned for M35)_
+
+Each secret has the hosts that open it and the hosts that cannot, so a reader sees who can read a secret and who cannot, the operator included.
+
+| Secret | Opened by | Cannot open |
+| --- | --- | --- |
+| A person's AI key | The agent host only, with its own private key, in memory, for the call that needs it | The server, the worker, the admin tool and the operator |
+| The installation's own secrets, the tenant's own model key among them | The server, the worker, the admin tool and the agent host, each by unwrapping the installation key at the cloud's or the customer's key service | A caller or a person with no host identity |
+
+Code that uses a key touches it while it uses it. Signed images, see I5 in the [installation threat model](threat-model-installation.md), and the review of the agent host's changes guard that limit.
 
 ## Data classification
 
@@ -84,8 +102,9 @@ Axis encrypts only the secrets, the values of `sensitive` fields and tenant back
 - **Retention.** A secret is kept until an operator replaces or removes it. A session id hash is kept until its session ends. Test: `WorkerSessionCleanupTests`.
 - **Logging.** A secret never appears in a log, a span, an API answer, problem details or a backup. Test: `TraceCorrelationTests`, `SecretValueTests` and `AdminTenantBackupTests`.
 - **Access to logs.** No log holds a secret, so reading a log reveals none. Test: `TraceCorrelationTests`.
-- **Access control.** Only the server, the worker and the admin tool read secrets, each under its own database role. The worker has no schema connection. Test: `DatabaseRoleTests`.
+- **Access control.** Only the server, the worker, the admin tool and the agent host read secrets, each under its own database role. The worker has no schema connection. Test: `DatabaseRoleTests`.
 - **Privacy.** A secret holds no personal data. Test: none.
+- **Sealed secrets** _(planned for M35)_. A secret that a person gives follows [which host opens which secret](#which-host-opens-which-secret).
 
 ### Restricted
 
