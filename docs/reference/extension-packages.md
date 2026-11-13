@@ -218,11 +218,11 @@ every host reads. An installation's package is trusted code that the operator re
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-- **The package hosts.** The Compose example's containers `package-host-dotnet` and `package-host-node` and the Helm chart's pods
+- **The package hosts.** The Compose example's containers `package-host-dotnet`, `package-host-python` and `package-host-node` and the Helm chart's pods
   `<release>-package-host-dotnet` and `<release>-package-host-node` mount the same folder read-only, and
   each runner runs the packages of its language, see [Package runners](#package-runners).
-- **The other package hosts** _(planned for M21)_. The containers `package-host-python` do the same
-  for the other languages.
+- **The other package host** _(planned for M21)_. The chart's container `package-host-python` does the same
+  for the other language.
 - **The Python host image.** The image `axis-package-host-python` holds the Python runner, see
   [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
@@ -457,7 +457,7 @@ package reaches nothing of the host and no binding of another call.
 - **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
-- **The hosts in Compose.** The Compose example runs `package-host-dotnet` and `package-host-node` on an internal network `runners` that only they and
+- **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
   the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
 - **The C# and Node.js hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet` and `<release>-package-host-node`, each as a Deployment, a Service on port 5310 and a

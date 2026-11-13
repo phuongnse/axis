@@ -5,7 +5,7 @@
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
 # compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
-# AXIS_VERSION          Required. The tag of the six images.
+# AXIS_VERSION          Required. The tag of the seven images.
 # AXIS_IMAGE_PREFIX     Optional. A registry prefix for the image names, such as registry.example.com/axis/.
 # AXIS_SECRETS_DIR      The folder with the secret files. Default ./secrets.
 # AXIS_EXTENSIONS_DIR   The extension packages, mounted at /extensions. Default ./extensions.
@@ -38,6 +38,8 @@
 # AXIS_SERVER_2_PORT    The host port of the second server replica, on 127.0.0.1 only. Default 8081.
 # AXIS_PACKAGE_HOST_CPUS   The CPU limit of the C# package host. Default 1.
 # AXIS_PACKAGE_HOST_MEMORY The memory limit of the C# package host. Default 1g.
+# AXIS_PACKAGE_HOST_PYTHON_CPUS   The CPU limit of the Python package host. Default 1.
+# AXIS_PACKAGE_HOST_PYTHON_MEMORY The memory limit of the Python package host. Default 1g.
 # AXIS_PACKAGE_HOST_NODE_CPUS   The CPU limit of the Node.js package host. Default 1.
 # AXIS_PACKAGE_HOST_NODE_MEMORY The memory limit of the Node.js package host. Default 1g.
 # AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
@@ -64,10 +66,11 @@ x-host: &host
     Extensions__Path: /extensions
     Modules__Path: /modules
 
-# The package hosts, the containers that run the package operations of the worker. The port 5310 of a host has no
-# authentication, so it sits only on the internal network `runners`, which only the worker and the hosts share. It
-# gets no environment, secret, port or module folder, only the packages, read-only. Each service adds its image and
-# limits. See docs/reference/extension-packages.md#package-runners and the threats P151 and P152 in
+# The package hosts, the containers that run the package operations of the worker. Each sets its own image and
+# limits. The rules are the same for all, so they cannot drift apart. Port 5310 has no authentication, so a host
+# sits only on the internal network `runners`, which only the worker and the hosts share. It gets no environment,
+# secret, port or module folder, only the packages, read-only. See docs/reference/extension-packages.md#package-runners
+# and the threats P151 and P152 in
 # docs/reference/threat-model-product.md.
 x-package-host: &package-host
   command: ["host"]
@@ -196,8 +199,9 @@ services:
       <<: *host-environment
       # All interfaces inside the container. The published port stays on 127.0.0.1.
       Health__Urls: http://0.0.0.0:5208
-      # The C# and the Node.js package host, on the internal network `runners`.
+      # The C#, Python and Node.js package hosts, on the internal network `runners`.
       Extensions__Runners__Dotnet: package-host-dotnet:5310
+      Extensions__Runners__Python: package-host-python:5310
       Extensions__Runners__Node: package-host-node:5310
     ports:
       - "127.0.0.1:${AXIS_WORKER_HEALTH_PORT:-5208}:5208"
@@ -218,6 +222,13 @@ services:
     image: ${AXIS_IMAGE_PREFIX:-}axis-package-host-dotnet:${AXIS_VERSION:?Set AXIS_VERSION}
     cpus: ${AXIS_PACKAGE_HOST_CPUS:-1}
     mem_limit: ${AXIS_PACKAGE_HOST_MEMORY:-1g}
+
+  # The Python package host, the container that runs the Python package operations of the worker. See x-package-host.
+  package-host-python:
+    <<: *package-host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-package-host-python:${AXIS_VERSION:?Set AXIS_VERSION}
+    cpus: ${AXIS_PACKAGE_HOST_PYTHON_CPUS:-1}
+    mem_limit: ${AXIS_PACKAGE_HOST_PYTHON_MEMORY:-1g}
 
   # The Node.js package host, the container that runs the `node` package operations of the worker. See x-package-host.
   package-host-node:
@@ -304,7 +315,7 @@ networks:
       config:
         - subnet: ${AXIS_NETWORK_SUBNET:-172.31.250.0/24}
           ip_range: ${AXIS_NETWORK_IP_RANGE:-172.31.250.128/25}
-  # No route out and no other service: only the worker and the two package hosts are on it.
+  # No route out and no other service: only the worker and the three package hosts are on it.
   runners:
     internal: true
 
