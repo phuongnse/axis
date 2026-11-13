@@ -43,7 +43,9 @@ namespace Axis.Processes.Instances;
 /// see docs/reference/extension-packages.md#package-runners. The runner gets only the declared bindings, and the same
 /// outcomes follow: a runner's <c>retryable</c> and <c>failure</c> answers are the exceptions above, a timeout and a
 /// runner that closes its connection are unknown outcomes, and a host that cannot be reached, is not set or starts no
-/// runner is a retryable error.
+/// runner is a retryable error. A request that a runner sends to a host no declared <c>url</c> binding names is
+/// refused by the worker's egress proxy and fails the call at once like the same request from a context. The error
+/// names the operation and the package, but no binding and no host.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
@@ -402,7 +404,9 @@ internal sealed partial class PackageCallHandler(
     /// the declared bindings of the call's tenant, nothing else. An attempt that fails before the
     /// <c>run</c> is sent is retryable, because the operation never ran. After it, a timeout closes the
     /// connection, which makes the host kill the runner, and a runner that closes its connection exited. Both
-    /// are unknown outcomes. A runner that answered goes back to the pool. Worker shutdown is not caught.
+    /// are unknown outcomes. A runner that answered goes back to the pool. Worker shutdown is not caught. While the
+    /// call runs, the worker's egress proxy admits only the hosts of the declared <c>url</c> bindings. When it refused a
+    /// request of the runner, the attempt is a violation whatever the runner answered or whether it timed out.
     /// </summary>
     private async Task<Run> RunInRunnerAsync(
         PackageRunners pool,
@@ -449,9 +453,12 @@ internal sealed partial class PackageCallHandler(
             }
         }
 
+        // The runner's egress proxy admits the hosts of the declared url bindings for this call only.
+        runner.Admit(urls.Values);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(target.Step.Timeout);
-        RunnerMessage? answer;
+        RunnerMessage? answer = null;
+        var timedOut = false;
         try
         {
             answer = await runner.RunAsync(message, timeout.Token);
@@ -459,18 +466,37 @@ internal sealed partial class PackageCallHandler(
         catch (Exception)
         {
             // The timeout or the shutdown. Closing the connection makes the host kill the runner.
-            runner.Dispose();
             if (cancellationToken.IsCancellationRequested)
             {
+                runner.Dispose();
                 throw;
             }
 
+            timedOut = true;
+        }
+
+        // A request that the proxy refused fails the call at once, even if the package caught the error. Such a
+        // runner is closed, so it never serves another call.
+        var refused = runner.EndCall();
+        if (refused || timedOut || answer is null)
+        {
+            runner.Dispose();
+        }
+
+        if (refused)
+        {
+            return new Run(
+                null,
+                PackageOperationContext.RefusedMessage(target.Operation.Name, target.Package.Manifest.Id, "sent a request through the egress proxy to a host that none of its url bindings declares."));
+        }
+
+        if (timedOut)
+        {
             return new Run(null, null, Timeout: true);
         }
 
         if (answer is null)
         {
-            runner.Dispose();
             return new Run(null, null, Exited: true);
         }
 

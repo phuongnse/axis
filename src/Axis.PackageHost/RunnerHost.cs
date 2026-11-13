@@ -16,10 +16,11 @@ namespace Axis.PackageHost;
 /// Host mode: accepts TCP connections and starts one runner process for each, see
 /// docs/reference/extension-packages.md#the-runner-protocol. The first line of a connection must be a
 /// <c>start</c> for an installed version whose id and version are well formed. Any other first line, or a
-/// version that is not installed, closes the connection and starts no runner. The runner gets an empty
-/// environment, its standard input is fed from the connection and its standard output goes to the
-/// connection. Closing the connection kills the runner and its child processes, and a runner that exits
-/// closes the connection. The host logs the runner's process id, package and version, and no message.
+/// version that is not installed, or whose <c>proxy</c> is not a <c>host:port</c>, closes the connection and starts
+/// no runner. The runner's environment holds only the proxy variables that name the worker's egress proxy. Its
+/// standard input is fed from the connection and its standard output goes to the connection. Closing the connection
+/// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
+/// runner's process id, package and version, and no message.
 /// </summary>
 internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand command, ILogger<RunnerHost> logger) : IAsyncDisposable
 {
@@ -156,6 +157,7 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
             return RunnerProtocol.Read(line) is StartMessage start
                 && IdPattern().IsMatch(start.Package)
                 && VersionPattern().IsMatch(start.Version)
+                && PackageIsolation.TryParseHostPort(start.Proxy, out _, out _)
                 && File.Exists(Path.Combine(extensionsRoot, start.Package, start.Version, PackageCatalog.ManifestFileName))
                     ? start
                     : null;
@@ -185,6 +187,15 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
         info.ArgumentList.Add(start.Package);
         info.ArgumentList.Add(start.Version);
         info.Environment.Clear();
+
+        // The runner's one route to the network is the worker's egress proxy, whose credentials are the runner's token.
+        // No NO_PROXY is set, so a request to a loopback address goes through the proxy too.
+        var proxy = $"http://axis:{start.ProxyToken}@{start.Proxy}";
+        foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
+        {
+            info.Environment[name] = proxy;
+        }
+
         return Process.Start(info) ?? throw new InvalidOperationException("The runner did not start.");
     }
 

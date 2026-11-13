@@ -85,7 +85,11 @@ public static class ProcessesServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(isolation);
 
         // A factory, so that the container disposes the runners when the host stops.
-        services.AddSingleton(_ => new PackageRunners(isolation.DotnetHost, isolation.DotnetPort));
+        services.AddSingleton(provider => new PackageRunners(
+            isolation.DotnetHost,
+            isolation.DotnetPort,
+            isolation.ProxyPort,
+            provider.GetRequiredService<ConnectorCallSettings>().AllowHttp));
         return services;
     }
 }

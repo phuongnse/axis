@@ -18,9 +18,10 @@ namespace Axis.Integration.Tests;
 /// Two tenants, <c>a</c> and <c>b</c>, each with its own StepApp database, and a
 /// <see cref="ConnectorStub"/> that stands in for an external system. Both activate the same copy of
 /// StepApp that pins <c>test-package</c> 1.0.0. The copy has the processes <c>PackageProbeDeclared</c>,
-/// <c>PackageProbeOtherHost</c>, <c>PackageProbeUndeclaredSecret</c> and <c>PackageProbeSwallow</c>, which
-/// run <c>test-package/probe</c> in the mode <c>declared</c>, <c>otherHost</c>, <c>undeclaredSecret</c>
-/// and <c>swallow</c>. Each tenant's <c>TestUrl</c> binding points at its own path on the stub,
+/// <c>PackageProbeOtherHost</c>, <c>PackageProbeUndeclaredSecret</c>, <c>PackageProbeSwallow</c>,
+/// <c>PackageProbeOwnClient</c>, <c>PackageProbeOwnOtherHost</c> and <c>PackageProbeOwnRedirect</c>, which
+/// run <c>test-package/probe</c> in the mode <c>declared</c>, <c>otherHost</c>, <c>undeclaredSecret</c>,
+/// <c>swallow</c>, <c>ownClient</c>, <c>ownOtherHost</c> and <c>ownRedirect</c>. Each tenant's <c>TestUrl</c> binding points at its own path on the stub,
 /// <c>/tenant-a</c> or <c>/tenant-b</c>, and its <c>TestToken</c> secret holds its own token. One worker
 /// runs in Development for both tenants and loads the package itself, with <c>Extensions:Isolation</c> <c>inProcess</c>.
 /// A second one with the same bindings runs as Production, so it refuses the stub's <c>http</c> URL. It has
@@ -28,7 +29,8 @@ namespace Axis.Integration.Tests;
 /// Each tenant also has an <c>OtherToken</c> secret that no operation declares. The process <c>PackageFlakyOnce</c>
 /// runs <c>test-package/flaky</c> with one failure and three attempts. A third worker runs in Development with
 /// <c>Extensions:Isolation</c> <c>process</c>. It sends each call to a package host that runs the installed package in real
-/// runner processes, through a <see cref="RecordingRelay"/> that keeps the lines it sent. The worker's log entries go to
+/// runner processes, through a <see cref="RecordingRelay"/> that keeps the lines it sent. Its egress proxy takes a free port,
+/// so that test classes that run side by side do not race for the default one. The worker's log entries go to
 /// <see cref="Logs"/>, and the hosts are never started, so a test runs the work items itself.
 /// </summary>
 public sealed class PackageCapabilityFixture : IAsyncLifetime
@@ -107,6 +109,9 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
             .With("processes/package-probe-other-host.json", Probe("PackageProbeOtherHost", "8d4f1c27-0b63-4e95-a7d2-1f6a9c3e5b08", "otherHost"))
             .With("processes/package-probe-undeclared-secret.json", Probe("PackageProbeUndeclaredSecret", "f2a58d93-6e14-4b07-8c3a-9d7b1e4f0a62", "undeclaredSecret"))
             .With("processes/package-probe-swallow.json", Probe("PackageProbeSwallow", "6c1b7e40-d985-4a32-b6f8-3a0e5d9c2f17", "swallow"))
+            .With("processes/package-probe-own-client.json", Probe("PackageProbeOwnClient", "a1e7c4b2-5d30-4f98-8b16-2c9d0e7f3a54", "ownClient"))
+            .With("processes/package-probe-own-other-host.json", Probe("PackageProbeOwnOtherHost", "d94b2f68-1a7e-4c05-9e83-6b5f0a1c7d29", "ownOtherHost"))
+            .With("processes/package-probe-own-redirect.json", Probe("PackageProbeOwnRedirect", "7e3a9c15-b2d8-4601-a4f7-8d1e5b0c6a93", "ownRedirect"))
             .With("processes/package-flaky-once.json", FlakyOnceProcess);
 
         var catalog = _catalog = PackageCatalog.Load(_packages.Path);
@@ -147,6 +152,7 @@ public sealed class PackageCapabilityFixture : IAsyncLifetime
         _relay = new RecordingRelay(_host.Endpoint);
         values[PackageIsolation.IsolationSetting] = "process";
         values[PackageIsolation.DotnetRunnerSetting] = _relay.Address;
+        values[PackageIsolation.ProxySetting] = "0";
         _runner = Worker(new ConfigurationBuilder().AddInMemoryCollection(values).Build(), "Development");
     }
 
