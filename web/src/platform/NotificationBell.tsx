@@ -256,7 +256,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
   )
 }
 
-/** The dot's and the icon's box: one line of text high, at the row's top, with them at its middle. */
+/** The icon's box: one line of text high, at the row's top, with the icon at its middle. */
 const firstLine: CSSProperties = { alignSelf: 'start', display: 'flex', alignItems: 'center', height: '1lh' }
 
 const kindIcons: Record<NotificationKind, ReactNode> = {
@@ -270,7 +270,8 @@ const kindIcons: Record<NotificationKind, ReactNode> = {
  * row opens its page, `spacing-xs` in from the list's edges with `radius-base` corners, on the hover tint under the
  * pointer. A dot and a bold title mark it unread. Its kind's icon leads it, in `primaryText` when it asks for an
  * action, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
- * The dot and the icon sit in the middle of the row's first line, and a problem's title is in `dangerText` too.
+ * The icon sits in the middle of the row's first line, the unread dot after how long ago, and a problem's title is in
+ * `dangerText` too.
  * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. See
  * the review on #3263.
  */
@@ -302,7 +303,7 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
         onMouseLeave={() => setHovered(false)}
         style={{
           display: 'grid',
-          gridTemplateColumns: `${spacing.sm}px auto 1fr`,
+          gridTemplateColumns: 'auto 1fr',
           columnGap: spacing.xs,
           width: '100%',
           padding: `${spacing.sm}px ${spacing.sm}px ${spacing.sm}px ${spacing.xs}px`,
@@ -315,24 +316,23 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
           cursor: 'pointer',
         }}
       >
-        <span aria-hidden style={firstLine}>
-          {!item.read && (
-            <span
-              style={{ display: 'block', width: 6, height: 6, borderRadius: '50%', background: colour.primaryText }}
-            />
-          )}
-        </span>
         <span aria-hidden style={{ ...firstLine, color: kindColour }}>
           {kindIcons[kind]}
         </span>
         <span style={{ minWidth: 0 }}>
           <Flex justify="space-between" gap={spacing.sm} style={{ color: colour.textMuted }}>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.source}</span>
-            <Tooltip title={exact}>
-              <time dateTime={item.createdAt} style={{ flex: 'none' }}>
-                {ago}
-              </time>
-            </Tooltip>
+            <Flex align="center" gap={spacing.xs} style={{ flex: 'none' }}>
+              <Tooltip title={exact}>
+                <time dateTime={item.createdAt}>{ago}</time>
+              </Tooltip>
+              {!item.read && (
+                <span
+                  aria-hidden
+                  style={{ width: 6, height: 6, borderRadius: '50%', background: colour.primaryText }}
+                />
+              )}
+            </Flex>
           </Flex>
           <span
             style={{
