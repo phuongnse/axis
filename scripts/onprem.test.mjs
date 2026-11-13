@@ -5,7 +5,8 @@
 // publisher runs in each tenant. It then starts a second server replica, signs requester in
 // through the TLS proxy on the Axis theme, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
-// reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
+// reads it back through the other, and checks that a stale save answers 409. Each start of a service that publishes a port picks that
+// port right before it, and Docker's bind error starts it again on new ports. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, the development
@@ -29,13 +30,13 @@ import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
-import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
+import { freePort, startOnFreePorts } from './lib/free-ports.mjs'
 import { addAccount, cookieHeader, preparePlatformClient, signIn } from './lib/keycloak-sign-in.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
@@ -62,16 +63,6 @@ const secretFiles = {
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
-const freePort = () =>
-  new Promise((resolve, reject) => {
-    const server = net.createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address()
-      server.close(() => resolve(port))
-    })
-  })
 
 const password = () => randomBytes(18).toString('hex')
 
@@ -484,6 +475,12 @@ describe('the on-premises installation', () => {
     return result.stdout.trim()
   }
 
+  // up: starts services on ports picked right before the start, and on new ports when Docker finds one taken.
+  const up = async (services, pick) => {
+    const result = await startOnFreePorts({ pick, start: () => compose(['up', '-d', ...services]) })
+    assert.equal(result.status, 0, `docker compose up -d ${services.join(' ')}\n${result.stdout}${result.stderr}`)
+  }
+
   const dumpLogs = () => {
     for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
@@ -849,7 +846,10 @@ describe('the on-premises installation', () => {
 
       // Start the identity provider and the proxy, and wait until the development realm answers through the proxy on
       // the identity host. The first start builds Keycloak and imports the realm.
-      run(['up', '-d', 'identity', 'proxy'])
+      await up(['identity', 'proxy'], async () => {
+        httpsPort = await freePort()
+        env.AXIS_HTTPS_PORT = String(httpsPort)
+      })
       const discovery = await waitFor(() => tlsRequest(httpsPort, identityHost, '/realms/axis/.well-known/openid-configuration'), 200, 240)
       assert.equal(discovery.status, 200, `the identity provider did not serve the axis realm\n${compose(['logs', 'identity']).stdout}`)
       assert.equal(JSON.parse(discovery.body).issuer, identityAuthority)
@@ -867,7 +867,14 @@ describe('the on-premises installation', () => {
       assert.equal(migrate.status, 0, `migrate\n${migrate.stdout}${migrate.stderr}`)
 
       // Step 3, start the server, the worker and the agent host, and wait until the server is ready.
-      run(['up', '-d', 'server', 'worker', 'agent'])
+      await up(['server', 'worker', 'agent'], async () => {
+        serverPort = await freePort()
+        workerPort = await freePort()
+        agentPort = await freePort()
+        env.AXIS_SERVER_PORT = String(serverPort)
+        env.AXIS_WORKER_HEALTH_PORT = String(workerPort)
+        env.AXIS_AGENT_HEALTH_PORT = String(agentPort)
+      })
       const ready200 = await waitFor(() => server('localhost', '/health/ready'), 200, 120)
       assert.equal(ready200.status, 200, 'the server never answered /health/ready with 200')
 
@@ -1043,7 +1050,10 @@ RETURNING id;`,
 
       // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready. The proxy has
       // run since the start of the test.
-      run(['up', '-d', 'server-2'])
+      await up(['server-2'], async () => {
+        server2Port = await freePort()
+        env.AXIS_SERVER_2_PORT = String(server2Port)
+      })
       const ready2 = await waitFor(() => serverRequest(server2Port, 'localhost', '/health/ready'), 200, 120)
       assert.equal(ready2.status, 200, 'the second server never answered /health/ready with 200')
       const site2 = await waitFor(() => serverRequest(server2Port, hosts.one, '/leave'), 200, 60)

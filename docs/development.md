@@ -212,7 +212,7 @@ in [Testing](testing.md).
 
 `dev-script` starts the Compose services of `scripts/dev.sh` once, on ports it picks before its first case, and
 its cases reuse them. Each start of `scripts/dev.sh` gets fresh ports for the server, the SPA, the worker and the
-agent host. The test removes the Compose project at the end.
+agent host. The test removes the Compose project at the end. `compose` and `onprem` pick each host port right before the start that binds it, and start again on new ports, up to three times, when Docker finds one taken.
 
 `scripts/smoke.sh` builds the [production images](production-images.md) once, before `images` and `onprem`, which both use them,
 and removes them when it exits. A change that skips both tests builds nothing. `ai-eval` needs no production image: it builds the server, the publisher and the agent host in Release,

@@ -6,11 +6,11 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
-import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { after, before, describe, it } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { freePort } from './lib/free-ports.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'artifacts', 'wwwroot', 'playwright-report', 'test-results'])
@@ -22,26 +22,6 @@ let scratch
 let env
 const ports = {}
 const running = []
-
-const handedOut = new Set()
-
-/** A free port that no earlier call returned, because a closed port can be handed out again at once. */
-async function freePort() {
-  for (;;) {
-    const port = await new Promise((resolve, reject) => {
-      const server = net.createServer()
-      server.once('error', reject)
-      server.listen(0, '127.0.0.1', () => {
-        const { port } = server.address()
-        server.close(() => resolve(port))
-      })
-    })
-    if (!handedOut.has(port)) {
-      handedOut.add(port)
-      return port
-    }
-  }
-}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 

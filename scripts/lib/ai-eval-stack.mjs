@@ -24,6 +24,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './docker-images.mjs'
+import { freePort } from './free-ports.mjs'
 import { addAccount, cookieHeader, newOtpSecret, otpCredential, preparePlatformClient, rolesMapper, signIn } from './keycloak-sign-in.mjs'
 import { issuePostgresCertificate } from './postgres-tls.mjs'
 
@@ -103,16 +104,6 @@ export function buildStack() {
   run('bash', ['scripts/lib/install-modules.sh'])
   run('bash', ['scripts/lib/install-sample-templates.sh'])
 }
-
-const freePort = () =>
-  new Promise((resolve, reject) => {
-    const server = net.createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address()
-      server.close(() => resolve(port))
-    })
-  })
 
 /**
  * Sends one http request, or one https request when the URL starts with `https:`, where `tls` adds TLS options such as `ca`
