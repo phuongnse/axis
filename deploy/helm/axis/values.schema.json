@@ -65,6 +65,21 @@
         "resources": { "type": "object" }
       }
     },
+    "packageHost": {
+      "type": "object",
+      "properties": {
+        "dotnet": {
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string" },
+            "replicas": { "type": "integer", "minimum": 0 },
+            "resources": { "type": "object" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "publisher": {
       "type": "object",
       "properties": {

@@ -4,7 +4,7 @@ This page says how a platform operator installs and upgrades Axis, on one machin
 and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
 and, in [upgrade](upgrade.md), the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-An installation runs four hosts, from four production images. The Compose example also runs a fifth container, the C# package host, from a fifth image, see [on premises](#on-premises):
+An installation runs four hosts, from four production images. The Compose example and the Helm chart also run a fifth container, the C# package host, from a fifth image, see [on premises](#on-premises) and [in the cloud](#in-the-cloud):
 
 | Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,10 +55,10 @@ Build an image from the repository root with `docker build --target axis-server 
   at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
   writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
   needs that root: the `host` command runs on a read-only root.
-- **The package runners.** The package host images also hold their runtime's runner. The Compose example runs `package-host-dotnet`
-  with the command `host` on a read-only root, with `/extensions` mounted read-only, as [on premises](#on-premises) says.
-- **The other package runners** _(planned for M21)_. The containers `package-host-node` and `package-host-python`, and the Helm
-  chart's hosts, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
+- **The package runners.** The package host images also hold their runtime's runner. The Compose example's `package-host-dotnet` and the
+  chart's `<release>-package-host-dotnet` run it with the command `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
+- **The other package runners** _(planned for M21)_. The containers `package-host-node` and `package-host-python`, in Compose and in the
+  Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
@@ -476,6 +476,7 @@ The chart has these objects:
   termination grace period is 360 seconds, longer than the five-minute lease. Outside a cell it mounts
   the same secrets as the migrate Job. When `studio.folders` is set, it also mounts the Studio volume
   and gets the folders and `platformConnection`, as the server does.
+- **The C# package host.** A Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-package-host-dotnet`, see [package runners](extension-packages.md#package-runners).
 - **The identity provider**, see [below](#the-identity-provider-in-the-chart).
 - **PgBouncer**, in a cell that turns it on, see [PgBouncer](#pgbouncer).
 - **The migrate Job and the CronJobs** of a cell, see [jobs](#jobs).
@@ -667,6 +668,7 @@ values schema rejects any field in a reference other than `name` and `key`.
 | Server | `platformConnection`, `platformSchemaConnection` and `platformSecretKey`, and `serverCertificate` read-only at `/server-tls`, which no other pod mounts |
 | Worker | `platformConnection` and `platformSecretKey` |
 | Agent host | `platformConnection` and `platformSecretKey`, and no other secret |
+| C# package host | None, and no env entry |
 | Migrate Job | `platformSchemaConnection` and `platformSecretKey` |
 | Publisher | `platformSchemaConnection` and `platformSecretKey`, and `scenarioServerConnection` when it is set, and `platformConnection` when `studio.folders` is set. In a cell also `platformConnection`, `adminConnection`, `identityAdminClientSecret` and `cellBackupKey`, see [the publisher in a cell](#the-publisher-in-a-cell) |
 | Identity provider | The four `axis-identity` files, and `identityCertificate` read-only at `/identity-tls`, and no other secret |
@@ -685,14 +687,15 @@ The values of the chart, with their defaults:
 
 | Value | Default | Meaning |
 | --- | --- | --- |
-| `image.registry` | empty | Registry prefix of the four images. |
-| `image.tag` | the chart's `appVersion` | Tag of all four images. |
+| `image.registry` | empty | Registry prefix of the Axis images. |
+| `image.tag` | the chart's `appVersion` | Tag of all Axis images. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
-| `server.repository`, `worker.repository`, `agent.repository`, `migrate.repository` | `axis-server`, `axis-worker`, `axis-agent`, `axis-admin` | Repository of each image. `migrate.repository` is also the publisher's image. |
+| `server.repository`, `worker.repository`, `agent.repository`, `migrate.repository`, `packageHost.dotnet.repository` | `axis-server`, `axis-worker`, `axis-agent`, `axis-admin`, `axis-package-host-dotnet` | Repository of each image. `migrate.repository` is also the publisher's image. |
 | `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](several-server-replicas.md). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `agent.replicas` | 1 | Agent host replicas. |
+| `packageHost.dotnet.replicas`, `packageHost.dotnet.resources` | 1, limits of 1 CPU and `1Gi` | C# package host replicas and resources. Rendering fails, naming the value, without `limits.cpu` or `limits.memory`. |
 | `studio.folders` | none | The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>` on the server and on the publisher. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica and on the publisher. In a cell the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
@@ -796,7 +799,7 @@ that secrets are files and never env entries, that a secret value in a reference
 that rendering fails, naming the value, without each required value. `scripts/setup.sh` installs the
 pinned Helm, kubeconform, Kubernetes schemas and cert-manager schemas into `~/.cache/axis-tools`, and
 downloads any schema file that a cached folder lacks. Axis has no test against a live cluster, so no
-test runs PgBouncer or the identity provider from the chart.
+test runs PgBouncer, the identity provider or the C# package host, or checks that a cluster enforces its NetworkPolicy.
 
 ## TLS
 

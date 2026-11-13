@@ -37,6 +37,9 @@ spec:
             # The image keeps the health address on loopback. The kubelet probes the pod address.
             - name: Health__Urls
               value: http://0.0.0.0:5208
+            # The C# package host, see docs/reference/extension-packages.md#package-runners.
+            - name: Extensions__Runners__Dotnet
+              value: {{ printf "%s-package-host-dotnet:5310" .Release.Name | quote }}
           ports:
             - name: health
               containerPort: 5208
