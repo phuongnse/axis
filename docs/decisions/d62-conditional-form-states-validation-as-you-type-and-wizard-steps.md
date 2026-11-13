@@ -17,8 +17,8 @@ interpreters.
 - **The server evaluates them.** A form state endpoint takes the draft, answers each field's state
   and the validation messages of the touched fields, and writes nothing. A record form and a task
   form each have one, under their own access checks
-  ([D20](d20-human-tasks-task-inbox-and-forms.md), [D24](d24-roles-and-policies.md)). The SPA has no
-  evaluator.
+  ([D20](d20-human-tasks-task-inbox-and-forms.md), [D24](d24-roles-and-policies.md)). The SPA
+  evaluates no form condition.
 - **On write.** The record API enforces `requiredWhen` only when a write names its form in `?form=`,
   and leaves `readOnlyWhen` to the field write grants. The task API enforces both. A rule that must
   always hold is an entity validation ([D17](d17-entity-logic-and-child-collections.md)).
@@ -32,7 +32,7 @@ The rules are in [form conditions](../reference/form-conditions.md#form-conditio
 
 ## Consequences
 
-- One interpreter evaluates every condition, and each change of state waits for the server.
+- One interpreter evaluates every form condition, and each change of state waits for the server.
 - A record API caller that does not name the form skips `requiredWhen`, so conditions are not a
   security boundary.
 
