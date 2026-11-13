@@ -44,6 +44,9 @@ if [ "$run_rest" = 1 ]; then
   # runs this script in a job without scripts/build.sh, which installs them too.
   bash scripts/lib/install-modules.sh
   bash scripts/lib/install-sample-templates.sh
+  # The unit test of the TypeScript sample package runs in its installed copy, which has its library in node_modules. The Python
+  # sample needs pip and the wheel cache, so only the Node.js one is installed.
+  bash scripts/lib/install-sample-packages.sh node
 
   # The server tests read the server's OpenAPI document. NexKit runs this script without scripts/build.sh, which writes it too.
   dotnet run --project tests/Axis.OpenApiDocument -c Release -- artifacts/openapi/axis-server.json || status=1
@@ -66,7 +69,8 @@ fi
 # The report, smoke test selection, link check, docs structure check and its rules, bundle budget check,
 # font check, licence writer, design-system bundle check, authoring eval case check, authoring eval judging, authoring eval stack settings, authoring eval client, Keycloak sign-in, dependency scan, SPA lock file, image scan, the scans' code owners, setup retries, saved container images, image build retries, E2E, integration, smoke and test shard
 # splits, the shard durations refresh, NexKit's sharded checks, the test script's shards, load script, load test workflow, load objectives, cell load scenarios, cell load script, cell load tenants, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, contrast helper, Compose status
-# helper, free port helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests.
+# helper, free port helper, module install script, dev script stop helper, development realm script and Helm chart scripts' own tests,
+# and the unit test of the TypeScript sample package.
 if [ "$run_rest" = 1 ]; then
   node --test scripts/test-report.test.mjs || status=1
   node --test scripts/affected.test.mjs || status=1
@@ -111,6 +115,8 @@ if [ "$run_rest" = 1 ]; then
   node --test scripts/development-realm.test.mjs || status=1
   node --test scripts/docker-build.test.mjs || status=1
   node --test scripts/docker-images.test.mjs || status=1
+  # The sample package payment-terms, installed above with its library.
+  node --test artifacts/extensions/payment-terms/1.0.0/index.test.mjs || status=1
   node --test tests/e2e/folder-comparison.test.ts || status=1
   node --test tests/e2e/hang-guard.test.ts || status=1
   node --test tests/e2e/dialogs.test.ts || status=1

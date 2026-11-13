@@ -4,7 +4,8 @@
 # system stub from tests/Axis.PurchasingStub.
 # The development images hold the built-in modules under modules and the sample modules under samples/modules
 # in /modules, each at the id and version of its module.json. They hold the built-in applications under
-# applications in /templates, each at the id and version of its template.json.
+# applications in /templates, each at the id and version of its template.json. The server, the worker and the publisher hold the
+# sample extension packages in /extensions: the C# one built from source and the TypeScript one with its library installed.
 # For local use: the Development environment and the sample credentials are not for production.
 #
 # The targets axis-server, axis-worker, axis-agent, axis-admin, axis-controlplane and axis-package-host-dotnet, -node and
@@ -48,6 +49,16 @@ COPY scripts/lib/install-sample-templates.sh scripts/lib/
 COPY applications/ applications/
 RUN bash scripts/lib/install-sample-templates.sh
 
+# The TypeScript sample extension package, installed in /src/artifacts/extensions/payment-terms/1.0.0 with its library by the script that
+# scripts/build.sh runs. The install is offline from the tarball in the package folder, and the build fails without the library.
+# The script sources the other two scripts, which only the Python install uses.
+FROM node:24-slim AS sample-packages
+WORKDIR /src
+COPY scripts/lib/install-sample-packages.sh scripts/lib/python-wheels.sh scripts/lib/retry.sh scripts/lib/
+COPY samples/packages/ samples/packages/
+RUN bash scripts/lib/install-sample-packages.sh node \
+    && test -f artifacts/extensions/payment-terms/1.0.0/node_modules/dayjs/package.json
+
 # The server, published with the SPA in its web root, the worker, the agent host, the admin tool and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
@@ -71,6 +82,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
+COPY --from=sample-packages /src/artifacts/extensions /extensions
 COPY --from=modules /src/artifacts/modules /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
@@ -88,6 +100,7 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0 AS publisher
 WORKDIR /app
 COPY --from=build /admin .
 COPY --from=build /src/artifacts/extensions /extensions
+COPY --from=sample-packages /src/artifacts/extensions /extensions
 COPY --from=modules /src/artifacts/modules /modules
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
@@ -279,6 +292,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
+COPY --from=sample-packages /src/artifacts/extensions /extensions
 COPY --from=modules /src/artifacts/modules /modules
 COPY samples/ /samples/
 COPY --from=templates /src/artifacts/templates /templates

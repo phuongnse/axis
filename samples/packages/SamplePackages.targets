@@ -2,8 +2,9 @@
 
   <!--
     Builds the sample extension package payment-references 1.0.0 and copies the build to
-    $(OutDir)SamplePackages/payment-references/1.0.0/. SamplePackages.Path is then the Extensions:Path
-    folder that a test passes to the server, the worker or PackageCatalog.Load.
+    $(OutDir)SamplePackages/payment-references/1.0.0/. It also copies the manifest, the adapter and the lock files
+    of the TypeScript sample package payment-terms 1.0.0 there, with no library, so that it is listed as metadata.
+    SamplePackages.Path is then the Extensions:Path folder that a test passes to the server, the worker or PackageCatalog.Load.
   -->
   <ItemGroup>
     <ProjectReference Include="$(MSBuildThisFileDirectory)PaymentReferences\PaymentReferences.csproj" ReferenceOutputAssembly="false" />
@@ -15,6 +16,11 @@
     </ItemGroup>
     <Error Condition="'@(SamplePackageFile)' == ''" Text="The sample package build was not found under $(MSBuildThisFileDirectory)." />
     <Copy SourceFiles="@(SamplePackageFile)" DestinationFiles="@(SamplePackageFile->'$(OutDir)SamplePackages\payment-references\1.0.0\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <PaymentTermsFile Include="$(MSBuildThisFileDirectory)payment-terms\axis-package.json;$(MSBuildThisFileDirectory)payment-terms\index.js;$(MSBuildThisFileDirectory)payment-terms\package.json;$(MSBuildThisFileDirectory)payment-terms\package-lock.json" />
+    </ItemGroup>
+    <Error Condition="'@(PaymentTermsFile)' == ''" Text="The sample package payment-terms was not found under $(MSBuildThisFileDirectory)." />
+    <Copy SourceFiles="@(PaymentTermsFile)" DestinationFolder="$(OutDir)SamplePackages\payment-terms\1.0.0\" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

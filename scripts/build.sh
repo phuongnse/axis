@@ -4,8 +4,9 @@
 # licences.json with versions) from the SPA's lock file and the NuGet project assets, then builds the Keycloak login theme `axis` into artifacts/keycloak-theme and checks its
 # files and fonts, and builds the email theme `axis` beside it and checks its files, then builds the sign-up page into the
 # control plane's web root and checks it and its fonts, then builds the .NET solution,
-# which installs the C# sample extension package in artifacts/extensions. Before that build it installs the Python sample
-# extension package there with its library, offline from the wheels that scripts/setup.sh keeps, and checks its files. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
+# which installs the C# sample extension package in artifacts/extensions. Before that build it installs the Python and the
+# TypeScript sample extension packages there with their libraries, the Python one offline from the wheels that scripts/setup.sh
+# keeps and the TypeScript one offline from the tarball in its folder, and checks their files. Then installs the built-in and sample modules in artifacts/modules and the sample templates and the built-in
 # applications in artifacts/templates. Then writes the server's OpenAPI document to artifacts/openapi.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -56,6 +57,10 @@ phone_numbers=artifacts/extensions/phone-numbers/1.0.0
 test -f "$phone_numbers/axis-package.json"
 test -f "$phone_numbers/adapter.py"
 test -f "$phone_numbers/phonenumbers/__init__.py"
+payment_terms=artifacts/extensions/payment-terms/1.0.0
+test -f "$payment_terms/axis-package.json"
+test -f "$payment_terms/index.js"
+test -f "$payment_terms/node_modules/dayjs/package.json"
 dotnet build Axis.slnx -c Release --no-restore
 bash scripts/lib/install-modules.sh
 test -f artifacts/modules/department-budgets/1.2.0/module.json

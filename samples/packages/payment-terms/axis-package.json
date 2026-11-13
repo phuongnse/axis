@@ -1,0 +1,17 @@
+{
+  "id": "payment-terms",
+  "version": "1.0.0",
+  "label": "Payment terms",
+  "language": "node",
+  "adapter": "index.js",
+  "lock": "package-lock.json",
+  "operations": [
+    {
+      "name": "dueDate",
+      "type": "dueDate",
+      "idempotent": true,
+      "input": [{ "name": "from", "type": "date-time", "required": true }],
+      "output": [{ "name": "dueDate", "type": "date", "required": true }]
+    }
+  ]
+}

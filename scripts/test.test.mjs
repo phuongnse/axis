@@ -67,7 +67,7 @@ function runTest(extraEnv = {}) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
     }
-    for (const script of ['install-modules.sh', 'install-sample-templates.sh']) {
+    for (const script of ['install-modules.sh', 'install-sample-templates.sh', 'install-sample-packages.sh']) {
       writeFileSync(join(dir, 'scripts/lib', script), '#!/usr/bin/env bash\nexit 0\n')
     }
     mkdirSync(join(dir, 'web/src'), { recursive: true })

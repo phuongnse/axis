@@ -67,7 +67,7 @@ samples/
   modules/                the sample module department-budgets, as configuration
   templates/              the sample templates, as configuration, when there are any
   packages/               the sample extension packages: the C# package PaymentReferences with its unit tests and the
-                          Python package phone-numbers
+                          Python package phone-numbers and the TypeScript package payment-terms
   keycloak/               the development Keycloak realms and their keys
   postgres/               init-roles.sql: the development database roles and the preview tenant's
                           database
