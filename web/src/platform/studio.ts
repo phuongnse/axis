@@ -1683,6 +1683,12 @@ export interface StudioAuthoringRequest {
   author: string
   authorName: string | null
   text: string
+  /**
+   * Proposed: the outside AI app whose work this is, by the name it registered with, or `null` for a request sent from
+   * Studio. Such a request starts at `create_draft` with the words the app gives, and has no plan and no review, see
+   * the review on #3263.
+   */
+  app: string | null
   state: StudioAuthoringRequestState
   plan: string | null
   round: number

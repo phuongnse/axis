@@ -440,6 +440,7 @@ function authoringRequest(
     author: mine ? currentUser.id : otherAuthor,
     authorName: mine ? currentUser.displayName : 'Linh Tran',
     text,
+    app: null,
     state,
     plan: null,
     round: state === 'fixing' ? 2 : 1,
@@ -449,6 +450,18 @@ function authoringRequest(
     approvedAt: null,
     finishedAt: null,
   }
+}
+
+// Proposed: the work of an outside AI app through the MCP server, see the review on #3263.
+const appRequest: StudioAuthoringRequest = {
+  ...authoringRequest(
+    7,
+    'ready',
+    'Add a Cost centre field to the purchase request, chosen from a list, and show it in the request list.',
+    '2026-11-10T09:15:00Z',
+    true,
+  ),
+  app: 'Claude Code',
 }
 
 const aiRequests: StudioAuthoringRequest[] = [
@@ -517,6 +530,16 @@ const loop: [string, string, string][] = [
   ['fix', 'Worked on what the checks found', 'Draft saved, 1 resource changed'],
   ['check', "Ran the compiler and the application's 8 scenarios", 'All 8 scenarios passed'],
   ['review', 'A second AI read the draft against the request and the plan', 'No findings'],
+]
+
+/** Proposed: the tool calls an outside app made for its request, each with its summary and outcome. */
+const appLoop: [string, string, string][] = [
+  ['create_draft', 'Created a draft', 'Draft created'],
+  ['write_resource', 'Wrote CostCentre (entities/cost-centre.json)', 'Saved, no problems'],
+  ['write_resource', 'Wrote PurchaseRequest (entities/purchase-request.json)', 'Saved, no problems'],
+  ['write_resource', 'Wrote Requests (pages/requests.json)', 'Saved, no problems'],
+  ['validate_draft', 'Checked the draft', 'No problems'],
+  ['run_scenarios', "Ran the application's 8 scenarios", 'All 8 scenarios passed'],
 ]
 
 /** How many steps of the loop a state has started, and whether the last one still runs. */
@@ -608,6 +631,32 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
           ...loopSteps(1, state === 'planning', start, gap),
         ]
       : loopSteps(count, running, start, gap)
+  // An outside app's request records its tool calls as its steps, with no plan and no review.
+  if (request.app !== null && sent === undefined && acted === undefined) {
+    const appSteps = appLoop.map(([kind, summary, outcome], index) => ({
+      kind,
+      summary,
+      outcome,
+      tokens: 0,
+      startedAt: new Date(start + index * gap).toISOString(),
+      finishedAt: new Date(start + (index + 1) * gap).toISOString(),
+    }))
+    const appAccept = acceptOf(request)
+    const appState = appAccept?.status === 'succeeded' ? 'accepted' : state
+    const appDiff = draftChanges[request.id] ?? genericChanges(request)
+    return {
+      ...request,
+      state: appState,
+      plan: null,
+      steps: appSteps,
+      draft: appState === 'accepted' ? null : draftOf(request.id),
+      checks: checksOf(request, appState),
+      review: null,
+      changes: appDiff.map(({ file, summary }) => ({ file, summary })),
+      failure: null,
+      accept: appAccept,
+    }
+  }
   const accept = acceptOf(request)
   if (accept?.status === 'succeeded') {
     state = 'accepted'
@@ -680,6 +729,34 @@ const approvalProcess = (emails: boolean) => ({
 
 const requestEntity = { kind: 'entity', name: 'PurchaseRequest', fields: [{ name: 'title', type: 'text' }] }
 const draftChanges: Record<string, (StudioRevisionChange & { summary: string })[]> = {
+  [appRequest.id]: [
+    change(
+      'entities/cost-centre.json',
+      'entity',
+      'CostCentre',
+      null,
+      {
+        kind: 'entity',
+        name: 'CostCentre',
+        fields: [
+          { name: 'name', type: 'text', required: true },
+          { name: 'code', type: 'text', required: true },
+        ],
+      },
+      'A cost centre with a name and a code, for the list a request picks from.',
+    ),
+    change(
+      'entities/purchase-request.json',
+      'entity',
+      'PurchaseRequest',
+      requestEntity,
+      {
+        ...requestEntity,
+        fields: [...requestEntity.fields, { name: 'costCentre', type: 'reference', entity: 'CostCentre' }],
+      },
+      'The purchase request gets a Cost centre field, chosen from the cost centres.',
+    ),
+  ],
   [aiRequests[0].id]: [
     change(
       'entities/supplier.json',
@@ -920,10 +997,21 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
       const told = noticeSubjects[request.state]
       const key = `${request.id}-${request.state}`
       const byItself = request.state !== 'accepted' || request.autoAccept
-      if (request.author !== currentUser.id || told === undefined || !byItself || notices.has(key)) {
+      // An outside app's request tells only of a change that has waited an hour to be accepted, as its author was at
+      // the app while it worked.
+      const fromApp = request.app !== null
+      if (
+        request.author !== currentUser.id ||
+        told === undefined ||
+        !byItself ||
+        notices.has(key) ||
+        (fromApp && request.state !== 'ready')
+      ) {
         continue
       }
-      const [subject, kind] = told
+      const [subject, kind] = fromApp
+        ? [`A change from ${request.app} waits for you to accept`, 'action' as const]
+        : told
       const sent = Date.parse(request.sentAt)
       notices.set(key, {
         id: key,
@@ -935,7 +1023,7 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
         open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
         read: sent < Date.parse('2026-11-09T00:00:00Z'),
         done: false,
-        createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + 20 * 60_000).toISOString(),
+        createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + (fromApp ? 90 : 20) * 60_000).toISOString(),
         request: request.id,
         state: request.state,
       })
@@ -970,9 +1058,11 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
     }
     return new Response(null, { status: 204 })
   }
-  const ids = [...aiRequests, ...[0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true))].flatMap(
-    (request) => Object.keys(noticeSubjects).map((state) => `${request.id}-${state}`),
-  )
+  const ids = [
+    appRequest,
+    ...aiRequests,
+    ...[0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true)),
+  ].flatMap((request) => Object.keys(noticeSubjects).map((state) => `${request.id}-${state}`))
   // The bell asks for its first page under each filter, which this answers in place of the shared empty one.
   return {
     '/api/notifications?page=1&pageSize=10': page('all'),
@@ -1079,7 +1169,7 @@ export const studioFixtures = {
   manyRows: workspaceRoutes(manyFolder),
   longNames: workspaceRoutes(longFolder),
   accessDenied: { [appsPath]: () => new Response(null, { status: 403 }) },
-  askAi: askAiRoutes({ items: aiRequests }, true),
+  askAi: askAiRoutes({ items: [appRequest, ...aiRequests] }, true),
   askAiFirst: askAiRoutes({ items: [] }, false),
   // Proposed: an author who has not connected their own Claude account, see the review on #3263.
   askAiNotConnected: askAiRoutes({ items: [] }, false, false),

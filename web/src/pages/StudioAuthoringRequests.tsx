@@ -48,6 +48,21 @@ import { StudioTestResults } from './StudioTestResults'
 const stageKeys = ['plan', 'approval', 'change', 'checks', 'review', 'ready'] as const
 
 /**
+ * Proposed: the stages of an outside AI app's request, which planned with its person in the app and has no review in
+ * Axis, see the review on #3263.
+ */
+const appStageKeys = ['change', 'checks', 'ready'] as const
+
+/** The stage of an outside app's request: its own three, or all of them once accepted. */
+function appStageOf(state: StudioAuthoringRequestState): number | null {
+  const stage = stageOf(state)
+  if (stage === null) {
+    return null
+  }
+  return state === 'accepted' ? appStageKeys.length : state === 'ready' ? 2 : stage >= 3 ? 1 : 0
+}
+
+/**
  * The stage a state is in: fixing goes back to the checks, and an accepted request has finished every stage. A dropped
  * or failed request shows no stages.
  */
@@ -147,8 +162,14 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       key: 'who',
       kind: 'freeText',
       title: t('shell.studio.aiRequests.who'),
-      render: (_, row) =>
-        row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone')),
+      // Proposed: an outside app's request names the app after the person, see the review on #3263.
+      render: (_, row) => {
+        const who =
+          row.author === userId ? t('shell.studio.aiRequests.you') : (row.authorName ?? t('shell.studio.ai.someone'))
+        return row.app === null
+          ? who
+          : t('shell.studio.aiRequests.fromApp').replace('{who}', who).replace('{app}', row.app)
+      },
     },
     {
       key: 'when',
@@ -213,7 +234,6 @@ export function StudioAuthoringRequestPage({
   const sentTime = useSentTime()
   const stateWords = useRequestStateWords()
   const stateColour = useRequestStateColour()
-  const stageTitles = stageKeys.map((key) => t(`shell.studio.aiRequest.stage.${key}`))
   const { generation, lost } = useStudioConnection()
   const [loaded, setLoaded] = useState<{ id: string; request: StudioAuthoringRequestDetail | null }>()
   const [follow, setFollow] = useState(0)
@@ -346,8 +366,10 @@ export function StudioAuthoringRequestPage({
       setActing(false)
     }
   }
-  const line = (mine ? t('shell.studio.aiRequest.lineMine') : t('shell.studio.aiRequest.line'))
+  const lineKey = request.app !== null ? (mine ? 'lineMineApp' : 'lineApp') : mine ? 'lineMine' : 'line'
+  const line = t(`shell.studio.aiRequest.${lineKey}`)
     .replace('{name}', request.authorName ?? t('shell.studio.ai.someone'))
+    .replace('{app}', request.app ?? '')
     .replace('{time}', sentTime(request.sentAt))
   // The page reads as one document on the content's `surface`, its parts a rule apart.
   const section = (testName: string, title: string, body: ReactNode) => (
@@ -356,7 +378,10 @@ export function StudioAuthoringRequestPage({
     </SectionPart>
   )
   const quoted = (text: string) => <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
-  const stage = stageOf(request.state)
+  const stage = request.app !== null ? appStageOf(request.state) : stageOf(request.state)
+  const stageTitles = (request.app !== null ? appStageKeys : stageKeys).map((key) =>
+    t(`shell.studio.aiRequest.stage.${key}`),
+  )
   const running = request.steps.findLast((step) => step.finishedAt === null)
   const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
     {
@@ -521,7 +546,7 @@ export function StudioAuthoringRequestPage({
           request.checks !== null &&
           section(
             'ai-checks',
-            t('shell.studio.aiRequest.checks'),
+            t(request.app !== null ? 'shell.studio.aiRequest.checksOnly' : 'shell.studio.aiRequest.checks'),
             <Flex vertical gap="small" data-testid="studio-ai-checks">
               {problems.length > 0 && (
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
