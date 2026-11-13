@@ -202,9 +202,10 @@ every host reads. An installation's package is trusted code that the operator re
 
 ### Building a package
 
-The operator builds a C# or Python package once, with `Axis.PackageHost build <source>`. The source is the
-folder that the developer published in locked mode, or, for Python, the folder of the adapter and
-`requirements.txt`. The build writes the folder that `Extensions:Path` names and compiles nothing.
+The operator builds a C#, Node.js or Python package once, with `Axis.PackageHost build <source>`. The source is the
+folder that the developer published in locked mode. For `node` it holds the compiled adapter, `package.json` and
+`package-lock.json`. For Python it is the folder of the adapter and `requirements.txt`. The build writes the folder
+that `Extensions:Path` names and compiles nothing.
 
 - **In the host image** _(planned for M21)_. The build runs in the package's own host image,
   `axis-package-host-<language>`, because dependencies, native modules included, install with the runtime
@@ -219,18 +220,23 @@ folder that the developer published in locked mode, or, for Python, the folder o
   1. The manifest, as [Loading](#loading) checks it, with `AXC0132` to `AXC0138`. Each problem is printed
      with its code, file and JSON Pointer. The folder name check is left out, because the build names the
      folder from the manifest.
-  2. The language. A `node` package is refused, because the build installs only C# and Python packages
-     yet.
-  3. The lock file, which the manifest's `lock` names: `packages.lock.json` for C#, `requirements.txt` for
-     Python.
-  4. An existing `<id>/<version>/` folder.
-  5. For Python, the install.
-  6. The scan.
+  2. The lock file, which the manifest's `lock` names: `packages.lock.json` for C#, `package-lock.json` for
+     `node` and `requirements.txt` for Python.
+  3. An existing `<id>/<version>/` folder.
+  4. For `node` and Python, the install.
+  5. The scan.
 - **Lock file.** A missing lock file is refused. A lock file is stale when the runtime dependency list,
   the `.deps.json` beside the assembly, names a NuGet package whose version the lock file does not
   resolve, and a stale lock file is refused. A lock file entry that has no runtime asset, such as an
   analyzer, is allowed. A missing `.deps.json` is refused too, because the lock file cannot be checked
-  without it.
+  without it. For `node`, a missing `package.json` or `package-lock.json` is refused, and so is a
+  `package-lock.json` that does not list the dependencies of `package.json` at the same ranges. The
+  check compares `dependencies`, `devDependencies`, `optionalDependencies` and `peerDependencies`
+  with the lock file's root entry, in both directions, before npm runs.
+- **Install** (`node`). It copies the source to a temporary folder and runs `npm ci --ignore-scripts` there,
+  with `npm` from the `PATH`. The install reads the lock file alone, and no install script of a
+  dependency ever runs. The temporary folder is deleted afterwards, so the source never changes. A
+  failed install is refused and prints npm's error output.
 - **Install** (Python). It copies the source to a temporary folder and runs
   `python3 -m pip install --require-hashes --no-deps --target <copy> -r requirements.txt` there, so the
   installed modules and their `.dist-info` folders sit in the package folder next to the adapter. pip's own
@@ -240,15 +246,15 @@ folder that the developer published in locked mode, or, for Python, the folder o
   a refusal too. The setting `PackageBuild:Python` names the Python command that runs pip, which defaults to
   `python3`. A pip that cannot start is a setup error.
 - **Scan.** It scans the dependencies with Trivy and refuses a vulnerability of high or critical
-  severity, naming the dependency. The setting `PackageBuild:Trivy` names the Trivy command, which
-  defaults to `trivy`. A scan that cannot run or prints no valid report is a setup error and never a
-  pass.
+  severity, naming the dependency. For `node` and Python it scans the installed copy. The setting
+  `PackageBuild:Trivy` names the Trivy command, which defaults to `trivy`. A scan that cannot run or
+  prints no valid report is a setup error and never a pass.
 - **Writes.** After every check passes, it copies the package to `<Extensions:Path>/<id>/<version>/`.
   It never overwrites an existing folder. Then it loads the extensions folder as the hosts do, and if
   that load rejects the new version it deletes the version again and refuses.
 - **Exit code.** `0` when the package is built, `1` when it is refused and `2` for a setup error: a wrong
-  argument, a missing source or extensions folder, or a scan that did not complete, or a pip that could not start.
-- **Other languages** _(planned for M21)_. For `node` the build runs `npm ci --ignore-scripts`.
+  argument, a missing source or extensions folder, an install that cannot start, or a scan that did not
+  complete.
 - **Python hashes.** Every requirement line of `requirements.txt` must carry a `--hash`, and a line without
   one is refused before anything is installed, with the line number and the dependency. The file is read as
   pip reads it: a comment and a blank line are skipped and a line that ends in a backslash continues on the
@@ -637,6 +643,11 @@ capability limits.
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
   it does not declare.
+- **Node.js test package.** A test-only `node` package, `node-test-package`, lives under
+  `tests/packages/node-test-package/`. Its adapter is TypeScript, `index.ts`, with its compiled
+  `index.js` committed. Its one dependency, `axis-test-dependency`, installs from the committed tarball
+  `vendor/axis-test-dependency-1.0.0.tgz`, so a build reaches no registry. The dependency declares a
+  `postinstall` script, and the tests use it to show that the build never runs install scripts.
 - **Python test package.** `python-test-package` lives under `tests/packages/PythonPackage/` as plain files:
   the package's manifest and adapter, and one small dependency. The package build tests zip the
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package

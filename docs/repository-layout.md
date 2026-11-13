@@ -25,7 +25,7 @@ src/
   Axis.Scenarios.Runner/  library that runs an application's test scenarios, from a folder or from
                           files in memory; used by Axis.Scenarios and the publisher
   Axis.Scenarios/         console host over Axis.Scenarios.Runner
-  Axis.PackageHost/       console host of the package build: checks, scans and writes a C# or Python package
+  Axis.PackageHost/       console host of the package build: checks, scans and writes a C#, Node.js or Python package
   Axis.Core/              shared primitives: the tenant context and telemetry
   Axis.Configuration/     resource model, file loader, JSON Schemas, compiler, diagnostics, releases,
                           extension package catalog
@@ -46,8 +46,9 @@ tests/
   Axis.LoadData/          generator of the load test's typical-size application with seeds
   Axis.OpenApiDocument/   console that writes the server's OpenAPI document with the unit tests' host settings
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
-  packages/               test-only extension package, built as three versions, covers the
-                          capability limits; and a Python test package of plain files
+  packages/               test-only extension packages: a C# package built as three versions, which
+                          covers the capability limits, a Node.js package with a local dependency, and
+                          a Python test package of plain files
   load/                   the k6 scenarios of the load tests
   e2e/                    Playwright journeys against the running server, and their fixtures
 controlplane/
@@ -73,8 +74,8 @@ deploy/
 scripts/                  the scripts of AGENTS.md and the checks that lint runs
 ```
 
-- **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C# or Python package,
-  see [building a package](reference/extension-packages.md#building-a-package).
+- **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
+  Python package, see [building a package](reference/extension-packages.md#building-a-package).
 - **Package runner mode and the host images** _(planned for M21)_. `Axis.PackageHost` in runner mode, over
   `Axis.Extensions`, runs extension package operations out of process, see
   [package runners](reference/extension-packages.md#package-runners). Each host image also carries the
