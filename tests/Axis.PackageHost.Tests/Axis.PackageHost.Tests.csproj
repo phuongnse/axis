@@ -30,6 +30,7 @@
     <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\packages\node-probe-package\**\*" LinkBase="NodeProbePackage" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\sdk\node\**\*" LinkBase="sdk/node" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\packages\phone-numbers\**\*" LinkBase="SamplePythonPackage" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

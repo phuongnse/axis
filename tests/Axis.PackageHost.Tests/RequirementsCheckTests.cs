@@ -51,6 +51,18 @@ public sealed class RequirementsCheckTests
     }
 
     [Fact]
+    public void The_sample_python_package_locks_its_library_with_a_hash()
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "SamplePythonPackage");
+        var check = PackageCatalog.CheckFolder(folder);
+
+        Assert.Empty(check.Diagnostics);
+        Assert.Empty(RequirementsCheck.Check(folder, check.Package!.Manifest));
+        var requirements = Assert.Single(File.ReadAllLines(Path.Combine(folder, "requirements.txt")));
+        Assert.Matches(@"^phonenumbers==\S+ --hash=sha256:[0-9a-f]{64}$", requirements);
+    }
+
+    [Fact]
     public void A_missing_file_is_refused()
     {
         using var folder = new TemporaryFolder();

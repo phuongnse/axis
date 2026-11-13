@@ -11,29 +11,29 @@ The scripts build, check and run Axis, and NexKit and CI run the same ones as th
 from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` to
 `scripts/smoke.sh`; the others say which workflow runs them, or that they run on demand only.
 
-| Script                          | What it does                                                                                                                                                      | Needs           |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools and, on CI, the container images                                                    | Network         |
-| `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` |                 |
-| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                 |
-| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                | Python 3, pip   |
-| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                                                                                      | Docker          |
-| `scripts/e2e.sh`                | Playwright against the full stack                                                                                                                                 | Docker          |
-| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install                                                                       | Docker          |
-| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                                                                                      | Docker          |
-| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                                                                                  | Network         |
-| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                                                                                       | Docker, network |
-| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes                                                               | Network         |
-| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them                                                               | Network         |
-| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue                                                           | Network         |
-| `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker          |
-| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network |
-| `scripts/ai-eval.sh`            | On demand only: the authoring eval against one model binding, see [the authoring eval](reference/model-bindings.md#the-authoring-eval)                            | Docker, network |
-| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker          |
+| Script                          | What it does                                                                                                                                                      | Needs                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools, the wheels of the Python samples and, on CI, the container images                  | Network, Python 3, pip |
+| `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` | Python 3, pip          |
+| `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                        |
+| `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                | Python 3, pip          |
+| `scripts/integration.sh`        | .NET tests and every sample's test scenarios on real PostgreSQL and Keycloak                                                                                      | Docker, Python 3, pip  |
+| `scripts/e2e.sh`                | Playwright against the full stack                                                                                                                                 | Docker                 |
+| `scripts/smoke.sh`              | Smoke tests of `scripts/dev.sh`, Compose, the production images and the on-premises install                                                                       | Docker                 |
+| `scripts/performance.sh`        | The `*PerformanceTests` classes alone, as the performance workflow runs them                                                                                      | Docker                 |
+| `scripts/scan.sh`               | NuGet and npm vulnerability scan                                                                                                                                  | Network                |
+| `scripts/scan-images.sh`        | Vulnerability scan of the production images and the identity provider image                                                                                       | Docker, network        |
+| `scripts/docs-audit.mjs`        | The docs audit of `docs-audit.yml`: picks a run's pages, reads them, opens issues, picks link homes                                                               | Network                |
+| `scripts/check-issue-links.mjs` | Lists open issues' links to a missing file or heading of `main`, with git's facts, and relinks them                                                               | Network                |
+| `scripts/shard-durations.mjs`   | CI's [shard durations](#shards) job: refreshes durations from recent runs, opens or updates their issue                                                           | Network                |
+| `scripts/load.sh`               | The load test against the reference stack                                                                                                                         | Docker                 |
+| `scripts/load-cell.sh`          | The cell load test against a staging cell                                                                                                                         | Docker, network        |
+| `scripts/ai-eval.sh`            | On demand only: the authoring eval against one model binding, see [the authoring eval](reference/model-bindings.md#the-authoring-eval)                            | Docker, network        |
+| `scripts/dev.sh`                | The local stack with hot reload, see [hot reload](#hot-reload-with-scriptsdevsh)                                                                                  | Docker                 |
 
 ### Setup
 
-`scripts/setup.sh` restores the .NET and npm packages and the Playwright browser, and installs pinned Helm,
+`scripts/setup.sh` restores the .NET and npm packages and the Playwright browser, downloads the wheels that the Python sample packages lock into `~/.cache/axis-tools/wheels`, and installs pinned Helm,
 kubeconform and the Kubernetes schemas into `~/.cache/axis-tools`. Each step and download gets up to 4 tries,
 with waits of 15, 30 and 60 seconds, so a short `403` is retried. A try of a restore or install step stops
 after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A download gives up after 30
@@ -63,8 +63,8 @@ file, the `Dockerfile` or a test script names an image that the list lacks.
 4. It builds the [sign-up page](reference/sign-up.md#the-page) into the control plane's web root,
    `controlplane/src/Axis.ControlPlane/wwwroot`, and checks that `sign-up.html` is there and runs the
    [font check](#fonts-and-the-keycloak-theme) on the folder.
-5. It builds the .NET solution, which installs the sample extension package in
-   `artifacts/extensions`.
+5. It installs the Python sample extension package in `artifacts/extensions` with its library, offline from the wheels that [setup](#setup) keeps and
+   with no scan, and checks its files. Then it builds the .NET solution, which installs the C# sample there, see [the sample packages](reference/extension-packages.md#sample-and-test-packages).
 6. It installs the built-in and sample modules in `artifacts/modules`, and the built-in applications
    in `artifacts/templates`.
 7. It writes the server's OpenAPI 3.1 document to `artifacts/openapi/axis-server.json`, and fails when
@@ -150,7 +150,7 @@ jsdom matches every rule on each query. A test that checks a style calls `withAn
 
 ### Integration tests
 
-`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme, then runs the .NET tests against real PostgreSQL
+`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme and installs the Python sample package as the [build](#build) does, then runs the .NET tests against real PostgreSQL
 and Keycloak through Testcontainers. They also run the test scenarios of every application under
 `samples/apps/` on that PostgreSQL, and the control plane's `Axis.ControlPlane.Integration.Tests`.
 The performance tests, whose class names end in `PerformanceTests`, stay out: `scripts/performance.sh`

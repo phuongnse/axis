@@ -60,17 +60,17 @@ Run from the repository root. NexKit and CI run `setup`, then `build`, `lint`, `
 `integration` and `e2e` as their checks. What each script starts and writes is in
 [development](docs/development.md#scripts).
 
-| Script                   | What it does                                                               | Needs   |
-| ------------------------ | -------------------------------------------------------------------------- | ------- |
-| `scripts/setup.sh`       | Restores packages, the Playwright browser, Helm tools and Docker images    | Network |
-| `scripts/build.sh`       | Builds the SPA and the solution, installs the samples in `artifacts/`      |         |
-| `scripts/lint.sh`        | Format, analyzer, type, Markdown link and docs structure checks, Helm lint |         |
-| `scripts/test.sh`        | .NET unit tests, Vitest and the scripts' own tests                         |         |
-| `scripts/integration.sh` | .NET tests and sample scenarios on real PostgreSQL and Keycloak            | Docker  |
-| `scripts/e2e.sh`         | Playwright against the full stack                                          | Docker  |
-| `scripts/smoke.sh`       | Smoke tests of `scripts/dev.sh`, Compose, the images and on-premises       | Docker  |
-| `scripts/performance.sh` | The `*PerformanceTests` classes alone, as the performance workflow runs    | Docker  |
-| `scripts/dev.sh`         | The local stack with hot reload                                            | Docker  |
+| Script                   | What it does                                                               | Needs                  |
+| ------------------------ | -------------------------------------------------------------------------- | ---------------------- |
+| `scripts/setup.sh`       | Restores packages, the Playwright browser, Helm tools and Docker images    | Network, Python 3, pip |
+| `scripts/build.sh`       | Builds the SPA and the solution, installs the samples in `artifacts/`      | Python 3, pip          |
+| `scripts/lint.sh`        | Format, analyzer, type, Markdown link and docs structure checks, Helm lint |                        |
+| `scripts/test.sh`        | .NET unit tests, Vitest and the scripts' own tests                         |                        |
+| `scripts/integration.sh` | .NET tests and sample scenarios on real PostgreSQL and Keycloak            | Docker, Python 3, pip  |
+| `scripts/e2e.sh`         | Playwright against the full stack                                          | Docker                 |
+| `scripts/smoke.sh`       | Smoke tests of `scripts/dev.sh`, Compose, the images and on-premises       | Docker                 |
+| `scripts/performance.sh` | The `*PerformanceTests` classes alone, as the performance workflow runs    | Docker                 |
+| `scripts/dev.sh`         | The local stack with hot reload                                            | Docker                 |
 
 While you work, run only the tests that cover your change:
 

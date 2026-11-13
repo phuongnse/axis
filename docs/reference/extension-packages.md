@@ -726,8 +726,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ## Sample and test packages
 
-One sample package shows a package in use, and five test packages cover installation, loading, the
-capability limits, the server's metadata-only load and the Node.js runner.
+Two sample packages show a package in use, a C# one and a Python one, and five test packages cover
+installation, loading, the capability limits, the server's metadata-only load and the Node.js runner.
 
 - **Sample package.** `samples/packages/` holds one C# package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
@@ -739,6 +739,20 @@ capability limits, the server's metadata-only load and the Node.js runner.
   test package. The package project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
   `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
   `/extensions`. In every run mode `Extensions:Path` names that folder.
+- **Python sample package.** `samples/packages/phone-numbers/` holds `phone-numbers` 1.0.0 as plain
+  files. Its adapter wraps the PyPI library `phonenumbers` and leaves it unchanged. Its one
+  operation, `normalize`, is pure and has no capabilities. It takes a `number` and an optional
+  `region` and returns the `number` in E.164 form, such as `+16502530000`. A national number such as
+  `(650) 253-0000` needs a `region` such as `US`. A text that is no number fails the call with
+  `phonenumbers.phonenumberutil.NumberParseException` and no message, see [the runner protocol](#the-runner-protocol).
+  Its `requirements.txt` pins one `phonenumbers` wheel with its SHA-256 hash.
+  `scripts/setup.sh` downloads that wheel into `~/.cache/axis-tools/wheels`, checked against the hash, and
+  `scripts/build.sh` and `scripts/integration.sh` install the package offline from there into
+  `artifacts/extensions/phone-numbers/1.0.0/` with the library beside the adapter, using the pip flags of the
+  [build](#building-a-package). They skip the scan that the build runs, as the project build of the C#
+  sample does, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `adapter.py` and
+  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host
+  yet. The integration tests run it from a process step through a Python package host.
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation
