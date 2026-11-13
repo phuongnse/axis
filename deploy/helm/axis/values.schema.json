@@ -22,6 +22,16 @@
     "volume": {
       "type": "object",
       "description": "Any Kubernetes volume source, or empty for none."
+    },
+    "packageHost": {
+      "type": "object",
+      "description": "The settings of one package host.",
+      "properties": {
+        "repository": { "type": "string" },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "resources": { "type": "object" }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -68,15 +78,8 @@
     "packageHost": {
       "type": "object",
       "properties": {
-        "dotnet": {
-          "type": "object",
-          "properties": {
-            "repository": { "type": "string" },
-            "replicas": { "type": "integer", "minimum": 0 },
-            "resources": { "type": "object" }
-          },
-          "additionalProperties": false
-        }
+        "dotnet": { "$ref": "#/definitions/packageHost" },
+        "node": { "$ref": "#/definitions/packageHost" }
       },
       "additionalProperties": false
     },

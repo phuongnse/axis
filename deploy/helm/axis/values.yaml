@@ -36,12 +36,19 @@ agent:
   replicas: 1
   resources: {}
 
-# The C# package host runs the C# extension packages for the worker, see
-# docs/reference/extension-packages.md#package-runners. It gets no env entry and no Secret. Both limits are
+# The package hosts run the extension packages for the worker, one host for each runtime, see
+# docs/reference/extension-packages.md#package-runners. They get no env entry and no Secret. Both limits are
 # required, and rendering fails without either.
 packageHost:
   dotnet:
     repository: axis-package-host-dotnet
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
+  node:
+    repository: axis-package-host-node
     replicas: 1
     resources:
       limits:

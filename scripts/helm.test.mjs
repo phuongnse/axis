@@ -241,7 +241,7 @@ describe('the Axis Helm chart', () => {
 
   test('the image tag and registry apply to every host', () => {
     const output = renderOk('--set', 'image.registry=registry.example.com/axis', '--set', 'image.tag=1.2.3')
-    for (const image of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet']) {
+    for (const image of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-node']) {
       assert.match(output, new RegExp(`image: "registry\\.example\\.com/axis/${image}:1\\.2\\.3"`))
     }
   })
@@ -300,73 +300,96 @@ describe('the Axis Helm chart', () => {
   })
 
   // docs/reference/extension-packages.md#package-runners
-  test('the C# package host runs limited, non-root and read-only with no env entry, secret or service link', () => {
-    const host = find(renderOk('--set', 'extensions.volume.persistentVolumeClaim.claimName=packages'), 'Deployment', 'axis-package-host-dotnet')
-    assert.match(host, /image: "axis-package-host-dotnet:[^"]+"/)
-    assert.match(host, /args:\n\s+- host\n/)
-    assert.match(host, /runAsNonRoot: true/)
-    assert.match(host, /readOnlyRootFilesystem: true/)
-    assert.match(host, /resources:\n\s+limits:\n\s+cpu: "1"\n\s+memory: 1Gi\n/)
-    assert.match(host, /enableServiceLinks: false/)
-    assert.match(host, /automountServiceAccountToken: false/)
-    assert.match(host, /- name: tmp\n\s+mountPath: \/tmp\n/)
-    assert.match(host, /mountPath: \/extensions\n\s+readOnly: true/)
-    assert.doesNotMatch(host, /^\s+env:/m)
-    assert.doesNotMatch(host, /secret/i)
-    assert.doesNotMatch(host, /\/run\/secrets/)
-    assert.doesNotMatch(host, /\/modules/)
-    assert.doesNotMatch(host, /livenessProbe|readinessProbe|startupProbe/)
-  })
+  for (const [runtime, label, setting] of [
+    ['dotnet', 'C#', 'Dotnet'],
+    ['node', 'Node.js', 'Node'],
+  ]) {
+    const name = `axis-package-host-${runtime}`
 
-  test('the C# package host mounts /extensions only when set', () => {
-    const host = find(renderOk('--set', 'extensions.volume=null'), 'Deployment', 'axis-package-host-dotnet')
-    assert.match(host, /mountPath: \/tmp\n/)
-    assert.doesNotMatch(host, /extensions/)
-  })
+    test(`the ${label} package host runs limited, non-root and read-only with no env entry, secret or service link`, () => {
+      const host = find(renderOk('--set', 'extensions.volume.persistentVolumeClaim.claimName=packages'), 'Deployment', name)
+      assert.match(host, new RegExp(`image: "${name}:[^"]+"`))
+      assert.match(host, /args:\n\s+- host\n/)
+      assert.match(host, /runAsNonRoot: true/)
+      assert.match(host, /readOnlyRootFilesystem: true/)
+      assert.match(host, /resources:\n\s+limits:\n\s+cpu: "1"\n\s+memory: 1Gi\n/)
+      assert.match(host, /enableServiceLinks: false/)
+      assert.match(host, /automountServiceAccountToken: false/)
+      assert.match(host, /- name: tmp\n\s+mountPath: \/tmp\n/)
+      assert.match(host, /mountPath: \/extensions\n\s+readOnly: true/)
+      assert.doesNotMatch(host, /^\s+env:/m)
+      assert.doesNotMatch(host, /secret/i)
+      assert.doesNotMatch(host, /\/run\/secrets/)
+      assert.doesNotMatch(host, /\/modules/)
+      assert.doesNotMatch(host, /livenessProbe|readinessProbe|startupProbe/)
+    })
 
-  test('the C# package host gets its replicas and image from its values', () => {
-    const host = find(renderOk('--set', 'packageHost.dotnet.replicas=2', '--set', 'packageHost.dotnet.repository=custom-host'), 'Deployment', 'axis-package-host-dotnet')
-    assert.match(host, /replicas: 2\n/)
-    assert.match(host, /image: "custom-host:[^"]+"/)
-  })
+    test(`the ${label} package host mounts /extensions only when set`, () => {
+      const host = find(renderOk('--set', 'extensions.volume=null'), 'Deployment', name)
+      assert.match(host, /mountPath: \/tmp\n/)
+      assert.doesNotMatch(host, /extensions/)
+    })
 
-  test('the C# package host admits only worker pods on TCP 5310 and sends only to worker pods', () => {
-    const policy = find(renderOk(), 'NetworkPolicy', 'axis-package-host-dotnet')
-    const host = 'app\\.kubernetes\\.io\\/component: package-host-dotnet'
-    assert.match(policy, new RegExp(`podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+${host}\\n`))
-    assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
-    for (const direction of ['from', 'to']) {
-      assert.equal(policy.match(new RegExp(`- ${direction}:`, 'g'))?.length, 1)
-      assert.match(
-        policy,
-        new RegExp(`- ${direction}:\\n\\s+- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: worker\\n`),
-      )
+    test(`the ${label} package host gets its replicas and image from its values`, () => {
+      const output = renderOk('--set', `packageHost.${runtime}.replicas=2`, '--set', `packageHost.${runtime}.repository=custom-host`)
+      const host = find(output, 'Deployment', name)
+      assert.match(host, /replicas: 2\n/)
+      assert.match(host, /image: "custom-host:[^"]+"/)
+      // The other package host keeps its own values.
+      const another = find(output, 'Deployment', `axis-package-host-${runtime === 'dotnet' ? 'node' : 'dotnet'}`)
+      assert.match(another, /replicas: 1\n/)
+      assert.doesNotMatch(another, /custom-host/)
+    })
+
+    test(`the ${label} package host admits only worker pods on TCP 5310 and sends only to worker pods`, () => {
+      const policy = find(renderOk(), 'NetworkPolicy', name)
+      const host = `app\\.kubernetes\\.io\\/component: package-host-${runtime}`
+      assert.match(policy, new RegExp(`podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+${host}\\n`))
+      assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
+      for (const direction of ['from', 'to']) {
+        assert.equal(policy.match(new RegExp(`- ${direction}:`, 'g'))?.length, 1)
+        assert.match(
+          policy,
+          new RegExp(`- ${direction}:\\n\\s+- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: worker\\n`),
+        )
+      }
+      assert.equal(policy.match(/port: /g)?.length, 1)
+      assert.match(policy, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
+      // The egress rule has no ports, so it covers any port of a worker pod, and DNS is not allowed.
+      assert.match(policy, /egress:\n\s+- to:\n(?:\s+.*\n)+?\s*$/)
+      assert.doesNotMatch(policy, /ipBlock|namespaceSelector|port: 53\b/)
+    })
+
+    test(`the Service maps 5310 to the ${label} package host and only the worker is pointed at it`, () => {
+      const output = renderOk()
+      const service = find(output, 'Service', name)
+      assert.match(service, /type: ClusterIP\n/)
+      assert.match(service, new RegExp(`selector:\\n(?:\\s+.*\\n)*?\\s+app\\.kubernetes\\.io/component: package-host-${runtime}\\n`))
+      assert.match(service, /- name: runner\n\s+port: 5310\n\s+targetPort: runner\n/)
+
+      const worker = find(output, 'Deployment', 'axis-worker')
+      assert.match(worker, new RegExp(`- name: Extensions__Runners__${setting}\\n\\s+value: "${name}:5310"\\n`))
+      assert.equal(worker.match(new RegExp(`Extensions__Runners__${setting}`, 'g')).length, 1)
+      for (const document of documents(output).filter((d) => !/^  name: axis-worker$/m.test(d))) {
+        assert.doesNotMatch(document, new RegExp(`Extensions__Runners__${setting}`))
+      }
+    })
+
+    test(`a value that the ${label} package host does not know is rejected`, () => {
+      const result = render('--set', `packageHost.${runtime}.env=leak`)
+      assert.notEqual(result.status, 0)
+      assert.doesNotMatch(result.stdout, /leak/)
+    })
+  }
+
+  test('the Node.js package host is the C# package host with only its names swapped', () => {
+    const output = renderOk('--set', 'extensions.volume.persistentVolumeClaim.claimName=packages')
+    for (const kind of ['Deployment', 'Service', 'NetworkPolicy']) {
+      const dotnet = find(output, kind, 'axis-package-host-dotnet')
+      const node = find(output, kind, 'axis-package-host-node')
+      assert.notEqual(node, dotnet)
+      assert.equal(node, dotnet.replaceAll('package-host-dotnet', 'package-host-node'))
     }
-    assert.equal(policy.match(/port: /g)?.length, 1)
-    assert.match(policy, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
-    // The egress rule has no ports, so it covers any port of a worker pod, and DNS is not allowed.
-    assert.match(policy, /egress:\n\s+- to:\n(?:\s+.*\n)+?\s*$/)
-    assert.doesNotMatch(policy, /ipBlock|namespaceSelector|port: 53\b/)
-  })
-
-  test('the Service maps 5310 to the C# package host and only the worker is pointed at it', () => {
-    const output = renderOk()
-    const service = find(output, 'Service', 'axis-package-host-dotnet')
-    assert.match(service, /type: ClusterIP\n/)
-    assert.match(service, /selector:\n(?:\s+.*\n)*?\s+app\.kubernetes\.io\/component: package-host-dotnet\n/)
-    assert.match(service, /- name: runner\n\s+port: 5310\n\s+targetPort: runner\n/)
-
-    const setting = /- name: Extensions__Runners__Dotnet\n\s+value: "axis-package-host-dotnet:5310"\n/
-    assert.match(find(output, 'Deployment', 'axis-worker'), setting)
-    for (const document of documents(output).filter((d) => !/^  name: axis-worker$/m.test(d))) {
-      assert.doesNotMatch(document, /Extensions__Runners__Dotnet/)
-    }
-  })
-
-  test('a value that the C# package host does not know is rejected', () => {
-    const result = render('--set', 'packageHost.dotnet.env=leak')
-    assert.notEqual(result.status, 0)
-    assert.doesNotMatch(result.stdout, /leak/)
   })
 
   test('several server replicas share one Studio volume', () => {
@@ -687,6 +710,9 @@ describe('the Axis Helm chart', () => {
     ['cell.internalDomain', 'cell.internalDomain='],
     ['packageHost.dotnet.resources.limits.cpu', 'packageHost.dotnet.resources.limits.cpu=null'],
     ['packageHost.dotnet.resources.limits.memory', 'packageHost.dotnet.resources.limits.memory=null'],
+    ['packageHost.node.resources', 'packageHost.node.resources=null'],
+    ['packageHost.node.resources.limits.cpu', 'packageHost.node.resources.limits.cpu=null'],
+    ['packageHost.node.resources.limits.memory', 'packageHost.node.resources.limits.memory=null'],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)

@@ -1,0 +1,18 @@
+{{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $.Release.Name }}-package-host-{{ $runtime }}
+  labels:
+    {{- include "axis.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: package-host-{{ $runtime }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "axis.selectorLabels" (dict "root" $ "component" (printf "package-host-%s" $runtime)) | nindent 4 }}
+  ports:
+    - name: runner
+      port: 5310
+      targetPort: runner
+{{- end }}

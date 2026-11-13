@@ -1,0 +1,56 @@
+{{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
+{{- $host := index $.Values.packageHost $runtime | default dict }}
+---
+# A package host, see docs/reference/extension-packages.md#package-runners. It gets no env entry, no credential and no
+# service account token, and it has no health endpoint, so it has no probe.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $.Release.Name }}-package-host-{{ $runtime }}
+  labels:
+    {{- include "axis.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: package-host-{{ $runtime }}
+spec:
+  replicas: {{ $host.replicas }}
+  selector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" $ "component" (printf "package-host-%s" $runtime)) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: package-host-{{ $runtime }}
+    spec:
+      automountServiceAccountToken: false
+      # Kubernetes otherwise adds the address of every Service to the environment.
+      enableServiceLinks: false
+      {{- with $.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" $ | nindent 8 }}
+      containers:
+        - name: package-host-{{ $runtime }}
+          image: {{ include "axis.image" (dict "root" $ "repository" $host.repository) | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - host
+          ports:
+            - name: runner
+              containerPort: 5310
+          securityContext:
+            {{- include "axis.containerSecurityContext" $ | nindent 12 }}
+          {{- /* A nil-safe lookup, so a removed limit fails with its name. */}}
+          {{- $limits := ($host.resources | default dict).limits | default dict }}
+          {{- $_ := required (printf "packageHost.%s.resources.limits.cpu is required: the CPU limit of the %s package host" $runtime $label) $limits.cpu }}
+          {{- $_ := required (printf "packageHost.%s.resources.limits.memory is required: the memory limit of the %s package host" $runtime $label) $limits.memory }}
+          resources:
+            {{- toYaml $host.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "axis.tmpAndExtensionsVolumeMounts" $ | nindent 12 }}
+      volumes:
+        {{- include "axis.tmpAndExtensionsVolumes" $ | nindent 8 }}
+{{- end }}

@@ -12,6 +12,15 @@ The tag defaults to the chart's appVersion.
 {{- end -}}
 {{- end }}
 
+{{/*
+The package hosts, one for each package runner: the runtime and the name that errors use. See
+docs/reference/extension-packages.md#package-runners. Call with the root context and read it with fromYaml.
+*/}}
+{{- define "axis.packageHostRuntimes" -}}
+dotnet: "C#"
+node: "Node.js"
+{{- end }}
+
 {{/* Labels of every object. Call with the root context. */}}
 {{- define "axis.labels" -}}
 app.kubernetes.io/name: axis
