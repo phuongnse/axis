@@ -12,8 +12,9 @@ namespace Axis.Configuration.Packages;
 /// <summary>
 /// The extension packages installed under <c>Extensions:Path</c>, one folder per package id and
 /// version: <c>&lt;id&gt;/&lt;version&gt;/axis-package.json</c>. Each version whose manifest matches
-/// its folder and its assembly is loaded in its own <see cref="PackageLoadContext"/>. A package with
-/// any problem is left out and each problem is a diagnostic, whose file is relative to the package
+/// its folder and its assembly is loaded in its own <see cref="PackageLoadContext"/>. A <c>node</c> or
+/// <c>python</c> version is listed from its manifest and adapter file alone, without loading code. A
+/// package with any problem is left out and each problem is a diagnostic, whose file is relative to the package
 /// root. Loading never stops at the first broken package.
 /// </summary>
 public sealed class PackageCatalog
@@ -134,7 +135,20 @@ public sealed class PackageCatalog
             return null;
         }
 
-        var assemblyPath = Path.Combine(versionFolder, manifest.Assembly);
+        // A node or python package is listed from its manifest alone, see docs/reference/extension-packages.md#loading.
+        if (manifest.Language != PackageLanguage.CSharp)
+        {
+            if (!File.Exists(Path.Combine(versionFolder, manifest.Adapter!)))
+            {
+                Report(DiagnosticCodes.PackageAssemblyMissing, $"The adapter '{manifest.Adapter}' is missing.", "/adapter");
+                diagnostics.AddRange(problems);
+                return null;
+            }
+
+            return new InstalledPackage(manifest, null, []);
+        }
+
+        var assemblyPath = Path.Combine(versionFolder, manifest.Assembly!);
         if (LoadAssembly($"{manifest.Id}/{manifest.Version}", assemblyPath) is not var (loadContext, assembly))
         {
             Report(DiagnosticCodes.PackageAssemblyMissing, $"The assembly '{manifest.Assembly}' is missing or cannot be loaded.", "/assembly");
@@ -231,8 +245,19 @@ public sealed class PackageCatalog
             root.GetProperty("id").GetString()!,
             root.GetProperty("version").GetString()!,
             root.GetProperty("label").GetString()!,
-            root.GetProperty("assembly").GetString()!,
+            root.TryGetProperty("language", out var language) ? ParseLanguage(language.GetString()!) : PackageLanguage.CSharp,
+            root.TryGetProperty("assembly", out var assembly) ? assembly.GetString()! : null,
+            root.TryGetProperty("adapter", out var adapter) ? adapter.GetString()! : null,
+            root.GetProperty("lock").GetString()!,
             [.. root.GetProperty("operations").EnumerateArray().Select(ParseOperation)]);
+
+    private static PackageLanguage ParseLanguage(string language) =>
+        language switch
+        {
+            "node" => PackageLanguage.Node,
+            "python" => PackageLanguage.Python,
+            _ => PackageLanguage.CSharp,
+        };
 
     private static PackageOperation ParseOperation(JsonElement operation)
     {

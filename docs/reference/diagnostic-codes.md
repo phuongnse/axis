@@ -157,7 +157,7 @@ test compares the table with `DiagnosticCodes` and `ExpressionDiagnosticCodes`.
 | `AXC0131` | A trigger's `event` is about another entity than the process's subject entity. Reported at `/event`, naming both entities. Not checked when either entity is unknown. |
 | `AXC0132` | An extension package manifest, `axis-package.json`, is missing, cannot be read, is not valid JSON or does not match its schema. Reported at startup by the host, at the failing JSON Pointer. |
 | `AXC0133` | An extension package's folder names differ from its manifest's `id` or `version`. Reported at startup by the host, at `/id` or `/version`. |
-| `AXC0134` | An extension package's `assembly` file is missing or cannot be loaded. Reported at startup by the host, at `/assembly`. |
+| `AXC0134` | An extension package's `assembly` file is missing or cannot be loaded, or the `adapter` file of a `node` or `python` package is missing. Reported at startup by the host, at `/assembly` or `/adapter`. |
 | `AXC0135` | An extension package assembly's informational version, without build metadata after a `+`, differs from the manifest's `version`. Reported at startup by the host, at `/version`. |
 | `AXC0136` | An extension package operation's `type` is not a class in the package assembly that implements `IOperation`, is not abstract and has a public parameterless constructor. Reported at startup by the host, at `/operations/{i}/type`. |
 | `AXC0137` | An extension package operation name, or a field name in one operation's `input` or `output`, is already used, ignoring letter case. Reported at startup by the host, at the `name` of the later one. |

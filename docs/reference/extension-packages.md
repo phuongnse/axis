@@ -56,6 +56,7 @@ identity, its operations and, for a C# package, its main assembly. This example 
   "version": "1.0.0",
   "label": "Purchasing tools",
   "assembly": "PurchasingTools.dll",
+  "lock": "packages.lock.json",
   "operations": [
     {
       "name": "normalizeSupplierCode",
@@ -81,14 +82,15 @@ identity, its operations and, for a C# package, its main assembly. This example 
   is not loaded.
 - **`assembly`.** For a C# package, the file name of its main assembly, in
   the package folder.
-- **`language`** _(planned for M21)_. `csharp`, `node` or `python`. It defaults to `csharp`, and
+- **`language`.** `csharp`, `node` or `python`. It defaults to `csharp`, and
   `assembly` is required exactly when it is `csharp`. `axis-package.schema.json` holds the rules of
   this field, `adapter` and `lock`.
-- **`adapter`** _(planned for M21)_. The adapter file in the package folder: a JavaScript module for
+- **`adapter`.** The adapter file in the package folder: a JavaScript module for
   `node`, where TypeScript is compiled before the build, or a `.py` module for `python`. It is refused
   for `csharp`, whose adapter is its `assembly`.
-- **`lock`** _(planned for M21)_. Required. The language's lock file: `packages.lock.json`,
-  `package-lock.json`, or `requirements.txt` with a `--hash` on every line.
+- **`lock`.** Required. The language's lock file: `packages.lock.json`,
+  `package-lock.json`, or `requirements.txt` with a `--hash` on every line. The schema refuses the name of
+  another language's lock file.
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
   `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
@@ -275,6 +277,8 @@ Each host loads the installed C# packages into its own process at startup and ch
 - **Development only** _(planned for M21)_. In-process loading is used only in Development.
   Elsewhere the worker loads no package code and the server only reads its metadata, see
   [Package runners](#package-runners).
+- **Node and Python.** A host reads only the manifest of a `node` or `python` package and checks that
+  its `adapter` file exists. It loads none of the package's code.
 - **Own load context.** Each C# package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
@@ -288,7 +292,8 @@ Each host loads the installed C# packages into its own process at startup and ch
   - `AXC0132`: the manifest is missing, cannot be read, is not valid JSON or
     does not match its schema;
   - `AXC0133`: the folder names differ from `id` or `version`;
-  - `AXC0134`: the `assembly` file is missing or cannot be loaded;
+  - `AXC0134`: the `assembly` file is missing or cannot be loaded, or the `adapter` file of a `node`
+    or `python` package is missing;
   - `AXC0135`: the assembly's informational version differs from
     `version`, ignoring build metadata after a `+`;
   - `AXC0136`: an operation's `type` is missing from the assembly, does not
@@ -547,7 +552,8 @@ capability limits.
   `RF`, two mod-97 check digits, then the number without separators. The purchase
   request sample declares the package and calls the operation in its approval process,
   in the `assignPaymentReference` step after the purchase order is created. The package
-  project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
+  project restores with a NuGet lock file and names `packages.lock.json` in `lock`, as does the
+  test package. The package project copies each build to `artifacts/extensions/payment-references/1.0.0/`.
   `scripts/build.sh` and `scripts/dev.sh` install it there, and the Compose image holds it in
   `/extensions`. In every run mode `Extensions:Path` names that folder.
 - **Test package.** A test-only package, `test-package`, lives under
