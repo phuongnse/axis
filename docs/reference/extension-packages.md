@@ -202,29 +202,54 @@ every host reads. An installation's package is trusted code that the operator re
 
 ### Building a package
 
-_(planned for M21)_
+The operator builds a C# package once, with `Axis.PackageHost build <source>`. The source is the folder
+that the developer published in locked mode. The build writes the folder that `Extensions:Path` names and
+compiles nothing.
 
-The operator builds a package once, in the package's own host image, `axis-package-host-<language>`,
-and the build writes the folder that `Extensions:Path` names.
+- **In the host image** _(planned for M21)_. The build runs in the package's own host image,
+  `axis-package-host-<language>`, because dependencies, native modules included, install with the runtime
+  and system libraries that run them, and install-time code never runs in the admin host.
 
-```sh
-docker run --rm -v <source>:/source:ro -v <extensions>:/extensions \
-  axis-package-host-<language> build /source
-```
+  ```sh
+  docker run --rm -v <source>:/source:ro -v <extensions>:/extensions \
+    axis-package-host-<language> build /source
+  ```
 
-The build runs there because dependencies, native modules included, install with the runtime and system
-libraries that run them, and install-time code never runs in the admin host.
+- **Checks, in this order.** The first refusal stops the build, so a later step never runs after it.
+  1. The manifest, as [Loading](#loading) checks it, with `AXC0132` to `AXC0138`. Each problem is printed
+     with its code, file and JSON Pointer. The folder name check is left out, because the build names the
+     folder from the manifest.
+  2. The language. A `node` or `python` package is refused, because the build installs only C# packages
+     yet.
+  3. The lock file, which the manifest's `lock` names, `packages.lock.json` for C#.
+  4. An existing `<id>/<version>/` folder.
+  5. The scan.
+- **Lock file.** A missing lock file is refused. A lock file is stale when the runtime dependency list,
+  the `.deps.json` beside the assembly, names a NuGet package whose version the lock file does not
+  resolve, and a stale lock file is refused. A lock file entry that has no runtime asset, such as an
+  analyzer, is allowed. A missing `.deps.json` is refused too, because the lock file cannot be checked
+  without it.
+- **Scan.** It scans the dependencies with Trivy and refuses a vulnerability of high or critical
+  severity, naming the dependency. The setting `PackageBuild:Trivy` names the Trivy command, which
+  defaults to `trivy`. A scan that cannot run or prints no valid report is a setup error and never a
+  pass.
+- **Writes.** After every check passes, it copies the package to `<Extensions:Path>/<id>/<version>/`.
+  It never overwrites an existing folder. Then it loads the extensions folder as the hosts do, and if
+  that load rejects the new version it deletes the version again and refuses.
+- **Exit code.** `0` when the package is built, `1` when it is refused and `2` for a setup error: a wrong
+  argument, a missing source or extensions folder, or a scan that did not complete.
+- **Other languages** _(planned for M21)_. For `node` the build runs `npm ci --ignore-scripts`. For
+  `python` it runs `pip install --require-hashes --no-deps`.
+- **Python hashes** _(planned for M21)_. A Python dependency without a hash is refused.
+- **Registry credentials** _(planned for M21)_. They are mounted for the build alone, and the runners
+  never see them.
 
-- **Checks.** It checks the manifest as [Loading](#loading) does, with `AXC0132` to `AXC0138`.
-- **Installs from the lock file only.** For `node` it runs `npm ci --ignore-scripts`. For `python` it
-  runs `pip install --require-hashes --no-deps`.
-- **C#.** `axis-package-host-dotnet build` takes the folder that the developer published in locked mode,
-  and scans its `packages.lock.json`. It compiles nothing.
-- **Scan.** It scans the installed dependencies with Trivy.
-- **Refuses.** A missing or stale lock file, a Python dependency without a hash, a vulnerability of
-  high or critical severity, and an existing `<id>/<version>/` folder.
-- **Writes.** `<Extensions:Path>/<id>/<version>/`.
-- **Registry credentials.** They are mounted for the build alone, and the runners never see them.
+The build reads these settings:
+
+| Setting | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `Extensions:Path` | `Extensions__Path` | none | The existing folder that the build writes the package to |
+| `PackageBuild:Trivy` | `PackageBuild__Trivy` | `trivy` | The Trivy command that scans the dependencies |
 
 ## Versions and pinning
 

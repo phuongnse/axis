@@ -113,6 +113,31 @@ public sealed class PackageCatalogTests
         AssertRefused(PackageCatalog.Load(root.Path), "node-tools/1.0.0/axis-package.json", "/lock", "lock");
     }
 
+    [Fact]
+    public void A_single_folder_is_checked_without_the_folder_name_rule()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0");
+        Directory.Move(Path.Combine(root.Path, "test-package", "1.0.0"), Path.Combine(root.Path, "elsewhere"));
+
+        var check = PackageCatalog.CheckFolder(Path.Combine(root.Path, "elsewhere"));
+
+        Assert.Empty(check.Diagnostics);
+        Assert.Equal(("test-package", "1.0.0"), (check.Package!.Manifest.Id, check.Package.Manifest.Version));
+    }
+
+    [Fact]
+    public void A_single_folder_without_a_manifest_is_refused_with_the_manifest_as_its_file()
+    {
+        using var root = new TemporaryFolder().With("source/readme.txt", "");
+
+        var check = PackageCatalog.CheckFolder(Path.Combine(root.Path, "source"));
+
+        Assert.Null(check.Package);
+        var diagnostic = Assert.Single(check.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, "axis-package.json", ""), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.DoesNotContain(root.Path, diagnostic.Message, StringComparison.Ordinal);
+    }
+
     private static void AssertRefused(PackageCatalog catalog, string file, string path, string messagePart)
     {
         Assert.Empty(catalog.Packages);

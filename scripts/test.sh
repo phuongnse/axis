@@ -48,7 +48,7 @@ if [ "$run_rest" = 1 ]; then
   # The server tests read the server's OpenAPI document. NexKit runs this script without scripts/build.sh, which writes it too.
   dotnet run --project tests/Axis.OpenApiDocument -c Release -- artifacts/openapi/axis-server.json || status=1
 
-  for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests Axis.Agent.Tests Axis.Hosting.Tests; do
+  for project in Axis.Server.Tests Axis.Configuration.Tests Axis.Data.Tests Axis.Expressions.Tests Axis.Tenancy.Tests Axis.Agent.Tests Axis.Hosting.Tests Axis.PackageHost.Tests; do
     run_suite "$project" "tests/$project" dotnet test --project "tests/$project" -c Release \
       --report-xunit-junit --report-xunit-junit-filename "$project.xml" --results-directory "$results_dir"
   done
