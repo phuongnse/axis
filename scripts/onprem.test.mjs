@@ -1,11 +1,11 @@
-// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the six
+// Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the seven
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and the example's own identity provider, creates two tenants and their realms there, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica, signs requester in
 // through the TLS proxy on the Axis theme, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
-// reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C# and Python) read-only root, limits, environment
+// reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C#, Python and Node.js) read-only root, limits, environment
 // and network: it reaches the worker only, and the worker reaches it on 5310. Each start of a service that publishes a port picks that
 // port right before it, and Docker's bind error starts it again on new ports. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
@@ -46,10 +46,16 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
 const scenariosFile = join(root, 'deploy/compose/compose.scenarios.yaml')
 const timeout = 30 * 60 * 1000
-const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-python']
+const targets = ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-python', 'axis-package-host-node']
 const identityHost = 'id.axis.test'
 const identityAuthority = `https://${identityHost}/realms/axis`
 const passThrough = ['AXIS_OIDC_CLIENT_SECRET']
+// The package hosts of the example: the image of each service and the worker setting that points at it.
+const packageHosts = {
+  'package-host-dotnet': { image: 'axis-package-host-dotnet', setting: 'Extensions__Runners__Dotnet' },
+  'package-host-python': { image: 'axis-package-host-python', setting: 'Extensions__Runners__Python' },
+  'package-host-node': { image: 'axis-package-host-node', setting: 'Extensions__Runners__Node' },
+}
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
 const secretFiles = {
@@ -61,6 +67,7 @@ const secretFiles = {
   agent: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   'package-host-dotnet': [],
   'package-host-python': [],
+  'package-host-node': [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
@@ -125,7 +132,7 @@ describe('the example holds no secret', () => {
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
     const config = render()
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'package-host-dotnet', 'package-host-python', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -416,47 +423,40 @@ describe('the tenant model key setting', () => {
   })
 })
 
-// Both package hosts run the same way: the C# host and the Python host, each from its own image.
-const packageHosts = [
-  ['package-host-dotnet', 'axis-package-host-dotnet'],
-  ['package-host-python', 'axis-package-host-python'],
-]
-
 describe('the package hosts', () => {
   // See docs/reference/extension-packages.md#package-runners and the threats P151 and P152 in docs/reference/threat-model-product.md.
-  test('run the host command on a read-only root with limits, no settings, secret or port, and only the packages, read-only', () => {
-    const { services } = render()
-    for (const [name, image] of packageHosts) {
+  for (const [name, host] of Object.entries(packageHosts)) {
+    test(`${name} runs the host command on a read-only root with limits, no settings, secret or port, and only the packages, read-only`, () => {
+      const { services } = render()
       const packageHost = services[name]
-      assert.match(packageHost.image, new RegExp(`${image}:`), `${name} runs another image`)
-      assert.deepEqual(packageHost.command, ['host'], `${name} runs another command`)
-      assert.equal(packageHost.read_only, true, `${name} has a writable root`)
-      assert.ok(packageHost.tmpfs.includes('/tmp'), `${name} has no /tmp tmpfs`)
-      assert.equal(Number(packageHost.cpus), 1, `${name} has another CPU limit`)
-      assert.equal(Number(packageHost.mem_limit), 1024 ** 3, `${name} has another memory limit`)
-      assert.deepEqual(Object.keys(packageHost.environment ?? {}), [], `${name} has an environment`)
-      assert.deepEqual(packageHost.secrets ?? [], [], `${name} has secrets`)
-      assert.deepEqual(packageHost.ports ?? [], [], `${name} publishes a port`)
-      assert.equal(packageHost.volumes.length, 1, `${name} mounts more than the packages`)
+      assert.match(packageHost.image, new RegExp(`${host.image}:`))
+      assert.deepEqual(packageHost.command, ['host'])
+      assert.equal(packageHost.read_only, true)
+      assert.ok(packageHost.tmpfs.includes('/tmp'), 'no /tmp tmpfs')
+      assert.equal(Number(packageHost.cpus), 1)
+      assert.equal(Number(packageHost.mem_limit), 1024 ** 3)
+      assert.deepEqual(Object.keys(packageHost.environment ?? {}), [])
+      assert.deepEqual(packageHost.secrets ?? [], [])
+      assert.deepEqual(packageHost.ports ?? [], [])
+      assert.equal(packageHost.volumes.length, 1)
       const [mount] = packageHost.volumes
-      assert.equal(mount.target, '/extensions', `${name} mounts another folder`)
-      assert.equal(mount.read_only, true, `${name} mounts the packages read-write`)
+      assert.equal(mount.target, '/extensions')
+      assert.equal(mount.read_only, true)
       assert.equal(mount.source, services.worker.volumes.find((volume) => volume.target === '/extensions').source)
-    }
-  })
+    })
+  }
 
-  test('are only on the internal network runners, which only they and the worker share, and the worker calls them there', () => {
+  test('are only on the internal network runners, which only they and the worker share, and the worker calls each there', () => {
     const config = render()
     const { services } = config
-    for (const [name] of packageHosts) {
-      assert.deepEqual(Object.keys(services[name].networks), ['runners'], `${name} is on another network`)
-    }
     assert.equal(config.networks.runners.internal, true)
+    for (const [name, host] of Object.entries(packageHosts)) {
+      assert.deepEqual(Object.keys(services[name].networks), ['runners'], `${name} networks`)
+      assert.equal(services.worker.environment[host.setting], `${name}:5310`, `${host.setting}`)
+    }
     const members = Object.keys(services).filter((name) => Object.hasOwn(services[name].networks ?? {}, 'runners'))
-    assert.deepEqual(members.sort(), ['package-host-dotnet', 'package-host-python', 'worker'])
+    assert.deepEqual(members.sort(), ['package-host-dotnet', 'package-host-node', 'package-host-python', 'worker'])
     assert.ok(Object.hasOwn(services.worker.networks, 'default'), 'the worker left the default network')
-    assert.equal(services.worker.environment.Extensions__Runners__Dotnet, 'package-host-dotnet:5310')
-    assert.equal(services.worker.environment.Extensions__Runners__Python, 'package-host-python:5310')
   })
 })
 
@@ -529,7 +529,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-python', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -676,7 +676,7 @@ describe('the on-premises installation', () => {
       const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
       assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
 
-      // Step 1, the images. scripts/smoke.sh built the six targets with the version that compose.yaml requires.
+      // Step 1, the images. scripts/smoke.sh built the seven targets with the version that compose.yaml requires.
       version = smokeImages(targets)
 
       // Step 2, the secret files. The folder and the files are readable by UID 1654.
@@ -913,8 +913,8 @@ describe('the on-premises installation', () => {
       const migrate = admin(['migrate'])
       assert.equal(migrate.status, 0, `migrate\n${migrate.stdout}${migrate.stderr}`)
 
-      // Step 3, start the server, the worker, the agent host and the two package hosts, and wait until the server is ready.
-      await up(['server', 'worker', 'agent', 'package-host-dotnet', 'package-host-python'], async () => {
+      // Step 3, start the server, the worker, the agent host and the package hosts, and wait until the server is ready.
+      await up(['server', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python'], async () => {
         serverPort = await freePort()
         workerPort = await freePort()
         agentPort = await freePort()
@@ -992,19 +992,19 @@ describe('the on-premises installation', () => {
       assert.equal((await request(workerPort, 'localhost', '/health/ready')).status, 200)
       assert.equal((await request(agentPort, 'localhost', '/health/ready')).status, 200)
 
-      // Each package host: a read-only root with a writable /tmp, the limits of the example, and the environment of its image
+      // The package hosts: a read-only root with a writable /tmp, the limits of the example, and the environment of their image
       // and no more. See docs/reference/installation.md#on-premises.
       const inspect = (target) => {
         const result = docker(['inspect', target])
         assert.equal(result.status, 0, result.stderr)
         return JSON.parse(result.stdout)[0]
       }
-      for (const [name, image] of packageHosts) {
+      for (const [name, host] of Object.entries(packageHosts)) {
         const packageHost = inspect(run(['ps', '-q', name]))
-        assert.equal(packageHost.HostConfig.ReadonlyRootfs, true, `${name} has a writable root`)
-        assert.equal(packageHost.HostConfig.NanoCpus, 1e9, `${name} has another CPU limit`)
-        assert.equal(packageHost.HostConfig.Memory, 1024 ** 3, `${name} has another memory limit`)
-        assert.deepEqual(packageHost.Config.Env, inspect(`${image}:${version}`).Config.Env, `${name} has another environment`)
+        assert.equal(packageHost.HostConfig.ReadonlyRootfs, true, `${name} root`)
+        assert.equal(packageHost.HostConfig.NanoCpus, 1e9, `${name} CPUs`)
+        assert.equal(packageHost.HostConfig.Memory, 1024 ** 3, `${name} memory`)
+        assert.deepEqual(packageHost.Config.Env, inspect(`${host.image}:${version}`).Config.Env, `${name} environment`)
         // UID 1654 cannot write / even on a writable root, so the error text proves that the root is read-only.
         const writeRoot = compose(['exec', '-T', name, 'touch', '/probe'])
         assert.notEqual(writeRoot.status, 0, `${name} wrote /`)
@@ -1025,17 +1025,15 @@ describe('the on-premises installation', () => {
         compose(['exec', '-T', service, 'timeout', '5', 'bash', '-c', 'exec 3<>/dev/tcp/$0/$1', host, String(port)]).status === 0
       const proxyAddress = addressOf('proxy')
       const postgresAddress = addressOf('postgres')
-      for (const [name] of packageHosts) {
+      for (const name of Object.keys(packageHosts)) {
         assert.equal(reach(name, 'worker', 5208), true, `${name} does not reach the worker`)
         assert.equal(reach(name, proxyAddress, 443), false, `${name} reaches the proxy`)
         assert.equal(reach(name, postgresAddress, 5432), false, `${name} reaches PostgreSQL`)
         assert.equal(reach(name, '1.1.1.1', 443), false, `${name} reaches an outside address`)
+        assert.equal(reach('worker', name, 5310), true, `the worker does not reach ${name} on 5310`)
       }
       assert.equal(reach('worker', proxyAddress, 443), true, 'the worker does not reach the proxy')
       assert.equal(reach('worker', postgresAddress, 5432), true, 'the worker does not reach PostgreSQL')
-      for (const [name] of packageHosts) {
-        assert.equal(reach('worker', name, 5310), true, `the worker does not reach ${name} on 5310`)
-      }
 
       // Every connection that an Axis host holds uses TLS. The check itself connects as postgres over the Unix socket,
       // so it leaves out that user.
