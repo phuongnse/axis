@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
@@ -161,6 +162,43 @@ public sealed class DocumentationTests
         Assert.True(!declared.Except(documented).Any(), $"Missing from the list keys table in docs/reference/customization-layers.md: {string.Join(", ", declared.Except(documented))}.");
         Assert.True(!documented.Except(declared).Any(), $"Not a keyed list of ListKeys: {string.Join(", ", documented.Except(declared))}. Each backticked word in the List cell must name a keyed list property of its kind.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
+    }
+
+    [Fact]
+    public void Reference_relation_table_matches_ReferenceRelations()
+    {
+        var documented = new List<string>();
+        var tables = 0;
+        foreach (var lines in DocsFiles().Select(File.ReadAllLines))
+        {
+            for (var i = 0; i < lines.Length; i++)
+            {
+                if (!Regex.IsMatch(lines[i], @"^\|\s*Relation\s*\|\s*From\s*\|\s*Path\s*\|\s*To\s*\|"))
+                {
+                    continue;
+                }
+
+                tables++;
+                for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
+                {
+                    // A relation may have one row for each source, such as navigate page from a page and from a process.
+                    var match = Regex.Match(lines[j], @"^\|\s*`([a-z ]+)`\s*\|");
+                    if (match.Success)
+                    {
+                        documented.Add(match.Groups[1].Value);
+                    }
+                }
+            }
+        }
+
+        Assert.True(tables == 1, $"Expected exactly one table with header '| Relation | From | Path | To |' under docs/, found {tables}.");
+        var declared = Constants(typeof(ReferenceRelations));
+        var duplicates = declared.GroupBy(name => name).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
+        var distinct = documented.Distinct().ToList();
+
+        Assert.True(duplicates.Count == 0, $"Declared more than once: {string.Join(", ", duplicates)}.");
+        Assert.True(!declared.Except(distinct).Any(), $"Missing from the reference index relation table in docs/reference/configuration.md: {string.Join(", ", declared.Except(distinct))}.");
+        Assert.True(!distinct.Except(declared).Any(), $"Not a relation of ReferenceRelations: {string.Join(", ", distinct.Except(declared))}.");
     }
 
     [Fact]
