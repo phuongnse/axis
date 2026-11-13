@@ -104,6 +104,36 @@ const manifest: StudioResource = {
   },
 }
 
+// Proposed: the request entity and the request list, which a review's findings open, see the review on #3263.
+const requestEntityResource: StudioResource = {
+  ...resource(id(firstEntityId), 'entity', 'Request', 'entities/Request.json', { [locale]: 'Purchase request' }, 2),
+  content: {
+    id: id(firstEntityId),
+    kind: 'entity',
+    name: 'Request',
+    formatVersion: 1,
+    label: { textKey: 'request.label' },
+    displayField: 'title',
+    fields: [
+      { name: 'title', type: 'text', required: true, maxLength: 200, label: { textKey: 'request.title' } },
+      { name: 'amount', type: 'decimal', precision: 18, scale: 2, label: { textKey: 'request.amount' } },
+      { name: 'costCentre', type: 'reference', target: 'CostCentre', label: { textKey: 'request.costCentre' } },
+    ],
+  },
+}
+
+const requestListResource: StudioResource = {
+  ...resource(pageId, 'page', 'RequestList', 'pages/request-list.json', { [locale]: 'Requests' }, 1),
+  content: {
+    id: pageId,
+    kind: 'page',
+    name: 'RequestList',
+    formatVersion: 1,
+    title: { textKey: 'pages.requests.title' },
+    widgets: [{ type: 'table', name: 'requests', entity: 'Request', columns: ['title', 'amount'] }],
+  },
+}
+
 const diagnostics = [
   {
     code: 'AX0412',
@@ -355,6 +385,8 @@ function workspaceRoutes(folder: Folder): Record<string, () => unknown> {
     '/api/studio/bindings': () => bindings,
     [`${folderPath}/relaxed`]: () => ({ items: [] }),
     [`${folderPath}/resources/${manifestId}`]: () => manifest,
+    [`${folderPath}/resources/${id(firstEntityId)}`]: () => requestEntityResource,
+    [`${folderPath}/resources/${pageId}`]: () => requestListResource,
     [`${folderPath}/releases`]: () => releasesNow(),
     [`${folderPath}/releases/live/diff`]: () => ({ resources: published() ? [] : liveDiff }),
     [`${folderPath}/publish`]: () => {
@@ -921,22 +953,23 @@ function checksOf(request: StudioAuthoringRequest, state: StudioAuthoringRequest
   }
 }
 
-// Proposed: a review's findings, see the review on #3263. The email request's fix rounds left one blocking finding open.
+// Proposed: a review's findings, see the review on #3263. The fix rounds of the request from an outside app left one
+// blocking finding open, and each finding opens the resource it is about.
 const reviews: Record<string, StudioReviewFinding[]> = {
-  [aiRequests[2].id]: [
+  [appRequest.id]: [
     {
       blocking: true,
-      text: 'The rejection email goes to the approver as well as the requester, while the request asked for the requester only: the step lists both under "to".',
-      file: 'processes/purchase-approval.json',
-      path: '/steps/4/to/1',
-      resourceId: null,
+      text: 'The request list shows no Cost centre column, while the request asked for one: the table lists no costCentre column.',
+      file: 'pages/request-list.json',
+      path: '/widgets/0/columns',
+      resourceId: pageId,
     },
     {
       blocking: false,
-      text: 'The rejection email could also say why. The request did not ask for it, so the draft leaves it out.',
-      file: 'processes/purchase-approval.json',
-      path: '/steps/5/message/body',
-      resourceId: null,
+      text: 'The Cost centre field could be required. The request did not say, so the draft leaves it optional.',
+      file: 'entities/Request.json',
+      path: '/fields/2',
+      resourceId: id(firstEntityId),
     },
   ],
 }

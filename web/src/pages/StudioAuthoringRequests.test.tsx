@@ -239,6 +239,30 @@ describe('a ready request’s review', () => {
     ).toBeInTheDocument()
   })
 
+  it('opens the resource of a finding at its path', async () => {
+    stub({
+      ...fromApp,
+      aiConnected: true,
+      review: [
+        { blocking: false, text: 'Could say why.', file: 'pages/list.json', path: '/widgets/0', resourceId: 'r-1' },
+      ],
+    })
+    const onOpen = vi.fn()
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={onOpen}
+      />,
+    )
+
+    await userEvent.setup().click(await screen.findByRole('button', { name: /Could say why\./ }))
+
+    expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
+  })
+
   it('says it found nothing that must change, and that a review is no guarantee', async () => {
     stub({ ...fromApp, aiConnected: true, review: [] })
     renderPage()
