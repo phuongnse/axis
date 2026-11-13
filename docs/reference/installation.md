@@ -26,10 +26,10 @@ extensions.
 
 ## Images
 
-Axis ships four production images, `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`, and the package host images
-below. They hold no sample, no sample extension package, no sample module, no development realm, no credential and no source
-control metadata such as `.git`. The default target of the `Dockerfile` and the `compose.yaml` at the repository root build the
-development images instead, which hold the samples and development credentials and are not for production, see
+Axis ships four host images, `axis-server`, `axis-worker`, `axis-agent` and `axis-admin`, and three package host images that
+build extension packages. All seven are production images. They hold no sample, no sample extension package, no sample module,
+no development realm, no credential and no source control metadata such as `.git`. The default target of the `Dockerfile` and
+the `compose.yaml` at the repository root build the development images instead, which hold the samples and development credentials and are not for production, see
 [development](../development.md#docker-compose). `axis-controlplane` is the image of the Axis SaaS control plane and not part of
 an installation, see [control plane](control-plane.md#image-and-chart).
 
@@ -37,12 +37,12 @@ Build an image from the repository root with `docker build --target axis-server 
 `axis-worker`, `axis-agent`, `axis-admin` or a package host image as the target for another. `AXIS_VERSION` defaults to `0.0.0-dev`.
 
 - **Environment.** The images run the `Production` environment.
-- **User.** They run as a non-root user, UID 1654, and work with a read-only root file system.
-- **Settings.** They read settings only from environment variables and from files in `/run/secrets`.
+- **User.** All run as a non-root user, UID 1654. The four host images work with a read-only root file system.
+- **Settings.** The four host images read settings only from environment variables and from files in `/run/secrets`.
   Each file is named after a setting in its environment variable form, such as `Platform__SecretKey`,
   and its content is the value. Compose `secrets:` and Kubernetes secret volumes put files there.
-- **Packages and modules.** Mount extension packages at `/extensions` and modules at `/modules`. The
-  agent host loads neither, so `axis-agent` has no mount point for them.
+- **Packages and modules.** Mount extension packages at `/extensions` and modules at `/modules` in the
+  host images. The agent host loads neither, so `axis-agent` has no mount point for them.
 - **Application folders.** Mount the folder into the admin container, then run `activate` on it.
 - **No curl.** The images hold no `curl`, so they have no container health check. Use the probes of
   the orchestrator, see [health checks](health-checks.md).
@@ -50,10 +50,10 @@ Build an image from the repository root with `docker build --target axis-server 
   backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`, and `axis-admin version` prints it.
-- **The package host images.** `axis-package-host-dotnet`, `axis-package-host-node` and `axis-package-host-python`
-  build extension packages, see [building a package](extension-packages.md#building-a-package). Each holds
-  `Axis.PackageHost`, Trivy at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. They
-  run as UID 1654 and, unlike the other images, need a writable root file system: the build, Trivy and npm write to it.
+- **The package host images.** `axis-package-host-dotnet`, `axis-package-host-node` and `axis-package-host-python` build
+  extension packages, see [building a package](extension-packages.md#building-a-package). Each holds `Axis.PackageHost`, Trivy
+  at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
+  writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`.
 - **The package runners** _(planned for M21)_. The package host images also hold their runtime's runner. They run as the containers
   `package-host-dotnet`, `package-host-node` and `package-host-python` beside the worker, with `/extensions` mounted read-only, and
   Compose and the Helm chart limit them as [package runners](extension-packages.md#package-runners) says.
