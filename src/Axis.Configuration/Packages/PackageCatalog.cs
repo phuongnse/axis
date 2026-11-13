@@ -88,7 +88,8 @@ public sealed class PackageCatalog
 
             foreach (var versionFolder in versionFolders)
             {
-                if (LoadPackage(idName, versionFolder, diagnostics) is { } package)
+                var versionName = Path.GetFileName(versionFolder);
+                if (LoadPackage(versionFolder, idName, versionName, $"{idName}/{versionName}/{ManifestFileName}", $"Package '{idName}' {versionName}", diagnostics) is { } package)
                 {
                     packages.Add(package);
                 }
@@ -102,11 +103,22 @@ public sealed class PackageCatalog
         return new PackageCatalog(packages, DiagnosticOrder.Sort(diagnostics));
     }
 
-    private static InstalledPackage? LoadPackage(string idName, string versionFolder, List<Diagnostic> diagnostics)
+    /// <summary>
+    /// Checks one package folder as <see cref="Load"/> checks each version folder, but without the folder name
+    /// check, because the folder is not yet named by the package's id and version. The diagnostics' file is
+    /// <c>axis-package.json</c>. The assembly of a C# package is loaded to check it.
+    /// </summary>
+    public static PackageFolderCheck CheckFolder(string folder)
     {
-        var versionName = Path.GetFileName(versionFolder);
-        var file = $"{idName}/{versionName}/{ManifestFileName}";
-        var label = $"Package '{idName}' {versionName}";
+        var diagnostics = new List<Diagnostic>();
+        var package = LoadPackage(folder, null, null, ManifestFileName, "Package source", diagnostics);
+        return new PackageFolderCheck(package, DiagnosticOrder.Sort(diagnostics));
+    }
+
+    /// <summary>Loads the package in <paramref name="versionFolder"/>. The folder names are checked against the manifest only when <paramref name="idName"/> and <paramref name="versionName"/> are given.</summary>
+    private static InstalledPackage? LoadPackage(
+        string versionFolder, string? idName, string? versionName, string file, string label, List<Diagnostic> diagnostics)
+    {
         var problems = new List<Diagnostic>();
         void Report(string code, string message, string path) =>
             problems.Add(new Diagnostic(code, $"{label}: {message}", file, path));
@@ -119,12 +131,12 @@ public sealed class PackageCatalog
         }
 
         CheckManifest(manifest, Report);
-        if (!string.Equals(manifest.Id, idName, StringComparison.Ordinal))
+        if (idName is not null && !string.Equals(manifest.Id, idName, StringComparison.Ordinal))
         {
             Report(DiagnosticCodes.PackageFolderMismatch, $"The id '{manifest.Id}' differs from its folder name '{idName}'.", "/id");
         }
 
-        if (!string.Equals(manifest.Version, versionName, StringComparison.Ordinal))
+        if (versionName is not null && !string.Equals(manifest.Version, versionName, StringComparison.Ordinal))
         {
             Report(DiagnosticCodes.PackageFolderMismatch, $"The version '{manifest.Version}' differs from its folder name '{versionName}'.", "/version");
         }
