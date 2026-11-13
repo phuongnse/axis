@@ -1036,8 +1036,8 @@ function acceptOf(request: StudioAuthoringRequest): StudioRequest | null {
  * them, its change is ready, AI could not finish it, or its change was accepted by itself.
  */
 const noticeSubjects: Partial<Record<StudioAuthoringRequest['state'], [string, NotificationKind]>> = {
-  awaitingApproval: ['A plan waits for your approval', 'action'],
-  ready: ['A change is ready for you to accept', 'action'],
+  awaitingApproval: ['A plan awaits your approval', 'action'],
+  ready: ['A change is ready to accept', 'action'],
   failed: ['AI could not finish your request', 'problem'],
   accepted: ['Your change was accepted', 'info'],
 }
