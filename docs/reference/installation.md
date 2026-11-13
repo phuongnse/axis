@@ -4,7 +4,7 @@ This page says how a platform operator installs and upgrades Axis, on one machin
 and on Kubernetes with the Helm chart. It lists the images, every setting and secret, the TLS rules
 and, in [upgrade](upgrade.md), the upgrade order. In this page, "database role" always means the PostgreSQL role.
 
-An installation runs four hosts, from four production images. The Compose example and the Helm chart also run a fifth container, the C# package host, from a fifth image, see [on premises](#on-premises) and [in the cloud](#in-the-cloud):
+An installation runs four hosts, from four production images. The Compose example also runs two package hosts, the C# one and the Node.js one, from two more images, and the Helm chart runs the C# package host, see [on premises](#on-premises) and [in the cloud](#in-the-cloud):
 
 | Host                     | Image         | What it does                                                                                                                                                                                                                                                               |
 | ------------------------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -56,9 +56,9 @@ Build an image from the repository root with `docker build --target axis-server 
   writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
   needs that root: the `host` command runs on a read-only root.
 - **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, and the `node` image holds the Node.js runner in `/app/sdk/node/`.
-  Compose's `package-host-dotnet` and the chart's `<release>-package-host-dotnet` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
-- **The other package runners** _(planned for M21)_. The Python runner in the `python` image, and the containers `package-host-node` and
-  `package-host-python`, in Compose and in the Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
+  Compose's `package-host-dotnet` and `package-host-node` and the chart's `<release>-package-host-dotnet` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
+- **The other package runners** _(planned for M21)_. The Python runner in the `python` image, the chart's `package-host-node` container and the containers `package-host-python`,
+  in Compose and in the Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
@@ -114,7 +114,7 @@ PostgreSQL runs elsewhere, and Axis's identity provider runs beside the server w
 on that PostgreSQL server.
 
 The example's `compose.yaml` has the server, the worker, the agent host, the publisher, the identity provider,
-the TLS proxy, the C# package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
+the TLS proxy, the C# and the Node.js package host and the admin host, and `docker compose up` starts all of them but the admin host. A second server replica sits
 under the `replicas` profile, see [TLS proxy and a second replica](#tls-proxy-and-a-second-replica). The file holds no password,
 client secret or key.
 
@@ -127,14 +127,14 @@ client secret or key.
   than the five-minute lease, so a stop lets the running request finish.
 - **The agent host** runs the `axis-agent` image. It mounts the `ConnectionStrings__Platform` and
   `Platform__SecretKey` files and no folder, and it publishes only its health port on `127.0.0.1`.
-- **The C# package host** runs the `axis-package-host-dotnet` image with the command `host`. It runs the C# package operations
-  of the worker, see [package runners](extension-packages.md#package-runners). It has a read-only root file system apart from a
-  `/tmp` tmpfs, 1 CPU and 1g of memory, and `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change the limits. It gets
-  no environment, secret or published port, and mounts `/extensions` read-only and nothing else. It sits only on the internal
-  network `runners`, which no other service but the worker shares, so only the worker reaches its port 5310, which does not
-  authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
-  `package-host-dotnet:5310`.
-- **The images.** Set `AXIS_VERSION` to the tag of the five images. `AXIS_IMAGE_PREFIX` adds a
+- **The package hosts** are `package-host-dotnet` and `package-host-node`. They run the `axis-package-host-dotnet` and `axis-package-host-node`
+  images with the command `host`, and run the C# and the `node` package operations of the worker, see [package runners](extension-packages.md#package-runners).
+  Each has a read-only root file system apart from a `/tmp` tmpfs, no environment, secret or published port, and `/extensions` read-only and
+  nothing else. Its limits are 1 CPU and 1g of memory. `AXIS_PACKAGE_HOST_CPUS` and `AXIS_PACKAGE_HOST_MEMORY` change those of the C# host and `AXIS_PACKAGE_HOST_NODE_CPUS` and `AXIS_PACKAGE_HOST_NODE_MEMORY` those of the Node.js host.
+  A host sits only on the internal network `runners`, which no other service but the worker shares, so only the worker reaches its port 5310, which
+  does not authenticate a connection, and it reaches nothing outside that network. The worker sets `Extensions__Runners__Dotnet` to
+  `package-host-dotnet:5310` and `Extensions__Runners__Node` to `package-host-node:5310`.
+- **The images.** Set `AXIS_VERSION` to the tag of the six images. `AXIS_IMAGE_PREFIX` adds a
   registry prefix. The comment at the top of `compose.yaml` lists every variable.
 
 The diagram shows the services of the example and the PostgreSQL server that they connect to. The
@@ -153,7 +153,7 @@ flowchart LR
         worker["worker"]
         agent["agent"]
         publisher["publisher"]
-        packagehost["package-host-dotnet"]
+        packagehost["package-host-dotnet, package-host-node"]
         admin["admin, only when asked"]
     end
     subgraph pg ["PostgreSQL, runs elsewhere"]
@@ -334,8 +334,8 @@ Install in this order:
    with code 0.
 3. Start the identity provider and the proxy with `docker compose up -d identity proxy`, and wait until
    `https://<AXIS_IDENTITY_HOST>/realms/master/.well-known/openid-configuration` answers `200`. Then
-   start the server, the worker, the agent host and the C# package host with
-   `docker compose up -d server worker agent package-host-dotnet`, and
+   start the server, the worker, the agent host and the package hosts with
+   `docker compose up -d server worker agent package-host-dotnet package-host-node`, and
    wait until `/health/ready` answers `200` on the server and the worker, because the server creates the `platform` tables at start
    and `tenant create` needs them. Then start the publisher with `docker compose up -d publisher`. It
    exits with code 1 until the server has created those tables, so start it only after
@@ -406,7 +406,7 @@ configured like `server`.
   headers from that address only. The proxy replaces any `X-Forwarded-For`, `X-Forwarded-Proto` and
   `X-Forwarded-Host` that a client sends. Behind it, sign-in returns to
   `https://<tenant host>/api/auth/callback` and the session cookie is `Secure`.
-- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the C# package host
+- **The runners network.** The `runners` network is `internal`: it has no route out. Only the worker and the two package hosts
   join it, and the worker also stays on the default network. It has no fixed subnet.
 - **The address range.** Docker hands out addresses without a fixed one only from
   `AXIS_NETWORK_IP_RANGE`, 172.31.250.128/25 by default, so a short-lived `admin` container cannot take
@@ -431,7 +431,7 @@ configured like `server`.
 
 Two kinds of test keep the example as this section describes it.
 
-- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the five
+- **The smoke test.** `scripts/onprem.test.mjs`, which `scripts/smoke.sh` runs, builds the six
   production images and installs the example in the order above, against a test PostgreSQL over TLS
   and the example's own identity provider, with a certificate authority that it makes for the run. Its
   additions, such as the scenario role and the modules from `artifacts/modules`, sit in an override
@@ -441,7 +441,7 @@ Two kinds of test keep the example as this section describes it.
   answers `503` while the other serves, that the installed publisher runs a publish request of each
   tenant to `succeeded`, that a session works on both replicas and survives a restart, that the
   proxy's TLS versions and ciphers are the ones of [TLS](#tls), and that a Studio save on one replica
-  is read on the other and a stale save there answers `409`. It checks the running C# package host: its root refuses a write
+  is read on the other and a stale save there answers `409`. It checks each running package host: its root refuses a write
   and `/tmp` takes one, its limits are set, its environment is the one of its image, it reaches the worker but not the
   proxy, PostgreSQL or an outside address, and the worker reaches it on 5310. It runs no `test` request against the
   installed images.
@@ -449,7 +449,7 @@ Two kinds of test keep the example as this section describes it.
   section: that nothing under `deploy/compose/` holds a secret, that every secret comes only from
   `secrets:` files, that each service mounts only the secrets, certificates and folders listed here,
   that the scenario secret and `Studio__Tests` appear only with `compose.scenarios.yaml`, that every
-  published port of both servers is on `127.0.0.1`, that the C# package host has a read-only root, its limits, no environment,
+  published port of both servers is on `127.0.0.1`, that each package host has a read-only root, its limits, no environment,
   secret or port, and only the packages, read-only, and sits only on the internal `runners` network with the worker, and that the Caddyfile and the Kestrel settings
   match [what the Compose example sets](#tls).
 
