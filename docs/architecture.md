@@ -76,7 +76,7 @@ flowchart LR
   [recomputing computed fields](reference/migrations.md#recomputing-computed-fields). It loads the
   same modules and installed [extension packages](reference/extension-packages.md) as the server, and
   serves its own [health checks](#health-checks).
-- **Axis.PackageHost** builds an extension package: its `build` command checks, scans and writes a C# package
+- **Axis.PackageHost** builds an extension package: its `build` command checks, scans and writes a C# or Python package
   to the extensions folder, see [building a package](reference/extension-packages.md#building-a-package).
 - **Axis.PackageHost as a runner** _(planned for M21)_. It runs package operations in package runners, outside the
   worker, in a container for each runtime, see [images](reference/installation.md#images). The worker
