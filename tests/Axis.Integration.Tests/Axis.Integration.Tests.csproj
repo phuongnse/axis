@@ -76,6 +76,12 @@
     <None Include="..\..\artifacts\keycloak-theme\**\*" Link="KeycloakTheme\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\packages\node-test-package\**\*" Exclude="..\packages\node-test-package\node_modules\**" LinkBase="NodeTestPackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\packages\node-probe-package\**\*" LinkBase="NodeProbePackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\sdk\node\**\*" LinkBase="sdk/node" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Import Project="..\packages\TestPackages.targets" />
   <Import Project="..\..\samples\packages\SamplePackages.targets" />
 
