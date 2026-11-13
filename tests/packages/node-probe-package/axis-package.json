@@ -1,0 +1,53 @@
+{
+  "id": "node-probe-package",
+  "version": "1.0.0",
+  "label": "Node probe package",
+  "language": "node",
+  "adapter": "index.mjs",
+  "lock": "package-lock.json",
+  "operations": [
+    {
+      "name": "sum",
+      "type": "sum",
+      "idempotent": false,
+      "input": [
+        { "name": "a", "type": "integer", "required": true },
+        { "name": "b", "type": "integer", "required": true }
+      ],
+      "output": [{ "name": "total", "type": "integer", "required": true }]
+    },
+    {
+      "name": "fail",
+      "type": "fail",
+      "idempotent": false,
+      "input": [{ "name": "a", "type": "integer", "required": true }]
+    },
+    {
+      "name": "flaky",
+      "type": "flaky",
+      "idempotent": true,
+      "input": [{ "name": "failures", "type": "integer", "required": true }],
+      "output": [{ "name": "attempts", "type": "integer", "required": true }]
+    },
+    {
+      "name": "probe",
+      "type": "probe",
+      "idempotent": false,
+      "input": [{ "name": "mode", "type": "text", "required": true }],
+      "output": [{ "name": "status", "type": "integer", "required": true }],
+      "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
+    },
+    {
+      "name": "badOutput",
+      "type": "badOutput",
+      "idempotent": false,
+      "output": [{ "name": "total", "type": "integer", "required": true }]
+    },
+    {
+      "name": "log",
+      "type": "log",
+      "idempotent": false,
+      "output": [{ "name": "done", "type": "boolean", "required": true }]
+    }
+  ]
+}

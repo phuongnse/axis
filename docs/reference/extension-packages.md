@@ -101,7 +101,8 @@ identity, its operations and, for a C# package, its main assembly. This example 
   - `type` is, for a C# package, the full name of a class in the main assembly
     that implements `IOperation`. The class is not abstract and has a public parameterless
     constructor, because the host creates each instance itself.
-    - **For `node` and `python`** _(planned for M21)_. `type` names a function that the adapter
+    - **For `node`.** `type` names a function that the adapter exports, see [contracts](#contracts).
+    - **For `python`** _(planned for M21)_. `type` names a function that the adapter
       exports.
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
@@ -151,10 +152,18 @@ public class RetryableException : Exception { }
 - **`RetryableException`.** Thrown by an operation to say that the attempt
   may succeed later. Any other exception fails the call, see
   [Call outcomes](process-execution.md#package-call-outcomes).
-- **One protocol and an SDK for each language** _(planned for M21)_. The
-  worker and every runner speak one protocol that no language owns, see
-  [The runner protocol](#the-runner-protocol). A small SDK for each language
-  implements the operation context over it.
+- **The Node.js SDK.** `sdk/node/` holds the Node.js runner and a small SDK that implements the operation
+  context over [the runner protocol](#the-runner-protocol), which no language owns. An adapter written as
+  CommonJS or as an ES module exports one function for each operation `type`, and the runner calls it with
+  `(input, context)`. The context has `operationId`, `fetch(urlBinding, path, init)` and
+  `getSecret(secretBinding)`. `fetch` resolves `path` against the base of the declared `url` binding and
+  sends no request to an origin that none of the operation's `url` bindings declares. It follows no redirect.
+  Asking for an undeclared binding throws, and the call fails with that binding even when the adapter catches
+  the error. An error named `RetryableError` says that the attempt may succeed later, as
+  `RetryableException` does, and any other error fails the call. Values keep their protocol form, so
+  `integer` and `decimal` are strings and a JavaScript number does not fit an `integer` field.
+- **The Python SDK** _(planned for M21)_. A small SDK implements the operation context over
+  [the runner protocol](#the-runner-protocol) for a Python package.
 - **Value types.** For a C# package, input and output values use these .NET types:
 
   | Field type | .NET type |
@@ -514,20 +523,24 @@ implements the operation context over it.
   runner network protects it. The host listens on port 5310 and reads the installed versions from
   `Extensions:Path`. It does not start without that setting, or when the folder does not exist.
 - **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
-  host starts the runner and pipes the connection to the runner's standard input and output.
+  host starts the runner of the manifest's `language`, the C# runner or the Node.js runner, and pipes the
+  connection to the runner's standard input and output. A Node.js runner also gets `NODE_USE_ENV_PROXY=1`,
+  so that its own HTTP calls go through the proxy.
 - **Start.** A `start` for a version that is not installed, or whose `package`, `version` or `proxy` is not
-  well formed, closes the connection and starts no runner. The runner answers `ready` once it has
+  well formed, closes the connection and starts no runner. So does a `start` for a version whose language
+  has no runner, or whose runtime is missing from the host's image. The runner answers `ready` once it has
   loaded the version.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
-  types, and an output whose .NET type does not fit its field are each a `failure` with the name of
-  the error's type.
+  types, and an output that does not fit its field are each a `failure` with the name of
+  the error's type. The Node.js runner names an error by its JavaScript `name`, such as `RangeError`, and
+  answers these three with `TypeError`.
 - **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host
   kills that runner. A runner that exits closes its connection, and the worker takes that as an
   unknown outcome.
 - **Values.** `text` is a string. `integer` and `decimal` are strings, so that no language loses
-  precision. `boolean` is a JSON boolean. `date` is `YYYY-MM-DD` and `date-time` is ISO 8601 with an
+  precision, and an `integer` is a whole number in the signed 64-bit range. `boolean` is a JSON boolean. `date` is `YYYY-MM-DD` and `date-time` is ISO 8601 with an
   offset. A missing value is `null`.
 - **No exception message.** No message carries an exception message, because history keeps only the
   type of an exception, see [Capabilities](#capabilities).
@@ -675,8 +688,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ## Sample and test packages
 
-One sample package shows a package in use, and four test packages cover installation, loading, the
-capability limits and the server's metadata-only load.
+One sample package shows a package in use, and five test packages cover installation, loading, the
+capability limits, the server's metadata-only load and the Node.js runner.
 
 - **Sample package.** `samples/packages/` holds one C# package, `payment-references`
   1.0.0, with its own unit tests. Its one operation, `creditorReference`, is pure and
@@ -703,7 +716,14 @@ capability limits and the server's metadata-only load.
   `tests/packages/node-test-package/`. Its adapter is TypeScript, `index.ts`, with its compiled
   `index.js` committed. Its one dependency, `axis-test-dependency`, installs from the committed tarball
   `vendor/axis-test-dependency-1.0.0.tgz`, so a build reaches no registry. The dependency declares a
-  `postinstall` script, and the tests use it to show that the build never runs install scripts.
+  `postinstall` script, and the tests use it to show that the build never runs install scripts. Its `greet`
+  function takes the protocol's input object, as the runner calls every function, and the tests start the built
+  package through the Node.js runner.
+- **Node.js probe package.** A test-only `node` package, `node-probe-package`, lives under
+  `tests/packages/node-probe-package/`. Its adapter is a plain ES module, `index.mjs`, with no dependency, so
+  together with the CommonJS `node-test-package` the tests cover both module forms. Its operations mirror the
+  C# test package's: `sum`, `fail`, `flaky` and `probe`, with the same modes. It adds `badOutput`, which returns an
+  `integer` as a JavaScript number, and `log`, which writes to the console.
 - **Python test package.** `python-test-package` lives under `tests/packages/PythonPackage/` as plain files:
   the package's manifest and adapter, and one small dependency. The package build tests zip the
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package

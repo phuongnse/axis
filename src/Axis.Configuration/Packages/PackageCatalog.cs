@@ -133,6 +133,19 @@ public sealed class PackageCatalog
         return (package, DiagnosticOrder.Sort(diagnostics));
     }
 
+    /// <summary>
+    /// Reads the manifest of the installed version <c>&lt;root&gt;/&lt;id&gt;/&lt;version&gt;</c>, and loads no package code. The manifest is
+    /// null when it is missing, cannot be read or does not match the manifest schema.
+    /// </summary>
+    public static PackageManifest? ReadInstalledManifest(string root, string id, string version)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(root);
+        ArgumentException.ThrowIfNullOrEmpty(id);
+        ArgumentException.ThrowIfNullOrEmpty(version);
+
+        return ReadManifest(Path.Combine(root, id, version, ManifestFileName), $"{id}/{version}/{ManifestFileName}", $"Package '{id}' {version}", []);
+    }
+
     /// <summary>Loads the package in <paramref name="versionFolder"/>. The folder names are checked against the manifest only when <paramref name="idName"/> and <paramref name="versionName"/> are given.</summary>
     private static InstalledPackage? LoadPackage(
         string versionFolder, string? idName, string? versionName, string file, string label, PackageLoadMode mode, List<Diagnostic> diagnostics)
