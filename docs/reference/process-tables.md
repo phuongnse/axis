@@ -234,6 +234,9 @@ column for a request or response body.
 | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
 | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
 | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
+| `runner_id` _(planned for M37)_ | `uuid`, null | The [customer-hosted runner](extension-packages.md#customer-hosted-runners) that holds the lease |
+| `lease_id` _(planned for M37)_ | `uuid`, null | The lease of the current attempt |
+| `lease_until` _(planned for M37)_ | `timestamptz`, null | When the lease ends |
 
 ### Events
 
