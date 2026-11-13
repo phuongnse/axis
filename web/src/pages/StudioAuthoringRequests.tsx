@@ -30,13 +30,7 @@ import { useDesignTokens } from '../platform/themeMode'
 import { StepsBar } from '../platform/StepsBar'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
-import {
-  authoringRequestAddress,
-  settled,
-  useRequestStateColour,
-  useRequestStateWords,
-  waitingForAuthor,
-} from './authoringRequests'
+import { authoringRequestAddress, settled, useRequestStateColour, useRequestStateWords } from './authoringRequests'
 import { StudioChanges } from './StudioHistory'
 import { kindSingular } from '../platform/studioKinds'
 import { SectionPart, SectionParts } from './ResourceFormSection'
@@ -131,19 +125,7 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
       key: 'state',
       kind: 'freeText',
       title: t('shell.studio.aiRequests.state'),
-      render: (_, row) => {
-        const mine = row.author === userId
-        return (
-          <span
-            style={{
-              color: stateColour(row.state),
-              fontWeight: mine && waitingForAuthor.includes(row.state) ? 600 : undefined,
-            }}
-          >
-            {stateWords(row)}
-          </span>
-        )
-      },
+      render: (_, row) => <span style={{ color: stateColour(row.state) }}>{stateWords(row)}</span>,
     },
     {
       key: 'who',
@@ -654,10 +636,10 @@ export function StudioAuthoringRequestPage({
         {stage !== null && working && <StepsBar titles={stageTitles} current={stage} />}
         <Flex align="center" gap={spacing.sm}>
           {following && !waitsForApp && <Spin size="small" />}
-          <Typography.Text strong style={{ color: stateColour(request.state) }}>
+          <Typography.Text style={{ color: stateColour(request.state) }}>
             {stateWords(request)}
             {request.round > 1 && request.state !== 'planning' && (
-              <span style={{ color: colour.textMuted, fontWeight: 400 }}>
+              <span style={{ color: colour.textMuted }}>
                 {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
               </span>
             )}
