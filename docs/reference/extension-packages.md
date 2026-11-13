@@ -219,10 +219,10 @@ every host reads. An installation's package is trusted code that the operator re
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
 - **The package hosts.** The Compose example's containers `package-host-dotnet` and `package-host-node` and the Helm chart's pods
-  `<release>-package-host-dotnet` and `<release>-package-host-node` mount the same folder read-only, and
+  `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python` mount the same folder read-only, and
   each runner runs the packages of its language, see [Package runners](#package-runners).
-- **The other package hosts** _(planned for M21)_. The containers `package-host-python` do the same
-  for the other languages.
+- **The Compose Python host** _(planned for M21)_. The Compose container `package-host-python` does the same
+  for Python.
 - **The Python host image.** The image `axis-package-host-python` holds the Python runner, see
   [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
@@ -460,10 +460,10 @@ package reaches nothing of the host and no binding of another call.
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet` and `package-host-node` on an internal network `runners` that only they and
   the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
-- **The C# and Node.js hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet` and `<release>-package-host-node`, each as a Deployment, a Service on port 5310 and a
+- **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
   NetworkPolicy, with the command `host` and a read-only root file system apart from `/tmp`. It has no env entry, no secret and no
-  service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet` and `Extensions__Runners__Node`. Its CPU and memory limits come from
-  `packageHost.dotnet.resources` and `packageHost.node.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
+  service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`. Its CPU and memory limits come from
+  `packageHost.dotnet.resources`, `packageHost.node.resources` and `packageHost.python.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
   pods and allows no DNS. It holds only where the network plugin enforces NetworkPolicy, see
   [in the cloud](installation.md#in-the-cloud).
 - **The Python runner.** For a `start` that names a `python` version, the host runs

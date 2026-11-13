@@ -79,7 +79,8 @@
       "type": "object",
       "properties": {
         "dotnet": { "$ref": "#/definitions/packageHost" },
-        "node": { "$ref": "#/definitions/packageHost" }
+        "node": { "$ref": "#/definitions/packageHost" },
+        "python": { "$ref": "#/definitions/packageHost" }
       },
       "additionalProperties": false
     },

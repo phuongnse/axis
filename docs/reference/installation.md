@@ -55,10 +55,10 @@ Build an image from the repository root with `docker build --target axis-server 
   at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
   writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
   needs that root: the `host` command runs on a read-only root.
-- **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, and the `node` image holds the Node.js runner in `/app/sdk/node/`.
-  Compose's `package-host-dotnet` and `package-host-node` and the chart's `<release>-package-host-dotnet` and `<release>-package-host-node` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
-- **The other package runners** _(planned for M21)_. The Python runner in the `python` image and
-  the containers `package-host-python`, in Compose and in the Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
+- **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, the `node` image holds the Node.js runner in `/app/sdk/node/`, and the `python` image holds the Python runner in `/app/sdk/python/`.
+  Compose's `package-host-dotnet` and `package-host-node` and the chart's `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
+- **The Compose Python host** _(planned for M21)_. The Compose container `package-host-python`
+  runs the same way, limited as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.
@@ -476,7 +476,7 @@ The chart has these objects:
   termination grace period is 360 seconds, longer than the five-minute lease. Outside a cell it mounts
   the same secrets as the migrate Job. When `studio.folders` is set, it also mounts the Studio volume
   and gets the folders and `platformConnection`, as the server does.
-- **The package hosts.** For each of the C# and the Node.js hosts, a Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-package-host-dotnet` or `<release>-package-host-node`, see [package runners](extension-packages.md#package-runners). The worker gets `Extensions__Runners__Dotnet` and `Extensions__Runners__Node`, one for each Service.
+- **The package hosts.** For each of the C#, the Node.js and the Python hosts, a Deployment, a Service on port 5310 and a NetworkPolicy, all named `<release>-package-host-dotnet`, `<release>-package-host-node` or `<release>-package-host-python`, see [package runners](extension-packages.md#package-runners). The worker gets `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`, one for each Service.
 - **The identity provider**, see [below](#the-identity-provider-in-the-chart).
 - **PgBouncer**, in a cell that turns it on, see [PgBouncer](#pgbouncer).
 - **The migrate Job and the CronJobs** of a cell, see [jobs](#jobs).
@@ -691,11 +691,11 @@ The values of the chart, with their defaults:
 | `image.tag` | the chart's `appVersion` | Tag of all Axis images. |
 | `image.pullPolicy` | `IfNotPresent` | Pull policy. |
 | `image.pullSecrets` | none | Names of image pull Secrets. |
-| `server.repository`, `worker.repository`, `agent.repository`, `migrate.repository`, `packageHost.dotnet.repository`, `packageHost.node.repository` | `axis-server`, `axis-worker`, `axis-agent`, `axis-admin`, `axis-package-host-dotnet`, `axis-package-host-node` | Repository of each image. `migrate.repository` is also the publisher's image. |
+| `server.repository`, `worker.repository`, `agent.repository`, `migrate.repository`, `packageHost.dotnet.repository`, `packageHost.node.repository`, `packageHost.python.repository` | `axis-server`, `axis-worker`, `axis-agent`, `axis-admin`, `axis-package-host-dotnet`, `axis-package-host-node`, `axis-package-host-python` | Repository of each image. `migrate.repository` is also the publisher's image. |
 | `server.replicas` | 1 | Server replicas. The key ring is shared, so sessions work on every replica. With Studio on, the replicas also share the `studio.persistence` volume, see [several server replicas](several-server-replicas.md). |
 | `worker.replicas` | 1 | Worker replicas. |
 | `agent.replicas` | 1 | Agent host replicas. |
-| `packageHost.dotnet.replicas`, `packageHost.dotnet.resources`, `packageHost.node.replicas`, `packageHost.node.resources` | 1, limits of 1 CPU and `1Gi` | Replicas and resources of the C# and the Node.js package host. Rendering fails, naming the value, without `limits.cpu` or `limits.memory`. |
+| `packageHost.dotnet.replicas`, `packageHost.dotnet.resources`, `packageHost.node.replicas`, `packageHost.node.resources`, `packageHost.python.replicas`, `packageHost.python.resources` | 1, limits of 1 CPU and `1Gi` | Replicas and resources of the C#, the Node.js and the Python package host. Rendering fails, naming the value, without `limits.cpu` or `limits.memory`. |
 | `studio.folders` | none | The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>` on the server and on the publisher. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica and on the publisher. In a cell the server and the publisher use `/studio` as `Studio:ApplicationsPath`. It is required when `studio.folders` is set and in a cell, and rendering fails with a message that names it when it is missing. Outside a cell, on its own it does nothing. The chart creates no claim. With several replicas, and in a cell, it needs a `ReadWriteMany` storage class. |
