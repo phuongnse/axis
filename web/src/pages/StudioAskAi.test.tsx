@@ -53,11 +53,11 @@ describe('StudioAskAi', () => {
     expect(screen.queryByTestId('studio-ai-not-connected')).toBeNull()
   })
 
-  it('leads an author with no key of their own to add one on their account page, with no form', async () => {
+  it('leads an author with no AI of their own to connect one on their account page, with no form', async () => {
     renderPanel({ connected: false })
 
-    expect(await screen.findByText('Connect your Claude account to ask AI')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Add your key' })).toHaveAttribute('href', '/account')
+    expect(await screen.findByText('Connect your AI to ask for changes')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Connect your AI' })).toHaveAttribute('href', '/account')
     expect(screen.queryByRole('button', { name: 'Send' })).toBeNull()
   })
 })
