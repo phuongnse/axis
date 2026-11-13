@@ -60,8 +60,12 @@ export async function fetchNotifications(
   signal?: AbortSignal,
   filter: NotificationFilter = 'all',
 ): Promise<NotificationPage> {
-  const only = filter === 'unread' ? '&unread=true' : filter === 'needsAction' ? '&needsAction=true' : ''
-  const response = await apiFetch(`${path}?page=${page}&pageSize=${pageSize}${only}`, { signal }, quiet)
+  const only = filterQuery(filter)
+  const response = await apiFetch(
+    `${path}?page=${page}&pageSize=${pageSize}${only ? `&${only}` : ''}`,
+    { signal },
+    quiet,
+  )
   if (!response.ok) {
     throw new Error(`Loading the notifications failed with ${response.status}`)
   }
@@ -100,4 +104,26 @@ export function notificationAddress(sitePath: string | null, open: NotificationO
   }
   const search = query.toString()
   return search ? `${path}?${search}` : path
+}
+
+/** The query that limits a list or a clear-all to what a filter shows. */
+function filterQuery(filter: NotificationFilter): string {
+  return filter === 'unread' ? 'unread=true' : filter === 'needsAction' ? 'needsAction=true' : ''
+}
+
+/** Proposed: clears one notification from the signed-in user's list, see the review on #3263. */
+export async function clearNotification(path: string, id: string): Promise<void> {
+  const response = await apiFetch(`${path}/${encodeURIComponent(id)}/clear`, { method: 'POST' }, quiet)
+  if (!response.ok) {
+    throw new Error(`Clearing a notification failed with ${response.status}`)
+  }
+}
+
+/** Proposed: clears every notification the filter shows from the signed-in user's list, see the review on #3263. */
+export async function clearNotifications(path: string, filter: NotificationFilter): Promise<void> {
+  const query = filterQuery(filter)
+  const response = await apiFetch(`${path}/clear-all${query ? `?${query}` : ''}`, { method: 'POST' }, quiet)
+  if (!response.ok) {
+    throw new Error(`Clearing the notifications failed with ${response.status}`)
+  }
 }

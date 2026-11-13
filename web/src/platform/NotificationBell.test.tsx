@@ -170,7 +170,7 @@ describe('NotificationBell', () => {
       const user = userEvent.setup()
 
       await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
-      await user.click(await screen.findByRole('button', { name: /Note ready/ }))
+      await user.click(await screen.findByRole('button', { name: /, Note ready,/ }))
 
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
       expect(posts(fetchMock)).toEqual([{ url: `${path}/${withPage.id}/read`, csrf: '1' }])
@@ -184,7 +184,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Notifications' }))
-    await user.click(await screen.findByRole('button', { name: /Heads up/ }))
+    await user.click(await screen.findByRole('button', { name: /, Heads up,/ }))
 
     await waitFor(() => expect(posts(fetchMock)).toEqual([{ url: `${path}/${withoutPage.id}/read`, csrf: '1' }]))
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
@@ -201,7 +201,7 @@ describe('NotificationBell', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
-    await user.click(await screen.findByRole('button', { name: /Note ready/ }))
+    await user.click(await screen.findByRole('button', { name: /, Note ready,/ }))
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/e2e/notedetail?note=${noteId}`))
   })
@@ -229,7 +229,7 @@ describe('NotificationBell', () => {
 
   it('has Vietnamese texts for every key it uses', () => {
     const keys = Object.keys(platformEnglish).filter((key) => key.startsWith('shell.notifications.'))
-    expect(keys).toHaveLength(15)
+    expect(keys).toHaveLength(18)
     for (const key of keys) {
       expect(platformVietnamese).toHaveProperty([key])
     }
@@ -319,6 +319,37 @@ describe('NotificationBell list', () => {
     const { colour } = designTokensFor('light')
     expect(icon(waiting)).toHaveStyle({ color: colour.primaryText })
     expect(icon(done)).toHaveStyle({ color: colour.textMuted })
+  })
+
+  it('clears one notification, then every one its filter shows, with the CSRF header', async () => {
+    const fetchMock = stubServer(() => json(page([withPage, withoutPage], 1)))
+    renderBell()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    await user.click(within(dialog).getByRole('button', { name: 'Clear Heads up' }))
+    await user.click(within(dialog).getByText('Unread'))
+    await user.click(within(dialog).getByRole('button', { name: 'Clear all' }))
+
+    await waitFor(() =>
+      expect(posts(fetchMock)).toEqual([
+        { url: `${path}/${withoutPage.id}/clear`, csrf: expect.any(String) },
+        { url: `${path}/clear-all?unread=true`, csrf: expect.any(String) },
+      ]),
+    )
+  })
+
+  it('shows no tooltip on a filter, whose words are already there', async () => {
+    stubServer(() => json(page([withPage], 1)))
+    renderBell()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Notifications (1 unread)' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Notifications' })
+    for (const option of within(dialog).getAllByText(/^(All|Unread|Needs action)$/)) {
+      expect(option.closest('[title]')?.getAttribute('title') ?? '').toBe('')
+    }
   })
 
   it('closes on Escape and gives the focus back to the bell', async () => {

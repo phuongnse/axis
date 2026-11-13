@@ -898,11 +898,20 @@ const notices = new Map<
   ],
 ])
 
+/** The notices the person cleared, which no list shows again. */
+const cleared = new Set<string>()
+
+/** Whether a notice is one the filter shows. */
+function shows(filter: NotificationFilter, item: NotificationItem): boolean {
+  return filter === 'unread' ? !item.read : filter === 'needsAction' ? item.kind === 'action' && !item.done : true
+}
+
 /**
  * Proposed: the bell's routes over the author's requests. A request of theirs that reaches a state the bell tells
  * adds a notice that opens its page, an auto-accepted one only when it was accepted by itself, and a notice is read
  * once its request has moved on, which also makes an `action` notice done, see the review on #3263. The notices of
- * requests sent before November 9 start read, so the ready request's notice is read but still needs its author.
+ * requests sent before November 9 start read, so the ready request's notice is read but still needs its author. A
+ * cleared notice is in no list again.
  */
 function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<string, FixtureRoute> {
   const page = (filter: NotificationFilter) => (): NotificationPage => {
@@ -932,14 +941,13 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
     }
     const states = new Map(requests().map((request) => [request.id, request.state]))
     const items = [...notices.values()]
+      .filter((notice) => !cleared.has(notice.id))
       .map(({ request, state, ...notice }) => {
         const movedOn = request !== null && states.get(request) !== state
         return { ...notice, read: notice.read || movedOn, done: notice.kind === 'action' && movedOn }
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    const shown = items.filter((item) =>
-      filter === 'unread' ? !item.read : filter === 'needsAction' ? item.kind === 'action' && !item.done : true,
-    )
+    const shown = items.filter((item) => shows(filter, item))
     return {
       items: shown,
       page: 1,
@@ -947,6 +955,12 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
       totalCount: shown.length,
       unreadCount: items.filter((item) => !item.read).length,
     }
+  }
+  const clearAll = (filter: NotificationFilter) => () => {
+    for (const item of page(filter)().items) {
+      cleared.add(item.id)
+    }
+    return new Response(null, { status: 204 })
   }
   const markRead = (id: string) => () => {
     const notice = notices.get(id)
@@ -968,7 +982,19 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
       notices.forEach((notice) => (notice.read = true))
       return new Response(null, { status: 204 })
     },
+    '/api/notifications/clear-all': clearAll('all'),
+    '/api/notifications/clear-all?unread=true': clearAll('unread'),
+    '/api/notifications/clear-all?needsAction=true': clearAll('needsAction'),
     ...Object.fromEntries(['storage', ...ids].map((id) => [`/api/notifications/${id}/read`, markRead(id)])),
+    ...Object.fromEntries(
+      ['storage', ...ids].map((id) => [
+        `/api/notifications/${id}/clear`,
+        () => {
+          cleared.add(id)
+          return new Response(null, { status: 204 })
+        },
+      ]),
+    ),
   }
 }
 

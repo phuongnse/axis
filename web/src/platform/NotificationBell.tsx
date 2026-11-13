@@ -1,8 +1,10 @@
 import {
   BellOutlined,
   CheckOutlined,
+  ClearOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CloseOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons'
 import { Badge, Flex, Pagination, Popover, Segmented, Tooltip, Typography } from 'antd'
@@ -13,6 +15,8 @@ import { useLocation, useNavigate } from 'react-router'
 import { Announcement } from './Announcement'
 import { formatValue } from './formatValue'
 import {
+  clearNotification,
+  clearNotifications,
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -58,6 +62,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
   const [open, setOpen] = useState(false)
   const [markFailed, setMarkFailed] = useState(false)
   const [filter, setFilter] = useState<NotificationFilter>('all')
+  const [clearFailed, setClearFailed] = useState(false)
   const request = useRef<AbortController | null>(null)
   const panel = useRef<HTMLDivElement>(null)
   const bell = useRef<HTMLButtonElement>(null)
@@ -112,6 +117,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
 
   function openPanel() {
     setMarkFailed(false)
+    setClearFailed(false)
     setFilter('all')
     setOpen(true)
     void load(1, 'all')
@@ -152,6 +158,19 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
     await load(data?.page ?? 1, filter)
   }
 
+  // Proposed: clearing takes a notification out of the person's list for good, see the review on #3263.
+  async function clear(item: NotificationItem | 'all') {
+    setMarkFailed(false)
+    setClearFailed(false)
+    try {
+      await (item === 'all' ? clearNotifications(path, filter) : clearNotification(path, item.id))
+    } catch (error) {
+      console.warn('Clearing notifications failed', error)
+      setClearFailed(true)
+    }
+    await load(item === 'all' ? 1 : (data?.page ?? 1), filter)
+  }
+
   const list = (
     <div
       ref={panel}
@@ -174,13 +193,22 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
         <Typography.Title level={5} style={{ margin: 0 }}>
           {label}
         </Typography.Title>
-        <AxisButton
-          role="icon"
-          nameKey="shell.notifications.markAllRead"
-          icon={<CheckOutlined />}
-          disabled={unread === 0}
-          onClick={() => void markAllRead()}
-        />
+        <Flex>
+          <AxisButton
+            role="icon"
+            nameKey="shell.notifications.markAllRead"
+            icon={<CheckOutlined />}
+            disabled={unread === 0}
+            onClick={() => void markAllRead()}
+          />
+          <AxisButton
+            role="icon"
+            nameKey="shell.notifications.clearAll"
+            icon={<ClearOutlined />}
+            disabled={data.items.length === 0}
+            onClick={() => void clear('all')}
+          />
+        </Flex>
       </Flex>
       {/* Proposed: the list's filter, which starts at All each time the list opens, see the review on #3263. */}
       <div style={{ padding: `0 ${spacing.md}px ${spacing.xs}px` }}>
@@ -188,16 +216,19 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
           block
           value={filter}
           onChange={choose}
+          // An empty title, as each choice shows its words already and needs no tooltip.
           options={(['all', 'unread', 'needsAction'] as const).map((value) => ({
             value,
             label: t(`shell.notifications.filter.${value}`),
+            title: '',
           }))}
         />
       </div>
-      {(failed || markFailed) && (
+      {(failed || markFailed || clearFailed) && (
         <div style={{ paddingInline: spacing.md, paddingBottom: spacing.xs }}>
           {failed && <AxisAlert kind="error" message={t('shell.notifications.loadFailed')} />}
           {markFailed && <AxisAlert kind="error" message={t('shell.notifications.markFailed')} />}
+          {clearFailed && <AxisAlert kind="error" message={t('shell.notifications.clearFailed')} />}
         </div>
       )}
       {data.items.length === 0 ? (
@@ -218,7 +249,13 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
           }}
         >
           {data.items.map((item) => (
-            <NotificationRow key={item.id} item={item} locale={locale} onOpen={() => void openRow(item)} />
+            <NotificationRow
+              key={item.id}
+              item={item}
+              locale={locale}
+              onOpen={() => void openRow(item)}
+              onClear={() => void clear(item)}
+            />
           ))}
         </ul>
       )}
@@ -299,10 +336,20 @@ const kindIcons: Record<NotificationKind, ReactNode> = {
  * action that waits, `dangerText` for a problem and `textMuted` for information, with the kind in words for assistive technology.
  * The icon sits in the middle of the row's first line, the unread dot after how long ago, and a problem's title is in
  * `dangerText` too.
- * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. See
- * the review on #3263.
+ * Its source and how long ago it came head it, the exact time in a tooltip, and its body shows two lines at most. A
+ * Clear button follows the row, on the middle of its first line. See the review on #3263.
  */
-function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; locale: string; onOpen: () => void }) {
+function NotificationRow({
+  item,
+  locale,
+  onOpen,
+  onClear,
+}: {
+  item: NotificationItem
+  locale: string
+  onOpen: () => void
+  onClear: () => void
+}) {
   const t = useText()
   const { colour, radius, spacing } = useDesignTokens()
   const { mode } = useThemeMode()
@@ -323,22 +370,29 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
     item.body,
   ].join(', ')
   return (
-    <li>
+    <li
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        borderRadius: radius.base,
+        background: hovered ? hoverItemTint(mode) : undefined,
+      }}
+    >
       <button
         type="button"
         aria-label={name}
         onClick={onOpen}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
         style={{
           display: 'grid',
           gridTemplateColumns: 'auto 1fr',
           columnGap: spacing.xs,
-          width: '100%',
-          padding: `${spacing.sm}px ${spacing.sm}px ${spacing.sm}px ${spacing.xs}px`,
+          flex: '1 1 auto',
+          minWidth: 0,
+          padding: `${spacing.sm}px ${spacing.xs}px`,
           border: 0,
-          borderRadius: radius.base,
-          background: hovered ? hoverItemTint(mode) : 'transparent',
+          background: 'transparent',
           color: colour.text,
           font: 'inherit',
           textAlign: 'start',
@@ -385,6 +439,17 @@ function NotificationRow({ item, locale, onOpen }: { item: NotificationItem; loc
           </span>
         </span>
       </button>
+      {/* Its own button beside the row, as a button holds no other; at the middle of the row's first line. */}
+      <span style={{ flex: 'none', paddingTop: spacing.sm - 1, paddingRight: spacing.xs / 2 }}>
+        <AxisButton
+          role="icon"
+          size="small"
+          nameKey="shell.notifications.clear"
+          nameSuffix={item.subject}
+          icon={<CloseOutlined />}
+          onClick={onClear}
+        />
+      </span>
     </li>
   )
 }
