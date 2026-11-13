@@ -16,6 +16,7 @@ import type {
   StudioResource,
   StudioResourceItem,
 } from '../platform/studio'
+import type { NotificationItem, NotificationPage } from '../platform/notifications'
 import type { FixtureRoute } from './fixtureFetch'
 import { application, currentUser, locale } from './fixtures'
 
@@ -466,7 +467,10 @@ const aiRequests: StudioAuthoringRequest[] = [
     '2026-11-08T16:20:00Z',
     true,
   ),
-  authoringRequest(3, 'accepted', 'Rename the Category field to Spending category.', '2026-11-07T10:05:00Z', false),
+  {
+    ...authoringRequest(3, 'accepted', 'Rename the Category field to Spending category.', '2026-11-07T10:05:00Z', true),
+    autoAccept: true,
+  },
   authoringRequest(
     2,
     'failed',
@@ -851,6 +855,85 @@ function acceptOf(request: StudioAuthoringRequest): StudioRequest | null {
   }
 }
 
+/**
+ * Proposed: what the bell tells an author about their own AI request, see the review on #3263: its plan waits for
+ * them, its change is ready, AI could not finish it, or its change was accepted by itself.
+ */
+const noticeSubjects: Partial<Record<StudioAuthoringRequest['state'], string>> = {
+  awaitingApproval: 'A plan waits for your approval',
+  ready: 'A change is ready for you to accept',
+  failed: 'AI could not finish your request',
+  accepted: 'Your change was accepted',
+}
+
+/** The bell's notices, one for each request and state that told its author, kept as the server keeps them. */
+const notices = new Map<string, NotificationItem & { request: string; state: StudioAuthoringRequest['state'] }>()
+
+/**
+ * Proposed: the bell's routes over the author's requests. A request of theirs that reaches a state the bell tells
+ * adds a notice that opens its page, an auto-accepted one only when it was accepted by itself, and a notice is read
+ * once its request has moved on, see the review on #3263. The notices of requests sent before November 8 start read.
+ */
+function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<string, FixtureRoute> {
+  const page = (): NotificationPage => {
+    for (const request of requests()) {
+      const subject = noticeSubjects[request.state]
+      const told = request.state !== 'accepted' || request.autoAccept
+      const key = `${request.id}-${request.state}`
+      if (request.author !== currentUser.id || subject === undefined || !told || notices.has(key)) {
+        continue
+      }
+      const sent = Date.parse(request.sentAt)
+      notices.set(key, {
+        id: key,
+        releaseId: null,
+        subject,
+        body:
+          request.state === 'accepted'
+            ? `Purchase requests: “${request.text}” It goes live when someone publishes.`
+            : `Purchase requests: “${request.text}”`,
+        open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
+        read: sent < Date.parse('2026-11-08T00:00:00Z'),
+        createdAt: new Date(Number.isNaN(sent) ? Date.now() : sent + 20 * 60_000).toISOString(),
+        request: request.id,
+        state: request.state,
+      })
+    }
+    const states = new Map(requests().map((request) => [request.id, request.state]))
+    const items = [...notices.values()]
+      .map((notice) => ({ ...notice, read: notice.read || states.get(notice.request) !== notice.state }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    const shown = items.map(({ request: _request, state: _state, ...item }) => item)
+    return {
+      items: shown,
+      page: 1,
+      pageSize: 10,
+      totalCount: shown.length,
+      unreadCount: shown.filter((item) => !item.read).length,
+    }
+  }
+  const markRead = (id: string) => () => {
+    const notice = notices.get(id)
+    if (notice !== undefined) {
+      notice.read = true
+    }
+    return new Response(null, { status: 204 })
+  }
+  const ids = [...aiRequests, ...[0, 1, 2, 3].map((n) => authoringRequest(100 + n, 'planning', '', '', true))].flatMap(
+    (request) => Object.keys(noticeSubjects).map((state) => `${request.id}-${state}`),
+  )
+  // The bell asks for its first page, which this answers in place of the shared empty one.
+  return {
+    '/api/notifications?page=1&pageSize=10': page,
+    '/api/notifications/read-all': () => {
+      page()
+      notices.forEach((notice) => (notice.read = true))
+      return new Response(null, { status: 204 })
+    },
+    ...Object.fromEntries(ids.map((id) => [`/api/notifications/${id}/read`, markRead(id)])),
+  }
+}
+
 /** The routes of the open application with Ask AI on, its requests and whether it allows auto-accept. */
 function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Record<string, FixtureRoute> {
   const all = () => [...sentRequests.map((item) => item.request), ...list.items]
@@ -870,6 +953,7 @@ function askAiRoutes(list: StudioAuthoringRequestList, autoAccept: boolean): Rec
     }
   const routes: Record<string, FixtureRoute> = {
     ...workspaceRoutes(typicalFolder),
+    ...noticeRoutes(() => all().map(asNow)),
     [`${folderPath}/settings`]: () => ({ autoAccept }),
     [`${folderPath}/authoring-requests`]: (init) => {
       if (init?.method !== 'POST') {

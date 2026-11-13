@@ -243,4 +243,14 @@ describe('notificationAddress', () => {
     expect(notificationAddress('e2e', { page: 'Notes', parameters: { note: null } })).toBe('/e2e/notes')
     expect(notificationAddress('e2e', { page: 'Notes', parameters: {} })).toBe('/e2e/notes')
   })
+
+  // Proposed: a notice about an AI request opens its page in Studio, see the review on #3263.
+  it('opens a platform page at the root for a platform notice', () => {
+    expect(
+      notificationAddress(null, {
+        page: 'studio',
+        parameters: { app: 'Purchases', view: 'requests', request: noteId },
+      }),
+    ).toBe(`/studio?app=Purchases&view=requests&request=${noteId}`)
+  })
 })

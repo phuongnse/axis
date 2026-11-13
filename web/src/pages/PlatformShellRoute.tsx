@@ -8,8 +8,9 @@ import { fetchTexts } from '../platform/texts'
 import { LocaleLoadFailed } from './LocaleLoadFailed'
 import { usePlatform } from './context'
 
-// A tenant notice has no page to open, so the site path is never used.
-const tenantNotices = { path: '/api/notifications', sitePath: '/' }
+// Proposed: the platform's notices, the tenant notices and what the bell tells an author about their AI requests, whose
+// pages are platform pages, see the review on #3263.
+const platformNotices = { path: '/api/notifications', sitePath: null }
 
 // The console's title and navigation are fixed here, as the server's site metadata on its host has only Home.
 const cellConsoleTitleKey = 'shell.cell.title'
@@ -21,7 +22,8 @@ const cellConsoleNavigation: NavigationItem[] = [
 
 /**
  * Renders a page in the platform shell, with the platform texts, navigation and locales. The header has
- * the notification bell for an administrator, who sees the tenant notices. On the cell console's host the
+ * the notification bell for every signed-in person: an administrator sees the tenant notices, and an author what
+ * concerns their AI requests. On the cell console's host the
  * shell has the console's title and its three entries, no bell, and shows `account` in place of the app switcher
  * and the account button.
  */
@@ -82,7 +84,7 @@ export function PlatformShellRoute({ children, account }: { children: ReactNode;
         locale={current.locale}
         onLocaleChange={changeLocale}
         legal={site.legal}
-        notifications={!cellConsole && user?.users ? tenantNotices : undefined}
+        notifications={!cellConsole && user ? platformNotices : undefined}
         account={cellConsole ? (account ?? null) : undefined}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}

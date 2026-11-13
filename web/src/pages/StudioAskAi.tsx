@@ -1,23 +1,15 @@
 import { Flex, Form, Input, Typography } from 'antd'
-import { useContext, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { AxisAlert } from '../platform/AxisAlert'
 import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisCheckboxField, AxisField } from '../platform/AxisField'
 import { QuotaRefusedError } from '../platform/quota'
 import { requiredMark } from '../platform/requiredMark'
-import {
-  fetchAuthoringRequests,
-  fetchStudioSettings,
-  sendAuthoringRequest,
-  type StudioAuthoringRequest,
-  type StudioAuthoringRequestList,
-} from '../platform/studio'
+import { fetchAuthoringRequests, fetchStudioSettings, sendAuthoringRequest } from '../platform/studio'
 import { useText } from '../platform/texts'
-import { hoverItemTint, selectedItemTint } from '../platform/antTheme'
-import { useDesignTokens, useThemeMode } from '../platform/themeMode'
-import { PlatformContext } from './context'
-import { authoringRequestAddress, useRequestStateWords, waitingForAuthor } from './authoringRequests'
+import { useDesignTokens } from '../platform/themeMode'
+import { authoringRequestAddress } from './authoringRequests'
 import { StudioSidePanel } from './StudioSidePanel'
 
 /** The id of the request panel, which the band's Ask AI button controls. */
@@ -30,26 +22,18 @@ const maxText = 4000
  * Proposed: the request panel of the open application, in the shared `StudioSidePanel`. On top an author writes a
  * request in words and sends it, with "Accept when checks and review pass" when the application allows auto-accept,
  * and the requests left this month when the tenant has a quota. A sent request opens its page, where its plan shows
- * when AI has written it, and the panel stays open and empty for the next one. Under the form only the author's
- * requests that wait for them show, under "Waiting for you": each one's text is a link to its page, and under it its
- * state and when it was sent. The request whose page is open is on the selected tint. Last, "All AI requests" leads to
- * the page that lists every request, and under a line the MCP server's address on the tenant's host, with a copy
- * button, for an AI app of the author's own. The panel goes with the page and never holds a request, see
- * docs/reference/actions-and-controls.md#opening-things.
+ * when AI has written it, and the panel stays open and empty for the next one. Under a line comes the MCP server's
+ * address on the tenant's host, with a copy button, for an AI app of the author's own. The panel lists no requests:
+ * the sidebar leads to AI requests, and the notification bell tells the author when one waits for them or ends. The
+ * panel goes with the page and never holds a request, see docs/reference/actions-and-controls.md#opening-things.
  */
 export function StudioAskAi({
   application,
-  userId,
-  openRequest,
   revision,
   onClose,
 }: {
   application: string
-  /** The signed-in author, whose requests that wait for them the panel shows. */
-  userId: string | null
-  /** The id of the request whose page is open, which the panel marks. */
-  openRequest: string | null
-  /** Counts the changes to the application's requests, each of which loads them again. */
+  /** Counts the changes to the application's requests, each of which loads the requests left again. */
   revision: number
   onClose: () => void
 }) {
@@ -57,21 +41,21 @@ export function StudioAskAi({
   const navigate = useNavigate()
   const { colour, spacing } = useDesignTokens()
   const [form] = Form.useForm<{ text: string; autoAccept: boolean }>()
-  const [list, setList] = useState<StudioAuthoringRequestList | 'failed'>()
+  const [left, setLeft] = useState<number | null>(null)
   const [allowsAutoAccept, setAllowsAutoAccept] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState<string | null>(null)
 
-  // The list loads again when another request's page opens or a request changes, as that changes what waits.
+  // The requests left load again when a request changes, as a sent one uses one. Without them Send stays on, and the
+  // send route refuses a request over the quota.
   useEffect(() => {
     const controller = new AbortController()
-    fetchAuthoringRequests(application, controller.signal).then(setList, () => {
-      if (!controller.signal.aborted) {
-        setList('failed')
-      }
-    })
+    fetchAuthoringRequests(application, controller.signal).then(
+      (list) => setLeft(list.left),
+      () => {},
+    )
     return () => controller.abort()
-  }, [application, openRequest, revision])
+  }, [application, revision])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -82,11 +66,6 @@ export function StudioAskAi({
     return () => controller.abort()
   }, [application])
 
-  const left = list !== undefined && list !== 'failed' ? list.left : null
-  const waiting =
-    list !== undefined && list !== 'failed'
-      ? list.items.filter((request) => request.author === userId && waitingForAuthor.includes(request.state))
-      : []
   const send = async (values: { text: string; autoAccept: boolean }) => {
     setSending(true)
     setSendError(null)
@@ -153,97 +132,17 @@ export function StudioAskAi({
         </Form>
       }
     >
-      <Flex vertical gap={spacing.sm} style={{ marginTop: spacing.sm }}>
-        {list === 'failed' && <AxisAlert kind="warning" message={t('shell.studio.ai.listFailed')} />}
-        {waiting.length > 0 && (
-          <Flex vertical gap={4}>
-            <Typography.Text strong>{t('shell.studio.ai.waiting')}</Typography.Text>
-            <Flex
-              component="ul"
-              vertical
-              gap={4}
-              style={{ listStyle: 'none', margin: 0, padding: 0 }}
-              data-testid="studio-ai-waiting"
-            >
-              {waiting.map((request) => (
-                <WaitingRow
-                  key={request.id}
-                  application={application}
-                  request={request}
-                  open={request.id === openRequest}
-                />
-              ))}
-            </Flex>
-          </Flex>
-        )}
-        <Link to={authoringRequestAddress(application)} data-testid="studio-ai-all-requests">
-          {t('shell.studio.ai.allRequests')}
-        </Link>
-        {/* Proposed: the MCP server's address, see docs/reference/ai-authoring-in-studio.md#connected-apps. */}
-        <Flex
-          vertical
-          gap={spacing.xs}
-          data-testid="studio-ai-mcp"
-          style={{ marginTop: spacing.sm, paddingTop: spacing.md, borderTop: `1px solid ${colour.borderSubtle}` }}
-        >
-          <Typography.Text strong>{t('shell.studio.ai.mcp')}</Typography.Text>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.ai.mcp.help')}</Typography.Text>
-          <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
-        </Flex>
+      {/* Proposed: the MCP server's address, see docs/reference/ai-authoring-in-studio.md#connected-apps. */}
+      <Flex
+        vertical
+        gap={spacing.xs}
+        data-testid="studio-ai-mcp"
+        style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTop: `1px solid ${colour.borderSubtle}` }}
+      >
+        <Typography.Text strong>{t('shell.studio.ai.mcp')}</Typography.Text>
+        <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.ai.mcp.help')}</Typography.Text>
+        <Typography.Text code copyable>{`${window.location.origin}/mcp`}</Typography.Text>
       </Flex>
     </StudioSidePanel>
-  )
-}
-
-/**
- * One request that waits for its author, drawn as a menu's item is, see docs/reference/actions-and-controls.md#menus:
- * the whole row is a link to its page, `spacing-xs` in from the panel's edges with `radius-base` corners, its words in
- * the text colour, on the hover tint under the pointer, and in `primaryText` on the selected tint while its page is
- * open. Under them its state and when it was sent. Proposed: one look for a selected item, see the review on #3263.
- */
-function WaitingRow({
-  application,
-  request,
-  open,
-}: {
-  application: string
-  request: StudioAuthoringRequest
-  open: boolean
-}) {
-  const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
-  const { mode } = useThemeMode()
-  const [hovered, setHovered] = useState(false)
-  const stateWords = useRequestStateWords()
-  const locale = useContext(PlatformContext)?.current.locale
-  const sentAt = new Date(request.sentAt)
-  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(sentAt)
-  const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(sentAt)
-  const inset = spacing.md - spacing.xs
-
-  return (
-    <li style={{ marginInline: -inset }}>
-      <Link
-        to={authoringRequestAddress(application, request.id)}
-        aria-current={open ? 'page' : undefined}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        style={{
-          display: 'block',
-          padding: `${spacing.xs / 2}px ${inset}px`,
-          borderRadius: radius.base,
-          color: open ? colour.primaryText : colour.text,
-          background: open ? selectedItemTint(mode) : hovered ? hoverItemTint(mode) : undefined,
-        }}
-      >
-        <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {request.text}
-        </span>
-        <span style={{ display: 'block', color: colour.textMuted }}>
-          <span style={{ color: colour.text, fontWeight: 600 }}>{stateWords(request, true)}</span>
-          {t('shell.studio.ai.sentByYou').replace('{date}', date).replace('{time}', time)}
-        </span>
-      </Link>
-    </li>
   )
 }

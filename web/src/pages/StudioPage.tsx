@@ -591,8 +591,6 @@ function StudioWorkspace() {
               sidePanel === 'askAi' ? (
                 <StudioAskAi
                   application={application!}
-                  userId={userId}
-                  openRequest={requestsView ? params.get('request') : null}
                   revision={requestsRevision}
                   onClose={() => setSidePanel(null)}
                 />

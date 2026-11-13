@@ -23,13 +23,13 @@ const pageSize = 10
 interface NotificationBellProps {
   /** The address of the application's notification routes. */
   path: string
-  /** The path of the site, which a notification's page opens in. */
-  sitePath: string
+  /** The path of the site, which a notification's page opens in, or `null` on the platform site. */
+  sitePath: string | null
   locale: string
 }
 
 /**
- * The notification bell in the header of an application site, and of the platform site for an administrator.
+ * The notification bell in the header of an application site, and of the platform site for every signed-in person.
  * It shows the signed-in user's unread count and opens a panel with the notifications, newest first, 10 to
  * a page. A row opens its page, if it has one, and marks the notification read. The count reloads when the bell mounts, on every navigation, when the
  * panel opens and after any mark read. The bell renders nothing until the first load succeeds, and after a

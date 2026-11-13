@@ -241,11 +241,6 @@ export function diffTints(mode: ThemeMode): { added: string; addedWord: string; 
   }
 }
 
-/** Proposed: the tint Ant Design gives an item under the pointer, for a list that draws its items as a menu does. */
-export function hoverItemTint(mode: ThemeMode): string {
-  return theme.getDesignToken(antThemeFor(mode)).controlItemBgHover
-}
-
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }
 

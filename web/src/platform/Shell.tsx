@@ -34,8 +34,11 @@ interface ShellProps {
   locales: readonly string[]
   locale: string
   onLocaleChange: (locale: string) => void
-  /** Where the notification bell reads, set on an application site and, for an administrator, on the platform site. Without it the header has no bell. */
-  notifications?: { path: string; sitePath: string }
+  /**
+   * Where the notification bell reads, set on an application site and, for a signed-in person, on the platform site,
+   * whose `sitePath` is `null`. Without it the header has no bell.
+   */
+  notifications?: { path: string; sitePath: string | null }
   /** The privacy and terms links the footer shows, from the site the shell shows. */
   legal?: SiteLegal | null
   /** What the header shows in place of the app switcher and the account button, such as the cell console's operator name. `null` shows nothing there. */

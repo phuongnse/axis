@@ -63,10 +63,12 @@ export async function markAllNotificationsRead(path: string): Promise<void> {
 
 /**
  * The address of the page a notification opens: the page's path in the site, with one query entry
- * for each parameter that is not null.
+ * for each parameter that is not null. A platform notice has no site, so `sitePath` is `null` and its page is a
+ * platform page at the root, such as `studio`.
  */
-export function notificationAddress(sitePath: string, open: NotificationOpen): string {
-  const path = siteAddress(sitePath, open.page.toLowerCase())
+export function notificationAddress(sitePath: string | null, open: NotificationOpen): string {
+  const page = open.page.toLowerCase()
+  const path = sitePath === null ? `/${page}` : siteAddress(sitePath, page)
   const query = new URLSearchParams()
   for (const [name, value] of Object.entries(open.parameters)) {
     if (value !== null && value !== undefined) {

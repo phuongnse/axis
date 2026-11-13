@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -59,11 +59,11 @@ function json(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
-function stubApi(current: CurrentUser) {
+function stubApi(current: CurrentUser | null) {
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = String(input)
     if (url === '/api/me') {
-      return Promise.resolve(json(current))
+      return Promise.resolve(current === null ? new Response(null, { status: 401 }) : json(current))
     }
     if (url === '/api/sites') {
       return Promise.resolve(json({ sites: [] }))
@@ -103,12 +103,20 @@ describe('PlatformShellRoute', () => {
     expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument()
   })
 
-  it('shows no bell and never asks for notices for another user', async () => {
-    const fetchMock = stubApi({ ...user, users: false })
+  // Proposed: the bell tells an author about their own AI requests, see the review on #3263.
+  it('shows the notification bell with their own notices to a signed-in person who is no administrator', async () => {
+    stubApi({ ...user, users: false })
     renderShell()
 
-    expect(await screen.findByRole('button', { name: /Ada Admin/ })).toBeInTheDocument()
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/sites', expect.anything()))
+    expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument()
+  })
+
+  it('shows no bell and never asks for notices for a visitor who is not signed in', async () => {
+    const fetchMock = stubApi(null)
+    renderShell()
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
+    await act(() => Promise.resolve())
     expect(screen.queryByRole('button', { name: /^Notifications/ })).toBeNull()
     expect(fetchMock.mock.calls.some(([input]) => String(input).startsWith('/api/notifications'))).toBe(false)
   })
