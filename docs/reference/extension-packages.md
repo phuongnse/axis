@@ -35,9 +35,9 @@ and installed apart from any application, see [Installation](#installation).
   operation to a function of the library, and the library's code does not
   change.
 - **Built once** _(planned for M21)_. A package is built once, when it is
-  installed or published. Its dependencies are installed from the lock file
-  and scanned for known vulnerabilities. A runner downloads nothing at run
-  time.
+  installed or published, see [Building a package](#building-a-package). Its
+  dependencies are installed from the lock file and scanned for known
+  vulnerabilities. A runner downloads nothing at run time.
 - **No data access.** A package cannot read or write entities.
 - **Widgets** _(planned for M22)_. A package may also hold custom widgets,
   React components that a page names, which build on Axis widgets and Axis tokens, never on Ant
@@ -81,8 +81,14 @@ identity, its operations and, for a C# package, its main assembly. This example 
   is not loaded.
 - **`assembly`.** For a C# package, the file name of its main assembly, in
   the package folder.
-- **Language, adapter and lock file** _(planned for M21)_. The manifest names
-  the package's language, its adapter and its lock file.
+- **`language`** _(planned for M21)_. `csharp`, `node` or `python`. It defaults to `csharp`, and
+  `assembly` is required exactly when it is `csharp`. `axis-package.schema.json` holds the rules of
+  this field, `adapter` and `lock`.
+- **`adapter`** _(planned for M21)_. The adapter file in the package folder: a JavaScript module for
+  `node`, where TypeScript is compiled before the build, or a `.py` module for `python`. It is refused
+  for `csharp`, whose adapter is its `assembly`.
+- **`lock`** _(planned for M21)_. Required. The language's lock file: `packages.lock.json`,
+  `package-lock.json`, or `requirements.txt` with a `--hash` on every line.
 - **`assembly` left out** _(planned for M22)_. A package that holds only widgets has no
   `assembly`.
 - **`widgets`** _(planned for M22)_. The custom widgets the package offers,
@@ -93,6 +99,8 @@ identity, its operations and, for a C# package, its main assembly. This example 
   - `type` is, for a C# package, the full name of a class in the main assembly
     that implements `IOperation`. The class is not abstract and has a public parameterless
     constructor, because the host creates each instance itself.
+    - **For `node` and `python`** _(planned for M21)_. `type` names a function that the adapter
+      exports.
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
     whether an unknown outcome is retried, see
@@ -142,8 +150,9 @@ public class RetryableException : Exception { }
   may succeed later. Any other exception fails the call, see
   [Call outcomes](process-execution.md#package-call-outcomes).
 - **One protocol and an SDK for each language** _(planned for M21)_. The
-  worker and every runner speak one protocol that no language owns. A small
-  SDK for each language implements the operation context over it.
+  worker and every runner speak one protocol that no language owns, see
+  [The runner protocol](#the-runner-protocol). A small SDK for each language
+  implements the operation context over it.
 - **Value types.** For a C# package, input and output values use these .NET types:
 
   | Field type | .NET type |
@@ -180,13 +189,40 @@ every host reads. An installation's package is trusted code that the operator re
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-- **The package host** _(planned for M21)_. The `package-host` container holds the same packages,
-  and its runners for each runtime run them, see [Package runners](#package-runners).
+- **The package hosts** _(planned for M21)_. The containers `package-host-dotnet`, `package-host-node`
+  and `package-host-python` mount the same folder read-only, and their runners run the packages, see
+  [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
   release with a running or waiting instance, pins. Removing one stops the
   start of both hosts, see [Versions and pinning](#versions-and-pinning).
+
+### Building a package
+
+_(planned for M21)_
+
+The operator builds a package once, in the package's own host image, `axis-package-host-<language>`,
+and the build writes the folder that `Extensions:Path` names.
+
+```sh
+docker run --rm -v <source>:/source:ro -v <extensions>:/extensions \
+  axis-package-host-<language> build /source
+```
+
+The build runs there because dependencies, native modules included, install with the runtime and system
+libraries that run them, and install-time code never runs in the admin host.
+
+- **Checks.** It checks the manifest as [Loading](#loading) does, with `AXC0132` to `AXC0138`.
+- **Installs from the lock file only.** For `node` it runs `npm ci --ignore-scripts`. For `python` it
+  runs `pip install --require-hashes --no-deps`.
+- **C#.** `axis-package-host-dotnet build` takes the folder that the developer published in locked mode,
+  and scans its `packages.lock.json`. It compiles nothing.
+- **Scan.** It scans the installed dependencies with Trivy.
+- **Refuses.** A missing or stale lock file, a Python dependency without a hash, a vulnerability of
+  high or critical severity, and an existing `<id>/<version>/` folder.
+- **Writes.** `<Extensions:Path>/<id>/<version>/`.
+- **Registry credentials.** They are mounted for the build alone, and the runners never see them.
 
 ## Versions and pinning
 
@@ -321,30 +357,35 @@ _(planned for M21)_
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runners.** Each runtime has its own runner, in a runner image that
-  carries that runtime. `Axis.PackageHost` runs them, and the worker loads no
-  package code. The runners run in their own container, `package-host`,
-  beside the worker, in Compose and in the Helm chart.
+- **The runners.** Each runtime has its own container, whose host,
+  `Axis.PackageHost`, starts a runner process when the worker asks and stops
+  it when told. The worker loads no package code. The images and containers
+  are in [images](installation.md#images).
 - **One set for each version.** An installation's packages share runners
   across tenants, one set for each installed package version. Each runner
   process runs one call at a time. The worker keeps a small pool for each
   version, and starts a new runner when one exits.
-- **The request.** For each attempt the worker sends a runner one request
-  over a local socket: the operation name, the operation identity, the input,
-  and the values of the bindings the operation declares, for the call's
-  tenant. The worker and every runner speak one protocol that no language
-  owns, and each language's SDK implements the operation context over it, so
-  package code and manifests do not change.
-- **Environment, for a runner that Axis hosts.** It starts with an empty
-  environment, a read-only file system apart from a temporary folder, and CPU
-  and memory limits. It sees no tenant's secrets except the bindings of the
-  call it runs.
-- **Network, for a runner that Axis hosts.** Its only network route is an
-  egress proxy in the worker. The proxy lets through only the scheme, host and
-  port of the `url` bindings the operation declares, and follows no redirects.
-  The context's HTTP client sends through it, and so does a library's own HTTP
-  call, so the library needs no change. A socket the package opens itself
-  reaches nothing else.
+- **The request.** For each attempt the worker sends a runner one `run`
+  message, see [The runner protocol](#the-runner-protocol). Package code and
+  manifests do not change with the language.
+- **Environment, for a runner that Axis hosts.** The environment is empty
+  apart from `HTTP_PROXY` and `HTTPS_PROXY`, their lower-case forms, and
+  `NODE_USE_ENV_PROXY=1` for Node.js. The container gets no tenant or
+  installation settings, a read-only root file system apart from a temporary
+  folder, and CPU and memory limits. It sees no tenant's secrets except the
+  bindings of the call it runs.
+- **Network, for a runner that Axis hosts.** The proxy variables name the
+  egress proxy in the worker, with a token for each runner that the worker
+  sends in `start`. So the context's HTTP client sends through the proxy, and
+  so does a library's own HTTP call, and the library needs no change. The
+  proxy admits a `CONNECT` only to the scheme, host and port of a `url`
+  binding that the runner's current call declares, and plain `http` only in
+  Development. It follows no redirects. Compose puts the worker and the three
+  hosts on an `internal` network of their own. The Helm chart gives a
+  NetworkPolicy that admits traffic to the hosts only from the worker and lets
+  them reach only the proxy port. Every other route is closed, DNS included,
+  because the proxy resolves hosts. A library that ignores the proxy variables
+  reaches nothing.
 - **Timeout.** At the operation's `timeout` the worker kills the runner
   process. The attempt's outcome is unknown, see
   [package call outcomes](process-execution.md#package-call-outcomes).
@@ -357,6 +398,37 @@ package reaches nothing of the host and no binding of another call.
   default, uses the runners. `inProcess` keeps the in-process
   [loading](#loading), and is allowed only in Development. Elsewhere the host
   does not start.
+
+### The runner protocol
+
+_(planned for M21)_
+
+The worker and every runner speak one protocol that no language owns. A small SDK for each language
+implements the operation context over it.
+
+| Message | Sent by | Fields |
+| --- | --- | --- |
+| `start` | The worker, to the host | `package`, `version`, `proxyToken` |
+| `ready` | The runner | None |
+| `run` | The worker | `operation`, `operationId`, `input`, and `bindings` with `urls` and `secrets`, each mapping a binding name to its value |
+| `result` | The runner | `output` |
+| `retryable` | The runner | `error`, the name of the error's type |
+| `failure` | The runner | `error`, the name of the error's type, or `binding`, the undeclared binding it asked for |
+| `stop` | The worker | None |
+
+- **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network.
+- **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
+  host starts the runner and pipes the connection to the runner's standard input and output.
+- **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host
+  kills that runner. A runner that exits closes its connection, and the worker takes that as an
+  unknown outcome.
+- **Values.** `text` is a string. `integer` and `decimal` are strings, so that no language loses
+  precision. `boolean` is a JSON boolean. `date` is `YYYY-MM-DD` and `date-time` is ISO 8601 with an
+  offset. A missing value is `null`.
+- **No exception message.** No message carries an exception message, because history keeps only the
+  type of an exception, see [Capabilities](#capabilities).
+- **The schema.** `sdk/package-runner-protocol.schema.json` holds the exact shape of each message.
+  Every SDK's tests read it.
 
 ### Customer-hosted runners
 
@@ -429,7 +501,7 @@ trusted code, so the platform gives it more limits than an installation's packag
   [versions and pinning](#versions-and-pinning).
 - **No change to a module's code.** A customization layer cannot change a module's code. An
   application that needs other code adds a package of its own and calls it, or
-  [ejects](customization-layers.md) the module.
+  [ejects](modules-and-templates.md#upgrades-with-module-migrations) the module.
 - **Built and scanned on publish.** Publishing the application builds and scans the package.
 
 ### How a package is written
