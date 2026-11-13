@@ -98,12 +98,7 @@ export function StudioAskAi({ application, onClose }: { application: string; onC
           // Proposed: before an author has connected their AI, the panel offers the two ways to ask it: their own API
           // key, or an AI app they already pay for through the MCP address under it, see the review on #3263.
           <Flex vertical gap={spacing.xs} data-testid="studio-ai-not-connected">
-            <Typography.Title level={5} style={{ margin: 0 }}>
-              {t('shell.studio.ai.notConnected')}
-            </Typography.Title>
-            <Typography.Text strong style={{ marginTop: spacing.xs }}>
-              {t('shell.studio.ai.notConnected.key')}
-            </Typography.Text>
+            <Typography.Text strong>{t('shell.studio.ai.notConnected.key')}</Typography.Text>
             <Typography.Text style={{ color: colour.textMuted }}>
               {t('shell.studio.ai.notConnected.key.help')}
             </Typography.Text>

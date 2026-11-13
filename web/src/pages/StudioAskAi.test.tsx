@@ -57,8 +57,7 @@ describe('StudioAskAi', () => {
   it('leads an author with no AI of their own to connect one on their account page or to use an AI app through MCP, with no form', async () => {
     renderPanel({ connected: false })
 
-    expect(await screen.findByRole('heading', { name: 'Ask AI in one of two ways' })).toBeInTheDocument()
-    expect(screen.getByText('With your own API key')).toBeInTheDocument()
+    expect(await screen.findByText('With your own API key')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Connect your AI' })).toHaveAttribute('href', '/account')
     expect(
       within(screen.getByTestId('studio-ai-mcp')).getByText('With an AI app you already pay for'),

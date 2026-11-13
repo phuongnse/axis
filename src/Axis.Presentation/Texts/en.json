@@ -2096,7 +2096,6 @@
   "shell.studio.ai.send": "Send",
   "shell.studio.ai.sendFailed": "The request was not sent. Try again.",
   "shell.studio.ai.connect": "Connect your AI",
-  "shell.studio.ai.notConnected": "Ask AI in one of two ways",
   "shell.studio.ai.notConnected.key": "With your own API key",
   "shell.studio.ai.notConnected.key.help": "Add your AI provider's API key, and the requests you send here run on it. Your account pays for what you ask.",
   "shell.studio.ai.notConnected.app": "With an AI app you already pay for",
