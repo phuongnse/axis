@@ -332,6 +332,13 @@ A tenant of a cell also has a backup key in `platform.tenant_backup_keys`, wrapp
   re-encrypts every tenant secret and every data protection key with the new key, in one
   transaction. The format and the associated data do not change. See
   [installation key](tenant-setting-commands.md#installation-key).
+- **Sealed secrets.** _(planned for M35)_ A secret that a person gives is stored as the sealed value,
+  which the server cannot open. Its last four characters are kept apart for display, and the
+  installation key does not encrypt it.
+- **Removal.** _(planned for M35)_ Removing a sealed secret destroys its data key, so no copy, backup
+  included, opens again.
+- **The installation key at rest.** _(planned for M35)_ The cloud's or the customer's key service wraps
+  it, see [key policy](keys-and-data-protection.md#key-policy).
 
 ## Database roles
 

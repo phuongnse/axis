@@ -182,7 +182,36 @@ flowchart LR
 | I21 | The previous installation key stays on the hosts after a rekey. | Stored secrets and key ring | Information disclosure | Medium | **Delegated** | The operator removes `Platform:PreviousSecretKey` from every host once the rekey has run, see [Installation key](tenant-setting-commands.md#installation-key). |
 | I22 | A leaked installation key stays in use until the operator rotates it. | Stored secrets and key ring | Information disclosure | High | **Delegated** | The operator runs `platform rekey` and changes the secrets at once when a key may have leaked, see [Key policy](keys-and-data-protection.md#key-policy). |
 
-Other categories do not apply to stored keys. A changed key ring fails to start, see I12, and a rekey writes a record, see I3.
+**Browser, agent host and key service** _(planned for M35)_
+
+```mermaid
+flowchart LR
+    Browser[Browser]
+    Server[Server]
+    Db[(Platform database)]
+    Agent[Agent host]
+    KeyService[Cloud's or customer's key service]
+    Provider[Model provider's API host]
+    Browser -->|seals with the agent host's public key and sends| Server
+    Server -->|stores the sealed value| Db
+    Agent -->|reads the sealed value| Db
+    Agent -->|unwraps its private key| KeyService
+    Agent -->|opens the value and sends the key| Provider
+```
+
+The browser seals a person's secret with the agent host's public key, and the server stores the sealed value and cannot open it. The agent host unwraps its private key at the key service, opens the value in memory and sends the key only to the model provider's API host.
+
+Open threats, which no issue closes, see [threat model method](threat-model-method.md#how-it-is-filled):
+
+- I29 (Information disclosure, High): the server, the worker, the admin tool or someone with the installation key opens a sealed secret. The test must show that none of them opens it.
+- I30 (Information disclosure, High): a route, log, trace, problem details or backup holds a person's secret in clear, or more than its last four characters. The test must show that none of them does.
+- I31 (Elevation of privilege, High): an identity other than the host's own unwraps a host key or the installation key, or an unwrap is not logged. The test must show that only the host's own identity unwraps its key and that each unwrap is logged.
+- I32 (Information disclosure, Medium): a removed secret opens again from a copy or a backup. The test must show that a restored copy of a removed secret does not open.
+- I33 (Information disclosure, High): an AI key is sent to a host other than its provider's API host, or into a prompt. The test must show that the key reaches only the provider's API host and appears in no prompt.
+- I34 (Tampering, Medium): the browser seals with a public key that is not the host's. The test must show that the browser refuses a public key that the host does not vouch for.
+- I35 (Repudiation, Low): adding, changing or removing a person's key writes no audit record. The test must show that each of the three writes one.
+
+Other categories do not apply to the key ring and the installation key. A changed key ring fails to start, see I12, and a rekey writes a record, see I3.
 
 ### Cell console and provisioning API
 
