@@ -103,7 +103,7 @@ describe('an outside AI app’s request', () => {
     )
 
     expect(await screen.findByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
-    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Ready for you to accept')).toBeInTheDocument()
+    expect(within(screen.getByTestId('studio-ai-progress')).getByText('Ready')).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     expect(screen.getByTestId('studio-ai-not-reviewed')).toHaveTextContent(
@@ -125,7 +125,7 @@ describe('an outside AI app’s request while it works', () => {
       />,
     )
 
-    expect(await screen.findByText('Making the change')).toBeInTheDocument()
+    expect(await screen.findByText('Working')).toBeInTheDocument()
     expect(screen.queryByTestId('studio-ai-app-works')).toBeNull()
     // Every request goes through the same frame, whichever way it began.
     const progress = screen.getByTestId('studio-ai-progress')

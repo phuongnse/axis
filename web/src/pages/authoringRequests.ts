@@ -13,15 +13,10 @@ export function authoringRequestAddress(application: string, id?: string): strin
   return `/studio?${new URLSearchParams({ app: application, view: 'requests', ...(id ? { request: id } : {}) })}`
 }
 
-/** A request's state in words, for its author or for anyone else, see docs/reference/authoring-requests.md#states. */
-export function useRequestStateWords(): (request: StudioAuthoringRequest, mine: boolean) => string {
+/** Proposed: a request's state in one word, the same for every reader, see docs/reference/authoring-requests.md#states and the review on #3263. */
+export function useRequestStateWords(): (request: StudioAuthoringRequest) => string {
   const t = useText()
-  return (request, mine) =>
-    t(
-      waitingForAuthor.includes(request.state) && !mine
-        ? `shell.studio.ai.state.${request.state}.other`
-        : `shell.studio.ai.state.${request.state}`,
-    )
+  return (request) => t(`shell.studio.ai.state.${request.state}`)
 }
 
 /** The colour of a state's words: muted once it is over, the danger text when it failed. */

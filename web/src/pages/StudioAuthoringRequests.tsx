@@ -140,7 +140,7 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
               fontWeight: mine && waitingForAuthor.includes(row.state) ? 600 : undefined,
             }}
           >
-            {stateWords(row, mine)}
+            {stateWords(row)}
           </span>
         )
       },
@@ -655,7 +655,7 @@ export function StudioAuthoringRequestPage({
         <Flex align="center" gap={spacing.sm}>
           {following && !waitsForApp && <Spin size="small" />}
           <Typography.Text strong style={{ color: stateColour(request.state) }}>
-            {stateWords(request, mine)}
+            {stateWords(request)}
             {request.round > 1 && request.state !== 'planning' && (
               <span style={{ color: colour.textMuted, fontWeight: 400 }}>
                 {t('shell.studio.aiRequest.round').replace('{round}', String(request.round))}
