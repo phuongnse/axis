@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -16,12 +17,18 @@ namespace Axis.PackageHost.Tests;
 /// package from the test output, see docs/reference/extension-packages.md#the-runner-protocol. The Python package is
 /// copied with its dependency folder, so the tests need no pip, and they run only where <c>python3</c> is on the path. A stub on a loopback port answers the
 /// package's HTTP request. Every line the tests send and receive is checked against the protocol's schema.
-/// Each wait ends on a state, under a cancellation deadline that only bounds a hang.
+/// Each wait ends on a state, under a cancellation deadline that only bounds a hang. The Node.js tests run the
+/// probe package, a plain ES module, and the built Node.js test package, which is CommonJS, through the Node.js runner
+/// that the test project copies to the test output. One test builds a package, and every build writes and deletes
+/// folders named axis-package-build-* in the temporary folder, so this class runs one after the other with the classes
+/// that build packages.
 /// </summary>
+[Collection(BuildTest.Collection)]
 public sealed class PackageHostTests : IAsyncLifetime
 {
     private const string PythonId = "python-test-package";
     private const string PythonOnWindows = "The Python runner tests need python3 on the path.";
+    private const string NodeProbe = "node-probe-package";
 
     private static readonly TimeSpan _deadline = TimeSpan.FromSeconds(90);
 
@@ -38,19 +45,31 @@ public sealed class PackageHostTests : IAsyncLifetime
     private string? _authorization;
     private string? _idempotencyKey;
     private string? _requestTarget;
+    private TcpListener _tunnels = null!;
+    private Task _tunnelLoop = Task.CompletedTask;
+    private string? _connectTarget;
+    private string? _proxyAuthorization;
 
     public async ValueTask InitializeAsync()
     {
         _extensions.Install("1.0.0");
         InstallPython();
+        if (!OperatingSystem.IsWindows())
+        {
+            BuildTest.CopyFolder(Path.Combine(AppContext.BaseDirectory, "NodeProbePackage"), Path.Combine(_extensions.Path, NodeProbe, "1.0.0"));
+        }
+
         var port = FreePort();
         _stubAddress = new Uri($"http://127.0.0.1:{port}/");
         _stub = new HttpListener();
         _stub.Prefixes.Add(_stubAddress.AbsoluteUri);
         _stub.Start();
         _stubLoop = AnswerStubAsync();
+        _tunnels = new TcpListener(IPAddress.Loopback, 0);
+        _tunnels.Start();
+        _tunnelLoop = AcceptTunnelsAsync();
 
-        _host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), PythonRunnerCommand.ForThisProgram(), _log);
+        _host = new RunnerHost(_extensions.Path, TestRunnerCommand.Create(), _log);
         _endpoint = await _host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
     }
 
@@ -64,6 +83,8 @@ public sealed class PackageHostTests : IAsyncLifetime
         await _host.DisposeAsync();
         _stub.Close();
         await _stubLoop;
+        _tunnels.Stop();
+        await _tunnelLoop;
         _extensions.Dispose();
     }
 
@@ -345,22 +366,239 @@ public sealed class PackageHostTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task A_node_package_runs_and_returns_typed_values()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
+
+        var sum = await connection.RunAsync("sum", new JsonObject { ["a"] = "9007199254740993", ["b"] = "1" }, withBindings: false);
+
+        Assert.Equal("9007199254740994", Assert.IsType<ResultMessage>(sum.Answer).Output["total"]!.GetValue<string>());
+        Assert.Single(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task A_node_package_operation_name_is_matched_ignoring_letter_case()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var sum = await connection.RunAsync("SUM", new JsonObject { ["a"] = "2", ["b"] = "3" }, withBindings: false);
+
+        Assert.Equal("5", Assert.IsType<ResultMessage>(sum.Answer).Output["total"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_node_package_reaches_the_declared_host_through_the_proxy_with_its_secret_and_operation_id()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0", proxyPort: ((IPEndPoint)_tunnels.LocalEndpoint).Port);
+        await connection.ReceiveAsync();
+
+        var probe = await connection.RunAsync("probe", new JsonObject { ["mode"] = "declared" }, withBindings: true);
+
+        Assert.Equal("200", Assert.IsType<ResultMessage>(probe.Answer).Output["status"]!.GetValue<string>());
+        Assert.Equal("Bearer secret-token", _authorization);
+        Assert.Equal(probe.OperationId.ToString("D"), _idempotencyKey);
+        // Node.js tunnels each request through the proxy, so the proxy saw a CONNECT to the declared host, with the runner's token.
+        Assert.Equal($"127.0.0.1:{_stubAddress.Port}", _connectTarget);
+        Assert.Equal("Basic " + Convert.ToBase64String("axis:proxy-token"u8), _proxyAuthorization);
+        Assert.Equal("/probe", _requestTarget);
+    }
+
+    [Fact]
+    public async Task A_node_package_request_to_a_host_that_no_url_binding_declares_fails_the_run_with_the_url_binding()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var probe = await connection.RunAsync("probe", new JsonObject { ["mode"] = "otherHost" }, withBindings: true);
+
+        Assert.Equal(new FailureMessage(null, "TestUrl"), probe.Answer);
+    }
+
+    [Theory]
+    [InlineData("undeclaredSecret")]
+    [InlineData("swallow")]
+    public async Task A_node_package_asking_for_an_undeclared_secret_fails_the_run_with_its_binding_even_when_it_catches_the_error(string mode)
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var probe = await connection.RunAsync("probe", new JsonObject { ["mode"] = mode }, withBindings: true);
+
+        var failure = Assert.IsType<FailureMessage>(probe.Answer);
+        Assert.Equal("OtherToken", failure.Binding);
+        Assert.Null(failure.Error);
+        Assert.DoesNotContain("The operation", probe.Line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_node_package_error_named_RetryableError_gives_retryable_with_its_name_and_no_message()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var flaky = await connection.RunAsync("flaky", new JsonObject { ["failures"] = "1" }, withBindings: false);
+
+        Assert.Equal(new RetryableMessage("RetryableError"), flaky.Answer);
+        Assert.DoesNotContain("Attempt", flaky.Line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Another_node_package_error_gives_failure_with_its_name_and_no_message()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var fail = await connection.RunAsync("fail", new JsonObject { ["a"] = "4242424242" }, withBindings: false);
+
+        Assert.Equal(new FailureMessage("RangeError", null), fail.Answer);
+        Assert.DoesNotContain("4242424242", fail.Line, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("missing", "not a number")]
+    [InlineData("sum", "not a number")]
+    [InlineData("sum", "9223372036854775808")]
+    public async Task A_node_package_unknown_operation_or_input_that_does_not_fit_gives_failure_with_TypeError_and_no_value(string operation, string a)
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var run = await connection.RunAsync(operation, new JsonObject { ["a"] = a, ["b"] = "1" }, withBindings: false);
+
+        Assert.Equal(new FailureMessage("TypeError", null), run.Answer);
+        Assert.DoesNotContain(a, run.Line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_node_package_integer_output_that_is_a_JavaScript_number_gives_failure_with_an_error_and_no_output()
+    {
+        SkipOnWindows();
+        using var connection = await StartAsync(NodeProbe, "1.0.0");
+        await connection.ReceiveAsync();
+
+        var run = await connection.RunAsync("badOutput", [], withBindings: false);
+
+        Assert.Equal(new FailureMessage("TypeError", null), run.Answer);
+        Assert.DoesNotContain("output", run.Line, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_node_runner_sends_console_output_of_the_package_to_standard_error_and_keeps_the_protocol_stream_intact()
+    {
+        SkipOnWindows();
+        var info = new ProcessStartInfo("node")
+        {
+            UseShellExecute = false,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        info.ArgumentList.Add(Path.Combine(AppContext.BaseDirectory, "sdk", "node", "runner.js"));
+        info.ArgumentList.Add("runner");
+        info.ArgumentList.Add(_extensions.Path);
+        info.ArgumentList.Add(NodeProbe);
+        info.ArgumentList.Add("1.0.0");
+        using var runner = Process.Start(info)!;
+        var run = new RunMessage("log", Guid.NewGuid(), [], new RunBindings([], []));
+        var sent = new[] { RunnerProtocol.Write(run), RunnerProtocol.Write(new StopMessage()) };
+        foreach (var line in sent)
+        {
+            AssertValid(line);
+            await runner.StandardInput.WriteLineAsync(line);
+        }
+
+        runner.StandardInput.Close();
+
+        using var deadline = new CancellationTokenSource(_deadline);
+        var output = runner.StandardOutput.ReadToEndAsync(deadline.Token);
+        var error = runner.StandardError.ReadToEndAsync(deadline.Token);
+        await runner.WaitForExitAsync(deadline.Token);
+
+        var lines = (await output).Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(2, lines.Length);
+        foreach (var line in lines)
+        {
+            AssertValid(line);
+        }
+
+        Assert.Equal(new ReadyMessage(), RunnerProtocol.Read(lines[0]));
+        Assert.True(Assert.IsType<ResultMessage>(RunnerProtocol.Read(lines[1])).Output["done"]!.GetValue<bool>());
+        Assert.DoesNotContain("axis-console-marker-4242424242", lines[1], StringComparison.Ordinal);
+        Assert.Contains("axis-console-marker-4242424242", await error, StringComparison.Ordinal);
+        Assert.Equal(0, runner.ExitCode);
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task The_built_TypeScript_node_test_package_answers_its_operation_through_the_runner()
+    {
+        SkipOnWindows();
+        using var test = new BuildTest("""{ "Results": [] }""", node: true);
+        var (exitCode, _) = await test.RunAsync();
+        Assert.Equal(PackageBuildCommand.Built, exitCode);
+        await using var host = new RunnerHost(test.Extensions.Path, TestRunnerCommand.Create(), _log);
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+
+        using var connection = await StartAsync(BuildTest.NodeId, "1.0.0", endpoint: endpoint);
+        Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
+        var greet = await connection.RunAsync("greet", new JsonObject { ["name"] = "Axis" }, withBindings: false);
+
+        Assert.Contains("Axis", Assert.IsType<ResultMessage>(greet.Answer).Output["greeting"]!.GetValue<string>(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_start_for_a_python_version_whose_runtime_is_missing_closes_the_connection_and_starts_no_runner()
+    {
+        var commands = TestRunnerCommand.Create() with { Python = new RunnerCommand("axis-no-such-python-runtime", []) };
+        await using var host = new RunnerHost(_extensions.Path, commands, _log);
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+
+        using var connection = await StartAsync(PythonId, "1.0.0", endpoint: endpoint);
+
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.Empty(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task A_start_for_a_node_version_whose_runtime_is_missing_closes_the_connection_and_starts_no_runner()
+    {
+        var commands = TestRunnerCommand.Create() with { Node = new RunnerCommand("axis-no-such-node-runtime", []) };
+        await using var host = new RunnerHost(_extensions.Path, commands, _log);
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+
+        using var connection = await StartAsync(NodeProbe, "1.0.0", endpoint: endpoint);
+
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.Empty(_log.StartedRunners);
+    }
+
     /// <summary>
     /// Connects and sends a <c>start</c> that names the stub as the egress proxy, which answers each request the runner
     /// sends through its environment proxy.
     /// A start that the test means to be malformed is not checked against the schema.
     /// </summary>
-    private async Task<Connection> StartAsync(string package, string version, bool wellFormed = true)
+    private async Task<Connection> StartAsync(string package, string version, bool wellFormed = true, IPEndPoint? endpoint = null, int? proxyPort = null)
     {
-        var connection = Connect();
-        await connection.SendAsync(new StartMessage(package, version, $"127.0.0.1:{_stubAddress.Port}", "proxy-token"), wellFormed);
+        var connection = Connect(endpoint);
+        await connection.SendAsync(new StartMessage(package, version, $"127.0.0.1:{proxyPort ?? _stubAddress.Port}", "proxy-token"), wellFormed);
         return connection;
     }
 
-    private Connection Connect()
+    private Connection Connect(IPEndPoint? endpoint = null)
     {
         var client = new TcpClient();
-        client.Connect(_endpoint);
+        client.Connect(endpoint ?? _endpoint);
         _clients.Add(client);
         return new Connection(client, _stubAddress);
     }
@@ -387,6 +625,80 @@ public sealed class PackageHostTests : IAsyncLifetime
             context.Response.Close();
         }
     }
+
+    /// <summary>Accepts the connections of the Node.js runner's tunnels, see <see cref="TunnelAsync"/>.</summary>
+    private async Task AcceptTunnelsAsync()
+    {
+        var tunnels = new List<Task>();
+        while (true)
+        {
+            TcpClient client;
+            try
+            {
+                client = await _tunnels.AcceptTcpClientAsync();
+            }
+            catch (Exception exception) when (exception is ObjectDisposedException or SocketException)
+            {
+                break;
+            }
+
+            tunnels.Add(TunnelAsync(client));
+        }
+
+        await Task.WhenAll(tunnels);
+    }
+
+    /// <summary>
+    /// Acts as the egress proxy of a Node.js runner, whose <c>fetch</c> asks the proxy for a <c>CONNECT</c> tunnel, which the
+    /// stub, an <see cref="HttpListener"/>, cannot answer. It keeps the target and the credentials of the <c>CONNECT</c>, then
+    /// pipes the tunnel to the target until one side closes.
+    /// </summary>
+    private async Task TunnelAsync(TcpClient client)
+    {
+        try
+        {
+            var stream = client.GetStream();
+            var head = new StringBuilder();
+            var buffer = new byte[1];
+            while (!head.ToString().EndsWith("\r\n\r\n", StringComparison.Ordinal))
+            {
+                if (await stream.ReadAsync(buffer) == 0)
+                {
+                    return;
+                }
+
+                head.Append((char)buffer[0]);
+            }
+
+            var lines = head.ToString().Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+            var request = lines[0].Split(' ');
+            _connectTarget = request[0] == "CONNECT" ? request[1] : null;
+            _proxyAuthorization = lines.Skip(1).Select(line => line.Split(": ", 2)).FirstOrDefault(pair => pair[0].Equals("Proxy-Authorization", StringComparison.OrdinalIgnoreCase))?[1];
+            if (_connectTarget is null)
+            {
+                return;
+            }
+
+            using var target = new TcpClient();
+            await target.ConnectAsync(IPAddress.Loopback, _stubAddress.Port);
+            await stream.WriteAsync("HTTP/1.1 200 Connection Established\r\n\r\n"u8.ToArray());
+            var upstream = target.GetStream();
+            var toTarget = stream.CopyToAsync(upstream);
+            var fromTarget = upstream.CopyToAsync(stream);
+            await Task.WhenAny(toTarget, fromTarget);
+
+            // Closing both ends settles the copy that is still waiting.
+            target.Dispose();
+            client.Dispose();
+            await Task.WhenAll(toTarget, fromTarget);
+        }
+        catch (Exception exception) when (exception is IOException or ObjectDisposedException or SocketException)
+        {
+            // The runner or the stub closed the connection.
+        }
+    }
+
+    private static void SkipOnWindows() => Assert.SkipWhen(OperatingSystem.IsWindows(), "The Node.js tests need a Unix shell and the Node.js runtime.");
 
     private static int FreePort()
     {

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
@@ -16,14 +17,16 @@ namespace Axis.PackageHost;
 /// Host mode: accepts TCP connections and starts one runner process for each, see
 /// docs/reference/extension-packages.md#the-runner-protocol. The first line of a connection must be a
 /// <c>start</c> for an installed version whose id and version are well formed. Any other first line, or a
-/// version that is not installed or fails the manifest check, or whose <c>proxy</c> is not a <c>host:port</c>, closes
-/// the connection and starts no runner. The check reads the manifest without loading package code. A <c>python</c>
-/// version starts the Python runner and any other version starts this program's own runner. The runner's environment holds only the proxy variables that name the worker's egress proxy. Its
+/// version that is not installed, or whose <c>proxy</c> is not a <c>host:port</c>, closes the connection and starts
+/// no runner. So does a version whose language has no runner, or whose runner's program is missing from the image.
+/// The host starts the runner of the manifest's language: the C# runner, the Node.js runner or the Python runner. The
+/// runner's environment holds only the proxy variables that name the worker's egress proxy, and
+/// <c>NODE_USE_ENV_PROXY=1</c> for a Node.js runner, so that its own HTTP calls use them. Its
 /// standard input is fed from the connection and its standard output goes to the connection. Closing the connection
 /// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
 /// runner's process id, package and version, and no message.
 /// </summary>
-internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand command, PythonRunnerCommand python, ILogger<RunnerHost> logger) : IAsyncDisposable
+internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger) : IAsyncDisposable
 {
     /// <summary>The longest <c>start</c> line the host reads, in bytes.</summary>
     private const int MaxStartLine = 4096;
@@ -106,13 +109,18 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
             var reader = PipeReader.Create(client.GetStream());
             try
             {
-                if (await ReadStartAsync(reader) is not var (start, language))
+                if (await ReadStartAsync(reader) is not { } started)
                 {
                     return;
                 }
 
-                using var runner = StartRunner(start, language);
-                LogStarted(runner.Id, start.Package, start.Version);
+                using var runner = TryStartRunner(started.Start, started.Language);
+                if (runner is null)
+                {
+                    return;
+                }
+
+                LogStarted(runner.Id, started.Start.Package, started.Start.Version);
                 await PipeAsync(reader, client.GetStream(), runner);
             }
             finally
@@ -123,9 +131,9 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
     }
 
     /// <summary>
-    /// Reads the first line. Returns the <c>start</c> it holds with the language of its version, or <see langword="null"/> when the connection ends
+    /// Reads the first line. Returns the <c>start</c> it holds, or <see langword="null"/> when the connection ends
     /// first or the line is too long, is not a <c>start</c>, names an id or version that is not well formed, or names a
-    /// version that is not installed or fails the manifest check. Bytes after the line stay in the reader.
+    /// version that is not installed, with the language of its manifest. Bytes after the line stay in the reader.
     /// </summary>
     private async Task<(StartMessage Start, PackageLanguage Language)?> ReadStartAsync(PipeReader reader)
     {
@@ -151,24 +159,17 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
         }
     }
 
-    /// <summary>
-    /// The <c>start</c> in <paramref name="line"/> and the language of the version it names, or <see langword="null"/>.
-    /// The version is loaded as metadata only, so no package code runs in the host.
-    /// </summary>
     private (StartMessage Start, PackageLanguage Language)? Parse(string line)
     {
         try
         {
-            if (RunnerProtocol.Read(line) is not StartMessage start
-                || !IdPattern().IsMatch(start.Package)
-                || !VersionPattern().IsMatch(start.Version)
-                || !PackageIsolation.TryParseHostPort(start.Proxy, out _, out _))
-            {
-                return null;
-            }
-
-            var (package, _) = PackageCatalog.LoadVersion(extensionsRoot, start.Package, start.Version, PackageLoadMode.MetadataOnly);
-            return package is null ? null : (start, package.Manifest.Language);
+            return RunnerProtocol.Read(line) is StartMessage start
+                && IdPattern().IsMatch(start.Package)
+                && VersionPattern().IsMatch(start.Version)
+                && PackageIsolation.TryParseHostPort(start.Proxy, out _, out _)
+                && PackageCatalog.ReadInstalledManifest(extensionsRoot, start.Package, start.Version) is { } manifest
+                    ? (start, manifest.Language)
+                    : null;
         }
         catch (JsonException)
         {
@@ -176,30 +177,54 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
         }
     }
 
-    private Process StartRunner(StartMessage start, PackageLanguage language)
+    /// <summary>
+    /// Starts the runner of <paramref name="language"/>. Returns <see langword="null"/> when the language has no runner
+    /// or the runner's program is not installed, so that no runner starts.
+    /// </summary>
+    private Process? TryStartRunner(StartMessage start, PackageLanguage language)
     {
-        var info = new ProcessStartInfo(language == PackageLanguage.Python ? python.FileName : command.FileName)
+        var command = language switch
+        {
+            PackageLanguage.CSharp => commands.CSharp,
+            PackageLanguage.Node => commands.Node,
+            PackageLanguage.Python => commands.Python,
+            _ => null,
+        };
+        if (command is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return StartRunner(command, start, language);
+        }
+        catch (Win32Exception)
+        {
+            return null;
+        }
+    }
+
+    private Process StartRunner(RunnerCommand command, StartMessage start, PackageLanguage language)
+    {
+        var info = new ProcessStartInfo(command.FileName)
         {
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
         };
+        foreach (var argument in command.Arguments)
+        {
+            info.ArgumentList.Add(argument);
+        }
+
         if (language == PackageLanguage.Python)
         {
-            // -I ignores the environment and the current folder, and -B writes no .pyc files onto the read-only extensions mount.
-            info.ArgumentList.Add("-I");
-            info.ArgumentList.Add("-B");
-            info.ArgumentList.Add(Path.Combine(python.Sdk, "axis_runner.py"));
             info.ArgumentList.Add(Path.Combine(extensionsRoot, start.Package, start.Version));
         }
         else
         {
-            foreach (var argument in command.Arguments)
-            {
-                info.ArgumentList.Add(argument);
-            }
-
             info.ArgumentList.Add("runner");
             info.ArgumentList.Add(extensionsRoot);
             info.ArgumentList.Add(start.Package);
@@ -214,6 +239,12 @@ internal sealed partial class RunnerHost(string extensionsRoot, RunnerCommand co
         foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy" })
         {
             info.Environment[name] = proxy;
+        }
+
+        // Node.js makes its own HTTP calls through these variables only when it is told to.
+        if (language == PackageLanguage.Node)
+        {
+            info.Environment["NODE_USE_ENV_PROXY"] = "1";
         }
 
         return Process.Start(info) ?? throw new InvalidOperationException("The runner did not start.");

@@ -57,7 +57,7 @@ internal static class PackageHostProgram
             return PackageBuildCommand.SetupError;
         }
 
-        builder.Services.AddSingleton(provider => new RunnerHost(extensions, RunnerCommand.ForThisProgram(), PythonRunnerCommand.ForThisProgram(), provider.GetRequiredService<ILogger<RunnerHost>>()));
+        builder.Services.AddSingleton(provider => new RunnerHost(extensions, RunnerCommands.ForThisProgram(), provider.GetRequiredService<ILogger<RunnerHost>>()));
         builder.Services.AddHostedService<RunnerHostService>();
         await builder.Build().RunAsync();
         return 0;

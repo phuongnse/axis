@@ -40,7 +40,7 @@ src/
                           to the SPA
   Axis.Tenancy/           tenant resolution, connection factory, platform schema
   Axis.Extensions/        contracts for extension packages: operation interface, operation context
-sdk/                      the runner protocol's JSON Schema and the Python runner and SDK
+sdk/                      the runner protocol's JSON Schema, and the Node.js and Python runners and SDKs
 web/                      React + TypeScript SPA (Vite), Ant Design, and the Keycloak login theme
 tests/
   Axis.<Module>.Tests/    unit tests per module
@@ -79,18 +79,20 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
 
 - **`src/Axis.PackageHost/`**. The package host. Its `build` command checks, scans and writes a C#, Node.js or
   Python package, see [building a package](reference/extension-packages.md#building-a-package). Its `host`
-  mode listens for runner protocol connections and starts a runner process for each, which is the Python
-  runner for a `python` version, and its `runner` mode
+  mode listens for runner protocol connections and starts a runner process for each, and its `runner` mode
   runs one installed C# package version over [the runner protocol](reference/extension-packages.md#the-runner-protocol).
+  For a Node.js package the host starts the runner in `sdk/node/` instead, and for a Python package the runner in
+  `sdk/python/`.
 - **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
   `Axis.PackageHost`, Trivy and one runtime, and runs the `build` command, see
   [images](reference/installation.md#images).
 - **Package runner images** _(planned for M21)_. The host images also carry the runner and run the `host` mode, see
   [package runners](reference/extension-packages.md#package-runners).
 - **`sdk/`**. The runner protocol's schema, `package-runner-protocol.schema.json`.
+- **`sdk/node/`**. The Node.js runner and its SDK, which the package host starts for a `node` package.
 - **`sdk/python/`**. The Python runner, `axis_runner.py`, and the SDK module `axis_sdk`, which uses only the Python
-  standard library. The `axis-package-host-python` image copies the folder to `/app/sdk/python`.
-- **`sdk/node/`** _(planned for M21)_. The Node.js runner and SDK.
+  standard library. The package host starts it for a `python` package, and the `axis-package-host-python` image
+  copies the folder to `/app/sdk/python`.
 
 ## Module rules
 

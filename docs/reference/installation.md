@@ -55,10 +55,10 @@ Build an image from the repository root with `docker build --target axis-server 
   at the pinned version and one runtime: .NET, Node.js 24 with npm, or Python 3 with pip. Unlike the host images, they need a
   writable root file system for the build, Trivy and npm, read only environment variables and have no `/modules`. Only the build
   needs that root: the `host` command runs on a read-only root.
-- **The package runners.** The package host images also hold their runtime's runner. The Compose example's `package-host-dotnet` and the
-  chart's `<release>-package-host-dotnet` run it with the command `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
-- **The other package runners** _(planned for M21)_. The containers `package-host-node` and `package-host-python`, in Compose and in the
-  Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
+- **The package runners.** The `dotnet` image runs the C# runner from `Axis.PackageHost` itself, and the `node` image holds the Node.js runner in `/app/sdk/node/`.
+  Compose's `package-host-dotnet` and the chart's `<release>-package-host-dotnet` run the host with `host` on a read-only root, see [on premises](#on-premises) and [in the cloud](#in-the-cloud).
+- **The other package runners** _(planned for M21)_. The Python runner in the `python` image, and the containers `package-host-node` and
+  `package-host-python`, in Compose and in the Helm chart, run the same way, limited as [package runners](extension-packages.md#package-runners) says.
 - **Signed images** _(planned for M32)_. A release workflow publishes the images to the GitHub
   container registry, each signed with cosign and with a CycloneDX SBOM. Check the signature before
   an install or an upgrade.

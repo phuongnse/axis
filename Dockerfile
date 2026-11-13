@@ -242,7 +242,9 @@ RUN mkdir /extensions
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 
-# Production package host for Node.js packages: the same as axis-package-host-dotnet, with Node.js and npm.
+# Production package host for Node.js packages: the same as axis-package-host-dotnet, with Node.js and npm, and the
+# Node.js runner that the host starts for a `node` package, see
+# docs/reference/extension-packages.md#the-runner-protocol.
 FROM package-host-node AS axis-package-host-node
 ARG AXIS_VERSION
 LABEL org.opencontainers.image.version=$AXIS_VERSION
@@ -250,6 +252,7 @@ ENV DOTNET_ENVIRONMENT=Production Extensions__Path=/extensions
 WORKDIR /app
 COPY --from=trivy /trivy /usr/local/bin/trivy
 COPY --from=production-build /out/package-host .
+COPY sdk/node/ ./sdk/node/
 RUN mkdir /extensions
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
