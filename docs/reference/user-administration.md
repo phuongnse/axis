@@ -251,6 +251,35 @@ switch routes, and lists and revokes the consents through the connected apps rou
   `tenant connected-app revoke`, which names `consent` and holds no client id. The storage quota never refuses a revoke,
   see [refusals](tenant-quotas.md#refusals).
 
+### Application packages
+
+_(planned for M37)_
+
+An administrator turns on the tenant's [application packages](extension-packages.md#an-applications-packages)
+and reads whether they are on. The routes answer to an administrator with a browser session only, as the
+command routes do.
+
+| Route                                              | Body              | Answer                    |
+| -------------------------------------------------- | ----------------- | ------------------------- |
+| `GET /api/tenant/application-packages` _(planned for M37)_ | None              | `200` with `{ "on": false }` |
+| `PUT /api/tenant/application-packages` _(planned for M37)_ | `{ "on": true }`  | `204`                     |
+
+- **The order of the checks.** A request is checked in this order: a signed-in user (`401`),
+  `Users:AdministratorRole` (`403`), `Extensions:ApplicationPackages` (`403`), then a tenant with a row in
+  the tenant directory that is not a preview tenant (`404`), and for `PUT` the body (`400`). With the
+  setting off, the routes answer `403` to every caller who has the role.
+- **The quota.** While `packageCpuSecondsPerDay` is 0, a `PUT` that turns packages on answers the quota's
+  `403`, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
+- **Off by default.** A tenant has packages off until an administrator turns them on.
+- **Stored in the directory.** The switch is a tenant setting in the tenant directory, so each change
+  raises the tenant's version and every host loads it at its next refresh.
+- **Audit.** Each accepted `PUT` writes a platform audit record, see
+  [when a record is written](tenant-setting-commands.md#when-a-record-is-written).
+- **Turning it off.** It refuses writes to a package's files and publishes of an application that holds a
+  package, see [packages in Studio](studio-packages.md#the-authoring-api). Active releases keep running
+  their packages, so running work does not fail half-way. The operator can still stop the calls with the
+  quota.
+
 ## Accounts
 
 Every realm that `tenant create` makes holds the account rules below: an invitation, a second step, passwords, failed
@@ -314,6 +343,10 @@ stores both and applies them at the person's next request.
   kind, such as `operator`. Each request maps the kind to the value of `Studio:AuthorRole`, `Studio:PublisherRole`,
   `Console:OperatorRole` or `Users:AdministratorRole`, and the name joins the roles from sign-in. A kind whose setting
   has no value gives nothing.
+- **The developer role** _(planned for M37)_. A fifth platform role kind, `developer`, named by
+  `Studio:DeveloperRole`, given and removed as the others are and mapped by the platform sign-in. With the
+  author role it allows writing an application's packages in a tenant that turned them on, see
+  [application packages](#application-packages). A publisher needs no developer role.
 - **Stored by Axis.** Given roles are rows of the tenant database, each with the user, the application or the platform,
   and the role, so the realm holds no Axis role. A row for a role that the active release does not declare stays and
   gives nothing, and the page marks it.

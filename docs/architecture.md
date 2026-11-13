@@ -81,7 +81,8 @@ flowchart LR
   runner, and loads package code itself only in Development. An installation's package runs in runners
   that every tenant shares. See [package runners](reference/extension-packages.md#package-runners).
 - **Application runners and customer-hosted runners** _(planned for M37)_. An application's package runs
-  in runners that serve only its tenant, and a customer can host a runner in its own network. See
+  in runners that serve only its tenant, in their own `application-package-host` container under gVisor,
+  and a customer can host a runner in its own network. See
   [D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md).
 - **Axis.Agent** is the agent host. It runs [AI authoring requests](reference/authoring-requests.md#the-agent-host).
   With AI authoring on, it reads its tenants as the worker does. Under `Tenancy:Source=directory` it reads

@@ -154,9 +154,16 @@ A tool with an optional draft reads the working folder without it and the person
 | `run_scenarios`        | application, draft, optional `names`, optional `request` | Without `request`, a `test` request of the draft stored for the publisher, as `{ request, status, diagnostics, scenarios }`. With `request`, the same for that request of this draft and person, see [test](authoring.md#test)                                                                        |
 | `diff_draft`           | application, draft, optional `cursor`                    | One page of the draft's changes from the working folder, resource by resource, as the [draft diff](authoring-revisions.md#draft-diff) route gives them                                                                                                                                                |
 | `accept_draft`         | application, draft, optional `request`                   | Without `request`, an `accept` publish request of the draft stored for the publisher, or the one already queued or running, as `{ request, status, diagnostics }`, under the rules of [accepting](authoring-requests.md#accepting). With `request`, the same for that accept of this draft and person, also after the accept has removed the draft |
+| `list_package_files` _(planned for M37)_ | application, optional draft | Each file of the application's packages, with its package id, `path` and `version` |
+| `read_package_file` _(planned for M37)_ | application, package, `path`, optional draft | The file's content and version |
+| `write_package_file` _(planned for M37)_ | application, draft, package, `path`, `content` | Creates or replaces a package file in the draft, as a Studio save does. It needs the developer role |
+| `delete_package_file` _(planned for M37)_ | application, draft, package, `path` | Removes a package file from the draft |
+| `test_package` _(planned for M37)_ | application, draft, package, optional `request` | Builds the package and runs its tests in the tenant's sandbox, as `{ request, status, diagnostics, tests }`, like `run_scenarios` |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
   runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
+- **Package tests** _(planned for M37)_. `test_package` runs only the package's own tests, in the tenant's
+  sandbox, see [an application's packages](extension-packages.md#an-applications-packages).
 - **Checked.** `McpToolsDocumentationTests` compares the table with the tools the server serves and
   with the `tools/list` answer. `McpToolOutputTests` calls every tool of `tools/list` on a tenant that holds
   a record, a `secret` binding, a `url` binding and the sign-in client secret, and fails when an output

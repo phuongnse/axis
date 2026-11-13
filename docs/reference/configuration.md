@@ -80,6 +80,8 @@ them is resolved.
   root. An `application` resource in any other file is not used as the manifest.
 - **Unique ids and names.** Resource ids are unique across the application, compared as UUIDs.
   Names are unique per kind, ignoring letter case.
+- **An application's packages** _(planned for M37)_. No file under `packages/` at the folder root is
+  loaded as a resource, see [an application's packages](extension-packages.md#an-applications-packages).
 - **Stored releases.** The same checks run on a release's stored resources when the server rebuilds
   its model.
 
