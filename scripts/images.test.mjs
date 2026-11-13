@@ -467,4 +467,20 @@ describe('the package host images', () => {
     chmodSync(join(source, 'requirements.txt'), 0o644)
     build('axis-package-host-python', { source, id: 'python-test-package', marker: 'axis_fixture_dependency/__init__.py' })
   })
+
+  test('axis-package-host-python imports axis_sdk from /app/sdk/python', { timeout }, () => {
+    // The host starts the Python runner from this folder, see docs/reference/extension-packages.md#package-runners.
+    const output = run([
+      'run',
+      '--rm',
+      '--entrypoint',
+      'python3',
+      image('axis-package-host-python'),
+      '-I',
+      '-B',
+      '-c',
+      "import sys; sys.path.insert(0, '/app/sdk/python'); import axis_sdk; print(axis_sdk.RetryableError.__name__)",
+    ])
+    assert.equal(output, 'RetryableError')
+  })
 })

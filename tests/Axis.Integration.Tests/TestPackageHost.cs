@@ -39,7 +39,7 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
     {
         var logs = new LogCollector();
         var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
-        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), loggers.CreateLogger<RunnerHost>());
+        var host = new RunnerHost(extensionsRoot, TestRunnerCommand.Create(), PythonRunnerCommand.ForThisProgram(), loggers.CreateLogger<RunnerHost>());
         return new TestPackageHost(host, loggers, await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None), logs);
     }
 

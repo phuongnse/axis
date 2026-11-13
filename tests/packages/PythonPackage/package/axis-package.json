@@ -12,6 +12,47 @@
       "idempotent": true,
       "input": [{ "name": "name", "type": "text", "required": true }],
       "output": [{ "name": "greeting", "type": "text", "required": true }]
+    },
+    {
+      "name": "echo",
+      "type": "echo",
+      "idempotent": true,
+      "input": [
+        { "name": "text", "type": "text" },
+        { "name": "integer", "type": "integer" },
+        { "name": "decimal", "type": "decimal" },
+        { "name": "boolean", "type": "boolean" },
+        { "name": "date", "type": "date" },
+        { "name": "dateTime", "type": "date-time" }
+      ],
+      "output": [
+        { "name": "text", "type": "text" },
+        { "name": "integer", "type": "integer" },
+        { "name": "decimal", "type": "decimal" },
+        { "name": "boolean", "type": "boolean" },
+        { "name": "date", "type": "date" },
+        { "name": "dateTime", "type": "date-time" }
+      ]
+    },
+    {
+      "name": "probe",
+      "type": "probe",
+      "idempotent": false,
+      "input": [{ "name": "mode", "type": "text", "required": true }],
+      "output": [{ "name": "status", "type": "integer" }],
+      "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
+    },
+    {
+      "name": "flaky",
+      "type": "flaky",
+      "idempotent": false,
+      "input": [{ "name": "a", "type": "text" }]
+    },
+    {
+      "name": "fail",
+      "type": "fail",
+      "idempotent": false,
+      "input": [{ "name": "a", "type": "text" }]
     }
   ]
 }

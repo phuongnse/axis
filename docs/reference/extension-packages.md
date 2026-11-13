@@ -101,8 +101,9 @@ identity, its operations and, for a C# package, its main assembly. This example 
   - `type` is, for a C# package, the full name of a class in the main assembly
     that implements `IOperation`. The class is not abstract and has a public parameterless
     constructor, because the host creates each instance itself.
-    - **For `node` and `python`** _(planned for M21)_. `type` names a function that the adapter
-      exports.
+    - **For `python`.** `type` names a function that the adapter module defines, see
+      [Contracts](#contracts).
+    - **For `node`** _(planned for M21)_. `type` names a function that the adapter exports.
   - `idempotent` says whether running the operation twice with the same
     operation identity has the same effect as running it once. It decides
     whether an unknown outcome is retried, see
@@ -151,22 +152,42 @@ public class RetryableException : Exception { }
 - **`RetryableException`.** Thrown by an operation to say that the attempt
   may succeed later. Any other exception fails the call, see
   [Call outcomes](process-execution.md#package-call-outcomes).
-- **One protocol and an SDK for each language** _(planned for M21)_. The
+- **One protocol and an SDK for each language.** The
   worker and every runner speak one protocol that no language owns, see
   [The runner protocol](#the-runner-protocol). A small SDK for each language
-  implements the operation context over it.
-- **Value types.** For a C# package, input and output values use these .NET types:
+  implements the operation context over it. The Python SDK is built, in `sdk/python/`.
+- **The Node.js SDK** _(planned for M21)_. It implements the same context for a `node` package.
+- **A Python package.** The SDK module is `axis_sdk`, and it uses only the Python standard library. An operation's
+  `type` names a synchronous function of the adapter. It gets the input and the context, and returns the output,
+  both dicts keyed by field name. It maps the operation onto a library that does not change:
 
-  | Field type | .NET type |
-  | --- | --- |
-  | `text` | `string` |
-  | `integer` | `long` |
-  | `decimal` | `decimal` |
-  | `boolean` | `bool` |
-  | `date` | `DateOnly` |
-  | `date-time` | `DateTimeOffset` |
+  ```python
+  from axis_sdk import RetryableError
+  from purchasing import normalize
 
-  A missing value is `null`.
+  def normalize_supplier_code(input, context):
+      try:
+          return {"code": normalize(input["code"])}
+      except ConnectionError:
+          raise RetryableError()
+  ```
+
+  `context.operation_id` is a `uuid.UUID`, `context.get_secret(name)` returns a secret and
+  `context.get_http_client(name).request(method, url, headers=, body=)` returns the `urllib` response. The
+  client resolves `url` against the binding's value, follows no redirects and returns a response with any
+  status instead of raising. Binding names match ignoring letter case.
+- **Value types.** For a C# or Python package, input and output values use these types:
+
+  | Field type | .NET type | Python type |
+  | --- | --- | --- |
+  | `text` | `string` | `str` |
+  | `integer` | `long` | `int`, in the 64-bit range |
+  | `decimal` | `decimal` | `Decimal`, or `int` for an output |
+  | `boolean` | `bool` | `bool` |
+  | `date` | `DateOnly` | `datetime.date` |
+  | `date-time` | `DateTimeOffset` | `datetime` with a time zone |
+
+  A missing value is `null` in C# and `None` in Python.
 
 - **Published** _(planned for M22)_. `Axis.Extensions` is published as a NuGet package, at a 0.x
   version with no compatibility promise, see [the SDK](custom-widgets.md#the-sdk).
@@ -195,7 +216,8 @@ every host reads. An installation's package is trusted code that the operator re
   `<release>-package-host-dotnet` mount the same folder read-only, and
   its runner runs the C# packages, see [Package runners](#package-runners).
 - **The other package hosts** _(planned for M21)_. The containers `package-host-node` and `package-host-python` do the same
-  for the other languages.
+  for the other languages. The image `axis-package-host-python` already holds the Python runner, see
+  [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
 - **Keep pinned versions.** Keep every version that an active release, or a
@@ -337,7 +359,8 @@ to `inProcess`, see [Package runners](#package-runners).
   server nor the worker starts with it, and the error names `Extensions:Isolation`, see
   [Package runners](#package-runners).
 - **Node and Python.** A host reads only the manifest of a `node` or `python` package and checks that
-  its `adapter` file exists. It loads none of the package's code.
+  its `adapter` file exists. It loads none of the package's code. The package host reads each version this way
+  before it starts a runner, so it never loads the code of a C# package either.
 - **Own load context.** In a worker with `inProcess`, each C# package version loads in its own
   `AssemblyLoadContext`. Two versions of the same package can be loaded at
   once.
@@ -436,6 +459,13 @@ package reaches nothing of the host and no binding of another call.
   rendering fails without them. The NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
   pods and allows no DNS. It holds only where the network plugin enforces NetworkPolicy, see
   [in the cloud](installation.md#in-the-cloud).
+- **The Python runner.** For a `start` that names a `python` version, the host runs
+  `python3 -I -B <sdk>/axis_runner.py <version folder>` and any other version starts the .NET runner. The host
+  reads the version's manifest first, and a version that fails the [manifest check](#loading) starts no runner. The
+  image `axis-package-host-python` holds the SDK at `/app/sdk/python`. The runner moves
+  file descriptor 1 aside for the protocol and points it at standard error, so a `print` at import or while an
+  operation runs, and a library that writes to the descriptor, never reach the protocol stream. The first line
+  after `start` is `ready`. The worker does not route to a Python host yet.
 - **No package code in the worker.** With `Extensions:Isolation` `process`, the worker reads the
   manifests and metadata of the installed C# packages, as the server does, and loads no package
   code. It sends each attempt of a C# call to a runner.
@@ -521,8 +551,10 @@ implements the operation context over it.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to
   the console goes to standard error.
 - **Runner errors.** An operation that is not in the manifest, an input that does not fit its field
-  types, and an output whose .NET type does not fit its field are each a `failure` with the name of
-  the error's type.
+  types, and an output whose type does not fit its field are each a `failure` with the name of
+  the error's type. The name is the full type name for C#, such as `System.FormatException`. For Python it is
+  `module.QualName` with the module left out for a built-in exception, such as `ValueError`,
+  `LookupError` and `axis_sdk.RetryableError`.
 - **Closing kills the runner.** When the worker closes a connection, at a timeout or at `stop`, the host
   kills that runner. A runner that exits closes its connection, and the worker takes that as an
   unknown outcome.
@@ -707,7 +739,10 @@ capability limits and the server's metadata-only load.
 - **Python test package.** `python-test-package` lives under `tests/packages/PythonPackage/` as plain files:
   the package's manifest and adapter, and one small dependency. The package build tests zip the
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package
-  offline, so the repository holds no binary file.
+  offline, so the repository holds no binary file. Its operations cover each outcome of the Python
+  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared
+  bindings or asks for an undeclared one, `flaky` raises `RetryableError` and `fail` raises `ValueError`.
+  The package host tests install the package by copying it with its dependency folder, so they need no pip.
 
 ## Declaring packages in an application
 
