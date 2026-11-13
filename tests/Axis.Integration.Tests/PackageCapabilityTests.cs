@@ -147,6 +147,56 @@ public sealed class PackageCapabilityTests(PackageCapabilityFixture fixture) : I
     }
 
     [Fact]
+    public async Task A_runner_reaches_the_declared_host_through_the_proxy_with_the_context_client_and_with_its_own_client()
+    {
+        foreach (var process in new[] { "PackageProbeDeclared", "PackageProbeOwnClient" })
+        {
+            var (_, _, callId) = await fixture.StageAsync("a", process, CancellationToken);
+
+            Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+
+            var request = Assert.Single(fixture.Stub.RequestsWithKey(callId));
+            Assert.Equal(("POST", "/tenant-a/probe", $"Bearer {fixture.Token("a")}"), (request.Method, request.Path, request.Authorization));
+            Assert.Contains("axis-egress-proxy", request.Headers!["Via"], StringComparison.Ordinal);
+            Assert.Equal(PackageCalls.Succeeded, (await CallAsync("a", callId)).State);
+        }
+    }
+
+    [Fact]
+    public async Task A_request_of_a_runners_own_client_to_an_undeclared_host_reaches_nothing_and_fails_the_call_after_one_attempt()
+    {
+        var tenant = fixture.Tenant("a");
+        var (_, instanceId, callId) = await fixture.StageAsync("a", "PackageProbeOwnOtherHost", CancellationToken);
+
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+
+        Assert.DoesNotContain(fixture.Stub.Requests, request => request.Headers!["Host"].StartsWith("localhost", StringComparison.OrdinalIgnoreCase));
+        Assert.Empty(fixture.Stub.RequestsWithKey(callId));
+        Assert.Equal(ProcessStarts.Failed, (await tenant.InstanceAsync(instanceId)).State);
+        var call = await CallAsync("a", callId);
+        Assert.Equal(PackageCalls.Failed, call.State);
+        Assert.Equal(1, await tenant.ScalarAsync("SELECT attempts FROM axis.package_calls WHERE id = @id", ("id", callId)));
+        Assert.Contains("'probe'", call.LastError, StringComparison.Ordinal);
+        Assert.Contains("'test-package'", call.LastError, StringComparison.Ordinal);
+        Assert.DoesNotContain("localhost", call.LastError, StringComparison.Ordinal);
+        Assert.Equal(call.LastError, (await tenant.HistoryAsync(instanceId))[1].Error);
+    }
+
+    [Fact]
+    public async Task A_redirect_from_the_declared_host_to_another_host_is_not_followed_and_fails_the_call()
+    {
+        var (_, instanceId, callId) = await fixture.StageAsync("a", "PackageProbeOwnRedirect", CancellationToken);
+        fixture.Stub.Redirect($"{fixture.Stub.LocalhostBaseUrl}/landed");
+
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallInRunnerAsync("a", CancellationToken));
+
+        Assert.Single(fixture.Stub.RequestsWithKey(callId));
+        Assert.DoesNotContain(fixture.Stub.Requests, request => request.Path == "/landed");
+        Assert.Equal(ProcessStarts.Failed, (await fixture.Tenant("a").InstanceAsync(instanceId)).State);
+        Assert.Equal(PackageCalls.Failed, (await CallAsync("a", callId)).State);
+    }
+
+    [Fact]
     public async Task A_runner_that_throws_a_retryable_exception_leaves_the_call_pending_with_a_retryable_attempt()
     {
         var tenant = fixture.Tenant("a");
@@ -168,7 +218,7 @@ public sealed class PackageCapabilityTests(PackageCapabilityFixture fixture) : I
         var result = await fixture.TryActivateAsync("a", ProcessStepFixture.StepAppBindings("a"));
 
         var missing = result.Diagnostics.Where(diagnostic => diagnostic.Message.Contains("'TestUrl'", StringComparison.Ordinal)).ToList();
-        Assert.Equal(4, missing.Count);
+        Assert.Equal(7, missing.Count);
         Assert.All(missing, diagnostic => Assert.Equal((DiagnosticCodes.MissingDeploymentBinding, "/steps/0/operation"), (diagnostic.Code, diagnostic.Path)));
         var declared = Assert.Single(missing, diagnostic => diagnostic.File == "processes/package-probe-declared.json");
         Assert.Contains("'a'", declared.Message, StringComparison.Ordinal);

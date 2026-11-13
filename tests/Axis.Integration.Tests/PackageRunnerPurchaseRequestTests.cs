@@ -29,6 +29,7 @@ public sealed partial class PackageRunnerPurchaseRequestTests(SampleAppFixture f
         {
             [PackageIsolation.IsolationSetting] = "process",
             [PackageIsolation.DotnetRunnerSetting] = host.Address,
+            [PackageIsolation.ProxySetting] = "0",
         });
         using var requester = fixture.CreateClient().SignedInAs("requester");
         using var manager2 = fixture.CreateClient().SignedInAs("manager-2");

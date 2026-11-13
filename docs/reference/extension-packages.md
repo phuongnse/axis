@@ -401,7 +401,9 @@ see [Contracts](#contracts).
 - **The error names the binding.** The error in the step history and on the call
   names the operation, the package and the binding the operation asked for, or
   the client it sent through. It holds no secret value and no URL, because a
-  host the package builds can carry input data.
+  host the package builds can carry input data. A request that the worker's
+  [egress proxy](#package-runners) refuses names only the operation and the
+  package, because a package's own client has no binding to name.
 - **Activation check.** The binding check at activation also covers the
   bindings that package operations declare. A binding that is missing for the
   tenant, or of the wrong kind, fails activation with `AXC0100`, and an `http`
@@ -448,11 +450,18 @@ package reaches nothing of the host and no binding of another call.
   bindings of the call it runs.
 - **Network, for a runner that Axis hosts.** _(planned for M21)_ The proxy variables name the
   egress proxy in the worker, with a token for each runner that the worker
-  sends in `start`. So the context's HTTP client sends through the proxy, and
+  sends in `start`, together with the address of the proxy as the host reaches
+  it. The proxy listens on `Extensions:Runners:ProxyPort` and starts with the
+  worker's first runner. So the context's HTTP client sends through the proxy, and
   so does a library's own HTTP call, and the library needs no change. The
   proxy admits a `CONNECT` only to the scheme, host and port of a `url`
   binding that the runner's current call declares, and plain `http` only in
-  Development. It follows no redirects. Compose puts the worker and the three
+  Development. A runner that has no call reaches nothing, and one runner's
+  token never admits the hosts of another runner's call. A request without a
+  known token gets `407`. The proxy refuses any other request, and a refused
+  request fails the attempt at once, even if the package catches the error. The
+  error names the operation and the package. It follows no redirects, so a
+  redirect to another host is a new request that the proxy checks again. Compose puts the worker and the three
   hosts on an `internal` network of their own. The Helm chart gives a
   NetworkPolicy that admits traffic to the hosts only from the worker and lets
   them reach only the proxy port. Every other route is closed, DNS included,
@@ -466,12 +475,13 @@ package reaches nothing of the host and no binding of another call.
 - **No host.** A host that cannot be reached, that starts no runner, or that is not set makes the
   attempt retryable, because the operation never ran.
 
-The server reads `Extensions:Isolation`, and the worker reads both settings:
+The server reads `Extensions:Isolation`, and the worker reads all three settings:
 
 | Setting | Environment variable | Default | Meaning |
 | --- | --- | --- | --- |
 | `Extensions:Isolation` | `Extensions__Isolation` | `process` | `process` uses the runners. `inProcess` keeps the in-process [loading](#loading) and is allowed only in Development. Outside Development `inProcess`, or any other value, stops the server and the worker at start |
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
+| `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
 ### The runner protocol
 
@@ -480,7 +490,7 @@ implements the operation context over it.
 
 | Message | Sent by | Fields |
 | --- | --- | --- |
-| `start` | The worker, to the host | `package`, `version`, `proxyToken` |
+| `start` | The worker, to the host | `package`, `version`, `proxy`, the `host:port` of the worker's egress proxy, and `proxyToken` |
 | `ready` | The runner | None |
 | `run` | The worker | `operation`, `operationId`, `input`, and `bindings` with `urls` and `secrets`, each mapping a binding name to its value |
 | `result` | The runner | `output` |
@@ -494,7 +504,7 @@ implements the operation context over it.
   `Extensions:Path`. It does not start without that setting, or when the folder does not exist.
 - **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
   host starts the runner and pipes the connection to the runner's standard input and output.
-- **Start.** A `start` for a version that is not installed, or whose `package` or `version` is not
+- **Start.** A `start` for a version that is not installed, or whose `package`, `version` or `proxy` is not
   well formed, closes the connection and starts no runner. The runner answers `ready` once it has
   loaded the version.
 - **Standard output.** The runner's standard output holds only protocol lines. What a package writes to

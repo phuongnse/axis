@@ -19,8 +19,11 @@ namespace Axis.Configuration.Packages;
 [JsonDerivedType(typeof(StopMessage), "stop")]
 public abstract record RunnerMessage;
 
-/// <summary>The worker asks the host to start a runner for one installed package version.</summary>
-public sealed record StartMessage(string Package, string Version, string ProxyToken) : RunnerMessage;
+/// <summary>
+/// The worker asks the host to start a runner for one installed package version. <paramref name="Proxy"/> is the
+/// <c>host:port</c> of the worker's egress proxy, and <paramref name="ProxyToken"/> is the runner's credential for it.
+/// </summary>
+public sealed record StartMessage(string Package, string Version, string Proxy, string ProxyToken) : RunnerMessage;
 
 /// <summary>The runner has loaded the version and takes a <c>run</c>.</summary>
 public sealed record ReadyMessage : RunnerMessage;
@@ -51,6 +54,9 @@ public static class RunnerProtocol
 {
     /// <summary>The TCP port that the package host listens on.</summary>
     public const int Port = 5310;
+
+    /// <summary>The default TCP port of the worker's egress proxy.</summary>
+    public const int ProxyPort = 5311;
 
     private static readonly JsonSerializerOptions _options = new(JsonSerializerDefaults.Web)
     {

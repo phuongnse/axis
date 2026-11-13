@@ -33,6 +33,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     private Uri _stubAddress = null!;
     private string? _authorization;
     private string? _idempotencyKey;
+    private string? _requestTarget;
 
     public async ValueTask InitializeAsync()
     {
@@ -73,6 +74,7 @@ public sealed class PackageHostTests : IAsyncLifetime
         Assert.Equal("200", result.Output["status"]!.GetValue<string>());
         Assert.Equal("Bearer secret-token", _authorization);
         Assert.Equal(probe.OperationId.ToString("D"), _idempotencyKey);
+        Assert.StartsWith(_stubAddress.GetLeftPart(UriPartial.Authority), _requestTarget, StringComparison.Ordinal);
 
         var sum = await connection.RunAsync("sum", new JsonObject { ["a"] = "9007199254740993", ["b"] = "1" }, withBindings: false);
         Assert.Equal("9007199254740994", Assert.IsType<ResultMessage>(sum.Answer).Output["total"]!.GetValue<string>());
@@ -200,6 +202,7 @@ public sealed class PackageHostTests : IAsyncLifetime
     [Theory]
     [InlineData("{\"type\":\"ready\"}")]
     [InlineData("{\"type\":\"start\",\"package\":\"test-package\",\"version\":\"1.0.0\"}")]
+    [InlineData("{\"type\":\"start\",\"package\":\"test-package\",\"version\":\"1.0.0\",\"proxy\":\"nohost\",\"proxyToken\":\"t\"}")]
     [InlineData("{\"type\":\"unknown\"}")]
     [InlineData("not json")]
     public async Task A_first_line_that_is_not_a_start_closes_the_connection_and_starts_no_runner(string line)
@@ -222,11 +225,15 @@ public sealed class PackageHostTests : IAsyncLifetime
         Assert.Single(_log.StartedRunners);
     }
 
-    /// <summary>Connects and sends a <c>start</c>. A start that the test means to be malformed is not checked against the schema.</summary>
+    /// <summary>
+    /// Connects and sends a <c>start</c> that names the stub as the egress proxy, which answers each request the runner
+    /// sends through its environment proxy.
+    /// A start that the test means to be malformed is not checked against the schema.
+    /// </summary>
     private async Task<Connection> StartAsync(string package, string version, bool wellFormed = true)
     {
         var connection = Connect();
-        await connection.SendAsync(new StartMessage(package, version, "proxy-token"), wellFormed);
+        await connection.SendAsync(new StartMessage(package, version, $"127.0.0.1:{_stubAddress.Port}", "proxy-token"), wellFormed);
         return connection;
     }
 
@@ -255,6 +262,7 @@ public sealed class PackageHostTests : IAsyncLifetime
 
             _authorization = context.Request.Headers["Authorization"];
             _idempotencyKey = context.Request.Headers["Idempotency-Key"];
+            _requestTarget = context.Request.RawUrl;
             context.Response.StatusCode = 200;
             context.Response.Close();
         }

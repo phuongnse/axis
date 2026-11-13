@@ -14,7 +14,8 @@ namespace Axis.Integration.Tests;
 /// An external system for connector call tests, over real HTTP on a free local port. It records
 /// every request it gets on any path, and answers <c>200 {"orderNumber":"PO-1"}</c> unless a test
 /// lines up the next answers. A test can also hold the next response until it releases it, or drop
-/// the connection of the next request that is not a <c>GET</c>. The stub stores the key of each
+/// the connection of the next request that is not a <c>GET</c>, or answer the next request with a <c>302</c>
+/// that carries the <c>Location</c> of <see cref="Redirect"/>. The stub stores the key of each
 /// such request it acts on, from the <c>Idempotency-Key</c> header or a UUID last path segment. A
 /// <c>GET</c> with no answer lined up whose last path segment is a UUID is a lookup: it answers the
 /// default answer when that key is stored, and <c>404</c> otherwise. A <c>POST</c> with the content
@@ -37,6 +38,7 @@ public sealed class ConnectorStub : IAsyncDisposable
     private readonly Lock _lock = new();
     private readonly WebApplication _app;
     private readonly Queue<(int Status, string Body)> _next = new();
+    private string? _location;
     private readonly ConcurrentDictionary<Guid, bool> _keys = new();
     private HeldResponse? _held;
     private HeldResponse? _heldToken;
@@ -46,6 +48,9 @@ public sealed class ConnectorStub : IAsyncDisposable
 
     /// <summary>The stub's base address, such as <c>http://127.0.0.1:41234</c>, with no trailing slash.</summary>
     public string BaseUrl { get; private set; } = "";
+
+    /// <summary>The stub's address with the host <c>localhost</c> in place of its IP address, which is another host to a client that sends through a proxy.</summary>
+    public string LocalhostBaseUrl => BaseUrl.Replace("127.0.0.1", "localhost", StringComparison.Ordinal);
 
     /// <summary>The requests the stub got, in the order they arrived.</summary>
     public IReadOnlyCollection<StubRequest> Requests => _requests;
@@ -81,10 +86,21 @@ public sealed class ConnectorStub : IAsyncDisposable
         lock (_lock)
         {
             _next.Clear();
+            _location = null;
             foreach (var answer in answers)
             {
                 _next.Enqueue(answer);
             }
+        }
+    }
+
+    /// <summary>Answers the next request with <c>302</c> and a <c>Location</c> of <paramref name="location"/>. Later requests get the default answer again.</summary>
+    public void Redirect(string location)
+    {
+        Respond(StatusCodes.Status302Found, "{}");
+        lock (_lock)
+        {
+            _location = location;
         }
     }
 
@@ -205,10 +221,12 @@ public sealed class ConnectorStub : IAsyncDisposable
 
         (int Status, string Body)? next;
         HeldResponse? held;
+        string? location;
         lock (_lock)
         {
             next = _next.TryDequeue(out var answer) ? answer : null;
             (held, _held) = (_held, null);
+            (location, _location) = (next is null ? null : _location, null);
         }
 
         if (next is null && key is { } created && !get)
@@ -228,6 +246,11 @@ public sealed class ConnectorStub : IAsyncDisposable
 
         var (status, text) = next ?? (StatusCodes.Status200OK, DefaultBody);
         context.Response.StatusCode = status;
+        if (location is not null)
+        {
+            context.Response.Headers.Location = location;
+        }
+
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsync(text, context.RequestAborted);
     }
