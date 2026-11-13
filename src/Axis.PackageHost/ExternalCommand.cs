@@ -1,18 +1,19 @@
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace Axis.PackageHost;
 
 /// <summary>
-/// Runs a command-line tool of the package build, the Trivy scan and the npm install alike, see
-/// docs/reference/extension-packages.md#building-a-package. The tool is killed with its child processes when the
-/// build is cancelled.
+/// Runs an external command of the package build, such as Trivy or pip, see
+/// docs/reference/extension-packages.md#building-a-package. A cancelled run kills the whole process tree.
 /// </summary>
-internal static class ToolProcess
+internal static class ExternalCommand
 {
-    /// <summary>The outcome of a run. <paramref name="Started"/> is false when the command could not start.</summary>
-    public sealed record ToolResult(bool Started, int ExitCode, string Output, string Error);
+    /// <summary>The exit code and the text that the command wrote to its standard output and error.</summary>
+    public sealed record Result(int ExitCode, string Output, string Error);
 
-    public static async Task<ToolResult> RunAsync(string command, IEnumerable<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
+    /// <summary>Runs the command and waits for it. Returns <c>null</c> when it cannot start, because the exception message would name the command.</summary>
+    public static async Task<Result?> RunAsync(string command, IEnumerable<string> arguments, string? workingDirectory, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo(command)
         {
@@ -45,12 +46,11 @@ internal static class ToolProcess
                 throw;
             }
 
-            return new ToolResult(true, process.ExitCode, await outputTask, await errorTask);
+            return new Result(process.ExitCode, await outputTask, await errorTask);
         }
-        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        catch (Exception exception) when (exception is InvalidOperationException or Win32Exception)
         {
-            // The exception message names the command, so it is never passed on.
-            return new ToolResult(false, -1, "", "");
+            return null;
         }
     }
 }

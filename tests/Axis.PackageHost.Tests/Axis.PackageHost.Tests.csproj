@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <None Include="..\packages\node-test-package\**\*" Exclude="..\packages\node-test-package\node_modules\**" LinkBase="NodeTestPackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="..\packages\TestPackages.targets" />

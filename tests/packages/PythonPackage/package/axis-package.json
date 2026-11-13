@@ -1,0 +1,17 @@
+{
+  "id": "python-test-package",
+  "version": "1.0.0",
+  "label": "Python test package",
+  "language": "python",
+  "adapter": "adapter.py",
+  "lock": "requirements.txt",
+  "operations": [
+    {
+      "name": "greet",
+      "type": "greet",
+      "idempotent": true,
+      "input": [{ "name": "name", "type": "text", "required": true }],
+      "output": [{ "name": "greeting", "type": "text", "required": true }]
+    }
+  ]
+}

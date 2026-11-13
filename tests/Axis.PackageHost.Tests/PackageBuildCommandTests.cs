@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Tests;
@@ -168,23 +170,61 @@ public sealed class PackageBuildCommandTests
     }
 
     [Fact]
-    public async Task A_python_package_is_refused_because_only_csharp_and_node_packages_are_built()
+    public async Task A_python_package_is_installed_from_hashed_requirements_and_loads_without_diagnostics()
     {
-        using var test = new BuildTest(NoFindings);
-        File.Delete(Path.Combine(test.Source, "Axis.TestPackage.dll"));
-        test.EditSourceManifest(manifest =>
-        {
-            manifest.Remove("assembly");
-            manifest["language"] = "python";
-            manifest["adapter"] = "adapter.py";
-            manifest["lock"] = "requirements.txt";
-        });
-        File.WriteAllText(Path.Combine(test.Source, "adapter.py"), "");
+        using var test = BuildTest.Python(NoFindings);
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Built, exitCode);
+        Assert.Contains("Built python-test-package 1.0.0 in python-test-package/1.0.0/.", output);
+        Assert.True(test.ScannerRan);
+        var written = Path.Combine(test.Extensions.Path, "python-test-package", "1.0.0");
+        Assert.True(File.Exists(Path.Combine(written, "adapter.py")));
+        Assert.True(File.Exists(Path.Combine(written, "axis_fixture_dependency", "__init__.py")));
+        Assert.True(Directory.Exists(Path.Combine(written, "axis_fixture_dependency-1.0.0.dist-info")));
+        var catalog = PackageCatalog.Load(test.Extensions.Path);
+        Assert.Empty(catalog.Diagnostics);
+        Assert.NotNull(catalog.Find("python-test-package", "1.0.0"));
+    }
+
+    [Fact]
+    public async Task A_requirement_without_a_hash_is_refused_before_the_install()
+    {
+        using var test = BuildTest.Python(NoFindings, _ => "axis-fixture-dependency==1.0.0\n");
 
         var (exitCode, output) = await test.RunAsync();
 
         Assert.Equal(PackageBuildCommand.Refused, exitCode);
-        Assert.Contains("Only C# and Node.js packages can be built", output);
+        Assert.Contains("'requirements.txt' line 1 has no --hash: axis-fixture-dependency==1.0.0.", output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
+    public async Task A_wheel_whose_hash_differs_is_refused_and_writes_nothing()
+    {
+        var other = Convert.ToHexStringLower(SHA256.HashData("other"u8));
+        using var test = BuildTest.Python(NoFindings, _ => $"./wheels/{BuildTest.WheelName} --hash=sha256:{other}\n");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.Refused, exitCode);
+        Assert.Contains("'requirements.txt'", output);
+        Assert.DoesNotContain(test.Source, output);
+        test.AssertNothingWrittenAndNoScan();
+    }
+
+    [Fact]
+    public async Task A_python_command_that_cannot_start_is_a_setup_error()
+    {
+        using var test = BuildTest.Python(NoFindings);
+        test.PythonCommand = Path.Combine(test.Scripts.Path, "missing-python");
+
+        var (exitCode, output) = await test.RunAsync();
+
+        Assert.Equal(PackageBuildCommand.SetupError, exitCode);
+        Assert.Contains("PackageBuild:Python", output);
+        Assert.DoesNotContain(test.Scripts.Path, output);
         test.AssertNothingWrittenAndNoScan();
     }
 

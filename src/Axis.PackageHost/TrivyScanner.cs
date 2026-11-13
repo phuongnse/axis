@@ -21,12 +21,12 @@ internal static class TrivyScanner
     public static async Task<ScanResult> ScanAsync(IConfiguration configuration, string source, CancellationToken cancellationToken)
     {
         var command = configuration[CommandSetting] is { Length: > 0 } configured ? configured : DefaultCommand;
-        var result = await ToolProcess.RunAsync(
+        var result = await ExternalCommand.RunAsync(
             command,
             ["fs", "--scanners", "vuln", "--format", "json", "--quiet", "--exit-code", "0", source],
-            null,
+            workingDirectory: null,
             cancellationToken);
-        if (!result.Started)
+        if (result is null)
         {
             return new ScanResult([], $"The scan could not start. Set '{CommandSetting}' to the Trivy command.");
         }
