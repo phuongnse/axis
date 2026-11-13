@@ -157,8 +157,8 @@ says what still holds and what does not.
 
 - The server checks every request against the user's grants, so a widget never reads or changes more than the user
   may.
-- The operator installs and reviews packages for the whole installation. Authors pick installed widgets and never
-  upload code.
+- The operator installs and reviews the widget code of the installation's packages. Authors pick installed
+  widgets and never upload widget code.
 - The import map pins each entry to its content hash.
 
 **What does not hold:**

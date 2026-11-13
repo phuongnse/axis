@@ -22,7 +22,7 @@ table.
   it may depend on other modules, as D89 says.
 - **Installed, declared and pinned like packages.** Modules are installed per installation.
   `application.json` declares each module it uses with a version range of the forms that
-  [D28](d28-extension-packages.md) gives packages, and compilation pins the highest installed version
+  [D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md) gives packages, and compilation pins the highest installed version
   in range and copies its files into the release.
 - **Named by module.** An application names a module resource as `<module id>/<name>` and calls a
   module rule as `<module id>:<name>(…)`. A module resource names resources of its own module and

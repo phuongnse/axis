@@ -494,7 +494,7 @@ way:
 ## Package operations
 
 A package operation step runs one operation of an [extension package](extension-packages.md), custom
-C# code that the operator installs. The step runs like a [connector call](#connector-calls): it stages
+code that an installation or an application provides. The step runs like a [connector call](#connector-calls): it stages
 the call, the worker runs the operation outside any database transaction, and a separate transaction
 records the result. This holds for every package operation, even a pure one, so there is one rule for
 all of them.
@@ -573,6 +573,9 @@ operation in place of the HTTP request:
 - **Run in a package runner** _(planned for M21)_. Outside Development, the worker sends the attempt
   to a [package runner](extension-packages.md#package-runners) instead of loading the version itself,
   and kills the runner at the `timeout`.
+- **Run in a customer-hosted runner** _(planned for M37)_. The worker sends the attempt to a
+  [customer-hosted runner](extension-packages.md#customer-hosted-runners), which receives no binding
+  value.
 - **Record.** An outcome transaction records the result, as for a connector call. On success it
   writes the output fields with the record update rules, sets the instance to `running` on `next`,
   writes the history row and the audit records, and queues the next step.

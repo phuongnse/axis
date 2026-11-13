@@ -5,7 +5,7 @@ Status: **Agreed**
 ## Context
 
 [D8](d8-custom-ui-widgets-are-packaged-react-components.md) agreed that a custom widget is a React
-component in an extension package ([D28](d28-extension-packages.md)), with no design. Package authors
+component in an extension package ([D148](d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md)), with no design. Package authors
 need a manifest, a way for the SPA to load their code under the content security policy, an SDK to
 build on, and a place in the page designer.
 

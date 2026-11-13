@@ -40,8 +40,12 @@ shared engines. Publishing an application, or changing one, never needs a change
 or a build made for that application. The platform holds no code for any one domain.
 
 When a requirement cannot be expressed as configuration, it is written as an **extension package**. An
-extension package is versioned, tested C# code that adds typed operations within the capabilities it
-declares. The package is built and deployed on its own, apart from the configuration.
+extension package is versioned, tested code that adds typed operations within the capabilities it
+declares. It can be written in C#, TypeScript, JavaScript or Python, and it can reuse the libraries that
+the business already has. An installation's package is trusted code that the operator installs and
+reviews. How far a package is trusted depends on its source, see
+[extension packages](reference/extension-packages.md#installation). The package is built and deployed
+on its own, apart from the configuration.
 
 An author creates, configures, tests, publishes and runs an application through Studio, without
 editing JSON or code. The files stay the source of truth, the master copy of the application.
@@ -55,7 +59,7 @@ every write. The modules are listed in [built-in modules](reference/built-in-mod
   with a built-in application that uses it.
 
 The reasons are in [D46](decisions/d46-an-enterprise-application-platform-for-any-domain-and-the-milestones-after-m9.md),
-[D7](decisions/d7-custom-code-lives-in-extension-packages.md),
+[D148](decisions/d148-packages-in-c-typescript-or-python-run-in-runners-that-axis-or-the-customer-hosts.md),
 [D5](decisions/d5-configuration-is-authored-as-files-first.md) and
 [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
 
@@ -111,7 +115,7 @@ Each role below uses Axis for a different job.
 | Application author             | Define data, queries, rules, processes, UI and policies; validate, test and publish them; see clear errors and where each resource is used. |
 | Process participant (end user) | Use the application's site: fill in forms, find records, work through assigned tasks, follow status.                                       |
 | Application administrator      | Manage users, roles and application settings; track running work; retry or resolve failures.                                               |
-| Extension developer            | Write C# operations and custom UI components against stable contracts, and test them in isolation.                                         |
+| Extension developer            | Write operations in C#, TypeScript or Python over their own libraries, and UI components against stable contracts; test them in isolation.  |
 | Platform operator              | Install and upgrade Axis; manage tenants, databases, identity providers and secrets; watch health and diagnose incidents.                   |
 
 ## Product goals

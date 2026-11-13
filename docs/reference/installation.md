@@ -52,7 +52,7 @@ Build an image from the repository root with
   backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`, and `axis-admin version` prints it.
-- **The package host image** _(planned for M21)_. A fifth image, `axis-package-host`, runs the
+- **The runner images** _(planned for M21)_. One runner image for each runtime runs the
   [package runners](extension-packages.md#package-runners) in the `package-host` container beside the
   worker. Compose and the Helm chart give that container no tenant settings, a read-only root file
   system, CPU and memory limits, and a network that reaches only the worker.
