@@ -86,10 +86,8 @@ scripts/                  the scripts of AGENTS.md and the checks that lint runs
   For a Node.js package the host starts the runner in `sdk/node/` instead, and for a Python package the runner in
   `sdk/python/`.
 - **`axis-package-host-<language>` images.** The `Dockerfile` builds one for each language. Each holds
-  `Axis.PackageHost`, Trivy and one runtime, and runs the `build` command, see
-  [images](reference/installation.md#images).
-- **Package runner images** _(planned for M21)_. The host images also carry the runner and run the `host` mode, see
-  [package runners](reference/extension-packages.md#package-runners).
+  `Axis.PackageHost`, Trivy, one runtime and its runner, and runs the `build` command and the `host` mode, see
+  [images](reference/installation.md#images) and [package runners](reference/extension-packages.md#package-runners).
 - **`sdk/`**. The runner protocol's schema, `package-runner-protocol.schema.json`.
 - **`sdk/node/`**. The Node.js runner and its SDK, which the package host starts for a `node` package.
 - **`sdk/python/`**. The Python runner, `axis_runner.py`, and the SDK module `axis_sdk`, which uses only the Python

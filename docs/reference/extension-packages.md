@@ -25,18 +25,18 @@ and installed apart from any application, see [Installation](#installation).
   contracts assembly described in [Contracts](#contracts).
 - **Build artifact.** A C# package's build gives a folder with its assemblies
   and a manifest, `axis-package.json`.
-- **Three languages** _(planned for M21)_. A package is written in C#,
+- **Three languages.** A package is written in C#,
   TypeScript or JavaScript on Node.js, or Python.
-- **A folder with a lock file** _(planned for M21)_. A package of any of
+- **A folder with a lock file.** A package of any of
   these languages is a folder with a manifest, a thin adapter in that
   language and a lock file of its dependencies.
-- **Reuses a library** _(planned for M21)_. The dependencies of a package may
-  be the business's own libraries, from a public or private registry, as
-  built files or as a commit of a git repository. The adapter maps an
-  operation to a function of the library, and the library's code does not
-  change.
-- **Built once** _(planned for M21)_. A package is built once, when it is
-  installed or published or, for a customer-hosted package, by the customer with the same `build`, see
+- **Reuses a library.** The dependencies of a package may
+  be the business's own libraries, from a public registry or as
+  built files. The adapter maps an operation to a function of the library,
+  and the library's code does not change.
+- **Private registries and git commits** _(planned for M37)_. The dependencies
+  may also come from a private registry, or as a commit of a git repository.
+- **Built once.** A package is built once, when it is installed, see
   [Building a package](#building-a-package). Its dependencies are installed from the lock file and
   scanned for known vulnerabilities. A runner downloads nothing at run time.
 - **No data access.** A package cannot read or write entities.
@@ -207,7 +207,7 @@ public class RetryableException : Exception { }
 The operator installs an installation's packages once for the whole installation, in a folder that
 every host reads. An installation's package is trusted code that the operator reviews.
 
-- **Inside a module** _(planned for M21)_. A module installed for the installation can ship a package,
+- **Inside a module** _(planned for M37)_. A module installed for the installation can ship a package,
   such as a built-in module or a partner's module, and the operator reviews that package too.
 - **Per installation.** Packages are installed once for the installation,
   not per tenant. Every tenant sees the same installed packages. An
@@ -299,7 +299,7 @@ that `Extensions:Path` names and compiles nothing.
   pip reads it: a comment and a blank line are skipped and a line that ends in a backslash continues on the
   next line. An option line such as `--index-url` needs no hash. A line that starts with `-r`, `-c` or `-e`,
   or their long forms, is refused, because it brings in requirements that the check never sees.
-- **Registry credentials** _(planned for M21)_. They are mounted for the build alone, and the runners
+- **Registry credentials** _(planned for M37)_. They are mounted for the build alone, and the runners
   never see them.
 
 The build reads these settings:
@@ -456,7 +456,7 @@ see [Contracts](#contracts).
 Outside Development, package operations run outside the worker, in package runners, so that a
 package reaches nothing of the host and no binding of another call.
 
-- **The runners** _(planned for M21)_. Each runtime has its own container, whose host,
+- **The runners.** Each runtime has its own container, whose host,
   `Axis.PackageHost`, starts a runner process when the worker asks and stops
   it when told. The images and containers are in [images](installation.md#images).
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
@@ -760,8 +760,8 @@ installation, loading, the capability limits, the server's metadata-only load an
   `artifacts/extensions/phone-numbers/1.0.0/` with the library beside the adapter, using the pip flags of the
   [build](#building-a-package). They skip the scan that the build runs, as the project build of the C#
   sample does, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `adapter.py` and
-  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host
-  yet. The integration tests run it from a process step through a Python package host.
+  `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host.
+  The integration tests run it from a process step through a Python package host.
 - **TypeScript sample package.** `samples/packages/payment-terms/` holds `payment-terms` 1.0.0, a `node`
   package whose adapter, `index.ts`, wraps the npm library dayjs 1.11.23 and leaves it unchanged. The compiled
   `index.js` is committed beside it. dayjs is committed as `vendor/dayjs-1.11.23.tgz` and locked in
