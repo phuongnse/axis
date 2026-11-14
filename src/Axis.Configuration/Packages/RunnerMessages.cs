@@ -1,4 +1,6 @@
 using System.Buffers;
+using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -110,6 +112,39 @@ public static class RunnerProtocol
         await JsonSerializer.SerializeAsync(stream, message, _options, cancellationToken);
         await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
         await stream.FlushAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Connects to <paramref name="host"/> and <paramref name="port"/>, sends <paramref name="question"/> as the one line of the
+    /// connection and reads the one line that answers it. Returns <see langword="null"/> when the host gives no answer: it refuses or
+    /// closes the connection, sends a line that is not a message, or does not answer within <paramref name="wait"/>.
+    /// </summary>
+    /// <exception cref="OperationCanceledException"><paramref name="stopping"/> was cancelled.</exception>
+    public static async Task<RunnerMessage?> AskAsync(string host, int port, RunnerMessage question, TimeSpan wait, CancellationToken stopping)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(question);
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stopping);
+        timeout.CancelAfter(wait);
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(host, port, timeout.Token);
+            var stream = client.GetStream();
+            await WriteAsync(stream, question, timeout.Token);
+            using var reader = new StreamReader(stream, new UTF8Encoding(false));
+            var line = await reader.ReadLineAsync(timeout.Token);
+            return line is null ? null : Read(line);
+        }
+        catch (OperationCanceledException) when (!stopping.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (Exception exception) when (exception is SocketException or IOException or JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>Reads one line.</summary>

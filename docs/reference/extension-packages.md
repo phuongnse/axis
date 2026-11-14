@@ -545,7 +545,7 @@ The server reads `Extensions:Isolation`, and the worker reads all seven settings
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Node` | `Extensions__Runners__Node` | none | The `host:port` of the Node.js package host, with the same forms. Unset, every `node` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
-| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker needs it, see [an application's packages](#an-applications-packages). Unset with the setting off, the worker never contacts the host. A value that is not a `host:port` stops the worker at start, with the setting on or off |
+| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker and the publisher need it, see [an application's packages](#an-applications-packages). Unset with the setting off, the worker never contacts the host. A value that is not a `host:port` stops the worker at start, with the setting on or off |
 | `Extensions:ApplicationPackages` | `Extensions__ApplicationPackages` | `false` | `true` makes the worker ask `application-package-host` at start whether it runs under gVisor, and stop with exit code 1 when it does not, see [an application's packages](#an-applications-packages). `false` never asks. Any other value stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
@@ -717,7 +717,9 @@ trusted code, so the platform gives it more limits than an installation's packag
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker, `activate` and publisher setting, `false` by default.
   With `true`, the worker sends `sandbox` to `application-package-host` at `Extensions:Runners:Application`
-  before it reads any tenant or claims any work, and does not start otherwise. It exits with code 1 when the
+  before it reads any tenant or claims any work, and does not start otherwise. The publisher needs the same
+  `Extensions:Runners:Application`, to send it each package to build, and exits with code 2 at start when it is unset or
+  malformed. It exits with code 1 when the
   answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
   `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
   it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
@@ -747,10 +749,18 @@ trusted code, so the platform gives it more limits than an installation's packag
   [Package step shape](process-execution.md#package-step-shape).
 - **A customer-hosted package's folder** _(planned for M37)_. It holds the manifest alone, and another file
   in it is a compile error at that file, because Axis neither builds nor scans it.
-- **Built and scanned on publish** _(planned for M37)_. The publisher builds and scans each package that Axis runs as
-  [built once](#what-a-package-is) says, but in the tenant's sandbox, because a dependency's install
-  script is the tenant's code. A failed build or scan fails the publish with diagnostics. A publish
-  needs the publisher role only.
+- **Built and scanned on publish.** With `Extensions:ApplicationPackages` on, a `publish` sends each
+  `packages/<id>/` of its snapshot to `application-package-host` as a `build`, one at a time in id order,
+  before it compiles, for a `tenant` and a `preview` target alike. The host builds and scans the package in the
+  tenant's sandbox, as [built once](#what-a-package-is) says, because a dependency's install script is the
+  tenant's code. The publisher runs no pip, npm or install script itself. A `refused` answer fails the
+  `compile` step with an `AXC0149` diagnostic at `packages/<id>/<file>` for each problem, such as
+  `packages/<id>/requirements.txt` for a scan finding or a failed install. A host that refuses the connection,
+  closes it without an answer or does not answer within 5 minutes fails it with one `AXC0152` diagnostic at
+  `packages/<id>/axis-package.json`, which does not name the host's address. Either way no release is stored,
+  and a `publish` to a `tenant` writes `release.publishFailed`. A `built` answer lets the compile go on, and the release
+  still holds the files as written. A `validate`, `accept`, `test`, `activate` and the activation at server start do not build
+  packages yet. A publish needs the publisher role only.
 - **In the release.** The release holds every file of the package as written, and the content hash covers
   them, see [versions and pinning](#versions-and-pinning) and
   [the release](configuration.md#release).

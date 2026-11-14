@@ -1,6 +1,3 @@
-using System.Net.Sockets;
-using System.Text;
-using System.Text.Json;
 using Axis.Configuration.Packages;
 
 namespace Axis.Worker;
@@ -45,26 +42,8 @@ public sealed partial class ApplicationSandboxCheck(ApplicationPackageSettings s
     /// <summary>The host's answer, or <see langword="null"/> when it gives none.</summary>
     private async Task<bool?> AskAsync(TimeSpan wait, CancellationToken stoppingToken)
     {
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        timeout.CancelAfter(wait);
-        try
-        {
-            using var client = new TcpClient();
-            await client.ConnectAsync(settings.RunnerHost!, settings.RunnerPort, timeout.Token);
-            var stream = client.GetStream();
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(RunnerProtocol.Write(new SandboxMessage()) + "\n"), timeout.Token);
-            using var reader = new StreamReader(stream, new UTF8Encoding(false));
-            var line = await reader.ReadLineAsync(timeout.Token);
-            return line is not null && RunnerProtocol.Read(line) is SandboxMessage { Gvisor: { } gvisor } ? gvisor : null;
-        }
-        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
-        {
-            return null;
-        }
-        catch (Exception exception) when (exception is SocketException or IOException or JsonException)
-        {
-            return null;
-        }
+        var answer = await RunnerProtocol.AskAsync(settings.RunnerHost!, settings.RunnerPort, new SandboxMessage(), wait, stoppingToken);
+        return answer is SandboxMessage { Gvisor: { } gvisor } ? gvisor : null;
     }
 
     [LoggerMessage(LogLevel.Critical, "application-package-host at {Address}, set by {Setting}, does not run under gVisor. The worker does not start, because an application's package is untrusted code.")]

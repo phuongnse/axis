@@ -83,6 +83,13 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
             .Where(match => match.Success)
             .Select(match => bool.Parse(match.Groups["gvisor"].Value))];
 
+    /// <summary>The package and version of each package the host built and answered <c>built</c> to.</summary>
+    public IReadOnlyList<(string Package, string Version)> Builds() =>
+        [.. Logs.Entries
+            .Select(entry => PackageBuilt().Match(entry))
+            .Where(match => match.Success)
+            .Select(match => (match.Groups["package"].Value, match.Groups["version"].Value))];
+
     /// <summary>A loopback port where nothing listens, as <c>host:port</c>.</summary>
     public static string ClosedAddress()
     {
@@ -113,6 +120,9 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
 
     [GeneratedRegex(@"Answered a sandbox question: gVisor (?<gvisor>True|False)\.")]
     private static partial Regex SandboxAnswered();
+
+    [GeneratedRegex(@"Built package (?<package>\S+) (?<version>\S+)\.")]
+    private static partial Regex PackageBuilt();
 
     [GeneratedRegex(@"Runner (?<id>\d+) started for package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex RunnerStarted();

@@ -1296,6 +1296,19 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        // With the setting on, a publish builds each application package in application-package-host.
+        ApplicationPackageBuilds? builds;
+        try
+        {
+            var packages = ApplicationPackageSettings.Load(configuration);
+            builds = packages.On ? new ApplicationPackageBuilds(packages.RunnerHost!, packages.RunnerPort, ApplicationPackageBuilds.Wait) : null;
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return 2;
+        }
+
         // A setting's own message holds its value, so these say only which setting is wrong.
         TenancySource source;
         try
@@ -1336,14 +1349,15 @@ internal static partial class AdminCommands
                 studioPlatform is null ? null : new PlatformStudioWriteLock(studioPlatform, NullLogger<PlatformStudioWriteLock>.Instance));
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, cell, studio, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, studio, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, cell, studio, builds, output, error, lease, testLimit, identityProviderHandler, dnsResolver, certificateWriter, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, studio, builds, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
         IConfiguration configuration,
         CellOptions cell,
         PublisherStudio? studio,
+        ApplicationPackageBuilds? builds,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1458,7 +1472,8 @@ internal static partial class AdminCommands
                 hostCheckInterval,
                 certificates),
             storage is null ? null : new TenantExportSweep(storage),
-            studio).RunAsync();
+            studio,
+            builds).RunAsync();
     }
 
     // A blank setting is the default. A setting's own value is never echoed, so the message says only which setting is wrong.
@@ -1536,6 +1551,7 @@ internal static partial class AdminCommands
     private static async Task<int> ConfigurationPublisherAsync(
         IConfiguration configuration,
         PublisherStudio? studio,
+        ApplicationPackageBuilds? builds,
         TextWriter output,
         TextWriter error,
         TimeSpan lease,
@@ -1591,7 +1607,8 @@ internal static partial class AdminCommands
             output,
             error,
             cancellationToken,
-            studio: studio).RunAsync();
+            studio: studio,
+            packageBuilds: builds).RunAsync();
     }
 
     // An empty value is no setting: a test request then fails with AXC0217. A value that is no connection string stops the

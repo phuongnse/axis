@@ -168,8 +168,10 @@ public static class DiagnosticCodes
     public const string PinnedPackageVersionMissing = "AXC0146";
     public const string ApplicationPackageIdTaken = "AXC0147";
     public const string ApplicationPackagesOff = "AXC0148";
+    public const string ApplicationPackageBuildRefused = "AXC0149";
     public const string UnknownStepPackage = "AXC0150";
     public const string UnknownPackageOperation = "AXC0151";
+    public const string ApplicationPackageBuildNoAnswer = "AXC0152";
 
     public const string InvalidTriggerSchedule = "AXC0160";
     public const string UnknownTriggerTimeZone = "AXC0161";

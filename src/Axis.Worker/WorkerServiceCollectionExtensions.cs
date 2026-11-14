@@ -91,7 +91,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(isolation);
 
         // Read before any database work too, so a bad value stops the start.
-        var applicationPackages = ApplicationPackageSettings.LoadForWorker(configuration);
+        var applicationPackages = ApplicationPackageSettings.Load(configuration);
         services.AddSingleton(applicationPackages);
         services.AddSingleton<ApplicationSandboxCheck>();
 
