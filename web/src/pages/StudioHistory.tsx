@@ -371,7 +371,13 @@ function ChangedFile({
     <section
       data-testid="studio-revision-change"
       data-file={file}
-      style={{ border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base, background: colour.surface }}
+      // The block clips its diff to its rounded corners.
+      style={{
+        border: `1px solid ${colour.borderSubtle}`,
+        borderRadius: radius.base,
+        background: colour.surface,
+        overflow: 'hidden',
+      }}
     >
       <Flex
         wrap
@@ -416,7 +422,13 @@ function ChangedFile({
           {author !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{author}</Typography.Text>}
         </Flex>
       )}
-      <div hidden={!open}>
+      <div
+        hidden={!open}
+        // A line parts the diff from the summary above it, as the header's line parts the header.
+        style={
+          summary !== undefined || author !== undefined ? { borderTop: `1px solid ${colour.borderSubtle}` } : undefined
+        }
+      >
         <Suspense fallback={<Spin />}>
           <LazyJsonDiff
             before={before === null ? '' : prettyJson(before)}

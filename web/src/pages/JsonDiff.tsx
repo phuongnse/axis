@@ -1,5 +1,5 @@
 import { Chunk, unifiedMergeView } from '@codemirror/merge'
-import { EditorState, Text } from '@codemirror/state'
+import { EditorState, Prec, Text } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 import { diffTints } from '../platform/antTheme'
@@ -103,33 +103,39 @@ const diffTheme = sharedTheme((tokens, mode) => {
   const tint = diffTints(mode)
   return [
     codeEditorTheme(tokens, mode),
-    EditorView.theme({
-      '&': { borderColor: colour.borderSubtle },
-      '.cm-content': { padding: `${spacing.xs}px 0` },
-      '.cm-line': { paddingInline: `${spacing.sm}px` },
-      '.cm-gutters': {
-        backgroundColor: colour.surface,
-        color: colour.textMuted,
-        border: 'none',
-        borderInlineEnd: `1px solid ${colour.borderSubtle}`,
-      },
-      '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.xs}px` },
-      '&.cm-merge-b .cm-changedLine, .cm-inlineChangedLine': { backgroundColor: tint.added },
-      '&.cm-merge-b .cm-changedText': { background: tint.addedWord },
-      '.cm-deletedChunk': { backgroundColor: tint.removed, paddingLeft: 0 },
-      '.cm-deletedChunk .cm-deletedLine': { paddingInline: `${spacing.sm}px` },
-      '&.cm-merge-b .cm-deletedText, .cm-deletedChunk .cm-deletedText': { background: tint.removedWord },
-      '&.cm-merge-b .cm-changedLineGutter': { background: colour.success },
-      '.cm-deletedLineGutter': { background: colour.danger },
-      '.cm-changeGutter': { width: '3px', paddingLeft: 0 },
-      '&.cm-wholeAdded .cm-line': { backgroundColor: tint.added },
-      '&.cm-wholeRemoved .cm-line': { backgroundColor: tint.removed },
-      '.cm-collapsedLines': {
-        color: colour.primaryText,
-        background: colour.canvas,
-        paddingInline: `${spacing.sm}px`,
-        '&:before, &:after': { content: '""', margin: 0 },
-      },
-    }),
+    // The diff's own look comes first, so it wins over the shared editor's frame, which an earlier extension sets.
+    Prec.high(
+      EditorView.theme({
+        // Proposed: the diff fills its file's block flush, as GitHub draws a file's diff, with no frame of its own inside the
+        // block's, see the review on #3263; keyboard focus stays visible inside the block's edge.
+        '&': { border: 'none', borderRadius: 0 },
+        '&.cm-focused': { outlineOffset: '-2px' },
+        '.cm-content': { padding: `${spacing.xs}px 0` },
+        '.cm-line': { paddingInline: `${spacing.sm}px` },
+        '.cm-gutters': {
+          backgroundColor: colour.surface,
+          color: colour.textMuted,
+          border: 'none',
+          borderInlineEnd: `1px solid ${colour.borderSubtle}`,
+        },
+        '.cm-lineNumbers .cm-gutterElement': { paddingInline: `${spacing.xs}px` },
+        '&.cm-merge-b .cm-changedLine, .cm-inlineChangedLine': { backgroundColor: tint.added },
+        '&.cm-merge-b .cm-changedText': { background: tint.addedWord },
+        '.cm-deletedChunk': { backgroundColor: tint.removed, paddingLeft: 0 },
+        '.cm-deletedChunk .cm-deletedLine': { paddingInline: `${spacing.sm}px` },
+        '&.cm-merge-b .cm-deletedText, .cm-deletedChunk .cm-deletedText': { background: tint.removedWord },
+        '&.cm-merge-b .cm-changedLineGutter': { background: colour.success },
+        '.cm-deletedLineGutter': { background: colour.danger },
+        '.cm-changeGutter': { width: '3px', paddingLeft: 0 },
+        '&.cm-wholeAdded .cm-line': { backgroundColor: tint.added },
+        '&.cm-wholeRemoved .cm-line': { backgroundColor: tint.removed },
+        '.cm-collapsedLines': {
+          color: colour.primaryText,
+          background: colour.canvas,
+          paddingInline: `${spacing.sm}px`,
+          '&:before, &:after': { content: '""', margin: 0 },
+        },
+      }),
+    ),
   ]
 })
