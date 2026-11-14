@@ -30,7 +30,13 @@ import { useDesignTokens } from '../platform/themeMode'
 import { StepsBar } from '../platform/StepsBar'
 import { useFollowJob } from '../platform/useFollowJob'
 import { PlatformContext } from './context'
-import { authoringRequestAddress, requestStateTone, settled, useRequestStateWords } from './authoringRequests'
+import {
+  authoringRequestAddress,
+  requestStateTone,
+  requestTitle,
+  settled,
+  useRequestStateWords,
+} from './authoringRequests'
 import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
 import { kindSingular } from '../platform/studioKinds'
@@ -117,7 +123,7 @@ export function StudioAuthoringRequests({ application, userId }: { application: 
           to={authoringRequestAddress(application, row.id)}
           style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
         >
-          {row.text}
+          {requestTitle(row)}
         </Link>
       ),
     },
@@ -620,11 +626,10 @@ export function StudioAuthoringRequestPage({
 
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-request">
-      {/* Proposed: the request's state beside the heading, and its words, signed by who sent it and the AIs that made it,
-          right under it, as what the page is about, see the review on #3263. */}
+      {/* Proposed: the request's name as the heading, then its state at the start of the line that says who sent it and
+          the AIs that made it, as a pull request's page does, then its words, see the review on #3263. */}
       <StudioPageHeading
-        title={t('shell.studio.aiRequest.title')}
-        tags={<StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>}
+        title={requestTitle(request)}
         actions={
           canDrop && !awaiting && !ready ? (
             <AxisButton role="secondary" disabled={acting} onClick={() => setDropOpen(true)}>
@@ -633,9 +638,12 @@ export function StudioAuthoringRequestPage({
           ) : undefined
         }
       />
-      <Flex vertical gap={spacing.xs} data-testid="studio-ai-asked">
+      <Flex vertical gap={spacing.sm} data-testid="studio-ai-asked">
+        <Flex align="center" gap={spacing.sm} wrap>
+          <StatusTag tone={requestStateTone(request.state)}>{stateWords(request)}</StatusTag>
+          <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
+        </Flex>
         {quoted(request.text)}
-        <Typography.Text style={{ color: colour.textMuted }}>{line}</Typography.Text>
       </Flex>
       {/* Proposed: while AI works, its stages, the fix round and what it does now, see the review on #3263. */}
       <Flex vertical gap="small" data-testid="studio-ai-progress">

@@ -36,3 +36,20 @@ export function requestStateTone(state: StudioAuthoringRequestState): StatusTone
       return 'neutral'
   }
 }
+
+/** The longest a request's name runs, in characters, before it is cut. */
+const titleLength = 80
+
+/**
+ * Proposed: a request's name, its title, or until AI has given it one, the first sentence of its words, cut at 80
+ * characters, see the review on #3263.
+ */
+export function requestTitle(request: StudioAuthoringRequest): string {
+  if (request.title !== null && request.title.trim() !== '') {
+    return request.title
+  }
+  const words = request.text.trim()
+  const end = words.search(/[.!?\n]/)
+  const sentence = end === -1 ? words : words.slice(0, end)
+  return sentence.length > titleLength ? `${sentence.slice(0, titleLength - 1).trimEnd()}…` : sentence
+}

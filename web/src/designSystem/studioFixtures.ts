@@ -26,6 +26,7 @@ import type {
 } from '../platform/notifications'
 import type { FixtureRoute } from './fixtureFetch'
 import { application, currentUser, locale } from './fixtures'
+import { requestTitle } from '../pages/authoringRequests'
 
 // The answers of the `studio` preview. Its states answer the same `/api/studio/apps` path, so each state brings its own
 // routes, and the preview shows one state at a time, see docs/reference/widget-previews.md#the-bundle.
@@ -460,6 +461,17 @@ const longFolder: Folder = {
 // Proposed: the request panel's answers. The signed-in author is `currentUser`; another author sent some requests.
 const otherAuthor = '8a2b0c1d-4e5f-4a6b-9c7d-0e1f2a3b4c5d'
 
+// Proposed: the short names AI gave the preview's requests when it wrote their plans, see the review on #3263.
+const titles: Record<number, string> = {
+  7: 'Add a Cost centre field to purchase requests',
+  6: 'Add a Supplier field to purchase requests',
+  5: 'Finance manager approval over 50 million VND',
+  4: 'Email the requester when a request is decided',
+  3: 'Rename Category to Spending category',
+  2: 'Import suppliers from the purchasing system nightly',
+  1: 'A dashboard of spending by month',
+}
+
 /** The model of the preview's AI, which makes the changes asked for in Studio. */
 const workingModel = 'Claude Sonnet 5.5'
 
@@ -476,6 +488,7 @@ function authoringRequest(
     author: mine ? currentUser.id : otherAuthor,
     authorName: mine ? currentUser.displayName : 'Linh Tran',
     text,
+    title: state === 'planning' ? null : (titles[number] ?? null),
     app: null,
     // Proposed: the model the author's AI used, see the review on #3263.
     coAuthors: [workingModel],
@@ -1108,7 +1121,7 @@ function noticeRoutes(requests: () => StudioAuthoringRequestDetail[]): Record<st
         source: 'Purchase requests',
         kind,
         subject,
-        body: request.text,
+        body: requestTitle(request),
         open: { page: 'studio', parameters: { app: application, view: 'requests', request: request.id } },
         read: sent < Date.parse('2026-11-09T00:00:00Z'),
         done: false,

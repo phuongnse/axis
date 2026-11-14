@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioAuthoringRequestDetail } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
+import { requestTitle } from './authoringRequests'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
 
 const application = 'Purchases'
@@ -17,6 +18,7 @@ const fromApp: StudioAuthoringRequestDetail = {
   author: userId,
   authorName: 'Alex Morgan',
   text: 'Add a Cost centre field to the purchase request.',
+  title: 'Add a Cost centre field',
   app: 'Claude Code',
   coAuthors: ['Claude Code'],
   state: 'ready',
@@ -402,5 +404,43 @@ describe('a request in a fix round', () => {
     expect(await screen.findByText('Working')).toHaveAttribute('data-tone', 'neutral')
     expect(screen.queryByText('Fixing')).toBeNull()
     expect(within(screen.getByTestId('studio-ai-progress')).getByText('Fix round 2')).toBeInTheDocument()
+  })
+})
+
+// Proposed: a request's short name heads its page and names it in the table, see the review on #3263.
+describe('a request’s name', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('heads its page, with its state leading the line of who sent it, and its words under it', async () => {
+    stub(fromApp)
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Add a Cost centre field' })).toBeInTheDocument()
+    const asked = screen.getByTestId('studio-ai-asked')
+    expect(within(asked).getByText('Ready')).toHaveAttribute('data-tone', 'attention')
+    expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
+  })
+
+  it('names it in the table of AI requests', async () => {
+    stub({ items: [fromApp] })
+    renderIn(<StudioAuthoringRequests application={application} userId={userId} />)
+
+    expect(await screen.findByRole('link', { name: 'Add a Cost centre field' })).toBeInTheDocument()
+  })
+
+  it('is the first sentence of its words, cut at 80 characters, until AI gives it one', () => {
+    expect(requestTitle({ ...fromApp, title: null, text: 'Rename a field. Then show it.' })).toBe('Rename a field')
+    expect(requestTitle({ ...fromApp, title: null, text: 'x'.repeat(100) })).toBe(`${'x'.repeat(79)}…`)
+    expect(requestTitle(fromApp)).toBe('Add a Cost centre field')
   })
 })

@@ -1684,6 +1684,11 @@ export interface StudioAuthoringRequest {
   authorName: string | null
   text: string
   /**
+   * Proposed: the request's short name, which AI gives it from its words when it writes the plan, or an outside app
+   * gives through `propose_plan`, and `null` until then, see {@link requestTitle} and the review on #3263.
+   */
+  title: string | null
+  /**
    * Proposed: the outside AI app whose work this is, by the name it registered with, or `null` for a request sent from
    * Studio. Such a request starts at `create_draft` with the words the app gives, and has no plan and no review, see
    * the review on #3263.
