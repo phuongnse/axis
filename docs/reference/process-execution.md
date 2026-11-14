@@ -581,6 +581,10 @@ operation in place of the HTTP request:
   [package runner](extension-packages.md#package-runners) instead. The worker sends the stored input and the
   resolved bindings in a `run`, and closes the connection at the `timeout`, which kills the runner. A `node` or
   `python` attempt always goes to a package runner, with `inProcess` too.
+  An attempt of an application's own package, in any language, always goes to a runner of
+  `application-package-host`, see [an application's packages](extension-packages.md#an-applications-packages). The
+  worker reads the package's built files from the call's release in the mark transaction and sends them with the call's
+  tenant when it starts the runner. Without `Extensions:Runners:Application`, the attempt is retryable and names the setting.
 - **Run in a customer-hosted runner** _(planned for M37)_. A call to a customer-hosted package, whether
   the application's own package or an installation's package that the application
   [declares](declaring-packages.md#declaring-packages-in-an-application) with `runner: customer`, see
@@ -616,6 +620,7 @@ input under the same operation identity.
 | A `RetryableException`                                                        | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | Any other exception, or a request to the context for an undeclared capability | Failed    | No                                                                        | The instance becomes `failed` at once |
 | The pinned version is missing on the worker                                   | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
+| The release holds an application package's source but no built files         | Failed    | No                                                                        | The instance becomes `failed` at once |
 | A package host that cannot be reached, is not set, or starts no runner        | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | A declared binding the tenant lacks, or an `http` url outside Development     | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
 | The release lacks the step, or the installed manifest lacks the operation     | Failed    | No                                                                        | The instance becomes `failed` at once |

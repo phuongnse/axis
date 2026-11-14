@@ -78,15 +78,20 @@ public static class ProcessesServiceCollectionExtensions
     /// Makes the handler that runs package operation calls send each attempt of a C# package, unless it is
     /// <c>inProcess</c>, and each attempt of a <c>node</c> or <c>python</c> package, always, to a runner of the package host that
     /// <paramref name="isolation"/> names for its runtime, see
-    /// docs/reference/extension-packages.md#package-runners. Call it after <see cref="AddProcesses"/>. The runners
-    /// are closed when the host stops.
+    /// docs/reference/extension-packages.md#package-runners. It also sends each attempt of an application's own package to a
+    /// runner of the application package host at <c>Extensions:Runners:Application</c>, see
+    /// docs/reference/extension-packages.md#an-applications-packages, so it needs the <see cref="ApplicationPackageSettings"/> that the
+    /// caller registered. Call it after <see cref="AddProcesses"/>. The runners are closed when the host stops.
     /// </summary>
     public static IServiceCollection AddPackageRunners(this IServiceCollection services, PackageIsolation isolation)
     {
         ArgumentNullException.ThrowIfNull(isolation);
 
         // A factory, so that the container disposes the runners when the host stops.
-        services.AddSingleton(provider => new PackageRunnerPools(isolation, provider.GetRequiredService<ConnectorCallSettings>().AllowHttp));
+        services.AddSingleton(provider => new PackageRunnerPools(
+            isolation,
+            provider.GetRequiredService<ApplicationPackageSettings>(),
+            provider.GetRequiredService<ConnectorCallSettings>().AllowHttp));
         return services;
     }
 }

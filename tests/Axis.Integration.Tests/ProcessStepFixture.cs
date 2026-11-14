@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
@@ -805,6 +806,31 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             await TriggerSchedules.ActivateAsync(connection, _tenantId, compiled.Model!, compiled.Release!.Id, CancellationToken.None);
         }
 
+        return (compiled.Release!.Id, compiled.Model!);
+    }
+
+    /// <summary>
+    /// Compiles <paramref name="files"/>, the files of an application held in memory that may hold packages of its own under
+    /// <c>packages/</c>, and activates it with <paramref name="bindings"/>. The release stores <paramref name="builtPackageFiles"/>,
+    /// keyed by path such as <c>packages/&lt;id&gt;/&lt;file&gt;</c>, with it. The compile and the activation must give no diagnostic.
+    /// Returns the release's id and model.
+    /// </summary>
+    internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateFilesAsync(
+        IReadOnlyList<ResourceContent> files,
+        IReadOnlyDictionary<string, byte[]> builtPackageFiles,
+        ActivationBindings bindings)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync();
+        await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
+        await using var data = DataDatabaseFixture.CreateContext(connection);
+        var compiled = await ReleaseCompiler.CompileAsync(
+            files, configuration, [], _modules, ApplicationCompiler.DefaultMaxFileSize, applicationPackages: true, builtPackageFiles);
+        Assert.Empty(compiled.Diagnostics);
+        var activated = await ReleaseActivator.ActivateAsync(
+            compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, ReleaseActivator.DefaultInlineRecomputeLimit);
+        Assert.Empty(activated.Diagnostics);
+        await TriggerSchedules.ActivateAsync(connection, _tenantId, compiled.Model!, compiled.Release!.Id, CancellationToken.None);
         return (compiled.Release!.Id, compiled.Model!);
     }
 

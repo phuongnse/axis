@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
@@ -48,6 +49,13 @@ namespace Axis.Processes.Instances;
 /// runner is a retryable error that names the setting of the call's runtime. A request that a runner sends to a host no declared <c>url</c> binding names is
 /// refused by the worker's egress proxy and fails the call at once like the same request from a context. The error
 /// names the operation and the package, but no binding and no host.
+/// An application's own package is not installed. When the worker finds no installed version, it reads the package's built files from the
+/// call's release, in the mark transaction. With them, the attempt goes to a runner of <c>application-package-host</c> at
+/// <c>Extensions:Runners:Application</c>, whatever the package's language, which gets the files and the call's tenant, and the same outcomes
+/// follow, see docs/reference/extension-packages.md#an-applications-packages. Without a pool the attempt is retryable like one whose host
+/// is not set. A release that holds the package's source but no usable built files, such as one that <c>activate</c> stored, fails the call at
+/// once: the error names the package and no path, no runner starts and no attempt is counted. A release that holds neither keeps the retryable
+/// "not installed" error.
 /// The retry policy and the <c>idempotent</c> flag are stored with the call, so a worker that cannot load the pinned
 /// version can still decide. Each transaction checks the claim token, and the outcome needs the
 /// instance still waiting on the step at the revision the attempt saw. Each outcome transaction
@@ -80,6 +88,9 @@ internal sealed partial class PackageCallHandler(
 
     /// <summary>The error of an attempt when no package host is set in <paramref name="setting"/>.</summary>
     internal static string RunnerNotSet(string setting) => $"No package host is set in '{setting}'.";
+
+    /// <summary>The error of a call whose release holds an application package's source or unusable built files, but no usable built package.</summary>
+    internal static string NoBuiltFiles(string package) => $"The release holds no built files of the package '{package}'.";
 
     public string Kind => ProcessStarts.PackageCallWorkItemKind;
 
@@ -124,51 +135,76 @@ internal sealed partial class PackageCallHandler(
                 error = UnknownOutcome;
                 await transaction.RollbackAsync(cancellationToken);
             }
-            else if (package is null)
-            {
-                // The release cannot be rebuilt without the version, and the operation never ran, so
-                // the attempt is counted without marking the call.
-                var attempts = await PackageCalls.CountAttemptAsync(transaction, call.Id, cancellationToken)
-                    ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
-                attempt = attempt with { Attempts = attempts };
-                errorClass = ErrorClass.Retryable;
-                error = $"The package '{call.Package}' {call.Version} is not installed on this worker.";
-                await transaction.CommitAsync(cancellationToken);
-            }
             else
             {
-                try
+                var manifest = package?.Manifest;
+                Dictionary<string, byte[]>? files = null;
+                if (package is null)
                 {
-                    target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, package, cancellationToken);
-                    attempt = attempt with { Application = target.Model.Manifest.Name };
-                }
-                catch (InvalidOperationException exception)
-                {
-                    // The operation never ran, and the attempt is not counted.
-                    error = exception.Message;
-                    counted = false;
+                    // An application's own package is not installed. The release holds its built files, or only its source.
+                    var (hasSource, stored) = await ReleasePackageFiles.LoadAsync(transaction, call.ReleaseId, call.Package, cancellationToken);
+                    if (stored.Count > 0 || hasSource)
+                    {
+                        manifest = ReadBuiltManifest(call, stored);
+                        files = stored;
+                        if (manifest is null)
+                        {
+                            // No retry can build the files, and the operation never ran, so the attempt is not counted.
+                            error = NoBuiltFiles(call.Package);
+                            counted = false;
+                        }
+                    }
                 }
 
-                if (target is not null)
+                if (manifest is null && error is null)
                 {
-                    var attempts = await PackageCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
+                    // The release cannot be rebuilt without the version, and the operation never ran, so
+                    // the attempt is counted without marking the call.
+                    var attempts = await PackageCalls.CountAttemptAsync(transaction, call.Id, cancellationToken)
                         ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
                     attempt = attempt with { Attempts = attempts };
-
-                    // No other worker claims the item while the operation runs, and a runner starts.
-                    var starting = runners?.For(target.Package.Manifest.Language) is not null ? PackageRunners.StartTimeout : TimeSpan.Zero;
-                    if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, starting + target.Step.Timeout + item.Lease, cancellationToken))
-                    {
-                        await transaction.RollbackAsync(cancellationToken);
-                        LogLostClaim(item.Id, item.PackageCallId);
-                        return WorkItemOutcome.LostClaim;
-                    }
-
+                    errorClass = ErrorClass.Retryable;
+                    error = $"The package '{call.Package}' {call.Version} is not installed on this worker.";
                     await transaction.CommitAsync(cancellationToken);
                 }
                 else
                 {
-                    await transaction.RollbackAsync(cancellationToken);
+                    if (manifest is not null)
+                    {
+                        try
+                        {
+                            target = await FindTargetAsync(new WorkItemContext(item, connection, transaction), call, instance, manifest, package, files, cancellationToken);
+                            attempt = attempt with { Application = target.Model.Manifest.Name };
+                        }
+                        catch (InvalidOperationException exception)
+                        {
+                            // The operation never ran, and the attempt is not counted.
+                            error = exception.Message;
+                            counted = false;
+                        }
+                    }
+
+                    if (target is not null)
+                    {
+                        var attempts = await PackageCalls.MarkSendingAsync(transaction, call.Id, cancellationToken)
+                            ?? throw new InvalidOperationException($"The package call '{call.Id}' is no longer pending.");
+                        attempt = attempt with { Attempts = attempts };
+
+                        // No other worker claims the item while the operation runs, and a runner starts.
+                        var starting = PoolFor(target) is not null ? PackageRunners.StartTimeout : TimeSpan.Zero;
+                        if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, starting + target.Step.Timeout + item.Lease, cancellationToken))
+                        {
+                            await transaction.RollbackAsync(cancellationToken);
+                            LogLostClaim(item.Id, item.PackageCallId);
+                            return WorkItemOutcome.LostClaim;
+                        }
+
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+                    else
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                    }
                 }
             }
         }
@@ -182,7 +218,7 @@ internal sealed partial class PackageCallHandler(
 
         if (ReadInput(attempt.Call.Input, target.Operation) is not { } input)
         {
-            var misfit = $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}'.";
+            var misfit = $"The stored input of the call did not fit the operation '{target.Operation.Name}' of the package '{target.Manifest.Id}'.";
             return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
@@ -193,7 +229,7 @@ internal sealed partial class PackageCallHandler(
             [
                 new(AxisTelemetry.TenantTag, item.TenantId),
                 new(AxisTelemetry.ApplicationTag, target.Model.Manifest.Name),
-                new(AxisTelemetry.PackageTag, target.Package.Manifest.Id),
+                new(AxisTelemetry.PackageTag, target.Manifest.Id),
                 new(AxisTelemetry.OperationTag, target.Operation.Name),
             ]);
         try
@@ -223,10 +259,22 @@ internal sealed partial class PackageCallHandler(
         }
 
         // A package that has a runner pool never loads in the worker, see
-        // docs/reference/extension-packages.md#package-runners.
-        var run = runners?.For(target.Package.Manifest.Language) is { } pool
-            ? await RunInRunnerAsync(pool, target, attempt.Call, input, urls, secrets, cancellationToken)
-            : await RunAsync(target, attempt.Call, input, urls, secrets, cancellationToken);
+        // docs/reference/extension-packages.md#package-runners. An application's own package never runs in the worker, so without
+        // a pool its attempt is retryable, like one whose host is not set.
+        Run run;
+        if (PoolFor(target) is { } pool)
+        {
+            run = await RunInRunnerAsync(pool, item.TenantId, target, attempt.Call, input, urls, secrets, cancellationToken);
+        }
+        else if (target.Files is not null)
+        {
+            run = new Run(null, null, Error: RunnerNotSet(ApplicationPackageSettings.RunnerSetting), Retryable: true);
+        }
+        else
+        {
+            run = await RunAsync(target, attempt.Call, input, urls, secrets, cancellationToken);
+        }
+
         if (run.Violation is { } violation)
         {
             // The operation asked for more than it declares. A retry cannot fix that, and the
@@ -253,7 +301,7 @@ internal sealed partial class PackageCallHandler(
 
         if (Fit(run.Output, target) is not { } values)
         {
-            var misfit = $"The output of the operation '{target.Operation.Name}' of the package '{target.Package.Manifest.Id}' {target.Package.Manifest.Version} did not fit its manifest.";
+            var misfit = $"The output of the operation '{target.Operation.Name}' of the package '{target.Manifest.Id}' {target.Manifest.Version} did not fit its manifest.";
             return await FailAsync(item, connection, attempt, misfit, AttemptRow(attempt, CallAttempts.Failed, misfit), cancellationToken);
         }
 
@@ -261,15 +309,18 @@ internal sealed partial class PackageCallHandler(
     }
 
     /// <summary>
-    /// Finds the step, the subject entity and the operation of the call in the release and the installed
-    /// <paramref name="package"/>. A process without a subject has no entity.
+    /// Finds the step, the subject entity and the operation of the call in the release and the
+    /// <paramref name="manifest"/> of its package, which is the installed <paramref name="installed"/> package or, with <paramref name="files"/>,
+    /// the application's own. A process without a subject has no entity.
     /// </summary>
     /// <exception cref="InvalidOperationException">The release or the package lacks one of them.</exception>
     private async Task<Target> FindTargetAsync(
         WorkItemContext context,
         LoadedPackageCall call,
         LoadedInstance instance,
-        InstalledPackage package,
+        PackageManifest manifest,
+        InstalledPackage? installed,
+        Dictionary<string, byte[]>? files,
         CancellationToken cancellationToken)
     {
         var model = await models.GetAsync(context, call.ReleaseId, cancellationToken);
@@ -283,9 +334,42 @@ internal sealed partial class PackageCallHandler(
             throw new InvalidOperationException($"The process '{process.Name}' has no package operation step '{call.Step}'.");
         }
 
-        var operation = package.Manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase))
+        var operation = manifest.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, call.Operation, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException($"The package '{call.Package}' {call.Version} has no operation '{call.Operation}'.");
-        return new Target(model, entity, packageStep, package, operation);
+        return new Target(model, entity, packageStep, manifest, operation, installed, files);
+    }
+
+    /// <summary>
+    /// The runner pool that runs the call's package: the application pool for an application's own package, the pool of
+    /// its language for an installed one, or <see langword="null"/> when there is none and the worker runs it itself.
+    /// </summary>
+    private PackageRunners? PoolFor(Target target) =>
+        target.Files is not null ? runners?.Application : runners?.For(target.Manifest.Language);
+
+    /// <summary>
+    /// Reads the manifest of the application package that <paramref name="call"/> names from its built <paramref name="files"/>. Returns
+    /// <see langword="null"/> when they hold no manifest, the manifest cannot be read, it names another id or version than the call, or it says the
+    /// package runs in a customer-hosted runner, so the files cannot start a runner.
+    /// </summary>
+    private static PackageManifest? ReadBuiltManifest(LoadedPackageCall call, Dictionary<string, byte[]> files)
+    {
+        if (!files.TryGetValue(PackageCatalog.ManifestFileName, out var content))
+        {
+            return null;
+        }
+
+        try
+        {
+            return PackageCatalog.ReadManifestText(new UTF8Encoding(false, true).GetString(content)) is { CustomerHosted: false } manifest
+                && manifest.Id == call.Package
+                && manifest.Version == call.Version
+                    ? manifest
+                    : null;
+        }
+        catch (DecoderFallbackException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -378,12 +462,13 @@ internal sealed partial class PackageCallHandler(
         Dictionary<string, Func<string>> secrets,
         CancellationToken cancellationToken)
     {
-        var context = new PackageOperationContext(call.Id, target.Package.Manifest.Id, target.Operation.Name, urls, secrets, transport.Handler);
+        var context = new PackageOperationContext(call.Id, target.Manifest.Id, target.Operation.Name, urls, secrets, transport.Handler);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(target.Step.Timeout);
         try
         {
-            var operation = createOperation is null ? target.Package.CreateOperation(call.Operation) : createOperation(target.Package, call.Operation);
+            var installed = target.Installed!;
+            var operation = createOperation is null ? installed.CreateOperation(call.Operation) : createOperation(installed, call.Operation);
 
             // An operation that ignores its token keeps running, but the worker stops waiting for it.
             var output = await operation.RunAsync(input, context, timeout.Token).WaitAsync(timeout.Token);
@@ -412,6 +497,7 @@ internal sealed partial class PackageCallHandler(
     /// </summary>
     private async Task<Run> RunInRunnerAsync(
         PackageRunners pool,
+        string tenant,
         Target target,
         LoadedPackageCall call,
         Dictionary<string, object?> input,
@@ -446,7 +532,7 @@ internal sealed partial class PackageCallHandler(
             starting.CancelAfter(PackageRunners.StartTimeout);
             try
             {
-                runner = await pool.RentAsync(call.Package, call.Version, starting.Token);
+                runner = await pool.RentAsync(call.Package, call.Version, starting.Token, target.Files is null ? null : tenant, target.Files);
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
             {
@@ -489,7 +575,7 @@ internal sealed partial class PackageCallHandler(
         {
             return new Run(
                 null,
-                PackageOperationContext.RefusedMessage(target.Operation.Name, target.Package.Manifest.Id, "sent a request through the egress proxy to a host that none of its url bindings declares."));
+                PackageOperationContext.RefusedMessage(target.Operation.Name, target.Manifest.Id, "sent a request through the egress proxy to a host that none of its url bindings declares."));
         }
 
         if (timedOut)
@@ -527,7 +613,7 @@ internal sealed partial class PackageCallHandler(
             case FailureMessage { Binding: { } binding }:
                 return new Run(
                     null,
-                    PackageOperationContext.RefusedMessage(target.Operation.Name, target.Package.Manifest.Id, $"went beyond its declared capabilities with the binding '{binding}'."));
+                    PackageOperationContext.RefusedMessage(target.Operation.Name, target.Manifest.Id, $"went beyond its declared capabilities with the binding '{binding}'."));
             case FailureMessage failure:
                 return new Run(null, null, Error: failure.Error ?? nameof(FailureMessage));
             default:
@@ -1049,13 +1135,18 @@ internal sealed partial class PackageCallHandler(
     /// </summary>
     private sealed record Attempt(LoadedPackageCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
 
-    /// <summary>What the call's release and the host declare for it.</summary>
+    /// <summary>
+    /// What the call's release and the host declare for it: the manifest of its package, and either the installed package, or for an
+    /// application's own package the built files that the release stores.
+    /// </summary>
     private sealed record Target(
         ApplicationModel Model,
         EntityModel? Entity,
         PackageOperationStepModel Step,
-        InstalledPackage Package,
-        PackageOperation Operation);
+        PackageManifest Manifest,
+        PackageOperation Operation,
+        InstalledPackage? Installed = null,
+        Dictionary<string, byte[]>? Files = null);
 
     /// <summary>
     /// The result of a run: the output, the violation of the declared capabilities, the error of an exception and

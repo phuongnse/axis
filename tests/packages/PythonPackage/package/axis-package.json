@@ -43,6 +43,12 @@
       "capabilities": { "urls": ["TestUrl"], "secrets": ["TestToken"] }
     },
     {
+      "name": "pid",
+      "type": "pid",
+      "idempotent": true,
+      "output": [{ "name": "pid", "type": "integer", "required": true }]
+    },
+    {
       "name": "flaky",
       "type": "flaky",
       "idempotent": false,

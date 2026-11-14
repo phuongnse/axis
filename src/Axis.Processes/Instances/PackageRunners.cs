@@ -8,10 +8,13 @@ using Axis.Configuration.Packages;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// The worker's connections to the runners of one package host, the C# one, the Node.js one or the Python one, see
-/// docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
+/// The worker's connections to the runners of one package host, the C# one, the Node.js one, the Python one or the application
+/// one, see docs/reference/extension-packages.md#package-runners. A runner is one connection, which the host pipes to one
 /// runner process, and it runs one call at a time. An idle runner waits in the pool of its package version,
-/// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. A runner that
+/// and <see cref="RentAsync"/> starts a new one when the pool has none that is still connected. The application pool serves an
+/// application's own package, see docs/reference/extension-packages.md#an-applications-packages: its idle runners wait for
+/// one tenant, one package version and one build of the package, which is a digest of its built files, so a runner never
+/// serves another tenant or a release whose built files differ. A runner that
 /// exits, times out or fails is dropped, and closing its connection makes the host kill the process. Runners
 /// start when an attempt needs one, so a version never has more of them than calls in flight. The pool uses the
 /// worker's <see cref="EgressProxy"/>, which starts with the first runner and which <see cref="PackageRunnerPools"/>
@@ -26,7 +29,7 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
     /// </summary>
     public static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
-    private readonly ConcurrentDictionary<(string Package, string Version), ConcurrentBag<RunnerConnection>> _idle = new();
+    private readonly ConcurrentDictionary<(string? Tenant, string Package, string Version, string? Build), ConcurrentBag<RunnerConnection>> _idle = new();
     private volatile bool _disposed;
 
     /// <summary>The name of the setting that holds the address of the package host, for the errors of an attempt.</summary>
@@ -37,18 +40,25 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
 
     /// <summary>
     /// Takes an idle runner of the version whose connection is still open, or connects to the host, sends
-    /// <c>start</c> and waits for <c>ready</c>.
+    /// <c>start</c> and waits for <c>ready</c>. For an application's package, <paramref name="tenant"/> and the built
+    /// <paramref name="files"/> go in <c>start</c>, and an idle runner serves only that tenant and the same digest of files.
     /// </summary>
     /// <exception cref="IOException">The host did not start a runner, so no <c>ready</c> came.</exception>
     /// <exception cref="SocketException">The host cannot be reached.</exception>
-    public async Task<RunnerConnection> RentAsync(string package, string version, CancellationToken cancellationToken)
+    public async Task<RunnerConnection> RentAsync(
+        string package,
+        string version,
+        CancellationToken cancellationToken,
+        string? tenant = null,
+        IReadOnlyDictionary<string, byte[]>? files = null)
     {
         if (host is null)
         {
             throw new InvalidOperationException("No package host is set.");
         }
 
-        if (_idle.TryGetValue((package, version), out var bag))
+        var build = files is null ? null : ReleasePackageFiles.Digest(files);
+        if (_idle.TryGetValue((tenant, package, version, build), out var bag))
         {
             while (bag.TryTake(out var idle))
             {
@@ -66,10 +76,10 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
         {
             proxy.EnsureStarted();
             await client.ConnectAsync(host, port, cancellationToken);
-            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), proxy.Register(), proxy);
+            var runner = new RunnerConnection(client, package, version, ProxyAddress(client), proxy.Register(), proxy, tenant, build);
             try
             {
-                await runner.StartAsync(cancellationToken);
+                await runner.StartAsync(files, cancellationToken);
                 return runner;
             }
             catch
@@ -106,7 +116,7 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
             return;
         }
 
-        _idle.GetOrAdd((runner.Package, runner.Version), _ => []).Add(runner);
+        _idle.GetOrAdd((runner.Tenant, runner.Package, runner.Version, runner.Build), _ => []).Add(runner);
     }
 
     /// <summary>Sends <c>stop</c> to each idle runner and closes it. The proxy stays, because the other pool uses it.</summary>
@@ -125,10 +135,12 @@ internal sealed class PackageRunners(string setting, string? host, int port, Egr
 }
 
 /// <summary>
-/// The worker's package runner pools, one for each runtime, which share the worker's one <see cref="EgressProxy"/>, see
-/// docs/reference/extension-packages.md#package-runners. The C# pool exists unless <c>Extensions:Isolation</c> is
-/// <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists, because the worker cannot
-/// load JavaScript, and so does the Python pool, because the worker cannot load Python.
+/// The worker's package runner pools, one for each runtime and one for application packages, which share the worker's one
+/// <see cref="EgressProxy"/>, see docs/reference/extension-packages.md#package-runners. The C# pool exists unless
+/// <c>Extensions:Isolation</c> is <c>inProcess</c>, which loads C# packages into the worker. The Node.js pool always exists,
+/// because the worker cannot load JavaScript, and so does the Python pool, because the worker cannot load Python. The
+/// <see cref="Application"/> pool always exists too: it runs an application's own package, of any language, in a runner of
+/// <c>application-package-host</c>, see docs/reference/extension-packages.md#an-applications-packages.
 /// </summary>
 internal sealed class PackageRunnerPools : IAsyncDisposable
 {
@@ -136,10 +148,12 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
     private readonly PackageRunners? _dotnet;
     private readonly PackageRunners _node;
     private readonly PackageRunners _python;
+    private readonly PackageRunners _application;
 
-    public PackageRunnerPools(PackageIsolation isolation, bool allowHttp)
+    public PackageRunnerPools(PackageIsolation isolation, ApplicationPackageSettings application, bool allowHttp)
     {
         ArgumentNullException.ThrowIfNull(isolation);
+        ArgumentNullException.ThrowIfNull(application);
 
         _proxy = new EgressProxy(isolation.ProxyPort, allowHttp);
         _dotnet = isolation.InProcess
@@ -147,7 +161,11 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
             : new PackageRunners(PackageIsolation.DotnetRunnerSetting, isolation.DotnetHost, isolation.DotnetPort, _proxy);
         _node = new PackageRunners(PackageIsolation.NodeRunnerSetting, isolation.NodeHost, isolation.NodePort, _proxy);
         _python = new PackageRunners(PackageIsolation.PythonRunnerSetting, isolation.PythonHost, isolation.PythonPort, _proxy);
+        _application = new PackageRunners(ApplicationPackageSettings.RunnerSetting, application.RunnerHost, application.RunnerPort, _proxy);
     }
+
+    /// <summary>The pool of <c>application-package-host</c>, which runs the application's own packages, whatever their language.</summary>
+    public PackageRunners Application => _application;
 
     /// <summary>The pool that runs the packages of <paramref name="language"/>, or <see langword="null"/> when the worker runs them itself or cannot run them.</summary>
     public PackageRunners? For(PackageLanguage language) =>
@@ -169,6 +187,7 @@ internal sealed class PackageRunnerPools : IAsyncDisposable
 
         await _node.DisposeAsync();
         await _python.DisposeAsync();
+        await _application.DisposeAsync();
         await _proxy.DisposeAsync();
     }
 }
@@ -183,10 +202,12 @@ internal sealed class RunnerConnection : IDisposable
     private readonly string _token;
     private readonly EgressProxy _egress;
 
-    public RunnerConnection(TcpClient client, string package, string version, string proxy, string token, EgressProxy egress)
+    public RunnerConnection(TcpClient client, string package, string version, string proxy, string token, EgressProxy egress, string? tenant = null, string? build = null)
     {
         Package = package;
         Version = version;
+        Tenant = tenant;
+        Build = build;
         _proxy = proxy;
         _token = token;
         _egress = egress;
@@ -200,6 +221,12 @@ internal sealed class RunnerConnection : IDisposable
     public string Package { get; }
 
     public string Version { get; }
+
+    /// <summary>The tenant whose application package the runner serves, or <see langword="null"/> for an installed package.</summary>
+    public string? Tenant { get; }
+
+    /// <summary>The digest of the built files the runner was started from, or <see langword="null"/> for an installed package.</summary>
+    public string? Build { get; }
 
     /// <summary>
     /// Whether the connection can still be used. A closed or reset connection reads as ready, and so does an
@@ -220,11 +247,15 @@ internal sealed class RunnerConnection : IDisposable
         }
     }
 
-    /// <summary>Sends <c>start</c> and waits for <c>ready</c>.</summary>
+    /// <summary>
+    /// Sends <c>start</c> and waits for <c>ready</c>. The <c>start</c> of an application's package carries its tenant and
+    /// <paramref name="files"/>, which the runner is started from.
+    /// </summary>
     /// <exception cref="IOException">The host closed the connection or answered something else.</exception>
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public async Task StartAsync(IReadOnlyDictionary<string, byte[]>? files, CancellationToken cancellationToken)
     {
-        await _writer.WriteLineAsync(RunnerProtocol.Write(new StartMessage(Package, Version, _proxy, _token)).AsMemory(), cancellationToken);
+        var start = new StartMessage(Package, Version, _proxy, _token, Tenant, files?.ToDictionary(file => file.Key, file => file.Value));
+        await _writer.WriteLineAsync(RunnerProtocol.Write(start).AsMemory(), cancellationToken);
         if (await ReadAsync(cancellationToken) is not ReadyMessage)
         {
             throw new IOException("The package host did not start a runner.");

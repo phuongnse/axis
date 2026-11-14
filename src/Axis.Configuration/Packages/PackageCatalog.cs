@@ -336,6 +336,26 @@ public sealed class PackageCatalog
         return ReadManifest(stream, file, label, problems);
     }
 
+    /// <summary>
+    /// Reads the manifest of an application's package from its text, with the schema and rules of an installed package's
+    /// manifest, and says why in no diagnostic. Returns <see langword="null"/> when the text has any problem. The worker reads the
+    /// manifest of the built files that a release stores this way, see docs/reference/extension-packages.md#an-applications-packages.
+    /// </summary>
+    public static PackageManifest? ReadManifestText(string content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        var problems = new List<Diagnostic>();
+        var manifest = ReadManifestContent(content, ManifestFileName, "Package", problems);
+        if (manifest is null)
+        {
+            return null;
+        }
+
+        CheckManifestRules(manifest, ManifestFileName, "Package", problems);
+        return problems.Count == 0 ? manifest : null;
+    }
+
     /// <summary>Checks what the schema cannot, as <see cref="Load"/> does for an installed package: unique names and the timeout.</summary>
     internal static void CheckManifestRules(PackageManifest manifest, string file, string label, List<Diagnostic> problems) =>
         CheckManifest(manifest, (code, message, path) => problems.Add(new Diagnostic(code, $"{label}: {message}", file, path)));
