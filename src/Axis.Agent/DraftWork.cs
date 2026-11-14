@@ -4,7 +4,7 @@ namespace Axis.Agent;
 
 /// <summary>
 /// The model work on a request's draft that the <c>working</c> and the <c>fixing</c> step share, see <c>docs/reference/authoring-requests.md#states</c>.
-/// It offers the model the read tools, the write tools and the layer tool of the MCP server and nothing else, runs the model loop on the draft through
+/// It offers the model the read tools, the write tools, the layer tool and the package tools of the MCP server and nothing else, runs the model loop on the draft through
 /// <see cref="DraftToolPolicy"/>, and moves the request to <c>checking</c> when the model ends its turn. A model that has not ended its turn within
 /// <see cref="MaxModelCalls"/> model calls, or whose answer stops at the output limit, stops the request as <c>failed</c> with the outcome
 /// <c>unfinished</c>, see <c>docs/reference/authoring-requests.md#budgets</c>.
@@ -27,6 +27,11 @@ internal static class DraftWork
         "check_expression",
         "validate_draft",
         "diff_draft",
+        "list_package_files",
+        "read_package_file",
+        "write_package_file",
+        "delete_package_file",
+        "test_package",
     };
 
     internal static string SystemText(string application, Guid draft) =>
@@ -36,6 +41,8 @@ internal static class DraftWork
         Read the application first, with the tools you have. Use them to see its resources, its names and the reference of the configuration language. Name the application '{application}' when a tool asks for one. You do not need to name the draft: the tools use it.
 
         Make the change with write_resource and delete_resource. When the application pins a built-in module that does the job, change the module only through write_layer, which writes its customization layer. Do not add new resources for what the module already does.
+
+        When the request names a library, write a package over it with write_package_file, as the plan says, and remove a file with delete_package_file. Start the package's tests with test_package, then call it again with the request it answered until its status is succeeded or failed. Fix every failing test before you end your turn.
 
         Add a test scenario with write_resource for each behaviour you add.
 

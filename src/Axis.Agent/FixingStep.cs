@@ -45,7 +45,7 @@ internal sealed class FixingStep(TenantModelAdapters adapters, AiSettings settin
         return message.Append("\n\nFix every failure and every finding in the draft.").ToString();
     }
 
-    // The compile diagnostics when the compile failed, and the scenario items that did not pass, as the check step stored them.
+    // The compile diagnostics when the compile failed, the package tests that did not pass and the scenario items that did not pass, as the check step stored them.
     private static string Failures(string? checks)
     {
         if (checks is null || JsonNode.Parse(checks) is not JsonObject root)
@@ -57,6 +57,23 @@ internal sealed class FixingStep(TenantModelAdapters adapters, AiSettings settin
         if (root["compile"] is JsonObject compile && compile["outcome"]?.GetValue<string>() == "failed" && compile["diagnostics"] is JsonArray diagnostics)
         {
             failures.Add("Compile diagnostics: " + diagnostics.ToJsonString());
+        }
+
+        if (root["packages"] is JsonObject packages && packages["outcome"]?.GetValue<string>() == "failed" && packages["items"] is JsonArray tested)
+        {
+            var failed = new JsonArray();
+            foreach (var item in tested.OfType<JsonObject>().Where(item => item["status"]?.GetValue<string>() != "succeeded"))
+            {
+                var tests = (item["tests"] as JsonArray ?? []).Where(test => test?["outcome"]?.GetValue<string>() != "passed").Select(test => test!.DeepClone());
+                failed.Add(new JsonObject
+                {
+                    ["package"] = item["package"]?.DeepClone(),
+                    ["diagnostics"] = item["diagnostics"]?.DeepClone() ?? new JsonArray(),
+                    ["tests"] = new JsonArray(tests.ToArray()),
+                });
+            }
+
+            failures.Add("Package tests that did not pass: " + failed.ToJsonString());
         }
 
         if (root["scenarios"]?["items"] is JsonArray items)

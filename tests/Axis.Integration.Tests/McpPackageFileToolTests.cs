@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -123,6 +124,34 @@ public sealed class McpPackageFileToolTests(KeycloakFixture keycloak, PostgreSql
         Assert.Equal(before, await DraftFilesAsync(draft));
         Assert.Equal("print('kept')\n", (await CallAsync("read_package_file", Arguments(draft, "x", "adapter.py"))).Output!["content"]!.GetValue<string>());
         Assert.Equal(0L, await AuditCountAsync(draft, null));
+    }
+
+    // It reuses the package of McpTestPackageTests, whose tests are skipped on Windows.
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public async Task The_diagnostics_of_a_draft_with_a_package_report_AXC0148_when_the_tenants_application_packages_are_off_and_not_when_they_are_on()
+    {
+        const string Manifest = "packages/tools/axis-package.json";
+        await StartAsync(developerRole: "publisher", switchOn: false);
+        var off = await CreateDraftAsync();
+        Assert.Null((await Drafts(_user!).WritePackageFileAsync(off, Manifest, Encoding.UTF8.GetBytes(McpTestPackageTests.Manifest), null, false, CancellationToken)).Refusal);
+
+        var refused = await CallAsync("validate_draft", Arguments(off));
+
+        var diagnostic = Assert.Single(refused.Output!["diagnostics"]!.AsArray(), item => item!["code"]!.GetValue<string>() == "AXC0148")!;
+        Assert.Equal(Manifest, diagnostic["file"]!.GetValue<string>());
+        await _factory!.DisposeAsync();
+        _client!.Dispose();
+
+        await StartAsync(developerRole: "publisher", switchOn: true);
+        var on = await CreateDraftAsync();
+        var written = await CallAsync("write_package_file", Arguments(on, "tools", "axis-package.json", McpTestPackageTests.Manifest));
+        Assert.False(written.IsError, written.Error);
+        Assert.DoesNotContain(written.Output!["diagnostics"]!.AsArray(), item => item!["code"]!.GetValue<string>() == "AXC0148");
+
+        var allowed = await CallAsync("validate_draft", Arguments(on));
+
+        Assert.DoesNotContain(allowed.Output!["diagnostics"]!.AsArray(), item => item!["code"]!.GetValue<string>() == "AXC0148");
     }
 
     [Fact]

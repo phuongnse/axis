@@ -134,7 +134,7 @@ the checks, an independent review and fix rounds.
 | `planning`         | The agent reads the application through the tools and writes a plan in plain words: what it will change and which scenarios it will add | `awaitingApproval`                                          |
 | `awaitingApproval` | The author reads the plan and approves it, or asks for another plan with a comment                                                      | `working`, or `planning` again                              |
 | `working`          | The agent creates the draft and makes the change through the tools                                                                      | `checking`                                                  |
-| `checking`         | The compiler, the application's scenarios and the contract scenarios of its modules run on the draft                                    | `reviewing`, or `fixing` on a failure                       |
+| `checking`         | The compiler, the tests of each package the draft changed, the application's scenarios and the contract scenarios of its modules run on the draft | `reviewing`, or `fixing` on a failure                       |
 | `reviewing`        | A second agent session, with no memory of the first, reviews the draft against the request and the plan                                 | `ready`, or `fixing` on findings                            |
 | `fixing`           | The agent works on the failures and findings                                                                                            | `checking`                                                  |
 | `ready`            | The draft passed. The author accepts or drops it, or the agent accepts it, see [accepting](#accepting)                                  | `accepted`, `dropped`, `working` on a conflict, or `failed` |
@@ -146,30 +146,41 @@ the checks, an independent review and fix rounds.
   and writes a [customization layer](customization-layers.md) over it instead of new resources, so the
   application keeps the module's upgrades and its contract. It adds scenarios for what it adds.
 - **Planning reads only.** The model is offered `read_reference`, `list_resources`, `read_resource`,
-  `read_module_resource` and `read_names`, and only for the request's application. Any other call gets a
+  `read_module_resource`, `read_names`, `list_package_files` and `read_package_file`, and only for the request's application. Any other call gets a
   tool error from the agent host and never reaches the MCP server. The plan is the text of the model's
   last answer, which ends its turn: an answer that stops at the output limit, or has no text, is no plan.
   The plan goes into the request's `plan` and the request moves to `awaitingApproval`.
 - **Working writes only its draft.** The step makes the draft with `create_draft` and keeps its id in
   `draft_id` before the first model call, and a step that runs again uses the same draft. The model is offered
-  the five read tools of planning plus `write_resource`, `delete_resource`, `write_layer`, `check_expression`,
-  `validate_draft` and `diff_draft`, and only for the request's application and its draft. A call without a
+  the seven read tools of planning plus `write_resource`, `delete_resource`, `write_layer`, `check_expression`,
+  `validate_draft`, `diff_draft`, `write_package_file`, `delete_package_file` and `test_package`, and only for the request's application and its draft. A call without a
   draft gets the request's draft. Any other call gets a tool error from the agent host and never reaches the
   MCP server. When the model ends its turn, the request moves to `checking`.
-- **Packages** _(planned for M37)_. Planning is also offered `list_package_files` and `read_package_file`.
-  Working and fixing are also offered `write_package_file`, `delete_package_file` and `test_package`. When
-  the draft changes a file under `packages/<id>/`, checking calls `test_package` after the compile, stores
-  the result in `checks` as `packages` and moves the request to `fixing` on a failure. The author who sends
-  the request needs the developer role, because the tools act for the author, see
-  [roles](user-administration.md#roles).
+- **Packages.** Planning is also offered `list_package_files` and `read_package_file`, and any write tool it
+  calls, the package ones included, gets a tool error from the agent host and never reaches the MCP server.
+  Working and fixing are also offered `write_package_file`, `delete_package_file` and `test_package`, always
+  on the request's own draft. When the draft changes a file under `packages/<id>/`, checking calls
+  `test_package` after the compile, stores the result in `checks` as `packages` and moves the request to
+  `fixing` on a failure. The author who sends the request needs the developer role to write a package,
+  because the tools act for the author, see [roles](user-administration.md#roles). The agent host adds no
+  check of its own: the MCP server refuses each package write and the model gets the refusal as a tool
+  error. A request that writes no package needs no developer role.
 - **Checking runs every scenario.** The step makes no model call. It calls `validate_draft` on the request's
   draft. When no diagnostic is an `error`, it calls `run_scenarios` with no names, so the run covers the
   application's scenarios and every module scenario, contract scenarios included, and asks for the run's
-  status until it ends. A warning is kept and does not fail the compile. The step stores `{ compile, scenarios }`
-  in `checks` on its `check` step: the compile outcome with its diagnostics, and the scenario run with its
-  request id, its diagnostics and its items, as `run_scenarios` returns them. When the compile fails, the
-  scenarios are `notRun` and no run starts. When both passed, the request moves to `reviewing` with the
-  outcome `passed`. Otherwise it moves to `fixing` with the outcome `failed`. A step whose run does not end in
+  status until it ends. A warning is kept and does not fail the compile. Before the scenarios, the step
+  tests the packages. It reads every page of `diff_draft` for the files under `packages/<id>/`, keeps the
+  packages that still have files in the draft, according to `list_package_files`, and calls `test_package`
+  for each in turn, asking for its status until it ends. A package whose files were all deleted has nothing
+  to test. The step stores `{ compile, packages, scenarios }` in `checks` on its `check` step: the compile
+  outcome with its diagnostics, the package tests, and the scenario run with its request id, its diagnostics
+  and its items, as `run_scenarios` returns them. `packages` is `{ outcome, items }`, and each item is the
+  `package` with its `request`, `status`, `diagnostics` and `tests`, as `test_package` returns them. Its
+  outcome is `notRun` when the compile failed or no package changed, and otherwise `passed` or `failed`. When
+  the compile fails, the packages and the scenarios are `notRun` and no run starts. When the compile, the
+  package tests and the scenarios passed, the request moves to `reviewing` with the outcome `passed`.
+  Otherwise it moves to `fixing` with the outcome `failed`, also when a package test failed and every
+  scenario passed. A step whose run or package test does not end in
   time, whose tool call is a tool error, whose request has no draft, or whose application the author can no longer
   list stops the request as `failed` with the outcome `unfinished`. A step that runs again starts a new run.
 - **Reviewing reads only.** The step starts a new model conversation with no memory of the working session, on
@@ -184,7 +195,8 @@ the checks, an independent review and fix rounds.
 - **Fixing works on the failures.** The step uses the tools and the draft rules of working, on the draft that the
   working step stored, and never makes a draft. The model sees the request text, the approved plan, what failed
   in the latest `check` step and the findings of the latest `review` step after it. What failed is the compile
-  diagnostics when the compile failed, and the scenario items whose outcome is not `passed`. When the model ends
+  diagnostics when the compile failed, the package tests that did not pass, with their diagnostics and the tests whose
+  outcome is not `passed`, and the scenario items whose outcome is not `passed`. When the model ends
   its turn, the request moves to `checking`.
 - **Accepting by the agent.** The step makes no model call. It claims a `ready` request that asked for auto-accept,
   once after each review, and calls `accept_draft` on the request's draft. It asks for the accept's status until it
@@ -212,8 +224,8 @@ Each request has limits on its rounds, tokens and time, so the cost of one reque
   by then, or whose answer stops at the output limit, stops the request as `failed` with the outcome
   `unfinished`, and so does a request whose application the author can no longer list. So does a working step
   whose draft cannot be made, and a fix step whose request has no draft.
-- **Checking time.** At most 450 polls of the scenario run, 2 seconds apart, which is about 15 minutes. A
-  run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
+- **Checking time.** At most 450 polls of the scenario run, and of each package test, 2 seconds apart, which is
+  about 15 minutes for each run. A run that has not ended by then stops the request as `failed` with the outcome `unfinished`, so a run that
   never starts does not hold the agent host for ever. The publisher stops a test run after 10 minutes.
 - **Accepting time.** At most 450 polls of the accept, 2 seconds apart, the same as checking time, because an
   accept runs a validate and the application's test scenarios under the same publisher limit. An accept that has not

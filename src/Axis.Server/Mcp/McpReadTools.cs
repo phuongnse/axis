@@ -127,7 +127,7 @@ internal static class McpReadTools
     }
 
     private static CompilationResult Compile(McpToolContext context, IReadOnlyList<(string File, byte[] Bytes)> files) =>
-        ApplicationCompiler.CompileFiles(Contents(files), context.Packages.Versions, context.Modules.Modules);
+        ApplicationCompiler.CompileFiles(Contents(files), context.Packages.Versions, context.Modules.Modules, applicationPackages: context.ApplicationPackages);
 
     /// <summary>The files of a draft as compile input.</summary>
     internal static IReadOnlyList<ResourceContent> Contents(IReadOnlyList<(string File, byte[] Bytes)> files) =>

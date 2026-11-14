@@ -801,10 +801,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ### How a package is written
 
-_(planned for M37)_
-
-- **By hand.** An author edits the package's files in Studio, or in their own tools through the
-  authoring API.
+- **By hand.** An author edits the package's files in their own tools through the authoring API.
+- **In Studio** _(planned for M37)_. An author edits the package's files in Studio.
 - **By an agent.** An agent writes the package's adapter, manifest and tests over a library that the
   author names. It does so only through an [authoring request](authoring-requests.md#states) and the
   [MCP server's tools](mcp-server.md#tools), under the plan, review and accept of
