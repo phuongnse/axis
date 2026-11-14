@@ -16,7 +16,7 @@ JSON view stays as the second view of the same draft.
   Clearing a cell saves an empty string and keeps the key, because every locale holds the same keys
   (`AXC0027`).
 - **Add key.** The row below the table takes a key and a text for each locale, and writes the key to
-  every locale at once through the [text write route](authoring.md#text-writes). The key cannot be
+  every locale at once through the [text write route](authoring-text-writes.md). The key cannot be
   empty, cannot contain `/`, and cannot already be in the table. The editor takes the open file's new
   version from the answer and adds the key to its loaded copy and its draft, so unsaved cell edits stay
   and the next Save does not meet a stale version. The diagnostics and the names load again.

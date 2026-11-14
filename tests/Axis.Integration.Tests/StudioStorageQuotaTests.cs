@@ -16,6 +16,7 @@ public sealed class StudioStorageQuotaTests : IAsyncLifetime
     private const string EntityFile = "entities/purchase-request.json";
     private const string EntityId = "d9ccbf89-5004-4d52-8885-2ee377b7caa5";
     private const string PatchUrl = $"/api/studio/apps/PurchaseRequests/resources/{EntityId}";
+    private const string PackageFileUrl = "/api/studio/apps/PurchaseRequests/packages/x/files/adapter.py";
     private const string PublishUrl = "/api/studio/apps/PurchaseRequests/publish";
     private const string Title = "This tenant has reached its storage quota.";
     private const string Patch = """[{"op":"replace","path":"/displayField","value":"requester"}]""";
@@ -74,6 +75,36 @@ public sealed class StudioStorageQuotaTests : IAsyncLifetime
             using var publish = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
             Assert.Equal(HttpStatusCode.Accepted, publish.StatusCode);
             Assert.Equal(1, await CountRequestsAsync(connectionString));
+        }
+        finally
+        {
+            await StorageQuotaHost.ClearUsageAsync(connectionString, CancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task Over_the_quota_a_package_file_put_gets_the_quota_403_and_writes_nothing()
+    {
+        using var folder = NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("studio_quota_package_file", CancellationToken);
+        await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]).WithWebHostBuilder(builder => builder.InCell(Limit));
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        // The host compiles the folder at start, so the package file is written once the host runs.
+        var adapter = Path.Combine(folder.Path, "packages", "x", "adapter.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(adapter)!);
+        byte[] before = [.. "print('v1')\n"u8];
+        await File.WriteAllBytesAsync(adapter, before, CancellationToken);
+        await StorageQuotaHost.SeedUsageAsync(connectionString, "a", 2000, 0, CancellationToken);
+        try
+        {
+            using var request = RecordApiFixture.Request(
+                HttpMethod.Put, PackageFileUrl, HostA, """{"content":"print('v2')\n"}""", "application/json");
+            request.Headers.TryAddWithoutValidation("If-Match", $"\"{Convert.ToHexStringLower(SHA256.HashData(before))}\"");
+            using var response = await client.SendAsync(request, CancellationToken);
+
+            await AssertQuotaRefusalAsync(response);
+            Assert.Equal(before, await File.ReadAllBytesAsync(adapter, CancellationToken));
         }
         finally
         {

@@ -136,6 +136,10 @@ internal sealed record StudioOptions(
     public bool AllowsPublish(IReadOnlyList<string> roles) =>
         Allows(roles) && PublisherRole is not null && roles.Contains(PublisherRole, StringComparer.Ordinal);
 
+    /// <summary>True when <see cref="Allows"/> holds and <paramref name="roles"/> holds the developer role.</summary>
+    public bool AllowsDevelop(IReadOnlyList<string> roles) =>
+        Allows(roles) && DeveloperRole is not null && roles.Contains(DeveloperRole, StringComparer.Ordinal);
+
     /// <summary>True when <see cref="Allows"/> holds and <c>Studio:ApplicationsPath</c> is set.</summary>
     public bool AllowsCreate(IReadOnlyList<string> roles) => Allows(roles) && ApplicationsPath is not null;
 

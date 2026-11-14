@@ -15,6 +15,7 @@ using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Studio;
+using Axis.Tenancy;
 using Json.Patch;
 using Microsoft.Net.Http.Headers;
 
@@ -84,9 +85,10 @@ namespace Axis.Server.Studio;
 /// <see cref="ReadModuleResource"/>, which the read tools of the MCP server also call, so a tool and its route answer alike.
 /// The routes that validate and publish are in <see cref="StudioPublishEndpoints"/>, the revision list, diff and undo are in
 /// <see cref="StudioRevisionEndpoints"/>, and the expression check is in
-/// <see cref="StudioExpressionEndpoints"/>, and the template list is in <see cref="StudioTemplateEndpoints"/>.
-/// In a cell, the create, patch, <c>changes</c>, module resource save, module resource reset and text write routes check the tenant's storage
-/// quota (403 <c>quota-exceeded</c>) right after the session, and a delete never does, see
+/// <see cref="StudioExpressionEndpoints"/>, the template list is in <see cref="StudioTemplateEndpoints"/>, and the package file routes are in
+/// <see cref="StudioPackageFileEndpoints"/>.
+/// In a cell, the create, patch, <c>changes</c>, module resource save, module resource reset, text write and package file save routes check the tenant's storage
+/// quota (403 <c>quota-exceeded</c>) right after the session, and a delete, a package file delete included, never does, see
 /// <c>docs/reference/tenant-quotas.md#refusals</c>.
 /// <c>GET /api/studio/apps/{application}/releases</c> answers the application's release history in this tenant,
 /// newest first, as <c>{ active, folderContentHash, changes, items }</c>. <c>active</c> is the active release or null, and
@@ -130,6 +132,7 @@ internal static class StudioEndpoints
         endpoints.MapStudioApplicationEndpoints();
         endpoints.MapStudioSettingsEndpoints();
         endpoints.MapStudioActivityEndpoints();
+        endpoints.MapStudioPackageFileEndpoints();
     }
 
     private static async Task<IResult> AppsAsync(HttpContext httpContext, StudioOptions options)
@@ -1149,8 +1152,11 @@ internal static class StudioEndpoints
         id is { Length: 36 } && Guid.TryParseExact(id, "D", out var guid) ? guid : null;
 
     // The session and role checks every route shares: the problem that refuses the request, or null. A route that
-    // publishes also needs the publisher role, which is checked right after the author role.
-    internal static async Task<IResult?> RefuseAsync(HttpContext httpContext, StudioOptions options, bool publisher = false)
+    // publishes also needs the publisher role, which is checked right after the author role. A route that writes
+    // package files needs the developer role and the tenant's application packages switch on, checked after that,
+    // see docs/reference/studio-packages.md#the-authoring-api.
+    internal static async Task<IResult?> RefuseAsync(
+        HttpContext httpContext, StudioOptions options, bool publisher = false, bool developer = false)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
@@ -1162,9 +1168,27 @@ internal static class StudioEndpoints
             return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the author role.");
         }
 
-        return publisher && !options.AllowsPublish(user.Roles)
-            ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the publisher role.")
-            : null;
+        if (publisher && !options.AllowsPublish(user.Roles))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the publisher role.");
+        }
+
+        if (!developer)
+        {
+            return null;
+        }
+
+        if (!options.AllowsDevelop(user.Roles))
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the developer role.");
+        }
+
+        // A tenant with no stored switch counts as off.
+        var services = httpContext.RequestServices;
+        return services.GetRequiredService<ITenantContextAccessor>().Current is { } tenant
+            && services.GetRequiredService<ITenantCatalog>().Find(tenant.TenantId) is { ApplicationPackages: true }
+                ? null
+                : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Application packages are off in this tenant.");
     }
 
     // The checks the application routes share: the folder, or the problem that refused the request.
@@ -1172,9 +1196,10 @@ internal static class StudioEndpoints
         string application,
         HttpContext httpContext,
         StudioOptions options,
-        bool publisher = false)
+        bool publisher = false,
+        bool developer = false)
     {
-        if (await RefuseAsync(httpContext, options, publisher) is { } refusal)
+        if (await RefuseAsync(httpContext, options, publisher, developer) is { } refusal)
         {
             return (null, refusal);
         }

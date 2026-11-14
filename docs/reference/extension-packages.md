@@ -754,8 +754,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 - **In the release.** The release holds every file of the package as written, and the content hash covers
   them, see [versions and pinning](#versions-and-pinning) and
   [the release](configuration.md#release).
-- **Writing** _(planned for M37)_. A write to a package's files needs the author role, the developer role and the tenant's
-  switch on, see [packages in Studio](studio-packages.md).
+- **Writing.** A write to a package's files needs the author role, the developer role and the tenant's
+  switch on, see [packages in Studio](studio-packages.md#the-authoring-api).
 - **No change to a module's code.** A customization layer cannot change a module's code. An
   application that needs other code adds a package of its own and calls it, or
   [ejects](modules-and-templates.md#upgrades-with-module-migrations) the module.
