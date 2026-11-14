@@ -2208,7 +2208,7 @@
   "shell.studio.aiRequest.diffFailed": "The changes did not load.",
   "shell.studio.aiRequest.checks": "Checks and review",
   "shell.studio.aiRequest.tab.overview": "Overview",
-  "shell.studio.aiRequest.tab.changes": "Changes ({count})",
+  "shell.studio.aiRequest.tab.changes": "Changes",
   "shell.studio.aiRequest.tab.checks": "Checks",
   "shell.studio.aiRequest.tab.plan": "Plan",
   "shell.studio.aiRequest.tab.history": "History",

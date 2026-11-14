@@ -367,7 +367,7 @@ describe('a ready request’s page', () => {
     // The overview first, then the changes, the checks' detail, the plan and the history.
     expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
       'Overview',
-      'Changes (1)',
+      'Changes',
       'Checks',
       'Plan',
       'History',

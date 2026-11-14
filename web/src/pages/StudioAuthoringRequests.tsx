@@ -678,13 +678,8 @@ export function StudioAuthoringRequestPage({
         onChange={(key) => setTab({ id: requestId, key: key as RequestTab })}
         items={shown.map((key) => ({
           key,
-          label:
-            key === 'changes'
-              ? t('shell.studio.aiRequest.tab.changes').replace(
-                  '{count}',
-                  String(Array.isArray(changes) ? changes.length : request.changes.length),
-                )
-              : t(`shell.studio.aiRequest.tab.${key}`),
+          // Proposed: a tab is named by its words alone, with no count, as no other tab in Axis counts, see the review on #3263.
+          label: t(`shell.studio.aiRequest.tab.${key}`),
           children: { overview, changes: changesView, checks: checksView, plan: planView, history: historyView }[key],
         }))}
       />

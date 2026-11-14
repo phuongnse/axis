@@ -2208,7 +2208,7 @@
   "shell.studio.aiRequest.diffFailed": "Không tải được các thay đổi.",
   "shell.studio.aiRequest.checks": "Kiểm tra và rà soát",
   "shell.studio.aiRequest.tab.overview": "Tổng quan",
-  "shell.studio.aiRequest.tab.changes": "Thay đổi ({count})",
+  "shell.studio.aiRequest.tab.changes": "Thay đổi",
   "shell.studio.aiRequest.tab.checks": "Kiểm tra",
   "shell.studio.aiRequest.tab.plan": "Kế hoạch",
   "shell.studio.aiRequest.tab.history": "Lịch sử",
