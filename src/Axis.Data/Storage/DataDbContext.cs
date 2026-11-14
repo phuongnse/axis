@@ -39,6 +39,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
     public DbSet<McpClientRow> McpClients => Set<McpClientRow>();
 
+    public DbSet<PackageRunnerRow> PackageRunners => Set<PackageRunnerRow>();
+
     public DbSet<GivenRoleRow> GivenRoles => Set<GivenRoleRow>();
 
     public DbSet<FileRow> Files => Set<FileRow>();
@@ -182,6 +184,20 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             client.Property(c => c.ClientId).HasColumnName("client_id").ValueGeneratedNever();
             client.Property(c => c.LastUsedAt).HasColumnName("last_used_at");
             client.Property(c => c.RevokedAt).HasColumnName("revoked_at");
+        });
+
+        modelBuilder.Entity<PackageRunnerRow>(runner =>
+        {
+            runner.ToTable("package_runners");
+            runner.HasKey(r => r.Id).HasName("pk_package_runners");
+            runner.Property(r => r.Id).HasColumnName("id").ValueGeneratedNever();
+            runner.Property(r => r.Name).HasColumnName("name");
+            runner.Property(r => r.ClientId).HasColumnName("client_id");
+            runner.Property(r => r.Packages).HasColumnName("packages").HasColumnType("jsonb").HasDefaultValueSql("'[]'::jsonb").IsRequired();
+            runner.Property(r => r.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            runner.Property(r => r.LastCallAt).HasColumnName("last_call_at");
+            runner.Property(r => r.RevokedAt).HasColumnName("revoked_at");
+            runner.HasIndex(r => r.ClientId).IsUnique().HasDatabaseName("ux_package_runners_client_id");
         });
 
         modelBuilder.Entity<GivenRoleRow>(given =>

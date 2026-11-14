@@ -88,4 +88,8 @@ public static class AuditActions
     public const string McpToolCalled = "mcp.toolCalled";
 
     public const string McpConsentRevoked = "mcp.consentRevoked";
+
+    public const string PackageRunnerCreated = "packageRunner.created";
+
+    public const string PackageRunnerRevoked = "packageRunner.revoked";
 }
