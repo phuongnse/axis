@@ -222,7 +222,7 @@ Purchase requests prove the extensibility milestones, one step each.
    purchase request page in Studio.
 3. **A connector.** An approved request reaches the purchasing system through a connector that signs
    in with client credentials and sends the line items as a list.
-4. **A package runner** _(planned for M21)_. The payment reference package runs out of process.
+4. **A package runner.** The payment reference package runs out of process.
 5. **A webhook.** A signed webhook announces the approval, and a receiver that fails leaves a dead
    letter. The platform operator redelivers the dead letter from the console and sees it delivered.
 
