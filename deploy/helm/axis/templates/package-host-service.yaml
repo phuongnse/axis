@@ -1,16 +1,16 @@
-{{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
+{{- range $component, $host := include "axis.packageHosts" . | fromYaml }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $.Release.Name }}-package-host-{{ $runtime }}
+  name: {{ $.Release.Name }}-{{ $component }}
   labels:
     {{- include "axis.labels" $ | nindent 4 }}
-    app.kubernetes.io/component: package-host-{{ $runtime }}
+    app.kubernetes.io/component: {{ $component }}
 spec:
   type: ClusterIP
   selector:
-    {{- include "axis.selectorLabels" (dict "root" $ "component" (printf "package-host-%s" $runtime)) | nindent 4 }}
+    {{- include "axis.selectorLabels" (dict "root" $ "component" $component) | nindent 4 }}
   ports:
     - name: runner
       port: 5310

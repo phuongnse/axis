@@ -84,6 +84,17 @@
       },
       "additionalProperties": false
     },
+    "applicationPackageHost": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "runtimeClassName": { "type": "string", "minLength": 1 },
+        "repository": { "type": "string" },
+        "replicas": { "type": "integer", "minimum": 0 },
+        "resources": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "publisher": {
       "type": "object",
       "properties": {

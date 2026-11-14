@@ -62,6 +62,21 @@ packageHost:
         cpu: "1"
         memory: 1Gi
 
+# The application package host runs the packages of an application under gVisor, see
+# docs/reference/extension-packages.md#an-applications-packages. It is off by default, so a cluster without a gVisor
+# RuntimeClass still installs. When it is on, the cluster needs a RuntimeClass named runtimeClassName, the worker is
+# pointed at the host, and rendering fails without the RuntimeClass name or either limit. The chart does not set
+# Extensions__ApplicationPackages.
+applicationPackageHost:
+  enabled: false
+  runtimeClassName: gvisor
+  repository: axis-package-host-node
+  replicas: 1
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
 # The publisher runs "axis-admin publisher", which runs the publish requests that
 # Studio stores. It uses the image of migrate.repository and always runs one replica.
 # In a cell it also runs the create job of the provisioning API, so it gets the admin
