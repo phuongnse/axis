@@ -38,7 +38,8 @@
 # roles, axis_preview_schema and axis_preview_runtime, which Docker Compose creates, and no
 # deployment bindings. The server activates both samples on it too.
 # The sample extension package payment-references is built first, into artifacts/extensions,
-# which the server and the worker read through Extensions:Path. The built-in modules under modules
+# which the server and the worker read through Extensions:Path. The TypeScript sample package payment-terms is installed
+# there too, offline from its tarball, and needs Node.js and npm only. The built-in modules under modules
 # and the sample modules under samples/modules are installed into artifacts/modules, which they read
 # through Modules:Path. A change to a module needs a restart of this script. The sample templates under samples/templates and the built-in
 # applications under applications are installed into artifacts/templates, which the server reads through
@@ -194,6 +195,10 @@ cleanup() {
   rm -rf "$state"
 }
 trap cleanup EXIT
+# The server and the worker read the installed sample package payment-terms from artifacts/extensions too.
+log "Installing the TypeScript sample extension package"
+bash scripts/lib/install-sample-packages.sh node
+
 # The purchase request sample declares this package, so the server cannot activate it without the
 # build in artifacts/extensions. A fresh clone has none. A change to the package's C# code needs a
 # restart of this script.

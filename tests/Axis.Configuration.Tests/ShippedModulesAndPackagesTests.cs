@@ -20,6 +20,17 @@ public sealed class ShippedModulesAndPackagesTests
     }
 
     [Fact]
+    public void The_sample_package_catalog_lists_the_node_package_payment_terms()
+    {
+        var catalog = PackageCatalog.Load(SamplePackages.Path);
+
+        Assert.Empty(catalog.Diagnostics);
+        var package = Assert.Single(catalog.Packages, package => package.Manifest.Id == "payment-terms");
+        Assert.Equal("1.0.0", package.Manifest.Version);
+        Assert.Equal(PackageLanguage.Node, package.Manifest.Language);
+    }
+
+    [Fact]
     public void The_built_in_approvals_application_compiles_with_the_built_in_modules()
     {
         var modules = ModuleCatalog.Load(Path.Combine(AppContext.BaseDirectory, "BuiltInModules")).Modules;

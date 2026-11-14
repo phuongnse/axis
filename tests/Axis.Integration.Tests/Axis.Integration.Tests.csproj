@@ -82,6 +82,7 @@
     <None Include="..\..\sdk\node\**\*" LinkBase="sdk/node" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\packages\PythonPackage\**\*" LinkBase="PythonPackage" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\artifacts\extensions\phone-numbers\1.0.0\**\*" Exclude="..\..\artifacts\extensions\phone-numbers\1.0.0\**\__pycache__\**" LinkBase="SamplePythonPackage" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\packages\payment-terms\**\*" Exclude="..\..\samples\packages\payment-terms\node_modules\**" LinkBase="SamplePaymentTerms" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\sdk\python\**\*" Exclude="..\..\sdk\python\**\__pycache__\**" LinkBase="sdk/python" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

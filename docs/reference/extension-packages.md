@@ -724,7 +724,7 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 ## Sample and test packages
 
-Two sample packages show a package in use, a C# one and a Python one, and five test packages cover
+Three sample packages show a package in use, a C# one, a Python one and a TypeScript one, and five test packages cover
 installation, loading, the capability limits, the server's metadata-only load and the Node.js runner.
 
 - **Sample package.** `samples/packages/` holds one C# package, `payment-references`
@@ -751,6 +751,23 @@ installation, loading, the capability limits, the server's metadata-only load an
   sample does, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `adapter.py` and
   `phonenumbers/__init__.py`. No sample application calls it, and Compose and `scripts/dev.sh` run no Python host
   yet. The integration tests run it from a process step through a Python package host.
+- **TypeScript sample package.** `samples/packages/payment-terms/` holds `payment-terms` 1.0.0, a `node`
+  package whose adapter, `index.ts`, wraps the npm library dayjs 1.11.23 and leaves it unchanged. The compiled
+  `index.js` is committed beside it. dayjs is committed as `vendor/dayjs-1.11.23.tgz` and locked in
+  `package-lock.json` with the same `integrity` that `web/package-lock.json` records for it, so an install
+  reaches no registry and `npm ci` refuses a tarball that does not match. Its one operation, `dueDate`, is pure
+  and has no capabilities. It takes a `from` date-time and returns a `dueDate` date: 30 days after `from` in
+  UTC, moved to the last day of that month. `2026-01-31T10:00:00Z` gives `2026-03-31`, and
+  `2028-01-30T00:00:00Z` gives `2028-02-29`.
+  `scripts/lib/install-sample-packages.sh` installs it into `artifacts/extensions/payment-terms/1.0.0/` with the
+  flags of the [build](#building-a-package) and `--offline`. `scripts/build.sh`, `scripts/test.sh`,
+  `scripts/dev.sh` and `scripts/integration.sh` run it, and so does a `node:24-slim` stage of the `Dockerfile`,
+  whose output the development server, worker and publisher images hold in `/extensions`. The install skips the
+  scan that the build runs, and `scripts/build.sh` fails unless the folder holds `axis-package.json`, `index.js`
+  and `node_modules/dayjs/package.json`. `scripts/test.sh` runs the package's `node --test` unit test in the
+  installed copy, and an integration test starts a Node.js runner of the package host for it. The test
+  projects copy only its manifest, adapter and lock files, so a server lists it as metadata. No sample
+  application declares it, and Compose and `scripts/dev.sh` run no Node.js host yet.
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation

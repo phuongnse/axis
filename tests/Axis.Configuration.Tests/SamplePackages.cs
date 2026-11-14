@@ -3,8 +3,8 @@ using Axis.Configuration.Packages;
 namespace Axis.Configuration.Tests;
 
 /// <summary>
-/// The sample extension package that <c>samples/packages/SamplePackages.targets</c> copies to the test
-/// output, which the purchase request sample declares.
+/// The sample extension packages that <c>samples/packages/SamplePackages.targets</c> copies to the test
+/// output: <c>payment-references</c>, which the purchase request sample declares, and the metadata of <c>payment-terms</c>.
 /// </summary>
 internal static class SamplePackages
 {

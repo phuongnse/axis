@@ -63,8 +63,8 @@ file, the `Dockerfile` or a test script names an image that the list lacks.
 4. It builds the [sign-up page](reference/sign-up.md#the-page) into the control plane's web root,
    `controlplane/src/Axis.ControlPlane/wwwroot`, and checks that `sign-up.html` is there and runs the
    [font check](#fonts-and-the-keycloak-theme) on the folder.
-5. It installs the Python sample extension package in `artifacts/extensions` with its library, offline from the wheels that [setup](#setup) keeps and
-   with no scan, and checks its files. Then it builds the .NET solution, which installs the C# sample there, see [the sample packages](reference/extension-packages.md#sample-and-test-packages).
+5. It installs the Python and the TypeScript sample extension packages in `artifacts/extensions` with their libraries, the Python one offline from the wheels that [setup](#setup) keeps and
+   the TypeScript one offline from the tarball in its folder, with no scan, and checks their files. Then it builds the .NET solution, which installs the C# sample there, see [the sample packages](reference/extension-packages.md#sample-and-test-packages).
 6. It installs the built-in and sample modules in `artifacts/modules`, and the built-in applications
    in `artifacts/templates`.
 7. It writes the server's OpenAPI 3.1 document to `artifacts/openapi/axis-server.json`, and fails when
@@ -126,7 +126,7 @@ build also fails when the login theme has no `theme.properties`, `login.ftl` or
 
 `scripts/test.sh` runs the .NET unit tests, `Axis.ControlPlane.Tests` of the control plane included,
 Vitest and the tests of the scripts themselves. It first installs the built-in and sample modules
-and the built-in applications in `artifacts/`, for the server tests. It then writes the server's
+and the built-in applications in `artifacts/`, for the server tests. It also installs the TypeScript sample extension package there and runs its `node --test` unit test with the tests of the scripts. It then writes the server's
 OpenAPI document with the `tests/Axis.OpenApiDocument` console, as [the build](#build) does, because
 NexKit runs it without `scripts/build.sh`. `OpenApiDocumentTests` in `Axis.Server.Tests` reads that
 file and compares it with the routes the server maps. It fails when a route is missing from the
@@ -150,7 +150,7 @@ jsdom matches every rule on each query. A test that checks a style calls `withAn
 
 ### Integration tests
 
-`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme and installs the Python sample package as the [build](#build) does, then runs the .NET tests against real PostgreSQL
+`scripts/integration.sh` loads the [saved images](#setup), builds the Keycloak theme and installs the Python and the TypeScript sample packages as the [build](#build) does, then runs the .NET tests against real PostgreSQL
 and Keycloak through Testcontainers. They also run the test scenarios of every application under
 `samples/apps/` on that PostgreSQL, and the control plane's `Axis.ControlPlane.Integration.Tests`.
 The performance tests, whose class names end in `PerformanceTests`, stay out: `scripts/performance.sh`
@@ -792,7 +792,7 @@ Docker, .NET and Node, and works on a fresh clone.
 4. It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker Compose, and
    waits until PostgreSQL accepts connections and Keycloak's `axis` realm, Mailpit and the stub
    answer. The first run builds the stub's image.
-5. It builds the sample extension package, `samples/packages/PaymentReferences`, into
+5. It installs the TypeScript sample extension package, `samples/packages/payment-terms`, offline, and builds the sample extension package, `samples/packages/PaymentReferences`, into
    `artifacts/extensions`, where the Development settings of the server and the worker point
    `Extensions:Path`. The purchase request sample declares the package, so it does not activate
    without it. The worker runs with `Extensions:Isolation` `inProcess`, so it loads the package itself.
