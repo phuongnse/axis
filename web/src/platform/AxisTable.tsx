@@ -358,6 +358,7 @@ export function AxisTable<T extends object>({
 
   // Only a table with a group row folds rows, so every other table draws its cells as they are.
   const grouped = (pageRows ?? []).some((row) => Array.isArray((row as { children?: unknown }).children))
+  const foldRoom = tokens.spacing.xs / 2 + tokens.size.smallControl + tokens.spacing.xs / 2
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
   // The cells that stay leave room under their content for the moved lines, which run across the whole row.
   const staysRoom: CSSProperties = { paddingBottom: `calc(${tokens.spacing.xs}px + var(${movedHeight}, 0px))` }
@@ -380,7 +381,13 @@ export function AxisTable<T extends object>({
       ) => {
         const freeText = kind === 'freeText'
         const width = freeText ? share : freeTexts === 0 && column.key === lastKey ? undefined : fitContent
-        const sizing: CSSProperties = { width, ...(freeText ? {} : { whiteSpace: 'nowrap' }), ...line }
+        const sizing: CSSProperties = {
+          width,
+          ...(freeText ? {} : { whiteSpace: 'nowrap' }),
+          ...line,
+          // In a table with group rows, the first column's padding holds the fold with room on either side.
+          ...(grouped && position === 0 ? { paddingInlineStart: foldRoom } : {}),
+        }
         const sortable = view !== undefined && (Boolean(column.sorter) || sortValue !== undefined)
         const original = shown.find((candidate) => candidate.key === column.key)!
         return {
@@ -591,13 +598,13 @@ export function AxisTable<T extends object>({
               tableLayout="auto"
               dataSource={pageRows as T[] | undefined}
               // Proposed: a row with `children` is a group row the table opens and closes, see the review on #3263. Its
-              // fold is the right arrow that turns down when open, as a diff's file folds, and a row with no children
-              // keeps no room for one, so every row's words start where its column does; children start under their
-              // group's words.
+              // fold is the right arrow that turns down when open, as a diff's file folds. It hangs in the first column's
+              // padding, widened to hold it with room on either side, so every row's words start where the column's
+              // heading does, and each level of rows starts one such room further in.
               expandable={
                 grouped
                   ? {
-                      indentSize: tokens.size.smallControl + tokens.spacing.xs,
+                      indentSize: foldRoom,
                       expandIcon: ({ expandable, expanded, onExpand, record }) =>
                         expandable ? (
                           <AxisButton
@@ -613,7 +620,11 @@ export function AxisTable<T extends object>({
                                 }}
                               />
                             }
-                            style={{ marginInlineEnd: tokens.spacing.xs, verticalAlign: 'top' }}
+                            style={{
+                              marginInlineStart: -(foldRoom - tokens.spacing.xs / 2),
+                              marginInlineEnd: tokens.spacing.xs / 2,
+                              verticalAlign: 'top',
+                            }}
                             onClick={(event) => onExpand(record, event)}
                           />
                         ) : null,
