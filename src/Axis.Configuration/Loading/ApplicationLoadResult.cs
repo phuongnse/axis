@@ -123,5 +123,11 @@ public sealed record ApplicationLoadResult(
     /// <summary>The <c>scenario</c> resources, in path order. <see cref="Resources"/> does not hold them.</summary>
     public IReadOnlyList<ScenarioResource> Scenarios { get; init; } = [];
 
+    /// <summary>
+    /// The files under <c>packages/</c>, as written and in path order. They are the application's own
+    /// extension packages, so none is a resource: <see cref="Resources"/> does not hold them.
+    /// </summary>
+    public IReadOnlyList<ResourceContent> PackageFiles { get; init; } = [];
+
     public bool HasErrors => Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 }

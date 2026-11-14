@@ -1838,12 +1838,12 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks a package operation step: its package is pinned, and its operation is an operation of
-    /// the manifest of the pinned version, ignoring letter case. A package that is not pinned is
-    /// reported only when the application does not list it: a listed package that failed pinning is
-    /// already reported, and so is an <c>application.json</c> that was not loaded. Only then are its
-    /// inputs and outputs checked like those of a connector call, against the manifest's fields. The
-    /// retry <c>backoff</c>, when set, is a positive fixed duration.
+    /// Checks a package operation step: its package is pinned or is one of the application's own, and its operation is an
+    /// operation of the manifest of the pinned version or of the application's package, ignoring letter case. A package that
+    /// is not found is reported only when the application neither lists it nor holds it under <c>packages/</c>: a listed
+    /// package that failed pinning is already reported, and so is a broken package folder and an <c>application.json</c> that
+    /// was not loaded. Only then are its inputs and outputs checked like those of a connector call, against the manifest's
+    /// fields. The retry <c>backoff</c>, when set, is a positive fixed duration.
     /// </summary>
     private static void CheckPackageCall(
         ProcessResource process,
@@ -1870,7 +1870,7 @@ internal static class ProcessChecker
                     DiagnosticCodes.UnknownStepPackage,
                     ApplicationCompiler.IsModuleResource(process)
                         ? $"The package '{packageId}' is not one of the module's packages. Add it to 'packages' in module.json."
-                        : $"The package '{packageId}' is not one of the application's packages. Add it to 'packages' in application.json.",
+                        : $"The package '{packageId}' is not one of the application's packages. Add it to 'packages' in application.json, or add its folder under 'packages/'.",
                     $"{path}/operation");
             }
         }

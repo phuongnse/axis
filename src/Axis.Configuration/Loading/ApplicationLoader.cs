@@ -8,8 +8,10 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Loading;
 
 /// <summary>
-/// Loads an application folder: every <c>*.json</c> file is parsed, validated against the schema
-/// for its <c>kind</c> and turned into a typed resource. Every problem is reported; loading never
+/// Loads an application folder: every <c>*.json</c> file outside <c>packages/</c> is parsed, validated
+/// against the schema for its <c>kind</c> and turned into a typed resource. Every file under
+/// <c>packages/</c> is read as text and set aside as a package file, see
+/// <see cref="ApplicationLoadResult.PackageFiles"/>. Every problem is reported; loading never
 /// stops at the first one. A folder that cannot be listed, or has a subfolder that cannot be
 /// listed, is reported as <see cref="DiagnosticCodes.UnlistableFolder"/> and nothing in it is
 /// loaded, so no file is ever left out silently. Loading does not throw for an unreadable folder.
@@ -22,7 +24,12 @@ public static class ApplicationLoader
     /// <summary>The folder at the root of a release that holds the files of its pinned modules, as <c>modules/&lt;id&gt;/</c>.</summary>
     public const string ModulesFolderPrefix = "modules/";
 
+    /// <summary>The folder at the root of an application that holds its own extension packages, as <c>packages/&lt;id&gt;/</c>. No file in it is a resource.</summary>
+    public const string PackagesFolderPrefix = "packages/";
+
     private static readonly JsonDocumentOptions _documentOptions = new() { AllowDuplicateProperties = false };
+
+    private static readonly UTF8Encoding _strictUtf8 = new(false, true);
 
     internal static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -119,6 +126,7 @@ public static class ApplicationLoader
         var layers = new List<LayerResource>();
         var scenarios = new List<ScenarioResource>();
         var resources = new List<ResourceContent>();
+        var packageFiles = new List<ResourceContent>();
         var manifestFiles = new List<(string File, Guid? ResourceId)>();
         var firstFileById = new Dictionary<string, string>(StringComparer.Ordinal);
         var firstFileByKindAndName = new Dictionary<(string Kind, string Name), string>();
@@ -152,6 +160,17 @@ public static class ApplicationLoader
                     $"Releases reserve the folder '{ModulesFolderPrefix}' for the files of pinned modules, so an application file cannot be placed in it.",
                     file,
                     ""));
+                continue;
+            }
+
+            if (file.StartsWith(PackagesFolderPrefix, StringComparison.Ordinal))
+            {
+                // An application's own package: its files are text of any kind, so none is parsed as a resource.
+                if (ReadPackageFile(source, diagnostics) is { } content)
+                {
+                    packageFiles.Add(new ResourceContent(file, content));
+                }
+
                 continue;
             }
 
@@ -370,12 +389,13 @@ public static class ApplicationLoader
             Migrations = migrations,
             Layers = layers,
             Scenarios = scenarios,
+            PackageFiles = packageFiles,
         };
     }
 
     /// <summary>
-    /// Lists the resource files in path order, or returns null when the folder or one of its
-    /// subfolders does not exist or cannot be opened.
+    /// Lists the <c>*.json</c> files and every file under <c>packages/</c> in path order, or returns null
+    /// when the folder or one of its subfolders does not exist or cannot be opened.
     /// </summary>
     private static List<string>? EnumerateResourceFiles(string folderPath)
     {
@@ -386,14 +406,38 @@ public static class ApplicationLoader
         try
         {
             // The enumeration is lazy, so it must run to the end inside the try.
-            return Directory.EnumerateFiles(folderPath, "*.json", options)
+            return Directory.EnumerateFiles(folderPath, "*", options)
                 .Select(path => Path.GetRelativePath(folderPath, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .Where(path => path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || path.StartsWith(PackagesFolderPrefix, StringComparison.Ordinal))
                 .Order(StringComparer.Ordinal)
                 .ToList();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // DirectoryNotFoundException is an IOException.
+            return null;
+        }
+    }
+
+    /// <summary>Reads a package file as UTF-8 text, exactly as written. A file that cannot be read or is not UTF-8 is reported and gives null.</summary>
+    private static string? ReadPackageFile(ResourceSource source, List<Diagnostic> diagnostics)
+    {
+        try
+        {
+            using var stream = source.Open();
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            return _strictUtf8.GetString(memory.GetBuffer(), 0, (int)memory.Length);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The exception message names the absolute path, so it is never passed on.
+            diagnostics.Add(new Diagnostic(DiagnosticCodes.UnreadableFile, "The file could not be read.", source.Path, ""));
+            return null;
+        }
+        catch (DecoderFallbackException)
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticCodes.UnreadableFile, "The file is not UTF-8 text.", source.Path, ""));
             return null;
         }
     }

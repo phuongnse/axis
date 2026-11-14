@@ -23,7 +23,7 @@ flowchart LR
     Release --> Activate[Plan and apply schema changes, activate]
 ```
 
-1. **Load.** Every `*.json` file in the folder and its subfolders is one resource. Each is validated
+1. **Load.** Every `*.json` file in the folder and its subfolders, outside `packages/`, is one resource. Each is validated
    against the JSON Schema for its `kind` (`application`, `entity`, `site`, `page`, `text`, `seed`,
    `dataSource`, `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`,
    `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration`, `layer`, `scenario` or
@@ -80,8 +80,9 @@ them is resolved.
   root. An `application` resource in any other file is not used as the manifest.
 - **Unique ids and names.** Resource ids are unique across the application, compared as UUIDs.
   Names are unique per kind, ignoring letter case.
-- **An application's packages** _(planned for M37)_. No file under `packages/` at the folder root is
-  loaded as a resource, see [an application's packages](extension-packages.md#an-applications-packages).
+- **An application's packages.** No file under `packages/` at the folder root is loaded as a resource,
+  whatever its extension, see [an application's packages](extension-packages.md#an-applications-packages).
+  Each is read as UTF-8 text, and one that is not UTF-8 is `AXC0010`.
 - **Stored releases.** The same checks run on a release's stored resources when the server rebuilds
   its model.
 
@@ -628,6 +629,11 @@ The Release step stores the compiled application as a release, which is immutabl
   resource path never starts with `/`, so a pin cannot be confused with a file. An application
   without pins has the hash of its resources alone. So installing a newer version in range gives the
   same folder a new hash and a new release, and the old release keeps its pin.
+- **Application packages in the hash.** Each file under `packages/<id>/` at the folder root
+  contributes `path`, a newline, its length in UTF-8 bytes, a newline, its text as written and a
+  newline, in the order of its path among the resources. The text is raw, not canonical JSON, so the
+  length keeps one file from running into the next. An application without such files has the same
+  hash as before.
 - **Modules and scenarios in the hash.** Module files are hashed as ordinary resource paths under
   `modules/<id>/`, see [modules](modules-and-templates.md#modules).
   [Scenario](test-scenarios.md) files under `scenarios/` are left out of the release and its content
@@ -636,7 +642,8 @@ The Release step stores the compiled application as a release, which is immutabl
   folder returns the stored release instead of storing a second one, also when two compiles run at
   the same time.
 - **Content.** A release stores the canonical content of every resource with its relative path, the
-  files of every module it pins under `modules/<id>/`, and the exact version of every package it
+  files of every module it pins under `modules/<id>/`, every file of each of its own packages
+  under `packages/<id>/` as written, and the exact version of every package it
   pins, so it can be read back without the folder. Reading it back resolves each range against the
   release's own pins only, never against the packages installed at that time.
 - **Errors.** A folder with any error diagnostic produces no release, and compile returns the

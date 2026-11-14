@@ -65,14 +65,16 @@ public static partial class ApplicationCompiler
     /// <summary>
     /// Compiles the folder at <paramref name="folderPath"/> against <paramref name="installedPackages"/>
     /// and <paramref name="installedModules"/>. Null means none is installed. A <c>file</c> field's <c>maxSize</c> may be at most
-    /// <paramref name="maxFileSize"/> bytes.
+    /// <paramref name="maxFileSize"/> bytes. The folder's own packages under <c>packages/</c> are compile errors unless
+    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>.
     /// </summary>
     public static CompilationResult Compile(
         string folderPath,
         IReadOnlyCollection<PackageVersion>? installedPackages = null,
         IReadOnlyCollection<InstalledModule>? installedModules = null,
-        long maxFileSize = DefaultMaxFileSize) =>
-        Compile(folderPath, installedPackages, installedModules, collectReferences: true, maxFileSize);
+        long maxFileSize = DefaultMaxFileSize,
+        bool applicationPackages = false) =>
+        Compile(folderPath, installedPackages, installedModules, collectReferences: true, maxFileSize, applicationPackages);
 
     /// <summary>Lets the performance tests measure what the reference index adds to a compile.</summary>
     internal static CompilationResult Compile(
@@ -80,26 +82,29 @@ public static partial class ApplicationCompiler
         IReadOnlyCollection<PackageVersion>? installedPackages,
         IReadOnlyCollection<InstalledModule>? installedModules,
         bool collectReferences,
-        long maxFileSize = DefaultMaxFileSize) =>
-        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences, maxFileSize);
+        long maxFileSize = DefaultMaxFileSize,
+        bool applicationPackages = false) =>
+        Compile(ApplicationLoader.Load(folderPath), installedPackages ?? [], installedModules ?? [], collectReferences, maxFileSize, applicationPackages: applicationPackages);
 
     /// <summary>
     /// Compiles the files of an application held in memory, such as a publish snapshot, as the folder overload compiles a
     /// folder: the paths are the application's own, relative with <c>/</c>, and the pinned modules come from
     /// <paramref name="installedModules"/>. Null means none is installed. Unlike the overload for the resources of a stored
     /// release, an entry under <c>modules/</c> is not a release copy of a module. A <c>file</c> field's <c>maxSize</c> may be at most
-    /// <paramref name="maxFileSize"/> bytes.
+    /// <paramref name="maxFileSize"/> bytes. The application's own packages under <c>packages/</c> are compile errors unless
+    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static CompilationResult CompileFiles(
         IReadOnlyList<ResourceContent> files,
         IReadOnlyCollection<PackageVersion>? installedPackages,
         IReadOnlyCollection<InstalledModule>? installedModules,
-        long maxFileSize = DefaultMaxFileSize)
+        long maxFileSize = DefaultMaxFileSize,
+        bool applicationPackages = false)
     {
         ArgumentNullException.ThrowIfNull(files);
 
-        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, maxFileSize);
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: true, maxFileSize, applicationPackages: applicationPackages);
     }
 
     /// <summary>
@@ -112,12 +117,13 @@ public static partial class ApplicationCompiler
         IReadOnlyCollection<PackageVersion>? installedPackages,
         IReadOnlyCollection<InstalledModule>? installedModules,
         ExpressionProbe probe,
-        long maxFileSize = DefaultMaxFileSize)
+        long maxFileSize = DefaultMaxFileSize,
+        bool applicationPackages = false)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(probe);
 
-        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: false, maxFileSize, probe);
+        return Compile(ApplicationLoader.Load(files), installedPackages ?? [], installedModules ?? [], collectReferences: false, maxFileSize, probe, applicationPackages: applicationPackages);
     }
 
     /// <summary>
@@ -125,7 +131,8 @@ public static partial class ApplicationCompiler
     /// <paramref name="installedPackages"/>. Null means no package is installed. Entries under
     /// <c>modules/&lt;id&gt;/</c> are the release's own copies of its pinned modules, and the
     /// application compiles against those copies alone. A <c>file</c> field's <c>maxSize</c> may be at most
-    /// <paramref name="maxFileSize"/> bytes.
+    /// <paramref name="maxFileSize"/> bytes. A stored release always allows the packages it holds under <c>packages/&lt;id&gt;/</c>,
+    /// whatever <c>Extensions:ApplicationPackages</c> says now, so a release stored while the setting was on still builds.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static CompilationResult Compile(
@@ -297,8 +304,9 @@ public static partial class ApplicationCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         IReadOnlyCollection<InstalledModule> previousModules,
-        long maxFileSize) =>
-        Compile(loaded, installedPackages, installedModules, collectReferences: true, maxFileSize, previousModules: previousModules);
+        long maxFileSize,
+        bool applicationPackages = false) =>
+        Compile(loaded, installedPackages, installedModules, collectReferences: true, maxFileSize, previousModules: previousModules, applicationPackages: applicationPackages);
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
@@ -308,7 +316,8 @@ public static partial class ApplicationCompiler
         long maxFileSize,
         ExpressionProbe? probe = null,
         IReadOnlyCollection<InstalledModule>? previousModules = null,
-        bool storedRelease = false)
+        bool storedRelease = false,
+        bool applicationPackages = false)
     {
         var diagnostics = new List<Diagnostic>(loaded.Diagnostics);
 
@@ -331,6 +340,7 @@ public static partial class ApplicationCompiler
         IReadOnlyDictionary<string, LayerTrace> layerTraces = new Dictionary<string, LayerTrace>();
         IReadOnlyList<RemovedResource> removedResources = [];
         IReadOnlySet<string>? declaredPackageIds = null;
+        IReadOnlyDictionary<string, PinnedOperations> applicationPins = new Dictionary<string, PinnedOperations>();
         var timeZone = TimeZoneInfo.Utc;
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
@@ -350,7 +360,8 @@ public static partial class ApplicationCompiler
             var (byModule, added) = PackageChecker.CheckModules(manifest, packages, pinnedManifests, installedPackages, diagnostics, references);
             modulePackages = byModule;
             allPackages = [.. packages, .. added];
-            declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
+            applicationPins = ApplicationPackageChecker.Check(loaded.PackageFiles, installedPackages, applicationPackages || storedRelease, diagnostics, out var applicationPackageIds);
+            declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id).Concat(applicationPackageIds), StringComparer.Ordinal);
             if (manifest.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out timeZone))
             {
                 diagnostics.Add(new Diagnostic(
@@ -506,12 +517,13 @@ public static partial class ApplicationCompiler
 
         var pinnedPackages = packages.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
 
-        PinnedOperations? FindPackage(string id) => pinnedPackages.GetValueOrDefault(id);
+        // The application's own processes also call the packages under packages/. Modules never see those.
+        PinnedOperations? FindPackage(string id) => pinnedPackages.GetValueOrDefault(id) ?? applicationPins.GetValueOrDefault(id);
 
         // A release pins one version of a package id, so the pins of the modules and the application agree.
         var anyPinnedPackages = allPackages.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
 
-        PinnedOperations? FindAnyPackage(string id) => anyPinnedPackages.GetValueOrDefault(id);
+        PinnedOperations? FindAnyPackage(string id) => anyPinnedPackages.GetValueOrDefault(id) ?? applicationPins.GetValueOrDefault(id);
 
         foreach (var role in loaded.Roles)
         {
@@ -1045,10 +1057,10 @@ public static partial class ApplicationCompiler
             Modules = modules,
         };
 
-        // The pinned modules' files are stored with the application's own, in ordinal path order.
-        IReadOnlyList<ResourceContent> resources = moduleFiles.Count == 0
+        // The pinned modules' files and the application's package files are stored with the application's own, in ordinal path order.
+        IReadOnlyList<ResourceContent> resources = moduleFiles.Count == 0 && loaded.PackageFiles.Count == 0
             ? loaded.Resources
-            : [.. loaded.Resources.Concat(moduleFiles).OrderBy(resource => resource.Path, StringComparer.Ordinal)];
+            : [.. loaded.Resources.Concat(moduleFiles).Concat(loaded.PackageFiles).OrderBy(resource => resource.Path, StringComparer.Ordinal)];
         return result with
         {
             Model = model,

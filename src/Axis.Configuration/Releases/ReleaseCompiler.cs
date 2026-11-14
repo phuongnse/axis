@@ -50,11 +50,12 @@ public static class ReleaseCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         CancellationToken cancellationToken = default) =>
-        await CompileAsync(folderPath, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken);
+        await CompileAsync(folderPath, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Compiles the folder as the overload with modules does. A <c>file</c> field's <c>maxSize</c> may be at most
-    /// <paramref name="maxFileSize"/> bytes.
+    /// <paramref name="maxFileSize"/> bytes. The folder's own packages under <c>packages/</c> are compile errors unless
+    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>.
     /// </summary>
     public static async Task<ReleaseCompilationResult> CompileAsync(
         string folderPath,
@@ -62,6 +63,7 @@ public static class ReleaseCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         long maxFileSize,
+        bool applicationPackages = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -70,7 +72,7 @@ public static class ReleaseCompiler
 
         var loaded = ApplicationLoader.Load(folderPath);
         var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
-        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), context, cancellationToken);
     }
 
     /// <summary>
@@ -85,11 +87,12 @@ public static class ReleaseCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         CancellationToken cancellationToken = default) =>
-        await CompileAsync(files, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken);
+        await CompileAsync(files, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken: cancellationToken);
 
     /// <summary>
     /// Compiles the files as the overload for files does. A <c>file</c> field's <c>maxSize</c> may be at most
-    /// <paramref name="maxFileSize"/> bytes.
+    /// <paramref name="maxFileSize"/> bytes. The files' own packages under <c>packages/</c> are compile errors unless
+    /// <paramref name="applicationPackages"/> is true, see <c>Extensions:ApplicationPackages</c>.
     /// </summary>
     /// <exception cref="ArgumentException">A path appears more than once.</exception>
     public static async Task<ReleaseCompilationResult> CompileAsync(
@@ -98,6 +101,7 @@ public static class ReleaseCompiler
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
         long maxFileSize,
+        bool applicationPackages = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(files);
@@ -107,7 +111,7 @@ public static class ReleaseCompiler
 
         var loaded = ApplicationLoader.Load(files);
         var previous = await ActiveModuleCopiesAsync(loaded, context, cancellationToken);
-        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(loaded, installedPackages, installedModules, previous, maxFileSize, applicationPackages), context, cancellationToken);
     }
 
     /// <summary>

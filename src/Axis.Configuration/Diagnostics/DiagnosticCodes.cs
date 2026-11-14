@@ -166,6 +166,8 @@ public static class DiagnosticCodes
     public const string TriggerEntityNotProcessSubject = "AXC0144";
     public const string InvalidTriggerField = "AXC0145";
     public const string PinnedPackageVersionMissing = "AXC0146";
+    public const string ApplicationPackageIdTaken = "AXC0147";
+    public const string ApplicationPackagesOff = "AXC0148";
     public const string UnknownStepPackage = "AXC0150";
     public const string UnknownPackageOperation = "AXC0151";
 

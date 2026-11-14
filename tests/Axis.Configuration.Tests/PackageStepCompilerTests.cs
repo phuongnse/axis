@@ -81,7 +81,7 @@ public sealed class PackageStepCompilerTests
             (DiagnosticCodes.UnknownStepPackage, "processes/order-review.json", "/steps/0/operation"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Equal(
-            "The package 'other-package' is not one of the application's packages. Add it to 'packages' in application.json.",
+            "The package 'other-package' is not one of the application's packages. Add it to 'packages' in application.json, or add its folder under 'packages/'.",
             diagnostic.Message);
         Assert.Null(result.Model);
     }

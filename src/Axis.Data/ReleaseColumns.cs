@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Axis.Configuration.Loading;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 
@@ -17,7 +18,7 @@ public static class ReleaseColumns
     {
         ArgumentNullException.ThrowIfNull(release);
         var fields = new Dictionary<Guid, IReadOnlySet<string>>();
-        foreach (var resource in release.Resources)
+        foreach (var resource in release.Resources.Where(resource => !IsPackageFile(resource)))
         {
             using var document = JsonDocument.Parse(resource.Content);
             var root = document.RootElement;
@@ -49,7 +50,7 @@ public static class ReleaseColumns
     {
         ArgumentNullException.ThrowIfNull(release);
         var ids = new HashSet<Guid>();
-        foreach (var resource in release.Resources)
+        foreach (var resource in release.Resources.Where(resource => !IsPackageFile(resource)))
         {
             using var document = JsonDocument.Parse(resource.Content);
             var root = document.RootElement;
@@ -62,6 +63,10 @@ public static class ReleaseColumns
 
         return ids;
     }
+
+    // An application package's files are text of any kind, never resources.
+    private static bool IsPackageFile(ReleaseResource resource) =>
+        resource.Path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal);
 
     /// <summary>
     /// Whether the release uses the column. <paramref name="fieldsByEntityId"/> is <see langword="null"/> when the

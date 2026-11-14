@@ -66,6 +66,12 @@ public sealed record RealmApplication(
         var firstSitePath = "";
         foreach (var resource in release.Resources.OrderBy(resource => resource.Path, StringComparer.Ordinal))
         {
+            // An application package's files are text of any kind, never resources.
+            if (resource.Path.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             using var document = JsonDocument.Parse(resource.Content);
             var root = document.RootElement;
             if (!root.TryGetProperty("kind", out var kind))

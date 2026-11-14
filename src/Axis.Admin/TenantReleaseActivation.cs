@@ -319,6 +319,7 @@ internal sealed class TenantReleaseActivation(
     /// A scenario that covers a point the application relaxed does not run. It adds a <c>skipped</c> result with the point and one
     /// output line, and the other scenarios run as before. When every scenario is skipped, no scenario server is needed.
     /// The scenarios may run for at most <paramref name="limit"/>, and then fail with <c>AXC0219</c>. A stop never cuts them short.
+    /// <paramref name="applicationPackages"/> is <c>Extensions:ApplicationPackages</c>, so the compile agrees with the one that stores the release.
     /// Returns whether the step passed.
     /// </summary>
     public async Task<bool> ContractsAsync(
@@ -329,14 +330,15 @@ internal sealed class TenantReleaseActivation(
         ModuleCatalog modules,
         List<Diagnostic> diagnostics,
         JsonArray results,
-        TimeSpan limit)
+        TimeSpan limit,
+        bool applicationPackages = false)
     {
         if (files is null)
         {
             return true;
         }
 
-        var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules);
+        var compiled = ApplicationCompiler.CompileFiles(files, packages.Versions, modules.Modules, applicationPackages: applicationPackages);
         if (compiled.HasErrors || compiled.Model is null)
         {
             return true;

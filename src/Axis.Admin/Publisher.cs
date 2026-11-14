@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Releases;
@@ -520,9 +521,9 @@ internal sealed class Publisher(
                 tenant.Bindings,
                 files is null
                     ? null
-                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
                 diagnostics,
-                contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
+                contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit, settings.ApplicationPackages));
             await StopRenewalAsync(renewing, renewal);
             await FinishAsync(tenant.Id, connections, request, new ReleaseRun(valid, null), diagnostics, audit: false, ScenarioResultsJson(scenarioResults));
             return;
@@ -573,11 +574,11 @@ internal sealed class Publisher(
                 target.SchemaVersion,
                 previewConnections ?? connections,
                 target.Bindings,
-                configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
                 syncRealm: target.SyncRealm,
-                contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
+                contracts: () => activation.ContractsAsync(target.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit, settings.ApplicationPackages));
         }
 
         await WakeAsync(target.Id, publishSignals);
@@ -659,9 +660,9 @@ internal sealed class Publisher(
             tenant.SchemaVersion,
             connections,
             tenant.Bindings,
-            configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+            configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
             diagnostics,
-            contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
+            contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit, settings.ApplicationPackages));
         if (!valid)
         {
             return false;
