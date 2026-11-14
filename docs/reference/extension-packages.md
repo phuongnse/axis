@@ -467,7 +467,9 @@ package reaches nothing of the host and no binding of another call.
   service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`. Its CPU and memory limits come from
   `packageHost.dotnet.resources`, `packageHost.node.resources` and `packageHost.python.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
   pods and allows no DNS. It holds only where the network plugin enforces NetworkPolicy, see
-  [in the cloud](installation.md#in-the-cloud).
+  [in the cloud](installation.md#in-the-cloud). With `applicationPackageHost.enabled`, the chart also runs
+  `<release>-application-package-host` from the same templates, under gVisor, see
+  [the sandbox](#an-applications-packages).
 - **The Python runner.** For a `start` that names a `python` version, the host runs
   `python3 -I -B <sdk>/axis_runner.py <version folder>`. The host picks the runner from the manifest's `language`, and
   a version whose manifest is missing or does not match the manifest schema starts no runner. The
@@ -691,6 +693,10 @@ trusted code, so the platform gives it more limits than an installation's packag
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime. Compose's
   service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
+  In the chart, `applicationPackageHost.enabled`, off by default, runs `<release>-application-package-host`
+  from `axis-package-host-node` with the templates of the package hosts. It sets `runtimeClassName` from
+  `applicationPackageHost.runtimeClassName`, `gvisor` by default, and points the worker at it with
+  `Extensions__Runners__Application`. The chart does not set `Extensions__ApplicationPackages`.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
