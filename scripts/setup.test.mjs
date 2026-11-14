@@ -380,6 +380,28 @@ describe('scripts/setup.sh installs gVisor once', () => {
     }
   })
 
+  test('a Docker that does not reload leaves setup with a warning that runsc is missing', () => {
+    const session = newSession({ runtimes: '{"runc":{}}' })
+    try {
+      writeFileSync(
+        join(session.bin, 'sudo'),
+        '#!/usr/bin/env bash\necho "$*" >> "$SUDO_LOG"\nif [ "$1 $2" = "systemctl reload" ]; then exit 5; fi\nexit 0\n',
+        { mode: 0o755 },
+      )
+      const result = runSetup({ gvisor: { bytes, sum }, session })
+      assert.equal(result.status, 0, result.stderr)
+      assert.deepEqual(sudoLines(result), [
+        'install -m 0755 <cache> /usr/local/bin/runsc',
+        '/usr/local/bin/runsc install',
+        'systemctl reload docker',
+      ])
+      assert.match(result.stderr, /Docker did not reload/)
+      assert.match(result.stderr, /Docker does not list the runsc runtime/)
+    } finally {
+      rmSync(session.dir, { recursive: true, force: true })
+    }
+  })
+
   test('a Docker that is not reachable skips gVisor with a note', () => {
     const session = newSession()
     try {

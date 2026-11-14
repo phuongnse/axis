@@ -158,10 +158,12 @@ install_gvisor() {
   as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
   as_root install -m 0755 "$gvisor" /usr/local/bin/runsc
   as_root /usr/local/bin/runsc install
+  # Rootless Docker, Docker Desktop and snap Docker have no system unit or dockerd to reload, so a failed
+  # reload is not fatal: the check below decides whether to warn.
   if command -v systemctl >/dev/null; then
-    as_root systemctl reload docker
+    as_root systemctl reload docker || echo "Warning: Docker did not reload" >&2
   else
-    as_root kill -HUP "$(pidof dockerd)"
+    as_root kill -HUP "$(pidof dockerd || true)" || echo "Warning: Docker did not reload" >&2
   fi
   runtimes="$(docker info --format '{{json .Runtimes}}' 2>/dev/null || true)"
   if [[ "$runtimes" != *'"runsc"'* ]]; then

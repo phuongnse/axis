@@ -45,7 +45,10 @@ On Linux with a reachable Docker, setup also registers gVisor's `runsc` runtime 
 architecture into `~/.cache/axis-tools/gvisor-<release>`, which NexKit's `tools` cache entry restores, and checks it against the SHA-512 that the release publishes. A
 download that does not match stops setup and installs nothing. Setup then copies the binary to `/usr/local/bin` with `sudo` unless it runs as root, runs `runsc install`
 and reloads Docker. It skips all of this when Docker already lists `runsc`, so a second run downloads nothing and changes nothing. On macOS, and when Docker is not reachable, it prints a note and skips gVisor.
-With rootless Docker or Docker Desktop, `runsc install` writes a `daemon.json` that the daemon does not read, so setup warns that `runsc` is still missing. every container image that the integration, E2E and smoke checks pull, the ones listed in
+With rootless Docker or Docker Desktop, `runsc install` writes a `daemon.json` that the daemon does not read, and
+Docker has no system unit to reload, so setup warns that `runsc` is still missing and goes on.
+
+On CI, setup also keeps every container image that the integration, E2E and smoke checks pull, the ones listed in
 `scripts/docker-images.json`, in one archive in `~/.cache/axis-docker`, which NexKit's `docker` cache entry restores, as
 [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
 agrees. One archive stores each layer that images share once. Setup pulls only the images the archive lacks and saves
