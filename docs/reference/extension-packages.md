@@ -554,8 +554,11 @@ implements the operation context over it.
 
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
   is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
-  runner network protects it. The host listens on port 5310 and reads the installed versions from
-  `Extensions:Path`. It does not start without that setting, or when the folder does not exist.
+  runner network protects it. The host listens on port 5310, or on `PackageHost:Port`, on every interface, or on the IP address of
+  `PackageHost:Address`, and reads the installed versions from `Extensions:Path`. It does not start without that
+  setting, or when the folder does not exist, or when `PackageHost:Port` is not a whole number from 1 to 65535, or
+  when `PackageHost:Address` is not an IP address, and it exits with code 2 and a message that names the setting.
+  `scripts/dev.sh` and `scripts/e2e.sh` set `PackageHost:Address` to `127.0.0.1`, because the protocol has no authentication.
 - **One connection, one runner.** The worker opens a connection for each runner and sends `start`. The
   host starts the runner of the manifest's `language`, the C# runner, the Node.js runner or the Python runner, and pipes the
   connection to the runner's standard input and output. A Node.js runner also gets `NODE_USE_ENV_PROXY=1`,
@@ -767,7 +770,8 @@ installation, loading, the capability limits, the server's metadata-only load an
   and `node_modules/dayjs/package.json`. `scripts/test.sh` runs the package's `node --test` unit test in the
   installed copy, and an integration test starts a Node.js runner of the package host for it. The test
   projects copy only its manifest, adapter and lock files, so a server lists it as metadata. No sample
-  application declares it, and Compose and `scripts/dev.sh` run no Node.js host yet.
+  application declares it. `scripts/dev.sh`, `scripts/e2e.sh` and the root `compose.yaml` each run a Node.js package
+  host that holds it, and point their worker at it, see [development](../development.md).
 - **Test package.** A test-only package, `test-package`, lives under
   `tests/packages/`. One source is built as versions 1.0.0, 1.1.0 and 2.0.0, and the
   tests install it to cover installation and loading. Its `probe` operation

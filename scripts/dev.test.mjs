@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import http from 'node:http'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { after, before, describe, it } from 'node:test'
@@ -15,7 +16,7 @@ import { freePort } from './lib/free-ports.mjs'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const excluded = new Set(['.git', 'node_modules', 'bin', 'obj', 'artifacts', 'wwwroot', 'playwright-report', 'test-results'])
 const project = `axis-dev-test-${process.pid}`
-const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis\.Admin|Axis\.Agent|vite/
+const processPattern = /dotnet-watch|dotnet watch|Axis\.Server|Axis\.Worker|Axis\.Admin|Axis\.Agent|Axis\.PackageHost|vite/
 
 let copy
 let scratch
@@ -49,6 +50,7 @@ async function pickAppPorts() {
   ports.web = await freePort()
   ports.workerHealth = await freePort()
   ports.agentHealth = await freePort()
+  ports.packageHostNode = await freePort()
   env = {
     ...process.env,
     COMPOSE_PROJECT_NAME: project,
@@ -60,8 +62,45 @@ async function pickAppPorts() {
     AXIS_SERVER_PORT: String(ports.server),
     AXIS_WEB_PORT: String(ports.web),
     AXIS_AGENT_HEALTH_PORT: String(ports.agentHealth),
+    AXIS_PACKAGE_HOST_NODE_PORT: String(ports.packageHostNode),
     Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
     MSBUILDDISABLENODEREUSE: '1',
+  }
+}
+
+/**
+ * Opens a runner of payment-terms 1.0.0 on the Node.js package host and returns the first line it answers. The host
+ * starts with the other processes, so a refused connection is tried again until the deadline.
+ */
+async function startRunner(port) {
+  const deadline = Date.now() + 60_000
+  for (;;) {
+    try {
+      return await new Promise((resolve, reject) => {
+        const socket = net.connect(port, '127.0.0.1')
+        const timer = setTimeout(() => socket.destroy(new Error('The runner did not answer.')), Math.max(deadline - Date.now(), 1))
+        let received = ''
+        socket.setEncoding('utf8')
+        socket.on('connect', () => {
+          socket.write(`${JSON.stringify({ type: 'start', package: 'payment-terms', version: '1.0.0', proxy: '127.0.0.1:5311', proxyToken: 'smoke' })}\n`)
+        })
+        socket.on('data', (chunk) => {
+          received += chunk
+          if (received.includes('\n')) {
+            clearTimeout(timer)
+            socket.destroy()
+            resolve(received.split('\n')[0])
+          }
+        })
+        socket.on('error', (error) => {
+          clearTimeout(timer)
+          reject(error)
+        })
+      })
+    } catch (error) {
+      if (error.code !== 'ECONNREFUSED' || Date.now() >= deadline) throw error
+      await sleep(500)
+    }
   }
 }
 
@@ -134,18 +173,18 @@ async function waitForOutput(run, pattern, timeoutMs = 300_000) {
   assert.fail(`No output matching ${pattern} after ${timeoutMs} ms.\n${run.stdout}\n${run.stderr}`)
 }
 
-/** The leftover processes of a finished run: its Vite by its port, and the server, worker, publisher and agent host of this copy. */
+/** The leftover processes of a finished run: its Vite by its port, and the server, worker, publisher, agent host and package host of this copy. */
 function leftoverProcs() {
   return execFileSync('ps', ['-A', '-o', 'pid=,command='], { encoding: 'utf8' })
     .split('\n')
     .filter(
       (line) =>
         (/vite/.test(line) && line.includes(`--port ${ports.web}`)) ||
-        (/Axis\.(Server|Worker|Admin|Agent)/.test(line) && line.includes(copy)),
+        (/Axis\.(Server|Worker|Admin|Agent|PackageHost)/.test(line) && line.includes(copy)),
     )
 }
 
-/** The server, worker, publisher, agent host, dotnet watch and Vite processes below the dev.sh process. */
+/** The server, worker, publisher, agent host, package host, dotnet watch and Vite processes below the dev.sh process. */
 function runProcs(rootPid) {
   const rows = execFileSync('ps', ['-A', '-o', 'pid=,ppid=,command='], { encoding: 'utf8' })
     .split('\n')
@@ -366,6 +405,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(procs.some((p) => /Axis\.Worker/.test(p.command)), `No worker process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Admin/.test(p.command)), `No publisher process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Agent/.test(p.command)), `No agent host process in:\n${JSON.stringify(procs)}`)
+    assert.ok(procs.some((p) => /Axis\.PackageHost/.test(p.command)), `No Node.js package host process in:\n${JSON.stringify(procs)}`)
 
     // The worker runs with its mail settings pointing at Mailpit. /proc exists on Linux only.
     const workerProc = procs.find((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
@@ -375,7 +415,15 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       assert.ok(workerEnv.includes('Email__Smtp__Host=localhost'), 'The worker has no Email__Smtp__Host=localhost')
       assert.ok(workerEnv.includes(`Email__Smtp__Port=${ports.mailpitSmtp}`), 'The worker has the wrong Email__Smtp__Port')
       assert.ok(workerEnv.includes('Email__Smtp__UseTls=false'), 'The worker has no Email__Smtp__UseTls=false')
+      assert.ok(
+        workerEnv.includes(`Extensions__Runners__Node=127.0.0.1:${ports.packageHostNode}`),
+        'The worker has the wrong Extensions__Runners__Node',
+      )
     }
+
+    // The Node.js package host runs the installed sample package payment-terms 1.0.0 for a start line and answers ready.
+    assert.equal(await startRunner(ports.packageHostNode), '{"type":"ready"}')
+    assert.match(run.stdout, /\[package-host\] /)
 
     // A configuration edit restarts only the server, so the worker keeps its process.
     const activationsBefore = activations()

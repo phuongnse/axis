@@ -30,7 +30,7 @@ Axis ships four host images, `axis-server`, `axis-worker`, `axis-agent` and `axi
 build extension packages. All seven are production images. They hold no sample, no sample extension package, no sample module,
 no development realm, no credential and no source control metadata such as `.git`. The default target of the `Dockerfile` and
 the `compose.yaml` at the repository root build the development images instead, which hold the samples and development credentials and are not for production, see
-[development](../development.md#docker-compose). `axis-controlplane` is the image of the Axis SaaS control plane and not part of
+[development](../development.md#docker-compose). The `compose.yaml` also builds a development Node.js package host that holds the sample packages. `axis-controlplane` is the image of the Axis SaaS control plane and not part of
 an installation, see [control plane](control-plane.md#image-and-chart).
 
 Build an image from the repository root with `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`, and use

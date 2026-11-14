@@ -40,6 +40,9 @@
 # One publisher, `axis-admin publisher`, runs against the same database and writes
 # artifacts/logs/e2e-publisher.log. It waits until the server has migrated the database, then runs the
 # publish requests of Studio. The run fails if it exits during the run or never finds the database migrated.
+# One Node.js package host, `Axis.PackageHost host`, runs from the build output on a free loopback port and reads
+# artifacts/extensions. It writes artifacts/logs/e2e-package-host.log. The worker sends its `node` calls to it through
+# Extensions__Runners__Node, see docs/reference/extension-packages.md#package-runners. The run fails if it exits during the run.
 # The purchase request release spec also holds the Studio journey: edit, validate, preview on localhost, publish and
 # activation, all through the publisher and with no admin command.
 # The purchasing system stub from tests/Axis.PurchasingStub runs from the build output on
@@ -156,6 +159,7 @@ network="axis-e2e-$$"
 purchasing_pid=""
 control_plane_pid=""
 publisher_pid=""
+package_host_pid=""
 worker_pid=""
 worker_dir="$(mktemp -d)"
 export AXIS_E2E_WORKER_PID_FILE="$worker_dir/worker.pid"
@@ -185,6 +189,10 @@ cleanup() {
   if [ -n "$publisher_pid" ]; then
     kill "$publisher_pid" 2>/dev/null || true
     wait "$publisher_pid" 2>/dev/null || true
+  fi
+  if [ -n "$package_host_pid" ]; then
+    kill "$package_host_pid" 2>/dev/null || true
+    wait "$package_host_pid" 2>/dev/null || true
   fi
   rm -rf "$studio_dir" "$journey_dir" "$tls_dir"
   if [ -n "$purchasing_pid" ]; then
@@ -454,6 +462,15 @@ if affected playwright; then
   : >"$AXIS_E2E_WORKER_LOG"
   : >"$AXIS_E2E_JOURNEY_SERVER_LOG"
   : >"$publisher_log"
+  package_host_log="$root/artifacts/logs/e2e-package-host.log"
+  : >"$package_host_log"
+
+  # The Node.js package host listens on a free loopback port, so a host under scripts/dev.sh does not hold the address.
+  package_host_port="$(node --input-type=module -e "import { freePort } from './scripts/lib/free-ports.mjs'; console.log(await freePort())")"
+  DOTNET_ENVIRONMENT=Development Extensions__Path="$root/artifacts/extensions" PackageHost__Address=127.0.0.1 \
+    PackageHost__Port="$package_host_port" \
+    dotnet src/Axis.PackageHost/bin/Release/net10.0/Axis.PackageHost.dll host >>"$package_host_log" 2>&1 &
+  package_host_pid=$!
 
   # The init script gives both roles the development password axis. The bootstrap superuser axis keeps $password.
   export AXIS_E2E_DATABASE="Host=127.0.0.1;Port=$port;Database=axis;Username=axis_runtime;Password=axis"
@@ -492,7 +509,8 @@ if affected playwright; then
   # backoff for the dead letter of a failing receiver instead of four.
   # The worker runs in Development, as the server does, because only Development lets a connector
   # call the stub over http. It gets the same purchasing system bindings as the server.
-  # Its health endpoints listen on a free port, so a worker under scripts/dev.sh does not hold the address.
+  # Its health endpoints and its egress proxy listen on free ports, so a worker under scripts/dev.sh does not hold the addresses.
+  # It sends each attempt of a node package to the Node.js package host.
   # Bash cannot export a name with a hyphen, so the preview tenant's settings go through env.
   # It serves the journey tenant with only its runtime connection string and no bindings.
   run_worker() {
@@ -507,6 +525,7 @@ if affected playwright; then
         DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
         Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 Worker__DeliveryAttempts=2 Worker__IdlePollCeiling=00:00:01 \
         Extensions__Path="$root/artifacts/extensions" Extensions__Isolation=inProcess Modules__Path="$root/artifacts/modules" \
+        Extensions__Runners__Node="127.0.0.1:$package_host_port" Extensions__Runners__ProxyPort=0 \
         Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
         Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
         Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind=url \
@@ -600,6 +619,13 @@ if affected playwright; then
   fi
   if [ "$publisher_failed" -ne 0 ]; then status=1; fi
 
+  package_host_failed=0
+  if ! kill -0 "$package_host_pid" 2>/dev/null; then
+    echo "The Node.js package host exited before Playwright finished." >&2
+    package_host_failed=1
+    status=1
+  fi
+
   # print_log TITLE FILE
   print_log() {
     if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
@@ -623,6 +649,9 @@ if affected playwright; then
   fi
   if [ "$playwright_status" -ne 0 ] || [ "$publisher_failed" -ne 0 ]; then
     print_log "Axis publisher log" "$publisher_log"
+  fi
+  if [ "$package_host_failed" -ne 0 ]; then
+    print_log "Node.js package host log" "$package_host_log"
   fi
 else
   skip_suite "$playwright_suite" tests/e2e

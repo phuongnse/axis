@@ -62,6 +62,8 @@ test -f "$payment_terms/axis-package.json"
 test -f "$payment_terms/index.js"
 test -f "$payment_terms/node_modules/dayjs/package.json"
 dotnet build Axis.slnx -c Release --no-restore
+# The scripts run the Node.js package host from this output, and its runner sits beside the dll.
+test -f src/Axis.PackageHost/bin/Release/net10.0/sdk/node/runner.js
 bash scripts/lib/install-modules.sh
 test -f artifacts/modules/department-budgets/1.2.0/module.json
 test -f artifacts/modules/organization/1.0.1/module.json

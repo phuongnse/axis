@@ -5,7 +5,8 @@
 # The development images hold the built-in modules under modules and the sample modules under samples/modules
 # in /modules, each at the id and version of its module.json. They hold the built-in applications under
 # applications in /templates, each at the id and version of its template.json. The server, the worker and the publisher hold the
-# sample extension packages in /extensions: the C# one built from source and the TypeScript one with its library installed.
+# sample extension packages in /extensions: the C# one built from source and the TypeScript one with its library installed. The
+# package-host-node-dev image, which the root compose.yaml runs as the Node.js package host, holds the TypeScript one.
 # For local use: the Development environment and the sample credentials are not for production.
 #
 # The targets axis-server, axis-worker, axis-agent, axis-admin, axis-controlplane and axis-package-host-dotnet, -node and
@@ -59,7 +60,7 @@ COPY samples/packages/ samples/packages/
 RUN bash scripts/lib/install-sample-packages.sh node \
     && test -f artifacts/extensions/payment-terms/1.0.0/node_modules/dayjs/package.json
 
-# The server, published with the SPA in its web root, the worker, the agent host, the admin tool and the sample extension package.
+# The server, published with the SPA in its web root, the worker, the agent host, the admin tool, the package host and the sample extension package.
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props .editorconfig ./
@@ -73,6 +74,7 @@ RUN dotnet publish src/Axis.Server/Axis.Server.csproj -c Release -o /app \
 RUN dotnet publish src/Axis.Worker/Axis.Worker.csproj -c Release -o /worker
 RUN dotnet publish src/Axis.Agent/Axis.Agent.csproj -c Release -o /agent
 RUN dotnet publish src/Axis.Admin/Axis.Admin.csproj -c Release -o /admin
+RUN dotnet publish src/Axis.PackageHost/Axis.PackageHost.csproj -c Release -o /package-host
 # The sample extension package, installed in /src/artifacts/extensions/payment-references/1.0.0.
 RUN dotnet build samples/packages/PaymentReferences/PaymentReferences.csproj -c Release \
     && test -f /src/artifacts/extensions/payment-references/1.0.0/axis-package.json
@@ -267,6 +269,19 @@ COPY --from=trivy /trivy /usr/local/bin/trivy
 COPY --from=production-build /out/package-host .
 COPY sdk/node/ ./sdk/node/
 RUN mkdir /extensions
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
+
+# The development package host for Node.js packages, which the root compose.yaml runs for the worker. It is the runtime stage
+# package-host-node with the development build of Axis.PackageHost, the Node.js runner and the sample extension packages in
+# /extensions. It runs host mode, which listens on every interface of its container, on port 5310. It holds no Trivy, so it
+# does not build packages. It is not a production image, so its name does not start with axis-.
+FROM package-host-node AS package-host-node-dev
+ENV DOTNET_ENVIRONMENT=Development Extensions__Path=/extensions
+WORKDIR /app
+COPY --from=build /package-host .
+COPY sdk/node/ ./sdk/node/
+COPY --from=sample-packages /src/artifacts/extensions /extensions
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.PackageHost.dll"]
 

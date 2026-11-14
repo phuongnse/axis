@@ -39,7 +39,11 @@ internal static class PackageHostProgram
         return await PackageBuildCommand.RunAsync(args, configuration, Console.Out, cancellation.Token);
     }
 
-    /// <summary>Runs host mode until it is stopped. It does not start when <c>Extensions:Path</c> is missing or names no folder.</summary>
+    /// <summary>
+    /// Runs host mode until it is stopped, on the port and address of <c>PackageHost:Port</c> and <c>PackageHost:Address</c>, see
+    /// docs/reference/extension-packages.md#the-runner-protocol. It does not start when <c>Extensions:Path</c> is missing or names no
+    /// folder, or when either of the other two settings is malformed.
+    /// </summary>
     private static async Task<int> RunHostAsync(string[] args)
     {
         var builder = Host.CreateApplicationBuilder(args);
@@ -57,8 +61,14 @@ internal static class PackageHostProgram
             return PackageBuildCommand.SetupError;
         }
 
+        if (!RunnerHostService.TryReadEndpoint(builder.Configuration, out var endpoint, out var error))
+        {
+            await Console.Error.WriteLineAsync(error);
+            return PackageBuildCommand.SetupError;
+        }
+
         builder.Services.AddSingleton(provider => new RunnerHost(extensions, RunnerCommands.ForThisProgram(), provider.GetRequiredService<ILogger<RunnerHost>>()));
-        builder.Services.AddHostedService<RunnerHostService>();
+        builder.Services.AddHostedService(provider => new RunnerHostService(provider.GetRequiredService<RunnerHost>(), endpoint));
         await builder.Build().RunAsync();
         return 0;
     }
