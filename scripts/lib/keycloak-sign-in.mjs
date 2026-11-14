@@ -97,7 +97,8 @@ export async function preparePlatformClient({ admin, realm, redirectUris, roles 
 
 /**
  * Adds an account with a password and an authenticator to `realm`, and gives it the client roles `roles` of `client`, which
- * preparePlatformClient returns. Returns the user's id.
+ * preparePlatformClient returns. Returns the user's id. Keycloak gives a new account a random id. A caller whose seed names the
+ * user by id passes `id`, and the account is then added by a partial import, which keeps the id it is given.
  */
 export async function addAccount({
   admin,
@@ -107,25 +108,27 @@ export async function addAccount({
   password,
   credential,
   roles,
+  id,
   email = `${username}@axis.local`,
   firstName = username[0].toUpperCase() + username.slice(1),
 }) {
-  const created = await admin(
-    'POST',
-    `/admin/realms/${realm}/users`,
-    {
-      username,
-      enabled: true,
-      emailVerified: true,
-      email,
-      firstName,
-      lastName: 'User',
-      requiredActions: [],
-      credentials: [{ type: 'password', value: password, temporary: false }, credential],
-    },
-    201,
-  )
-  const userId = created.headers.location.split('/').pop()
+  const user = {
+    username,
+    enabled: true,
+    emailVerified: true,
+    email,
+    firstName,
+    lastName: 'User',
+    requiredActions: [],
+    credentials: [{ type: 'password', value: password, temporary: false }, credential],
+  }
+  let userId = id
+  if (id === undefined) {
+    const created = await admin('POST', `/admin/realms/${realm}/users`, user, 201)
+    userId = created.headers.location.split('/').pop()
+  } else {
+    await admin('POST', `/admin/realms/${realm}/partialImport`, { ifResourceExists: 'FAIL', users: [{ id, ...user }] }, 200)
+  }
   const representations = []
   for (const name of roles) {
     const role = await admin('GET', `${client.path}/roles/${name}`, undefined, 200)

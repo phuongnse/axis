@@ -10,7 +10,11 @@
 // port right before it, and Docker's bind error starts it again on new ports. Before any start it builds the sample packages
 // payment-references and payment-terms with the `build` command of their package host images, into the folder that
 // AXIS_EXTENSIONS_DIR names, which the worker and the package hosts mount read-only. It gives tenant one the deployment
-// bindings of the purchase request sample, every url binding over https, and activates the sample there only.
+// bindings of the purchase request sample, every url binding over https, and activates the sample there only. At the end it runs
+// the purchasing system stub over https, with a certificate of the test authority, which the worker trusts. The requester of tenant
+// one submits a purchase request, the department's manager approves it, and the test checks the purchase order that the stub holds,
+// the payment reference and the payment due date, and that runners in the package hosts gave the last two and the worker holds no
+// package code.
 // Requires Docker, openssl, the .NET SDK, network access for Trivy's vulnerability database, which the builds scan with, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
@@ -23,7 +27,7 @@
 // The production hosts refuse a connection string with a weaker mode.
 // The identity provider imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http. The proxy serves the identity host over https, and
-// only the server, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
+// only the server, the worker, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
 // The publisher updates a tenant's realm after it activates a release.
 // The identity provider starts with an admin client, which `tenant create` signs in as to create each tenant's realm.
 // A new realm has no accounts, no redirect address and no roles mapper, so the test adds them to realm one through the
@@ -31,7 +35,7 @@
 // and the author in there. The realm accounts and the sign-in steps are those of scripts/lib/keycloak-sign-in.mjs.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -92,6 +96,25 @@ const developmentCredential = (username) => {
 
 // developmentSecret: the Base32 secret of a development user's authenticator, from which the sign-in computes the one-time code.
 const developmentSecret = (username) => JSON.parse(developmentCredential(username).secretData).value
+
+// creditorReference: the ISO 11649 creditor reference of a reference, computed as samples/packages/PaymentReferences does: RF, two
+// mod-97 check digits, then the ASCII letters and digits of the reference in upper case.
+const creditorReference = (reference) => {
+  const body = reference.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+  let remainder = 0
+  for (const character of `${body}RF00`) {
+    const value = parseInt(character, 36)
+    remainder = (value < 10 ? remainder * 10 + value : remainder * 100 + value) % 97
+  }
+  return `RF${String(98 - remainder).padStart(2, '0')}${body}`
+}
+
+// paymentDueDate: the due date that samples/packages/payment-terms gives a request submitted at `submittedAt`: 30 days later in
+// UTC, moved to the last day of that month, as YYYY-MM-DD.
+const paymentDueDate = (submittedAt) => {
+  const later = new Date(new Date(submittedAt).getTime() + 30 * 24 * 60 * 60 * 1000)
+  return new Date(Date.UTC(later.getUTCFullYear(), later.getUTCMonth() + 1, 0)).toISOString().slice(0, 10)
+}
 
 const files = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -508,6 +531,7 @@ describe('the on-premises installation', () => {
   let agentPort
   let httpsPort
   let server2Port
+  let purchasingPort
   let built
   let extensions
   let overrideFile
@@ -538,7 +562,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher', 'purchasing']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -648,19 +672,27 @@ describe('the on-premises installation', () => {
   }
 
   // signInViaProxy: signs a user of tenant one's realm in through the proxy over HTTPS and returns the cookie jar
-  // with the sign-in and callback responses. The steps are those of scripts/lib/keycloak-sign-in.mjs.
-  const signInViaProxy = (username, userPassword, extraHeaders = {}) =>
-    signIn({
+  // with the sign-in and callback responses. The steps are those of scripts/lib/keycloak-sign-in.mjs. The identity provider
+  // refuses a one-time code that its user has used, and a code holds for a 30-second window, so a user who signs in again
+  // waits for a window after that of the last sign-in.
+  const codeWindows = new Map()
+  const codeWindow = () => Math.floor(Date.now() / 30000)
+  const signInViaProxy = async (username, userPassword, extraHeaders = {}, returnUrl = '/leave') => {
+    while (codeWindows.get(username) >= codeWindow()) await sleep(500)
+    const result = await signIn({
       app: viaProxy,
       identity: keycloak,
       realm: 'one',
       callbackOrigin: `https://${hosts.one}`,
-      returnUrl: '/leave',
+      returnUrl,
       username,
       password: userPassword,
       secret: developmentSecret(username),
       startHeaders: extraHeaders,
     })
+    codeWindows.set(username, codeWindow())
+    return result
+  }
 
   // waitFor: polls until the status is the expected one and returns the last response.
   const waitFor = async (get, status, seconds) => {
@@ -816,6 +848,15 @@ describe('the on-premises installation', () => {
       cpSync(join(certs, 'ca.crt'), join(tls, 'server-ca.crt'))
       chmodSync(join(tls, 'server-ca.crt'), 0o644)
 
+      // The purchasing system stub's folder holds tls.crt and tls.key for the name purchasing. The stub serves https only.
+      const purchasingTls = join(folder, 'purchasing-tls')
+      mkdirSync(purchasingTls)
+      chmodSync(purchasingTls, 0o755)
+      writeFile(join(folder, 'purchasing.ext'), 'subjectAltName=DNS:purchasing\nbasicConstraints=CA:FALSE\n')
+      openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=purchasing', '-keyout', join('purchasing-tls', 'tls.key'), '-out', join('certs', 'purchasing.csr'))
+      openssl('x509', '-req', '-in', join('certs', 'purchasing.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'purchasing.ext', '-out', join('purchasing-tls', 'tls.crt'))
+      for (const name of readdirSync(purchasingTls)) chmodSync(join(purchasingTls, name), 0o644)
+
       // A copy of the development realm that also accepts the https addresses of the two tenants.
       const realm = join(folder, 'realm')
       mkdirSync(realm)
@@ -824,6 +865,9 @@ describe('the on-premises installation', () => {
       const client = realmJson.clients.find((candidate) => candidate.clientId === 'axis')
       assert.ok(client, 'the development realm has no axis client')
       const origins = Object.values(hosts).map((host) => `https://${host}/*`)
+      // The copy's users lose their ids, because the ids of users are global in the identity provider and tenant one's realm
+      // needs the id manager-2 for the head of the Operations department.
+      for (const user of realmJson.users) delete user.id
       client.redirectUris.push(...origins)
       client.attributes['post.logout.redirect.uris'] += `##${origins.join('##')}`
       writeFile(join(realm, 'axis-realm.json'), JSON.stringify(realmJson))
@@ -839,6 +883,7 @@ describe('the on-premises installation', () => {
       agentPort = await freePort()
       httpsPort = await freePort()
       server2Port = await freePort()
+      purchasingPort = await freePort()
 
       const rendered = render()
 
@@ -871,7 +916,18 @@ describe('the on-premises installation', () => {
             },
             server: serverOverride,
             'server-2': serverOverride,
-            worker: { environment: refresh, ...trustOverride },
+            worker: { environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
+            // The purchasing system stub of the sample, from the purchasing stage of the Dockerfile, serves https only.
+            purchasing: {
+              build: { context: root, target: 'purchasing' },
+              environment: {
+                Kestrel__Endpoints__Https__Url: 'https://+:8443',
+                Kestrel__Endpoints__Https__Certificate__Path: '/purchasing-tls/tls.crt',
+                Kestrel__Endpoints__Https__Certificate__KeyPath: '/purchasing-tls/tls.key',
+              },
+              volumes: [`${purchasingTls}:/purchasing-tls:ro`],
+              ports: ['127.0.0.1:${AXIS_PURCHASING_PORT}:8443'],
+            },
             publisher: { environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
             admin: { environment: { SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
           },
@@ -887,6 +943,7 @@ describe('the on-premises installation', () => {
         AXIS_APPS_DIR: join(root, 'samples/apps'),
         AXIS_SERVER_PORT: String(serverPort),
         AXIS_SERVER_2_PORT: String(server2Port),
+        AXIS_PURCHASING_PORT: String(purchasingPort),
         AXIS_HTTPS_PORT: String(httpsPort),
         AXIS_TLS_DIR: tls,
         AXIS_IDENTITY_HOST: identityHost,
@@ -1000,7 +1057,7 @@ describe('the on-premises installation', () => {
         admin: adminCall,
         realm: 'one',
         redirectUris: [`https://${hosts.one}/*`],
-        roles: ['employee', 'requester', 'author', 'publisher'],
+        roles: ['employee', 'requester', 'department-manager', 'author', 'publisher'],
       })
       for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'] })) {
         await addAccount({
@@ -1013,6 +1070,18 @@ describe('the on-premises installation', () => {
           roles,
         })
       }
+      // The sample's Operations department has the head user manager-2, and the approval task goes to that user id, which is
+      // the `sub` of a session. A new account gets a random id, so manager-2 is added with this one.
+      await addAccount({
+        admin: adminCall,
+        realm: 'one',
+        client: platformClient,
+        username: 'manager-2',
+        id: 'manager-2',
+        password: realmPassword,
+        credential: developmentCredential('manager-2'),
+        roles: ['department-manager'],
+      })
 
       // Step 5, activate the leave request sample for every active tenant.
       const activate = admin(['activate', '/apps/leave-requests'])
@@ -1022,17 +1091,25 @@ describe('the on-premises installation', () => {
       // The purchase request sample, on tenant one only: it gets the sample's deployment bindings, every url binding over
       // https, and the activation checks each of them. See docs/reference/integration-resources.md#deployment-bindings.
       const urlBindings = {
-        PurchasingSystemUrl: 'https://purchasing.example.test',
-        PurchasingSystemTokenUrl: 'https://purchasing.example.test/oauth/token',
-        PurchaseRequestApprovedWebhookUrl: 'https://purchasing.example.test/webhooks/purchase-request-approved',
+        PurchasingSystemUrl: 'https://purchasing:8443',
+        PurchasingSystemTokenUrl: 'https://purchasing:8443/oauth/token',
+        PurchaseRequestApprovedWebhookUrl: 'https://purchasing:8443/webhooks/purchase-request-approved',
         CompanyIssuer: identityAuthority,
       }
       for (const [name, value] of Object.entries(urlBindings)) {
         const set = admin(['tenant', 'binding', 'set', 'one', name, '--url', value])
         assert.equal(set.status, 0, `tenant binding set one ${name}\n${set.stdout}${set.stderr}`)
       }
-      for (const name of ['PurchasingSystemClientId', 'PurchasingSystemClientSecret', 'PurchaseRequestApprovedWebhookSecret', 'CompanyClientId', 'CompanyClientSecret']) {
-        const set = admin(['tenant', 'binding', 'set', 'one', name, '--secret'], { input: password() })
+      // The connector and the webhook use the stub's default credentials, see docs/testing.md#purchasing-system-stub.
+      const secretBindings = {
+        PurchasingSystemClientId: 'axis-purchasing',
+        PurchasingSystemClientSecret: 'axis-development-purchasing-secret',
+        PurchaseRequestApprovedWebhookSecret: 'whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==',
+        CompanyClientId: password(),
+        CompanyClientSecret: password(),
+      }
+      for (const [name, value] of Object.entries(secretBindings)) {
+        const set = admin(['tenant', 'binding', 'set', 'one', name, '--secret'], { input: value })
         assert.equal(set.status, 0, `tenant binding set one ${name}\n${set.stdout}${set.stderr}`)
       }
       const bindings = admin(['tenant', 'binding', 'list', 'one'])
@@ -1312,6 +1389,104 @@ RETURNING id;`,
 
       const stale = await patch(server2Port, etag0, 'Leave (stale)')
       assert.equal(stale.status, 409, `a stale PATCH through server-2: ${stale.body}`)
+
+      // The approval journey of the purchase request sample on tenant one. The purchasing system stub serves https only, with
+      // a certificate of the test authority, which the worker trusts. A request below the finance threshold needs its manager.
+      assert.equal(creditorReference('539007547034'), 'RF18539007547034', 'the ISO 11649 example')
+      run(['build', 'purchasing'])
+      await up(['purchasing'], async () => {
+        purchasingPort = await freePort()
+        env.AXIS_PURCHASING_PORT = String(purchasingPort)
+      })
+      const stubHealth = await waitFor(() => tlsRequest(purchasingPort, 'purchasing', '/health'), 200, 60)
+      assert.equal(stubHealth.status, 200, `the purchasing system stub did not answer over https\n${compose(['logs', 'purchasing']).stdout}`)
+      const stubPlain = await request(purchasingPort, 'localhost', '/health')
+      assert.equal(stubPlain.status, 0, `the purchasing system stub answered plain HTTP on its port with ${stubPlain.status}`)
+
+      // requester submits a request of Operations, whose head is manager-2, and manager-2 approves it.
+      const { jar: requesterJar } = await signInViaProxy('requester', realmPassword, {}, '/purchasing')
+      const { jar: managerJar } = await signInViaProxy('manager-2', realmPassword, {}, '/purchasing')
+      const api = (jar, method, path, body, headers = {}) => {
+        const json = body === undefined ? undefined : JSON.stringify(body)
+        const sent = { ...cookieHeader(jar), 'x-axis-csrf': '1', ...headers }
+        if (json !== undefined) {
+          sent['content-type'] = 'application/json'
+          sent['content-length'] = String(Buffer.byteLength(json))
+        }
+        return tlsRequest(httpsPort, hosts.one, path, { method, headers: sent, body: json })
+      }
+      const appApi = '/api/apps/PurchaseRequests'
+      const recordPath = `${appApi}/entities/PurchaseRequest/records`
+      const created = await api(requesterJar, 'POST', recordPath, {
+        values: {
+          title: 'On-premises approval',
+          status: 'draft',
+          department: 'd1b09f14-34f5-4831-9708-158361c860df',
+          lineItems: [{ description: 'Desk', quantity: 1, unitPrice: 500 }],
+        },
+      })
+      assert.equal(created.status, 201, `create the request: ${created.body}`)
+      const subjectId = JSON.parse(created.body).id
+      const started = await api(requesterJar, 'POST', `${appApi}/processes/PurchaseRequestApproval/instances`, { subjectId }, { 'idempotency-key': randomUUID() })
+      assert.equal(started.status, 201, `start the approval: ${started.body}`)
+
+      // The worker creates manager-2's task some time after the start.
+      let task
+      for (let i = 0; i < 60 && !task; i++) {
+        if (i > 0) await sleep(1000)
+        const listed = await api(managerJar, 'GET', `${appApi}/tasks?pageSize=100`)
+        assert.equal(listed.status, 200, `manager-2 lists tasks: ${listed.body}`)
+        task = JSON.parse(listed.body).items.find((item) => item.subject.id === subjectId)
+      }
+      assert.ok(task, 'manager-2 got no task for the request')
+
+      // The task is manager-2's: requester cannot complete it, and the request stays submitted.
+      const denied = await api(requesterJar, 'POST', `${appApi}/tasks/${task.id}/complete`, { outcome: 'approve' })
+      assert.equal(denied.status, 403, `requester completed manager-2's task: ${denied.body}`)
+      const stillSubmitted = await api(requesterJar, 'GET', `${recordPath}/${subjectId}`)
+      assert.equal(stillSubmitted.status, 200, stillSubmitted.body)
+      assert.equal(JSON.parse(stillSubmitted.body).values.status, 'submitted')
+      const approved = await api(managerJar, 'POST', `${appApi}/tasks/${task.id}/complete`, { outcome: 'approve' })
+      assert.equal(approved.status, 200, `manager-2 approves: ${approved.body}`)
+
+      // After the approval the worker creates the purchase order through the connector, and the two package runners give the
+      // payment reference and the payment due date.
+      let record
+      for (let i = 0; i < 180; i++) {
+        if (i > 0) await sleep(1000)
+        const read = await api(requesterJar, 'GET', `${recordPath}/${subjectId}`)
+        assert.equal(read.status, 200, read.body)
+        record = JSON.parse(read.body)
+        if (record.values.paymentDueDate) break
+      }
+      assert.ok(
+        record.values.paymentDueDate,
+        `the request got no payment due date in 180 seconds\n${JSON.stringify(record)}\n${psql('one', `select state, step from axis.process_instances where subject_id = '${subjectId}'`).stdout}`,
+      )
+      const { number, submittedAt, purchaseOrderNumber } = record.values
+      assert.equal(record.values.status, 'approved')
+      assert.match(number, /\S/)
+      assert.equal(record.values.paymentReference, creditorReference(number))
+      assert.equal(record.values.paymentDueDate, paymentDueDate(submittedAt))
+
+      // The stub holds the request's purchase order, made with the connector's client.
+      const orderList = await tlsRequest(purchasingPort, 'purchasing', '/purchase-orders')
+      assert.equal(orderList.status, 200, orderList.body)
+      const orders = JSON.parse(orderList.body).filter((order) => order.requestNumber === number)
+      assert.deepEqual(orders.map((order) => order.orderNumber), [purchaseOrderNumber])
+      assert.equal(orders[0].clientId, 'axis-purchasing')
+
+      // The two values came from runners in the package hosts, not from the worker. A runner of each package is a process of
+      // its host, and the worker's memory maps the worker's own assembly and no file of the extensions folder.
+      assert.match(run(['top', 'package-host-dotnet']), /runner \/extensions payment-references 1\.0\.0/, 'no runner of payment-references in the C# package host')
+      assert.match(run(['top', 'package-host-node']), /runner \/extensions payment-terms 1\.0\.0/, 'no runner of payment-terms in the Node.js package host')
+      const maps = run(['exec', '-T', 'worker', 'cat', '/proc/1/maps'])
+      assert.match(maps, /Axis\.Worker\.dll/, 'the worker maps no Axis.Worker.dll')
+      assert.deepEqual(
+        maps.split('\n').filter((line) => line.includes(' /extensions/')),
+        [],
+        'the worker maps a file of the extensions folder',
+      )
     } catch (error) {
       dumpLogs()
       throw error

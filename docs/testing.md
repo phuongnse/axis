@@ -358,7 +358,7 @@ sample. `compareApplicationFolders` in `tests/e2e/folder-comparison.ts` throws a
 
 `tests/Axis.PurchasingStub` stands in for the external purchasing system that the purchase request
 sample's connector calls. It is a test fixture, not platform code, and references nothing under
-`src/`. The E2E run, `scripts/dev.sh` and Docker Compose start it. Its orders and webhook deliveries
+`src/`. The E2E run, `scripts/dev.sh` and Docker Compose start it. The on-premises smoke test serves it over https. Its orders and webhook deliveries
 live in memory only.
 
 **Tokens.** `POST /oauth/token` is the token route of the OAuth2 client credentials grant. It reads
