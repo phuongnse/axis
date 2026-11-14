@@ -3,9 +3,6 @@ using Axis.Configuration.Tests;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
-using Axis.Tenancy.Platform;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace Axis.Integration.Tests;
 
@@ -28,7 +25,7 @@ public sealed class PackageRunTimeTests(ApplicationPackageCallFixture fixture) :
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
         using var extensions = new TemporaryFolder();
         await using var host = await TestPackageHost.StartAsync(extensions.Path);
-        var (platform, catalog) = await PlatformAsync();
+        var (platform, catalog) = await fixture.PlatformAsync(CancellationToken);
         var clock = new ManualClock();
         await using var worker = fixture.BuildWorker(host.Address, directory: new(platform, catalog, clock, Cell: true));
 
@@ -44,7 +41,7 @@ public sealed class PackageRunTimeTests(ApplicationPackageCallFixture fixture) :
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
         using var extensions = new TemporaryFolder();
         await using var host = await TestPackageHost.StartAsync(extensions.Path);
-        var (platform, catalog) = await PlatformAsync();
+        var (platform, catalog) = await fixture.PlatformAsync(CancellationToken);
         await using var worker = fixture.BuildWorker(
             host.Address, directory: new(platform, catalog, new ManualClock(), Cell: false, PackageCpuSecondsPerDay: 0));
 
@@ -60,7 +57,7 @@ public sealed class PackageRunTimeTests(ApplicationPackageCallFixture fixture) :
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
         using var extensions = new TemporaryFolder();
         await using var host = await TestPackageHost.StartAsync(extensions.Path);
-        var (platform, catalog) = await PlatformAsync();
+        var (platform, catalog) = await fixture.PlatformAsync(CancellationToken);
         var clock = new ManualClock();
         await using var worker = fixture.BuildWorker(host.Address, directory: new(platform, catalog, clock, Cell: true));
 
@@ -76,7 +73,7 @@ public sealed class PackageRunTimeTests(ApplicationPackageCallFixture fixture) :
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
         using var extensions = new TemporaryFolder();
         await using var host = await TestPackageHost.StartAsync(extensions.Path);
-        var (platform, catalog) = await PlatformAsync();
+        var (platform, catalog) = await fixture.PlatformAsync(CancellationToken);
         await PostgreSqlServer.AdminScalarAsync(
             platform, $"REVOKE INSERT, UPDATE ON platform.tenant_daily_counters FROM \"{PostgreSqlServer.RuntimeRole}\"", CancellationToken);
         var clock = new ManualClock();
@@ -96,42 +93,6 @@ public sealed class PackageRunTimeTests(ApplicationPackageCallFixture fixture) :
         entry.StartsWith("Warning: The platform database could not be reached to count the package run time of tenant a.", StringComparison.Ordinal);
 
     private static DateOnly Today(TimeProvider clock) => DateOnly.FromDateTime(clock.GetUtcNow().UtcDateTime);
-
-    /// <summary>
-    /// A migrated platform database with the grants of the cell worker's role and the directory catalog loaded from it. Its tenant <c>a</c> is the
-    /// fixture's tenant <c>a</c>.
-    /// </summary>
-    private async Task<(string Platform, DirectoryTenantCatalog Catalog)> PlatformAsync()
-    {
-        var platform = await PostgreSqlServer.CreateDatabaseAsync("platform", CancellationToken);
-        var cipher = AdminScenario.Cipher;
-        var database = new NpgsqlConnectionStringBuilder(
-            PostgreSqlServer.RuntimeConnectionString(fixture.Tenant(ApplicationPackageCallFixture.TenantA).ConnectionString));
-        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
-        {
-            await context.Database.MigrateAsync(CancellationToken);
-            context.Tenants.Add(new TenantRow
-            {
-                Id = ApplicationPackageCallFixture.TenantA,
-                Status = "active",
-                SchemaVersion = TenantSchemaVersion.Current,
-                DatabaseHost = database.Host!,
-                DatabasePort = database.Port,
-                DatabaseName = database.Database!,
-                RuntimeUser = database.Username!,
-                RuntimePassword = cipher.Encrypt(ApplicationPackageCallFixture.TenantA, TenantSecretFields.RuntimePassword, database.Password!),
-            });
-            await context.SaveChangesAsync(CancellationToken);
-        }
-
-        await using (var connection = new NpgsqlConnection(platform))
-        {
-            await connection.OpenAsync(CancellationToken);
-            await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, CancellationToken);
-        }
-
-        return (platform, await DirectoryTenantCatalog.LoadAsync(platform, cipher, CancellationToken));
-    }
 
     private static async Task<long> CounterAsync(string platform, DateOnly day) =>
         Convert.ToInt64(

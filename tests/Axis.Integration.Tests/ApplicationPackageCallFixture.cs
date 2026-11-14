@@ -6,13 +6,17 @@ using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Axis.Worker;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using Record = Axis.Data.Records.Record;
 
 namespace Axis.Integration.Tests;
@@ -231,6 +235,47 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
                 values["Cell:TenantDomain"] = "vn.example.test";
             }
         }
+    }
+
+    /// <summary>
+    /// A migrated platform database with the grants of the cell worker's role and the directory catalog loaded from it. Its tenant <c>a</c> is the
+    /// fixture's tenant <c>a</c>. With <paramref name="noPackageLimit"/> the tenant has a row of its own that sets no limit on <c>packageCpuSecondsPerDay</c>.
+    /// </summary>
+    internal async Task<(string Platform, DirectoryTenantCatalog Catalog)> PlatformAsync(CancellationToken cancellationToken, bool noPackageLimit = false)
+    {
+        var platform = await PostgreSqlServer.CreateDatabaseAsync("platform", cancellationToken);
+        var cipher = AdminScenario.Cipher;
+        var database = new NpgsqlConnectionStringBuilder(
+            PostgreSqlServer.RuntimeConnectionString(Tenant(TenantA).ConnectionString));
+        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+        {
+            await context.Database.MigrateAsync(cancellationToken);
+            context.Tenants.Add(new TenantRow
+            {
+                Id = TenantA,
+                Status = "active",
+                SchemaVersion = TenantSchemaVersion.Current,
+                DatabaseHost = database.Host!,
+                DatabasePort = database.Port,
+                DatabaseName = database.Database!,
+                RuntimeUser = database.Username!,
+                RuntimePassword = cipher.Encrypt(TenantA, TenantSecretFields.RuntimePassword, database.Password!),
+            });
+            if (noPackageLimit)
+            {
+                context.TenantQuotas.Add(new TenantQuotaRow { TenantId = TenantA, Quota = QuotaKeys.PackageCpuSecondsPerDay, Value = null, UpdatedAt = DateTimeOffset.UtcNow });
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
+        await using (var connection = new NpgsqlConnection(platform))
+        {
+            await connection.OpenAsync(cancellationToken);
+            await PlatformRoleGrants.ApplyAsync(connection, PostgreSqlServer.RuntimeRole, cancellationToken);
+        }
+
+        return (platform, await DirectoryTenantCatalog.LoadAsync(platform, cipher, cancellationToken));
     }
 
     /// <summary>

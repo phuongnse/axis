@@ -19,11 +19,15 @@ internal static class TenantNotices
 
     public const string EmailsHeldBodyKey = "notices.emailsHeld.body";
 
+    public const string PackagesHeldSubjectKey = "notices.packagesHeld.subject";
+
+    public const string PackagesHeldBodyKey = "notices.packagesHeld.body";
+
     /// <summary>
-    /// Inserts the notice for the administrators that the tenant used its <paramref name="limit"/> emails of the day. It is
-    /// created at the transaction's time.
+    /// Inserts the notice for the administrators that the tenant used up a daily quota of <paramref name="limit"/>, with the platform
+    /// texts <paramref name="subjectKey"/> and <paramref name="bodyKey"/> that take <c>limit</c>. It is created at the transaction's time.
     /// </summary>
-    public static async Task InsertEmailsHeldAsync(NpgsqlTransaction transaction, long limit, CancellationToken cancellationToken)
+    public static async Task InsertHeldAsync(NpgsqlTransaction transaction, string subjectKey, string bodyKey, long limit, CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
@@ -36,8 +40,8 @@ internal static class TenantNotices
         command.Parameters.AddWithValue("id", Guid.CreateVersion7());
         command.Parameters.AddWithValue("kind", PlatformRoleRecipient);
         command.Parameters.AddWithValue("recipient", AdministratorRole);
-        command.Parameters.AddWithValue("subject", EmailsHeldSubjectKey);
-        command.Parameters.AddWithValue("body", EmailsHeldBodyKey);
+        command.Parameters.AddWithValue("subject", subjectKey);
+        command.Parameters.AddWithValue("body", bodyKey);
         command.Parameters.Add(new NpgsqlParameter("values", NpgsqlDbType.Jsonb) { Value = $$"""{"limit":{{limit}}}""" });
         command.Parameters.Add(new NpgsqlParameter("valueTypes", NpgsqlDbType.Jsonb) { Value = """{"limit":"integer"}""" });
         await command.ExecuteNonQueryAsync(cancellationToken);

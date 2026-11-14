@@ -3,9 +3,10 @@ namespace Axis.Processes.Work;
 /// <summary>
 /// Counts the emails a tenant sends per UTC day against its <c>emailsPerDay</c> quota. The email handler takes a slot
 /// just before it sends an email and gives the slot back when the send fails. Only a cell's worker has one, so
-/// outside a cell nothing is counted or held.
+/// outside a cell nothing is counted or held. The first held email of a day takes the tenant's emails-held notice,
+/// see <see cref="IHeldNotices"/>.
 /// </summary>
-public interface IEmailQuota
+public interface IEmailQuota : IHeldNotices
 {
     /// <summary>
     /// Takes one slot of the tenant's emails of the current UTC day. <see cref="EmailSlot.Taken"/> is
@@ -16,15 +17,6 @@ public interface IEmailQuota
 
     /// <summary>Gives back a slot taken on <paramref name="day"/>, because the email was not sent.</summary>
     Task ReturnAsync(string tenantId, DateOnly day, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Takes the one emails-held notice of the tenant on <paramref name="day"/>. Returns <see langword="false"/> when
-    /// the day's notice is taken already, so a later hold stores no second one.
-    /// </summary>
-    Task<bool> TakeHeldNoticeAsync(string tenantId, DateOnly day, CancellationToken cancellationToken);
-
-    /// <summary>Gives back the notice taken on <paramref name="day"/>, because the transaction that stores it did not commit.</summary>
-    Task ReturnHeldNoticeAsync(string tenantId, DateOnly day, CancellationToken cancellationToken);
 }
 
 /// <summary>
