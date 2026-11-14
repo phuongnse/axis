@@ -61,6 +61,7 @@ internal static partial class McpServer
     private const string ReadPackageFileTool = "read_package_file";
     private const string WritePackageFileTool = "write_package_file";
     private const string DeletePackageFileTool = "delete_package_file";
+    private const string TestPackageTool = "test_package";
     private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
 
@@ -94,6 +95,8 @@ internal static partial class McpServer
         "content", "The edited module resource whole, a JSON object, as read_module_resource answers its content.", true, "object");
 
     private static readonly ToolProperty _packageInput = new("package", "The id of one of the application's packages, its folder under packages/.", true);
+    private static readonly ToolProperty _packageRequestInput = new(
+        "request", "The id of a package test this tool answered for the same draft and package. Leave it out to start a new test.", false);
     private static readonly ToolProperty _filePathInput = new("path", "The path of the file inside the package, such as adapter.py.", true);
     private static readonly ToolProperty _fileContentInput = new("content", "The full text of the file, written as UTF-8 exactly as given.", true);
 
@@ -187,6 +190,13 @@ internal static partial class McpServer
             "Removes one package file from your draft and answers the draft's diagnostics. "
             + "Needs the developer role and the tenant's application packages switch on. Makes one commit on the draft's branch.",
             [_applicationInput, _writeDraftInput, _packageInput, _filePathInput]),
+        new(
+            TestPackageTool,
+            "Tests one package of your draft through the publisher, which sends its files to application-package-host to build and run its tests. "
+            + "Without request it starts a test and answers its request id at once. "
+            + "With request it answers that test's status, diagnostics and the outcome of each test. "
+            + "Needs the developer role and the tenant's application packages switch on. The working folder is not used.",
+            [_applicationInput, _writeDraftInput, _packageInput, _packageRequestInput]),
     ];
 
     /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
@@ -482,6 +492,13 @@ internal static partial class McpServer
                 arguments[_writeDraftInput.Name],
                 arguments[_packageInput.Name],
                 arguments[_filePathInput.Name],
+                ct),
+            TestPackageTool => await McpPackageFileTools.TestAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments[_packageInput.Name],
+                arguments.TryGetValue(_packageRequestInput.Name, out var packageRequest) ? packageRequest : null,
                 ct),
             _ => throw new InvalidOperationException("The tool has no implementation."),
         };

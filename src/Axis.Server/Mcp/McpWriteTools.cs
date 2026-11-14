@@ -318,8 +318,8 @@ internal static class McpWriteTools
     /// <summary>
     /// Without <paramref name="request"/>, stores a <c>test</c> publish request whose snapshot is the files of the person's draft, with
     /// the draft in <c>draft_id</c> and the scenario <paramref name="names"/> (a JSON list, none or empty for every scenario), and answers
-    /// it queued. With <paramref name="request"/>, answers that request, only when it is a <c>test</c> of this draft by this person. The
-    /// working folder plays no part. See <c>docs/reference/authoring.md#test</c>.
+    /// it queued. With <paramref name="request"/>, answers that request, only when it is a scenario <c>test</c> of this draft by this person, not a package test, see
+    /// <c>test_package</c>. The working folder plays no part. See <c>docs/reference/authoring.md#test</c>.
     /// </summary>
     public static async Task<(object? Output, string? Error)> RunScenariosAsync(
         McpToolContext context, string application, string draft, string? names, string? request, CancellationToken ct)
@@ -366,6 +366,7 @@ internal static class McpWriteTools
             Guid.Parse(draft),
             folder: null,
             client: null,
+            package: null,
             ct);
         return (new McpScenarioRun(id.ToString("D"), "queued", EmptyList(), EmptyList()), null);
     }
@@ -377,7 +378,7 @@ internal static class McpWriteTools
         if (!Guid.TryParseExact(request, "D", out var requestId)
             || StudioFolder.ReadManifest(folder) is not { Id: { } applicationId }
             || await StudioPublishEndpoints.FindRequestAsync(
-                await context.Database.GetConnectionAsync(ct), applicationId, requestId, ct) is not { Kind: "test" } stored
+                await context.Database.GetConnectionAsync(ct), applicationId, requestId, ct) is not { Kind: "test", Package: null } stored
             || stored.RequestedBy != context.Caller.Id
             || stored.DraftId != draft)
         {
@@ -483,6 +484,7 @@ internal static class McpWriteTools
             draftId,
             folder: application,
             client: context.Caller.ClientId,
+            package: null,
             ct);
         await transaction.CommitAsync(ct);
         await AuditAsync(context, folder, "accept_draft", draft, null);
@@ -531,7 +533,7 @@ internal static class McpWriteTools
         return (new McpAccept(request, stored.Status, diagnostics.RootElement.Clone()), null);
     }
 
-    private static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
+    internal static JsonElement EmptyList() => JsonDocument.Parse("[]").RootElement.Clone();
 
     // The compile diagnostics of the draft as its branch now holds it.
     internal static async Task<(IReadOnlyList<StudioDiagnostic>? Diagnostics, string? Error)> DiagnosticsAsync(

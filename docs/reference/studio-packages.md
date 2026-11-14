@@ -102,5 +102,6 @@ path names one as `packages/<package>/<path>`.
   `delete_package_file` list, read, write and delete package files, in the person's own draft for a write, see
   [tools](mcp-server.md#tools). A write or a delete needs the developer role and the switch, as the routes do, takes
   no version and does not check the storage quota, as `write_resource` does not.
-- **Testing a package.** _(planned for M37)_ The MCP server's `test_package` tests a package's files in a draft, see
-  [tools](mcp-server.md#tools).
+- **Testing a package.** The MCP server's `test_package` tests a package's files in a draft, see
+  [tools](mcp-server.md#tools) and [a package's tests](authoring.md#test). It needs the developer role and the switch,
+  as a write does.

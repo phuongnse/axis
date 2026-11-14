@@ -160,12 +160,12 @@ A tool with an optional draft reads the working folder without it and the person
 | `read_package_file` | application, package, `path`, optional draft | The file's content and version |
 | `write_package_file` | application, draft, package, `path`, `content` | Creates or replaces a package file in the draft, as a Studio save does, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
 | `delete_package_file` | application, draft, package, `path` | Removes a package file from the draft, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
-| `test_package` _(planned for M37)_ | application, draft, package, optional `request` | Builds the package and runs its tests in the tenant's sandbox, as `{ request, status, diagnostics, tests }`, like `run_scenarios` |
+| `test_package` | application, draft, package, optional `request` | Without `request`, a `test` request of the package in the draft stored for the publisher, as `{ request, status, diagnostics, tests }`. With `request`, the same for that request of this draft, package and person, see [a package's tests](authoring.md#test). It needs the developer role and the tenant's application packages switch on |
 
 - **No other tool.** No tool publishes, activates a release, reads a record, a secret or a file other than
   a resource file or a package file, runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
-- **Package tests** _(planned for M37)_. `test_package` runs only the package's own tests, in the tenant's
-  sandbox, see [an application's packages](extension-packages.md#an-applications-packages).
+- **Package tests.** `test_package` runs only the package's own tests, in `application-package-host`, see
+  [an application's packages](extension-packages.md#an-applications-packages).
 - **Checked.** `McpToolsDocumentationTests` compares the table with the tools the server serves and
   with the `tools/list` answer. `McpToolOutputTests` calls every tool of `tools/list` on a tenant that holds
   a record, a `secret` binding, a `url` binding and the sign-in client secret, and fails when an output
@@ -235,7 +235,7 @@ What an agent did is recorded, but never the content it read or wrote.
 - **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
   application, the draft and the resource ids. A package file tool records no resource id, because a package file has none.
   The fields are in [audit actions](storage.md#audit-actions).
-  `run_scenarios` writes none, as a [test](authoring.md#test) writes none. `accept_draft` writes one only when it queues an accept,
+  `run_scenarios` and `test_package` write none, as a [test](authoring.md#test) writes none. `accept_draft` writes one only when it queues an accept,
   and none when it answers an accept that is already queued or running or reads one.
 - **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant
   database and one in the platform database, see [audit actions](storage.md#audit-actions).

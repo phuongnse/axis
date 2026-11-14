@@ -402,7 +402,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
         string connectionString,
         string? previewConnectionString = null,
         string? modulesPath = null,
-        (string Folder, string RevisionsPath)? studio = null)
+        (string Folder, string RevisionsPath)? studio = null,
+        IReadOnlyDictionary<string, string?>? extra = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -439,6 +440,11 @@ public sealed class StudioPublishTests : IAsyncLifetime
             settings["Studio:RevisionsPath"] = revisionsPath;
             settings["ConnectionStrings:Platform"] = PostgreSqlServer.RuntimeConnectionString(connectionString);
         }
+        foreach (var (key, value) in extra ?? new Dictionary<string, string?>())
+        {
+            settings[key] = value;
+        }
+
         if (previewConnectionString is not null)
         {
             var preview = $"{tenant}-preview";

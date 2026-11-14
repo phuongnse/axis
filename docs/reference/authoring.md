@@ -706,8 +706,9 @@ first and then the application's own scenarios. An item is
 What each kind does:
 
 - **A snapshot.** `validate`, `publish`, `preview` and `test` store the folder as it is when the
-  request is made (a `test` of `run_scenarios`, the draft, see [Test](#test)): every `*.json` file
-  and every file under `packages/` that Studio can reach, with its `version`, as for [Versions](#versions). A file that is not a valid
+  request is made (a `test` of the MCP server's `run_scenarios` or `test_package`, the draft, see
+  [Test](#test)): every `*.json` file and every file under `packages/` that Studio can reach, with its
+  `version`, as for [Versions](#versions). A file that is not a valid
   resource is kept, so the request fails with the diagnostic that the diagnostics route shows. The
   snapshot is read under the write lock, so it never holds a write half done, and a later edit in
   Studio does not change a queued request: the release is exactly what the author sent.
@@ -773,7 +774,7 @@ send it, and its Test results list shows the outcome, see [Studio](studio.md).
   with `AXC0218`, as for a folder with errors. A [contract scenario](module-contracts.md#contract-scenarios)
   that covers a relaxed point of its module does not run. Its `skipped` item comes first, see [the request](#the-request).
 - **Where it runs.** The server stores the request with a snapshot, taken as for `validate`, or of
-  the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios`. The
+  the person's [draft](revisions-and-drafts.md#drafts) for the MCP server's `run_scenarios` and `test_package`. The
   publisher runs it with `Scenarios:ServerConnectionString`, in a new database for each scenario, see
   [the publisher](administration.md#publisher), and touches the tenant database only for the
   request's status and outcomes. Without the setting, the request ends `failed` with `AXC0217`, which
