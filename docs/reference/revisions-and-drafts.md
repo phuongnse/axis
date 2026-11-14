@@ -36,7 +36,7 @@ LibGit2Sharp.
 A revision is one commit on the repository's `main` branch, and every change to the folder makes one.
 
 - **What makes one.** Each save in Studio, each `changes` call, each text write, each create, each
-  delete, each module layer save or reset and each undo through the [authoring API](authoring.md#writes). The
+  delete, each package file save or delete, each module layer save or reset and each undo through the [authoring API](authoring.md#writes). The
   commit is made under the same platform lock as the write, after the files are written, so the
   history follows the folder in the same order. A write that leaves every file byte for byte the same
   makes no revision, and a refused write makes none.
