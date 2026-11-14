@@ -26,6 +26,11 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
           "operations": [ { "name": "sum", "type": "adapter.sum", "idempotent": true, "input": [], "output": [] } ] }
         """;
 
+    private const string CustomerManifest = """
+        { "id": "tools", "version": "1.0.0", "label": "Tools", "language": "python", "runner": "customer", "adapter": "adapter.py", "lock": "requirements.txt",
+          "operations": [ { "name": "sum", "type": "adapter.sum", "idempotent": true, "input": [], "output": [] } ] }
+        """;
+
     private const string NoDependencies = "# No dependencies.\n";
 
     private static readonly string _missingWheel = $"./wheels/missing-1.0-py3-none-any.whl --hash=sha256:{new string('0', 64)}\n";
@@ -115,6 +120,22 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         await scenario.AssertNoSecretsAsync();
     }
 
+    [Fact]
+    public async Task A_customer_hosted_package_is_not_sent_to_the_host_so_a_host_that_does_not_answer_does_not_fail_the_publish()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, customerHosted: true);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, TestPackageHost.ClosedAddress());
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.active_releases"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.publishFailed'"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
     // The request failed with one diagnostic at the package's lock file, and nothing was stored.
     private static async Task AssertRefusedAsync(AdminScenario scenario, string tenant, Guid request, AdminResult result, string code)
     {
@@ -147,7 +168,7 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
     }
 
     // Stores a publish of a minimal application with the package 'tools' over the runtime role, as the server does.
-    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string requirements)
+    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string requirements, bool customerHosted = false)
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
@@ -162,20 +183,26 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", _applicationId);
-        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements) });
+        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements, customerHosted) });
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }
 
-    private string Snapshot(string requirements)
+    private string Snapshot(string requirements, bool customerHosted)
     {
+        var package = customerHosted
+            ? new (string, string)[] { ("packages/tools/axis-package.json", CustomerManifest) }
+            :
+            [
+                ("packages/tools/axis-package.json", Manifest),
+                ("packages/tools/adapter.py", "import sys\n"),
+                ("packages/tools/requirements.txt", requirements),
+            ];
         (string File, string Content)[] files =
         [
             ("application.json", $$"""{ "id": "{{_applicationId}}", "kind": "application", "name": "Packages{{Guid.NewGuid():N}}", "formatVersion": 1 }"""),
             ("entities/order.json", $$"""{ "id": "{{_orderId}}", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [ { "name": "number", "type": "text", "required": true, "maxLength": 20 } ] }"""),
-            ("packages/tools/axis-package.json", Manifest),
-            ("packages/tools/adapter.py", "import sys\n"),
-            ("packages/tools/requirements.txt", requirements),
+            .. package,
         ];
         var items = new JsonArray();
         foreach (var (file, content) in files)

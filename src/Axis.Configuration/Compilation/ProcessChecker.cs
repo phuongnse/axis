@@ -907,7 +907,8 @@ internal static class ProcessChecker
                 operation.Idempotent,
                 operation.Timeout,
                 Resolve(step.Next!),
-                operation.Capabilities);
+                operation.Capabilities,
+                package.CustomerHosted);
         }
 
         // A checked step names a process of the application and gives what the process needs: a
@@ -2563,5 +2564,9 @@ internal static class ProcessChecker
     private readonly record struct Transition(int? Target, string Path);
 }
 
-/// <summary>The pinned version of an extension package: its id, its <c>major.minor.patch</c> version and the operations its manifest offers.</summary>
-internal sealed record PinnedOperations(string Id, string Version, IReadOnlyList<PackageOperation> Operations);
+/// <summary>
+/// The pinned version of an extension package: its id, its <c>major.minor.patch</c> version and the operations its manifest offers.
+/// <paramref name="CustomerHosted"/> is true when the package runs in a customer-hosted runner, see
+/// <c>docs/reference/extension-packages.md#customer-hosted-runners</c>.
+/// </summary>
+internal sealed record PinnedOperations(string Id, string Version, IReadOnlyList<PackageOperation> Operations, bool CustomerHosted = false);

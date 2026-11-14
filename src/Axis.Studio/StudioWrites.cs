@@ -364,6 +364,107 @@ internal static class StudioWrites
     }
 
     /// <summary>
+    /// Creates or replaces the package file <paramref name="file"/>, a path under <c>packages/</c> that
+    /// <see cref="StudioPackageFiles.File"/> made, with <paramref name="bytes"/> exactly as given, and records "Create package file
+    /// &lt;file&gt;" or "Change package file &lt;file&gt;". It refuses as <see cref="StudioWriteRefusal.Stale"/> when
+    /// <paramref name="ifMatch"/> is not the file's version or the file is missing, and as <see cref="StudioWriteRefusal.Exists"/> when
+    /// <paramref name="ifNoneMatch"/> is set and the file exists, or when a folder or a file is in the way. Nothing is written when it refuses.
+    /// </summary>
+    public static async Task<StudioWriteOutcome> WritePackageFileAsync(
+        IStudioWriteLock writeLock,
+        StudioRevisions? revisions,
+        string folder,
+        string file,
+        byte[] bytes,
+        string? ifMatch,
+        bool ifNoneMatch,
+        CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+        revisions?.RecordOutside();
+
+        if (Target(folder, file) is not { } target)
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+        }
+
+        var exists = File.Exists(target);
+        if (ifMatch is not null
+            && (!exists || !string.Equals(Unquote(ifMatch), Version(await File.ReadAllBytesAsync(target, cancellationToken)), StringComparison.Ordinal)))
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+        }
+
+        if ((ifNoneMatch && exists) || Directory.Exists(target) || FileInTheWay(folder, target))
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Exists);
+        }
+
+        if (exists)
+        {
+            await ReplaceAsync(target, bytes, cancellationToken);
+        }
+        else if (await WriteNewAsync(target, bytes, cancellationToken) is { } refused)
+        {
+            return StudioWriteOutcome.Refused(refused);
+        }
+
+        revisions?.Record($"{(exists ? "Change" : "Create")} package file {file}");
+        return new StudioWriteOutcome(null, Version(bytes));
+    }
+
+    /// <summary>
+    /// Deletes the package file <paramref name="file"/> when <paramref name="ifMatch"/> is its current version and records "Delete
+    /// package file &lt;file&gt;". A file that is missing under the lock counts as a stale version.
+    /// </summary>
+    public static async Task<StudioWriteOutcome> DeletePackageFileAsync(
+        IStudioWriteLock writeLock, StudioRevisions? revisions, string folder, string file, string ifMatch, CancellationToken cancellationToken)
+    {
+        if (await TryTakeAsync(writeLock, folder, cancellationToken) is not { } held)
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Unavailable);
+        }
+
+        await using var _ = held;
+        revisions?.RecordOutside();
+
+        if (Target(folder, file) is not { } target)
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.UnsafePath);
+        }
+
+        if (!File.Exists(target)
+            || !string.Equals(Unquote(ifMatch), Version(await File.ReadAllBytesAsync(target, cancellationToken)), StringComparison.Ordinal))
+        {
+            return StudioWriteOutcome.Refused(StudioWriteRefusal.Stale);
+        }
+
+        File.Delete(target);
+        revisions?.Record($"Delete package file {file}");
+        return new StudioWriteOutcome(null, null);
+    }
+
+    // True when a folder on the way to the target, below the application folder, is a file, so no folder can be made there.
+    private static bool FileInTheWay(string folder, string target)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
+        for (var directory = Path.GetDirectoryName(target); directory is not null && directory.Length > root.Length; directory = Path.GetDirectoryName(directory))
+        {
+            if (File.Exists(directory))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Undoes revision <paramref name="id"/> by putting back the files it changed and recording the revision
     /// "Undo &lt;summary&gt;". It refuses as <see cref="StudioWriteRefusal.Blocked"/> and writes nothing when a later
     /// revision changed any of the same files, or when the revision is the start of history.

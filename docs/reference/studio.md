@@ -336,7 +336,7 @@ picks what exists.
 
 A label is an object whose only property is `textKey`. Studio edits its texts in every locale, as
 [labels](studio-resource-form.md#labels) shows, and Save writes them through the
-[text write route](authoring.md#text-writes). Typing a label's texts is an unsaved change of the
+[text write route](authoring-text-writes.md). Typing a label's texts is an unsaved change of the
 resource, and Undo steps through it.
 
 - **The key.** A new label gets a key made of the kind's folder and the resource's name in camelCase,

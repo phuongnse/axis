@@ -78,6 +78,19 @@ public sealed class PackageCatalogTests
     }
 
     [Fact]
+    public void An_installed_manifest_that_says_it_runs_at_the_customer_is_refused_at_the_runner()
+    {
+        using var root = new TemporaryFolder().Install("1.0.0")
+            .EditManifest("1.0.0", manifest => manifest["runner"] = "customer");
+
+        var catalog = PackageCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Packages);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal((DiagnosticCodes.PackageManifestInvalid, ManifestFile, "/runner"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
     public void A_csharp_manifest_with_an_adapter_is_refused()
     {
         using var root = new TemporaryFolder().Install("1.0.0")

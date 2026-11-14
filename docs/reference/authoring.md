@@ -13,12 +13,12 @@ A write takes a lock in the platform database, see [Versions](#versions). Reads 
 except the [release history](#release-history), [release](studio-workspace.md#release-route), [resource activity](studio-resource-form.md#resource-activity),
 [request status](#the-request) and [application settings](#application-settings) routes, which read the tenant database.
 Some routes exist to help Studio's editors: [names](#names) feeds the reference pickers and the expression completion,
-[text writes](#text-writes) the label texts, and the [expression check](#expression-check) the expression editor.
+[text writes](authoring-text-writes.md) the label texts, and the [expression check](#expression-check) the expression editor.
 
 ## Settings
 
-Five server settings decide whether Studio is on, who may author and who may publish, and whether
-Studio shows its test controls. Their defaults, environment variables and behaviour in a cell are in
+Six server settings decide whether Studio is on, who may author, who may publish and who may write package
+files, and whether Studio shows its test controls. Their defaults, environment variables and behaviour in a cell are in
 [Studio settings](host-settings.md#studio-settings).
 
 | Setting                   | What it decides in the API                                                                                                                        | With no value                                                   |
@@ -27,6 +27,7 @@ Studio shows its test controls. Their defaults, environment variables and behavi
 | `Studio:ApplicationsPath` | The folder where Studio [creates applications](authoring-applications.md#creating-an-application), whose application subfolders Studio also lists | Studio cannot create an application                             |
 | `Studio:AuthorRole`       | The roles claim value that may use the API. Application policies play no part, because an author edits them                                       | Nobody may author                                               |
 | `Studio:PublisherRole`    | The roles claim value that may `publish`, `activate` and change [application settings](#application-settings), on top of the author role          | Nobody may publish or activate a release                        |
+| `Studio:DeveloperRole`    | The roles claim value that may write [package files](studio-packages.md#the-authoring-api), on top of the author role and the tenant's switch      | Nobody may write package files                                  |
 | `Studio:Tests`            | Whether Studio shows its test controls                                                                                                            | Off                                                             |
 
 Studio is on when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set. When it is off,
@@ -74,6 +75,10 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/apps/{application}/revisions/{revision}`                           | `200` with `{ revision, resources }`, one revision with the files it changed, see [revisions](authoring-revisions.md)                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `POST /api/studio/apps/{application}/revisions/{revision}/undo`                     | `200` with `{ id, diagnostics }`, see [revisions](authoring-revisions.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `GET /api/studio/apps/{application}/drafts/{draft}/diff`                            | `200` with `{ start, tip, resources, cursor }`, one page of a draft's diff, see [the draft diff](authoring-revisions.md#draft-diff)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `GET /api/studio/apps/{application}/package-files`                                  | `200` with `{ "items": [{ package, path, version }] }`, the files under `packages/`, see [the authoring API for packages](studio-packages.md#the-authoring-api)                                                                                                                                                         |
+| `GET /api/studio/apps/{application}/packages/{package}/files/{**path}`              | `200` with `{ package, path, version, content }` and an `ETag` header, see [the authoring API for packages](studio-packages.md#the-authoring-api)                                                                                                                                                                       |
+| `PUT /api/studio/apps/{application}/packages/{package}/files/{**path}`              | `200` with `{ version, diagnostics }` and an `ETag` header. The body is `{ content }` as `application/json`, with `If-None-Match: *` to create or `If-Match` to replace. It needs the developer role, see [the authoring API for packages](studio-packages.md#the-authoring-api)                                         |
+| `DELETE /api/studio/apps/{application}/packages/{package}/files/{**path}`           | `200` with `{ diagnostics }`. It needs `If-Match` and the developer role, see [the authoring API for packages](studio-packages.md#the-authoring-api)                                                                                                                                                                    |
 | `GET /api/studio/apps/{application}/resources/{id}/references`                      | `200` with `{ uses, usedBy }`, see [References](#references)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `GET /api/studio/apps/{application}/texts/{key}/references`                         | `200` with `{ usedBy }`, see [References](#references)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | `GET /api/studio/apps/{application}/diagnostics`                                    | `200` with `{ "diagnostics": [...] }`, the folder's diagnostics. A folder with errors still answers `200`                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -81,7 +86,7 @@ Studio lists on every request, in list order, and the first match wins. A resour
 | `GET /api/studio/apps/{application}/policy-matrix`                                  | `200` with what each role may do on each target, see [Policy matrix](authoring-policy-matrix.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | `GET /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `PUT /api/studio/apps/{application}/settings`                                       | `200` with `{ autoAccept }`. The body is `{ "autoAccept": true }` or `false` as `application/json`. It needs the publisher role, see [Application settings](#application-settings)                                                                                                                                                                                                                                                                                                                                                                              |
-| `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes)                                                                                                                                                                                                                                                                                                                                                                                          |
+| `PUT /api/studio/apps/{application}/texts/{key}`                                    | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](authoring-text-writes.md)                                                                                                                                                                                                                                                                                                                                                                                          |
 | `POST /api/studio/apps/{application}/expressions/check`                             | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression, draft }`, see [Expression check](#expression-check)                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `POST /api/studio/apps/{application}/expressions/scope`                             | `200` with `{ type, fields, functions }`. The body is `application/json`, `{ resourceId, path, draft }`, see [Expression scope](#expression-scope)                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `POST /api/studio/apps/{application}/resources/{id}/page-metadata`                  | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [draft page metadata](draft-page-metadata.md)                                                                                                                                                                                                                                                                                                                                                                   |
@@ -182,7 +187,9 @@ a caller without the roles cannot find out which applications, resources, reques
    A write in a [read-only tenant](subscriptions.md#the-read-only-tenant) is refused next, before the session.
 2. The session, `401`. A session from another tenant counts as no session.
 3. The author role, `403`. It needs Studio to be on and `Studio:AuthorRole` to be set and held in
-   the session's roles, see [Settings](#settings).
+   the session's roles, see [Settings](#settings). A package file write then needs the developer role, `403`, which needs
+   `Studio:DeveloperRole` to be set and held in the session's roles, and the tenant's
+   [application packages](user-administration.md#application-packages) switch on, `403`.
 4. The publisher role, `403`, on `publish`, `activate` and the settings `PUT` only. It needs
    `Studio:PublisherRole` to be set and held in the session's roles.
 5. An unknown application, `404`: one that Studio does not list, see
@@ -245,6 +252,8 @@ list above, except where it says so.
   [draft page metadata](draft-page-metadata.md#order-of-checks).
 - **Creating an application.** Its own list, see [Creating an application](authoring-applications.md#creating-an-application).
 - **Changes.** Checks 1, 2, 3 and 5, then the list in [Changes](#changes).
+- **Package files.** Checks 2, 3 and 5 on a list and a read. A write has checks 1, 2 and 3, then the developer
+  role and the switch, then 5, then its own list, see [the authoring API for packages](studio-packages.md#the-authoring-api).
 - **Revisions.** Its own list, see [revisions in the authoring API](authoring-revisions.md#order-of-checks).
 
 ## Responses
@@ -267,6 +276,10 @@ templates answers no `404` and no `409`. The other routes differ:
 | Patch                                       | Unknown application or resource                                                             | Stale `If-Match` version                                                                                 |
 | Delete                                      | Unknown application or resource                                                             | Stale `If-Match` version                                                                                 |
 | Changes                                     | Unknown application, or a patch that names an unknown resource                              | Any stale version, a patched resource that is gone, or a create whose `id` or target file already exists |
+| Package files list                          | Unknown application                                                                         | Not used                                                                                                 |
+| Package file read                           | Unknown application, or a path that names no package file                                   | Not used                                                                                                 |
+| Package file save                           | Unknown application                                                                         | A stale `If-Match` version, or `If-None-Match: *` over a file that exists                                |
+| Package file delete                         | Unknown application, or a path that names no package file                                   | A stale `If-Match` version                                                                               |
 | Module resource                             | Unknown application, module or resource                                                     | Not used                                                                                                 |
 | List revisions, Revision diff               | Unknown application, or for a diff a revision                                               | Not used                                                                                                 |
 | Undo                                        | Unknown application or revision                                                             | The start of history, or a later revision changed the same files                                         |
@@ -300,6 +313,9 @@ Some answers have titles of their own:
 | `400`, a bad settings body                            | "The body must be an object with a boolean autoAccept." |
 | `409`, a text resource whose `texts` is not an object | "A text resource has no texts object."                  |
 | `403`, no `Studio:ApplicationsPath` on a create       | "Studio cannot create applications here."               |
+| `403`, no developer role on a package file write      | "You do not hold the developer role."                   |
+| `403`, the tenant's application packages are off      | "Application packages are off in this tenant."          |
+| `409`, a stale package file version                   | "The package file has changed since this version, or it exists already. Read it again." |
 
 `400` is a bad body, `415` a body of the wrong content type, `428` a missing `If-Match` and `503` a
 write lock that cannot be taken, as [Order of checks](#order-of-checks) says. A successful `validate`,
@@ -418,33 +434,6 @@ again after a save, a delete and a reconnect. The answer is:
 - **Size.** The answer holds every name and every text. At the typical application size it is a few
   hundred kilobytes.
 
-## Text writes
-
-`PUT .../texts/{key}` writes one text key in every locale at once, so a key is never in one locale
-only. The body is `{ texts: { <locale>: <text> } }`.
-
-- **Every locale.** The body must hold exactly the locales of the folder's `text` resources, matched
-  ignoring letter case. With duplicate locales (`AXC0026`), the first file in path order counts. A
-  missing locale, an extra locale, a value that is not a string, or another top-level key is `400`. A
-  value may be any string, as the text schema allows. The body is `400` too when a text resource was
-  created or deleted between this check and the lock.
-- **The key.** `{key}` is matched ordinally and cannot contain `/`, as in the
-  [text key references](#references) route. A new key is added at the end of `texts`, and an existing
-  key keeps its position.
-- **The lock.** The write takes the folder [write lock](#versions). Under it, the server reads each
-  text file and writes every temporary file, then renames each one over its target. It changes only
-  that key and leaves the other keys as they are. A text resource with no `texts` object gets one. A
-  `texts` that is not an object is `409`, and nothing is written.
-- **No `If-Match`.** A text write takes no version, and the last write to a key wins, because one
-  version per file does not fit a write that spans files. Only that key can be lost.
-- **Not atomic across files.** Each rename is atomic, but all of them together are not. A crash between
-  two renames can leave the key in some locales only, and the next compile reports it as `AXC0027`.
-- **Stale versions.** A text resource that Studio has open has a new version after the write, so its
-  next save would be `409`. The answer therefore lists each text resource's new `version`, as
-  `{ resources: [{ id, locale, version }] }`.
-- **Answer.** `200` with the new versions and the folder's [diagnostics](#diagnostics), or `503` when
-  the lock cannot be taken, and then nothing is written.
-
 ## Expression scope
 
 `POST .../expressions/scope` answers what a place in a resource offers, so Studio's
@@ -525,7 +514,8 @@ and module resource saves.
 - **The manifest.** `application.json` at the folder root can be patched. It cannot be created or
   deleted, because `AXC0009` (see the [diagnostic codes](diagnostic-codes.md)) requires it there.
 - **Paths.** A path is resolved and must stay under the application folder, so `..` and links cannot
-  leave it. A resource write touches only `*.json` files. An undo and an accept also write `packages/` files.
+  leave it. A resource write touches only `*.json` files. A [package file write](studio-packages.md#the-authoring-api) writes one
+  file under `packages/`, byte for byte, and the Format rule above applies to resource files only. An undo and an accept also write `packages/` files.
 - **Patches.** A patch may not change `id` or `kind`, and a change of letter case alone counts as a
   change. Every other change is allowed, including one that breaks the resource: the new content is
   written and the diagnostics report the breakage.

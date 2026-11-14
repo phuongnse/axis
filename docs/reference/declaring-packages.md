@@ -35,12 +35,14 @@ declares the real sample package the same way, with
     `0.9.0` but not `1.0.0`.
   - `~1.0.0` is any version from `1.0.0` with the same minor version, so
     `1.0.3` but not `1.1.0`.
-- **`runner`** _(planned for M37)_. An entry of `application.json`'s `packages` may say where the package
-  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, but it
-  resolves no bindings for the package's operations and starts no Axis runner for it, see
-  [customer-hosted runners](extension-packages.md#customer-hosted-runners). A module's entry has no `runner`, and the
+- **`runner`.** An entry of `application.json`'s `packages` may say where the package
+  runs: `axis`, the default, or `customer`. With `customer`, the release still pins the version, the pin and
+  each step that calls the package are marked customer-hosted, and activation checks no binding of its
+  operations, see [capabilities](extension-packages.md#capabilities). A module's entry has no `runner`, and the
   application's entry decides for every process of the release, because the release holds one pin per
   package id. A wrong value is `AXC0004`. An application's own package says it in its manifest instead.
+- **A customer-hosted package's calls** _(planned for M37)_. They start no Axis runner and go to a
+  [customer-hosted runner](extension-packages.md#customer-hosted-runners).
 - **Pinning.** Compilation picks the highest installed version in each range and pins it in the
   release, in the Release step of the [pipeline](configuration.md#configuration-pipeline), as
   [versions and pinning](extension-packages.md#versions-and-pinning) says. A module's `packages` share

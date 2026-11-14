@@ -20,7 +20,7 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
 
     /// <summary>
     /// Builds the packages of <paramref name="files"/> one at a time, in id order, and returns the diagnostics of all of them. A file directly under
-    /// <c>packages/</c> is not a package's, and the compile reports it.
+    /// <c>packages/</c> is not a package's, and the compile reports it. A customer-hosted package is not sent.
     /// </summary>
     public async Task<IReadOnlyList<Diagnostic>> BuildAsync(IReadOnlyList<ResourceContent> files, CancellationToken cancellationToken)
     {
@@ -31,6 +31,7 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
             .Select(file => (Segments: file.Path[ApplicationLoader.PackagesFolderPrefix.Length..].Split('/', 2), file.Content))
             .Where(file => file.Segments.Length == 2)
             .GroupBy(file => file.Segments[0], StringComparer.Ordinal)
+            .Where(package => !IsCustomerHosted(package))
             .OrderBy(package => package.Key, StringComparer.Ordinal);
 
         var diagnostics = new List<Diagnostic>();
@@ -60,4 +61,8 @@ internal sealed class ApplicationPackageBuilds(string host, int port, TimeSpan w
 
         return diagnostics;
     }
+
+    // Axis builds and scans nothing of a customer-hosted package, which holds its manifest alone.
+    private static bool IsCustomerHosted(IEnumerable<(string[] Segments, string Content)> package) =>
+        package.Any(file => file.Segments[1] == PackageCatalog.ManifestFileName && PackageCatalog.IsCustomerHosted(file.Content));
 }

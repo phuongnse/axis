@@ -92,7 +92,7 @@ internal static class PackageChecker
                 continue;
             }
 
-            pins.Add((index, new PinnedPackageModel(package.Id, package.Version, pinned)));
+            pins.Add((index, new PinnedPackageModel(package.Id, package.Version, pinned, package.Runner == "customer")));
             if (owner is not null)
             {
                 references.Add(owner, path, ReferenceRelations.Package, new PackageNode(package.Id));
@@ -204,7 +204,7 @@ internal static class PackageChecker
                         continue;
                     }
 
-                    pins.Add(entry with { Version = applicationPin.Version });
+                    pins.Add(entry with { Version = applicationPin.Version, CustomerHosted = applicationPin.CustomerHosted });
                 }
                 else if (chosenById.TryGetValue(entry.Id, out var chosen))
                 {

@@ -43,6 +43,7 @@ public sealed class StorageQuotaRouteTests
         "POST /api/studio/apps/{application}/resources",
         "POST /api/studio/apps/{application}/revisions/{revision}/undo",
         "PUT /api/studio/apps/{application}/modules/{module}/resources/{id}",
+        "PUT /api/studio/apps/{application}/packages/{package}/files/{**path}",
         "PUT /api/studio/apps/{application}/texts/{key}",
     ];
 
@@ -138,6 +139,7 @@ public sealed class StorageQuotaRouteTests
         "POST /api/users/{id}/reset-authenticator",
 
         // Studio deletes are never refused.
+        "DELETE /api/studio/apps/{application}/packages/{package}/files/{**path}",
         "DELETE /api/studio/apps/{application}/resources/{id}",
 
         // An application setting is one flag, and a publisher can still turn it off over the quota.

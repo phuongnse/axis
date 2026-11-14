@@ -10,4 +10,10 @@ public sealed record ApplicationPackageDefinition
 
     /// <summary>The version range as written: <c>1.2.0</c>, <c>^1.2.0</c> or <c>~1.2.0</c>.</summary>
     public required string Version { get; init; }
+
+    /// <summary>
+    /// Where the package runs: <c>axis</c>, the default, or <c>customer</c>. Only <c>application.json</c> sets it, see
+    /// <c>docs/reference/declaring-packages.md#declaring-packages-in-an-application</c>.
+    /// </summary>
+    public string? Runner { get; init; }
 }

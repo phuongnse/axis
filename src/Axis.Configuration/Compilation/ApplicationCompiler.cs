@@ -513,7 +513,8 @@ public static partial class ApplicationCompiler
         PinnedOperations OperationsOf(PinnedPackageModel pin) => new(
             pin.Id,
             pin.Version,
-            installedPackages.First(candidate => candidate.Id == pin.Id && candidate.Version == pin.Version).Operations);
+            installedPackages.First(candidate => candidate.Id == pin.Id && candidate.Version == pin.Version).Operations,
+            pin.CustomerHosted);
 
         var pinnedPackages = packages.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
 
