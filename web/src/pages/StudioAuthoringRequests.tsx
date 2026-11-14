@@ -214,8 +214,6 @@ export function StudioAuthoringRequestPage({
   const [follow, setFollow] = useState(0)
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState(false)
-  // The history's rows of writes that are open to each write.
-  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set())
   // Which comment the dialog asks for: another plan, or changes to a ready draft.
   const [changeOpen, setChangeOpen] = useState<false | 'change-plan' | 'request-changes'>(false)
   // Proposed: the page's tab, see the review on #3263.
@@ -385,46 +383,11 @@ export function StudioAuthoringRequestPage({
       key: 'step',
       kind: 'freeText',
       title: t('shell.studio.aiRequest.step'),
-      // Proposed: writes in a row read as one, which opens to each of them, see the review on #3263.
+      // Proposed: writes in a row read as one group row, which the table opens to a row for each, see the review on #3263.
       render: (_, row) =>
-        row.steps.length === 1 ? (
-          stepWords(row.steps[0])
-        ) : (
-          <Flex vertical gap={spacing.xs}>
-            <span>
-              {t('shell.studio.aiRequest.history.writes').replace('{count}', String(row.steps.length))}{' '}
-              <AxisButton
-                role="link"
-                aria-expanded={openRows.has(row.key)}
-                onClick={() =>
-                  setOpenRows((open) => {
-                    const next = new Set(open)
-                    if (!next.delete(row.key)) {
-                      next.add(row.key)
-                    }
-                    return next
-                  })
-                }
-              >
-                {t(
-                  openRows.has(row.key) ? 'shell.studio.aiRequest.history.hide' : 'shell.studio.aiRequest.history.show',
-                )}
-              </AxisButton>
-            </span>
-            {openRows.has(row.key) && (
-              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-history-writes">
-                {row.steps.map((step, index) => (
-                  <li key={index}>
-                    {stepWords(step)}
-                    {step.outcome !== null && (
-                      <Typography.Text style={{ color: colour.textMuted }}>{` ${step.outcome}`}</Typography.Text>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Flex>
-        ),
+        row.steps.length === 1
+          ? stepWords(row.steps[0])
+          : t('shell.studio.aiRequest.history.writes').replace('{count}', String(row.steps.length)),
     },
     {
       key: 'result',
@@ -982,10 +945,14 @@ function checksSummary(checks: StudioRequest, t: (key: string) => string): { tex
 /** The kinds of step that write the draft, which the history reads as one row while they follow each other. */
 const writeKinds = new Set(['write_resource', 'write_layer', 'delete_resource'])
 
-/** Proposed: one row of a request's history, one step or writes that follow each other, see the review on #3263. */
+/**
+ * Proposed: one row of a request's history, see the review on #3263: one step, or writes that follow each other as a
+ * group row whose `children`, a row for each write, the table opens and closes as it does any row's children.
+ */
 interface HistoryRow {
   key: string
   steps: StudioAuthoringRequestStep[]
+  children?: HistoryRow[]
 }
 
 /** A request's steps as its history's rows: each step a row, but two writes or more in a row one row together. */
@@ -999,7 +966,11 @@ function historyRows(steps: readonly StudioAuthoringRequestStep[]): HistoryRow[]
       rows.push({ key: `${step.startedAt}/${step.kind}/${rows.length}`, steps: [step] })
     }
   }
-  return rows
+  return rows.map((row) =>
+    row.steps.length === 1
+      ? row
+      : { ...row, children: row.steps.map((step, index) => ({ key: `${row.key}/${index}`, steps: [step] })) },
+  )
 }
 
 /** Proposed: a span of time in the reader's words, in seconds, minutes, or hours and minutes, see the review on #3263. */

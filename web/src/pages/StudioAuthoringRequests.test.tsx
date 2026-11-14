@@ -633,11 +633,14 @@ describe("a request's history", () => {
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent(/Proposed a plan\s*Plan written.*40 s/)
-    expect(rows[1]).toHaveTextContent(/Wrote 3 resources\s*Show\s*Saved.*3 min/)
+    expect(rows[1]).toHaveTextContent(/Wrote 3 resources\s*Saved.*3 min/)
     expect(rows[2]).toHaveTextContent('Running…')
     expect(screen.queryByText('Wrote CostCentre')).toBeNull()
 
-    await user.click(within(rows[1]).getByRole('button', { name: 'Show' }))
-    expect(within(screen.getByTestId('studio-ai-history-writes')).getAllByRole('listitem')).toHaveLength(3)
+    // The table opens the group row to a row for each write, with its own result and time.
+    await user.click(within(rows[1]).getByRole('button', { name: 'Show the rows in it' }))
+    const opened = screen.getAllByRole('row').slice(1)
+    expect(opened).toHaveLength(6)
+    expect(opened[2]).toHaveTextContent(/Wrote CostCentre\s*Saved.*10 s/)
   })
 })

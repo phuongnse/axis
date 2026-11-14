@@ -1,4 +1,4 @@
-import { EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import { EllipsisOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Dropdown, Flex, Input, Table, type TableColumnType, type TableProps } from 'antd'
 import {
   useContext,
@@ -356,6 +356,8 @@ export function AxisTable<T extends object>({
     }
   }
 
+  // Only a table with a group row folds rows, so every other table draws its cells as they are.
+  const grouped = (pageRows ?? []).some((row) => Array.isArray((row as { children?: unknown }).children))
   const line: CSSProperties = { lineHeight: `${tokens.size.smallControl}px`, verticalAlign: 'top' }
   // The cells that stay leave room under their content for the moved lines, which run across the whole row.
   const staysRoom: CSSProperties = { paddingBottom: `calc(${tokens.spacing.xs}px + var(${movedHeight}, 0px))` }
@@ -410,6 +412,8 @@ export function AxisTable<T extends object>({
               ) : freeText ? (
                 <div
                   style={{
+                    // In a table with group rows, the first column's words sit beside the fold, not under it.
+                    ...(grouped && position === 0 ? { display: 'inline-block', verticalAlign: 'top' } : {}),
                     minWidth: freeTextMinWidth,
                     maxWidth: freeTextMaxWidth,
                     whiteSpace: 'normal',
@@ -586,6 +590,36 @@ export function AxisTable<T extends object>({
               // Ant Design otherwise switches to a fixed layout once a column is fixed.
               tableLayout="auto"
               dataSource={pageRows as T[] | undefined}
+              // Proposed: a row with `children` is a group row the table opens and closes, see the review on #3263. Its
+              // fold is the right arrow that turns down when open, as a diff's file folds, and a row with no children
+              // keeps no room for one, so every row's words start where its column does; children start under their
+              // group's words.
+              expandable={
+                grouped
+                  ? {
+                      indentSize: tokens.size.smallControl + tokens.spacing.xs,
+                      expandIcon: ({ expandable, expanded, onExpand, record }) =>
+                        expandable ? (
+                          <AxisButton
+                            role="icon"
+                            size="small"
+                            nameKey={expanded ? 'shell.table.collapseRow' : 'shell.table.expandRow'}
+                            aria-expanded={expanded}
+                            icon={
+                              <RightOutlined
+                                style={{
+                                  transform: expanded ? 'rotate(90deg)' : undefined,
+                                  transition: 'transform 0.2s',
+                                }}
+                              />
+                            }
+                            style={{ marginInlineEnd: tokens.spacing.xs, verticalAlign: 'top' }}
+                            onClick={(event) => onExpand(record, event)}
+                          />
+                        ) : null,
+                    }
+                  : undefined
+              }
               loading={loading}
               locale={{ emptyText: <EmptyState text={emptyText} /> }}
               pagination={

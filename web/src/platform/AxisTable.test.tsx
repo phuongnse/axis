@@ -33,6 +33,8 @@ const texts = {
   'shell.table.columnsMoveDown': 'Move down',
   'shell.form.cancel': 'Cancel',
   'shell.table.selectRow': 'Select row',
+  'shell.table.expandRow': 'Show the rows in it',
+  'shell.table.collapseRow': 'Hide the rows in it',
   'row.archive': 'Archive',
   'row.delete': 'Delete',
   'row.open': 'Open',
@@ -79,6 +81,25 @@ const openAction: AxisRowAction = { key: 'open', labelKey: 'row.open', onClick: 
 const closeAction: AxisRowAction = { key: 'close', labelKey: 'row.close', onClick: vi.fn() }
 
 describe('AxisTable', () => {
+  // Proposed: a row with children is a group row the table folds, see the review on #3263.
+  it('folds a group row with the right arrow, and keeps no room for a fold on any other row', async () => {
+    const grouped = [
+      { id: '1', name: 'Three writes', amount: 3, children: [{ id: '1a', name: 'One write', amount: 1 }] },
+      { id: '2', name: 'Plain', amount: 1 },
+    ]
+    const { container } = renderTable({ dataSource: grouped, pagination: false })
+
+    const fold = screen.getByRole('button', { name: 'Show the rows in it' })
+    expect(screen.getAllByRole('button', { name: /rows in it/ })).toHaveLength(1)
+    expect(container.querySelector('.ant-table-row-expand-icon-spaced')).toBeNull()
+    expect(screen.queryByText('One write')).toBeNull()
+
+    await userEvent.setup().click(fold)
+
+    expect(screen.getByText('One write')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide the rows in it' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
   it('keeps its column headers and draws the empty state in its body, with the line in the muted text colour', () => {
     const { container } = renderTable({ dataSource: [], pagination: false })
 
