@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
@@ -16,6 +19,7 @@ namespace Axis.Integration.Tests;
 /// runs the build, with a stub Trivy and the real pip, while the publisher's <c>PackageBuild:Python</c> names a missing command,
 /// so the publisher itself installs nothing. A refused build and a host that gives no answer each fail the publish at the
 /// <c>compile</c> step, store no release and write one <c>release.publishFailed</c>. Each wait ends on the request's status.
+/// A <c>test</c> that names a package sends only that package to the host as a <c>test</c> and stores each test's outcome.
 /// The tests use a stub shell script for Trivy, so they are skipped on Windows.
 /// </summary>
 [UnsupportedOSPlatform("windows")]
@@ -32,6 +36,27 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         """;
 
     private const string NoDependencies = "# No dependencies.\n";
+
+    private const string ToolsTests = """
+        import unittest
+
+
+        class ToolsTests(unittest.TestCase):
+            def test_passes(self):
+                self.assertEqual(2, 1 + 1)
+
+            def test_fails(self):
+                self.assertEqual(1, 2)
+        """;
+
+    private const string PassingTests = """
+        import unittest
+
+
+        class ToolsTests(unittest.TestCase):
+            def test_passes(self):
+                self.assertEqual(2, 1 + 1)
+        """;
 
     private static readonly string _missingWheel = $"./wheels/missing-1.0-py3-none-any.whl --hash=sha256:{new string('0', 64)}\n";
 
@@ -167,6 +192,157 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         await scenario.AssertNoSecretsAsync();
     }
 
+    [Fact]
+    public async Task A_package_test_with_a_passing_and_a_failing_test_fails_and_stores_both_outcomes()
+    {
+        using var trivy = new StubTrivy(StubTrivy.NoFindings);
+        using var extensions = new TemporaryFolder();
+        await using var host = await StartHostAsync(extensions.Path, trivy);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, package: "tools", testFile: ToolsTests);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, host.Address);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var tests = await PackageTestsAsync(scenario, tenant, request);
+        Assert.Equal(2, tests.Count);
+        var passed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsTests.test_passes")!;
+        Assert.Equal("passed", passed["outcome"]!.GetValue<string>());
+        Assert.Null(passed["message"]);
+        var failed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsTests.test_fails")!;
+        Assert.Equal("failed", failed["outcome"]!.GetValue<string>());
+        Assert.StartsWith("AssertionError", failed["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Empty(await DiagnosticsAsync(scenario, tenant, request));
+        Assert.Contains(result.Output, line => line == $"{tenant} package failed: 1 of 2 tests failed.");
+        Assert.Equal([("tools", "1.0.0")], host.Tests());
+        Assert.Empty(host.Builds());
+        Assert.Null(await ScalarAsync(scenario, tenant, $"SELECT scenario_results FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_package_test_whose_tests_all_pass_succeeds_with_no_diagnostics_and_no_audit_record()
+    {
+        using var trivy = new StubTrivy(StubTrivy.NoFindings);
+        using var extensions = new TemporaryFolder();
+        await using var host = await StartHostAsync(extensions.Path, trivy);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, package: "tools", testFile: PassingTests);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, host.Address);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("succeeded", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var test = Assert.Single(await PackageTestsAsync(scenario, tenant, request))!;
+        Assert.Equal("passed", test["outcome"]!.GetValue<string>());
+        Assert.Empty(await DiagnosticsAsync(scenario, tenant, request));
+        Assert.Contains(result.Output, line => line == $"{tenant} package ok");
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records"));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.releases"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_package_test_whose_install_fails_fails_with_AXC0149_at_the_lock_file_and_stores_no_test()
+    {
+        using var trivy = new StubTrivy(StubTrivy.NoFindings);
+        using var extensions = new TemporaryFolder();
+        await using var host = await StartHostAsync(extensions.Path, trivy);
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, _missingWheel, package: "tools", testFile: PassingTests);
+
+        var result = await RunPublisherAsync(scenario, tenant, request, host.Address);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.ApplicationPackageBuildRefused, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("packages/tools/requirements.txt", diagnostic["file"]!.GetValue<string>());
+        Assert.Empty(await PackageTestsAsync(scenario, tenant, request));
+        Assert.Empty(host.Tests());
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} package failed: {DiagnosticCodes.ApplicationPackageBuildRefused} ", StringComparison.Ordinal));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_package_test_without_the_setting_fails_with_AXC0148_at_the_manifest_and_sends_nothing_to_the_host()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, package: "tools", testFile: PassingTests);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var address = string.Create(CultureInfo.InvariantCulture, $"127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}");
+
+        var result = await RunPublisherAsync(scenario, tenant, request, address, applicationPackages: false);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.ApplicationPackagesOff, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("packages/tools/axis-package.json", diagnostic["file"]!.GetValue<string>());
+        Assert.Empty(await PackageTestsAsync(scenario, tenant, request));
+        Assert.False(listener.Pending());
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_stop_of_the_publisher_ends_a_package_test_at_once_with_AXC0220_while_the_host_holds_the_connection()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, package: "tools", testFile: PassingTests);
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var address = string.Create(CultureInfo.InvariantCulture, $"127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}");
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
+        var run = scenario.RunAsync(["publisher"], stop: stop, extra: PublisherSettings(address, applicationPackages: true));
+        AdminResult result;
+        try
+        {
+            using var accepted = await listener.AcceptTcpClientAsync(CancellationToken);
+            await stop.CancelAsync();
+            result = await run;
+        }
+        finally
+        {
+            await stop.CancelAsync();
+        }
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.ScenarioStopped, diagnostic["code"]!.GetValue<string>());
+        Assert.Empty(await PackageTestsAsync(scenario, tenant, request));
+        Assert.Equal(0L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records"));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_package_test_whose_host_does_not_answer_fails_with_AXC0152_at_the_manifest_and_stores_no_test()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        var request = await QueueAsync(scenario, tenant, NoDependencies, package: "tools", testFile: PassingTests);
+        var address = TestPackageHost.ClosedAddress();
+
+        var result = await RunPublisherAsync(scenario, tenant, request, address);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.ApplicationPackageBuildNoAnswer, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal("packages/tools/axis-package.json", diagnostic["file"]!.GetValue<string>());
+        Assert.DoesNotContain(address, diagnostic["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Empty(await PackageTestsAsync(scenario, tenant, request));
+        await scenario.AssertNoSecretsAsync();
+    }
+
     // The request failed with one diagnostic at the package's lock file, and nothing was stored.
     private static async Task AssertRefusedAsync(AdminScenario scenario, string tenant, Guid request, AdminResult result, string code)
     {
@@ -184,6 +360,9 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, "SELECT count(*) FROM axis.audit_records WHERE action = 'release.publishFailed'"));
     }
 
+    private static async Task<JsonArray> PackageTestsAsync(AdminScenario scenario, string tenant, Guid request) =>
+        JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT package_tests::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
+
     private static async Task<JsonArray> DiagnosticsAsync(AdminScenario scenario, string tenant, Guid request) =>
         JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT diagnostics::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
 
@@ -198,8 +377,16 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         return tenant;
     }
 
-    // Stores a publish of a minimal application with the package 'tools' over the runtime role, as the server does.
-    private async Task<Guid> QueueAsync(AdminScenario scenario, string tenant, string requirements, bool customerHosted = false, string adapter = "import sys\n")
+    // Stores a publish of a minimal application with the package 'tools' over the runtime role, as the server does. With
+    // package set, it stores a test of that package instead, and testFile is the package's test file.
+    private async Task<Guid> QueueAsync(
+        AdminScenario scenario,
+        string tenant,
+        string requirements,
+        bool customerHosted = false,
+        string adapter = "import sys\n",
+        string? package = null,
+        string? testFile = null)
     {
         var row = await scenario.RowAsync(tenant);
         var password = AdminScenario.Cipher.Decrypt(tenant, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
@@ -208,18 +395,20 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         var id = Guid.CreateVersion7();
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, 'publish', 'queued', @snapshot, 'author', 'Author User', clock_timestamp())
+            INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by, requested_by_name, requested_at, package)
+            VALUES (@id, @application, @kind, 'queued', @snapshot, 'author', 'Author User', clock_timestamp(), @package)
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", _applicationId);
-        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements, customerHosted, adapter) });
+        command.Parameters.AddWithValue("kind", package is null ? "publish" : "test");
+        command.Parameters.Add(new NpgsqlParameter("package", NpgsqlTypes.NpgsqlDbType.Text) { Value = (object?)package ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("snapshot", NpgsqlTypes.NpgsqlDbType.Jsonb) { Value = Snapshot(requirements, customerHosted, adapter, testFile) });
         await command.ExecuteNonQueryAsync(CancellationToken);
         return id;
     }
 
-    private string Snapshot(string requirements, bool customerHosted, string adapter)
+    private string Snapshot(string requirements, bool customerHosted, string adapter, string? testFile)
     {
         var package = customerHosted
             ? new (string, string)[] { ("packages/tools/axis-package.json", CustomerManifest) }
@@ -228,6 +417,7 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
                 ("packages/tools/axis-package.json", Manifest),
                 ("packages/tools/adapter.py", adapter),
                 ("packages/tools/requirements.txt", requirements),
+                .. testFile is null ? [] : new (string, string)[] { ("packages/tools/test_tools.py", testFile) },
             ];
         (string File, string Content)[] files =
         [
@@ -244,16 +434,18 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         return items.ToJsonString();
     }
 
-    // Runs the publisher until the request is final, then stops it and returns its result.
-    private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request, string host)
+    private static Dictionary<string, string?> PublisherSettings(string host, bool applicationPackages) => new()
     {
-        var settings = new Dictionary<string, string?>
-        {
-            ["Tenancy:Source"] = "directory",
-            ["Extensions:ApplicationPackages"] = "true",
-            ["Extensions:Runners:Application"] = host,
-            ["PackageBuild:Python"] = "axis-no-such-python-9183746520",
-        };
+        ["Tenancy:Source"] = "directory",
+        ["Extensions:ApplicationPackages"] = applicationPackages ? "true" : "false",
+        ["Extensions:Runners:Application"] = host,
+        ["PackageBuild:Python"] = "axis-no-such-python-9183746520",
+    };
+
+    // Runs the publisher until the request is final, then stops it and returns its result.
+    private static async Task<AdminResult> RunPublisherAsync(AdminScenario scenario, string tenant, Guid request, string host, bool applicationPackages = true)
+    {
+        var settings = PublisherSettings(host, applicationPackages);
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var run = scenario.RunAsync(["publisher"], stop: stop, extra: settings);
         try
