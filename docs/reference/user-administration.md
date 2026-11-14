@@ -375,7 +375,7 @@ stores both and applies them at the person's next request.
   holds the kind, such as `operator`. Each request maps the kind to the value of `Studio:AuthorRole`,
   `Studio:PublisherRole`, `Studio:DeveloperRole`, `Console:OperatorRole` or `Users:AdministratorRole`, and the name joins the roles from sign-in. A kind whose setting
   has no value gives nothing.
-- **Developers write packages** _(planned for M37)_. With the author role, the developer role allows writing an
+- **Developers write packages.** With the author role, the developer role allows writing an
   application's packages in a tenant that turned them on, see [application packages](#application-packages). A
   publisher needs no developer role.
 - **Stored by Axis.** Given roles are rows of the tenant database, each with the user, the application or the platform,
