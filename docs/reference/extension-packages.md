@@ -721,11 +721,11 @@ trusted code, so the platform gives it more limits than an installation's packag
   answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
   `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
   it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
-  The publisher needs the same `Extensions:Runners:Application`, to send it each package to build, and exits with code 2
-  at start when it is unset or malformed.
-  An application's package is then a compile error at its `packages/<id>/axis-package.json`, reported
+  With `false`, an application's package is a compile error at its `packages/<id>/axis-package.json`, reported
   once for each package, when the server activates a folder at start, `activate` compiles it or the publisher compiles a snapshot. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
+  With `true`, the publisher needs the same `Extensions:Runners:Application`, to send it each package to build, and exits
+  with code 2 at start when it is unset or malformed.
 - **A customer-hosted package and the setting** _(planned for M37)_. The tenant's switch and the compile
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
   needs no gVisor because gVisor guards only code on Axis's machines.
