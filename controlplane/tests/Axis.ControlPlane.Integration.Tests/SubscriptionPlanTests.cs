@@ -19,6 +19,7 @@ public sealed class SubscriptionPlanTests : IAsyncLifetime
           "storage": {{storage}},
           "applications": {{applications}},
           "emailsPerDay": 2000,
+          "packageCpuSecondsPerDay": 3600,
           "concurrentImports": 2,
           "concurrentConnectorCalls": 10,
           "concurrentQueries": 10,

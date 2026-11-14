@@ -7,12 +7,13 @@ namespace Axis.ControlPlane.Tests;
 /// <summary>The check of <c>ControlPlane:Plans</c> at start, see <c>docs/reference/plans.md#the-catalogue</c>.</summary>
 public sealed class PlanCatalogueTests
 {
-    // The eight quota keys are listed on purpose: a new quota key makes the valid catalogue fail until this fixture carries it too.
+    // The nine quota keys are listed on purpose: a new quota key makes the valid catalogue fail until this fixture carries it too.
     private const string Quotas = """
         "quotas": {
           "storage": 21474836480,
           "applications": 10,
           "emailsPerDay": 2000,
+          "packageCpuSecondsPerDay": 3600,
           "concurrentImports": 2,
           "concurrentConnectorCalls": 10,
           "concurrentQueries": 10,
@@ -20,6 +21,9 @@ public sealed class PlanCatalogueTests
           "authoringRequests": 200
         }
         """;
+
+    // A trial plan runs no package, so the same quotas with a package run time of 0.
+    private static readonly string _trialQuotas = Quotas.Replace("\"packageCpuSecondsPerDay\": 3600", "\"packageCpuSecondsPerDay\": 0", StringComparison.Ordinal);
 
     private const string Prices = """
         "prices": [{ "currency": "VND", "month": 990000 }, { "currency": "USD", "month": 3900 }]
@@ -127,6 +131,18 @@ public sealed class PlanCatalogueTests
     }
 
     [Fact]
+    public void A_trial_plan_with_a_package_run_time_is_refused_naming_the_plan_and_the_setting_and_not_the_value()
+    {
+        var plans = Bind($"[{Plan(1)}, {Plan(2, quotas: Quotas, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []")}]");
+
+        var problem = Assert.Single(PlanCatalogue.Problems(plans));
+
+        Assert.Contains("ControlPlane:Plans:1:Quotas:packageCpuSecondsPerDay", problem, StringComparison.Ordinal);
+        Assert.Contains("team version 2", problem, StringComparison.Ordinal);
+        Assert.DoesNotContain("3600", problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_trial_plan_with_no_price_is_valid()
     {
         var plans = Bind($"[{Plan(1, prices: "\"prices\": []", trial: true, addOns: "\"addOns\": []")}]");
@@ -189,7 +205,7 @@ public sealed class PlanCatalogueTests
           "name": { "en": "Team", "vi": "Nhóm" },
           "includedUsers": 25,
           "trial": {{(trial ? "true" : "false")}},
-          {{quotas ?? Quotas}},
+          {{quotas ?? (trial ? _trialQuotas : Quotas)}},
           {{prices ?? Prices}},
           {{addOns ?? """
           "addOns": [

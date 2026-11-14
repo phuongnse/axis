@@ -20,7 +20,7 @@ Each quota has a key, a cell-wide default and a kind, which says how it is count
 | `users`                    | The enabled users of the tenant's realm, invited and brokered ones included, without service accounts | 50      | Exact   |
 | `applications`             | The applications of the tenant: folders in its Studio folder and applications with a release          | 10      | Exact   |
 | `emailsPerDay`             | Emails sent for the tenant since 00:00 UTC                                                            | 1,000   | Exact   |
-| `packageCpuSecondsPerDay` _(planned for M37)_ | CPU seconds that the runners of the tenant's application packages used since 00:00 UTC | 0       | Exact   |
+| `packageCpuSecondsPerDay`  | CPU seconds that the runners of the tenant's application packages used since 00:00 UTC                | 0       | Exact   |
 | `concurrentImports`        | Imports and exports that run at once                                                                  | 2       | Lease   |
 | `concurrentConnectorCalls` | Connector and package calls in flight at once                                                         | 10      | Lease   |
 | `concurrentQueries`        | Data source queries and record list reads that run at once                                            | 10      | Lease   |
@@ -272,8 +272,9 @@ user name.
 - **The usage route.** `GET /api/tenant/usage` on a tenant's own host answers
   `{ quotas, days }` to an administrator. `quotas` holds every quota by its key as `{ limit, used }`,
   with a `null` limit for no limit. `used` is the latest storage sample, the realm's enabled users,
-  Studio's application count and the emails sent today. `storage.used` is `null` until the worker has
-  taken the tenant's first sample, and `emailsPerDay.used` is 0 when no email was sent today. A
+  Studio's application count, the emails sent today and the package CPU seconds counted today.
+  `storage.used` is `null` until the worker has taken the tenant's first sample, and
+  `emailsPerDay.used` and `packageCpuSecondsPerDay.used` are 0 when nothing was counted today. A
   concurrency quota, `workerWeight` and `authoringRequests` answer `used: null`, and so does `users`
   when the identity provider cannot count the users, with a warning in the server's log. `days` holds
   the tenant's own rows of today and the 29 days before it, newest first, with the columns of

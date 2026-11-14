@@ -31,6 +31,7 @@ public sealed class QuotaDefaultsTests
     [InlineData("users", 50L)]
     [InlineData("applications", 10L)]
     [InlineData("emailsPerDay", 1000L)]
+    [InlineData("packageCpuSecondsPerDay", 0L)]
     [InlineData("concurrentImports", 2L)]
     [InlineData("concurrentConnectorCalls", 10L)]
     [InlineData("concurrentQueries", 10L)]

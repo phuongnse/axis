@@ -11,6 +11,8 @@ public static class QuotaKeys
 
     public const string EmailsPerDay = "emailsPerDay";
 
+    public const string PackageCpuSecondsPerDay = "packageCpuSecondsPerDay";
+
     public const string ConcurrentImports = "concurrentImports";
 
     public const string ConcurrentConnectorCalls = "concurrentConnectorCalls";
@@ -28,6 +30,7 @@ public static class QuotaKeys
         Users,
         Applications,
         EmailsPerDay,
+        PackageCpuSecondsPerDay,
         ConcurrentImports,
         ConcurrentConnectorCalls,
         ConcurrentQueries,

@@ -18,6 +18,7 @@ public sealed class QuotaDefaults
         [QuotaKeys.Users] = 50,
         [QuotaKeys.Applications] = 10,
         [QuotaKeys.EmailsPerDay] = 1000,
+        [QuotaKeys.PackageCpuSecondsPerDay] = 0,
         [QuotaKeys.ConcurrentImports] = 2,
         [QuotaKeys.ConcurrentConnectorCalls] = 10,
         [QuotaKeys.ConcurrentQueries] = 10,
