@@ -26,7 +26,7 @@ python: "Python"
 The package host objects the chart renders: the name of each, the path of its values and the name that errors use.
 It lists the host of each runtime and, when applicationPackageHost.enabled is set, the application package host, which
 runs under gVisor, see docs/reference/extension-packages.md#an-applications-packages. Call with the root context and
-read it with fromYaml.
+read it with fromYaml. The application package host also takes calls from the publisher, which its publisher key marks.
 */}}
 {{- define "axis.packageHosts" -}}
 {{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
@@ -39,6 +39,19 @@ application-package-host:
   values: applicationPackageHost
   label: "the application package host"
   sandbox: true
+  publisher: true
+{{- end }}
+{{- end }}
+
+{{/*
+The environment entry that points a caller at the application package host, which runs under gVisor, see
+docs/reference/extension-packages.md#an-applications-packages. It renders nothing while applicationPackageHost.enabled is
+off. It sets no Extensions__ApplicationPackages. Call with the root context.
+*/}}
+{{- define "axis.applicationRunnerEnv" -}}
+{{- if .Values.applicationPackageHost.enabled }}
+- name: Extensions__Runners__Application
+  value: {{ printf "%s-application-package-host:5310" .Release.Name | quote }}
 {{- end }}
 {{- end }}
 

@@ -65,6 +65,10 @@ spec:
             {{- with include "axis.studioEnv" . }}
             {{- . | nindent 12 }}
             {{- end }}
+            {{- /* The publisher sends each application package of a publish to the application package host to build. */}}
+            {{- with include "axis.applicationRunnerEnv" . }}
+            {{- . | nindent 12 }}
+            {{- end }}
           securityContext:
             {{- include "axis.containerSecurityContext" . | nindent 12 }}
           {{- with .Values.publisher.resources }}
