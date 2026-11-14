@@ -527,8 +527,9 @@ package reaches nothing of the host and no binding of another call.
   error names the operation and the package. It follows no redirects, so a
   redirect to another host is a new request that the proxy checks again. Compose puts the worker, the publisher and the hosts
   on an `internal` network of their own. The Helm chart gives a
-  NetworkPolicy that admits traffic to the hosts only from the worker and lets
-  them reach only the proxy port. Every other route is closed, DNS included,
+  NetworkPolicy that admits traffic to the hosts only from the worker, and to
+  the application package host from the publisher too, and lets them reach
+  only the proxy port. Every other route is closed, DNS included,
   because the proxy resolves hosts. A library that ignores the proxy variables
   reaches nothing.
 - **Timeout.** The operation's `timeout` starts when the worker sends the `run`. At the `timeout` the
