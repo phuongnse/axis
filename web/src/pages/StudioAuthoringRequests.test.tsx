@@ -110,7 +110,8 @@ describe('an outside AI app’s request', () => {
     const asked = screen.getByTestId('studio-ai-asked')
     expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
     expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
-    expect(screen.getByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
+    await userEvent.setup().click(screen.getByRole('tab', { name: 'Plan' }))
+    expect(await screen.findByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     const notReviewed = screen.getByTestId('studio-ai-not-reviewed')
     expect(within(notReviewed).getByText('Not reviewed')).toHaveAttribute('data-tone', 'muted')
@@ -292,7 +293,7 @@ describe('a ready request’s page', () => {
     vi.unstubAllGlobals()
   })
 
-  it('leads with its checks and review, lists what changes, and opens a change in the Changes tab', async () => {
+  it('leads with its checks and review, and keeps the changes, the checks, the plan and the history in tabs', async () => {
     const fetchMock = vi.fn(async (input: string) =>
       input.includes('/drafts/')
         ? json({
@@ -349,15 +350,33 @@ describe('a ready request’s page', () => {
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
     expect(within(checks).getByText('All 1 scenarios pass.')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
-    const changeList = await screen.findByTestId('studio-ai-what-changes')
-    expect(within(changeList).getByText('A cost centre with a name and a code.')).toBeInTheDocument()
+    expect(screen.queryByText('What changes')).toBeNull()
+    // The overview first, then the changes, the checks' detail, the plan and the history.
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Overview',
+      'Changes (1)',
+      'Checks',
+      'Plan',
+      'History',
+    ])
+    expect(screen.getByRole('tab', { name: 'Overview', selected: true })).toBeInTheDocument()
+  })
 
-    const scrollIntoView = vi.fn()
-    Element.prototype.scrollIntoView = scrollIntoView
-    await userEvent.setup().click(within(changeList).getByRole('button', { name: 'CostCentre' }))
+  it('opens on its plan, with Approve plan, while the plan waits for its author', async () => {
+    stub({ ...fromApp, state: 'awaitingApproval', checks: null, review: null, aiConnected: true })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
 
-    expect(await screen.findByRole('tab', { name: 'Changes (1)', selected: true })).toBeInTheDocument()
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled())
+    expect(await screen.findByRole('tab', { name: 'Plan', selected: true })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Overview' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })
 })
 

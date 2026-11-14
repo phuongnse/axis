@@ -39,7 +39,6 @@ import {
 } from './authoringRequests'
 import { StatusTag } from '../platform/StatusTag'
 import { StudioChanges } from './StudioHistory'
-import { kindSingular } from '../platform/studioKinds'
 import { SectionPart, SectionParts } from './ResourceFormSection'
 import { ActionBar } from './SaveBar'
 import { StudioPageHeading } from './StudioPageHeading'
@@ -213,46 +212,8 @@ export function StudioAuthoringRequestPage({
   const [actionError, setActionError] = useState(false)
   // Which comment the dialog asks for: another plan, or changes to a ready draft.
   const [changeOpen, setChangeOpen] = useState<false | 'change-plan' | 'request-changes'>(false)
-  // Proposed: the page's tabs, the overview first, and the file a change in the overview opens, see the review on #3263.
-  const [tab, setTab] = useState<{ id: string; key: RequestTab; file?: string }>()
-  useEffect(() => {
-    const file = tab?.key === 'changes' ? tab.file : undefined
-    if (file === undefined) {
-      return
-    }
-    // The diffs above the file draw late and push it down, so it is brought back into view each time the page grows,
-    // until the person scrolls or two seconds pass.
-    const target = () => document.querySelector(`[data-file="${CSS.escape(file)}"]`)
-    // It stops below the header and the band, which stay at the top of the window.
-    const bring = () => {
-      const element = target()
-      if (element instanceof HTMLElement) {
-        element.style.scrollMarginTop = `${2 * size.bar + spacing.md}px`
-        element.scrollIntoView({ block: 'start' })
-      }
-    }
-    const frame = requestAnimationFrame(bring)
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(bring)
-    const page = document.querySelector('[data-testid="studio-ai-request"]')
-    if (observer !== null && page !== null) {
-      observer.observe(page)
-    }
-    const stop = () => {
-      cancelAnimationFrame(frame)
-      observer?.disconnect()
-      window.removeEventListener('wheel', stop, true)
-      window.removeEventListener('touchmove', stop, true)
-      window.removeEventListener('keydown', stop, true)
-    }
-    window.addEventListener('wheel', stop, true)
-    window.addEventListener('touchmove', stop, true)
-    window.addEventListener('keydown', stop, true)
-    const timer = window.setTimeout(stop, 2000)
-    return () => {
-      window.clearTimeout(timer)
-      stop()
-    }
-  }, [tab, size.bar, spacing.md])
+  // Proposed: the page's tab, see the review on #3263.
+  const [tab, setTab] = useState<{ id: string; key: RequestTab }>()
   const [dropOpen, setDropOpen] = useState(false)
   const [changeForm] = Form.useForm<{ comment: string }>()
   const [diff, setDiff] = useState<{ draft: string; changes: StudioRevisionChange[] | 'failed' }>()
@@ -464,27 +425,21 @@ export function StudioAuthoringRequestPage({
   const hasChecks = showsDiff && request.checks !== null
   const working = !['ready', 'accepted', 'failed', 'dropped'].includes(request.state)
   const fixRound = request.round > 1 && working && request.state !== 'planning'
-  const activeTab: RequestTab =
-    tab?.id === requestId &&
-    ((tab.key === 'changes' && hasDiff) ||
-      (tab.key === 'checks' && hasChecks) ||
-      tab.key === 'overview' ||
-      (tab.key === 'activity' && request.steps.length > 0))
-      ? tab.key
-      : 'overview'
-  const openFile = (file: string) => setTab({ id: requestId, key: 'changes', file })
-  const changeList = Array.isArray(changes)
-    ? changes.map((change) => ({
-        file: change.file,
-        name: change.name ?? change.file,
-        detail: `${kindSingular(change.kind ?? '', t)}, ${t(`shell.studio.overview.change.${change.change}`).toLowerCase()}`,
-        summary: summaries.get(change.file),
-      }))
-    : request.changes.map((change) => ({ file: change.file, name: change.file, detail: '', summary: change.summary }))
+  // The overview shows only what an author decides on, the checks and the review or an alert, so it may have nothing.
+  const hasOverview = hasChecks || request.state === 'failed' || conflicts.length > 0 || accept !== null
+  const shown: RequestTab[] = [
+    ...(hasOverview ? (['overview'] as const) : []),
+    ...(hasDiff ? (['changes'] as const) : []),
+    ...(hasChecks ? (['checks'] as const) : []),
+    ...(request.plan !== null ? (['plan'] as const) : []),
+    ...(request.steps.length > 0 ? (['history'] as const) : []),
+  ]
+  // A request that waits for its plan's approval opens on its plan; any other on its first tab.
+  const activeTab: RequestTab | undefined =
+    tab?.id === requestId && shown.includes(tab.key) ? tab.key : awaiting && shown.includes('plan') ? 'plan' : shown[0]
   const checksLine = request.checks !== null ? checksSummary(request.checks, t) : null
   const overview = (
     <SectionParts>
-      {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
       {request.state === 'failed' && (
         <AxisAlert
           kind="error"
@@ -544,45 +499,27 @@ export function StudioAuthoringRequestPage({
             )}
           </Flex>,
         )}
-      {hasDiff &&
-        changeList.length > 0 &&
-        section(
-          'ai-what-changes',
-          t('shell.studio.aiRequest.whatChanges'),
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }} data-testid="studio-ai-what-changes">
-            {changeList.map((change) => (
-              <li key={change.file} style={{ paddingBlock: spacing.xs / 2 }}>
-                <AxisButton role="link" onClick={() => openFile(change.file)}>
-                  {change.name}
-                </AxisButton>
-                {change.detail !== '' && (
-                  <Typography.Text style={{ color: colour.textMuted }}>{` ${change.detail}`}</Typography.Text>
-                )}
-                {change.summary !== undefined && <div>{change.summary}</div>}
-              </li>
-            ))}
-          </ul>,
-        )}
-      {request.plan !== null &&
-        section(
-          'ai-plan',
-          t('shell.studio.aiRequest.plan'),
-          <Flex vertical gap="small">
-            <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
-              {request.plan
-                .split('\n')
-                .filter((step) => step.trim() !== '')
-                .map((step, index) => (
-                  <li key={index}>{step}</li>
-                ))}
-            </ul>
-            {awaiting && !mine && (
-              <Typography.Text style={{ color: colour.textMuted }}>
-                {t('shell.studio.aiRequest.notYours')}
-              </Typography.Text>
-            )}
-          </Flex>,
-        )}
+    </SectionParts>
+  )
+  const planView = (
+    <Flex vertical gap="middle">
+      {request.plan !== null && (
+        <Flex vertical gap="small">
+          <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-plan">
+            {request.plan
+              .split('\n')
+              .filter((step) => step.trim() !== '')
+              .map((step, index) => (
+                <li key={index}>{step}</li>
+              ))}
+          </ul>
+          {awaiting && !mine && (
+            <Typography.Text style={{ color: colour.textMuted }}>
+              {t('shell.studio.aiRequest.notYours')}
+            </Typography.Text>
+          )}
+        </Flex>
+      )}
       {awaiting && mine && (
         <AxisActionRow>
           <AxisButton role="finish" disabled={acting} onClick={() => void act('approve')}>
@@ -596,7 +533,7 @@ export function StudioAuthoringRequestPage({
           </AxisButton>
         </AxisActionRow>
       )}
-    </SectionParts>
+    </Flex>
   )
   const changesView =
     changes === undefined ? (
@@ -616,7 +553,7 @@ export function StudioAuthoringRequestPage({
       {request.checks !== null && <StudioTestResults request={request.checks} onSelect={onOpen} nested />}
     </Flex>
   )
-  const activityView = (
+  const historyView = (
     <AxisTable<StudioAuthoringRequestStep>
       columns={stepColumns}
       rowKey={(step) => `${step.startedAt}/${step.kind}`}
@@ -678,30 +615,22 @@ export function StudioAuthoringRequestPage({
           </Typography.Text>
         )}
       </Flex>
+      {/* A failed action shows above the tabs, as it may come from any of them. */}
+      {actionError && <AxisAlert kind="error" message={t('shell.studio.aiRequest.actionFailed')} />}
       <Tabs
         activeKey={activeTab}
         onChange={(key) => setTab({ id: requestId, key: key as RequestTab })}
-        items={[
-          { key: 'overview', label: t('shell.studio.aiRequest.tab.overview'), children: overview },
-          ...(hasDiff
-            ? [
-                {
-                  key: 'changes',
-                  label: t('shell.studio.aiRequest.tab.changes').replace(
-                    '{count}',
-                    String(Array.isArray(changes) ? changes.length : request.changes.length),
-                  ),
-                  children: changesView,
-                },
-              ]
-            : []),
-          ...(hasChecks
-            ? [{ key: 'checks', label: t('shell.studio.aiRequest.tab.checks'), children: checksView }]
-            : []),
-          ...(request.steps.length > 0
-            ? [{ key: 'activity', label: t('shell.studio.aiRequest.steps'), children: activityView }]
-            : []),
-        ]}
+        items={shown.map((key) => ({
+          key,
+          label:
+            key === 'changes'
+              ? t('shell.studio.aiRequest.tab.changes').replace(
+                  '{count}',
+                  String(Array.isArray(changes) ? changes.length : request.changes.length),
+                )
+              : t(`shell.studio.aiRequest.tab.${key}`),
+          children: { overview, changes: changesView, checks: checksView, plan: planView, history: historyView }[key],
+        }))}
       />
       {/* What finishes the page's task, accepting the draft, sits in the bar at the foot of the window. */}
       {ready && mine && !acceptPending && (
@@ -854,7 +783,7 @@ function ReviewFindings({
 }
 
 /** Proposed: the tabs of a request's page, see the review on #3263. */
-type RequestTab = 'overview' | 'changes' | 'checks' | 'activity'
+type RequestTab = 'overview' | 'changes' | 'checks' | 'plan' | 'history'
 
 /** Proposed: the checks of a request in one line, and whether they passed, see the review on #3263. */
 function checksSummary(checks: StudioRequest, t: (key: string) => string): { text: string; passed: boolean } {
