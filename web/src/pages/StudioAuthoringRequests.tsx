@@ -534,13 +534,13 @@ export function StudioAuthoringRequestPage({
         section(
           'ai-checks',
           t('shell.studio.aiRequest.checks'),
-          // Proposed: the checks and the review as lines of one shape, see the review on #3263: each its name in bold, its
-          // verdict as a tag and its summary, in columns, so their words start together, then what the review found.
+          // Proposed: the checks and the review as lines of one shape, see the review on #3263: each its name in bold and its
+          // verdict as a tag, in columns so the tags start together, its summary under it, then what the review found.
           <div
             data-testid="studio-ai-checks"
             style={{
               display: 'grid',
-              gridTemplateColumns: 'max-content max-content minmax(0, 1fr)',
+              gridTemplateColumns: 'max-content minmax(0, 1fr)',
               columnGap: spacing.sm,
               rowGap: spacing.xs,
               alignItems: 'baseline',
@@ -556,8 +556,8 @@ export function StudioAuthoringRequestPage({
                     checksLine.passed ? 'shell.studio.aiRequest.checks.passed' : 'shell.studio.aiRequest.checks.failed',
                   )}
                 </StatusTag>
-                <span>
-                  <Typography.Text style={{ color: colour.textMuted }}>{checksLine.text}</Typography.Text>{' '}
+                <span style={{ gridColumn: '1 / -1' }}>
+                  <Typography.Text>{checksLine.text}</Typography.Text>{' '}
                   <AxisButton role="link" size="small" onClick={() => setTab({ id: requestId, key: 'checks' })}>
                     {t('shell.studio.aiRequest.seeChecks')}
                   </AxisButton>
@@ -567,9 +567,13 @@ export function StudioAuthoringRequestPage({
             {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
             {request.review === null && request.app !== null && request.state === 'ready' && (
               <div style={{ display: 'contents' }} data-testid="studio-ai-not-reviewed">
-                <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
-                <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
-                <Typography.Text style={{ color: colour.textMuted }}>
+                <Typography.Text strong style={{ marginTop: spacing.xs }}>
+                  {t('shell.studio.aiRequest.review')}
+                </Typography.Text>
+                <span style={{ marginTop: spacing.xs }}>
+                  <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
+                </span>
+                <Typography.Text style={{ gridColumn: '1 / -1' }}>
                   {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
                 </Typography.Text>
               </div>
@@ -927,21 +931,25 @@ function ReviewFindings({
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
-  const { colour } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const blocking = review.findings.filter((finding) => finding.blocking)
   const notes = review.findings.filter((finding) => !finding.blocking)
   return (
     <div style={{ display: 'contents' }} data-testid="studio-ai-review">
-      <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
-      <StatusTag tone={blocking.length > 0 ? 'attention' : 'success'}>
-        {t(
-          blocking.length > 0
-            ? 'shell.studio.aiRequest.review.changesRequested'
-            : 'shell.studio.aiRequest.review.noChangesRequested',
-        )}
-      </StatusTag>
+      {/* The checks' lines come first; a wider gap parts the review's from them than its own lines have. */}
+      <Typography.Text strong style={{ marginTop: spacing.xs }}>
+        {t('shell.studio.aiRequest.review')}
+      </Typography.Text>
+      <span style={{ marginTop: spacing.xs }}>
+        <StatusTag tone={blocking.length > 0 ? 'attention' : 'success'}>
+          {t(
+            blocking.length > 0
+              ? 'shell.studio.aiRequest.review.changesRequested'
+              : 'shell.studio.aiRequest.review.noChangesRequested',
+          )}
+        </StatusTag>
+      </span>
       {/* Its tag closes the line, and its summary, a sentence or two, reads under it across the columns. */}
-      <span />
       <Typography.Text style={{ gridColumn: '1 / -1' }}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
         <div style={{ gridColumn: '1 / -1' }}>
@@ -999,7 +1007,14 @@ function checksSummary(
     return { text: t('shell.studio.aiRequest.checks.noScenarios'), passed: true }
   }
   if (passed === scenarios.length) {
-    return { text: t('shell.studio.aiRequest.checks.allScenarios').replace('{total}', String(passed)), passed: true }
+    // One scenario, two and more read differently in English: "The scenario passes", "Both scenarios pass", "All 8 …".
+    const key =
+      passed === 1
+        ? 'shell.studio.aiRequest.checks.oneScenario'
+        : passed === 2
+          ? 'shell.studio.aiRequest.checks.bothScenarios'
+          : 'shell.studio.aiRequest.checks.allScenarios'
+    return { text: t(key).replace('{total}', String(passed)), passed: true }
   }
   return {
     text: t('shell.studio.aiRequest.checks.scenarios')

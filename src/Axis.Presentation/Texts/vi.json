@@ -2238,6 +2238,8 @@
   "shell.studio.problems.warningLead": "Cảnh báo",
   "shell.studio.problems.errorLead": "Lỗi",
   "shell.studio.aiRequest.checks.allScenarios": "Cả {total} kịch bản kiểm thử đều đạt",
+  "shell.studio.aiRequest.checks.oneScenario": "Kịch bản kiểm thử đạt",
+  "shell.studio.aiRequest.checks.bothScenarios": "Cả {total} kịch bản kiểm thử đều đạt",
   "shell.studio.aiRequest.review.mustChangeLead": "Phải sửa",
   "shell.studio.aiRequest.review.noteLead": "Ghi chú",
   "shell.studio.aiRequest.conflict": "Có người đã sửa các tài nguyên này sau khi AI đọc chúng, nên chưa có gì được chấp nhận:",

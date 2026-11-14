@@ -2238,6 +2238,8 @@
   "shell.studio.problems.warningLead": "Warning",
   "shell.studio.problems.errorLead": "Error",
   "shell.studio.aiRequest.checks.allScenarios": "All {total} scenarios pass",
+  "shell.studio.aiRequest.checks.oneScenario": "The scenario passes",
+  "shell.studio.aiRequest.checks.bothScenarios": "Both scenarios pass",
   "shell.studio.aiRequest.review.mustChangeLead": "Must change",
   "shell.studio.aiRequest.review.noteLead": "Note",
   "shell.studio.aiRequest.conflict": "Someone changed these resources after AI read them, so nothing was accepted:",

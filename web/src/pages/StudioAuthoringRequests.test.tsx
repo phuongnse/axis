@@ -362,7 +362,7 @@ describe('a ready request’s page', () => {
 
     const checks = await screen.findByTestId('studio-ai-checks')
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
-    expect(within(checks).getByText('All 1 scenarios pass')).toBeInTheDocument()
+    expect(within(checks).getByText('The scenario passes')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
     expect(screen.queryByText('What changes')).toBeNull()
     // The overview first, then the changes, the checks' detail, the plan and the history.
@@ -691,7 +691,14 @@ describe("a request's history", () => {
             scenarios: { outcome: 'failed', items: [{ outcome: 'passed' }, { outcome: 'failed' }] },
           },
         }),
-        step('fix', '2026-11-10T09:01:00Z', '2026-11-10T09:31:00Z', 'timedOut'),
+        step('fix', '2026-11-10T09:01:00Z', '2026-11-10T09:02:00Z', null),
+        step('check', '2026-11-10T09:02:00Z', '2026-11-10T09:03:00Z', 'passed', {
+          checks: {
+            compile: { outcome: 'passed', diagnostics: [] },
+            scenarios: { outcome: 'passed', items: [{ outcome: 'passed' }, { outcome: 'passed' }] },
+          },
+        }),
+        step('review', '2026-11-10T09:03:00Z', '2026-11-10T09:33:00Z', 'timedOut'),
       ],
     })
     renderIn(
@@ -708,7 +715,10 @@ describe("a request's history", () => {
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0]).toHaveTextContent(/Checked the draft\s*1 of 2 scenarios pass/)
-    expect(rows[1]).toHaveTextContent(/Fixed the draft\s*Ran out of time.*30 min/)
+    expect(rows[1]).toHaveTextContent(/Fixed the draft\s*Draft saved/)
+    // Two scenarios that pass read as both.
+    expect(rows[2]).toHaveTextContent(/Checked the draft\s*Both scenarios pass/)
+    expect(rows[3]).toHaveTextContent(/Reviewed the draft\s*Ran out of time.*30 min/)
   })
 })
 
