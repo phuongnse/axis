@@ -558,7 +558,7 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })
 
-  it('sums the review up and checks each plan step, with the resource where it falls short', async () => {
+  it('sums the review up on the overview, and ticks each step of the plan, with the resource where it falls short', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
@@ -583,11 +583,17 @@ describe('a plan and its review, as a pull request has them', () => {
 
     const review = await screen.findByTestId('studio-ai-review')
     expect(within(review).getByText('The field is added, but the list shows no column.')).toBeInTheDocument()
-    const [done, notDone] = within(review).getAllByTestId('studio-ai-review-step')
+    expect(within(review).queryByTestId('studio-ai-review-step')).toBeNull()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('tab', { name: 'Plan' }))
+    const changes = await screen.findByTestId('studio-ai-plan-changes')
+    expect(within(changes).getByText('What changes')).toBeInTheDocument()
+    const [done, notDone] = within(changes).getAllByTestId('studio-ai-review-step')
     expect(done).toHaveAttribute('data-done', 'true')
     expect(done).toHaveTextContent(/^Done:\s*Add the field\.$/)
     expect(notDone).toHaveTextContent(/^Not done:\s*Show it in the list\.\s*Requests\s*Page$/)
-    await userEvent.setup().click(within(notDone).getByRole('button', { name: 'Requests' }))
+    await user.click(within(notDone).getByRole('button', { name: 'Requests' }))
     expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
   })
 })

@@ -534,41 +534,56 @@ export function StudioAuthoringRequestPage({
         section(
           'ai-checks',
           t('shell.studio.aiRequest.checks'),
-          <Flex vertical gap="small" data-testid="studio-ai-checks">
+          // Proposed: the checks and the review as lines of one shape, see the review on #3263: each its name in bold, its
+          // verdict as a tag and its summary, in columns, so their words start together, then what the review found.
+          <div
+            data-testid="studio-ai-checks"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'max-content max-content minmax(0, 1fr)',
+              columnGap: spacing.sm,
+              rowGap: spacing.xs,
+              alignItems: 'baseline',
+              // A tag keeps its own width in its column.
+              justifyItems: 'start',
+            }}
+          >
             {checksLine !== null && (
-              <Flex align="center" gap={spacing.sm} wrap>
+              <>
                 <Typography.Text strong>{t('shell.studio.aiRequest.tab.checks')}</Typography.Text>
                 <StatusTag tone={checksLine.passed ? 'success' : 'danger'}>
                   {t(
                     checksLine.passed ? 'shell.studio.aiRequest.checks.passed' : 'shell.studio.aiRequest.checks.failed',
                   )}
                 </StatusTag>
-                <Typography.Text style={{ color: colour.textMuted }}>{checksLine.text}</Typography.Text>
-                <AxisButton role="link" onClick={() => setTab({ id: requestId, key: 'checks' })}>
-                  {t('shell.studio.aiRequest.seeChecks')}
-                </AxisButton>
-              </Flex>
+                <span>
+                  <Typography.Text style={{ color: colour.textMuted }}>{checksLine.text}</Typography.Text>{' '}
+                  <AxisButton role="link" size="small" onClick={() => setTab({ id: requestId, key: 'checks' })}>
+                    {t('shell.studio.aiRequest.seeChecks')}
+                  </AxisButton>
+                </span>
+              </>
             )}
             {/* Proposed: an outside app's ready request has no review when its author has no AI of their own. */}
             {request.review === null && request.app !== null && request.state === 'ready' && (
-              <Flex align="center" gap={spacing.sm} wrap data-testid="studio-ai-not-reviewed">
+              <div style={{ display: 'contents' }} data-testid="studio-ai-not-reviewed">
                 <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
                 <StatusTag tone="muted">{t('shell.studio.aiRequest.review.notReviewed')}</StatusTag>
                 <Typography.Text style={{ color: colour.textMuted }}>
                   {t(mine ? 'shell.studio.aiRequest.notReviewedMine' : 'shell.studio.aiRequest.notReviewed')}
                 </Typography.Text>
-              </Flex>
+              </div>
             )}
             {/* The review runs only once the checks pass, so a request that failed before it has no findings. */}
             {request.review !== null && (
               <ReviewFindings review={request.review} resources={resources} onOpen={onOpen} />
             )}
-          </Flex>,
+          </div>,
         )}
     </SectionParts>
   )
   const planView = request.plan !== null && (
-    <PlanView plan={request.plan} resources={resources} onOpen={onOpen}>
+    <PlanView plan={request.plan} review={request.review} resources={resources} onOpen={onOpen}>
       {awaiting && !mine && (
         <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.notYours')}</Typography.Text>
       )}
@@ -778,24 +793,27 @@ export function StudioAuthoringRequestPage({
 }
 
 /**
- * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: its summary, then, each a
- * group named in bold, What changes, Decisions to check, each choice in bold with its reason, Effects and risks, and How
- * it will be checked, then its details, resource by resource, folded until asked for, and last `children`, such as the
- * approval's actions.
+ * Proposed: a request's plan, written as a pull request's plan is, see the review on #3263: each a group named in bold,
+ * What changes, Decisions to check, each choice in bold with its reason, Effects and risks, and How it will be checked,
+ * then its details, resource by resource, folded until asked for, and last `children`, such as the approval's actions.
+ * Once a review ran, each step of What changes is its checklist item, a check mark when the draft does it and a cross
+ * when it does not, with the resource where, as a pull request's description ticks its own list.
  */
 function PlanView({
   plan,
+  review,
   resources,
   onOpen,
   children,
 }: {
   plan: StudioPlan
+  review: StudioReview | null
   resources: readonly StudioResourceItem[]
   onOpen: (resourceId: string, path: string) => void
   children: ReactNode
 }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const [details, setDetails] = useState(false)
   const bullets = (items: readonly ReactNode[]) => (
     <ul style={{ margin: 0, paddingInlineStart: spacing.lg }}>
@@ -813,7 +831,41 @@ function PlanView({
     )
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-plan">
-      {group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)}
+      {review === null || review.steps.length === 0 ? (
+        group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)
+      ) : (
+        <Flex vertical gap={spacing.xs} data-testid="studio-ai-plan-changes">
+          <Typography.Text strong>{t('shell.studio.aiRequest.plan.changes')}</Typography.Text>
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {review.steps.map((step, index) => (
+              <li key={index} data-testid="studio-ai-review-step" data-done={step.done}>
+                <Flex gap={spacing.xs} align="baseline" wrap>
+                  <span style={{ color: step.done ? colour.successText : colour.dangerText }}>
+                    {step.done ? <CheckOutlined aria-hidden /> : <CloseOutlined aria-hidden />}
+                    <span style={visuallyHidden}>
+                      {t(
+                        step.done
+                          ? 'shell.studio.aiRequest.review.stepDone'
+                          : 'shell.studio.aiRequest.review.stepNotDone',
+                      )}
+                    </span>
+                  </span>
+                  <Typography.Text>{step.step}</Typography.Text>
+                  <ResourceReference
+                    resourceId={step.resourceId}
+                    file={step.file}
+                    name={step.name}
+                    kind={step.kind}
+                    path={step.path}
+                    resources={resources}
+                    onSelect={onOpen}
+                  />
+                </Flex>
+              </li>
+            ))}
+          </ul>
+        </Flex>
+      )}
       {group(
         'shell.studio.aiRequest.decisions',
         'studio-ai-plan-decisions',
@@ -857,12 +909,11 @@ function PlanView({
 }
 
 /**
- * Proposed: a request's review, see the review on #3263: "Review" in bold and its verdict as a `StatusTag`, "Changes
- * requested" while a finding must change and "No changes requested" otherwise, never "Approved", as only its author
- * approves, by accepting. Its summary follows in words, then "Plan" in bold and each step of the approved plan, a check
- * mark when the draft does it and a cross when it does not, with the resource where, as a pull request's review checks
- * each of its criteria. Its findings follow in a `StudioProblemList`, grouped by the resource they are about, what must
- * change first, each led by "Must change" or "Note".
+ * Proposed: a request's review, see the review on #3263, as cells of the overview's columns: "Review" in bold, its
+ * verdict as a `StatusTag`, "Changes requested" while a finding must change and "No changes requested" otherwise, never
+ * "Approved", as only its author approves, by accepting, and its summary, muted, as the checks' line is. Its findings
+ * follow across the columns in a `StudioProblemList`, grouped by the resource they are about, what must change first,
+ * each led by "Must change" or "Note". How it checked each plan step shows on the plan.
  */
 function ReviewFindings({
   review,
@@ -874,77 +925,44 @@ function ReviewFindings({
   onOpen: (resourceId: string, path: string) => void
 }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { colour } = useDesignTokens()
   const blocking = review.findings.filter((finding) => finding.blocking)
   const notes = review.findings.filter((finding) => !finding.blocking)
   return (
-    <Flex vertical gap={spacing.xs} data-testid="studio-ai-review">
-      <Flex align="center" gap={spacing.sm} wrap>
-        <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
-        <StatusTag tone={blocking.length > 0 ? 'attention' : 'success'}>
-          {t(
-            blocking.length > 0
-              ? 'shell.studio.aiRequest.review.changesRequested'
-              : 'shell.studio.aiRequest.review.noChangesRequested',
-          )}
-        </StatusTag>
-      </Flex>
-      <Typography.Text>{review.summary}</Typography.Text>
-      {review.steps.length > 0 && (
-        <Flex vertical gap={spacing.xs} data-testid="studio-ai-review-steps">
-          <Typography.Text strong>{t('shell.studio.aiRequest.plan.changes')}</Typography.Text>
-          <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {review.steps.map((step, index) => (
-              <li key={index} data-testid="studio-ai-review-step" data-done={step.done}>
-                <Flex gap={spacing.xs} align="baseline" wrap>
-                  <span style={{ color: step.done ? colour.successText : colour.dangerText }}>
-                    {step.done ? <CheckOutlined aria-hidden /> : <CloseOutlined aria-hidden />}
-                    <span style={visuallyHidden}>
-                      {t(
-                        step.done
-                          ? 'shell.studio.aiRequest.review.stepDone'
-                          : 'shell.studio.aiRequest.review.stepNotDone',
-                      )}
-                    </span>
-                  </span>
-                  <Typography.Text>{step.step}</Typography.Text>
-                  <ResourceReference
-                    resourceId={step.resourceId}
-                    file={step.file}
-                    name={step.name}
-                    kind={step.kind}
-                    path={step.path}
-                    resources={resources}
-                    onSelect={onOpen}
-                  />
-                </Flex>
-              </li>
-            ))}
-          </ul>
-        </Flex>
-      )}
+    <div style={{ display: 'contents' }} data-testid="studio-ai-review">
+      <Typography.Text strong>{t('shell.studio.aiRequest.review')}</Typography.Text>
+      <StatusTag tone={blocking.length > 0 ? 'attention' : 'success'}>
+        {t(
+          blocking.length > 0
+            ? 'shell.studio.aiRequest.review.changesRequested'
+            : 'shell.studio.aiRequest.review.noChangesRequested',
+        )}
+      </StatusTag>
+      <Typography.Text style={{ color: colour.textMuted }}>{review.summary}</Typography.Text>
       {review.findings.length > 0 && (
-        <StudioProblemList
-          items={[...blocking, ...notes].map((finding) => ({
-            lead: (
-              <Typography.Text style={{ color: finding.blocking ? colour.dangerText : colour.textMuted }}>
-                {t(
-                  finding.blocking
-                    ? 'shell.studio.aiRequest.review.mustChangeLead'
-                    : 'shell.studio.aiRequest.review.noteLead',
-                )}
-              </Typography.Text>
-            ),
-            message: finding.text,
-            resourceId: finding.resourceId,
-            file: finding.file,
-            path: finding.path,
-          }))}
-          resources={resources}
-          onSelect={onOpen}
-        />
+        <div style={{ gridColumn: '1 / -1' }}>
+          <StudioProblemList
+            items={[...blocking, ...notes].map((finding) => ({
+              lead: (
+                <Typography.Text style={{ color: finding.blocking ? colour.dangerText : colour.textMuted }}>
+                  {t(
+                    finding.blocking
+                      ? 'shell.studio.aiRequest.review.mustChangeLead'
+                      : 'shell.studio.aiRequest.review.noteLead',
+                  )}
+                </Typography.Text>
+              ),
+              message: finding.text,
+              resourceId: finding.resourceId,
+              file: finding.file,
+              path: finding.path,
+            }))}
+            resources={resources}
+            onSelect={onOpen}
+          />
+        </div>
       )}
-    </Flex>
+    </div>
   )
 }
 
