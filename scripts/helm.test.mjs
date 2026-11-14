@@ -398,6 +398,123 @@ describe('the Axis Helm chart', () => {
     })
   }
 
+  // docs/reference/extension-packages.md#an-applications-packages
+  describe('the application package host', () => {
+    const on = ['--set', 'applicationPackageHost.enabled=true']
+    const name = 'axis-application-package-host'
+
+    test('runs under the RuntimeClass of its value and no package host of a runtime does', () => {
+      const output = renderOk(...on)
+      assert.match(find(output, 'Deployment', name), /runtimeClassName: "gvisor"\n/)
+      const custom = renderOk(...on, '--set', 'applicationPackageHost.runtimeClassName=kata')
+      assert.match(find(custom, 'Deployment', name), /runtimeClassName: "kata"\n/)
+      for (const rendered of [output, custom]) {
+        for (const runtime of ['dotnet', 'node', 'python']) {
+          assert.doesNotMatch(find(rendered, 'Deployment', `axis-package-host-${runtime}`), /runtimeClassName/)
+        }
+      }
+    })
+
+    test('renders no object and gives the worker no address while it is off', () => {
+      const output = renderOk()
+      for (const document of documents(output)) {
+        assert.doesNotMatch(document, /^  name: axis-application-package-host$/m)
+        assert.doesNotMatch(document, /application-package-host|Extensions__Runners__Application|runtimeClassName/)
+      }
+    })
+
+    test('points only the worker at the host while it is on', () => {
+      const output = renderOk(...on)
+      const worker = find(output, 'Deployment', 'axis-worker')
+      assert.match(worker, /- name: Extensions__Runners__Application\n\s+value: "axis-application-package-host:5310"\n/)
+      assert.equal(worker.match(/Extensions__Runners__Application/g).length, 1)
+      assert.doesNotMatch(worker, /- name: Extensions__ApplicationPackages/)
+      for (const document of documents(output).filter((d) => !/^  name: axis-worker$/m.test(d))) {
+        assert.doesNotMatch(document, /Extensions__Runners__Application/)
+      }
+    })
+
+    test('runs limited, non-root and read-only with no env entry, secret or service link', () => {
+      const host = find(renderOk(...on), 'Deployment', name)
+      assert.match(host, /image: "axis-package-host-node:[^"]+"/)
+      assert.match(host, /args:\n\s+- host\n/)
+      assert.match(host, /runAsNonRoot: true/)
+      assert.match(host, /readOnlyRootFilesystem: true/)
+      assert.match(host, /replicas: 1\n/)
+      assert.match(host, /resources:\n\s+limits:\n\s+cpu: "1"\n\s+memory: 1Gi\n/)
+      assert.match(host, /enableServiceLinks: false/)
+      assert.match(host, /automountServiceAccountToken: false/)
+      assert.doesNotMatch(host, /^\s+env:/m)
+      assert.doesNotMatch(host, /secret/i)
+      assert.doesNotMatch(host, /livenessProbe|readinessProbe|startupProbe/)
+    })
+
+    test('gets its replicas, image and limits from its own values', () => {
+      const output = renderOk(
+        ...on,
+        '--set', 'applicationPackageHost.replicas=3',
+        '--set', 'applicationPackageHost.repository=custom-host',
+        '--set', 'applicationPackageHost.resources.limits.memory=2Gi',
+      )
+      const host = find(output, 'Deployment', name)
+      assert.match(host, /replicas: 3\n/)
+      assert.match(host, /image: "custom-host:[^"]+"/)
+      assert.match(host, /memory: 2Gi\n/)
+      const node = find(output, 'Deployment', 'axis-package-host-node')
+      assert.match(node, /replicas: 1\n/)
+      assert.match(node, /image: "axis-package-host-node:[^"]+"/)
+      assert.match(node, /memory: 1Gi\n/)
+    })
+
+    test('admits only worker pods on TCP 5310 and sends only to worker pods', () => {
+      const policy = find(renderOk(...on), 'NetworkPolicy', name)
+      assert.match(policy, /podSelector:\n\s+matchLabels:\n\s+app\.kubernetes\.io\/name: axis\n\s+app\.kubernetes\.io\/instance: axis\n\s+app\.kubernetes\.io\/component: application-package-host\n/)
+      assert.match(policy, /policyTypes:\n\s+- Ingress\n\s+- Egress\n/)
+      for (const direction of ['from', 'to']) {
+        assert.equal(policy.match(new RegExp(`- ${direction}:`, 'g'))?.length, 1)
+        assert.match(
+          policy,
+          new RegExp(`- ${direction}:\\n\\s+- podSelector:\\n\\s+matchLabels:\\n\\s+app\\.kubernetes\\.io/name: axis\\n\\s+app\\.kubernetes\\.io/instance: axis\\n\\s+app\\.kubernetes\\.io/component: worker\\n`),
+        )
+      }
+      assert.equal(policy.match(/port: /g)?.length, 1)
+      assert.match(policy, /ports:\n\s+- protocol: TCP\n\s+port: 5310\n/)
+      assert.doesNotMatch(policy, /ipBlock|namespaceSelector|port: 53\b/)
+    })
+
+    test('has a Service that maps 5310 to the host', () => {
+      const service = find(renderOk(...on), 'Service', name)
+      assert.match(service, /type: ClusterIP\n/)
+      assert.match(service, /selector:\n(?:\s+.*\n)*?\s+app\.kubernetes\.io\/component: application-package-host\n/)
+      assert.match(service, /- name: runner\n\s+port: 5310\n\s+targetPort: runner\n/)
+    })
+
+    for (const [value, set] of [
+      ['applicationPackageHost.resources.limits.cpu', 'applicationPackageHost.resources.limits.cpu=null'],
+      ['applicationPackageHost.resources.limits.memory', 'applicationPackageHost.resources.limits.memory=null'],
+      ['applicationPackageHost.resources.limits.cpu', 'applicationPackageHost.resources=null'],
+      ['applicationPackageHost.runtimeClassName', 'applicationPackageHost.runtimeClassName=null'],
+    ]) {
+      test(`a missing ${value} fails and names it (${set})`, () => {
+        const result = render(...on, '--set', set)
+        assert.notEqual(result.status, 0)
+        assert.match(result.stderr, new RegExp(value.replaceAll('.', '\\.')))
+      })
+    }
+
+    test('an empty RuntimeClass is rejected by the schema and names the value', () => {
+      const result = render(...on, '--set', 'applicationPackageHost.runtimeClassName=')
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, /applicationPackageHost\/runtimeClassName/)
+    })
+
+    test('a value that it does not know is rejected', () => {
+      const result = render(...on, '--set', 'applicationPackageHost.env=leak')
+      assert.notEqual(result.status, 0)
+      assert.doesNotMatch(result.stdout, /leak/)
+    })
+  })
+
   test('several server replicas share one Studio volume', () => {
     const output = renderOk()
     const server = find(output, 'Deployment', 'axis-server')

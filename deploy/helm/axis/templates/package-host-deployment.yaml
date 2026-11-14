@@ -1,26 +1,33 @@
-{{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
-{{- $host := index $.Values.packageHost $runtime | default dict }}
+{{- range $component, $host := include "axis.packageHosts" . | fromYaml }}
+{{- $values := $.Values }}
+{{- range splitList "." $host.values }}{{- $values = index $values . | default dict }}{{- end }}
 ---
 # A package host, see docs/reference/extension-packages.md#package-runners. It gets no env entry, no credential and no
 # service account token, and it has no health endpoint, so it has no probe.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $.Release.Name }}-package-host-{{ $runtime }}
+  name: {{ $.Release.Name }}-{{ $component }}
   labels:
     {{- include "axis.labels" $ | nindent 4 }}
-    app.kubernetes.io/component: package-host-{{ $runtime }}
+    app.kubernetes.io/component: {{ $component }}
 spec:
-  replicas: {{ $host.replicas }}
+  replicas: {{ $values.replicas }}
   selector:
     matchLabels:
-      {{- include "axis.selectorLabels" (dict "root" $ "component" (printf "package-host-%s" $runtime)) | nindent 6 }}
+      {{- include "axis.selectorLabels" (dict "root" $ "component" $component) | nindent 6 }}
   template:
     metadata:
       labels:
         {{- include "axis.labels" $ | nindent 8 }}
-        app.kubernetes.io/component: package-host-{{ $runtime }}
+        app.kubernetes.io/component: {{ $component }}
     spec:
+      {{- if $host.sandbox }}
+      # The application package host runs tenant code, so it runs under gVisor, see
+      # docs/reference/extension-packages.md#an-applications-packages and threat P145 of
+      # docs/reference/threat-model-product.md. The package hosts of the runtimes set no runtimeClassName.
+      runtimeClassName: {{ required "applicationPackageHost.runtimeClassName is required: the RuntimeClass of gVisor that the application package host runs under" $values.runtimeClassName | quote }}
+      {{- end }}
       automountServiceAccountToken: false
       # Kubernetes otherwise adds the address of every Service to the environment.
       enableServiceLinks: false
@@ -33,8 +40,8 @@ spec:
       securityContext:
         {{- include "axis.podSecurityContext" $ | nindent 8 }}
       containers:
-        - name: package-host-{{ $runtime }}
-          image: {{ include "axis.image" (dict "root" $ "repository" $host.repository) | quote }}
+        - name: {{ $component }}
+          image: {{ include "axis.image" (dict "root" $ "repository" $values.repository) | quote }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           args:
             - host
@@ -44,11 +51,11 @@ spec:
           securityContext:
             {{- include "axis.containerSecurityContext" $ | nindent 12 }}
           {{- /* A nil-safe lookup, so a removed limit fails with its name. */}}
-          {{- $limits := ($host.resources | default dict).limits | default dict }}
-          {{- $_ := required (printf "packageHost.%s.resources.limits.cpu is required: the CPU limit of the %s package host" $runtime $label) $limits.cpu }}
-          {{- $_ := required (printf "packageHost.%s.resources.limits.memory is required: the memory limit of the %s package host" $runtime $label) $limits.memory }}
+          {{- $limits := ($values.resources | default dict).limits | default dict }}
+          {{- $_ := required (printf "%s.resources.limits.cpu is required: the CPU limit of %s" $host.values $host.label) $limits.cpu }}
+          {{- $_ := required (printf "%s.resources.limits.memory is required: the memory limit of %s" $host.values $host.label) $limits.memory }}
           resources:
-            {{- toYaml $host.resources | nindent 12 }}
+            {{- toYaml $values.resources | nindent 12 }}
           volumeMounts:
             {{- include "axis.tmpAndExtensionsVolumeMounts" $ | nindent 12 }}
       volumes:

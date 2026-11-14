@@ -22,6 +22,26 @@ node: "Node.js"
 python: "Python"
 {{- end }}
 
+{{/*
+The package host objects the chart renders: the name of each, the path of its values and the name that errors use.
+It lists the host of each runtime and, when applicationPackageHost.enabled is set, the application package host, which
+runs under gVisor, see docs/reference/extension-packages.md#an-applications-packages. Call with the root context and
+read it with fromYaml.
+*/}}
+{{- define "axis.packageHosts" -}}
+{{- range $runtime, $label := include "axis.packageHostRuntimes" . | fromYaml }}
+package-host-{{ $runtime }}:
+  values: packageHost.{{ $runtime }}
+  label: {{ printf "the %s package host" $label | quote }}
+{{- end }}
+{{- if .Values.applicationPackageHost.enabled }}
+application-package-host:
+  values: applicationPackageHost
+  label: "the application package host"
+  sandbox: true
+{{- end }}
+{{- end }}
+
 {{/* Labels of every object. Call with the root context. */}}
 {{- define "axis.labels" -}}
 app.kubernetes.io/name: axis

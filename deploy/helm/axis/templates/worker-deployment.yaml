@@ -42,6 +42,12 @@ spec:
             - name: Extensions__Runners__{{ title $runtime }}
               value: {{ printf "%s-package-host-%s:5310" $.Release.Name $runtime | quote }}
             {{- end }}
+            {{- if .Values.applicationPackageHost.enabled }}
+            # The application package host, which runs under gVisor, see
+            # docs/reference/extension-packages.md#an-applications-packages. Extensions__ApplicationPackages stays unset.
+            - name: Extensions__Runners__Application
+              value: {{ printf "%s-application-package-host:5310" .Release.Name | quote }}
+            {{- end }}
           ports:
             - name: health
               containerPort: 5208

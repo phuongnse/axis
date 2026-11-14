@@ -46,10 +46,16 @@ node scripts/check-ai-eval.mjs
 # schemas that scripts/setup.sh downloads. No schema is missing-ignored, so a new kind needs its
 # schema file.
 source scripts/lib/tools.sh
-for chart in deploy/helm/axis deploy/helm/axis-controlplane; do
-  "$helm" lint "$chart" --strict -f "$chart/ci/test-values.yaml"
-  "$helm" template "$(basename "$chart")" "$chart" -f "$chart/ci/test-values.yaml" |
+check_chart() {
+  local chart=$1
+  shift
+  "$helm" lint "$chart" --strict -f "$chart/ci/test-values.yaml" "$@"
+  "$helm" template "$(basename "$chart")" "$chart" -f "$chart/ci/test-values.yaml" "$@" |
     "$kubeconform" -strict -summary -kubernetes-version "$KUBERNETES_VERSION" \
       -schema-location "$kubernetes_schemas/{{ .ResourceKind }}{{ .KindSuffix }}.json" \
       -schema-location "$crd_schemas/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json"
-done
+}
+check_chart deploy/helm/axis
+check_chart deploy/helm/axis-controlplane
+# The application package host is off by default, so its objects need a run of their own.
+check_chart deploy/helm/axis --set applicationPackageHost.enabled=true

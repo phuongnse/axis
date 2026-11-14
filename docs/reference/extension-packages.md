@@ -462,7 +462,7 @@ package reaches nothing of the host and no binding of another call.
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
   the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
-- **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
+- **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, and with `applicationPackageHost.enabled` also `<release>-application-package-host`, each as a Deployment, a Service on port 5310 and a
   NetworkPolicy, with the command `host` and a read-only root file system apart from `/tmp`. It has no env entry, no secret and no
   service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`. Its CPU and memory limits come from
   `packageHost.dotnet.resources`, `packageHost.node.resources` and `packageHost.python.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
@@ -690,6 +690,10 @@ trusted code, so the platform gives it more limits than an installation's packag
 - **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
+  In the chart, `applicationPackageHost.enabled`, off by default, runs `<release>-application-package-host`
+  from `axis-package-host-node` with the templates of the package hosts. It sets `runtimeClassName` from
+  `applicationPackageHost.runtimeClassName`, `gvisor` by default, and points the worker at it with
+  `Extensions__Runners__Application`. The chart does not set `Extensions__ApplicationPackages`.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
