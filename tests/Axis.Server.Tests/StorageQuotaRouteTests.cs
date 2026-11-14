@@ -95,6 +95,10 @@ public sealed class StorageQuotaRouteTests
         // A consent revoke is a security action and is never refused over the quota, see docs/reference/tenant-quotas.md#refusals.
         "POST /api/tenant/connected-apps/{clientId}/revoke",
 
+        // A package runner create writes one small row and a revoke is a security action, see docs/reference/tenant-quotas.md#refusals.
+        "POST /api/tenant/package-runners",
+        "POST /api/tenant/package-runners/{id}/revoke",
+
         "POST /api/apps/{app}/forms/{form}/state",
         "POST /api/apps/{app}/tasks/{id}/form-state",
 

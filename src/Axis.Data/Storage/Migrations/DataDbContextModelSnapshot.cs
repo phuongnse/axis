@@ -289,6 +289,53 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("mcp_clients", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.PackageRunnerRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("client_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset?>("LastCallAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_call_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Packages")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("packages")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_package_runners");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_package_runners_client_id");
+
+                    b.ToTable("package_runners", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.PendingComputedFieldRow", b =>
                 {
                     b.Property<Guid>("EntityId")
