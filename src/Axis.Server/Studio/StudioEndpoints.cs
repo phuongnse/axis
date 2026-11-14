@@ -1178,18 +1178,24 @@ internal static class StudioEndpoints
             return null;
         }
 
-        if (!options.AllowsDevelop(user.Roles))
-        {
-            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "You do not hold the developer role.");
-        }
-
         // A tenant with no stored switch counts as off.
         var services = httpContext.RequestServices;
-        return services.GetRequiredService<ITenantContextAccessor>().Current is { } tenant
-            && services.GetRequiredService<ITenantCatalog>().Find(tenant.TenantId) is { ApplicationPackages: true }
-                ? null
-                : Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Application packages are off in this tenant.");
+        var applicationPackages = services.GetRequiredService<ITenantContextAccessor>().Current is { } tenant
+            && services.GetRequiredService<ITenantCatalog>().Find(tenant.TenantId) is { ApplicationPackages: true };
+        return DeveloperRefusal(options, user.Roles, applicationPackages) is { } title
+            ? Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: title)
+            : null;
     }
+
+    /// <summary>
+    /// The title that refuses a package file write: the person lacks the developer role, or the tenant's application packages
+    /// switch is off, checked in that order, or null when the write may go on. The routes and the MCP tools both call it, see
+    /// <c>docs/reference/studio-packages.md#the-authoring-api</c>.
+    /// </summary>
+    internal static string? DeveloperRefusal(StudioOptions options, IReadOnlyList<string> roles, bool applicationPackages) =>
+        !options.AllowsDevelop(roles)
+            ? "You do not hold the developer role."
+            : applicationPackages ? null : "Application packages are off in this tenant.";
 
     // The checks the application routes share: the folder, or the problem that refused the request.
     internal static async Task<(string? Folder, IResult? Refusal)> FindFolderAsync(

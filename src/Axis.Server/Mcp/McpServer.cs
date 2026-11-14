@@ -20,7 +20,8 @@ namespace Axis.Server.Mcp;
 /// server-sent stream, so <c>GET /mcp</c> is a <c>405</c>, and it takes <c>initialize</c>, <c>notifications/*</c>,
 /// <c>ping</c>, <c>tools/list</c> and <c>tools/call</c>, see <c>docs/reference/mcp-server.md#tools</c>. The tools are
 /// <c>list_applications</c>, <c>read_reference</c> of <see cref="McpReference"/>, the read tools of <see cref="McpReadTools"/> and the
-/// tools of <see cref="McpWriteTools"/> that change a draft, check an expression, validate a draft, diff a draft, run its scenarios and accept it. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
+/// tools of <see cref="McpWriteTools"/> that change a draft, check an expression, validate a draft, diff a draft, run its scenarios and accept it, and the
+/// package file tools of <see cref="McpPackageFileTools"/>. The route takes only a bearer token that was issued for the host's own <c>/mcp</c> URL (see
 /// <see cref="McpCaller"/>), and only from a person with the author role. A request is checked in order: token (401),
 /// author role (403), a body of at most 1 MiB (413), JSON body (400), and then by method. <c>initialize</c> opens a session when the protocol version is
 /// <see cref="ProtocolVersion"/>, and answers its id in <c>Mcp-Session-Id</c>. Every other call needs that id (400 when missing, 404
@@ -56,6 +57,10 @@ internal static partial class McpServer
     private const string DiffDraftTool = "diff_draft";
     private const string RunScenariosTool = "run_scenarios";
     private const string AcceptDraftTool = "accept_draft";
+    private const string ListPackageFilesTool = "list_package_files";
+    private const string ReadPackageFileTool = "read_package_file";
+    private const string WritePackageFileTool = "write_package_file";
+    private const string DeletePackageFileTool = "delete_package_file";
     private const string InputMismatch = "The input does not match the tool's input schema.";
     private const string UnknownTool = "unknown";
 
@@ -87,6 +92,10 @@ internal static partial class McpServer
     private static readonly ToolProperty _moduleInput = new("module", "The id of a module the application pins.", true);
     private static readonly ToolProperty _layerContentInput = new(
         "content", "The edited module resource whole, a JSON object, as read_module_resource answers its content.", true, "object");
+
+    private static readonly ToolProperty _packageInput = new("package", "The id of one of the application's packages, its folder under packages/.", true);
+    private static readonly ToolProperty _filePathInput = new("path", "The path of the file inside the package, such as adapter.py.", true);
+    private static readonly ToolProperty _fileContentInput = new("content", "The full text of the file, written as UTF-8 exactly as given.", true);
 
     private static readonly ToolDefinition[] _definitions =
     [
@@ -159,6 +168,25 @@ internal static partial class McpServer
             + "the authoring request of the draft asked for it and its last checks and review passed. Without request it answers the accept it queued, "
             + "or the one already queued or running for the draft. With request it answers that accept's status and diagnostics. Nothing goes live.",
             [_applicationInput, _writeDraftInput, _acceptRequestInput]),
+        new(
+            ListPackageFilesTool,
+            "Lists the files of the application's packages, the files under packages/: each one's package, path and version. "
+            + "Reads the working folder, or your draft when you name one.",
+            [_applicationInput, _draftInput]),
+        new(
+            ReadPackageFileTool,
+            "Reads one package file of the application: its text and version. Reads the working folder, or your draft when you name one.",
+            [_applicationInput, _packageInput, _filePathInput, _draftInput]),
+        new(
+            WritePackageFileTool,
+            "Creates or replaces one package file in your draft, by the checks of the authoring API, and answers its version and the draft's diagnostics. "
+            + "Needs the developer role and the tenant's application packages switch on. Makes one commit on the draft's branch. The working folder does not change.",
+            [_applicationInput, _writeDraftInput, _packageInput, _filePathInput, _fileContentInput]),
+        new(
+            DeletePackageFileTool,
+            "Removes one package file from your draft and answers the draft's diagnostics. "
+            + "Needs the developer role and the tenant's application packages switch on. Makes one commit on the draft's branch.",
+            [_applicationInput, _writeDraftInput, _packageInput, _filePathInput]),
     ];
 
     /// <summary>The names of the tools the server serves, which the tools table of docs/reference/mcp-server.md lists without a planned marker.</summary>
@@ -239,7 +267,8 @@ internal static partial class McpServer
         PackageCatalog packages,
         ModuleCatalog modules,
         IStudioWriteLock writeLock,
-        TenantDatabase database)
+        TenantDatabase database,
+        ITenantCatalog catalog)
     {
         var tenantId = tenants.Current?.TenantId ?? throw new InvalidOperationException("No tenant context is set.");
         if (EndpointCaller.Read(context.User) is not { } caller || !studio.ForTenant(tenantId).Allows(caller.Roles))
@@ -318,7 +347,15 @@ internal static partial class McpServer
             "tools/call" => await CallToolAsync(
                 message["params"],
                 id,
-                new McpToolContext(studio.ForTenant(tenantId), caller, packages, modules, writeLock, database, loggers),
+                new McpToolContext(
+                    studio.ForTenant(tenantId),
+                    caller,
+                    packages,
+                    modules,
+                    writeLock,
+                    database,
+                    loggers,
+                    catalog.Find(tenantId) is { ApplicationPackages: true }),
                 loggers.CreateLogger(typeof(McpServer).FullName!),
                 context.RequestAborted),
             _ => Error(StatusCodes.Status200OK, id, MethodNotFound, "The method is not supported."),
@@ -427,6 +464,24 @@ internal static partial class McpServer
                 arguments[_applicationInput.Name],
                 arguments[_writeDraftInput.Name],
                 arguments.TryGetValue(_acceptRequestInput.Name, out var accept) ? accept : null,
+                ct),
+            ListPackageFilesTool => await McpPackageFileTools.ListAsync(context, arguments[_applicationInput.Name], draft, ct),
+            ReadPackageFileTool => await McpPackageFileTools.ReadAsync(
+                context, arguments[_applicationInput.Name], arguments[_packageInput.Name], arguments[_filePathInput.Name], draft, ct),
+            WritePackageFileTool => await McpPackageFileTools.WriteAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments[_packageInput.Name],
+                arguments[_filePathInput.Name],
+                arguments[_fileContentInput.Name],
+                ct),
+            DeletePackageFileTool => await McpPackageFileTools.DeleteAsync(
+                context,
+                arguments[_applicationInput.Name],
+                arguments[_writeDraftInput.Name],
+                arguments[_packageInput.Name],
+                arguments[_filePathInput.Name],
                 ct),
             _ => throw new InvalidOperationException("The tool has no implementation."),
         };

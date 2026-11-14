@@ -71,7 +71,9 @@ A client signs in as a person, through OAuth as the MCP specification asks. The 
   and answers `403` without it.
 - **Tool grants.** Every tool runs with the person's grants: the author role for
   reading and writing drafts, and the rules of [accepting](authoring-requests.md#accepting) for
-  `accept_draft`.
+  `accept_draft`. `write_package_file` and `delete_package_file` also need the developer role and the tenant's
+  application packages switch on, as the [package file routes](studio-packages.md#the-authoring-api) do, and refuse
+  with their titles.
 - **Consent.** A client that requires consent gets a screen in the [Axis theme](identity-provider.md#theme)
   that names the client, links its home page and lists `axis:authoring` by its consent text, in every
   locale the platform offers. Allow sends the client a code. Deny sends it back with
@@ -154,14 +156,14 @@ A tool with an optional draft reads the working folder without it and the person
 | `run_scenarios`        | application, draft, optional `names`, optional `request` | Without `request`, a `test` request of the draft stored for the publisher, as `{ request, status, diagnostics, scenarios }`. With `request`, the same for that request of this draft and person, see [test](authoring.md#test)                                                                        |
 | `diff_draft`           | application, draft, optional `cursor`                    | One page of the draft's changes from the working folder, resource by resource, as the [draft diff](authoring-revisions.md#draft-diff) route gives them                                                                                                                                                |
 | `accept_draft`         | application, draft, optional `request`                   | Without `request`, an `accept` publish request of the draft stored for the publisher, or the one already queued or running, as `{ request, status, diagnostics }`, under the rules of [accepting](authoring-requests.md#accepting). With `request`, the same for that accept of this draft and person, also after the accept has removed the draft |
-| `list_package_files` _(planned for M37)_ | application, optional draft | Each file of the application's packages, with its package id, `path` and `version` |
-| `read_package_file` _(planned for M37)_ | application, package, `path`, optional draft | The file's content and version |
-| `write_package_file` _(planned for M37)_ | application, draft, package, `path`, `content` | Creates or replaces a package file in the draft, as a Studio save does. It needs the developer role |
-| `delete_package_file` _(planned for M37)_ | application, draft, package, `path` | Removes a package file from the draft |
+| `list_package_files` | application, optional draft | Each file of the application's packages, with its package id, `path` and `version` |
+| `read_package_file` | application, package, `path`, optional draft | The file's content and version |
+| `write_package_file` | application, draft, package, `path`, `content` | Creates or replaces a package file in the draft, as a Studio save does, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
+| `delete_package_file` | application, draft, package, `path` | Removes a package file from the draft, with the draft's diagnostics. It needs the developer role and the tenant's application packages switch on |
 | `test_package` _(planned for M37)_ | application, draft, package, optional `request` | Builds the package and runs its tests in the tenant's sandbox, as `{ request, status, diagnostics, tests }`, like `run_scenarios` |
 
-- **No other tool.** No tool publishes, activates a release, reads a record, a file or a secret,
-  runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
+- **No other tool.** No tool publishes, activates a release, reads a record, a secret or a file other than
+  a resource file or a package file, runs a command or opens a connection. A resource never holds a binding value, so no tool returns one.
 - **Package tests** _(planned for M37)_. `test_package` runs only the package's own tests, in the tenant's
   sandbox, see [an application's packages](extension-packages.md#an-applications-packages).
 - **Checked.** `McpToolsDocumentationTests` compares the table with the tools the server serves and
@@ -231,7 +233,8 @@ A call to the server is limited in rate and size, and the agent host's requests 
 What an agent did is recorded, but never the content it read or wrote.
 
 - **Calls.** Each successful write tool call writes an audit record with the person, the client id, the tool, the
-  application, the draft and the resource ids. The fields are in [audit actions](storage.md#audit-actions).
+  application, the draft and the resource ids. A package file tool records no resource id, because a package file has none.
+  The fields are in [audit actions](storage.md#audit-actions).
   `run_scenarios` writes none, as a [test](authoring.md#test) writes none. `accept_draft` writes one only when it queues an accept,
   and none when it answers an accept that is already queued or running or reads one.
 - **Consent revocation.** A [revoke](user-administration.md#outside-mcp-clients) writes an audit record in the tenant

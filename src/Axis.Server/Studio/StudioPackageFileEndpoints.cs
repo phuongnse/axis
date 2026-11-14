@@ -36,11 +36,11 @@ namespace Axis.Server.Studio;
 /// </summary>
 internal static class StudioPackageFileEndpoints
 {
-    private const string NoPackageFile = "The application has no package file at this path.";
+    internal const string NoPackageFile = "The application has no package file at this path.";
 
-    private const string BadPath = "The package or the path is not a plain file path under packages/.";
+    internal const string BadPath = "The package or the path is not a plain file path under packages/.";
 
-    private const string StalePackageFile = "The package file has changed since this version, or it exists already. Read it again.";
+    internal const string StalePackageFile = "The package file has changed since this version, or it exists already. Read it again.";
 
     public static void MapStudioPackageFileEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -114,10 +114,14 @@ internal static class StudioPackageFileEndpoints
             return StudioEndpoints.NotFound(NoPackageFile);
         }
 
-        var version = Convert.ToHexStringLower(SHA256.HashData(bytes));
-        httpContext.Response.Headers.ETag = $"\"{version}\"";
-        return Results.Ok(new StudioPackageFileResponse(package, path, version, Encoding.UTF8.GetString(bytes)));
+        var answer = Response(package, path, bytes);
+        httpContext.Response.Headers.ETag = $"\"{answer.Version}\"";
+        return Results.Ok(answer);
     }
+
+    /// <summary>The answer that reads one package file: its text, read as UTF-8, and the SHA-256 of its bytes as lower-case hex.</summary>
+    internal static StudioPackageFileResponse Response(string package, string path, byte[] bytes) =>
+        new(package, path, Convert.ToHexStringLower(SHA256.HashData(bytes)), Encoding.UTF8.GetString(bytes));
 
     private static async Task<IResult> PutAsync(
         string application,

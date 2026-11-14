@@ -22,7 +22,8 @@ internal sealed record McpToolContext(
     ModuleCatalog Modules,
     IStudioWriteLock WriteLock,
     TenantDatabase Database,
-    ILoggerFactory Loggers);
+    ILoggerFactory Loggers,
+    bool ApplicationPackages);
 
 /// <summary>
 /// The read tools of the MCP server, see <c>docs/reference/mcp-server.md#tools</c>. Each answers the output of the matching

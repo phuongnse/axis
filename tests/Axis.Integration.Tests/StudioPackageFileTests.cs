@@ -393,23 +393,8 @@ public sealed class StudioPackageFileTests(PostgreSqlFixture database) : IClassF
             if (switchOn)
             {
                 // The configuration source has no switch, so the host turns it on for every tenant.
-                builder.ConfigureTestServices(services =>
-                {
-                    var inner = (ITenantCatalog)services.Last(descriptor => descriptor.ServiceType == typeof(ITenantCatalog)).ImplementationInstance!;
-                    services.AddSingleton<ITenantCatalog>(new PackagesOnCatalog(inner));
-                });
+                builder.ConfigureTestServices(PackagesOnCatalog.Switch);
             }
         });
-    }
-
-    private sealed class PackagesOnCatalog(ITenantCatalog inner) : ITenantCatalog
-    {
-        public IReadOnlyList<TenantEntry> Tenants => inner.Tenants;
-
-        public TenantEntry? Find(string tenantId) => inner.Find(tenantId) is { } entry ? entry with { ApplicationPackages = true } : null;
-
-        public TenantEntry? FindByHost(string host) => inner.FindByHost(host) is { } entry ? entry with { ApplicationPackages = true } : null;
-
-        public bool IsUnavailableHost(string host) => inner.IsUnavailableHost(host);
     }
 }
