@@ -19,8 +19,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases, <c>a</c> and <c>b</c>, each with the same application: a copy of the StepApp fixture that holds the Python test
 /// package as a package of its own under <c>packages/python-test-package</c>, see
-/// docs/reference/extension-packages.md#an-applications-packages. The copy adds an integer field <c>runnerPid</c> to <c>Request</c> and these
-/// processes: <c>ApplicationPid</c>, which runs <c>python-test-package/pid</c> and writes the process id of its runner to <c>runnerPid</c>,
+/// docs/reference/extension-packages.md#an-applications-packages. The copy adds an integer field <c>runnerPid</c> and a text field <c>runnerFolder</c> to <c>Request</c> and these
+/// processes: <c>ApplicationPid</c>, which runs <c>python-test-package/pid</c> and writes the process id of its runner to <c>runnerPid</c> and the folder it runs from to <c>runnerFolder</c>,
 /// and <c>ApplicationProbeOwnOtherHost</c>, which runs <c>python-test-package/probe</c> in the mode <c>ownOtherHost</c>, whose request to a
 /// host that no <c>url</c> binding declares goes through the worker's egress proxy. Each release stores the package's built files, which are
 /// the Python test package and its dependency laid out as a build leaves them. Tenant <c>a</c> holds two more releases. The first,
@@ -55,7 +55,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
               "type": "operation",
               "operation": "python-test-package/pid",
               "input": {},
-              "output": { "pid": "runnerPid" },
+              "output": { "pid": "runnerPid", "folder": "runnerFolder" },
               "next": "done"
             },
             { "name": "done", "type": "end" }
@@ -132,9 +132,10 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
     /// <summary>
     /// A worker for both tenants with no installed package, whose application packages go to the package host at
     /// <paramref name="applicationHost"/>, or to none when it is <see langword="null"/>. The caller disposes it, so a test can run several
-    /// calls on one worker, and its idle runners stay until then.
+    /// calls on one worker. Its idle runners of an application's package stay until <paramref name="applicationIdleTime"/> has passed, or
+    /// the default idle time when it is <see langword="null"/>.
     /// </summary>
-    internal ServiceProvider BuildWorker(string? applicationHost)
+    internal ServiceProvider BuildWorker(string? applicationHost, TimeSpan? applicationIdleTime = null)
     {
         var values = new Dictionary<string, string?>
         {
@@ -154,10 +155,19 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
         }
 
         var settings = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-        return new ServiceCollection()
+        var services = new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
-            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory })
-            .BuildServiceProvider();
+            .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development", ContentRootPath = AppContext.BaseDirectory });
+        if (applicationIdleTime is not null)
+        {
+            services.AddSingleton(provider => new PackageRunnerPools(
+                provider.GetRequiredService<PackageIsolation>(),
+                provider.GetRequiredService<ApplicationPackageSettings>(),
+                provider.GetRequiredService<ConnectorCallSettings>().AllowHttp,
+                applicationIdleTime));
+        }
+
+        return services.BuildServiceProvider();
     }
 
     /// <summary>
@@ -202,6 +212,10 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
     public async Task<int> RunnerPidAsync(string tenant, Guid id) =>
         (int)(await RequestAsync(tenant, id)).Values["runnerPid"]!.GetValue<long>();
 
+    /// <summary>The <c>runnerFolder</c> of the request <paramref name="id"/> of <paramref name="tenant"/>, the folder its runner ran from.</summary>
+    public async Task<string> RunnerFolderAsync(string tenant, Guid id) =>
+        (await RequestAsync(tenant, id)).Values["runnerFolder"]!.GetValue<string>();
+
     private static ActivationBindings Bindings(string tenant) =>
         ProcessStepFixture.PackageBindings(tenant, new Uri("https://test.example.test"), allowHttp: false);
 
@@ -216,7 +230,9 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
             if (relative == "entities/request.json")
             {
                 var request = JsonNode.Parse(content)!.AsObject();
-                request["fields"]!.AsArray().Add(new JsonObject { ["name"] = "runnerPid", ["type"] = "integer" });
+                var fields = request["fields"]!.AsArray();
+                fields.Add(new JsonObject { ["name"] = "runnerPid", ["type"] = "integer" });
+                fields.Add(new JsonObject { ["name"] = "runnerFolder", ["type"] = "text" });
                 content = request.ToJsonString();
             }
 
@@ -235,7 +251,11 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
     }
 
     /// <summary>The built files of the Python test package, which <c>TestPackages.InstallPython</c> lays out in one folder, keyed as a release stores them.</summary>
-    private static Dictionary<string, byte[]> BuiltFiles()
+    private static Dictionary<string, byte[]> BuiltFiles() =>
+        BuiltPackageFiles().ToDictionary(file => PackageFolder + file.Key, file => file.Value, StringComparer.Ordinal);
+
+    /// <summary>The built files of the Python test package keyed relative to the package's folder, as a <c>start</c> carries them.</summary>
+    internal static Dictionary<string, byte[]> BuiltPackageFiles()
     {
         var built = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         foreach (var folder in new[] { "package", "dependency" })
@@ -243,7 +263,7 @@ public sealed class ApplicationPackageCallFixture : IAsyncLifetime
             var root = Path.Combine(AppContext.BaseDirectory, "PythonPackage", folder);
             foreach (var file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
             {
-                built[PackageFolder + Path.GetRelativePath(root, file).Replace('\\', '/')] = File.ReadAllBytes(file);
+                built[Path.GetRelativePath(root, file).Replace('\\', '/')] = File.ReadAllBytes(file);
             }
         }
 

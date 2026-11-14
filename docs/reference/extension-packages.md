@@ -752,13 +752,13 @@ trusted code, so the platform gives it more limits than an installation's packag
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
   needs no gVisor because gVisor guards only code on Axis's machines. A package that Axis runs is still
   refused, and `AXC0148` is never reported for a customer-hosted one.
-- **Its own runners.** The worker sends each attempt of an application's package, in any language, to
-  `application-package-host`, with the call's tenant and the built files of the call's release in `start`, see [a built package
-  in the release](#versions-and-pinning). The runners are one set for each tenant, package version and build, with the limits of
-  [package runners](#package-runners). A build is a SHA-256 digest of the built files, so changed files never reuse a runner.
-  A runner starts when that tenant's call needs one, and idle runners stay until the worker stops. A release with the source
-  but no built files, such as one `activate` stored, fails the call at once, naming the package and no path. Unset
-  `Extensions:Runners:Application` makes a call retryable and names the setting.
+- **Its own runners.** The worker sends each attempt of an application's package, in any language, to `application-package-host`,
+  with the call's tenant and the built files of the call's release in `start`, see [a built package in the
+  release](#versions-and-pinning). The runners are one set for each tenant, package version and build, with the limits of [package
+  runners](#package-runners). A build is a SHA-256 digest of the built files, so changed files never reuse a runner. A runner starts
+  when that tenant's call needs one. The worker stops a runner after 5 idle minutes, checked every minute, and the host kills it and
+  deletes its files. A release with no built files, such as one `activate` stored, fails the call at once, naming the package and no
+  path. Unset `Extensions:Runners:Application` makes a call retryable and names the setting.
 - **Quotas.** A call also holds a `concurrentConnectorCalls` lease, as any package call does.
 - **CPU seconds** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
   [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
@@ -896,5 +896,5 @@ installation, loading, the capability limits, the server's metadata-only load an
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package
   offline, so the repository holds no binary file. Its operations cover each outcome of the Python
   runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared bindings, asks for an
-  undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID, `flaky` raises
+  undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID and the folder it runs from, `flaky` raises
   `RetryableError` and `fail` raises `ValueError`. The package host tests install the package by copying it, so they need no pip.

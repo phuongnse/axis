@@ -39,6 +39,57 @@ public sealed class ApplicationPackageRunnerTests(ApplicationPackageCallFixture 
     }
 
     [Fact]
+    public async Task An_idle_runner_is_stopped_and_the_next_call_starts_a_new_one()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        using var extensions = new TemporaryFolder();
+        await using var host = await TestPackageHost.StartAsync(extensions.Path);
+        await using var worker = fixture.BuildWorker(host.Address, TimeSpan.FromMilliseconds(500));
+
+        var (subjectId, _) = await fixture.StageAsync(ApplicationPackageCallFixture.TenantA, "ApplicationPid", CancellationToken);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallOnAsync(ApplicationPackageCallFixture.TenantA, worker, CancellationToken));
+        var first = await fixture.RunnerPidAsync(ApplicationPackageCallFixture.TenantA, subjectId);
+        var folder = await fixture.RunnerFolderAsync(ApplicationPackageCallFixture.TenantA, subjectId);
+        var root = Path.GetDirectoryName(Path.GetDirectoryName(folder))!;
+        Assert.StartsWith("axis-runner-", Path.GetFileName(root), StringComparison.Ordinal);
+
+        await Polling.WaitUntilAsync(
+            () => TestPackageHost.HasExited(first) && !Directory.Exists(root),
+            "The idle runner did not exit and delete its files.");
+        var second = await RunPidAsync(ApplicationPackageCallFixture.TenantA, worker);
+
+        Assert.NotEqual(first, second);
+        Assert.Equal([first, second], host.TenantRunnerIds(ApplicationPackageCallFixture.TenantA, TestPackages.PythonId, "1.0.0"));
+    }
+
+    [Fact]
+    public async Task An_idle_runner_of_an_installed_package_stays_in_its_pool()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        using var extensions = new TemporaryFolder().InstallPython();
+        await using var host = await TestPackageHost.StartAsync(extensions.Path);
+        await using var pools = new PackageRunnerPools(
+            new PackageIsolation(false, null, 0, null, 0, ProxyPort: 0, PythonHost: "127.0.0.1", PythonPort: host.Endpoint.Port),
+            new ApplicationPackageSettings(true, "127.0.0.1", host.Endpoint.Port),
+            allowHttp: false,
+            TimeSpan.FromMilliseconds(500));
+        var python = pools.For(PackageLanguage.Python)!;
+
+        var installed = await python.RentAsync(TestPackages.PythonId, "1.0.0", CancellationToken);
+        var installedPid = Assert.Single(host.RunnerIds(TestPackages.PythonId, "1.0.0"));
+        python.Return(installed);
+        var application = await pools.Application.RentAsync(
+            TestPackages.PythonId, "1.0.0", CancellationToken, ApplicationPackageCallFixture.TenantA, ApplicationPackageCallFixture.BuiltPackageFiles());
+        var applicationPid = Assert.Single(host.TenantRunnerIds(ApplicationPackageCallFixture.TenantA, TestPackages.PythonId, "1.0.0"));
+        pools.Application.Return(application);
+
+        await Polling.WaitUntilAsync(() => TestPackageHost.HasExited(applicationPid), "The idle application runner did not exit.");
+
+        Assert.False(TestPackageHost.HasExited(installedPid));
+        Assert.Same(installed, await python.RentAsync(TestPackages.PythonId, "1.0.0", CancellationToken));
+    }
+
+    [Fact]
     public async Task A_release_with_other_built_files_of_the_same_version_runs_in_a_new_runner()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
