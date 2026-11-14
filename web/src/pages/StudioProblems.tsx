@@ -55,12 +55,15 @@ export function StudioProblems({
 
 /** Proposed: one problem of a `StudioProblemList`: what leads it, its words and the place it is about. */
 export interface StudioProblemItem {
-  /** What leads its words, such as "Error AX0412" or "Must change". */
+  /** What leads its words, such as "Error AX0412" or "Must change", or nothing. */
   lead: ReactNode
   message: string
   resourceId: string | null
   file: string
   path: string
+  /** The name and kind of a resource only the draft adds. */
+  name?: string | null
+  kind?: string | null
 }
 
 /**
@@ -104,6 +107,8 @@ export function StudioProblemList({
               <ResourceReference
                 resourceId={group.resourceId}
                 file={group.file}
+                name={first.name}
+                kind={first.kind}
                 path={first.path}
                 resources={resources}
                 onSelect={onSelect}
@@ -112,8 +117,10 @@ export function StudioProblemList({
             <ul style={{ listStyle: 'none', margin: 0, paddingInlineStart: spacing.md }}>
               {group.items.map((item, index) => (
                 <li key={index} data-testid="studio-problem">
-                  {item.lead} <Typography.Text>{item.message}</Typography.Text>
-                  {index > 0 && group.resourceId !== null && (
+                  {item.lead !== null && <>{item.lead} </>}
+                  <Typography.Text>{item.message}</Typography.Text>
+                  {/* A problem at another place of the resource than its first has a link to its own. */}
+                  {index > 0 && group.resourceId !== null && item.path !== first.path && (
                     <>
                       {' '}
                       <AxisButton role="link" onClick={() => onSelect(group.resourceId!, item.path)}>

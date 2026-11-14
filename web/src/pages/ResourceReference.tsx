@@ -9,18 +9,24 @@ import { PlatformContext } from './context'
 
 /**
  * Proposed: a pointer to a resource, see the review on #3263: the resource's title in the reader's language as the only
- * link, opening it at `path`, and its kind after it, muted, as the changes of a draft name a resource. A pointer to no
- * resource a person can open is its file, muted.
+ * link, opening it at `path`, and its kind after it, muted, as the changes of a draft name a resource. A resource only
+ * the draft adds is its name, as text, and its kind with "new", muted; any other pointer no one can open is its file,
+ * muted.
  */
 export function ResourceReference({
   resourceId,
   file,
+  name = null,
+  kind = null,
   path,
   resources,
   onSelect,
 }: {
   resourceId: string | null
   file: string | null
+  /** The name and kind of a resource only the draft adds, shown as text with "new", as no one opens it yet. */
+  name?: string | null
+  kind?: string | null
   path: string
   resources: readonly StudioResourceItem[]
   onSelect: (resourceId: string, path: string) => void
@@ -29,6 +35,16 @@ export function ResourceReference({
   const { colour, spacing } = useDesignTokens()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   if (resourceId === null) {
+    if (name !== null && kind !== null) {
+      return (
+        <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
+          <Typography.Text>{name}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>
+            {t('shell.studio.reference.new').replace('{kind}', kindSingular(kind, t))}
+          </Typography.Text>
+        </Flex>
+      )
+    }
     return file === null ? null : <Typography.Text style={{ color: colour.textMuted }}>{file}</Typography.Text>
   }
   const resource = resources.find((entry) => entry.id === resourceId)

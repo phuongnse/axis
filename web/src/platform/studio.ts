@@ -1812,18 +1812,17 @@ export interface StudioReviewFinding {
 }
 
 /**
- * Proposed: a request's plan, as a pull request's plan is written, see the review on #3263: its summary, what changes
- * in words, the choices AI made that the request did not say and why, which its author agrees to by approving, its
+ * Proposed: a request's plan, as a pull request's plan is written, see the review on #3263: what changes in words, the choices AI made that the request did not say and why, which its author agrees to by approving, its
  * effects on the data and the people already there and its limits, how it will be checked, and, resource by resource,
  * the edits it will make.
  */
 export interface StudioPlan {
-  summary: string
   changes: string[]
   decisions: { decision: string; reason: string }[]
   risks: string[]
   checks: string[]
-  details: { resourceId: string | null; file: string; edits: string[] }[]
+  /** Each resource's edits; `name` and `kind` name a resource the draft adds, which has no id yet. */
+  details: { resourceId: string | null; file: string; name: string | null; kind: string | null; edits: string[] }[]
 }
 
 /**
@@ -1835,6 +1834,9 @@ export interface StudioReviewStep {
   done: boolean
   resourceId: string | null
   file: string | null
+  /** The name and kind of a resource only the draft adds, which has no id in the application. */
+  name: string | null
+  kind: string | null
   path: string
 }
 

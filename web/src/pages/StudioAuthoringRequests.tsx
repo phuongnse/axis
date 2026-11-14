@@ -752,7 +752,6 @@ function PlanView({
     )
   return (
     <Flex vertical gap="middle" data-testid="studio-ai-plan">
-      <Typography.Text>{plan.summary}</Typography.Text>
       {group('shell.studio.aiRequest.plan.changes', 'studio-ai-plan-changes', plan.changes)}
       {group(
         'shell.studio.aiRequest.decisions',
@@ -773,20 +772,21 @@ function PlanView({
             </AxisButton>
           </span>
           {details && (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {plan.details.map((detail) => (
-                <li key={detail.file} style={{ paddingBlock: spacing.xs / 2 }}>
-                  <ResourceReference
-                    resourceId={detail.resourceId}
-                    file={detail.file}
-                    path=""
-                    resources={resources}
-                    onSelect={onOpen}
-                  />
-                  {bullets(detail.edits)}
-                </li>
-              ))}
-            </ul>
+            <StudioProblemList
+              items={plan.details.flatMap((detail) =>
+                detail.edits.map((edit) => ({
+                  lead: null,
+                  message: edit,
+                  resourceId: detail.resourceId,
+                  file: detail.file,
+                  path: '',
+                  name: detail.name,
+                  kind: detail.kind,
+                })),
+              )}
+              resources={resources}
+              onSelect={onOpen}
+            />
           )}
         </Flex>
       )}
@@ -850,6 +850,8 @@ function ReviewFindings({
                   <ResourceReference
                     resourceId={step.resourceId}
                     file={step.file}
+                    name={step.name}
+                    kind={step.kind}
                     path={step.path}
                     resources={resources}
                     onSelect={onOpen}

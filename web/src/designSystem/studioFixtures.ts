@@ -553,10 +553,8 @@ const aiRequests: StudioAuthoringRequest[] = [
   authoringRequest(1, 'dropped', 'Add a dashboard of spending by month.', '2026-11-05T09:10:00Z', true),
 ]
 
-// Proposed: the plans AI wrote for the preview's requests, as a pull request's plan is written, see the review on #3263.
+// Proposed: the plans AI wrote for the preview's requests, with no summary, as the request's words head its page, as a pull request's plan is written, see the review on #3263.
 const supplierPlan: StudioPlan = {
-  summary:
-    'Adds a Supplier entity and a required Supplier field on purchase requests, shown on the form, the detail and the list.',
   changes: [
     "A new Supplier entity keeps each supplier's name, tax code and email address, and whether it is active.",
     'Each purchase request gets a required Supplier field, chosen from the active suppliers.',
@@ -590,6 +588,8 @@ const supplierPlan: StudioPlan = {
     {
       resourceId: null,
       file: 'entities/supplier.json',
+      name: 'Supplier',
+      kind: 'entity',
       edits: [
         'A new entity Supplier: name (text, required), tax code (text), email address (email), active (yes or no).',
       ],
@@ -597,13 +597,29 @@ const supplierPlan: StudioPlan = {
     {
       resourceId: id(firstEntityId),
       file: 'entities/Request.json',
+      name: null,
+      kind: null,
       edits: ['A new field supplier: a reference to Supplier, required, limited to active suppliers.'],
     },
-    { resourceId: formId, file: 'forms/request-form.json', edits: ['The Supplier field after Title.'] },
-    { resourceId: pageId, file: 'pages/request-list.json', edits: ['A Supplier column after Title.'] },
+    {
+      resourceId: formId,
+      file: 'forms/request-form.json',
+      name: null,
+      kind: null,
+      edits: ['The Supplier field after Title.'],
+    },
+    {
+      resourceId: pageId,
+      file: 'pages/request-list.json',
+      name: null,
+      kind: null,
+      edits: ['A Supplier column after Title.'],
+    },
     {
       resourceId: null,
       file: 'scenarios/request-supplier.json',
+      name: 'Request supplier',
+      kind: 'scenario',
       edits: ['Two new scenarios: a request with a supplier saves, and one without is refused.'],
     },
   ],
@@ -611,8 +627,6 @@ const supplierPlan: StudioPlan = {
 
 // Proposed: the plan an outside AI app proposed from its conversation with its person, see the review on #3263.
 const appPlan: StudioPlan = {
-  summary:
-    'Adds a Cost centre entity and a Cost centre field on purchase requests, shown as a column of the request list.',
   changes: [
     'Add a Cost centre entity with a name and a code.',
     'Add a Cost centre field to the purchase request, chosen from the cost centres.',
@@ -625,14 +639,24 @@ const appPlan: StudioPlan = {
     {
       resourceId: null,
       file: 'entities/cost-centre.json',
+      name: 'Cost centre',
+      kind: 'entity',
       edits: ['A new entity CostCentre: name and code, both required.'],
     },
     {
       resourceId: id(firstEntityId),
       file: 'entities/Request.json',
+      name: null,
+      kind: null,
       edits: ['A new field costCentre: a reference to CostCentre.'],
     },
-    { resourceId: pageId, file: 'pages/request-list.json', edits: ['A Cost centre column after Title.'] },
+    {
+      resourceId: pageId,
+      file: 'pages/request-list.json',
+      name: null,
+      kind: null,
+      edits: ['A Cost centre column after Title.'],
+    },
   ],
 }
 
@@ -642,8 +666,7 @@ const plans: Record<string, StudioPlan> = { [aiRequests[0].id]: supplierPlan, [a
 function planOf(request: StudioAuthoringRequest): StudioPlan {
   return (
     plans[request.id] ?? {
-      summary: `Changes the application as asked: "${request.text}"`,
-      changes: [request.text],
+      changes: ['The application changes as the request asks.'],
       decisions: [],
       risks: [],
       checks: ['One new scenario checks the change.'],
@@ -660,7 +683,15 @@ function reviewOf(request: StudioAuthoringRequest, plan: StudioPlan | null): Stu
   return (
     reviews[request.id] ?? {
       summary: 'The draft does what the request and the plan ask.',
-      steps: (plan?.changes ?? []).map((step) => ({ step, done: true, resourceId: null, file: null, path: '' })),
+      steps: (plan?.changes ?? []).map((step) => ({
+        step,
+        done: true,
+        resourceId: null,
+        file: null,
+        name: null,
+        kind: null,
+        path: '',
+      })),
       findings: [],
     }
   )
@@ -1076,6 +1107,8 @@ const reviews: Record<string, StudioReview> = {
         done: true,
         resourceId: null,
         file: 'entities/cost-centre.json',
+        name: 'Cost centre',
+        kind: 'entity',
         path: '',
       },
       {
@@ -1083,6 +1116,8 @@ const reviews: Record<string, StudioReview> = {
         done: true,
         resourceId: id(firstEntityId),
         file: 'entities/Request.json',
+        name: null,
+        kind: null,
         path: '/fields/2',
       },
       {
@@ -1090,6 +1125,8 @@ const reviews: Record<string, StudioReview> = {
         done: false,
         resourceId: pageId,
         file: 'pages/request-list.json',
+        name: null,
+        kind: null,
         path: '/widgets/0/columns',
       },
     ],

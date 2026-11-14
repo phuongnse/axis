@@ -23,7 +23,6 @@ const fromApp: StudioAuthoringRequestDetail = {
   coAuthors: ['Claude Code'],
   state: 'ready',
   plan: {
-    summary: 'Add a Cost centre field to the purchase request.',
     changes: ['A Cost centre field on each purchase request.'],
     decisions: [],
     risks: [],
@@ -118,7 +117,9 @@ describe('an outside AI app’s request', () => {
     expect(within(asked).getByText('Add a Cost centre field to the purchase request.')).toBeInTheDocument()
     expect(within(asked).getByText(/^Sent by you on .*, co-authored with Claude Code$/)).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('tab', { name: 'Plan' }))
-    expect(await screen.findByTestId('studio-ai-plan')).toHaveTextContent('Add a Cost centre field')
+    expect(await screen.findByTestId('studio-ai-plan')).toHaveTextContent(
+      'A Cost centre field on each purchase request.',
+    )
     expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument()
     const notReviewed = screen.getByTestId('studio-ai-not-reviewed')
     expect(within(notReviewed).getByText('Not reviewed')).toHaveAttribute('data-tone', 'muted')
@@ -515,18 +516,25 @@ describe('a plan and its review, as a pull request has them', () => {
       review: null,
       aiConnected: true,
       plan: {
-        summary: 'Adds a Cost centre field.',
         changes: ['A Cost centre field on each request.'],
         decisions: [{ decision: 'The field is optional.', reason: 'The request did not say.' }],
         risks: ['Saved requests have no cost centre.'],
         checks: ['A request saves with a cost centre.'],
-        details: [{ resourceId: 'r-1', file: 'pages/list.json', edits: ['A Cost centre column.'] }],
+        details: [
+          { resourceId: 'r-1', file: 'pages/list.json', name: null, kind: null, edits: ['A Cost centre column.'] },
+          {
+            resourceId: null,
+            file: 'entities/cost-centre.json',
+            name: 'Cost centre',
+            kind: 'entity',
+            edits: ['A new entity.'],
+          },
+        ],
       },
     })
     renderPage()
 
-    const plan = await screen.findByTestId('studio-ai-plan')
-    expect(within(plan).getByText('Adds a Cost centre field.')).toBeInTheDocument()
+    await screen.findByTestId('studio-ai-plan')
     expect(within(screen.getByTestId('studio-ai-plan-changes')).getByText('What changes')).toBeInTheDocument()
     const decisions = screen.getByTestId('studio-ai-plan-decisions')
     expect(within(decisions).getByText('Decisions to check')).toBeInTheDocument()
@@ -537,11 +545,14 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(screen.queryByText('A Cost centre column.')).toBeNull()
 
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: 'Show the details' }))
-    expect(screen.getByText('A Cost centre column.')).toBeInTheDocument()
-    expect(
-      within(screen.getByTestId('studio-ai-plan-details')).getByRole('button', { name: 'Requests' }),
-    ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show the technical details' }))
+    // The details list as the review's findings do, each resource once, and one only the draft adds by its name, new.
+    const details = screen.getByTestId('studio-ai-plan-details')
+    const [page, added] = within(details).getAllByTestId('studio-problem-group')
+    expect(within(page).getByRole('button', { name: 'Requests' })).toBeInTheDocument()
+    expect(page).toHaveTextContent('A Cost centre column.')
+    expect(added).toHaveTextContent(/^Cost centre\s*Entity, new\s*A new entity\.$/)
+    expect(within(added).queryByText('entities/cost-centre.json')).toBeNull()
     expect(screen.getByRole('button', { name: 'Approve plan' })).toBeInTheDocument()
   })
 
@@ -552,8 +563,16 @@ describe('a plan and its review, as a pull request has them', () => {
       review: {
         summary: 'The field is added, but the list shows no column.',
         steps: [
-          { step: 'Add the field.', done: true, resourceId: null, file: null, path: '' },
-          { step: 'Show it in the list.', done: false, resourceId: 'r-1', file: 'pages/list.json', path: '/widgets/0' },
+          { step: 'Add the field.', done: true, resourceId: null, file: null, name: null, kind: null, path: '' },
+          {
+            step: 'Show it in the list.',
+            done: false,
+            resourceId: 'r-1',
+            file: 'pages/list.json',
+            name: null,
+            kind: null,
+            path: '/widgets/0',
+          },
         ],
         findings: [],
       },
