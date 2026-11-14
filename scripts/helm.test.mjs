@@ -241,7 +241,7 @@ describe('the Axis Helm chart', () => {
 
   test('the image tag and registry apply to every host', () => {
     const output = renderOk('--set', 'image.registry=registry.example.com/axis', '--set', 'image.tag=1.2.3')
-    for (const image of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-node']) {
+    for (const image of ['axis-server', 'axis-worker', 'axis-agent', 'axis-admin', 'axis-package-host-dotnet', 'axis-package-host-node', 'axis-package-host-python']) {
       assert.match(output, new RegExp(`image: "registry\\.example\\.com/axis/${image}:1\\.2\\.3"`))
     }
   })
@@ -303,6 +303,7 @@ describe('the Axis Helm chart', () => {
   for (const [runtime, label, setting] of [
     ['dotnet', 'C#', 'Dotnet'],
     ['node', 'Node.js', 'Node'],
+    ['python', 'Python', 'Python'],
   ]) {
     const name = `axis-package-host-${runtime}`
 
@@ -382,15 +383,20 @@ describe('the Axis Helm chart', () => {
     })
   }
 
-  test('the Node.js package host is the C# package host with only its names swapped', () => {
-    const output = renderOk('--set', 'extensions.volume.persistentVolumeClaim.claimName=packages')
-    for (const kind of ['Deployment', 'Service', 'NetworkPolicy']) {
-      const dotnet = find(output, kind, 'axis-package-host-dotnet')
-      const node = find(output, kind, 'axis-package-host-node')
-      assert.notEqual(node, dotnet)
-      assert.equal(node, dotnet.replaceAll('package-host-dotnet', 'package-host-node'))
-    }
-  })
+  for (const [runtime, label] of [
+    ['node', 'Node.js'],
+    ['python', 'Python'],
+  ]) {
+    test(`the ${label} package host is the C# package host with only its names swapped`, () => {
+      const output = renderOk('--set', 'extensions.volume.persistentVolumeClaim.claimName=packages')
+      for (const kind of ['Deployment', 'Service', 'NetworkPolicy']) {
+        const dotnet = find(output, kind, 'axis-package-host-dotnet')
+        const other = find(output, kind, `axis-package-host-${runtime}`)
+        assert.notEqual(other, dotnet)
+        assert.equal(other, dotnet.replaceAll('package-host-dotnet', `package-host-${runtime}`))
+      }
+    })
+  }
 
   test('several server replicas share one Studio volume', () => {
     const output = renderOk()
@@ -713,6 +719,9 @@ describe('the Axis Helm chart', () => {
     ['packageHost.node.resources', 'packageHost.node.resources=null'],
     ['packageHost.node.resources.limits.cpu', 'packageHost.node.resources.limits.cpu=null'],
     ['packageHost.node.resources.limits.memory', 'packageHost.node.resources.limits.memory=null'],
+    ['packageHost.python.resources', 'packageHost.python.resources=null'],
+    ['packageHost.python.resources.limits.cpu', 'packageHost.python.resources.limits.cpu=null'],
+    ['packageHost.python.resources.limits.memory', 'packageHost.python.resources.limits.memory=null'],
   ]) {
     test(`a missing ${value} fails and names it`, () => {
       const result = render('--set', set)

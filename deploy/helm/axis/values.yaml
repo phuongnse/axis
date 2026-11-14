@@ -54,6 +54,13 @@ packageHost:
       limits:
         cpu: "1"
         memory: 1Gi
+  python:
+    repository: axis-package-host-python
+    replicas: 1
+    resources:
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 # The publisher runs "axis-admin publisher", which runs the publish requests that
 # Studio stores. It uses the image of migrate.repository and always runs one replica.

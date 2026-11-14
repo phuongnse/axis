@@ -19,6 +19,7 @@ docs/reference/extension-packages.md#package-runners. Call with the root context
 {{- define "axis.packageHostRuntimes" -}}
 dotnet: "C#"
 node: "Node.js"
+python: "Python"
 {{- end }}
 
 {{/* Labels of every object. Call with the root context. */}}
