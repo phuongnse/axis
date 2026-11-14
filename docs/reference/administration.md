@@ -444,6 +444,7 @@ tenant database. Every loop writes to the same output.
 - `Extensions:Path` and `Modules:Path`, as `activate` reads them. An unset path gives an empty
   catalog, and a set path whose folder does not exist is a settings error.
 - `Activation:InlineRecomputeLimit` and `Data:ActivationTimeout`, as for `activate`.
+- `Extensions:ApplicationPackages` and `Extensions:Runners:Application`, see [an application's packages](extension-packages.md#an-applications-packages). With the first `true`, a missing or malformed second exits with code 2.
 - `Cell:HostCheckInterval`. A value that is not a positive time span exits with code `2`.
 - In a cell (`Cell:Id` set), the settings of the [create](#create-job) and [purge](#purge-job) jobs:
   `Admin:ConnectionString`, the `IdentityProvider` settings, `Cell:BackupKeyFile`,
@@ -541,15 +542,14 @@ tenant's schema role unless it says otherwise.
      activated.
    - The scenarios may run for 10 minutes, counted from the first one of each claim, and past that
      the request fails with `AXC0219`. A stop of the publisher does not cut them short.
-4. For `publish`: `compile` the snapshot against the tenant database and store its release,
-   `activate` the release, then `seed` and `indexes`. These are the steps of [activate](#activate)
-   and report the same diagnostics. `seed` runs as the runtime role, and `indexes` as the schema
-   role. The `activate` step also updates the tenant's realm after the activation has committed, as
-   in [activate](#activate). The compile reads the snapshot's files, never the application folder on
-   any disk. A snapshot that cannot be read, because it is not an array of
-   `{ file, version, content }` or names a file twice, fails at `compile` and stores no release.
-   Activation adds a row to the [release history](publish-request-storage.md#release-history) with the requesting
-   user, the label, the note and the request id, unless the release is already active.
+4. For `publish`: `compile` the snapshot against the tenant database and store its release, `activate` the release, then `seed` and `indexes`. These are
+   the steps of [activate](#activate) and report the same diagnostics. `seed` runs as the runtime role, and `indexes` as the schema role. The `activate`
+   step also updates the tenant's realm after the activation has committed, as in [activate](#activate). The compile reads the snapshot's files, never
+   the application folder on any disk. With `Extensions:ApplicationPackages` on, `compile` first builds each package in `application-package-host`, see
+   [an application's packages](extension-packages.md#an-applications-packages). A snapshot that cannot be read, because it is not an array of
+   `{ file, version, content }` or names a file twice, fails at `compile` and stores no release. Activation adds a row to the [release
+   history](publish-request-storage.md#release-history) with the requesting user, the label, the note and the request id, unless the release is already
+   active.
 5. For `validate`: the step `validate`, the only one after `version` and `contracts`. It runs the
    `compile` and every check of `activate` against the tenant inside one transaction, then rolls the
    transaction back. It stores no release, adds no history row, seeds nothing, starts no schedule

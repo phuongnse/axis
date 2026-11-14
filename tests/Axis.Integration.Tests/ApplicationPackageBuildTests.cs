@@ -20,16 +20,12 @@ public sealed class ApplicationPackageBuildTests
 {
     private const string Wheel = "phonenumbers-9.0.43-";
 
-    private const string NoFindings = """{"Results":[]}""";
-
-    private const string HighFinding = """{"Results":[{"Vulnerabilities":[{"Severity":"HIGH","PkgName":"phonenumbers","InstalledVersion":"9.0.43","VulnerabilityID":"CVE-2099-0001"}]}]}""";
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
     public async Task A_package_with_a_hashed_requirement_is_built_with_its_dependency_and_nothing_is_written_to_the_extensions_folder()
     {
-        using var test = new Build(NoFindings);
+        using var test = new Build(StubTrivy.NoFindings);
 
         var answer = await test.BuildAsync(Build.Files());
 
@@ -43,7 +39,7 @@ public sealed class ApplicationPackageBuildTests
     [Fact]
     public async Task A_dependency_with_a_high_vulnerability_is_refused_naming_the_dependency()
     {
-        using var test = new Build(HighFinding);
+        using var test = new Build(StubTrivy.HighFinding);
 
         var answer = await test.BuildAsync(Build.Files());
 
@@ -57,7 +53,7 @@ public sealed class ApplicationPackageBuildTests
     [Fact]
     public async Task A_requirement_without_a_hash_is_refused_naming_the_lock_file_and_nothing_is_scanned()
     {
-        using var test = new Build(NoFindings);
+        using var test = new Build(StubTrivy.NoFindings);
         var files = Build.Files();
         files["requirements.txt"] = Encoding.UTF8.GetBytes("phonenumbers==9.0.43\n");
 
@@ -75,19 +71,15 @@ public sealed class ApplicationPackageBuildTests
     private sealed class Build : IDisposable
     {
         private readonly TemporaryFolder _extensions = new();
-        private readonly TemporaryFolder _scripts = new();
-        private readonly string _trivy;
+        private readonly StubTrivy _trivy;
         private readonly string[] _leftBefore = BuildFolders();
 
         public Build(string report)
         {
-            Assert.SkipWhen(OperatingSystem.IsWindows(), "The stub scanner is a shell script.");
-            _trivy = Path.Combine(_scripts.Path, "trivy");
-            File.WriteAllText(_trivy, $"#!/bin/sh\ntouch \"$0.ran\"\ncat <<'JSON'\n{report}\nJSON\n");
-            File.SetUnixFileMode(_trivy, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            _trivy = new StubTrivy(report);
         }
 
-        public bool ScannerRan => File.Exists($"{_trivy}.ran");
+        public bool ScannerRan => _trivy.Ran;
 
         /// <summary>The manifest and adapter of the sample package, the wheel of <c>phonenumbers</c> and a <c>requirements.txt</c> that locks it by hash.</summary>
         public static Dictionary<string, byte[]> Files()
@@ -109,7 +101,7 @@ public sealed class ApplicationPackageBuildTests
         {
             await using var host = await TestPackageHost.StartAsync(
                 _extensions.Path,
-                settings: new Dictionary<string, string?> { ["PackageBuild:Trivy"] = _trivy });
+                settings: new Dictionary<string, string?> { ["PackageBuild:Trivy"] = _trivy.Command });
             using var client = new TcpClient();
             await client.ConnectAsync(host.Endpoint, CancellationToken);
             await using var stream = client.GetStream();
@@ -129,7 +121,7 @@ public sealed class ApplicationPackageBuildTests
         public void Dispose()
         {
             _extensions.Dispose();
-            _scripts.Dispose();
+            _trivy.Dispose();
         }
 
         private static string[] BuildFolders() =>

@@ -74,6 +74,8 @@ namespace Axis.Admin;
 /// A stop lets a running job finish. In a fourth loop it also checks the pending host requests of <c>platform.tenant_host_requests</c> every
 /// <c>Cell:HostCheckInterval</c>, see <see cref="TenantHostVerification"/>. In a fifth loop it deletes the stored tenant exports that are older
 /// than 7 days every hour, see <see cref="TenantExportSweep"/>, and only with the export storage settings. With a Studio setting it also holds the Studio folders and their write lock, see <see cref="PublisherStudio"/>. A failed round writes one line, and the next round tries again.
+/// With <c>Extensions:ApplicationPackages</c> on, the <c>compile</c> step of a <c>publish</c> first sends each application package to
+/// <c>application-package-host</c> to build, see <see cref="ApplicationPackageBuilds"/>, and a refused or unanswered build fails it.
 /// </summary>
 internal sealed class Publisher(
     ReleaseSettings settings,
@@ -88,7 +90,8 @@ internal sealed class Publisher(
     ProvisioningJobs? jobs = null,
     TenantHostVerification? hosts = null,
     TenantExportSweep? exports = null,
-    PublisherStudio? studio = null)
+    PublisherStudio? studio = null,
+    ApplicationPackageBuilds? packageBuilds = null)
 {
     /// <summary>The Studio folders this publisher reads and writes, or null when no Studio setting is set.</summary>
     internal PublisherStudio? Studio { get; } = studio;
@@ -472,6 +475,22 @@ internal sealed class Publisher(
         }
     }
 
+    // Builds the application packages in application-package-host before the compile, see
+    // docs/reference/extension-packages.md#an-applications-packages. Only a publish builds them.
+    private async Task<ReleaseCompilationResult> CompilePublishAsync(IReadOnlyList<ResourceContent> files, ConfigurationDbContext configuration)
+    {
+        if (packageBuilds is not null && settings.ApplicationPackages)
+        {
+            var refused = await packageBuilds.BuildAsync(files, CancellationToken.None);
+            if (refused.Count > 0)
+            {
+                return new ReleaseCompilationResult(null, null, refused);
+            }
+        }
+
+        return await ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None);
+    }
+
     private async Task RunRequestCoreAsync(
         PublisherTenant tenant,
         ITenantConnections connections,
@@ -574,7 +593,7 @@ internal sealed class Publisher(
                 target.SchemaVersion,
                 previewConnections ?? connections,
                 target.Bindings,
-                configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
+                configuration => CompilePublishAsync(files, configuration),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
                 syncRealm: target.SyncRealm,
