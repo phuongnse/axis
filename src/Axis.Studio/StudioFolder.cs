@@ -16,8 +16,8 @@ internal sealed record StudioSnapshotFile(string File, string Version, string Co
 internal sealed record StudioFile(Guid Id, string Kind, string? Name, string File, string Version, byte[] Bytes);
 
 /// <summary>
-/// Finds a Studio folder by application name and lists its resource files. Only real
-/// <c>*.json</c> files under the folder are listed. A symbolic link, a hidden file and a file
+/// Finds a Studio folder by application name and lists its files. Only real <c>*.json</c> files and
+/// real files under <c>packages/</c> are listed. A symbolic link, a hidden file and a file
 /// whose resolved path leaves the folder are never listed, so no request reads outside the folder.
 /// </summary>
 internal static class StudioFolder
@@ -182,9 +182,9 @@ internal static class StudioFolder
     }
 
     /// <summary>
-    /// Every <c>*.json</c> file under <paramref name="folder"/>, sorted by file, as a publish request stores it. A file
-    /// that is not a valid resource is kept, so the publisher reports it. The same files as <see cref="List"/> are
-    /// reachable: no link, no hidden file and nothing that leaves the folder.
+    /// Every <c>*.json</c> file and every file under <c>packages/</c> of <paramref name="folder"/>, sorted by file, as a
+    /// publish request stores it. A file that is not a valid resource is kept, so the publisher reports it. No link,
+    /// no hidden file and nothing that leaves the folder is reachable, as for <see cref="List"/>.
     /// </summary>
     public static IReadOnlyList<StudioSnapshotFile> Snapshot(string folder) => Snapshot(Files(folder));
 
@@ -199,23 +199,31 @@ internal static class StudioFolder
             Encoding.UTF8.GetString(file.Bytes)))];
 
     /// <summary>
-    /// The path relative to <paramref name="folder"/> and the bytes of every file <see cref="Snapshot"/> lists, sorted
-    /// by path ordinally. One mechanism decides which files a snapshot and a revision hold.
+    /// The path relative to <paramref name="folder"/> and the bytes of every <c>*.json</c> file and every file under
+    /// <c>packages/</c>, sorted by path ordinally. <see cref="Snapshot(string)"/> lists the same files. One mechanism
+    /// decides which files a snapshot and a revision hold.
     /// </summary>
     public static IReadOnlyList<(string File, byte[] Bytes)> Files(string folder)
     {
         var root = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
         var files = new List<(string File, byte[] Bytes)>();
-        foreach (var path in Directory.EnumerateFiles(folder, "*.json", _enumeration))
+        foreach (var path in Directory.EnumerateFiles(folder, "*", _enumeration))
         {
             if (!Path.GetFullPath(path).StartsWith(root, StringComparison.Ordinal))
             {
                 continue;
             }
 
+            var relative = Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/');
+            if (!relative.EndsWith(".json", StringComparison.Ordinal)
+                && !relative.StartsWith(ApplicationLoader.PackagesFolderPrefix, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             try
             {
-                files.Add((Path.GetRelativePath(folder, path).Replace(Path.DirectorySeparatorChar, '/'), File.ReadAllBytes(path)));
+                files.Add((relative, File.ReadAllBytes(path)));
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
@@ -274,8 +282,8 @@ internal static class StudioFolder
     }
 
     /// <summary>
-    /// The resources of <paramref name="folder"/>, as <see cref="List"/> lists them, and every <c>*.json</c> file as
-    /// <see cref="Snapshot"/> reads it, from one walk of the folder. Both lists are sorted by file.
+    /// The resources of <paramref name="folder"/>, as <see cref="List"/> lists them, and every <c>*.json</c> file, from
+    /// one walk of the folder. Both lists are sorted by file.
     /// </summary>
     public static (IReadOnlyList<StudioFile> Resources, IReadOnlyList<ResourceContent> Files) ListWithContent(string folder)
     {

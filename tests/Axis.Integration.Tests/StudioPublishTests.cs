@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Admin;
@@ -84,6 +85,33 @@ public sealed class StudioPublishTests : IAsyncLifetime
             $"SELECT count(*) FROM axis.release_activations WHERE request_id = '{id}' AND actor = 'author' AND actor_name IS NULL",
             CancellationToken));
         await AssertContractScenariosPassedAsync(connectionString, id);
+    }
+
+    [Fact]
+    public async Task The_snapshot_of_a_publish_request_holds_a_package_file_with_its_version()
+    {
+        using var folder = NewFolder();
+        var connectionString = await _database.CreateDatabaseAsync("studio_publish_package", CancellationToken);
+        await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        // The folder compiles at start without the file. The request stores a folder with errors as well.
+        var adapter = Path.Combine(folder.Path, "packages", "x", "adapter.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(adapter)!);
+        byte[] bytes = [.. "print('adapter')\n"u8];
+        File.WriteAllBytes(adapter, bytes);
+
+        using var accepted = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
+
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        using var request = await ReadAsync(accepted);
+        var id = request.RootElement.GetProperty("id").GetString()!;
+        Assert.Equal(
+            Convert.ToHexStringLower(SHA256.HashData(bytes)),
+            await PostgreSqlServer.AdminScalarAsync(
+                connectionString,
+                $"SELECT e->>'version' FROM axis.publish_requests, jsonb_array_elements(snapshot) e WHERE id = '{id}' AND e->>'file' = 'packages/x/adapter.py'",
+                CancellationToken));
     }
 
     [Fact]

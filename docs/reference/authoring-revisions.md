@@ -24,7 +24,7 @@ other.
 
 `200` with `{ revision, resources: [{ file, change, id, kind, name, before, after, target }] }`, sorted by
 `file`. `revision` has the fields of a list item. `change` is `added`, `changed` or `removed`. `before`
-and `after` are the file's JSON text, and `null` on the side where the file does not exist. `id`, `kind`
+and `after` are the file's text, and `null` on the side where the file does not exist. `id`, `kind`
 and `name` are read from the file, and are `null` when it does not parse. `target` is, for a
 [customization layer](customization-layers.md) file under `customizations/`, the module resource it changes, such as
 `approvals/RequestApproval`, taken from the file's path, and `null` for any other file. A file moved by

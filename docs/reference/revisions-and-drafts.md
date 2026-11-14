@@ -25,8 +25,8 @@ LibGit2Sharp.
 - **Created on first use.** The first write to a folder that has no repository commits the folder as
   it is, as the revision "Start of history". Creating an application makes no revision, so its first
   write records the template as "Start of history".
-- **Built in memory.** A revision is built from the folder's JSON files, as the authoring API reads
-  them, into a bare repository. Git never checks anything out, so no `.git` file ever appears in the
+- **Built in memory.** A revision is built from the folder's JSON files and every file under `packages/`, as
+  the authoring API reads them, into a bare repository. Git never checks anything out, so no `.git` file ever appears in the
   folder.
 - **Loaded at start.** The server loads the git library at start, so an installation without it fails
   at once, not on the first save.
@@ -136,6 +136,7 @@ is named "Undo <summary>", such as "Undo Change rule FinanceThreshold". The
 
 What a repository holds and how long it keeps it.
 
-- **Size.** A revision holds only JSON files under the folder, as the authoring API reads them.
+- **Size.** A revision holds the folder's JSON files and every file under `packages/`, as the authoring
+  API reads them. A hidden file and a link are left out.
 - **Retention.** Revisions are kept as long as the application. A deleted application's repository is
   deleted with its folder.

@@ -103,6 +103,35 @@ public sealed class StudioRevisionTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task A_hand_edit_of_a_package_file_is_an_outside_change_and_its_undo_puts_the_old_bytes_back()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var adapter = Path.Combine(folder.Path, "packages", "x", "adapter.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(adapter)!);
+        byte[] first = [.. "print('v1')\n"u8];
+        File.WriteAllBytes(adapter, first);
+        using var revisions = new TemporaryFolder();
+        await using var factory = await CreateFactoryAsync(folder.Path, revisions.Path);
+        using var client = factory.CreateClient().SignedInAs("author");
+
+        using var rule = await PatchAsync(client, RuleId, Version(folder.Path, "rules/finance-threshold.json"), "/expression", "20000");
+        Assert.Equal(HttpStatusCode.OK, rule.StatusCode);
+        File.WriteAllBytes(adapter, [.. "print('v2')\n"u8]);
+        using var policy = await PatchAsync(client, PolicyId, Version(folder.Path, "policies/employee-access.json"), "/name", "EmployeeAccessRenamed");
+        Assert.Equal(HttpStatusCode.OK, policy.StatusCode);
+
+        using var repository = new Repository(RepositoryPath(revisions.Path, folder.Path));
+        var commits = Commits(repository);
+        Assert.Equal(
+            ["Start of history", "Change rule FinanceThreshold", "Outside change", "Change policy EmployeeAccess"],
+            commits.Select(commit => commit.MessageShort));
+        Assert.Equal(["packages/x/adapter.py"], Paths(repository, commits[1], commits[2]));
+        using var undo = await SendAsync(client, HttpMethod.Post, $"{Url}/revisions/{commits[2].Sha}/undo", null);
+        Assert.Equal(HttpStatusCode.OK, undo.StatusCode);
+        Assert.Equal(first, File.ReadAllBytes(adapter));
+    }
+
+    [Fact]
     public async Task A_folder_inside_a_git_checkout_gets_its_repository_under_the_revisions_path_and_no_git_folder()
     {
         using var outer = new TemporaryFolder();
