@@ -569,7 +569,7 @@ implements the operation context over it.
 
 | Message | Sent by | Fields |
 | --- | --- | --- |
-| `start` | The worker, to the host | `package`, `version`, `proxy`, the `host:port` of the worker's egress proxy, and `proxyToken` |
+| `start` | The worker, to the host | `package`, `version`, `proxy`, the `host:port` of the worker's egress proxy, and `proxyToken`. Optional `tenant` and `files`, as in `build`, and `files` needs `tenant` |
 | `ready` | The runner | None |
 | `run` | The worker | `operation`, `operationId`, `input`, and `bindings` with `urls` and `secrets`, each mapping a binding name to its value |
 | `result` | The runner | `output` |
@@ -584,7 +584,7 @@ implements the operation context over it.
 - **Framing.** Each message is one line of JSON in UTF-8, over TCP on the runner network. The connection
   is neither encrypted nor authenticated, and a `run` carries binding secrets, so only the operator's
   runner network protects it. The host listens on port 5310, or on `PackageHost:Port`, on every interface, or on the IP address of
-  `PackageHost:Address`, and reads the installed versions from `Extensions:Path`. It does not start without that
+  `PackageHost:Address`, and reads the installed versions from `Extensions:Path`, unless a `start` carries `files`. It does not start without that
   setting, or when the folder does not exist, or when `PackageHost:Port` is not a whole number from 1 to 65535, or
   when `PackageHost:Address` is not an IP address, and it exits with code 2 and a message that names the setting.
   `scripts/dev.sh` and `scripts/e2e.sh` set `PackageHost:Address` to `127.0.0.1`, because the protocol has no authentication.
@@ -595,13 +595,16 @@ implements the operation context over it.
 - **Start.** A `start` for a version that is not installed, or whose `package`, `version` or `proxy` is not
   well formed, closes the connection and starts no runner. So does a `start` for a version whose runtime
   is missing from the host's image. The runner answers `ready` once it has
-  loaded the version.
+  loaded the version. A `start` with `files` may be as long as a `build`. The host refuses a path by the rule of the Build
+  bullet, a missing `tenant`, and a manifest whose id or version differs from the `start`. It then closes the connection and
+  starts no runner. Otherwise it writes the files to `/tmp/axis-runner-<random>/<package>/<version>/`, starts the runner from
+  there and deletes the folder when the runner ends. It logs the tenant with the runner's process ID, and no file names.
 - **Sandbox.** A `sandbox` may be the first line of a connection instead of a `start`. The host answers `sandbox`
   with `gvisor` set, `true` only when its kernel log, as `dmesg` reads it, begins with gVisor's `Starting gVisor` line. A kernel
   log that begins otherwise, or a read that is refused, answers `false`. Then the host closes the connection and starts no runner.
   A `sandbox` that already holds `gvisor` closes the connection without an answer.
 - **Build.** A `build` may be the first line of a connection instead of a `start`. It may be longer than the other
-  first lines, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line closes
+  first lines, as may a `start` with `files`, up to the limit in `RunnerHost`, because a package with a wheel needs megabytes, and a longer line closes
   the connection. The host writes the files into a temporary copy and runs steps 1, 2, 4 and 5 of
   [building a package](#building-a-package) on it, reading the manifest as metadata only, so no package code runs in the
   host. It answers `built` with every file of the built copy, or `refused` with each problem. Then it closes the connection.

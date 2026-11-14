@@ -28,9 +28,12 @@ public abstract record RunnerMessage;
 
 /// <summary>
 /// The worker asks the host to start a runner for one installed package version. <paramref name="Proxy"/> is the
-/// <c>host:port</c> of the worker's egress proxy, and <paramref name="ProxyToken"/> is the runner's credential for it.
+/// <c>host:port</c> of the worker's egress proxy, and <paramref name="ProxyToken"/> is the runner's credential for it. With
+/// <paramref name="Files"/>, which map a relative path to its content as in <see cref="BuildMessage"/>, the host runs the package
+/// from a temporary copy of the files and not from an installed version, and <paramref name="Tenant"/> names whose package it is.
 /// </summary>
-public sealed record StartMessage(string Package, string Version, string Proxy, string ProxyToken) : RunnerMessage;
+public sealed record StartMessage(
+    string Package, string Version, string Proxy, string ProxyToken, string? Tenant = null, Dictionary<string, byte[]>? Files = null) : RunnerMessage;
 
 /// <summary>The runner has loaded the version and takes a <c>run</c>.</summary>
 public sealed record ReadyMessage : RunnerMessage;

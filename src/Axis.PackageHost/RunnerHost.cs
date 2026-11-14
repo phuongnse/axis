@@ -27,7 +27,11 @@ namespace Axis.PackageHost;
 /// kills the runner and its child processes, and a runner that exits closes the connection. The host logs the
 /// runner's process id, package and version, and no message. The first line may instead be a <c>sandbox</c> question with no
 /// <c>gvisor</c>. The host answers it from <paramref name="sandbox"/>, closes the connection and starts no runner.
+/// A <c>start</c> may carry <c>files</c> and a <c>tenant</c>. The host then writes the files to a temporary root, checks that the manifest
+/// there names the <c>start</c>'s id and version, runs the runner from it, logs the tenant and deletes the root when the runner ends. A
+/// bad path, a missing tenant or a manifest that names another id or version closes the connection and starts no runner.
 /// The first line may also be a <c>build</c>, which may be longer than the other first lines, up to <see cref="MaxBuildLine"/> bytes.
+/// So may a <c>start</c> with files.
 /// The host writes its files into a temporary copy and runs the checks of <see cref="PackageChecks"/> on it, with the manifest read
 /// as metadata only and with <paramref name="configuration"/> for the settings of pip and Trivy. It answers <c>built</c> with
 /// the files of the built copy, without symbolic links, or <c>refused</c> with each problem, then closes the connection. It
@@ -38,7 +42,7 @@ namespace Axis.PackageHost;
 internal sealed partial class RunnerHost(
     string extensionsRoot, RunnerCommands commands, ILogger<RunnerHost> logger, Sandbox? sandbox = null, IConfiguration? configuration = null) : IAsyncDisposable
 {
-    /// <summary>The longest line the host reads as the first line of a connection, other than a <c>build</c>, in bytes.</summary>
+    /// <summary>The longest line the host reads as the first line of a connection, other than a <c>build</c> or a <c>start</c> with files, in bytes.</summary>
     private const int MaxStartLine = 4096;
 
     /// <summary>The longest <c>build</c> line the host reads, in bytes.</summary>
@@ -141,20 +145,70 @@ internal sealed partial class RunnerHost(
                     return;
                 }
 
-                using var runner = TryStartRunner(started.Start, started.Language);
-                if (runner is null)
+                if (started.Start.Files is not null)
                 {
+                    await RunFromFilesAsync(started.Start, reader, client.GetStream());
                     return;
                 }
 
-                LogStarted(runner.Id, started.Start.Package, started.Start.Version);
-                await PipeAsync(reader, client.GetStream(), runner);
+                await RunAsync(extensionsRoot, started.Start, started.Language, reader, client.GetStream(), tenant: null);
             }
             finally
             {
                 await reader.CompleteAsync();
             }
         }
+    }
+
+    /// <summary>
+    /// Runs a <c>start</c> with files, see docs/reference/extension-packages.md#the-runner-protocol. A bad path or a manifest that names
+    /// another id or version starts no runner. The temporary root is deleted when the runner has ended, whatever the cause.
+    /// </summary>
+    private async Task RunFromFilesAsync(StartMessage start, PipeReader reader, Stream socket)
+    {
+        if (BadPaths(start.Files!.Keys).Count > 0)
+        {
+            return;
+        }
+
+        var root = Directory.CreateTempSubdirectory("axis-runner-").FullName;
+        try
+        {
+            if (!Write(start.Files, Path.Combine(root, start.Package, start.Version), out _)
+                || PackageCatalog.ReadInstalledManifest(root, start.Package, start.Version) is not { } manifest
+                || manifest.Id != start.Package
+                || manifest.Version != start.Version)
+            {
+                return;
+            }
+
+            await RunAsync(root, start, manifest.Language, reader, socket, start.Tenant);
+        }
+        finally
+        {
+            DeleteQuietly(root);
+        }
+    }
+
+    /// <summary>Starts the runner from <paramref name="root"/> and pipes the connection to it until one side ends.</summary>
+    private async Task RunAsync(string root, StartMessage start, PackageLanguage language, PipeReader reader, Stream socket, string? tenant)
+    {
+        using var runner = TryStartRunner(root, start, language);
+        if (runner is null)
+        {
+            return;
+        }
+
+        if (tenant is null)
+        {
+            LogStarted(runner.Id, start.Package, start.Version);
+        }
+        else
+        {
+            LogStartedForTenant(runner.Id, tenant, start.Package, start.Version);
+        }
+
+        await PipeAsync(reader, socket, runner);
     }
 
     /// <summary>Answers a <c>sandbox</c> question with whether this machine runs under gVisor.</summary>
@@ -168,7 +222,7 @@ internal sealed partial class RunnerHost(
     }
 
     /// <summary>
-    /// What the first line asked for: a <see cref="Start"/> with the language of its manifest, a <see cref="Build"/>, or, with neither, a
+    /// What the first line asked for: a <see cref="Start"/> with the language of its installed manifest, or <c>default</c> for a start with files, a <see cref="Build"/>, or, with neither, a
     /// <c>sandbox</c> question.
     /// </summary>
     private sealed record FirstLine(StartMessage? Start, PackageLanguage Language, BuildMessage? Build);
@@ -177,7 +231,7 @@ internal sealed partial class RunnerHost(
     /// Reads the first line. Returns the <c>start</c> it holds with the language of its manifest, the <c>build</c> it holds, or a
     /// <c>FirstLine</c> with neither for a <c>sandbox</c> question. Returns <see langword="null"/> when the connection ends
     /// first or the line is too long, is none of these, names an id or version that is not well formed, or names a
-    /// version that is not installed. Only a <c>build</c> may be longer than <see cref="MaxStartLine"/>. Bytes after the line stay in the reader.
+    /// version that is not installed. A <c>start</c> with files is not looked up and needs a tenant. Only a <c>build</c> and a <c>start</c> with files may be longer than <see cref="MaxStartLine"/>. Bytes after the line stay in the reader.
     /// </summary>
     private async Task<FirstLine?> ReadFirstAsync(PipeReader reader)
     {
@@ -215,6 +269,16 @@ internal sealed partial class RunnerHost(
             if (message is BuildMessage build)
             {
                 return new FirstLine(null, default, build);
+            }
+
+            if (message is StartMessage { Files: not null } withFiles)
+            {
+                return IdPattern().IsMatch(withFiles.Package)
+                    && VersionPattern().IsMatch(withFiles.Version)
+                    && PackageIsolation.TryParseHostPort(withFiles.Proxy, out _, out _)
+                    && !string.IsNullOrEmpty(withFiles.Tenant)
+                        ? new FirstLine(withFiles, default, null)
+                        : null;
             }
 
             if (line.Length > MaxStartLine)
@@ -281,14 +345,19 @@ internal sealed partial class RunnerHost(
         }
         finally
         {
-            try
-            {
-                Directory.Delete(copy, recursive: true);
-            }
-            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-            {
-                // A temporary folder that stays is left to the operating system.
-            }
+            DeleteQuietly(copy);
+        }
+    }
+
+    private static void DeleteQuietly(string folder)
+    {
+        try
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A temporary folder that stays is left to the operating system.
         }
     }
 
@@ -356,7 +425,7 @@ internal sealed partial class RunnerHost(
     /// Starts the runner of <paramref name="language"/>. Returns <see langword="null"/> when the language has no runner
     /// or the runner's program is not installed, so that no runner starts.
     /// </summary>
-    private Process? TryStartRunner(StartMessage start, PackageLanguage language)
+    private Process? TryStartRunner(string root, StartMessage start, PackageLanguage language)
     {
         var command = language switch
         {
@@ -372,7 +441,7 @@ internal sealed partial class RunnerHost(
 
         try
         {
-            return StartRunner(command, start, language);
+            return StartRunner(command, root, start, language);
         }
         catch (Win32Exception)
         {
@@ -380,7 +449,7 @@ internal sealed partial class RunnerHost(
         }
     }
 
-    private Process StartRunner(RunnerCommand command, StartMessage start, PackageLanguage language)
+    private static Process StartRunner(RunnerCommand command, string root, StartMessage start, PackageLanguage language)
     {
         var info = new ProcessStartInfo(command.FileName)
         {
@@ -396,12 +465,12 @@ internal sealed partial class RunnerHost(
 
         if (language == PackageLanguage.Python)
         {
-            info.ArgumentList.Add(Path.Combine(extensionsRoot, start.Package, start.Version));
+            info.ArgumentList.Add(Path.Combine(root, start.Package, start.Version));
         }
         else
         {
             info.ArgumentList.Add("runner");
-            info.ArgumentList.Add(extensionsRoot);
+            info.ArgumentList.Add(root);
             info.ArgumentList.Add(start.Package);
             info.ArgumentList.Add(start.Version);
         }
@@ -494,4 +563,7 @@ internal sealed partial class RunnerHost(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Runner {ProcessId} started for package {Package} {Version}.")]
     private partial void LogStarted(int processId, string package, string version);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Runner {ProcessId} started for tenant {Tenant}, package {Package} {Version}.")]
+    private partial void LogStartedForTenant(int processId, string tenant, string package, string version);
 }
