@@ -41,5 +41,5 @@ timeout stop the items in the list above, and the runner holds nothing of the ho
 reflection. Static state shared across tenants is the one item still possible, because one set of
 runners serves every tenant.
 
-- **Runners for each tenant** _(planned for M37)_. An application's packages run in runners that serve
-  only their tenant, which closes that gap, see [An application's packages](extension-packages.md#an-applications-packages).
+- **Runners for each tenant.** An application's packages run in runners that serve only their tenant,
+  which closes that gap, see [An application's packages](extension-packages.md#an-applications-packages).

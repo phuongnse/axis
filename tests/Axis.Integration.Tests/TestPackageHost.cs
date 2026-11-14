@@ -12,8 +12,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The package host of <c>Axis.PackageHost</c> in this process, on a loopback port, with real C#, Node.js and Python runner
-/// processes that run the versions installed under <c>extensionsRoot</c>. It logs to <see cref="Logs"/>, which hold the process
-/// id of each runner it started.
+/// processes that run the versions installed under <c>extensionsRoot</c>, and the packages that a <c>start</c> carries the files of. It logs to
+/// <see cref="Logs"/>, which hold the process id of each runner it started, and for an application's package the tenant too.
 /// </summary>
 internal sealed partial class TestPackageHost : IAsyncDisposable
 {
@@ -76,6 +76,16 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
             .Where(match => match.Success && match.Groups["package"].Value == package && match.Groups["version"].Value == version)
             .Select(match => int.Parse(match.Groups["id"].Value, System.Globalization.CultureInfo.InvariantCulture))];
 
+    /// <summary>The process ids of the runners the host started for the application package <paramref name="package"/> <paramref name="version"/> of <paramref name="tenant"/>, from the files of a <c>start</c>.</summary>
+    public IReadOnlyList<int> TenantRunnerIds(string tenant, string package, string version) =>
+        [.. Logs.Entries
+            .Select(entry => TenantRunnerStarted().Match(entry))
+            .Where(match => match.Success
+                && match.Groups["tenant"].Value == tenant
+                && match.Groups["package"].Value == package
+                && match.Groups["version"].Value == version)
+            .Select(match => int.Parse(match.Groups["id"].Value, System.Globalization.CultureInfo.InvariantCulture))];
+
     /// <summary>What the host answered to each <c>sandbox</c> question, whether it runs under gVisor.</summary>
     public IReadOnlyList<bool> SandboxAnswers() =>
         [.. Logs.Entries
@@ -130,6 +140,9 @@ internal sealed partial class TestPackageHost : IAsyncDisposable
 
     [GeneratedRegex(@"Built package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex PackageBuilt();
+
+    [GeneratedRegex(@"Runner (?<id>\d+) started for tenant (?<tenant>\S+), package (?<package>\S+) (?<version>\S+)\.")]
+    private static partial Regex TenantRunnerStarted();
 
     [GeneratedRegex(@"Tested package (?<package>\S+) (?<version>\S+)\.")]
     private static partial Regex PackageTested();

@@ -553,7 +553,7 @@ The server reads `Extensions:Isolation`, and the worker reads all seven settings
 | `Extensions:Runners:Dotnet` | `Extensions__Runners__Dotnet` | none | The `host:port` of the C# package host, with a port from 1 to 65535, or `[address]:port` for an IPv6 address. Unset, every C# attempt is retryable. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Node` | `Extensions__Runners__Node` | none | The `host:port` of the Node.js package host, with the same forms. Unset, every `node` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
 | `Extensions:Runners:Python` | `Extensions__Runners__Python` | none | The `host:port` of the Python package host, with the same forms. Unset, every `python` attempt is retryable, with `inProcess` too. A value that is not a `host:port` stops the worker at start |
-| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker and the publisher need it, see [an application's packages](#an-applications-packages). Unset with the setting off, the worker never contacts the host. A value that is not a `host:port` stops the worker at start, with the setting on or off |
+| `Extensions:Runners:Application` | `Extensions__Runners__Application` | none | The `host:port` of `application-package-host`, with the same forms. With `Extensions:ApplicationPackages` on, the worker and the publisher need it, see [an application's packages](#an-applications-packages). The worker sends each attempt of an application's package there. Unset, every such attempt is retryable and names the setting, and with the setting off the worker never contacts the host otherwise. A value that is not a `host:port` stops the worker at start, with the setting on or off |
 | `Extensions:ApplicationPackages` | `Extensions__ApplicationPackages` | `false` | `true` makes the worker ask `application-package-host` at start whether it runs under gVisor, and stop with exit code 1 when it does not, see [an application's packages](#an-applications-packages). `false` never asks. Any other value stops the worker at start |
 | `Extensions:Runners:ProxyPort` | `Extensions__Runners__ProxyPort` | `5311` | The port of the worker's egress proxy for the runners, a whole number from 0 to 65535. `0` picks a free port. Any other value stops the worker at start |
 
@@ -752,13 +752,16 @@ trusted code, so the platform gives it more limits than an installation's packag
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which
   needs no gVisor because gVisor guards only code on Axis's machines. A package that Axis runs is still
   refused, and `AXC0148` is never reported for a customer-hosted one.
-- **Its own runners** _(planned for M37)_. One set for each tenant and package version, with the limits of
-  [package runners](#package-runners). The package host starts a set when a call comes and stops it
-  once it is idle, so a tenant that calls nothing holds no runner.
-- **Quotas** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
-  [package run time a day](tenant-quotas.md#package-run-time-a-day). A call also holds a
-  `concurrentConnectorCalls` lease, as any package call does. A customer-hosted package counts for nothing
-  there, see [package run time a day](tenant-quotas.md#package-run-time-a-day).
+- **Its own runners.** The worker sends each attempt of an application's package, in any language, to
+  `application-package-host`, with the call's tenant and the built files of the call's release in `start`, see [a built package
+  in the release](#versions-and-pinning). The runners are one set for each tenant, package version and build, with the limits of
+  [package runners](#package-runners). A build is a SHA-256 digest of the built files, so changed files never reuse a runner.
+  A runner starts when that tenant's call needs one, and idle runners stay until the worker stops. A release with the source
+  but no built files, such as one `activate` stored, fails the call at once, naming the package and no path. Unset
+  `Extensions:Runners:Application` makes a call retryable and names the setting.
+- **Quotas.** A call also holds a `concurrentConnectorCalls` lease, as any package call does.
+- **CPU seconds** _(planned for M37)_. The CPU seconds of its runners count against the tenant's
+  [package run time a day](tenant-quotas.md#package-run-time-a-day). A customer-hosted package counts for nothing there.
 - **Plans** _(planned for M37)_. In Axis SaaS only a paid plan allows an application's packages, see
   [the catalogue](plans.md#the-catalogue).
 - **Switched on by the tenant** _(planned for M37)_. The tenant's administrator turns them on, see
@@ -892,6 +895,6 @@ installation, loading, the capability limits, the server's metadata-only load an
   the package's manifest and adapter, and one small dependency. The package build tests zip the
   dependency into a wheel, lock it in `requirements.txt` with its SHA-256 hash, and build the package
   offline, so the repository holds no binary file. Its operations cover each outcome of the Python
-  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared
-  bindings or asks for an undeclared one, `flaky` raises `RetryableError` and `fail` raises `ValueError`.
-  The package host tests install the package by copying it with its dependency folder, so they need no pip.
+  runner: `greet` maps onto the dependency, `echo` returns all six field types, `probe` uses its declared bindings, asks for an
+  undeclared one or, in the mode `ownOtherHost`, requests one with `urllib`, `pid` returns its process ID, `flaky` raises
+  `RetryableError` and `fail` raises `ValueError`. The package host tests install the package by copying it, so they need no pip.

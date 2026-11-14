@@ -1,3 +1,6 @@
+import os
+import urllib.request
+
 from axis_fixture_dependency import greeting
 from axis_sdk import RetryableError
 
@@ -30,6 +33,9 @@ def probe(input, context):
         return {"status": response.status}
     if mode == "otherHost":
         context.get_http_client("TestUrl").request("GET", "https://other.example.test/probe")
+    elif mode == "ownOtherHost":
+        # urllib reads the proxy variables, so this request goes through the worker's egress proxy, which refuses the host.
+        urllib.request.urlopen("https://other.example.test/probe", timeout=10)
     elif mode == "undeclaredSecret":
         context.get_secret("OtherToken")
     elif mode == "swallow":
@@ -38,6 +44,10 @@ def probe(input, context):
         except Exception:
             pass
     return {"status": 0}
+
+
+def pid(input, context):
+    return {"pid": os.getpid()}
 
 
 def flaky(input, context):
