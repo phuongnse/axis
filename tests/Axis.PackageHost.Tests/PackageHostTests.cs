@@ -23,7 +23,8 @@ namespace Axis.PackageHost.Tests;
 /// probe package, a plain ES module, and the built Node.js test package, which is CommonJS, through the Node.js runner
 /// that the test project copies to the test output. One test builds a package, and every build writes and deletes
 /// folders named axis-package-build-* in the temporary folder, so this class runs one after the other with the classes
-/// that build packages.
+/// that build packages. Some tests start from files, and each of those writes and deletes a folder named axis-runner-* in the
+/// temporary folder, so the same rule holds for them.
 /// </summary>
 [Collection(BuildTest.Collection)]
 public sealed class PackageHostTests : IAsyncLifetime
@@ -384,6 +385,64 @@ public sealed class PackageHostTests : IAsyncLifetime
         using var next = await StartAsync(TestPackages.Id, "1.0.0");
         Assert.IsType<ReadyMessage>(await next.ReceiveAsync());
         Assert.Single(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task A_start_with_a_python_package_s_files_runs_it_from_a_temporary_copy_and_not_from_the_extensions_folder()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        using var empty = new TemporaryFolder();
+        await using var host = new RunnerHost(empty.Path, TestRunnerCommand.Create(), _log);
+        var endpoint = await host.StartAsync(new IPEndPoint(IPAddress.Loopback, 0), CancellationToken.None);
+
+        using var connection = await StartFromFilesAsync(TestPackages.PythonId, "1.0.0", PythonFiles(), endpoint: endpoint);
+
+        Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
+        var greet = await connection.RunAsync("greet", new JsonObject { ["name"] = "Axis" }, withBindings: false);
+        Assert.Equal("Hello, Axis", Assert.IsType<ResultMessage>(greet.Answer).Output["greeting"]!.GetValue<string>());
+        Assert.Single(_log.StartedRunners);
+    }
+
+    [Fact]
+    public async Task Closing_a_connection_that_started_from_files_deletes_the_runner_s_temporary_folder()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        var before = RunnerFolders();
+        var connection = await StartFromFilesAsync(TestPackages.PythonId, "1.0.0", PythonFiles());
+        Assert.Equal(new ReadyMessage(), await connection.ReceiveAsync());
+
+        var folder = Assert.Single(RunnerFolders().Except(before));
+        Assert.True(File.Exists(Path.Combine(folder, TestPackages.PythonId, "1.0.0", "axis-package.json")));
+
+        connection.Dispose();
+        var deadline = DateTime.UtcNow + _deadline;
+        while (Directory.Exists(folder) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        Assert.False(Directory.Exists(folder));
+    }
+
+    [Theory]
+    [InlineData("path", "1.0.0", true, true)]
+    [InlineData("version", "1.0.1", true, true)]
+    [InlineData("tenant", "1.0.0", false, false)]
+    public async Task A_start_from_files_with_a_bad_path_another_version_or_no_tenant_starts_no_runner(string defect, string version, bool withTenant, bool wellFormed)
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), PythonOnWindows);
+        var before = RunnerFolders();
+        var files = PythonFiles();
+        if (defect == "path")
+        {
+            files["../x"] = "x"u8.ToArray();
+        }
+
+        using var connection = await StartFromFilesAsync(TestPackages.PythonId, version, files, withTenant ? "tenant-a" : null, wellFormed);
+
+        Assert.Null(await connection.ReceiveAsync());
+        Assert.Empty(_log.StartedRunners);
+        Assert.Equal(before.Order(), RunnerFolders().Order());
     }
 
     [Fact]
@@ -811,6 +870,25 @@ public sealed class PackageHostTests : IAsyncLifetime
         await connection.SendAsync(new StartMessage(package, version, $"127.0.0.1:{proxyPort ?? _stubAddress.Port}", "proxy-token"), wellFormed);
         return connection;
     }
+
+    /// <summary>Connects and sends a <c>start</c> that carries <paramref name="files"/> and the tenant. A start that the test means to be malformed is not checked against the schema.</summary>
+    private async Task<Connection> StartFromFilesAsync(
+        string package, string version, Dictionary<string, byte[]> files, string? tenant = "tenant-a", bool wellFormed = true, IPEndPoint? endpoint = null)
+    {
+        var connection = Connect(endpoint);
+        await connection.SendAsync(new StartMessage(package, version, $"127.0.0.1:{_stubAddress.Port}", "proxy-token", tenant, files), wellFormed);
+        return connection;
+    }
+
+    /// <summary>The built files of the installed Python test package, each under its relative path that uses <c>/</c>.</summary>
+    private Dictionary<string, byte[]> PythonFiles()
+    {
+        var folder = Path.Combine(_extensions.Path, TestPackages.PythonId, "1.0.0");
+        return Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
+            .ToDictionary(file => Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllBytes);
+    }
+
+    private static string[] RunnerFolders() => Directory.GetDirectories(Path.GetTempPath(), "axis-runner-*");
 
     private Connection Connect(IPEndPoint? endpoint = null)
     {

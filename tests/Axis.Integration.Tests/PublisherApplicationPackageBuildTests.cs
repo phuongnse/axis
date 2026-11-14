@@ -41,7 +41,7 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         import unittest
 
 
-        class ToolsTests(unittest.TestCase):
+        class ToolsCase(unittest.TestCase):
             def test_passes(self):
                 self.assertEqual(2, 1 + 1)
 
@@ -53,7 +53,7 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         import unittest
 
 
-        class ToolsTests(unittest.TestCase):
+        class ToolsCase(unittest.TestCase):
             def test_passes(self):
                 self.assertEqual(2, 1 + 1)
         """;
@@ -208,10 +208,10 @@ public sealed class PublisherApplicationPackageBuildTests(PostgreSqlFixture data
         Assert.Equal("failed", await ScalarAsync(scenario, tenant, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var tests = await PackageTestsAsync(scenario, tenant, request);
         Assert.Equal(2, tests.Count);
-        var passed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsTests.test_passes")!;
+        var passed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_passes")!;
         Assert.Equal("passed", passed["outcome"]!.GetValue<string>());
         Assert.Null(passed["message"]);
-        var failed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsTests.test_fails")!;
+        var failed = Assert.Single(tests, test => test!["name"]!.GetValue<string>() == "test_tools.ToolsCase.test_fails")!;
         Assert.Equal("failed", failed["outcome"]!.GetValue<string>());
         Assert.StartsWith("AssertionError", failed["message"]!.GetValue<string>(), StringComparison.Ordinal);
         Assert.Empty(await DiagnosticsAsync(scenario, tenant, request));
