@@ -265,14 +265,14 @@ only [publishing](authoring.md#publishing) does.
   host's last step still commits, and no step moves an `accepted` request. A failed accept of the author, such as a
   conflict, leaves the request `ready` with its token, and the author can accept again or drop the request. The
   agent's own failed accept ends as [accepting by the agent](#states) says.
-- **All or nothing.** The publisher checks that every resource the draft read or changed still has the version
-  the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
+- **All or nothing.** The publisher checks that every resource and package file the draft read or changed still has the
+  version the draft recorded, applies the draft to the working folder as it is now, runs a validate with its
   contract scenarios and the application's test scenarios on the result, and commits it as a revision, see
   [revisions and drafts](revisions-and-drafts.md#accepting-a-draft). So two changes that pass alone
   cannot break the application together, and on any failure nothing is written.
-- **Conflicts.** A resource that changed since the draft recorded it is a conflict, and the accept
-  answers it with one `AXC0377` diagnostic for each resource, naming the resource, its file and its
-  new version.
+- **Conflicts.** A resource or a package file that changed since the draft recorded it is a conflict, and the
+  accept answers it with one `AXC0377` diagnostic for each, naming the resource, its file and its
+  new version, or the package file's path and its new version.
 - **Retrying a conflict.** When the agent's accept meets a conflict, the request goes back to `working` with no
   draft. The agent reads the folder again, makes the change on a new draft and runs the checks and the review
   again, within the request's budgets: the request keeps its `round`, tokens and time limit. The conflicted draft

@@ -728,8 +728,8 @@ What each kind does:
 - **`accept`**. The publisher applies a person's draft to the application's folder, see
   [accepting a draft](revisions-and-drafts.md#accepting-a-draft). It runs the contract scenarios, then
   the steps of a `validate`, then the application's own test scenarios on the applied files, and a
-  failing one ends the request `failed`. A resource that changed on `main` since the draft read it ends the
-  request `failed` with one `AXC0377` for each such resource. An author's `accept` comes from the [accept route](authoring-requests.md#routes).
+  failing one ends the request `failed`. A resource or a package file that changed on `main` since the draft
+  used it ends the request `failed` with one `AXC0377` for each such resource or file. An author's `accept` comes from the [accept route](authoring-requests.md#routes).
 - **Order.** For one tenant and application the publisher runs `publish`, `validate`, `activate` and
   `accept` requests one at a time, oldest first, so when two publishes are queued, the newer one ends
   up live. A `test` has a queue of its own.

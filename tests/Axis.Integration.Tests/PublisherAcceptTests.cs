@@ -106,6 +106,38 @@ public sealed class PublisherAcceptTests(PostgreSqlFixture database) : IClassFix
     }
 
     [Fact]
+    public async Task An_accept_after_a_package_file_the_draft_read_changed_on_main_fails_with_AXC0377_naming_the_file()
+    {
+        const string adapter = "packages/x/adapter.py";
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var tenant = await CreateTenantAsync(scenario);
+        using var folder = Application().With("entities/order.json", Order()).With(adapter, "print('v1')\n");
+        using var revisions = new TemporaryFolder();
+        var author = NewAuthor(scenario, folder.Path, revisions.Path, "author");
+        var draft = await NewDraftAsync(author);
+        Assert.Null((await author.Drafts.ReadPackageFileAsync(draft, adapter, CancellationToken)).Refusal);
+        folder.With(adapter, "print('v2')\n");
+        author.Revisions.RecordOutside();
+        var folderBefore = Snapshot(folder.Path);
+        var tip = MainTip(revisions.Path, folder.Path);
+        var version = Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(Path.Combine(folder.Path, adapter))));
+        var request = await QueueAsync(scenario, tenant, draft, "author");
+
+        var result = await RunPublisherAsync(scenario, tenant, revisions.Path, folder.Path, request);
+
+        Assert.Equal("failed", await StatusAsync(scenario, tenant, request));
+        var diagnostic = Assert.Single(await DiagnosticsAsync(scenario, tenant, request))!;
+        Assert.Equal(DiagnosticCodes.AcceptConflict, diagnostic["code"]!.GetValue<string>());
+        Assert.Equal(adapter, diagnostic["file"]!.GetValue<string>());
+        Assert.Null(diagnostic["resourceId"]);
+        Assert.Contains(version, diagnostic["message"]!.GetValue<string>(), StringComparison.Ordinal);
+        Assert.Contains(result.Output, line => line.StartsWith($"{tenant} draft failed: {DiagnosticCodes.AcceptConflict} ", StringComparison.Ordinal));
+        Assert.Equal(folderBefore, Snapshot(folder.Path));
+        Assert.Equal(tip, MainTip(revisions.Path, folder.Path));
+        Assert.True(DraftExists(revisions.Path, folder.Path, draft));
+    }
+
+    [Fact]
     public async Task An_accept_whose_draft_does_not_compile_fails_with_the_compile_diagnostics_and_changes_nothing()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

@@ -79,13 +79,22 @@ path names one as `packages/<package>/<path>`.
   CSRF header, the storage quota on a save, the session, the author role, the developer role, the
   switch, the application, then the path, the precondition headers (`428` for none, and `400` for both
   on a save), the content type (`415`) and the body (`400`, which is anything but an object with a
-  string `content`). The write lock (`503`) and the version (`409`) come last.
+  string `content`). The write lock (`503`) and the version (`409`) come last. With a draft, the write lock
+  (`503`), the draft (`404`), the missing file of a read or a delete (`404`) and the version (`409`) come
+  last.
 - **Each write is a revision.** It is named "Create package file packages/x/adapter.py", "Change package
   file packages/x/adapter.py" or "Delete package file packages/x/adapter.py", and the
   [undo](revisions-and-drafts.md#undo) puts the file back.
 - **Diagnostics.** The answer carries the diagnostics of the folder, as a resource write does.
-- **Drafts.** _(planned for M37)_ A package file can be written in a draft, see
-  [drafts](revisions-and-drafts.md#drafts).
+- **Drafts.** Each route takes an optional `?draft=<draft id>`. The list, the read, the write and the delete
+  then work on the files of the signed-in author's [draft](revisions-and-drafts.md#drafts), and leave the
+  working folder and `main` as they are. The checks, the roles, the switch and the storage quota are those
+  of the working folder. `If-Match` and `If-None-Match` are checked against the file in the draft. A draft
+  that is another person's, or does not exist, answers `404`, as does any server that keeps no revisions.
+  Each write is one commit on the draft's branch, named as a revision is, and the answer's diagnostics are
+  those of the draft. A read, a write or a delete records the file's version on `main` by its path, and
+  the [accept](revisions-and-drafts.md#accepting-a-draft) of the draft fails with `AXC0377` when that
+  file has changed on `main` since.
 - **Publishing.** _(planned for M37)_ A publish of an application that holds a package needs the publisher
   role only, and builds and scans each package that Axis runs, see
   [an application's packages](extension-packages.md#an-applications-packages).

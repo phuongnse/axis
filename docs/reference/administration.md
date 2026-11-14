@@ -606,7 +606,7 @@ tenant's schema role unless it says otherwise.
      missing Studio setting or lock setting, an unknown folder, a folder whose manifest `id` is not the
      request's application, a draft that is not the requester's or does not exist, and a lock that
      cannot be taken write `<tenant> draft failed: <message>` with no diagnostic code. Each resource
-     that changed on `main` since the draft read it writes
+     or package file that changed on `main` since the draft used it writes
      `<tenant> draft failed: AXC0377 <message>`, and the step ends the request.
    - `version`, `contracts` and `validate` are as for a `validate`, and run on the folder's files
      with the draft applied, in memory. They store no release and change nothing.
