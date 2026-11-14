@@ -336,7 +336,7 @@ internal static class StudioPublishEndpoints
         var id = Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         var requestedAt = await InsertRequestAsync(
-            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, cancellationToken);
+            connection, id, kind, applicationId, target, snapshot, releaseId, label, note, user.Id, scenarioNames, draftId: null, folder: null, client: null, package: null, cancellationToken);
 
         // The name is the one in the user's profile, else the session's, as GET answers it.
         var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
@@ -363,13 +363,14 @@ internal static class StudioPublishEndpoints
         Guid? draftId,
         string? folder,
         string? client,
+        string? package,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names, draft_id, folder, client)
-            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios, @draft, @folder, @client)
+                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names, draft_id, folder, client, package)
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios, @draft, @folder, @client, @package)
             RETURNING requested_at
             """,
             connection);
@@ -386,6 +387,7 @@ internal static class StudioPublishEndpoints
         command.Parameters.Add(new NpgsqlParameter("draft", NpgsqlDbType.Uuid) { Value = (object?)draftId ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("folder", NpgsqlDbType.Text) { Value = (object?)folder ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("client", NpgsqlDbType.Text) { Value = (object?)client ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("package", NpgsqlDbType.Text) { Value = (object?)package ?? DBNull.Value });
         await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
         await inserted.ReadAsync(cancellationToken);
         return inserted.GetFieldValue<DateTimeOffset>(0);
@@ -397,7 +399,7 @@ internal static class StudioPublishEndpoints
     {
         await using var command = new NpgsqlCommand(
             """
-            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name, draft_id
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name, draft_id, package, package_tests::text
             FROM axis.publish_requests
             WHERE id = @id AND application_id = @application
             """,
@@ -420,7 +422,9 @@ internal static class StudioPublishEndpoints
                 reader.GetString(10),
                 reader.IsDBNull(11) ? null : reader.GetString(11),
                 reader.IsDBNull(12) ? null : reader.GetString(12),
-                reader.IsDBNull(13) ? null : reader.GetGuid(13))
+                reader.IsDBNull(13) ? null : reader.GetGuid(13),
+                reader.IsDBNull(14) ? null : reader.GetString(14),
+                reader.IsDBNull(15) ? null : reader.GetString(15))
             : null;
     }
 
@@ -486,7 +490,8 @@ internal static class StudioPublishEndpoints
 
 /// <summary>
 /// A row of <c>axis.publish_requests</c> as <see cref="StudioPublishEndpoints.FindRequestAsync"/> reads it, without its snapshot.
-/// <c>Diagnostics</c> and <c>ScenarioResults</c> are the stored JSON text, null when none were stored.
+/// <c>Diagnostics</c>, <c>ScenarioResults</c> and <c>PackageTests</c> are the stored JSON text, null when none were stored.
+/// <c>Package</c> is the package a <c>test</c> tests, null for a scenario test and for every other kind.
 /// </summary>
 internal sealed record StoredPublishRequest(
     string Kind,
@@ -502,7 +507,9 @@ internal sealed record StoredPublishRequest(
     string Target,
     string? ScenarioResults,
     string? RequestedByName,
-    Guid? DraftId);
+    Guid? DraftId,
+    string? Package,
+    string? PackageTests);
 
 /// <summary>
 /// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
