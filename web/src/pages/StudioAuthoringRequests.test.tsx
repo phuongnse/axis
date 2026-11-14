@@ -590,3 +590,54 @@ describe('a plan and its review, as a pull request has them', () => {
     expect(onOpen).toHaveBeenCalledWith('r-1', '/widgets/0')
   })
 })
+
+// Proposed: the history reads writes in a row as one, and says how long each step took, see the review on #3263.
+describe("a request's history", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const step = (kind: string, summary: string, start: string, end: string | null, outcome: string | null) => ({
+    kind,
+    summary,
+    outcome,
+    tokens: 0,
+    startedAt: start,
+    finishedAt: end,
+  })
+
+  it('reads writes that follow each other as one row that opens to each, and how long each step took', async () => {
+    stub({
+      ...fromApp,
+      aiConnected: true,
+      steps: [
+        step('propose_plan', 'Proposed a plan', '2026-11-10T09:00:00Z', '2026-11-10T09:00:40Z', 'Plan written'),
+        step('write_resource', 'Wrote CostCentre', '2026-11-10T09:01:00Z', '2026-11-10T09:01:10Z', 'Saved'),
+        step('write_resource', 'Wrote Request', '2026-11-10T09:01:10Z', '2026-11-10T09:02:00Z', 'Saved'),
+        step('write_resource', 'Wrote Requests', '2026-11-10T09:02:00Z', '2026-11-10T09:04:00Z', 'Saved'),
+        step('validate_draft', 'Checked the draft', '2026-11-10T09:04:00Z', null, null),
+      ],
+    })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('tab', { name: 'History' }))
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(3)
+    expect(rows[0]).toHaveTextContent(/Proposed a plan\s*Plan written.*40 s/)
+    expect(rows[1]).toHaveTextContent(/Wrote 3 resources\s*Show\s*Saved.*3 min/)
+    expect(rows[2]).toHaveTextContent('Running…')
+    expect(screen.queryByText('Wrote CostCentre')).toBeNull()
+
+    await user.click(within(rows[1]).getByRole('button', { name: 'Show' }))
+    expect(within(screen.getByTestId('studio-ai-history-writes')).getAllByRole('listitem')).toHaveLength(3)
+  })
+})

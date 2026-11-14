@@ -724,9 +724,9 @@ const loop: [string, string, string][] = [
  */
 const appLoop: [string, string, string][] = [
   ['propose_plan', 'Proposed a plan from its conversation with you', 'Plan written'],
-  ['write_resource', 'Wrote CostCentre (entities/cost-centre.json)', 'Saved, no problems'],
-  ['write_resource', 'Wrote PurchaseRequest (entities/purchase-request.json)', 'Saved, no problems'],
-  ['write_resource', 'Wrote Requests (pages/requests.json)', 'Saved, no problems'],
+  ['write_resource', 'Wrote the Cost centre entity', 'Saved, no problems'],
+  ['write_resource', 'Wrote the Purchase request entity', 'Saved, no problems'],
+  ['write_resource', 'Wrote the Requests page', 'Saved, no problems'],
   ['validate_draft', 'Checked the draft', 'No problems'],
   ['run_scenarios', "Ran the application's 8 scenarios", 'All 8 scenarios passed'],
   ['review', 'A second AI read the draft against the request', 'No findings'],

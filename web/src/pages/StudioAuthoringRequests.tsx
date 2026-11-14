@@ -214,6 +214,8 @@ export function StudioAuthoringRequestPage({
   const [follow, setFollow] = useState(0)
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState(false)
+  // The history's rows of writes that are open to each write.
+  const [openRows, setOpenRows] = useState<ReadonlySet<string>>(new Set())
   // Which comment the dialog asks for: another plan, or changes to a ready draft.
   const [changeOpen, setChangeOpen] = useState<false | 'change-plan' | 'request-changes'>(false)
   // Proposed: the page's tab, see the review on #3263.
@@ -365,35 +367,93 @@ export function StudioAuthoringRequestPage({
     request.app !== null && !request.aiConnected && ['planning', 'working', 'fixing'].includes(request.state)
   const stageTitles = stageKeys.map((key) => t(`shell.studio.aiRequest.stage.${key}`))
   const running = request.steps.findLast((step) => step.finishedAt === null)
-  const stepColumns: AxisColumn<StudioAuthoringRequestStep>[] = [
+  // A step's summary in words; a change of plan, and an ask for changes to a ready draft, keep the author's comment.
+  const stepWords = (step: StudioAuthoringRequestStep) =>
+    step.kind === 'planChange'
+      ? t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary)
+      : step.kind === 'changeRequest'
+        ? t('shell.studio.aiRequest.changeRequest').replace('{comment}', step.summary)
+        : step.summary
+  const stepResult = (step: StudioAuthoringRequestStep) =>
+    step.finishedAt === null ? (
+      <span style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.stepRunning')}</span>
+    ) : (
+      (step.outcome ?? <EmptyDash />)
+    )
+  const stepColumns: AxisColumn<HistoryRow>[] = [
     {
       key: 'step',
       kind: 'freeText',
       title: t('shell.studio.aiRequest.step'),
-      // A change of plan, and an ask for changes to a ready draft, keep the author's comment as their summary.
-      render: (_, step) =>
-        step.kind === 'planChange'
-          ? t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary)
-          : step.kind === 'changeRequest'
-            ? t('shell.studio.aiRequest.changeRequest').replace('{comment}', step.summary)
-            : step.summary,
+      // Proposed: writes in a row read as one, which opens to each of them, see the review on #3263.
+      render: (_, row) =>
+        row.steps.length === 1 ? (
+          stepWords(row.steps[0])
+        ) : (
+          <Flex vertical gap={spacing.xs}>
+            <span>
+              {t('shell.studio.aiRequest.history.writes').replace('{count}', String(row.steps.length))}{' '}
+              <AxisButton
+                role="link"
+                aria-expanded={openRows.has(row.key)}
+                onClick={() =>
+                  setOpenRows((open) => {
+                    const next = new Set(open)
+                    if (!next.delete(row.key)) {
+                      next.add(row.key)
+                    }
+                    return next
+                  })
+                }
+              >
+                {t(
+                  openRows.has(row.key) ? 'shell.studio.aiRequest.history.hide' : 'shell.studio.aiRequest.history.show',
+                )}
+              </AxisButton>
+            </span>
+            {openRows.has(row.key) && (
+              <ul style={{ margin: 0, paddingInlineStart: spacing.lg }} data-testid="studio-ai-history-writes">
+                {row.steps.map((step, index) => (
+                  <li key={index}>
+                    {stepWords(step)}
+                    {step.outcome !== null && (
+                      <Typography.Text style={{ color: colour.textMuted }}>{` ${step.outcome}`}</Typography.Text>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Flex>
+        ),
     },
     {
       key: 'result',
       kind: 'freeText',
       title: t('shell.studio.aiRequest.result'),
-      render: (_, step) =>
-        step.finishedAt === null ? (
-          <span style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.stepRunning')}</span>
-        ) : (
-          (step.outcome ?? <EmptyDash />)
-        ),
+      render: (_, row) => {
+        const outcomes = new Set(row.steps.map((step) => step.outcome))
+        return row.steps.length === 1 || row.steps.some((step) => step.finishedAt === null)
+          ? stepResult(row.steps.at(-1)!)
+          : outcomes.size === 1
+            ? (row.steps[0].outcome ?? <EmptyDash />)
+            : t('shell.studio.aiRequest.history.mixed')
+      },
     },
     {
       key: 'started',
       kind: 'fixed',
       title: t('shell.studio.aiRequest.started'),
-      render: (_, step) => sentTime(step.startedAt),
+      render: (_, row) => sentTime(row.steps[0].startedAt),
+    },
+    {
+      // Proposed: how long a step took, which, with when it started, says when it ended, see the review on #3263.
+      key: 'took',
+      kind: 'fixed',
+      title: t('shell.studio.aiRequest.took'),
+      render: (_, row) => {
+        const end = row.steps.at(-1)!.finishedAt
+        return end === null ? <EmptyDash /> : formatDuration(Date.parse(end) - Date.parse(row.steps[0].startedAt), t)
+      },
     },
   ]
   const startAccept = async () => {
@@ -544,10 +604,10 @@ export function StudioAuthoringRequestPage({
     </Flex>
   )
   const historyView = (
-    <AxisTable<StudioAuthoringRequestStep>
+    <AxisTable<HistoryRow>
       columns={stepColumns}
-      rowKey={(step) => `${step.startedAt}/${step.kind}`}
-      dataSource={request.steps}
+      rowKey={(row) => row.key}
+      dataSource={historyRows(request.steps)}
       pagination={false}
       toolbar={{}}
       emptyText=""
@@ -917,4 +977,42 @@ function checksSummary(checks: StudioRequest, t: (key: string) => string): { tex
       .replace('{total}', String(scenarios.length)),
     passed: passed === scenarios.length,
   }
+}
+
+/** The kinds of step that write the draft, which the history reads as one row while they follow each other. */
+const writeKinds = new Set(['write_resource', 'write_layer', 'delete_resource'])
+
+/** Proposed: one row of a request's history, one step or writes that follow each other, see the review on #3263. */
+interface HistoryRow {
+  key: string
+  steps: StudioAuthoringRequestStep[]
+}
+
+/** A request's steps as its history's rows: each step a row, but two writes or more in a row one row together. */
+function historyRows(steps: readonly StudioAuthoringRequestStep[]): HistoryRow[] {
+  const rows: HistoryRow[] = []
+  for (const step of steps) {
+    const last = rows.at(-1)
+    if (last !== undefined && writeKinds.has(step.kind) && writeKinds.has(last.steps[0].kind)) {
+      last.steps.push(step)
+    } else {
+      rows.push({ key: `${step.startedAt}/${step.kind}/${rows.length}`, steps: [step] })
+    }
+  }
+  return rows
+}
+
+/** Proposed: a span of time in the reader's words, in seconds, minutes, or hours and minutes, see the review on #3263. */
+function formatDuration(milliseconds: number, t: (key: string) => string): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000))
+  if (seconds < 60) {
+    return t('shell.studio.duration.seconds').replace('{count}', String(seconds))
+  }
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) {
+    return t('shell.studio.duration.minutes').replace('{count}', String(minutes))
+  }
+  return t('shell.studio.duration.hours')
+    .replace('{hours}', String(Math.floor(minutes / 60)))
+    .replace('{minutes}', String(minutes % 60))
 }
