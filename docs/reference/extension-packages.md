@@ -462,12 +462,14 @@ package reaches nothing of the host and no binding of another call.
 - **The hosts in Compose.** The Compose example runs `package-host-dotnet`, `package-host-python` and `package-host-node` on an internal network `runners` that only they and
   the worker share. Each gets no settings or secrets and no published port, a read-only root file system apart from `/tmp`, and
   CPU and memory limits, see [on premises](installation.md#on-premises).
-- **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, and with `applicationPackageHost.enabled` also `<release>-application-package-host`, each as a Deployment, a Service on port 5310 and a
+- **The C#, Node.js and Python hosts in the Helm chart.** The chart runs `<release>-package-host-dotnet`, `<release>-package-host-node` and `<release>-package-host-python`, each as a Deployment, a Service on port 5310 and a
   NetworkPolicy, with the command `host` and a read-only root file system apart from `/tmp`. It has no env entry, no secret and no
   service link, and the worker is pointed at its Service with `Extensions__Runners__Dotnet`, `Extensions__Runners__Node` and `Extensions__Runners__Python`. Its CPU and memory limits come from
   `packageHost.dotnet.resources`, `packageHost.node.resources` and `packageHost.python.resources`, and rendering fails without them. Each NetworkPolicy admits only worker pods, on TCP 5310, lets the host send traffic only to worker
   pods and allows no DNS. It holds only where the network plugin enforces NetworkPolicy, see
-  [in the cloud](installation.md#in-the-cloud).
+  [in the cloud](installation.md#in-the-cloud). With `applicationPackageHost.enabled`, the chart also runs
+  `<release>-application-package-host` from the same templates, under gVisor, see
+  [the sandbox](#an-applications-packages).
 - **The Python runner.** For a `start` that names a `python` version, the host runs
   `python3 -I -B <sdk>/axis_runner.py <version folder>`. The host picks the runner from the manifest's `language`, and
   a version whose manifest is missing or does not match the manifest schema starts no runner. The
