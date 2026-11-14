@@ -5,6 +5,7 @@ import type {
   StudioAiConnection,
   StudioAuthoringRequestList,
   StudioAuthoringRequestStep,
+  StudioAuthoringStepChecks,
   StudioLiveChange,
   StudioRequest,
   StudioRevisionChange,
@@ -703,41 +704,78 @@ const actedOn = new Map<string, { state: StudioAuthoringRequest['state']; at: nu
 const planComments = new Map<string, string[]>()
 const changeRequests = new Map<string, { comment: string; at: number }[]>()
 
-// Proposed: the steps of a request's loop, each with its kind, its summary and its outcome. A fix round adds a fix and a
-// second check, see docs/reference/authoring-requests.md#states.
-const loop: [string, string, string][] = [
-  ['plan', 'Read the application and wrote a plan', 'Plan written'],
-  ['work', 'Made the change in a draft', 'Draft saved, 4 resources changed'],
-  [
-    'check',
-    "Ran the compiler and the application's 8 scenarios",
-    '1 scenario failed: a request without a supplier was saved',
-  ],
-  ['fix', 'Worked on what the checks found', 'Draft saved, 1 resource changed'],
-  ['check', "Ran the compiler and the application's 8 scenarios", 'All 8 scenarios passed'],
-  ['review', 'A second AI read the draft against the request and the plan', 'No findings'],
+/** The results of a step's checks: the compile, with `errors` errors, then `passed` of `total` scenarios, when they ran. */
+function stepChecks(errors: number, scenarios?: [number, number]): StudioAuthoringStepChecks {
+  return {
+    compile: {
+      outcome: errors > 0 ? 'failed' : 'passed',
+      diagnostics: Array.from({ length: errors }, () => ({
+        code: 'AX0412',
+        severity: 'error' as const,
+        message: 'The field costCentre refers to an entity that does not exist.',
+        file: 'entities/Request.json',
+        path: '/fields/2',
+        resourceId: id(firstEntityId),
+      })),
+    },
+    ...(scenarios === undefined
+      ? {}
+      : {
+          scenarios: {
+            outcome: scenarios[0] === scenarios[1] ? ('passed' as const) : ('failed' as const),
+            items: Array.from({ length: scenarios[1] }, (_, index) => ({
+              outcome: index < scenarios[0] ? 'passed' : 'failed',
+            })),
+          },
+        }),
+  }
+}
+
+/** A step of a fixture: its kind, its outcome code and the results of its checks, or the resource it writes. */
+type FixtureStep = Pick<StudioAuthoringRequestStep, 'kind' | 'outcome' | 'checks' | 'resource'>
+
+// Proposed: the steps of a request's loop, each with its kind, its outcome and its checks' results, which Studio puts in
+// words. A fix round adds a fix and a second check, see docs/reference/authoring-requests.md#states.
+const loop: FixtureStep[] = [
+  { kind: 'plan', outcome: null },
+  { kind: 'work', outcome: null },
+  { kind: 'check', outcome: 'failed', checks: stepChecks(0, [7, 8]) },
+  { kind: 'fix', outcome: null },
+  { kind: 'check', outcome: 'passed', checks: stepChecks(0, [8, 8]) },
+  { kind: 'review', outcome: 'passed', checks: { review: { outcome: 'passed' } } },
 ]
 
 /**
- * Proposed: the tool calls an outside app made for its request, each with its summary and outcome: its plan, which its
- * author approved in Studio, the writes it could make only then, the checks and the review.
+ * Proposed: the tool calls an outside app made for its request, each with its outcome: its plan, which its author
+ * approved in Studio, the writes it could make only then, each with its resource, the checks and the review.
  */
-const appLoop: [string, string, string][] = [
-  ['propose_plan', 'Proposed a plan from its conversation with you', 'Plan written'],
-  ['write_resource', 'Wrote the Cost centre entity', 'Saved, no problems'],
-  ['write_resource', 'Wrote the Purchase request entity', 'Saved, no problems'],
-  ['write_resource', 'Wrote the Requests page', 'Saved, no problems'],
-  ['validate_draft', 'Checked the draft', 'No problems'],
-  ['run_scenarios', "Ran the application's 8 scenarios", 'All 8 scenarios passed'],
-  ['review', 'A second AI read the draft against the request', 'No findings'],
+const appLoop: FixtureStep[] = [
+  { kind: 'propose_plan', outcome: null },
+  {
+    kind: 'write_resource',
+    outcome: 'saved',
+    resource: { resourceId: null, file: 'entities/cost-centre.json', name: 'Cost centre', kind: 'entity' },
+  },
+  {
+    kind: 'write_resource',
+    outcome: 'saved',
+    resource: { resourceId: id(firstEntityId), file: 'entities/Request.json', name: null, kind: null },
+  },
+  {
+    kind: 'write_resource',
+    outcome: 'saved',
+    resource: { resourceId: pageId, file: 'pages/request-list.json', name: null, kind: null },
+  },
+  { kind: 'validate_draft', outcome: 'passed', checks: stepChecks(0) },
+  { kind: 'run_scenarios', outcome: 'passed', checks: { scenarios: stepChecks(0, [2, 2]).scenarios } },
+  { kind: 'review', outcome: 'passed', checks: { review: { outcome: 'passed' } } },
 ]
 
 /** The steps of an outside app's request, a minute apart from its sending. */
 function appSteps(request: StudioAuthoringRequest): StudioAuthoringRequestStep[] {
-  return appLoop.map(([kind, summary, outcome], index) => ({
-    kind,
-    summary,
-    outcome,
+  return appLoop.map((step, index) => ({
+    ...step,
+    summary: null,
     tokens: 0,
     startedAt: new Date(Date.parse(request.sentAt) + index * 60_000).toISOString(),
     finishedAt: new Date(Date.parse(request.sentAt) + (index + 1) * 60_000).toISOString(),
@@ -770,12 +808,13 @@ const afterApproval: [StudioAuthoringRequest['state'], number, number, boolean][
 
 /** The first `count` steps of the loop, `gap` milliseconds apart from `start`, the last one running when asked. */
 function loopSteps(count: number, running: boolean, start: number, gap: number): StudioAuthoringRequestStep[] {
-  return loop.slice(0, count).map(([kind, summary, outcome], index) => {
+  return loop.slice(0, count).map((step, index) => {
     const last = running && index === count - 1
     return {
-      kind,
-      summary,
-      outcome: last ? null : outcome,
+      ...step,
+      summary: null,
+      outcome: last ? null : step.outcome,
+      checks: last ? null : step.checks,
       tokens: 0,
       startedAt: new Date(start + index * gap).toISOString(),
       finishedAt: last ? null : new Date(start + (index + 1) * gap).toISOString(),
@@ -815,7 +854,7 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
       ? [
           ...loopSteps(1, false, start - 2 * gap, gap),
           ...comments.map((comment) => ({
-            kind: 'planChange',
+            kind: 'planChange' as const,
             summary: comment,
             outcome: null,
             tokens: 0,
@@ -829,7 +868,7 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
             // An ask for changes follows the ready request's steps, and the loop runs again from the work.
             ...(request.app !== null ? appSteps(request) : loopSteps(6, false, Date.parse(request.sentAt), 60_000)),
             ...changeRequests.get(request.id)!.map(({ comment, at }) => ({
-              kind: 'changeRequest',
+              kind: 'changeRequest' as const,
               summary: comment,
               outcome: null,
               tokens: 0,

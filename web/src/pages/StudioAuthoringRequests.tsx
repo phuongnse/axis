@@ -6,6 +6,7 @@ import { AxisActionRow, AxisButton } from '../platform/AxisButton'
 import { AxisField } from '../platform/AxisField'
 import { AxisTable, type AxisColumn } from '../platform/AxisTable'
 import { EmptyDash } from '../platform/EmptyValue'
+import { FilledText } from '../platform/FilledText'
 import { requiredMark } from '../platform/requiredMark'
 import {
   acceptAuthoringRequest,
@@ -19,6 +20,8 @@ import {
   type StudioAuthoringRequestDetail,
   type StudioAuthoringRequestState,
   type StudioAuthoringRequestStep,
+  type StudioAuthoringStepKind,
+  type StudioDiagnostic,
   type StudioPlan,
   type StudioReview,
   type StudioRequest,
@@ -365,19 +368,41 @@ export function StudioAuthoringRequestPage({
     request.app !== null && !request.aiConnected && ['planning', 'working', 'fixing'].includes(request.state)
   const stageTitles = stageKeys.map((key) => t(`shell.studio.aiRequest.stage.${key}`))
   const running = request.steps.findLast((step) => step.finishedAt === null)
-  // A step's summary in words; a change of plan, and an ask for changes to a ready draft, keep the author's comment.
-  const stepWords = (step: StudioAuthoringRequestStep) =>
-    step.kind === 'planChange'
-      ? t('shell.studio.aiRequest.planChange').replace('{comment}', step.summary)
-      : step.kind === 'changeRequest'
-        ? t('shell.studio.aiRequest.changeRequest').replace('{comment}', step.summary)
-        : step.summary
-  const stepResult = (step: StudioAuthoringRequestStep) =>
-    step.finishedAt === null ? (
-      <span style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.stepRunning')}</span>
-    ) : (
-      (step.outcome ?? <EmptyDash />)
-    )
+  // Proposed: a step in words Studio writes from its kind, see the review on #3263, the same for every request and in the
+  // reader's language. A change of plan, and an ask for changes to a ready draft, keep the author's comment, and a write
+  // names its resource as a link.
+  const stepWords = (step: StudioAuthoringRequestStep): ReactNode => {
+    switch (step.kind) {
+      case 'planChange':
+      case 'changeRequest':
+        return t(`shell.studio.aiRequest.${step.kind}`).replace('{comment}', step.summary ?? '')
+      case 'write_resource':
+      case 'write_layer':
+      case 'delete_resource':
+        return (
+          <FilledText
+            text={t(`shell.studio.aiRequest.step.${step.kind === 'delete_resource' ? 'delete' : 'write'}`)}
+            parts={{
+              resource:
+                step.resource == null ? null : (
+                  <ResourceReference
+                    resourceId={step.resource.resourceId}
+                    file={step.resource.file}
+                    name={step.resource.name}
+                    kind={step.resource.kind}
+                    path=""
+                    resources={resources}
+                    onSelect={onOpen}
+                  />
+                ),
+            }}
+          />
+        )
+      default:
+        return t(stepKeys[step.kind])
+    }
+  }
+  const runningWords = <span style={{ color: colour.textMuted }}>{t('shell.studio.aiRequest.stepRunning')}</span>
   const stepColumns: AxisColumn<HistoryRow>[] = [
     {
       key: 'step',
@@ -387,19 +412,24 @@ export function StudioAuthoringRequestPage({
       render: (_, row) =>
         row.steps.length === 1
           ? stepWords(row.steps[0])
-          : t('shell.studio.aiRequest.history.writes').replace('{count}', String(row.steps.length)),
+          : t(
+              row.steps.some((step) => step.kind === 'delete_resource')
+                ? 'shell.studio.aiRequest.history.changes'
+                : 'shell.studio.aiRequest.history.writes',
+            ).replace('{count}', String(row.steps.length)),
     },
     {
       key: 'result',
       kind: 'freeText',
       title: t('shell.studio.aiRequest.result'),
+      // Proposed: a step's result in words Studio writes from its outcome and its checks, see the review on #3263; a group
+      // row's is its writes' when they share one.
       render: (_, row) => {
-        const outcomes = new Set(row.steps.map((step) => step.outcome))
-        return row.steps.length === 1 || row.steps.some((step) => step.finishedAt === null)
-          ? stepResult(row.steps.at(-1)!)
-          : outcomes.size === 1
-            ? (row.steps[0].outcome ?? <EmptyDash />)
-            : t('shell.studio.aiRequest.history.mixed')
+        if (row.steps.some((step) => step.finishedAt === null)) {
+          return runningWords
+        }
+        const results = new Set(row.steps.map((step) => stepResult(step, t)))
+        return results.size > 1 ? t('shell.studio.aiRequest.history.mixed') : ([...results][0] ?? <EmptyDash />)
       },
     },
     {
@@ -464,7 +494,16 @@ export function StudioAuthoringRequestPage({
   // A request that waits for its plan's approval opens on its plan; any other on its first tab.
   const activeTab: RequestTab | undefined =
     tab?.id === requestId && shown.includes(tab.key) ? tab.key : awaiting && shown.includes('plan') ? 'plan' : shown[0]
-  const checksLine = request.checks !== null ? checksSummary(request.checks, t) : null
+  const checksLine =
+    request.checks !== null
+      ? checksSummary(
+          request.checks.diagnostics,
+          (request.checks.scenarios ?? []).filter(
+            (scenario) => 'outcome' in scenario && scenario.outcome !== undefined,
+          ),
+          t,
+        )
+      : null
   const overview = (
     <SectionParts>
       {request.state === 'failed' && (
@@ -606,9 +645,11 @@ export function StudioAuthoringRequestPage({
             {following && !waitsForApp && <Spin size="small" />}
             {following && !waitsForApp && (running !== undefined || request.state === 'planning') && (
               <Typography.Text style={{ color: colour.textMuted }}>
-                {request.state === 'planning' || running === undefined
-                  ? t('shell.studio.aiRequest.planning')
-                  : t('shell.studio.aiRequest.now').replace('{step}', running.summary)}
+                {request.state === 'planning' || running === undefined ? (
+                  t('shell.studio.aiRequest.planning')
+                ) : (
+                  <FilledText text={t('shell.studio.aiRequest.now')} parts={{ step: stepWords(running) }} />
+                )}
               </Typography.Text>
             )}
             {fixRound && (
@@ -913,9 +954,16 @@ function ReviewFindings({
 /** Proposed: the tabs of a request's page, see the review on #3263. */
 type RequestTab = 'overview' | 'changes' | 'checks' | 'plan' | 'history'
 
-/** Proposed: the checks of a request in one line, and whether they passed, see the review on #3263. */
-function checksSummary(checks: StudioRequest, t: (key: string) => string): { text: string; passed: boolean } {
-  const errors = checks.diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
+/**
+ * Proposed: checks in one line, and whether they passed, see the review on #3263: the compile's errors when there are
+ * any, otherwise the scenarios that passed, or that it compiles when no scenario ran, `scenarios` being `null`.
+ */
+function checksSummary(
+  diagnostics: readonly StudioDiagnostic[],
+  scenarios: readonly { outcome?: string }[] | null,
+  t: (key: string) => string,
+): { text: string; passed: boolean } {
+  const errors = diagnostics.filter((diagnostic) => diagnostic.severity === 'error').length
   if (errors > 0) {
     return {
       text: t(
@@ -924,9 +972,9 @@ function checksSummary(checks: StudioRequest, t: (key: string) => string): { tex
       passed: false,
     }
   }
-  const scenarios = (checks.scenarios ?? []).filter(
-    (scenario) => 'outcome' in scenario && scenario.outcome !== undefined,
-  )
+  if (scenarios === null) {
+    return { text: t('shell.studio.aiRequest.checks.compiles'), passed: true }
+  }
   const passed = scenarios.filter((scenario) => scenario.outcome === 'passed').length
   if (scenarios.length === 0) {
     return { text: t('shell.studio.aiRequest.checks.noScenarios'), passed: true }
@@ -938,7 +986,99 @@ function checksSummary(checks: StudioRequest, t: (key: string) => string): { tex
     text: t('shell.studio.aiRequest.checks.scenarios')
       .replace('{passed}', String(passed))
       .replace('{total}', String(scenarios.length)),
-    passed: passed === scenarios.length,
+    passed: false,
+  }
+}
+
+/** The text key of each step kind whose words name nothing else. */
+const stepKeys: Record<
+  Exclude<
+    StudioAuthoringStepKind,
+    'planChange' | 'changeRequest' | 'write_resource' | 'write_layer' | 'delete_resource'
+  >,
+  string
+> = {
+  plan: 'shell.studio.aiRequest.step.plan',
+  work: 'shell.studio.aiRequest.step.work',
+  check: 'shell.studio.aiRequest.step.check',
+  fix: 'shell.studio.aiRequest.step.fix',
+  review: 'shell.studio.aiRequest.step.review',
+  accept: 'shell.studio.aiRequest.step.accept',
+  propose_plan: 'shell.studio.aiRequest.step.proposePlan',
+  validate_draft: 'shell.studio.aiRequest.step.validateDraft',
+  run_scenarios: 'shell.studio.aiRequest.step.runScenarios',
+}
+
+/**
+ * The text key of each outcome whose words do not hang on the step's checks: why a step stopped its request, and how an
+ * accept by the agent ended, see docs/reference/authoring-requests.md#budgets and #accepting.
+ */
+const outcomeKeys: Record<string, string> = {
+  timedOut: 'shell.studio.aiRequest.result.timedOut',
+  overBudget: 'shell.studio.aiRequest.result.overBudget',
+  tokenEnded: 'shell.studio.aiRequest.result.tokenEnded',
+  noPlan: 'shell.studio.aiRequest.result.noPlan',
+  unfinished: 'shell.studio.aiRequest.result.unfinished',
+  notAccepted: 'shell.studio.aiRequest.result.notAccepted',
+  accepted: 'shell.studio.aiRequest.result.accepted',
+  refused: 'shell.studio.aiRequest.result.refused',
+  conflict: 'shell.studio.aiRequest.result.conflict',
+}
+
+/**
+ * Proposed: a finished step's result in words, see the review on #3263: why it stopped its request, else what its checks
+ * found, else what a step of its kind did, or `null` for a step that has no result, such as the author's comment.
+ */
+function stepResult(step: StudioAuthoringRequestStep, t: (key: string) => string): string | null {
+  if (step.outcome !== null && Object.hasOwn(outcomeKeys, step.outcome)) {
+    return t(outcomeKeys[step.outcome])
+  }
+  const checks = step.checks ?? null
+  if (checks?.review !== undefined) {
+    return t(
+      checks.review.outcome === 'passed'
+        ? 'shell.studio.aiRequest.review.noChangesRequested'
+        : 'shell.studio.aiRequest.review.changesRequested',
+    )
+  }
+  if (checks?.compile !== undefined || checks?.scenarios !== undefined) {
+    const scenarios = checks.scenarios
+    return checksSummary(
+      checks.compile?.diagnostics ?? [],
+      scenarios === undefined || scenarios.outcome === 'notRun' ? null : scenarios.items,
+      t,
+    ).text
+  }
+  switch (step.kind) {
+    case 'plan':
+    case 'propose_plan':
+      return t('shell.studio.aiRequest.result.planWritten')
+    case 'work':
+    case 'fix':
+      return t('shell.studio.aiRequest.result.draftSaved')
+    case 'write_resource':
+    case 'write_layer':
+      return step.outcome === 'refused'
+        ? t('shell.studio.aiRequest.result.notSaved')
+        : t('shell.studio.aiRequest.result.saved')
+    case 'delete_resource':
+      return step.outcome === 'refused'
+        ? t('shell.studio.aiRequest.result.notDeleted')
+        : t('shell.studio.aiRequest.result.deleted')
+    case 'check':
+    case 'validate_draft':
+    case 'run_scenarios':
+      return step.outcome === 'failed'
+        ? t('shell.studio.aiRequest.checks.failed')
+        : t('shell.studio.aiRequest.checks.passed')
+    case 'review':
+      return t(
+        step.outcome === 'findings'
+          ? 'shell.studio.aiRequest.review.changesRequested'
+          : 'shell.studio.aiRequest.review.noChangesRequested',
+      )
+    default:
+      return null
   }
 }
 

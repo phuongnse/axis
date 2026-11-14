@@ -48,7 +48,8 @@ export function ResourceReference({
   const resource = resources.find((entry) => entry.id === resourceId)
   return (
     <Flex component="span" align="baseline" gap={spacing.xs} wrap style={{ display: 'inline-flex' }}>
-      <AxisButton role="link" onClick={() => onSelect(resourceId, path)}>
+      {/* A small link, as a table's link, so a pointer in a line of text keeps the line's height. */}
+      <AxisButton role="link" size="small" onClick={() => onSelect(resourceId, path)}>
         {resource === undefined ? (file ?? resourceId) : resourceTitle(resource, locale, t)}
       </AxisButton>
       {resource !== undefined && (

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { StudioAuthoringRequestDetail } from '../platform/studio'
+import type { StudioAuthoringRequestDetail, StudioAuthoringRequestStep } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
 import { requestTitle } from './authoringRequests'
 import { StudioAuthoringRequestPage, StudioAuthoringRequests } from './StudioAuthoringRequests'
@@ -39,8 +39,9 @@ const fromApp: StudioAuthoringRequestDetail = {
   steps: [
     {
       kind: 'validate_draft',
-      summary: 'Checked the draft',
-      outcome: 'No problems',
+      summary: null,
+      outcome: 'passed',
+      checks: { compile: { outcome: 'passed', diagnostics: [] } },
       tokens: 0,
       startedAt: '2026-11-10T09:20:00Z',
       finishedAt: '2026-11-10T09:21:00Z',
@@ -360,7 +361,7 @@ describe('a ready request’s page', () => {
 
     const checks = await screen.findByTestId('studio-ai-checks')
     expect(within(checks).getByText('Passed')).toHaveAttribute('data-tone', 'success')
-    expect(within(checks).getByText('All 1 scenarios pass.')).toBeInTheDocument()
+    expect(within(checks).getByText('All 1 scenarios pass')).toBeInTheDocument()
     expect(screen.getByText('Checks and review passed')).toBeInTheDocument()
     expect(screen.queryByText('What changes')).toBeNull()
     // The overview first, then the changes, the checks' detail, the plan and the history.
@@ -591,40 +592,64 @@ describe('a plan and its review, as a pull request has them', () => {
   })
 })
 
-// Proposed: the history reads writes in a row as one, and says how long each step took, see the review on #3263.
+// Proposed: the history puts each step in Studio's own words from its codes, reads writes in a row as one, and says how
+// long each step took, see the review on #3263.
 describe("a request's history", () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })
 
-  const step = (kind: string, summary: string, start: string, end: string | null, outcome: string | null) => ({
+  const step = (
+    kind: StudioAuthoringRequestStep['kind'],
+    start: string,
+    end: string | null,
+    outcome: string | null,
+    more: Partial<StudioAuthoringRequestStep> = {},
+  ): StudioAuthoringRequestStep => ({
     kind,
-    summary,
+    summary: null,
     outcome,
     tokens: 0,
     startedAt: start,
     finishedAt: end,
+    ...more,
   })
+  const write = (start: string, end: string, resourceId: string | null, name: string | null = null) =>
+    step('write_resource', start, end, 'saved', {
+      resource: { resourceId, file: `${name ?? resourceId}.json`, name, kind: name === null ? null : 'entity' },
+    })
+  const resources = [
+    {
+      id: 'r-1',
+      kind: 'page',
+      name: 'RequestList',
+      file: 'pages/list.json',
+      version: 'v',
+      usedBy: 0,
+      titles: { en: 'Requests' },
+    },
+  ]
 
-  it('reads writes that follow each other as one row that opens to each, and how long each step took', async () => {
+  it('reads writes that follow each other as one row that opens to each, in its own words, and how long each took', async () => {
     stub({
       ...fromApp,
       aiConnected: true,
       steps: [
-        step('propose_plan', 'Proposed a plan', '2026-11-10T09:00:00Z', '2026-11-10T09:00:40Z', 'Plan written'),
-        step('write_resource', 'Wrote CostCentre', '2026-11-10T09:01:00Z', '2026-11-10T09:01:10Z', 'Saved'),
-        step('write_resource', 'Wrote Request', '2026-11-10T09:01:10Z', '2026-11-10T09:02:00Z', 'Saved'),
-        step('write_resource', 'Wrote Requests', '2026-11-10T09:02:00Z', '2026-11-10T09:04:00Z', 'Saved'),
-        step('validate_draft', 'Checked the draft', '2026-11-10T09:04:00Z', null, null),
+        step('propose_plan', '2026-11-10T09:00:00Z', '2026-11-10T09:00:40Z', null),
+        write('2026-11-10T09:01:00Z', '2026-11-10T09:01:10Z', null, 'Cost centre'),
+        write('2026-11-10T09:01:10Z', '2026-11-10T09:02:00Z', 'r-1'),
+        write('2026-11-10T09:02:00Z', '2026-11-10T09:04:00Z', 'r-1'),
+        step('validate_draft', '2026-11-10T09:04:00Z', null, null),
       ],
     })
+    const onOpen = vi.fn()
     renderIn(
       <StudioAuthoringRequestPage
         application={application}
         requestId={fromApp.id}
         userId={userId}
-        resources={[]}
-        onOpen={() => {}}
+        resources={resources}
+        onOpen={onOpen}
       />,
     )
     const user = userEvent.setup()
@@ -634,13 +659,45 @@ describe("a request's history", () => {
     expect(rows).toHaveLength(3)
     expect(rows[0]).toHaveTextContent(/Proposed a plan\s*Plan written.*40 s/)
     expect(rows[1]).toHaveTextContent(/Wrote 3 resources\s*Saved.*3 min/)
-    expect(rows[2]).toHaveTextContent('Running…')
-    expect(screen.queryByText('Wrote CostCentre')).toBeNull()
+    expect(rows[2]).toHaveTextContent(/Compiled the draft\s*Running…/)
 
-    // The table opens the group row to a row for each write, with its own result and time.
+    // The table opens the group row to a row for each write, its resource named as people read it.
     await user.click(within(rows[1]).getByRole('button', { name: 'Show the rows in it' }))
     const opened = screen.getAllByRole('row').slice(1)
     expect(opened).toHaveLength(6)
-    expect(opened[2]).toHaveTextContent(/Wrote CostCentre\s*Saved.*10 s/)
+    expect(opened[2]).toHaveTextContent(/Wrote Cost centre\s*Entity\s*Saved.*10 s/)
+    await user.click(within(opened[3]).getByRole('button', { name: 'Requests' }))
+    expect(onOpen).toHaveBeenCalledWith('r-1', '')
+  })
+
+  it("puts a check's results and why a step stopped its request in words", async () => {
+    stub({
+      ...fromApp,
+      state: 'failed',
+      steps: [
+        step('check', '2026-11-10T09:00:00Z', '2026-11-10T09:01:00Z', 'failed', {
+          checks: {
+            compile: { outcome: 'passed', diagnostics: [] },
+            scenarios: { outcome: 'failed', items: [{ outcome: 'passed' }, { outcome: 'failed' }] },
+          },
+        }),
+        step('fix', '2026-11-10T09:01:00Z', '2026-11-10T09:31:00Z', 'timedOut'),
+      ],
+    })
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={resources}
+        onOpen={() => {}}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('tab', { name: 'History' }))
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent(/Compiled the draft and ran the scenarios\s*1 of 2 scenarios pass/)
+    expect(rows[1]).toHaveTextContent(/Fixed what the checks and the review found\s*Ran out of time.*30 min/)
   })
 })

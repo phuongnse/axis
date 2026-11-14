@@ -1766,14 +1766,61 @@ export async function sendAuthoringRequest(
   return (await response.json()) as StudioAuthoringRequest
 }
 
-/** One step of an authoring request, as the read route answers it, see docs/reference/authoring-requests.md#routes. */
+/**
+ * The kind of an authoring request's step, see docs/reference/authoring-requests.md#states: Axis's own loop, the author's
+ * `planChange` and `changeRequest` comments, and, Proposed, see the review on #3263, the tool calls an outside AI app
+ * makes for its request.
+ */
+export type StudioAuthoringStepKind =
+  | 'plan'
+  | 'planChange'
+  | 'work'
+  | 'check'
+  | 'fix'
+  | 'review'
+  | 'changeRequest'
+  | 'accept'
+  | 'propose_plan'
+  | 'write_resource'
+  | 'write_layer'
+  | 'delete_resource'
+  | 'validate_draft'
+  | 'run_scenarios'
+
+/**
+ * The results a check or review step stores, see docs/reference/authoring-requests.md#states: the compile and the scenario
+ * run of a `check` step, and the verdict of a `review` step. Proposed: an outside app's `validate_draft` stores its
+ * compile and its `run_scenarios` its run, see the review on #3263.
+ */
+export interface StudioAuthoringStepChecks {
+  compile?: { outcome: 'passed' | 'failed'; diagnostics: StudioDiagnostic[] }
+  scenarios?: { outcome: 'passed' | 'failed' | 'notRun'; items: { outcome: string }[] }
+  review?: { outcome: 'passed' | 'findings' }
+}
+
+/**
+ * One step of an authoring request, as the read route answers it, see docs/reference/authoring-requests.md#routes. Its
+ * `kind` and `outcome` are codes, which Studio puts in words; `summary` is the author's own comment on a `planChange` or
+ * `changeRequest` step, and `null` on any other, so AI writes no words of the history.
+ */
 export interface StudioAuthoringRequestStep {
-  kind: string
-  summary: string
+  kind: StudioAuthoringStepKind
+  summary: string | null
+  /**
+   * The step's outcome, such as `passed`, `failed`, `findings`, `timedOut` or `accepted`, or `null` while it runs and on a
+   * step that ends with none. Proposed: an outside app's write is `saved` or `refused`, see the review on #3263.
+   */
   outcome: string | null
   tokens: number
   startedAt: string
   finishedAt: string | null
+  /** The results of a check or review step, or `null` on any other. */
+  checks?: StudioAuthoringStepChecks | null
+  /**
+   * Proposed: the resource an outside app's write or delete is about, see the review on #3263; `name` and `kind` name a
+   * resource only the draft adds, which has no id yet.
+   */
+  resource?: { resourceId: string | null; file: string; name: string | null; kind: string | null } | null
 }
 
 /**
