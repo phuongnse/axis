@@ -254,7 +254,8 @@ if (startupFolders.Length > 0)
     builder.Services.AddSingleton(new StartupActivationOptions(
         [.. startupFolders.Select(folder => Path.GetFullPath(folder, builder.Environment.ContentRootPath))],
         builder.Configuration.GetValue("Activation:InlineRecomputeLimit", ReleaseActivator.DefaultInlineRecomputeLimit),
-        ReleaseActivator.ReadActivationTimeout(builder.Configuration)));
+        ReleaseActivator.ReadActivationTimeout(builder.Configuration),
+        ApplicationPackageSettings.IsOn(builder.Configuration)));
     builder.Services.AddHostedService<StartupActivation>();
 }
 

@@ -693,14 +693,14 @@ trusted code, so the platform gives it more limits than an installation's packag
   Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
-- **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.
+- **`Extensions:ApplicationPackages`.** A server, worker, `activate` and publisher setting, `false` by default.
   With `true`, the worker sends `sandbox` to `application-package-host` at `Extensions:Runners:Application`
   before it reads any tenant or claims any work, and does not start otherwise. It exits with code 1 when the
   answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
   `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
   it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
   An application's package is then a compile error at its `packages/<id>/axis-package.json`, reported
-  once for each package. So an installation without gVisor refuses it and runs its own packages as before.
+  once for each package, when the server activates a folder at start, `activate` compiles it or the publisher compiles a snapshot. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
 - **A customer-hosted package and the setting** _(planned for M37)_. The tenant's switch and the compile
   check still allow a [customer-hosted](#customer-hosted-runners) package with the setting `false`, which

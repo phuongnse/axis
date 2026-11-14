@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Releases;
@@ -520,7 +521,7 @@ internal sealed class Publisher(
                 tenant.Bindings,
                 files is null
                     ? null
-                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                    : configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
                 diagnostics,
                 contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
             await StopRenewalAsync(renewing, renewal);
@@ -573,7 +574,7 @@ internal sealed class Publisher(
                 target.SchemaVersion,
                 previewConnections ?? connections,
                 target.Bindings,
-                configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+                configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
                 syncRealm: target.SyncRealm,
@@ -659,7 +660,7 @@ internal sealed class Publisher(
             tenant.SchemaVersion,
             connections,
             tenant.Bindings,
-            configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
+            configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, ApplicationCompiler.DefaultMaxFileSize, settings.ApplicationPackages, CancellationToken.None),
             diagnostics,
             contracts: () => activation.ContractsAsync(tenant.Id, scenarioServer, files, settings.Packages, settings.Modules, diagnostics, scenarioResults, testLimit));
         if (!valid)

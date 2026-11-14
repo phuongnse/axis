@@ -1,3 +1,4 @@
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
@@ -32,6 +33,7 @@ internal sealed class TenantActivate(
     ModuleCatalog modules,
     int inlineRecomputeLimit,
     TimeSpan activationTimeout,
+    bool applicationPackages,
     TenantAudit? audit,
     TextWriter output,
     TextWriter error,
@@ -72,7 +74,7 @@ internal sealed class TenantActivate(
             row.SchemaVersion,
             steps,
             bindings[row.Id],
-            configuration => ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken),
+            configuration => ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, ApplicationCompiler.DefaultMaxFileSize, applicationPackages, cancellationToken),
             [],
             ActivationActor.Operator,
             syncRealm: TenantReleaseActivation.RealmSync(

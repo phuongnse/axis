@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
@@ -116,7 +117,7 @@ internal sealed partial class StartupActivation(
             activity?.SetTag(AxisTelemetry.TenantTag, tenantId);
             try
             {
-                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken);
+                var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, ApplicationCompiler.DefaultMaxFileSize, options.ApplicationPackages, cancellationToken);
                 activity?.SetTag(AxisTelemetry.ApplicationTag, compiled.Model?.Manifest.Name);
                 LogDiagnostics(compiled.Diagnostics, folder, tenantId);
                 if (compiled.Release is null || compiled.Model is null)

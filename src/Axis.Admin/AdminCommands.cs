@@ -1270,6 +1270,7 @@ internal static partial class AdminCommands
             settings.Modules,
             settings.InlineRecomputeLimit,
             settings.ActivationTimeout,
+            settings.ApplicationPackages,
             new TenantAudit(command, settings.Platform.PlatformConnectionString),
             output,
             error,
@@ -1439,7 +1440,7 @@ internal static partial class AdminCommands
         }
 
         return await new Publisher(
-            new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout),
+            new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout, settings.ApplicationPackages),
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
             sensitive,
@@ -1734,7 +1735,7 @@ internal static partial class AdminCommands
         }
 
         return ReadRealmMail(configuration, out problem) is { } mail
-            ? new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit, release.ActivationTimeout, mail)
+            ? new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit, release.ActivationTimeout, mail, release.ApplicationPackages)
             : null;
     }
 
@@ -1807,7 +1808,18 @@ internal static partial class AdminCommands
             error.WriteLine($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
         }
 
-        return new ReleaseSettings(packages, modules, limit, activationTimeout);
+        bool applicationPackages;
+        try
+        {
+            applicationPackages = ApplicationPackageSettings.IsOn(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            problem = $"The setting {ApplicationPackageSettings.Setting} must be true or false.";
+            return null;
+        }
+
+        return new ReleaseSettings(packages, modules, limit, activationTimeout, applicationPackages);
     }
 
     internal static string? ResolveFolder(string? setting) =>
@@ -2319,11 +2331,11 @@ internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyLis
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
 
-/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules, the inline recompute limit, the activation timeout and the realm's mail fallback.</summary>
-internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout, RealmMail Mail);
+/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules, the inline recompute limit, the activation timeout, the realm's mail fallback and <c>Extensions:ApplicationPackages</c>.</summary>
+internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout, RealmMail Mail, bool ApplicationPackages);
 
-/// <summary>The settings of the release steps that need no platform database: the loaded packages and modules, the inline recompute limit and the activation timeout.</summary>
-internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout);
+/// <summary>The settings of the release steps that need no platform database: the loaded packages and modules, the inline recompute limit, the activation timeout and <c>Extensions:ApplicationPackages</c>.</summary>
+internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout, bool ApplicationPackages);
 
 /// <summary>The host environment that the tenant configuration check reads, from <c>DOTNET_ENVIRONMENT</c>. This host has no other.</summary>
 internal sealed class AdminEnvironment(string environmentName) : IHostEnvironment

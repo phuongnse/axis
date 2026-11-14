@@ -195,6 +195,7 @@ internal static class CreateJob
             activate.Modules,
             activate.InlineRecomputeLimit,
             activate.ActivationTimeout,
+            activate.ApplicationPackages,
             audit: null,
             captured,
             error,
