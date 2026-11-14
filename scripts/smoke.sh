@@ -12,7 +12,9 @@
 #   provider, which the TLS proxy serves on a host of its own. Every
 #   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
-#   and resume, and an unknown host. It checks each package host's read-only root, limits, environment and network.
+#   and resume, and an unknown host. It checks each package host's read-only root, limits, environment and network. It builds
+#   the sample packages payment-references and payment-terms in their package host images, and gives tenant one the
+#   purchase request sample's bindings, every url binding over https, and activates the sample there.
 #   It reads the sample modules, which this script installs in artifacts/modules.
 # - ai-eval: scripts/ai-eval-stack.test.mjs builds the server, the publisher and the agent host and starts them with
 #   PostgreSQL and Keycloak in Docker, as the authoring eval's stack, see docs/reference/model-bindings.md#the-authoring-eval.

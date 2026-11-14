@@ -9,7 +9,6 @@ import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   chmodSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -24,6 +23,7 @@ import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { listedImage } from './lib/docker-images.mjs'
+import { buildPackage, copyReadable, downloadTrivyDatabase, removeAsImageUser, writable } from './lib/package-build.mjs'
 import { smokeImages } from './lib/smoke-images.mjs'
 import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
@@ -304,20 +304,6 @@ test('the admin tool prints its version and has the PostgreSQL 18 tools', { time
 // The version that scripts/lib/trivy.sh pins, which each package host image must hold.
 const trivyVersion = readFileSync(join(root, 'scripts/lib/trivy.sh'), 'utf8').match(/^TRIVY_VERSION=(\S+)$/m)[1]
 
-// Copies a folder so that the non-root user of a package host image can read it: mkdtemp makes folders with mode 0700.
-const copyReadable = (from, to, skip = () => false) => {
-  mkdirSync(to, { recursive: true })
-  chmodSync(to, 0o755)
-  for (const entry of readdirSync(from, { withFileTypes: true })) {
-    if (skip(entry.name)) continue
-    if (entry.isDirectory()) copyReadable(join(from, entry.name), join(to, entry.name), skip)
-    else {
-      copyFileSync(join(from, entry.name), join(to, entry.name))
-      chmodSync(join(to, entry.name), 0o644)
-    }
-  }
-}
-
 // The sorted paths under a folder, to show that a build leaves its read-only source as it was.
 const listing = (dir) =>
   readdirSync(dir, { recursive: true })
@@ -330,39 +316,14 @@ describe('the package host images', () => {
   let work
   let cache
 
-  const writable = (dir) => {
-    mkdirSync(dir)
-    chmodSync(dir, 0o777)
-    return dir
-  }
-
-  // The folders of the non-root user are 0777 so that it can write them. Trivy's vulnerability database is
-  // downloaded once, in up to three attempts, because the download is the one step that needs the network and fails at
-  // times. The builds then use it with TRIVY_SKIP_DB_UPDATE, as scripts/scan-images.mjs retries its Trivy runs.
+  // The folders of the non-root user are 0777 so that it can write them. Trivy's vulnerability database is downloaded
+  // once, see scripts/lib/package-build.mjs.
   before(
     async () => {
       work = mkdtempSync(join(tmpdir(), 'axis-package-hosts-'))
       chmodSync(work, 0o755)
       cache = writable(join(work, 'trivy-cache'))
-      let result
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        result = docker([
-          'run',
-          '--rm',
-          '--entrypoint',
-          'trivy',
-          '-e',
-          'TRIVY_CACHE_DIR=/trivy-cache',
-          '-v',
-          `${cache}:/trivy-cache`,
-          image('axis-package-host-dotnet'),
-          'fs',
-          '--download-db-only',
-        ])
-        if (result.status === 0) break
-        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 15_000))
-      }
-      assert.equal(result.status, 0, `trivy could not download its database\n${result.stdout}${result.stderr}`)
+      await downloadTrivyDatabase({ image: image('axis-package-host-dotnet'), cache })
     },
     { timeout },
   )
@@ -371,10 +332,7 @@ describe('the package host images', () => {
   // own shell deletes them first.
   after(() => {
     if (!work) return
-    docker(
-      ['run', '--rm', '--entrypoint', 'sh', '-v', `${work}:/work`, image('axis-package-host-dotnet'), '-c', 'rm -rf /work/*/*'],
-      { stdio: 'ignore' },
-    )
+    removeAsImageUser(image('axis-package-host-dotnet'), work)
     rmSync(work, { recursive: true, force: true })
   })
 
@@ -382,23 +340,7 @@ describe('the package host images', () => {
   const build = (target, { source, id, marker }) => {
     const extensions = writable(join(work, `${id}-extensions`))
     const unchanged = listing(source)
-    const output = run([
-      'run',
-      '--rm',
-      '-e',
-      'TRIVY_CACHE_DIR=/trivy-cache',
-      '-e',
-      'TRIVY_SKIP_DB_UPDATE=true',
-      '-v',
-      `${cache}:/trivy-cache`,
-      '-v',
-      `${source}:/source:ro`,
-      '-v',
-      `${extensions}:/extensions`,
-      image(target),
-      'build',
-      '/source',
-    ])
+    const output = buildPackage({ image: image(target), source, extensions, cache })
     assert.match(output, new RegExp(`Built ${id} 1\\.0\\.0 in ${id}/1\\.0\\.0/\\.`))
     const manifest = join(extensions, id, '1.0.0', 'axis-package.json')
     assert.ok(existsSync(manifest), `${manifest} was not written`)
