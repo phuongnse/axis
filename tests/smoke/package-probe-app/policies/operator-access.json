@@ -1,0 +1,10 @@
+{
+  "id": "077469c3-f03c-499a-92cb-0bf8fca355ed",
+  "kind": "policy",
+  "name": "OperatorAccess",
+  "formatVersion": 1,
+  "roles": ["operator"],
+  "grants": [
+    { "name": "packageProbe", "process": "PackageProbe", "actions": ["start", "inspect"] }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "3dd363e1-777e-41ea-8f61-35fdace371b2",
+  "kind": "process",
+  "name": "PackageProbe",
+  "formatVersion": 1,
+  "parameters": [{ "name": "mode", "type": "text" }],
+  "start": "probe",
+  "steps": [
+    { "name": "probe", "type": "operation", "operation": "test-package/probe", "input": { "mode": "mode" }, "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

@@ -226,6 +226,6 @@ Read by people who change how Axis stores data.
 | [The local stack](dev-script.md)          | What `scripts/dev.sh` starts, the settings it sets, what reloads and how it stops                                  | You run or change `scripts/dev.sh`             |
 | [Running a host](running-a-host.md)       | Running the worker or the server alone, and activating another application folder                                  | You run one host outside `scripts/dev.sh`      |
 | [Production images](production-images.md) | The production images and the admin tool, built the same in development as in an install                           | You build or change a production image         |
-| [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub | You write or change a test                     |
+| [Testing](testing.md)                     | The test levels, rules for tests, shared test services, the E2E stack and its journeys, the purchasing system stub, the smoke test fixtures | You write or change a test                     |
 | [Delivery](delivery.md)                   | How work flows through NexKit                                                                                      | You file an issue, plan or open a pull request |
 | [Writing the docs](writing-docs.md)       | What goes in which doc, how to write it, and how the docs stay correct                                             | You add or change a doc                        |

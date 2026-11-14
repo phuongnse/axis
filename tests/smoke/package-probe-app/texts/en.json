@@ -1,0 +1,10 @@
+{
+  "id": "7bb6a788-5ff3-42e8-b8d5-ca7e732c6e91",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.operator": "Operator"
+  }
+}

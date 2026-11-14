@@ -14,7 +14,10 @@
 // the purchasing system stub over https, with a certificate of the test authority, which the worker trusts. The requester of tenant
 // one submits a purchase request, the department's manager approves it, and the test checks the purchase order that the stub holds,
 // the payment reference and the payment due date, and that runners in the package hosts gave the last two and the worker holds no
-// package code.
+// package code. It also builds the test package test-package 1.0.0 in the C# package host image, and activates the fixture
+// application tests/smoke/package-probe-app on tenant one. Its operator starts the process that calls the package's probe
+// operation in ownOtherHost mode, where the package's own HTTP client calls an undeclared host. The instance ends failed, its step
+// error names the operation and the package and not the host, and requester, who lacks the fixture's role, is refused the instance.
 // Requires Docker, openssl, the .NET SDK, network access for Trivy's vulnerability database, which the builds scan with, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
@@ -741,7 +744,21 @@ describe('the on-premises installation', () => {
       copyReadable(join(root, 'samples/packages/payment-terms'), termsSource, (name) => name === 'node_modules')
       const terms = buildPackage({ image: `axis-package-host-node:${version}`, source: termsSource, extensions, cache })
       assert.match(terms, /Built payment-terms 1\.0\.0 in payment-terms\/1\.0\.0\//)
-      for (const file of ['payment-references/1.0.0/axis-package.json', 'payment-terms/1.0.0/axis-package.json', 'payment-terms/1.0.0/node_modules/dayjs/package.json']) {
+
+      // The C# test package, whose `probe` operation the package probe fixture calls.
+      const testProject = 'tests/packages/TestPackage.V1/TestPackage.V1.csproj'
+      const testCompiled = spawnSync('dotnet', ['build', testProject, '-c', 'Release'], { cwd: root, encoding: 'utf8' })
+      assert.equal(testCompiled.status, 0, `dotnet build ${testProject}\n${testCompiled.stdout}${testCompiled.stderr}`)
+      const testSource = join(folder, 'sources', 'test-package')
+      copyReadable(join(root, 'tests/packages/TestPackage.V1/bin/Release/net10.0'), testSource)
+      const testPackage = buildPackage({ image: `axis-package-host-dotnet:${version}`, source: testSource, extensions, cache })
+      assert.match(testPackage, /Built test-package 1\.0\.0 in test-package\/1\.0\.0\//)
+      for (const file of [
+        'payment-references/1.0.0/axis-package.json',
+        'payment-terms/1.0.0/axis-package.json',
+        'payment-terms/1.0.0/node_modules/dayjs/package.json',
+        'test-package/1.0.0/axis-package.json',
+      ]) {
         assert.ok(existsSync(join(extensions, file)), `${file} was not written to the extensions folder`)
       }
 
@@ -929,7 +946,10 @@ describe('the on-premises installation', () => {
               ports: ['127.0.0.1:${AXIS_PURCHASING_PORT}:8443'],
             },
             publisher: { environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
-            admin: { environment: { SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
+            admin: {
+              environment: { SSL_CERT_FILE: '/run/test-ca/ca.crt' },
+              volumes: [`${certs}:/run/test-ca:ro`, `${join(root, 'tests/smoke/package-probe-app')}:/fixtures/package-probe-app:ro`],
+            },
           },
         }),
       )
@@ -1057,9 +1077,9 @@ describe('the on-premises installation', () => {
         admin: adminCall,
         realm: 'one',
         redirectUris: [`https://${hosts.one}/*`],
-        roles: ['employee', 'requester', 'department-manager', 'author', 'publisher'],
+        roles: ['employee', 'requester', 'department-manager', 'author', 'publisher', 'operator'],
       })
-      for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'] })) {
+      for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'], operator: ['operator'] })) {
         await addAccount({
           admin: adminCall,
           realm: 'one',
@@ -1487,6 +1507,60 @@ RETURNING id;`,
         [],
         'the worker maps a file of the extensions folder',
       )
+
+      // A runner's own HTTP client that calls a host the package did not declare. The test package's `probe` operation, in
+      // `ownOtherHost` mode, sends its request to localhost with a `new HttpClient()` of its own, in place of the declared
+      // TestUrl host. The runner's only route out is the worker's egress proxy, which refuses a host that the call was not given,
+      // so the step fails. The error names the operation and the package and not the host. See
+      // docs/reference/extension-package-limits.md#in-package-runners.
+      for (const [name, args, input] of [
+        ['TestUrl', ['--url', 'https://purchasing:8443'], undefined],
+        ['TestToken', ['--secret'], password()],
+      ]) {
+        const set = admin(['tenant', 'binding', 'set', 'one', name, ...args], { input })
+        assert.equal(set.status, 0, `tenant binding set one ${name}\n${set.stdout}${set.stderr}`)
+      }
+      const probeApp = admin(['activate', '/fixtures/package-probe-app', '--tenant', 'one'])
+      assert.equal(probeApp.status, 0, `activate package-probe-app\n${probeApp.stdout}${probeApp.stderr}`)
+      assert.match(probeApp.stdout, /^one activate ok$/m)
+
+      // The operator has the fixture's `operator` role, requester does not. The hosts serve the release after their next refresh,
+      // so the start answers 404 until then.
+      const { jar: operatorJar } = await signInViaProxy('operator', realmPassword)
+      const probePath = '/api/apps/PackageProbeApp/processes/PackageProbe/instances'
+      const probeKey = randomUUID()
+      let probeStart
+      for (let i = 0; i < 30; i++) {
+        if (i > 0) await sleep(1000)
+        probeStart = await api(operatorJar, 'POST', probePath, { parameters: { mode: 'ownOtherHost' } }, { 'idempotency-key': probeKey })
+        if (probeStart.status !== 404) break
+      }
+      assert.equal(probeStart.status, 201, `the operator starts the probe: ${probeStart.body}`)
+      const detailPath = `${probePath}/${JSON.parse(probeStart.body).id}`
+
+      let detail
+      for (let i = 0; i < 120; i++) {
+        if (i > 0) await sleep(1000)
+        const read = await api(operatorJar, 'GET', detailPath)
+        assert.equal(read.status, 200, `the operator inspects the probe: ${read.body}`)
+        detail = JSON.parse(read.body)
+        if (detail.state === 'failed' || detail.state === 'completed') break
+      }
+      const dump = () =>
+        `${JSON.stringify(detail)}\n${psql('one', 'select * from axis.process_instances').stdout}\n${psql('one', 'select * from axis.package_calls').stdout}`
+      assert.equal(detail.state, 'failed', `the probe instance did not fail\n${dump()}`)
+      const failures = detail.path.filter((entry) => entry.error)
+      assert.equal(failures.length, 1, `the probe path has ${failures.length} failed steps\n${dump()}`)
+      assert.equal(failures[0].step, 'probe')
+      assert.ok(
+        failures[0].error.includes("'probe'") && failures[0].error.includes("'test-package'"),
+        `the error does not name the operation and the package: ${failures[0].error}`,
+      )
+      assert.ok(!failures[0].error.includes('localhost'), `the error names the host: ${failures[0].error}`)
+
+      // requester does not have the operator role, so the inspection is refused.
+      const refused = await api(requesterJar, 'GET', detailPath)
+      assert.equal(refused.status, 403, `requester inspected the probe: ${refused.body}`)
     } catch (error) {
       dumpLogs()
       throw error

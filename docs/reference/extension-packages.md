@@ -498,13 +498,13 @@ package reaches nothing of the host and no binding of another call.
   that runs in the worker, see [package call outcomes](process-execution.md#package-call-outcomes).
   A `failure` that names a binding fails the call at once, and its error names the operation, the
   package and the binding.
-- **Environment, for a runner that Axis hosts.** _(planned for M21)_ The environment is empty
+- **Environment, for a runner that Axis hosts.** The environment is empty
   apart from `HTTP_PROXY` and `HTTPS_PROXY`, their lower-case forms, and
   `NODE_USE_ENV_PROXY=1` for Node.js. The container gets no tenant or
   installation settings, a read-only root file system apart from a temporary
   folder, and CPU and memory limits. It sees no tenant's secrets except the
   bindings of the call it runs.
-- **Network, for a runner that Axis hosts.** _(planned for M21)_ The proxy variables name the
+- **Network, for a runner that Axis hosts.** The proxy variables name the
   egress proxy in the worker, with a token for each runner that the worker
   sends in `start`, together with the address of the proxy as the host reaches
   it. The proxy listens on `Extensions:Runners:ProxyPort` and starts with the
@@ -791,7 +791,9 @@ installation, loading, the capability limits, the server's metadata-only load an
   tests install it to cover installation and loading. Its `probe` operation
   in version 1.0.0 covers the capability limits: it uses its declared `url`
   and `secret` bindings, and in the other modes it asks for a host or a secret
-  it does not declare. Its `ExitOperation` type ends its own process only when it runs in a
+  it does not declare. The on-premises smoke test builds 1.0.0 with the `build` command of the C# package host
+  image and runs `probe` in the `ownOtherHost` mode in a runner, see
+  [tests of the example](installation.md#tests-of-the-example). Its `ExitOperation` type ends its own process only when it runs in a
   package runner and throws anywhere else, so tests can stand in for a runner that crashes.
 - **Initializer package.** A test-only package, `initializer-package` 1.0.0, lives under
   `tests/packages/`. Its module initializer and its operation's static constructor each write a
