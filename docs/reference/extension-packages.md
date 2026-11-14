@@ -717,12 +717,12 @@ trusted code, so the platform gives it more limits than an installation's packag
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker, `activate` and publisher setting, `false` by default.
   With `true`, the worker sends `sandbox` to `application-package-host` at `Extensions:Runners:Application`
-  before it reads any tenant or claims any work, and does not start otherwise. The publisher needs the same
-  `Extensions:Runners:Application`, to send it each package to build, and exits with code 2 at start when it is unset or
-  malformed. It exits with code 1 when the
+  before it reads any tenant or claims any work, and does not start otherwise. The worker exits with code 1 when the
   answer is no, or when none comes within 10 seconds, and a refused connection counts as no answer. An unset or malformed
   `Extensions:Runners:Application` stops it at start too, naming the setting. A value other than `true` or `false` stops
   it as well. The check makes one attempt, and the orchestrator's restart tries again. With `false`, the worker never asks.
+  The publisher needs the same `Extensions:Runners:Application`, to send it each package to build, and exits with code 2
+  at start when it is unset or malformed.
   An application's package is then a compile error at its `packages/<id>/axis-package.json`, reported
   once for each package, when the server activates a folder at start, `activate` compiles it or the publisher compiles a snapshot. So an installation without gVisor refuses it and runs its own packages as before.
   A stored release that holds one still rebuilds, whatever the setting says.
