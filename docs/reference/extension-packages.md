@@ -689,7 +689,8 @@ trusted code, so the platform gives it more limits than an installation's packag
 
 - **The sandbox.** The runners run under gVisor (`runsc`), in their own container,
   `application-package-host`, beside the worker. The Helm chart sets that pod's `runtimeClassName` and
-  Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime.
+  Compose sets that service's `runtime`, so the `package-host-*` containers keep the plain runtime. Compose's
+  service sits behind the `application-packages` profile, so an installation without gVisor runs the rest.
   gVisor runs on an ordinary Kubernetes node, while a microVM needs nodes that allow nested
   virtualization.
 - **`Extensions:ApplicationPackages`.** A server, worker and publisher setting, `false` by default.

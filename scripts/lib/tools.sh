@@ -1,5 +1,5 @@
 # Pinned versions of the chart tools, and where they live. Source it from the repository root.
-# scripts/setup.sh calls install_tools. scripts/lint.sh and scripts/test.sh use the paths. The image
+# scripts/setup.sh calls install_tools and install_gvisor. scripts/lint.sh and scripts/test.sh use the paths. The image
 # scanner's pin is in scripts/lib/trivy.sh, which the owner guards. The tools go into versioned
 # folders under the home cache, so a version change downloads again and the lint step needs no network.
 # Each download has a connect and a total time limit, and retry alone tries it again, as D147 says.
@@ -10,6 +10,8 @@ source scripts/lib/trivy.sh
 HELM_VERSION=v3.22.1
 KUBECONFORM_VERSION=v0.8.0
 KUBERNETES_VERSION=1.33.0
+# gVisor, the sandbox runtime of the Compose example's application package host, as a release date.
+GVISOR_VERSION=20260817
 # A commit of github.com/yannh/kubernetes-json-schema. A commit keeps the schemas fixed.
 KUBERNETES_SCHEMAS_COMMIT=93153a1458e24e93f386c50f9980d584fcba574b
 # The Kubernetes kinds the chart renders. A new kind needs its schema file here.
@@ -24,6 +26,22 @@ helm="$tools_dir/helm-$HELM_VERSION/helm"
 kubeconform="$tools_dir/kubeconform-$KUBECONFORM_VERSION/kubeconform"
 kubernetes_schemas="$tools_dir/kubernetes-schemas-$KUBERNETES_VERSION"
 crd_schemas="$tools_dir/crd-schemas-$CRDS_CATALOG_COMMIT"
+gvisor="$tools_dir/gvisor-$GVISOR_VERSION/runsc"
+
+# Checks FILE against the SHA-512 checksum EXPECTED. gVisor publishes SHA-512 sums, and verify_sha256
+# in scripts/lib/trivy.sh checks SHA-256 only.
+verify_sha512() {
+  local file="$1" expected="$2" actual
+  if command -v sha512sum >/dev/null; then
+    actual="$(sha512sum "$file" | cut -d' ' -f1)"
+  else
+    actual="$(shasum -a 512 "$file" | cut -d' ' -f1)"
+  fi
+  if [ "$actual" != "$expected" ]; then
+    echo "Checksum mismatch for $file: expected $expected, got $actual" >&2
+    return 1
+  fi
+}
 
 # Downloads each missing tool and skips the ones present. The schema files are fetched one by one,
 # so a cache that lacks a newly listed file gets it. Each download goes to a temporary folder and
@@ -88,4 +106,65 @@ install_tools() {
   done
 
   rm -rf "$work"
+}
+
+# Downloads the runsc at URL to FILE and checks it against the SHA-512 that gVisor publishes beside it.
+# The caller tests the status, so every step stops the function itself.
+fetch_gvisor() {
+  local file="$1" url="$2" sum
+  retry 4 curl -fsSL --connect-timeout 30 --max-time 300 -o "$file" "$url" || return 1
+  sum="$(retry 4 curl -fsSL --connect-timeout 30 --max-time 300 "$url.sha512" | cut -d' ' -f1)" || return 1
+  verify_sha512 "$file" "$sum" || return 1
+  chmod 0755 "$file"
+}
+
+# Registers gVisor's runsc runtime with Docker, which the application-packages profile of the Compose
+# example needs, see docs/reference/installation.md#on-premises. It skips the step on systems other than
+# Linux, when Docker is not reachable and when Docker already lists runsc. Otherwise it downloads the
+# pinned release into the tools cache, checks its SHA-512, copies it to /usr/local/bin, runs
+# runsc install and reloads Docker. Only runsc is installed: Docker calls it directly, and the
+# containerd shim serves containerd without Docker. A runtime that is still missing after the reload
+# is a warning, because docker compose up without the profile needs no gVisor.
+install_gvisor() {
+  local runtimes arch work url
+  if [ "$(uname -s)" != Linux ]; then
+    echo "Skipping gVisor: it installs on Linux only, and this is $(uname -s)" >&2
+    return 0
+  fi
+  if ! runtimes="$(docker info --format '{{json .Runtimes}}' 2>/dev/null)"; then
+    echo "Skipping gVisor: Docker is not reachable" >&2
+    return 0
+  fi
+  if [[ "$runtimes" == *'"runsc"'* ]]; then return 0; fi
+  case "$(uname -m)" in
+    x86_64 | amd64) arch=x86_64 ;;
+    arm64 | aarch64) arch=aarch64 ;;
+    *) echo "Unsupported architecture: $(uname -m)" >&2; return 1 ;;
+  esac
+
+  if [ ! -x "$gvisor" ]; then
+    mkdir -p "$tools_dir"
+    work="$(mktemp -d "$tools_dir/.install.XXXXXX")"
+    url="https://storage.googleapis.com/gvisor/releases/release/$GVISOR_VERSION/$arch/runsc"
+    mkdir "$work/gvisor"
+    if ! fetch_gvisor "$work/gvisor/runsc" "$url"; then
+      rm -rf "$work"
+      return 1
+    fi
+    mv "$work/gvisor" "$tools_dir/gvisor-$GVISOR_VERSION"
+    rm -rf "$work"
+  fi
+
+  as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
+  as_root install -m 0755 "$gvisor" /usr/local/bin/runsc
+  as_root /usr/local/bin/runsc install
+  if command -v systemctl >/dev/null; then
+    as_root systemctl reload docker
+  else
+    as_root kill -HUP "$(pidof dockerd)"
+  fi
+  runtimes="$(docker info --format '{{json .Runtimes}}' 2>/dev/null || true)"
+  if [[ "$runtimes" != *'"runsc"'* ]]; then
+    echo "Warning: Docker does not list the runsc runtime after the reload. The application-packages profile needs it." >&2
+  fi
 }

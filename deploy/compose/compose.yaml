@@ -42,6 +42,8 @@
 # AXIS_PACKAGE_HOST_PYTHON_MEMORY The memory limit of the Python package host. Default 1g.
 # AXIS_PACKAGE_HOST_NODE_CPUS   The CPU limit of the Node.js package host. Default 1.
 # AXIS_PACKAGE_HOST_NODE_MEMORY The memory limit of the Node.js package host. Default 1g.
+# AXIS_APPLICATION_PACKAGE_HOST_CPUS   The CPU limit of the application package host. Default 1.
+# AXIS_APPLICATION_PACKAGE_HOST_MEMORY The memory limit of the application package host. Default 1g.
 # AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
 #                       network of the machine.
 # AXIS_NETWORK_IP_RANGE The part of the subnet that Docker hands out to containers without a fixed address.
@@ -49,8 +51,10 @@
 # AXIS_PROXY_ADDRESS    The fixed address of the proxy in the subnet. Both servers trust the forwarded headers
 #                       from this address only. Default 172.31.250.10.
 #
-# Profiles. `replicas` starts the second server, server-2. `admin` is for `docker compose run --rm admin`. The
-# TLS proxy and the identity provider have no profile, so `docker compose up` starts them.
+# Profiles. `replicas` starts the second server, server-2. `admin` is for `docker compose run --rm admin`.
+# `application-packages` starts application-package-host under gVisor, which must be registered with Docker as
+# `runsc`, see docs/reference/installation.md#on-premises. The TLS proxy and the identity provider have no
+# profile, so `docker compose up` starts them.
 # AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore`. It is never stored here.
 # Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
 #                       Studio stays off without them. The publisher gets Studio__Folders__0 alone.
@@ -203,6 +207,8 @@ services:
       Extensions__Runners__Dotnet: package-host-dotnet:5310
       Extensions__Runners__Python: package-host-python:5310
       Extensions__Runners__Node: package-host-node:5310
+      # The application package host, which the worker only asks when Extensions__ApplicationPackages is on.
+      Extensions__Runners__Application: application-package-host:5310
     ports:
       - "127.0.0.1:${AXIS_WORKER_HEALTH_PORT:-5208}:5208"
     volumes:
@@ -236,6 +242,19 @@ services:
     image: ${AXIS_IMAGE_PREFIX:-}axis-package-host-node:${AXIS_VERSION:?Set AXIS_VERSION}
     cpus: ${AXIS_PACKAGE_HOST_NODE_CPUS:-1}
     mem_limit: ${AXIS_PACKAGE_HOST_NODE_MEMORY:-1g}
+
+  # The application package host, which runs the code of an application's own packages. It is the Node.js package
+  # host image under gVisor (`runsc`), and the profile keeps `docker compose up` working on a machine without
+  # gVisor. See docs/reference/extension-packages.md#an-applications-packages and the threat P145 in
+  # docs/reference/threat-model-product.md.
+  application-package-host:
+    <<: *package-host
+    image: ${AXIS_IMAGE_PREFIX:-}axis-package-host-node:${AXIS_VERSION:?Set AXIS_VERSION}
+    runtime: runsc
+    profiles:
+      - application-packages
+    cpus: ${AXIS_APPLICATION_PACKAGE_HOST_CPUS:-1}
+    mem_limit: ${AXIS_APPLICATION_PACKAGE_HOST_MEMORY:-1g}
 
   # The agent host. It gets the platform connection and the installation key, which it reads only when AI authoring is on. It reads
   # a tenant's own model key from the platform database only with Ai__AllowTenantKeys on.
@@ -315,7 +334,7 @@ networks:
       config:
         - subnet: ${AXIS_NETWORK_SUBNET:-172.31.250.0/24}
           ip_range: ${AXIS_NETWORK_IP_RANGE:-172.31.250.128/25}
-  # No route out and no other service: only the worker and the three package hosts are on it.
+  # No route out and no other service: only the worker and the four package hosts are on it.
   runners:
     internal: true
 

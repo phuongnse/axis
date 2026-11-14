@@ -62,7 +62,7 @@ Run from the repository root. NexKit and CI run `setup`, then `build`, `lint`, `
 
 | Script                   | What it does                                                               | Needs                  |
 | ------------------------ | -------------------------------------------------------------------------- | ---------------------- |
-| `scripts/setup.sh`       | Restores packages, the Playwright browser, Helm tools and Docker images    | Network, Python 3, pip |
+| `scripts/setup.sh`       | Restores packages, the Playwright browser, Helm tools, gVisor, Docker images | Network, Python 3, pip |
 | `scripts/build.sh`       | Builds the SPA and the solution, installs the samples in `artifacts/`      | Python 3, pip          |
 | `scripts/lint.sh`        | Format, analyzer, type, Markdown link and docs structure checks, Helm lint |                        |
 | `scripts/test.sh`        | .NET unit tests, Vitest and the scripts' own tests                         |                        |

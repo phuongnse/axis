@@ -13,7 +13,7 @@ from the repository root. NexKit and CI run the scripts from `scripts/setup.sh` 
 
 | Script                          | What it does                                                                                                                                                      | Needs                  |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools, the wheels of the Python samples and, on CI, the container images                  | Network, Python 3, pip |
+| `scripts/setup.sh`              | Restores .NET and npm packages, the Playwright browser, the pinned Helm tools, the wheels of the Python samples, gVisor on Linux and, on CI, the container images  | Network, Python 3, pip |
 | `scripts/build.sh`              | Builds the SPA with its checks, the licence lists, the Keycloak themes and the solution, and installs the samples and writes the OpenAPI document in `artifacts/` | Python 3, pip          |
 | `scripts/lint.sh`               | Format, analyzer and type checks, the code checks of the SPA and the tests, the docs checks and the Helm lint                                                     |                        |
 | `scripts/test.sh`               | .NET unit tests, the control plane's unit tests, Vitest and the scripts' own tests                                                                                | Python 3, pip          |
@@ -40,7 +40,12 @@ after 10 minutes, or runs with no limit on stock macOS, which lacks `timeout`. A
 seconds without a connection or 5 minutes. A service that does not answer fails its try in time for the
 next. See [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md).
 
-On CI, setup also keeps every container image that the integration, E2E and smoke checks pull, the ones listed in
+On Linux with a reachable Docker, setup also registers gVisor's `runsc` runtime with Docker, which the `application-packages` profile of the
+[Compose example](reference/installation.md#on-premises) and the `onprem` test need. `scripts/lib/tools.sh` pins the release, downloads `runsc` for the machine's
+architecture into `~/.cache/axis-tools/gvisor-<release>`, which NexKit's `tools` cache entry restores, and checks it against the SHA-512 that the release publishes. A
+download that does not match stops setup and installs nothing. Setup then copies the binary to `/usr/local/bin` with `sudo` unless it runs as root, runs `runsc install`
+and reloads Docker. It skips all of this when Docker already lists `runsc`, so a second run downloads nothing and changes nothing. On macOS, and when Docker is not reachable, it prints a note and skips gVisor.
+With rootless Docker or Docker Desktop, `runsc install` writes a `daemon.json` that the daemon does not read, so setup warns that `runsc` is still missing. every container image that the integration, E2E and smoke checks pull, the ones listed in
 `scripts/docker-images.json`, in one archive in `~/.cache/axis-docker`, which NexKit's `docker` cache entry restores, as
 [D147](decisions/d147-a-run-downloads-only-what-the-caches-miss-and-a-transient-stop-runs-again-after-a-wait.md)
 agrees. One archive stores each layer that images share once. Setup pulls only the images the archive lacks and saves

@@ -6,7 +6,10 @@
 // through the TLS proxy on the Axis theme, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. It checks each package host's (C#, Python and Node.js) read-only root, limits, environment
-// and network: it reaches the worker only, and the worker reaches it on 5310. Each start of a service that publishes a port picks that
+// and network: it reaches the worker only, and the worker reaches it on 5310. It then starts application-package-host with the
+// application-packages profile and checks that Docker runs it under runsc, gVisor, and no package-host-* container. It recreates the worker with
+// Extensions__ApplicationPackages on, and the worker becomes ready only because that host answers that it runs under gVisor, see
+// docs/reference/extension-packages.md#an-applications-packages. Each start of a service that publishes a port picks that
 // port right before it, and Docker's bind error starts it again on new ports. Before any start it builds the sample packages
 // payment-references and payment-terms with the `build` command of their package host images, into the folder that
 // AXIS_EXTENSIONS_DIR names, which the worker and the package hosts mount read-only. It gives tenant one the deployment
@@ -18,8 +21,8 @@
 // application tests/smoke/package-probe-app on tenant one. Its operator starts the process that calls the package's probe
 // operation in ownOtherHost mode, where the package's own HTTP client calls an undeclared host. The instance ends failed, its step
 // error names the operation and the package and not the host, and requester, who lacks the fixture's role, is refused the instance.
-// Requires Docker, openssl, the .NET SDK, network access for Trivy's vulnerability database, which the builds scan with, and the
-// sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
+// Requires Docker with gVisor registered as runsc, which scripts/setup.sh does, openssl, the .NET SDK, network access for Trivy's
+// vulnerability database, which the builds scan with, and the sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, the development
 // realm that the identity provider imports, a certificate authority made for the run, the modules folder and a short
@@ -68,6 +71,10 @@ const packageHosts = {
   'package-host-python': { image: 'axis-package-host-python', setting: 'Extensions__Runners__Python' },
   'package-host-node': { image: 'axis-package-host-node', setting: 'Extensions__Runners__Node' },
 }
+// The package host under gVisor, behind its own profile.
+const applicationPackageHost = 'application-package-host'
+// Every profile of the example.
+const allProfiles = ['admin', 'replicas', 'application-packages']
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
 const secretFiles = {
@@ -80,6 +87,7 @@ const secretFiles = {
   'package-host-dotnet': [],
   'package-host-python': [],
   'package-host-node': [],
+  'application-package-host': [],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'IdentityProvider__DatabaseConnectionString', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
@@ -134,15 +142,15 @@ const openToAll = (dir) => {
   }
 }
 
-// render: the config of the example with every profile on and no variable set but the version and the identity host. `extraFiles` are
-// added after compose.yaml with -f.
-const render = (extraFiles = []) => {
+// render: the config of the example with the profiles on, every profile by default, and no variable set but the version and the identity
+// host. `extraFiles` are added after compose.yaml with -f.
+const render = (extraFiles = [], profiles = allProfiles) => {
   const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost, ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_IDENTITY_HOST', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
   for (const name of Object.keys(env)) if (name.startsWith('Studio__') || name.startsWith('Ai__')) delete env[name]
   const rendered = spawnSync(
     'docker',
-    ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'replicas', 'config', '--format', 'json'],
+    ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), ...profiles.flatMap((profile) => ['--profile', profile]), 'config', '--format', 'json'],
     { cwd: root, encoding: 'utf8', env },
   )
   assert.equal(rendered.status, 0, rendered.stderr)
@@ -163,7 +171,7 @@ describe('the example holds no secret', () => {
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
     const config = render()
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'identity', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'agent', 'application-package-host', 'identity', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
@@ -187,6 +195,7 @@ describe('the example holds no secret', () => {
     assert.equal(config.services.proxy.profiles, undefined, 'the proxy has a profile')
     assert.equal(config.services.identity.profiles, undefined, 'the identity provider has a profile')
     assert.deepEqual(config.services['server-2'].profiles, ['replicas'])
+    assert.deepEqual(config.services[applicationPackageHost].profiles, ['application-packages'])
     assert.equal(config.services.worker.profiles, undefined)
     assert.equal(config.services.agent.profiles, undefined)
     const publisher = config.services.publisher
@@ -479,16 +488,53 @@ describe('the package hosts', () => {
     })
   }
 
+  test('application-package-host runs the Node.js package host image under runsc, behind the application-packages profile, with the rules of the others', () => {
+    // See docs/reference/extension-packages.md#an-applications-packages and the threat P145 in docs/reference/threat-model-product.md.
+    const { services } = render()
+    const host = services[applicationPackageHost]
+    assert.match(host.image, /axis-package-host-node:/)
+    assert.deepEqual(host.command, ['host'])
+    assert.equal(host.runtime, 'runsc')
+    assert.deepEqual(host.profiles, ['application-packages'])
+    assert.equal(host.read_only, true)
+    assert.ok(host.tmpfs.includes('/tmp'), 'no /tmp tmpfs')
+    assert.equal(Number(host.cpus), 1)
+    assert.equal(Number(host.mem_limit), 1024 ** 3)
+    assert.deepEqual(Object.keys(host.environment ?? {}), [])
+    assert.deepEqual(host.secrets ?? [], [])
+    assert.deepEqual(host.ports ?? [], [])
+    assert.deepEqual(Object.keys(host.networks), ['runners'])
+    assert.equal(host.volumes.length, 1)
+    const [mount] = host.volumes
+    assert.equal(mount.target, '/extensions')
+    assert.equal(mount.read_only, true)
+    assert.equal(mount.source, services.worker.volumes.find((volume) => volume.target === '/extensions').source)
+    assert.equal(services.worker.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
+    for (const name of Object.keys(packageHosts)) assert.equal(services[name].runtime, undefined, `${name} runtime`)
+  })
+
+  test('application-package-host is absent without its profile, and a plain docker compose up does not start it', () => {
+    const { services } = render([], ['admin', 'replicas'])
+    assert.equal(services[applicationPackageHost], undefined)
+    assert.equal(services.worker.environment.Extensions__Runners__Application, `${applicationPackageHost}:5310`)
+    const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost }
+    for (const name of Object.keys(env)) if (name.startsWith('COMPOSE_')) delete env[name]
+    const listed = spawnSync('docker', ['compose', '-f', composeFile, 'config', '--services'], { cwd: root, encoding: 'utf8', env })
+    assert.equal(listed.status, 0, listed.stderr)
+    assert.equal(listed.stdout.split('\n').includes(applicationPackageHost), false, 'docker compose up starts application-package-host')
+  })
+
   test('are only on the internal network runners, which only they and the worker share, and the worker calls each there', () => {
     const config = render()
     const { services } = config
     assert.equal(config.networks.runners.internal, true)
+    assert.deepEqual(Object.keys(services[applicationPackageHost].networks), ['runners'], `${applicationPackageHost} networks`)
     for (const [name, host] of Object.entries(packageHosts)) {
       assert.deepEqual(Object.keys(services[name].networks), ['runners'], `${name} networks`)
       assert.equal(services.worker.environment[host.setting], `${name}:5310`, `${host.setting}`)
     }
     const members = Object.keys(services).filter((name) => Object.hasOwn(services[name].networks ?? {}, 'runners'))
-    assert.deepEqual(members.sort(), ['package-host-dotnet', 'package-host-node', 'package-host-python', 'worker'])
+    assert.deepEqual(members.sort(), ['application-package-host', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'worker'])
     assert.ok(Object.hasOwn(services.worker.networks, 'default'), 'the worker left the default network')
   })
 })
@@ -565,9 +611,9 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', 'publisher', 'purchasing']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'agent', 'package-host-dotnet', 'package-host-node', 'package-host-python', applicationPackageHost, 'publisher', 'purchasing']) {
       console.log(`--- docker compose logs ${service}`)
-      console.log(compose(['logs', '--no-color', service]).stdout)
+      console.log(compose(['--profile', 'application-packages', 'logs', '--no-color', service]).stdout)
     }
   }
 
@@ -933,7 +979,11 @@ describe('the on-premises installation', () => {
             },
             server: serverOverride,
             'server-2': serverOverride,
-            worker: { environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
+            // Compose interpolates Extensions__ApplicationPackages, so the test turns it on after the application package host runs.
+            worker: {
+              environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt', Extensions__ApplicationPackages: '${AXIS_TEST_APPLICATION_PACKAGES:-false}' },
+              ...trustOverride,
+            },
             // The purchasing system stub of the sample, from the purchasing stage of the Dockerfile, serves https only.
             purchasing: {
               build: { context: root, target: 'purchasing' },
@@ -984,7 +1034,7 @@ describe('the on-premises installation', () => {
   )
 
   after(() => {
-    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,replicas' } })
+    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: allProfiles.join(',') } })
     // The built packages and Trivy's database belong to UID 1654, which the host user cannot delete, so the image's own
     // shell deletes them first.
     if (built) removeAsImageUser(`axis-package-host-dotnet:${version}`, built)
@@ -1209,6 +1259,32 @@ describe('the on-premises installation', () => {
       }
       assert.equal(reach('worker', proxyAddress, 443), true, 'the worker does not reach the proxy')
       assert.equal(reach('worker', postgresAddress, 5432), true, 'the worker does not reach PostgreSQL')
+
+      // The application package host runs under gVisor, which the profile starts, and no package host does. The worker, recreated with
+      // Extensions__ApplicationPackages on, asks it at start and becomes ready only when it answers that it runs under gVisor.
+      // See docs/reference/extension-packages.md#an-applications-packages.
+      run(['--profile', 'application-packages', 'up', '-d', applicationPackageHost])
+      const applicationHost = inspect(run(['--profile', 'application-packages', 'ps', '-q', applicationPackageHost]))
+      assert.equal(applicationHost.HostConfig.Runtime, 'runsc', `${applicationPackageHost} runtime`)
+      for (const name of Object.keys(packageHosts)) {
+        assert.notEqual(inspect(run(['ps', '-q', name])).HostConfig.Runtime, 'runsc', `${name} runs under runsc`)
+      }
+      let applicationHostReached = false
+      for (let i = 0; i < 60 && !applicationHostReached; i++) {
+        if (i > 0) await sleep(1000)
+        applicationHostReached = reach('worker', applicationPackageHost, 5310)
+      }
+      assert.equal(applicationHostReached, true, `the worker does not reach ${applicationPackageHost} on 5310`)
+      env.AXIS_TEST_APPLICATION_PACKAGES = 'true'
+      await up(['worker'], async () => {
+        workerPort = await freePort()
+        env.AXIS_WORKER_HEALTH_PORT = String(workerPort)
+      })
+      const workerReady = await waitFor(() => request(workerPort, 'localhost', '/health/ready'), 200, 120)
+      assert.equal(workerReady.status, 200, 'the worker with Extensions__ApplicationPackages on never became ready')
+      const hostLog = compose(['--profile', 'application-packages', 'logs', '--no-color', applicationPackageHost])
+      assert.match(hostLog.stdout, /Answered a sandbox question: gVisor True/)
+      assert.doesNotMatch(compose(['logs', '--no-color', 'worker']).stdout, /does not run under gVisor/)
 
       // Every connection that an Axis host holds uses TLS. The check itself connects as postgres over the Unix socket,
       // so it leaves out that user.

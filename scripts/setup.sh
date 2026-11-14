@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Installs every dependency the checks need, including the wheels of the Python sample packages in
-# ~/.cache/axis-tools/wheels. Safe to run repeatedly.
+# ~/.cache/axis-tools/wheels, and registers gVisor's runsc runtime with Docker on Linux. Safe to run
+# repeatedly.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/tools.sh
@@ -24,6 +25,7 @@ retry 4 limit npm ci --prefix tests/e2e
 retry 4 limit npx --prefix tests/e2e playwright install chromium
 fetch_python_wheels
 install_tools
+install_gvisor
 # On CI, keeps every container image of the integration, E2E and smoke checks in the cache folder, see docs/development.md#setup.
 if [[ "${CI:-}" == "true" ]]; then
   node scripts/lib/docker-images.mjs save
