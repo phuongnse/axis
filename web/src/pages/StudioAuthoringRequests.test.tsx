@@ -701,3 +701,48 @@ describe("a request's history", () => {
     expect(rows[1]).toHaveTextContent(/Fixed the draft\s*Ran out of time.*30 min/)
   })
 })
+
+// Proposed: a draft's changes name each resource as people read it, a resource only the draft adds by its label, see the
+// review on #3263.
+describe("a request's changes", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('names each changed resource by its label, a resource only the draft adds too', async () => {
+    const detail = { ...fromApp, state: 'ready', draft: 'd-1' }
+    const diff = {
+      cursor: null,
+      resources: [
+        {
+          file: 'entities/cost-centre.json',
+          change: 'added',
+          id: null,
+          kind: 'entity',
+          name: 'CostCentre',
+          before: null,
+          after: '{"kind":"entity","name":"CostCentre"}',
+          titles: { en: 'Cost centre' },
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => json(input.includes('/diff') ? diff : detail)),
+    )
+    renderIn(
+      <StudioAuthoringRequestPage
+        application={application}
+        requestId={fromApp.id}
+        userId={userId}
+        resources={[]}
+        onOpen={() => {}}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('tab', { name: 'Changes' }))
+
+    const file = await screen.findByTestId('studio-revision-change')
+    expect(file).toHaveTextContent(/Cost centre\s*Entity\s*Added/)
+  })
+})

@@ -313,7 +313,7 @@ export function StudioChanges({
     change: resource.change,
     kind: resource.kind,
     name: resource.name,
-    titles: null,
+    titles: resource.titles ?? null,
     locale: null,
   }))
   const byKey = new Map(changes.map((resource) => [`${resource.change}:${resource.file}`, resource]))

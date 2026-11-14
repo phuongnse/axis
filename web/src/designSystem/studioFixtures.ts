@@ -937,6 +937,15 @@ function asNow(request: StudioAuthoringRequest): StudioAuthoringRequestDetail {
 const draftOf = (id: string) => id.replace('a1e00000', 'd1a00000')
 const json = (value: unknown) => JSON.stringify(value)
 
+/** The labels of the resources a draft changes, which name them as people read them; a scenario has none. */
+const changeTitles: Record<string, string> = {
+  CostCentre: 'Cost centre',
+  PurchaseRequest: 'Purchase request',
+  Supplier: 'Supplier',
+  RequestList: 'Requests',
+  PurchaseApproval: 'Purchase approval',
+}
+
 function change(
   file: string,
   kind: string,
@@ -951,6 +960,7 @@ function change(
     id: null,
     kind,
     name,
+    titles: Object.hasOwn(changeTitles, name) ? { [locale]: changeTitles[name] } : {},
     before: before === null ? null : json(before),
     after: after === null ? null : json(after),
     summary,

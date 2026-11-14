@@ -1385,6 +1385,11 @@ export interface StudioRevisionChange {
   name: string | null
   before: string | null
   after: string | null
+  /**
+   * Proposed: the resource's label text by locale, from the side that has it, so a resource only the change adds, which
+   * the folder list lacks, reads as people read it, see the review on #3263. Empty or absent for a kind with no label.
+   */
+  titles?: Record<string, string> | null
 }
 
 /** One revision with the files it changed, sorted by file. */
